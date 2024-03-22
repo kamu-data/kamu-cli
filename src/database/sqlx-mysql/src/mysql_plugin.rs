@@ -11,7 +11,7 @@ use database_common::{
     DatabaseConfiguration,
     DatabaseError,
     DatabaseTransactionManager,
-    TransactionSubject,
+    Transaction,
 };
 use dill::*;
 use kamu_core::{InternalError, ResultIntoInternal};
@@ -53,20 +53,14 @@ impl MySqlPlugin {
 
 #[async_trait::async_trait]
 impl DatabaseTransactionManager for MySqlPlugin {
-    async fn make_transaction_subject(
-        &self,
-        base_catalog: &Catalog,
-    ) -> Result<TransactionSubject, InternalError> {
+    async fn make_transaction(&self, base_catalog: &Catalog) -> Result<Transaction, InternalError> {
         let mysql_connection_pool = base_catalog.get_one::<MySqlConnectionPool>().unwrap();
         let mysql_transaction = mysql_connection_pool.begin_transaction().await.int_err()?;
-        Ok(TransactionSubject::new(mysql_transaction))
+        Ok(Transaction::new(mysql_transaction))
     }
 
-    async fn commit_transaction(
-        &self,
-        transaction_subject: TransactionSubject,
-    ) -> Result<(), InternalError> {
-        let mysql_transaction = transaction_subject
+    async fn commit_transaction(&self, transaction: Transaction) -> Result<(), InternalError> {
+        let mysql_transaction = transaction
             .transaction
             .downcast::<MySqlTransaction>()
             .unwrap();
@@ -75,11 +69,8 @@ impl DatabaseTransactionManager for MySqlPlugin {
         Ok(())
     }
 
-    async fn rollback_transaction(
-        &self,
-        transaction_subject: TransactionSubject,
-    ) -> Result<(), InternalError> {
-        let mysql_transaction = transaction_subject
+    async fn rollback_transaction(&self, transaction: Transaction) -> Result<(), InternalError> {
+        let mysql_transaction = transaction
             .transaction
             .downcast::<MySqlTransaction>()
             .unwrap();

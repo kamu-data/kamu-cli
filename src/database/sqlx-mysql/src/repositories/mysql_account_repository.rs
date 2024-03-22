@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use database_common::models::{AccountModel, AccountOrigin};
-use database_common::TransactionSubject;
+use database_common::Transaction;
 use dill::{component, interface};
 use kamu_core::auth::{AccountRepository, AccountRepositoryError};
 use kamu_core::ResultIntoInternal;
@@ -20,13 +20,13 @@ use crate::MySqlTransaction;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MySqlAccountRepository {
-    transaction_ptr: Arc<tokio::sync::Mutex<TransactionSubject>>,
+    transaction_ptr: Arc<tokio::sync::Mutex<Transaction>>,
 }
 
 #[component(pub)]
 #[interface(dyn AccountRepository)]
 impl MySqlAccountRepository {
-    pub fn new(transaction_ptr: Arc<tokio::sync::Mutex<TransactionSubject>>) -> Self {
+    pub fn new(transaction_ptr: Arc<tokio::sync::Mutex<Transaction>>) -> Self {
         Self { transaction_ptr }
     }
 }

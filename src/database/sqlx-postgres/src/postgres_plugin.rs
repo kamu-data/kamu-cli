@@ -11,7 +11,7 @@ use database_common::{
     DatabaseConfiguration,
     DatabaseError,
     DatabaseTransactionManager,
-    TransactionSubject,
+    Transaction,
 };
 use dill::*;
 use kamu_core::{InternalError, ResultIntoInternal};
@@ -51,23 +51,17 @@ impl PostgresPlugin {
 
 #[async_trait::async_trait]
 impl DatabaseTransactionManager for PostgresPlugin {
-    async fn make_transaction_subject(
-        &self,
-        base_catalog: &Catalog,
-    ) -> Result<TransactionSubject, InternalError> {
+    async fn make_transaction(&self, base_catalog: &Catalog) -> Result<Transaction, InternalError> {
         let postgres_connection_pool = base_catalog.get_one::<PostgresConnectionPool>().unwrap();
         let postgres_transaction = postgres_connection_pool
             .begin_transaction()
             .await
             .int_err()?;
-        Ok(TransactionSubject::new(postgres_transaction))
+        Ok(Transaction::new(postgres_transaction))
     }
 
-    async fn commit_transaction(
-        &self,
-        transaction_subject: TransactionSubject,
-    ) -> Result<(), InternalError> {
-        let postgres_transaction = transaction_subject
+    async fn commit_transaction(&self, transaction: Transaction) -> Result<(), InternalError> {
+        let postgres_transaction = transaction
             .transaction
             .downcast::<PostgresTransaction>()
             .unwrap();
@@ -76,11 +70,8 @@ impl DatabaseTransactionManager for PostgresPlugin {
         Ok(())
     }
 
-    async fn rollback_transaction(
-        &self,
-        transaction_subject: TransactionSubject,
-    ) -> Result<(), InternalError> {
-        let postgres_transaction = transaction_subject
+    async fn rollback_transaction(&self, transaction: Transaction) -> Result<(), InternalError> {
+        let postgres_transaction = transaction
             .transaction
             .downcast::<PostgresTransaction>()
             .unwrap();
