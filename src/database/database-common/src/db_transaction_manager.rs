@@ -45,27 +45,36 @@ where
     // Wrap transaction into a pointer behind asynchronous mutex
     let transaction_ptr = Arc::new(tokio::sync::Mutex::new(transaction));
 
-    // Create a chained catalog for transaction-aware components, but keep a local
-    // copy of transaction pointer
+    // Create a chained catalog for transaction-aware components,
+    // but keep a local copy of transaction pointer
     let chained_catalog = CatalogBuilder::new_chained(base_catalog)
         .add_builder(transaction_ptr.clone())
         .build();
 
     // Run transactional code in the callback
-    // Note: in case of error, the transaction rolls back automatically
-    callback(chained_catalog).await?;
+    let result = callback(chained_catalog).await;
 
-    // Unwrap transaction subject from pointer and mutex, as catalog is already
-    // consumed
+    // Unwrap transaction from pointer and mutex, as catalog is already consumed
     let transaction = Arc::try_unwrap(transaction_ptr).unwrap().into_inner();
 
-    // Commit transaction
-    db_transaction_manager
-        .commit_transaction(transaction)
-        .await?;
+    // Commit or rollback transaction depending on the result
+    match result {
+        // In case everything succeeded, commit the transaction
+        Ok(_) => {
+            db_transaction_manager
+                .commit_transaction(transaction)
+                .await?;
+            Ok(())
+        }
 
-    // Success
-    Ok(())
+        // Otherwise, do an explicit rollback
+        Err(e) => {
+            db_transaction_manager
+                .rollback_transaction(transaction)
+                .await?;
+            Err(e)
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
