@@ -85,7 +85,7 @@ where
 
 #[derive(Debug)]
 pub struct TransactionSubject {
-    pub transaction: Box<dyn Any>,
+    pub transaction: Box<dyn Any + Send>,
 }
 
 impl TransactionSubject {
@@ -95,7 +95,5 @@ impl TransactionSubject {
         }
     }
 }
-
-unsafe impl Send for TransactionSubject {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
