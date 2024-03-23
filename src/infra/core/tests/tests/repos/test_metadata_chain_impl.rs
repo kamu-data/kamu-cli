@@ -168,12 +168,13 @@ async fn test_append_prev_block_not_found() {
 
     assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash_1);
 
-    let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(
-            &Multihash::from_digest_sha3_256(b"does-not-exist"),
-            block_1_sequence_number,
-        )
-        .build();
+    let block_2 =
+        MetadataFactory::metadata_block(MetadataFactory::add_data().some_new_data().build())
+            .prev(
+                &Multihash::from_digest_sha3_256(b"does-not-exist"),
+                block_1_sequence_number,
+            )
+            .build();
 
     assert_matches!(
         chain.append(block_2, AppendOpts::default()).await,
@@ -366,10 +367,11 @@ async fn test_append_system_time_non_monotonic() {
 
     let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
 
-    let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_1, block_1_sequence_number)
-        .system_time(Utc.with_ymd_and_hms(2000, 1, 1, 12, 0, 0).unwrap())
-        .build();
+    let block_2 =
+        MetadataFactory::metadata_block(MetadataFactory::add_data().some_new_data().build())
+            .prev(&hash_1, block_1_sequence_number)
+            .system_time(Utc.with_ymd_and_hms(2000, 1, 1, 12, 0, 0).unwrap())
+            .build();
 
     assert_matches!(
         chain.append(block_2, AppendOpts::default()).await,
@@ -1001,11 +1003,11 @@ async fn test_accept() {
 
     let mut always_stop_visitor = create_always_stop_visitor();
     let mut next_of_data_visitor = create_next_of_type_visitor(
-        MetadataBlockTypeFlags::DATA_BLOCK,
+        MetadataEventTypeFlags::DATA_BLOCK,
         NextOfTypeVisitorState::with_expected_visit_call_count(3),
     );
     let mut next_of_set_data_schema_visitor = create_next_of_type_visitor(
-        MetadataBlockTypeFlags::SET_DATA_SCHEMA,
+        MetadataEventTypeFlags::SET_DATA_SCHEMA,
         NextOfTypeVisitorState::with_expected_visit_call_count(2),
     );
     let mut always_next_visitor = create_always_next_visitor_with_expected_visit_call_count(6);
@@ -1063,7 +1065,7 @@ async fn test_accept_stop_on_first_error() {
     let mut always_stop_visitor = create_always_stop_visitor();
     let mut always_next_visitor = create_always_next_visitor_with_expected_visit_call_count(2);
     let mut failed_on_type_visitor = create_failed_on_type_visitor_with_expected_visit_call_count(
-        MetadataBlockTypeFlags::SET_INFO,
+        MetadataEventTypeFlags::SET_INFO,
         2,
     );
 
@@ -1107,14 +1109,16 @@ mockall::mock! {
     impl MetadataChainVisitor for MetadataChainVisitor {
         type Error = MockError;
 
-        fn visit<'a>(&mut self, hashed_block_ref: HashedMetadataBlockRef<'a>) -> Result<Decision, MockError>;
+        fn initial_decision(&self) -> Result<MetadataVisitorDecision, MockError>;
+
+        fn visit<'a>(&mut self, hashed_block_ref: HashedMetadataBlockRef<'a>) -> Result<MetadataVisitorDecision, MockError>;
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 fn create_failed_on_type_visitor_with_expected_visit_call_count(
-    fail_on_type_flags: MetadataBlockTypeFlags,
+    fail_on_type_flags: MetadataEventTypeFlags,
     visit_call_count: usize,
 ) -> MockMetadataChainVisitor {
     let mut always_stop_visitor = MockMetadataChainVisitor::new();
@@ -1123,12 +1127,12 @@ fn create_failed_on_type_visitor_with_expected_visit_call_count(
         .expect_visit()
         .times(visit_call_count)
         .returning(move |(_, block)| {
-            let block_flag = MetadataBlockTypeFlags::from(block);
+            let block_flag = MetadataEventTypeFlags::from(&block.event);
 
             if fail_on_type_flags.contains(block_flag) {
                 Err(MockError::SomethingFailed)
             } else {
-                Ok(Decision::NextOfType(fail_on_type_flags))
+                Ok(MetadataVisitorDecision::NextOfType(fail_on_type_flags))
             }
         });
 
@@ -1143,7 +1147,7 @@ fn create_always_stop_visitor() -> MockMetadataChainVisitor {
     always_stop_visitor
         .expect_visit()
         .times(1)
-        .returning(|_| Ok(Decision::Stop));
+        .returning(|_| Ok(MetadataVisitorDecision::Stop));
 
     always_stop_visitor
 }
@@ -1158,7 +1162,7 @@ fn create_always_next_visitor_with_expected_visit_call_count(
     always_next_visitor
         .expect_visit()
         .times(visit_call_count)
-        .returning(|_| Ok(Decision::Next));
+        .returning(|_| Ok(MetadataVisitorDecision::Next));
 
     always_next_visitor
 }
@@ -1180,7 +1184,7 @@ impl NextOfTypeVisitorState {
 }
 
 fn create_next_of_type_visitor(
-    flags: MetadataBlockTypeFlags,
+    flags: MetadataEventTypeFlags,
     state: NextOfTypeVisitorState,
 ) -> MockMetadataChainVisitor {
     let state = Arc::new(Mutex::new(state));
@@ -1196,9 +1200,9 @@ fn create_next_of_type_visitor(
             if state.visit_call_count != state.expected_visit_call_count {
                 state.visit_call_count += 1;
 
-                Ok(Decision::NextOfType(flags))
+                Ok(MetadataVisitorDecision::NextOfType(flags))
             } else {
-                Ok(Decision::Stop)
+                Ok(MetadataVisitorDecision::Stop)
             }
         });
 

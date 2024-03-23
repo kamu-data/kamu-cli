@@ -258,19 +258,21 @@ impl Command for ListCommand {
             size.push(summary.data_size);
 
             if self.detail_level > 0 {
+                let mut data_block_visitor = <SearchDataBlocksVisitor>::next_data_block();
+                let mut next_block_visitor = <SearchNextBlockVisitor>::default();
+
+                dataset
+                    .as_metadata_chain()
+                    .accept(&mut [&mut data_block_visitor, &mut next_block_visitor])
+                    .await?;
+
                 // TODO: Should be precomputed
-                let mut num_blocks = 0;
-                let mut last_watermark: Option<DateTime<Utc>> = None;
-                let mut blocks_stream = dataset.as_metadata_chain().iter_blocks();
-                while let Some((_, b)) = blocks_stream.try_next().await? {
-                    if num_blocks == 0 {
-                        num_blocks = b.sequence_number + 1;
-                    }
-                    if let Some(b) = b.as_data_stream_block() {
-                        last_watermark = b.event.new_watermark.copied();
-                        break;
-                    }
-                }
+                let num_blocks = next_block_visitor
+                    .into_block()
+                    .map_or(0, |b| b.sequence_number + 1);
+                let last_watermark = data_block_visitor
+                    .into_event()
+                    .and_then(|e| e.new_watermark);
 
                 id.push(hdl.id.as_did_str().to_string());
                 head.push(current_head.as_multibase().to_string());

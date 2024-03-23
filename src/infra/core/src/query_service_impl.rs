@@ -136,16 +136,14 @@ impl QueryServiceImpl {
         // TODO: Update to use SetDataSchema event
         let last_data_slice_opt = dataset
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.new_data)
-            .try_first()
+            .accept_one(<SearchDataBlocksVisitor>::next_filled_new_data())
             .await
             .map_err(|e| {
                 tracing::error!(error = ?e, "Resolving last data slice failed");
                 e
-            })
-            .int_err()?;
+            })?
+            .into_event()
+            .and_then(|e| e.new_data);
 
         match last_data_slice_opt {
             Some(last_data_slice) => {
@@ -196,14 +194,11 @@ impl QueryService for QueryServiceImpl {
     ) -> Result<DataFrame, QueryError> {
         let (dataset, df) = self.single_dataset(dataset_ref, Some(skip + limit)).await?;
 
-        // TODO: PERF: Avoid full scan of metadata
         let vocab: DatasetVocabulary = dataset
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(_, b)| b.event.into_variant::<SetVocab>())
-            .try_first()
-            .await
-            .int_err()?
+            .accept_one(<SearchSetVocabVisitor>::default())
+            .await?
+            .into_event()
             .unwrap_or_default()
             .into();
 
@@ -374,27 +369,51 @@ impl KamuSchema {
         dataset: &dyn Dataset,
         last_records_to_consider: Option<u64>,
     ) -> Result<Vec<Multihash>, InternalError> {
-        let mut files = Vec::new();
-        let mut num_records = 0;
+        type Flag = MetadataEventTypeFlags;
+        type Decision = MetadataVisitorDecision;
 
-        let mut slices = dataset
-            .as_metadata_chain()
-            .iter_blocks()
-            .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.new_data);
-
-        while let Some(slice) = slices.try_next().await.int_err()? {
-            num_records += slice.num_records();
-            files.push(slice.physical_hash);
-
-            if last_records_to_consider.is_some()
-                && last_records_to_consider.unwrap() <= num_records
-            {
-                break;
-            }
+        struct DataSliceCollectorVisitorState {
+            files: Vec<Multihash>,
+            num_records: u64,
+            last_records_to_consider: Option<u64>,
         }
 
-        Ok(files)
+        let mut slice_collector_visitor = GenericCallbackVisitor::new(
+            DataSliceCollectorVisitorState {
+                files: Vec::new(),
+                num_records: 0,
+                last_records_to_consider,
+            },
+            Decision::NextOfType(Flag::DATA_BLOCK),
+            |state, (_, block)| {
+                let new_data = match &block.event {
+                    MetadataEvent::AddData(e) => e.new_data.as_ref(),
+                    MetadataEvent::ExecuteTransform(e) => e.new_data.as_ref(),
+                    _ => return Ok(Decision::NextOfType(Flag::DATA_BLOCK)),
+                };
+                let Some(slice) = new_data else {
+                    return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
+                };
+
+                state.num_records += slice.num_records();
+                state.files.push(slice.physical_hash.clone());
+
+                if let Some(last_records_to_consider) = &state.last_records_to_consider
+                    && *last_records_to_consider <= state.num_records
+                {
+                    return Ok(Decision::Stop);
+                }
+
+                Ok(Decision::NextOfType(Flag::DATA_BLOCK))
+            },
+        );
+
+        dataset
+            .as_metadata_chain()
+            .accept::<InternalError>(&mut [&mut slice_collector_visitor])
+            .await?;
+
+        Ok(slice_collector_visitor.into_state().files)
     }
 
     fn options_for(&self, dataset_handle: &DatasetHandle) -> Option<&DatasetQueryOptions> {
