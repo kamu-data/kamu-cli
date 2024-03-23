@@ -57,7 +57,6 @@ use arrow_flight::{
     FlightInfo,
     HandshakeRequest,
     HandshakeResponse,
-    Location,
     SchemaAsIpc,
     Ticket,
 };
@@ -508,14 +507,16 @@ impl KamuFlightSqlService {
 
         let schema_bytes = self.schema_to_arrow(&schema)?;
 
-        let (host, port) = ("127.0.0.1".to_string(), 50050); // TODO: use advertise host
-        let authority = format!("{}:{}", &host, &port); // TODO: use advertise host
-        let loc = Location {
-            uri: format!("grpc+tcp://{authority}"),
-        };
+        // Note: Leaving location empty per documentation:
+        //
+        // If the list is empty, the expectation is that the ticket can only be redeemed
+        // on the current service where the ticket was generated.
+        //
+        // See: https://github.com/apache/arrow-datafusion/blob/01ff53771a5e866813ef9636e3f7eec6b88ce4a4/datafusion-examples/examples/flight/flight_sql_server.rs#L300
+
         let fieps = vec![FlightEndpoint {
             ticket: Some(Ticket { ticket }),
-            location: vec![loc],
+            location: vec![],
         }];
 
         let flight_desc = FlightDescriptor {
@@ -548,14 +549,16 @@ impl KamuFlightSqlService {
 
         let schema_bytes = self.df_schema_to_arrow(df.schema())?;
 
-        let (host, port) = ("127.0.0.1".to_string(), 50050); // TODO: use advertise host
-        let authority = format!("{}:{}", &host, &port); // TODO: use advertise host
-        let loc = Location {
-            uri: format!("grpc+tcp://{authority}"),
-        };
+        // Note: Leaving location empty per documentation:
+        //
+        // If the list is empty, the expectation is that the ticket can only be redeemed
+        // on the current service where the ticket was generated.
+        //
+        // See: https://github.com/apache/arrow-datafusion/blob/01ff53771a5e866813ef9636e3f7eec6b88ce4a4/datafusion-examples/examples/flight/flight_sql_server.rs#L300
+
         let fieps = vec![FlightEndpoint {
             ticket: Some(Ticket { ticket }),
-            location: vec![loc],
+            location: vec![],
         }];
 
         let flight_desc = FlightDescriptor {
