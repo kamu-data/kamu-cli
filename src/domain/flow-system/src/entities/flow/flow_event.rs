@@ -38,7 +38,6 @@ pub enum FlowEvent {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowEventInitiated {
     pub event_time: DateTime<Utc>,
-    pub trigger_time: DateTime<Utc>,
     pub flow_id: FlowID,
     pub flow_key: FlowKey,
     pub trigger: FlowTrigger,
@@ -51,6 +50,7 @@ pub struct FlowEventStartConditionUpdated {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
     pub start_condition: FlowStartCondition,
+    pub last_trigger_index: usize,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

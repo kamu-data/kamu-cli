@@ -18,6 +18,7 @@ use kamu::{
     DatasetRepositoryS3,
     DependencyGraphRepositoryInMemory,
     DependencyGraphServiceInMemory,
+    S3RegistryCache,
 };
 use kamu_core::{DatasetRepository, DependencyGraphService};
 use opendatafabric::AccountName;
@@ -36,10 +37,13 @@ impl S3RepoHarness {
         s3: &LocalS3Server,
         dataset_action_authorizer: TDatasetActionAuthorizer,
         multi_tenant: bool,
+        registry_caching: bool,
     ) -> Self {
         let s3_context = S3Context::from_url(&s3.url).await;
 
-        let catalog = dill::CatalogBuilder::new()
+        let mut catalog = dill::CatalogBuilder::new();
+
+        catalog
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
@@ -50,8 +54,13 @@ impl S3RepoHarness {
                     .with_s3_context(s3_context)
                     .with_multi_tenant(multi_tenant),
             )
-            .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
-            .build();
+            .bind::<dyn DatasetRepository, DatasetRepositoryS3>();
+
+        if registry_caching {
+            catalog.add::<S3RegistryCache>();
+        }
+
+        let catalog = catalog.build();
 
         let dataset_repo = catalog.get_one().unwrap();
 
@@ -81,8 +90,13 @@ impl S3RepoHarness {
 #[tokio::test]
 async fn test_create_dataset() {
     let s3 = LocalS3Server::new().await;
-    let harness =
-        S3RepoHarness::create(&s3, auth::AlwaysHappyDatasetActionAuthorizer::new(), false).await;
+    let harness = S3RepoHarness::create(
+        &s3,
+        auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        false,
+        false,
+    )
+    .await;
 
     test_dataset_repository_shared::test_create_dataset(harness.dataset_repo.as_ref(), None).await;
 }
@@ -93,8 +107,34 @@ async fn test_create_dataset() {
 #[tokio::test]
 async fn test_create_dataset_multi_tenant() {
     let s3 = LocalS3Server::new().await;
-    let harness =
-        S3RepoHarness::create(&s3, auth::AlwaysHappyDatasetActionAuthorizer::new(), true).await;
+    let harness = S3RepoHarness::create(
+        &s3,
+        auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        true,
+        false,
+    )
+    .await;
+
+    test_dataset_repository_shared::test_create_dataset(
+        harness.dataset_repo.as_ref(),
+        Some(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized)]
+#[tokio::test]
+async fn test_create_dataset_multi_tenant_with_caching() {
+    let s3 = LocalS3Server::new().await;
+    let harness = S3RepoHarness::create(
+        &s3,
+        auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        true,
+        true,
+    )
+    .await;
 
     test_dataset_repository_shared::test_create_dataset(
         harness.dataset_repo.as_ref(),
@@ -109,8 +149,13 @@ async fn test_create_dataset_multi_tenant() {
 #[tokio::test]
 async fn test_create_dataset_same_name_multiple_tenants() {
     let s3 = LocalS3Server::new().await;
-    let harness =
-        S3RepoHarness::create(&s3, auth::AlwaysHappyDatasetActionAuthorizer::new(), true).await;
+    let harness = S3RepoHarness::create(
+        &s3,
+        auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        true,
+        false,
+    )
+    .await;
 
     test_dataset_repository_shared::test_create_dataset_same_name_multiple_tenants(
         harness.dataset_repo.as_ref(),
@@ -125,8 +170,13 @@ async fn test_create_dataset_same_name_multiple_tenants() {
 #[tokio::test]
 async fn test_create_dataset_from_snapshot() {
     let s3 = LocalS3Server::new().await;
-    let harness =
-        S3RepoHarness::create(&s3, auth::AlwaysHappyDatasetActionAuthorizer::new(), false).await;
+    let harness = S3RepoHarness::create(
+        &s3,
+        auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        false,
+        false,
+    )
+    .await;
 
     test_dataset_repository_shared::test_create_dataset_from_snapshot(
         harness.dataset_repo.as_ref(),
@@ -141,8 +191,13 @@ async fn test_create_dataset_from_snapshot() {
 #[tokio::test]
 async fn test_create_dataset_from_snapshot_multi_tenant() {
     let s3 = LocalS3Server::new().await;
-    let harness =
-        S3RepoHarness::create(&s3, auth::AlwaysHappyDatasetActionAuthorizer::new(), true).await;
+    let harness = S3RepoHarness::create(
+        &s3,
+        auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        true,
+        false,
+    )
+    .await;
 
     test_dataset_repository_shared::test_create_dataset_from_snapshot(
         harness.dataset_repo.as_ref(),
@@ -161,6 +216,7 @@ async fn test_rename_dataset() {
         &s3,
         MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1),
         false,
+        false,
     )
     .await;
 
@@ -176,6 +232,28 @@ async fn test_rename_dataset_multi_tenant() {
     let harness = S3RepoHarness::create(
         &s3,
         MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1),
+        true,
+        false,
+    )
+    .await;
+
+    test_dataset_repository_shared::test_rename_dataset(
+        harness.dataset_repo.as_ref(),
+        Some(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized)]
+#[tokio::test]
+async fn test_rename_dataset_multi_tenant_with_caching() {
+    let s3 = LocalS3Server::new().await;
+    let harness = S3RepoHarness::create(
+        &s3,
+        MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1),
+        true,
         true,
     )
     .await;
@@ -197,6 +275,7 @@ async fn test_rename_dataset_same_name_multiple_tenants() {
         &s3,
         MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1),
         true,
+        false,
     )
     .await;
 
@@ -212,7 +291,8 @@ async fn test_rename_dataset_same_name_multiple_tenants() {
 #[tokio::test]
 async fn test_rename_unauthorized() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, MockDatasetActionAuthorizer::denying(), true).await;
+    let harness =
+        S3RepoHarness::create(&s3, MockDatasetActionAuthorizer::denying(), true, false).await;
 
     test_dataset_repository_shared::test_rename_dataset_unauthorized(
         harness.dataset_repo.as_ref(),
@@ -227,8 +307,13 @@ async fn test_rename_unauthorized() {
 #[tokio::test]
 async fn test_delete_dataset() {
     let s3 = LocalS3Server::new().await;
-    let harness =
-        S3RepoHarness::create(&s3, auth::AlwaysHappyDatasetActionAuthorizer::new(), false).await;
+    let harness = S3RepoHarness::create(
+        &s3,
+        auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        false,
+        false,
+    )
+    .await;
     harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset(harness.dataset_repo.as_ref(), None).await;
@@ -240,8 +325,13 @@ async fn test_delete_dataset() {
 #[tokio::test]
 async fn test_delete_dataset_multi_tenant() {
     let s3 = LocalS3Server::new().await;
-    let harness =
-        S3RepoHarness::create(&s3, auth::AlwaysHappyDatasetActionAuthorizer::new(), true).await;
+    let harness = S3RepoHarness::create(
+        &s3,
+        auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        true,
+        false,
+    )
+    .await;
     harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset(
@@ -257,7 +347,8 @@ async fn test_delete_dataset_multi_tenant() {
 #[tokio::test]
 async fn test_delete_unauthorized() {
     let s3: LocalS3Server = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, MockDatasetActionAuthorizer::denying(), true).await;
+    let harness =
+        S3RepoHarness::create(&s3, MockDatasetActionAuthorizer::denying(), true, false).await;
     harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset_unauthorized(
@@ -273,8 +364,13 @@ async fn test_delete_unauthorized() {
 #[tokio::test]
 async fn test_iterate_datasets() {
     let s3 = LocalS3Server::new().await;
-    let harness =
-        S3RepoHarness::create(&s3, auth::AlwaysHappyDatasetActionAuthorizer::new(), false).await;
+    let harness = S3RepoHarness::create(
+        &s3,
+        auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        false,
+        false,
+    )
+    .await;
 
     test_dataset_repository_shared::test_iterate_datasets(harness.dataset_repo.as_ref()).await;
 }
@@ -285,8 +381,13 @@ async fn test_iterate_datasets() {
 #[tokio::test]
 async fn test_iterate_datasets_multi_tenant() {
     let s3 = LocalS3Server::new().await;
-    let harness =
-        S3RepoHarness::create(&s3, auth::AlwaysHappyDatasetActionAuthorizer::new(), true).await;
+    let harness = S3RepoHarness::create(
+        &s3,
+        auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        true,
+        false,
+    )
+    .await;
 
     test_dataset_repository_shared::test_iterate_datasets_multi_tenant(
         harness.dataset_repo.as_ref(),

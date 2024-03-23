@@ -152,16 +152,18 @@ impl Flow {
     /// History of flow events
     async fn history(&self, ctx: &Context<'_>) -> Result<Vec<FlowEvent>> {
         let flow_event_store = from_catalog::<dyn fs::FlowEventStore>(ctx).unwrap();
+
         let flow_events: Vec<_> = flow_event_store
             .get_events(&self.flow_state.flow_id, Default::default())
             .try_collect()
             .await
             .int_err()?;
 
-        Ok(flow_events
-            .into_iter()
-            .map(|(id, ev)| FlowEvent::new(id, ev))
-            .collect::<Vec<_>>())
+        let mut history = Vec::new();
+        for (event_id, flow_event) in flow_events {
+            history.push(FlowEvent::build(event_id, flow_event, &self.flow_state, ctx).await?);
+        }
+        Ok(history)
     }
 
     /// A user, who initiated the flow run. None for system-initiated flows
@@ -173,20 +175,26 @@ impl Flow {
     }
 
     /// Primary flow trigger
-    async fn primary_trigger(&self) -> FlowTrigger {
-        self.flow_state.primary_trigger().clone().into()
+    async fn primary_trigger(&self, ctx: &Context<'_>) -> Result<FlowTrigger, InternalError> {
+        FlowTrigger::build(self.flow_state.primary_trigger().clone(), ctx).await
     }
 
     /// Start condition
     async fn start_condition(&self, ctx: &Context<'_>) -> Result<Option<FlowStartCondition>> {
-        let dataset_changes_service = from_catalog::<dyn DatasetChangesService>(ctx).unwrap();
-
-        let maybe_condition = FlowStartCondition::create_from_raw_flow_data(
-            &self.flow_state,
-            dataset_changes_service.as_ref(),
-        )
-        .await
-        .int_err()?;
+        let maybe_condition =
+            if let Some(start_condition) = self.flow_state.start_condition.as_ref() {
+                Some(
+                    FlowStartCondition::create_from_raw_flow_data(
+                        start_condition,
+                        &self.flow_state.triggers,
+                        ctx,
+                    )
+                    .await
+                    .int_err()?,
+                )
+            } else {
+                None
+            };
 
         Ok(maybe_condition)
     }

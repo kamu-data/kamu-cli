@@ -1544,7 +1544,12 @@ async fn test_history_of_completed_flow() {
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
     harness
-        .mimic_flow_secondary_trigger(flow_id, FlowTrigger::AutoPolling(FlowTriggerAutoPolling {}))
+        .mimic_flow_secondary_trigger(
+            flow_id,
+            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                trigger_time: Utc::now(),
+            }),
+        )
         .await;
 
     let flow_task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
@@ -1595,7 +1600,9 @@ async fn test_history_of_completed_flow() {
                                         {
                                             "__typename": "FlowEventStartConditionUpdated",
                                             "eventId": "2",
-                                            "startConditionKind": "EXECUTOR"
+                                            "startCondition": {
+                                                "__typename" : "FlowStartConditionExecutor"
+                                            }
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
@@ -1947,7 +1954,10 @@ impl FlowRunsHarness {
                                         primaryTrigger {
                                             __typename
                                             ... on FlowTriggerInputDatasetFlow {
-                                                datasetId
+                                                dataset {
+                                                    id
+                                                    name
+                                                }
                                                 flowType
                                                 flowId
                                             }
@@ -2022,7 +2032,9 @@ impl FlowRunsHarness {
                                                     }
                                                 }
                                                 ... on FlowEventStartConditionUpdated {
-                                                    startConditionKind
+                                                    startCondition {
+                                                        __typename
+                                                    }
                                                 }
                                                 ... on FlowEventTriggerAdded {
                                                     trigger {

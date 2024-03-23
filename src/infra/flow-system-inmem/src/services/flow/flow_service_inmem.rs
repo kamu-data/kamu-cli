@@ -235,9 +235,10 @@ impl FlowServiceInMemory {
         schedule: &Schedule,
     ) -> Result<FlowState, InternalError> {
         self.trigger_flow_common(
-            start_time,
             flow_key,
-            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {}),
+            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                trigger_time: start_time,
+            }),
             FlowTriggerContext::Scheduled(schedule),
         )
         .await
@@ -251,9 +252,10 @@ impl FlowServiceInMemory {
     ) -> Result<FlowState, InternalError> {
         // Very similar to manual trigger, but automatic reasons
         self.trigger_flow_common(
-            start_time,
             flow_key,
-            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {}),
+            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                trigger_time: start_time,
+            }),
             FlowTriggerContext::Unconditional,
         )
         .await
@@ -299,6 +301,7 @@ impl FlowServiceInMemory {
                     .into();
 
                     let trigger = FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
+                        trigger_time: input_success_time,
                         dataset_id: fk_dataset.dataset_id.clone(),
                         flow_type: fk_dataset.flow_type,
                         flow_id,
@@ -306,7 +309,6 @@ impl FlowServiceInMemory {
                     });
 
                     self.trigger_flow_common(
-                        input_success_time,
                         &dependent_flow_key,
                         trigger,
                         FlowTriggerContext::Batching(&batching_rule),
@@ -323,7 +325,6 @@ impl FlowServiceInMemory {
 
     async fn trigger_flow_common<'a>(
         &self,
-        trigger_time: DateTime<Utc>,
         flow_key: &FlowKey,
         trigger: FlowTrigger,
         context: FlowTriggerContext<'a>,
@@ -333,6 +334,7 @@ impl FlowServiceInMemory {
 
         // Flows may not be attempted more frequent than mandatory throttling period.
         // If flow has never run before, let it go without restriction.
+        let trigger_time = trigger.trigger_time();
         let mut throttling_boundary_time =
             flow_run_stats.last_attempt_time.map_or(trigger_time, |t| {
                 t + self.run_config.mandatory_throttling_period
@@ -352,7 +354,7 @@ impl FlowServiceInMemory {
                     .int_err()?;
 
                 // Only merge unique triggers, ignore identical
-                flow.add_trigger_if_unique(trigger_time, trigger)
+                flow.add_trigger_if_unique(self.time_source.now(), trigger)
                     .int_err()?;
 
                 match context {
@@ -400,9 +402,7 @@ impl FlowServiceInMemory {
             // Otherwise, initiate a new flow, and enqueue it in the time wheel
             None => {
                 // Initiate new flow
-                let mut flow = self
-                    .make_new_flow(trigger_time, flow_key.clone(), trigger)
-                    .await?;
+                let mut flow = self.make_new_flow(flow_key.clone(), trigger).await?;
 
                 match context {
                     FlowTriggerContext::Batching(batching_rule) => {
@@ -509,7 +509,8 @@ impl FlowServiceInMemory {
         }
 
         // The timeout for batching will happen at:
-        let batching_deadline = flow.timing.created_at + *batching_rule.max_batching_interval();
+        let batching_deadline =
+            flow.primary_trigger().trigger_time() + *batching_rule.max_batching_interval();
 
         // Accumulated something if at least some input changed or watermark was touched
         let accumulated_something = accumulated_records_count > 0 || watermark_modified;
@@ -529,7 +530,7 @@ impl FlowServiceInMemory {
             Some(FlowStartCondition::Batching(_))
         ) {
             flow.set_relevant_start_condition(
-                evaluation_time,
+                self.time_source.now(),
                 FlowStartCondition::Batching(FlowStartConditionBatching {
                     active_batching_rule: *batching_rule,
                     batching_deadline,
@@ -608,13 +609,11 @@ impl FlowServiceInMemory {
     #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?trigger))]
     async fn make_new_flow(
         &self,
-        trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
         trigger: FlowTrigger,
     ) -> Result<Flow, InternalError> {
         let flow = Flow::new(
             self.time_source.now(),
-            trigger_time,
             self.flow_event_store.new_flow_id(),
             flow_key,
             trigger,
@@ -798,9 +797,9 @@ impl FlowService for FlowServiceInMemory {
         let activation_time = self.round_time(trigger_time).int_err()?;
 
         self.trigger_flow_common(
-            activation_time,
             &flow_key,
             FlowTrigger::Manual(FlowTriggerManual {
+                trigger_time: activation_time,
                 initiator_account_id,
                 initiator_account_name,
             }),
@@ -1001,13 +1000,11 @@ impl AsyncEventHandler<TaskEventRunning> for FlowServiceInMemory {
             state.pending_flows.try_get_flow_id_by_task(event.task_id)
         };
 
-        let running_time = self.round_time(event.event_time)?;
-
         if let Some(flow_id) = maybe_flow_id {
             let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
                 .await
                 .int_err()?;
-            flow.on_task_running(running_time, event.task_id)
+            flow.on_task_running(event.event_time, event.task_id)
                 .int_err()?;
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;
         }
@@ -1046,7 +1043,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
             let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
                 .await
                 .int_err()?;
-            flow.on_task_finished(finish_time, event.task_id, event.outcome.clone())
+            flow.on_task_finished(event.event_time, event.task_id, event.outcome.clone())
                 .int_err()?;
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
@@ -1058,7 +1055,9 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
 
             // In case of success:
             //  - execute followup method
-            if let Some(flow_result) = flow.try_result_as_ref() {
+            if let Some(flow_result) = flow.try_result_as_ref()
+                && !flow_result.is_empty()
+            {
                 match flow.flow_key.get_type().success_followup_method() {
                     FlowSuccessFollowupMethod::Ignore => {}
                     FlowSuccessFollowupMethod::TriggerDependent => {

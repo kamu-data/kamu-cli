@@ -25,18 +25,19 @@ pub(crate) enum FlowStartCondition {
 
 impl FlowStartCondition {
     pub async fn create_from_raw_flow_data(
-        flow_state: &fs::FlowState,
-        dataset_changes_service: &dyn DatasetChangesService,
-    ) -> Result<Option<Self>, InternalError> {
-        Ok(match &flow_state.start_condition {
-            None => None,
-            Some(fs::FlowStartCondition::Schedule(s)) => {
-                Some(Self::Schedule(FlowStartConditionSchedule {
-                    wake_up_at: s.wake_up_at,
-                }))
-            }
-            Some(fs::FlowStartCondition::Throttling(t)) => Some(Self::Throttling((*t).into())),
-            Some(fs::FlowStartCondition::Batching(b)) => {
+        start_condition: &fs::FlowStartCondition,
+        matching_triggers: &[fs::FlowTrigger],
+        ctx: &Context<'_>,
+    ) -> Result<Self, InternalError> {
+        Ok(match start_condition {
+            fs::FlowStartCondition::Schedule(s) => Self::Schedule(FlowStartConditionSchedule {
+                wake_up_at: s.wake_up_at,
+            }),
+            fs::FlowStartCondition::Throttling(t) => Self::Throttling((*t).into()),
+            fs::FlowStartCondition::Batching(b) => {
+                let dataset_changes_service =
+                    from_catalog::<dyn DatasetChangesService>(ctx).unwrap();
+
                 // Start from zero increment
                 let mut total_increment = DatasetIntervalIncrement::default();
 
@@ -44,7 +45,7 @@ impl FlowStartCondition {
                 // flow latest event, as they might have evolved after this state was loaded
 
                 // For each dataset trigger, add accumulated changes since trigger first fired
-                for trigger in &flow_state.triggers {
+                for trigger in matching_triggers {
                     if let fs::FlowTrigger::InputDatasetFlow(dataset_trigger) = trigger {
                         if let fs::FlowResult::DatasetUpdate(dataset_update) =
                             &dataset_trigger.flow_result
@@ -61,18 +62,16 @@ impl FlowStartCondition {
                 }
 
                 // Finally, present the full picture from condition + computed view results
-                Some(Self::Batching(FlowStartConditionBatching {
+                Self::Batching(FlowStartConditionBatching {
                     active_batching_rule: b.active_batching_rule.into(),
                     batching_deadline: b.batching_deadline,
                     accumulated_records_count: total_increment.num_records,
                     watermark_modified: total_increment.updated_watermark.is_some(),
-                }))
+                })
             }
-            Some(fs::FlowStartCondition::Executor(e)) => {
-                Some(Self::Executor(FlowStartConditionExecutor {
-                    task_id: e.task_id.into(),
-                }))
-            }
+            fs::FlowStartCondition::Executor(e) => Self::Executor(FlowStartConditionExecutor {
+                task_id: e.task_id.into(),
+            }),
         })
     }
 }

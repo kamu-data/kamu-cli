@@ -74,6 +74,48 @@ impl QueryServiceImpl {
         session_context
     }
 
+    async fn single_dataset(
+        &self,
+        dataset_ref: &DatasetRef,
+        last_records_to_consider: Option<u64>,
+    ) -> Result<(Arc<dyn Dataset>, DataFrame), QueryError> {
+        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, DatasetAction::Read)
+            .await?;
+
+        let dataset = self
+            .dataset_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
+
+        let summary = dataset
+            .get_summary(GetSummaryOpts::default())
+            .await
+            .int_err()?;
+
+        if summary.num_records == 0 {
+            return Err(DatasetSchemaNotAvailableError {
+                dataset_ref: dataset_ref.clone(),
+            }
+            .into());
+        }
+
+        let ctx = self.session_context(QueryOptions {
+            datasets: vec![DatasetQueryOptions {
+                dataset_ref: dataset_handle.as_local_ref(),
+                last_records_to_consider,
+            }],
+        });
+
+        let df = ctx
+            .table(TableReference::bare(dataset_handle.alias.to_string()))
+            .await?;
+
+        Ok((dataset, df))
+    }
+
     #[tracing::instrument(level = "debug", skip_all)]
     async fn get_schema_impl(
         &self,
@@ -186,28 +228,7 @@ impl QueryService for QueryServiceImpl {
         skip: u64,
         limit: u64,
     ) -> Result<DataFrame, QueryError> {
-        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
-
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle, DatasetAction::Read)
-            .await?;
-
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
-
-        let summary = dataset
-            .get_summary(GetSummaryOpts::default())
-            .await
-            .int_err()?;
-
-        if summary.num_records == 0 {
-            return Err(DatasetSchemaNotAvailableError {
-                dataset_ref: dataset_ref.clone(),
-            }
-            .into());
-        }
+        let (dataset, df) = self.single_dataset(dataset_ref, Some(skip + limit)).await?;
 
         // TODO: PERF: Avoid full scan of metadata
         let vocab: DatasetVocabulary = dataset
@@ -219,17 +240,6 @@ impl QueryService for QueryServiceImpl {
             .int_err()?
             .unwrap_or_default()
             .into();
-
-        let ctx = self.session_context(QueryOptions {
-            datasets: vec![DatasetQueryOptions {
-                dataset_ref: dataset_handle.as_local_ref(),
-                last_records_to_consider: Some(skip + limit),
-            }],
-        });
-
-        let df = ctx
-            .table(TableReference::bare(dataset_handle.alias.to_string()))
-            .await?;
 
         let df = df
             .sort(vec![col(&vocab.offset_column).sort(false, true)])?
@@ -267,6 +277,13 @@ impl QueryService for QueryServiceImpl {
     ) -> Result<Option<Type>, QueryError> {
         let ctx = self.session_context(QueryOptions::default());
         self.get_schema_parquet_impl(&ctx, dataset_ref).await
+    }
+
+    #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]
+    async fn get_data(&self, dataset_ref: &DatasetRef) -> Result<DataFrame, QueryError> {
+        // TODO: PERF: Limit push-down opportunity
+        let (_dataset, df) = self.single_dataset(dataset_ref, None).await?;
+        Ok(df)
     }
 
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError> {

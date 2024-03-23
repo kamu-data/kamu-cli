@@ -22,7 +22,6 @@ impl Flow {
     /// Creates a flow
     pub fn new(
         now: DateTime<Utc>,
-        trigger_time: DateTime<Utc>,
         flow_id: FlowID,
         flow_key: FlowKey,
         trigger: FlowTrigger,
@@ -32,7 +31,6 @@ impl Flow {
                 flow_id,
                 FlowEventInitiated {
                     event_time: now,
-                    trigger_time,
                     flow_id,
                     flow_key,
                     trigger,
@@ -53,6 +51,7 @@ impl Flow {
                 event_time: now,
                 flow_id: self.flow_id,
                 start_condition,
+                last_trigger_index: self.triggers.len(),
             };
             self.apply(event)
         } else {

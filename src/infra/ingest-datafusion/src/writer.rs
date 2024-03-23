@@ -852,15 +852,15 @@ impl DataWriterDataFusionBuilder {
             .await
             .int_err()?;
 
-        let mut metadata_state_visitor =
+        let (decision, mut visitor) =
             DataWriterDataFusionMetaDataStateVisitor::new(head.clone(), source_name);
 
         self.dataset
             .as_metadata_chain()
-            .accept_by_hash(&mut [&mut metadata_state_visitor], &head)
+            .accept_by_hash_with_decisions(&mut [decision], &mut [&mut visitor], &head)
             .await?;
 
-        let metadata_state = metadata_state_visitor.get_metadata_state()?;
+        let metadata_state = visitor.get_metadata_state()?;
 
         Ok(self.with_metadata_state(metadata_state))
     }

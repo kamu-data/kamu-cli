@@ -50,6 +50,7 @@ kamu-adapter-flight-sql = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true }
 kamu-adapter-oauth = { workspace = true }
+kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
 
 # CLI

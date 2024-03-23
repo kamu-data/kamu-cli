@@ -2,11 +2,13 @@ import jpype
 import jpype.dbapi2
 import os
 
+DRIVER_PATH = os.path.join(os.getcwd(), "path-to/flight-sql-jdbc-driver-13.0.0.jar")
+if not os.path.exists(DRIVER_PATH):
+    raise Exception(f"Driver not found at: {DRIVER_PATH}")
 
-classpath = os.path.join(os.getcwd(), "path-to/flight-sql-jdbc-driver-13.0.0.jar")
 jpype.startJVM(
     "--add-opens=java.base/java.nio=ALL-UNNAMED",
-    classpath=classpath
+    classpath=DRIVER_PATH
 )
 
 conn = jpype.dbapi2.connect(
