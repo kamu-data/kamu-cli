@@ -109,33 +109,38 @@ impl KamuFlightSqlService {
         }
     }
 
-    fn get_sql_info(&self, query: &CommandGetSqlInfo) -> Result<RecordBatch, Status> {
-        let record_batch = self
-            .sql_info
+    fn get_sql_info(
+        &self,
+        query: &CommandGetSqlInfo,
+        _schema_only: bool,
+    ) -> Result<RecordBatch, Status> {
+        self.sql_info
             .record_batch(query.info.clone())
-            .map_err(|e| Status::internal(format!("Error: {e}")))?;
-        Ok(record_batch)
+            .map_err(|e| Status::internal(format!("Error: {e}")))
     }
 
-    fn get_table_types(&self) -> Result<RecordBatch, Status> {
-        RecordBatch::try_new(
-            Arc::new(Schema::new(vec![Field::new(
-                "table_type",
-                DataType::Utf8,
-                false,
-            )])),
-            [TABLE_TYPES]
-                .iter()
-                .map(|i| Arc::new(StringArray::from(i.to_vec())) as ArrayRef)
-                .collect::<Vec<_>>(),
-        )
-        .map_err(|e| Status::internal(format!("Error: {e}")))
+    fn get_table_types(&self, schema_only: bool) -> Result<RecordBatch, Status> {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "table_type",
+            DataType::Utf8,
+            false,
+        )]));
+
+        let col_table_type = if schema_only {
+            Vec::new()
+        } else {
+            TABLE_TYPES.to_vec()
+        };
+
+        RecordBatch::try_new(schema, vec![Arc::new(StringArray::from(col_table_type))])
+            .map_err(|e| Status::internal(format!("Error: {e}")))
     }
 
     fn get_catalogs(
         &self,
         ctx: &SessionContext,
         _query: &CommandGetCatalogs,
+        schema_only: bool,
     ) -> Result<RecordBatch, Status> {
         let batch_schema = Arc::new(Schema::new(vec![Field::new(
             "catalog_name",
@@ -143,21 +148,24 @@ impl KamuFlightSqlService {
             true,
         )]));
 
-        let col_catalog_name = ctx.catalog_names();
+        let col_catalog_name = if schema_only {
+            Vec::new()
+        } else {
+            ctx.catalog_names()
+        };
 
-        let rb = RecordBatch::try_new(
+        RecordBatch::try_new(
             batch_schema,
             vec![Arc::new(StringArray::from(col_catalog_name))],
         )
-        .map_err(|e| Status::internal(format!("Error: {e}")))?;
-
-        Ok(rb)
+        .map_err(|e| Status::internal(format!("Error: {e}")))
     }
 
     fn get_schemas(
         &self,
         ctx: &SessionContext,
         query: &CommandGetDbSchemas,
+        schema_only: bool,
     ) -> Result<RecordBatch, Status> {
         let db_schema_filter_pattern = if let Some(pat) = &query.db_schema_filter_pattern {
             pat.as_str()
@@ -173,41 +181,42 @@ impl KamuFlightSqlService {
         let mut col_catalog_name = Vec::new();
         let mut col_db_schema_name = Vec::new();
 
-        for catalog_name in ctx.catalog_names() {
-            if let Some(catalog_name_filter) = &query.catalog {
-                if catalog_name != *catalog_name_filter {
-                    continue;
+        if !schema_only {
+            for catalog_name in ctx.catalog_names() {
+                if let Some(catalog_name_filter) = &query.catalog {
+                    if catalog_name != *catalog_name_filter {
+                        continue;
+                    }
                 }
-            }
-            let catalog = ctx.catalog(&catalog_name).unwrap();
-            for schema_name in catalog.schema_names() {
-                if like::Like::<false>::not_like(schema_name.as_str(), db_schema_filter_pattern)
-                    .unwrap()
-                {
-                    continue;
-                }
+                let catalog = ctx.catalog(&catalog_name).unwrap();
+                for schema_name in catalog.schema_names() {
+                    if like::Like::<false>::not_like(schema_name.as_str(), db_schema_filter_pattern)
+                        .unwrap()
+                    {
+                        continue;
+                    }
 
-                col_catalog_name.push(catalog_name.clone());
-                col_db_schema_name.push(schema_name.clone());
+                    col_catalog_name.push(catalog_name.clone());
+                    col_db_schema_name.push(schema_name.clone());
+                }
             }
         }
 
-        let rb = RecordBatch::try_new(
+        RecordBatch::try_new(
             batch_schema,
             vec![
                 Arc::new(StringArray::from(col_catalog_name)),
                 Arc::new(StringArray::from(col_db_schema_name)),
             ],
         )
-        .map_err(|e| Status::internal(format!("Error: {e}")))?;
-
-        Ok(rb)
+        .map_err(|e| Status::internal(format!("Error: {e}")))
     }
 
     async fn get_tables(
         &self,
         ctx: Arc<SessionContext>,
         query: &CommandGetTables,
+        schema_only: bool,
     ) -> Result<RecordBatch, Status> {
         let db_schema_filter_pattern = if let Some(pat) = &query.db_schema_filter_pattern {
             pat.as_str()
@@ -231,6 +240,8 @@ impl KamuFlightSqlService {
         }
         let batch_schema = Arc::new(Schema::new(fields));
 
+        // TODO: PERF: Use query.table_name_filter_pattern to reduce search space
+
         // TODO: Can significantly reduce allocations using dict builders
         let mut col_catalog_name = Vec::new();
         let mut col_db_schema_name = Vec::new();
@@ -238,37 +249,42 @@ impl KamuFlightSqlService {
         let mut col_table_type = Vec::new();
         let mut col_table_schema = Vec::new();
 
-        for catalog_name in ctx.catalog_names() {
-            if let Some(catalog_name_filter) = &query.catalog {
-                if catalog_name != *catalog_name_filter {
-                    continue;
+        if !schema_only {
+            for catalog_name in ctx.catalog_names() {
+                if let Some(catalog_name_filter) = &query.catalog {
+                    if catalog_name != *catalog_name_filter {
+                        continue;
+                    }
                 }
-            }
-            let catalog = ctx.catalog(&catalog_name).unwrap();
-            for schema_name in catalog.schema_names() {
-                if like::Like::<false>::not_like(schema_name.as_str(), db_schema_filter_pattern)
-                    .unwrap()
-                {
-                    continue;
-                }
-                let schema = catalog.schema(&schema_name).unwrap();
-                for table_name in schema.table_names() {
-                    if like::Like::<false>::not_like(table_name.as_str(), table_name_filter_pattern)
+                let catalog = ctx.catalog(&catalog_name).unwrap();
+                for schema_name in catalog.schema_names() {
+                    if like::Like::<false>::not_like(schema_name.as_str(), db_schema_filter_pattern)
                         .unwrap()
                     {
                         continue;
                     }
+                    let schema = catalog.schema(&schema_name).unwrap();
+                    for table_name in schema.table_names() {
+                        if like::Like::<false>::not_like(
+                            table_name.as_str(),
+                            table_name_filter_pattern,
+                        )
+                        .unwrap()
+                        {
+                            continue;
+                        }
 
-                    let table = schema.table(&table_name).await.unwrap();
+                        let table = schema.table(&table_name).await.unwrap();
 
-                    col_catalog_name.push(catalog_name.clone());
-                    col_db_schema_name.push(schema_name.clone());
-                    col_table_name.push(table_name.clone());
-                    col_table_type.push("TABLE");
+                        col_catalog_name.push(catalog_name.clone());
+                        col_db_schema_name.push(schema_name.clone());
+                        col_table_name.push(table_name.clone());
+                        col_table_type.push("TABLE");
 
-                    if query.include_schema {
-                        let schema_bytes = self.schema_to_arrow(&table.schema())?;
-                        col_table_schema.push(schema_bytes);
+                        if query.include_schema {
+                            let schema_bytes = self.schema_to_arrow(&table.schema())?;
+                            col_table_schema.push(schema_bytes);
+                        }
                     }
                 }
             }
@@ -297,6 +313,7 @@ impl KamuFlightSqlService {
         &self,
         _ctx: &Arc<SessionContext>,
         _query: &CommandGetPrimaryKeys,
+        _schema_only: bool,
     ) -> Result<RecordBatch, Status> {
         let batch_schema = Arc::new(Schema::new(vec![
             Field::new("catalog_name", DataType::Utf8, true),
@@ -328,6 +345,7 @@ impl KamuFlightSqlService {
         &self,
         _ctx: &Arc<SessionContext>,
         _query: &CommandGetExportedKeys,
+        _schema_only: bool,
     ) -> Result<RecordBatch, Status> {
         let batch_schema = Arc::new(Schema::new(vec![
             Field::new("pk_catalog_name", DataType::Utf8, true),
@@ -373,6 +391,7 @@ impl KamuFlightSqlService {
         &self,
         _ctx: &Arc<SessionContext>,
         _query: &CommandGetImportedKeys,
+        _schema_only: bool,
     ) -> Result<RecordBatch, Status> {
         let batch_schema = Arc::new(Schema::new(vec![
             Field::new("pk_catalog_name", DataType::Utf8, true),
@@ -424,19 +443,18 @@ impl KamuFlightSqlService {
         let auth = req
             .metadata()
             .get("authorization")
-            .ok_or_else(|| Status::internal("No authorization header!"))?;
-        let str = auth
+            .ok_or_else(|| Status::internal("No authorization header!"))?
             .to_str()
-            .map_err(|e| Status::internal(format!("Error parsing header: {e}")))?;
-        let authorization = str.to_string();
-        let bearer = "Bearer ";
-        if !authorization.starts_with(bearer) {
-            Err(Status::internal("Invalid auth header!"))?;
-        }
-        let auth = authorization[bearer.len()..].to_string();
+            .map_err(|e| Status::internal(format!("Error parsing header: {e}")))?
+            .to_string();
 
-        let handle = Uuid::from_str(auth.as_str())
+        let Some(token) = auth.strip_prefix("Bearer ") else {
+            return Err(Status::internal("Invalid auth header!"));
+        };
+
+        let handle = Uuid::from_str(token)
             .map_err(|e| Status::internal(format!("Error locking contexts: {e}")))?;
+
         if let Some(context) = self.contexts.get(&handle) {
             Ok(context.clone())
         } else {
@@ -496,15 +514,23 @@ impl KamuFlightSqlService {
         &self,
         data: &RecordBatch,
         ticket: &arrow_flight::sql::Any,
+        schema_only: bool,
     ) -> Result<Response<FlightInfo>, Status> {
         let ticket: prost::bytes::Bytes = ticket.encode_to_vec().into();
 
-        let num_bytes = i64::try_from(data.get_array_memory_size())
-            .map_err(|e| Status::internal(format!("\"num_bytes\" convert error: {e}")))?;
-        let schema = data.schema();
-        let num_rows = i64::try_from(data.num_rows())
-            .map_err(|e| Status::internal(format!("\"num_rows\" convert error: {e}")))?;
+        let mut total_records = -1;
+        let mut total_bytes = -1;
 
+        if !schema_only {
+            total_records = i64::try_from(data.num_rows())
+                .map_err(|e| Status::internal(format!("\"num_rows\" convert error: {e}")))?;
+
+            total_bytes = i64::try_from(data.get_array_memory_size()).map_err(|e| {
+                Status::internal(format!("\"get_array_memory_size\" convert error: {e}"))
+            })?;
+        }
+
+        let schema = data.schema();
         let schema_bytes = self.schema_to_arrow(&schema)?;
 
         // Note: Leaving location empty per documentation:
@@ -528,8 +554,8 @@ impl KamuFlightSqlService {
             schema: schema_bytes.into(),
             flight_descriptor: Some(flight_desc),
             endpoint: fieps,
-            total_records: num_rows,
-            total_bytes: num_bytes,
+            total_records,
+            total_bytes,
             ordered: false,
         };
         tracing::debug!(
@@ -763,8 +789,8 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_catalogs(&ctx, &query)?;
-        self.record_batch_to_flight_info(&data, &query.as_any())
+        let data = self.get_catalogs(&ctx, &query, true)?;
+        self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
@@ -774,8 +800,8 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_schemas(&ctx, &query)?;
-        self.record_batch_to_flight_info(&data, &query.as_any())
+        let data = self.get_schemas(&ctx, &query, true)?;
+        self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
@@ -785,8 +811,8 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_tables(ctx, &query).await?;
-        self.record_batch_to_flight_info(&data, &query.as_any())
+        let data = self.get_tables(ctx, &query, true).await?;
+        self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
@@ -796,8 +822,8 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let _ctx = self.get_ctx(&request)?;
-        let data = self.get_table_types()?;
-        self.record_batch_to_flight_info(&data, &query.as_any())
+        let data = self.get_table_types(true)?;
+        self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
@@ -807,8 +833,8 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let _ctx = self.get_ctx(&request)?;
-        let data = self.get_sql_info(&query)?;
-        self.record_batch_to_flight_info(&data, &query.as_any())
+        let data = self.get_sql_info(&query, true)?;
+        self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
@@ -818,8 +844,8 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_primary_keys(&ctx, &query)?;
-        self.record_batch_to_flight_info(&data, &query.as_any())
+        let data = self.get_primary_keys(&ctx, &query, true)?;
+        self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
@@ -829,8 +855,8 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_exported_keys(&ctx, &query)?;
-        self.record_batch_to_flight_info(&data, &query.as_any())
+        let data = self.get_exported_keys(&ctx, &query, true)?;
+        self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
@@ -840,8 +866,8 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_imported_keys(&ctx, &query)?;
-        self.record_batch_to_flight_info(&data, &query.as_any())
+        let data = self.get_imported_keys(&ctx, &query, true)?;
+        self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
@@ -917,7 +943,7 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_catalogs(&ctx, &query)?;
+        let data = self.get_catalogs(&ctx, &query, false)?;
         self.record_batch_to_stream(data)
     }
 
@@ -928,7 +954,7 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_schemas(&ctx, &query)?;
+        let data = self.get_schemas(&ctx, &query, false)?;
         self.record_batch_to_stream(data)
     }
 
@@ -939,7 +965,7 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_tables(ctx, &query).await?;
+        let data = self.get_tables(ctx, &query, false).await?;
         self.record_batch_to_stream(data)
     }
 
@@ -950,7 +976,7 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let _ctx = self.get_ctx(&request)?;
-        let data = self.get_table_types()?;
+        let data = self.get_table_types(false)?;
         self.record_batch_to_stream(data)
     }
 
@@ -961,7 +987,7 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let _ctx = self.get_ctx(&request)?;
-        let data = self.get_sql_info(&query)?;
+        let data = self.get_sql_info(&query, false)?;
         self.record_batch_to_stream(data)
     }
 
@@ -972,7 +998,7 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_primary_keys(&ctx, &query)?;
+        let data = self.get_primary_keys(&ctx, &query, false)?;
         self.record_batch_to_stream(data)
     }
 
@@ -983,7 +1009,7 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_exported_keys(&ctx, &query)?;
+        let data = self.get_exported_keys(&ctx, &query, false)?;
         self.record_batch_to_stream(data)
     }
 
@@ -994,7 +1020,7 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_imported_keys(&ctx, &query)?;
+        let data = self.get_imported_keys(&ctx, &query, false)?;
         self.record_batch_to_stream(data)
     }
 
