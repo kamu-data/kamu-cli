@@ -4,10 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Changed
+- FlightSQL: For expensive queries `GetFlightInfo` we will only prepare schemas and not compute results - this avoids doing double the work just to return `total_records` and `total_bytes` in `FlightInfo` before result is fetched via `DoGet`
+- Optimized implementation of Datafusion catalog, scheme, and table providers that includes caching and maximally delays the metadata scanning
+
 ## [0.167.2] - 2024-03-23
 ### Fixed
-- Improved Python connectivity examples (ADBC, Sqlalchemy, DBAPI2, JDBC)
-- Fix invalid `location` info returned by FlightSQL protocol in `FlightInfo` that might've been causing errors in some client libraries and slowing down others.
+- FlightSQL: Improved Python connectivity examples (ADBC, Sqlalchemy, DBAPI2, JDBC)
+- FlightSQL: Fix invalid `location` info in `FlightInfo` that was causing errors in some client libraries
 
 ## [0.167.1] - 2024-03-20
 ### Fixed

@@ -31,5 +31,5 @@ with con:
     df = pandas.read_sql("show tables", con)
     print(df)
 
-    df = pandas.read_sql("select * from 'kamu/co.alphavantage.tickers.daily.spy' limit 10", con)
+    df = pandas.read_sql("select * from 'co.alphavantage.tickers.daily.spy' limit 10", con)
     print(df)

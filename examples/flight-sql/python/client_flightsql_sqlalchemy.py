@@ -21,5 +21,5 @@ with engine.connect() as con:
     df = pd.read_sql(sql="show tables", con=con.connection)
     print(df)
 
-    df = pd.read_sql(sql="select * from 'kamu/co.alphavantage.tickers.daily.spy' limit 10", con=con.connection)
+    df = pd.read_sql(sql="select * from 'co.alphavantage.tickers.daily.spy' limit 10", con=con.connection)
     print(df)

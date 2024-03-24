@@ -29,7 +29,7 @@ cursor.execute("show tables")
 print("columns:", cursor.description)
 print("rows:", [r for r in cursor])
 
-cursor.execute("select * from 'kamu/co.alphavantage.tickers.daily.spy' limit 10")
+cursor.execute("select * from 'co.alphavantage.tickers.daily.spy' limit 10")
 print("columns:", cursor.description)
 print("rows:", [r for r in cursor])
 
