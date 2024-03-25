@@ -31,7 +31,7 @@ doctest = false
 [features]
 default = []
 
-web-ui = []
+web-ui = ["rust-embed"]
 ftp = ["kamu/ftp"]
 
 
@@ -50,6 +50,7 @@ kamu-adapter-flight-sql = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true }
 kamu-adapter-oauth = { workspace = true }
+kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
 
 # CLI
@@ -81,7 +82,7 @@ tower = "0.4"
 tower-http = { version = "0.4", features = ["trace", "cors"] }
 
 # Web UI
-rust-embed = { version = "8", features = ["interpolate-folder-path", "compression"] }
+rust-embed = { optional = true, version = "8", features = ["interpolate-folder-path", "compression"] }
 mime = "0.3"
 mime_guess = "2"
 
@@ -133,7 +134,6 @@ libc = "0.2"  # For getting uid:gid
 
 [dev-dependencies]
 assert_cmd = "2"
-env_logger = "0.10"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 

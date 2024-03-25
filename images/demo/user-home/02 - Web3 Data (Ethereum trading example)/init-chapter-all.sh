@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-REPO_BASE_URL="${KAMU_NODE_URL}/kamu/"
+REPO_BASE_URL="${KAMU_NODE_URL}kamu/"
 
 rm -rf .kamu
 kamu init

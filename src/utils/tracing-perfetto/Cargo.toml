@@ -30,8 +30,5 @@ tracing-subscriber = { version = "0.3", default-features = false }
 
 
 [dev-dependencies]
-env_logger = "0.10"
-test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features=["rt", "rt-multi-thread", "macros", "time"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

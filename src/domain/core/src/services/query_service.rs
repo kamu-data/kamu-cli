@@ -55,6 +55,12 @@ pub trait QueryService: Send + Sync {
     /// this moment, None otherwise
     async fn get_schema(&self, dataset_ref: &DatasetRef) -> Result<Option<Type>, QueryError>;
 
+    // TODO: Introduce additional options that could be used to narrow down the
+    // number of files we collect to construct the dataframe.
+    //
+    /// Returns a [DataFrame] representing the contents of an entire dataset
+    async fn get_data(&self, dataset_ref: &DatasetRef) -> Result<DataFrame, QueryError>;
+
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;
 }

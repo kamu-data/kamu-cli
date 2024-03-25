@@ -273,9 +273,7 @@ impl PullServiceImpl {
         // No luck - now have to search through aliases (of current user)
         if let CurrentAccountSubject::Logged(l) = self.current_account_subject.as_ref() {
             use tokio_stream::StreamExt;
-            let mut datasets = self
-                .dataset_repo
-                .get_datasets_by_owner(l.account_name.clone());
+            let mut datasets = self.dataset_repo.get_datasets_by_owner(&l.account_name);
             while let Some(dataset_handle) = datasets.next().await {
                 let dataset_handle = dataset_handle?;
 
@@ -510,12 +508,18 @@ impl PullService for PullServiceImpl {
         options: PullMultiOptions,
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
+        let current_account_name = match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => {
+                return Err("Anonymous account misused, use multi-tenant alias").int_err()
+            }
+            CurrentAccountSubject::Logged(l) => l.account_name.clone(),
+        };
         let requests: Vec<_> = if !options.all {
             requests
         } else {
             use futures::TryStreamExt;
             self.dataset_repo
-                .get_all_datasets()
+                .get_datasets_by_owner(&current_account_name)
                 .map_ok(|hdl| PullRequest {
                     local_ref: Some(hdl.into()),
                     remote_ref: None,

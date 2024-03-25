@@ -29,12 +29,12 @@ impl BatchingRule {
             return Err(BatchingRuleValidationError::MinRecordsToAwaitNotPositive);
         }
 
-        let lower_interval_bound = Duration::seconds(0);
+        let lower_interval_bound = Duration::try_seconds(0).unwrap();
         if lower_interval_bound >= max_batching_interval {
             return Err(BatchingRuleValidationError::MinIntervalNotPositive);
         }
 
-        let upper_interval_bound = Duration::hours(Self::MAX_BATCHING_INTERVAL_HOURS);
+        let upper_interval_bound = Duration::try_hours(Self::MAX_BATCHING_INTERVAL_HOURS).unwrap();
         if max_batching_interval > upper_interval_bound {
             return Err(BatchingRuleValidationError::MaxIntervalAboveLimit);
         }
@@ -85,18 +85,24 @@ mod tests {
 
     #[test]
     fn test_good_batching_rule() {
-        assert_matches!(BatchingRule::new_checked(1, TimeDelta::minutes(15)), Ok(_));
         assert_matches!(
-            BatchingRule::new_checked(1_000_000, TimeDelta::hours(3)),
+            BatchingRule::new_checked(1, TimeDelta::try_minutes(15).unwrap()),
             Ok(_)
         );
-        assert_matches!(BatchingRule::new_checked(1, TimeDelta::hours(24)), Ok(_));
+        assert_matches!(
+            BatchingRule::new_checked(1_000_000, TimeDelta::try_hours(3).unwrap()),
+            Ok(_)
+        );
+        assert_matches!(
+            BatchingRule::new_checked(1, TimeDelta::try_hours(24).unwrap()),
+            Ok(_)
+        );
     }
 
     #[test]
     fn test_non_positive_min_records() {
         assert_matches!(
-            BatchingRule::new_checked(0, TimeDelta::minutes(15)),
+            BatchingRule::new_checked(0, TimeDelta::try_minutes(15).unwrap()),
             Err(BatchingRuleValidationError::MinRecordsToAwaitNotPositive)
         );
     }
@@ -104,11 +110,11 @@ mod tests {
     #[test]
     fn test_non_positive_max_interval() {
         assert_matches!(
-            BatchingRule::new_checked(1, TimeDelta::minutes(0)),
+            BatchingRule::new_checked(1, TimeDelta::try_minutes(0).unwrap()),
             Err(BatchingRuleValidationError::MinIntervalNotPositive)
         );
         assert_matches!(
-            BatchingRule::new_checked(1, TimeDelta::minutes(-1)),
+            BatchingRule::new_checked(1, TimeDelta::try_minutes(-1).unwrap()),
             Err(BatchingRuleValidationError::MinIntervalNotPositive)
         );
     }
@@ -116,7 +122,10 @@ mod tests {
     #[test]
     fn test_too_large_max_interval() {
         assert_matches!(
-            BatchingRule::new_checked(1, TimeDelta::hours(24) + TimeDelta::nanoseconds(1)),
+            BatchingRule::new_checked(
+                1,
+                TimeDelta::try_hours(24).unwrap() + TimeDelta::nanoseconds(1)
+            ),
             Err(BatchingRuleValidationError::MaxIntervalAboveLimit)
         );
     }

@@ -29,7 +29,7 @@ async fn test_visibility() {
     let harness = FlowConfigurationHarness::new();
     assert!(harness.list_enabled_configurations().await.is_empty());
 
-    let gc_schedule: Schedule = Duration::minutes(30).into();
+    let gc_schedule: Schedule = Duration::try_minutes(30).unwrap().into();
     harness
         .set_system_flow_schedule(SystemFlowType::GC, gc_schedule.clone())
         .await;
@@ -37,7 +37,7 @@ async fn test_visibility() {
     let foo_id = harness.create_root_dataset("foo").await;
     let bar_id = harness.create_root_dataset("bar").await;
 
-    let foo_ingest_schedule: Schedule = Duration::days(1).into();
+    let foo_ingest_schedule: Schedule = Duration::try_days(1).unwrap().into();
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
@@ -46,7 +46,7 @@ async fn test_visibility() {
         )
         .await;
 
-    let foo_compaction_schedule: Schedule = Duration::weeks(1).into();
+    let foo_compaction_schedule: Schedule = Duration::try_weeks(1).unwrap().into();
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
@@ -55,7 +55,7 @@ async fn test_visibility() {
         )
         .await;
 
-    let bar_ingest_schedule: Schedule = Duration::hours(3).into();
+    let bar_ingest_schedule: Schedule = Duration::try_hours(3).unwrap().into();
     harness
         .set_dataset_flow_schedule(
             bar_id.clone(),
@@ -96,7 +96,7 @@ async fn test_pause_resume_individual_dataset_flows() {
 
     // Make a dataset and configure daily ingestion schedule
     let foo_id = harness.create_root_dataset("foo").await;
-    let foo_ingest_schedule: Schedule = Duration::days(1).into();
+    let foo_ingest_schedule: Schedule = Duration::try_days(1).unwrap().into();
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
@@ -169,7 +169,7 @@ async fn test_pause_resume_all_dataset_flows() {
 
     // Make a dataset and configure ingestion and compacting schedule
     let foo_id = harness.create_root_dataset("foo").await;
-    let foo_ingest_schedule: Schedule = Duration::days(1).into();
+    let foo_ingest_schedule: Schedule = Duration::try_days(1).unwrap().into();
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
@@ -177,7 +177,7 @@ async fn test_pause_resume_all_dataset_flows() {
             foo_ingest_schedule.clone(),
         )
         .await;
-    let foo_compacting_schedule: Schedule = Duration::weeks(1).into();
+    let foo_compacting_schedule: Schedule = Duration::try_weeks(1).unwrap().into();
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
@@ -269,7 +269,7 @@ async fn test_pause_resume_individual_system_flows() {
     assert_eq!(0, harness.configuration_events_count());
 
     // Configure GC schedule
-    let gc_schedule: Schedule = Duration::minutes(30).into();
+    let gc_schedule: Schedule = Duration::try_minutes(30).unwrap().into();
     harness
         .set_system_flow_schedule(SystemFlowType::GC, gc_schedule.clone())
         .await;
@@ -322,7 +322,7 @@ async fn test_modify() {
 
     // Make a dataset and configure daily ingestion schedule
     let foo_id = harness.create_root_dataset("foo").await;
-    let foo_ingest_schedule: Schedule = Duration::days(1).into();
+    let foo_ingest_schedule: Schedule = Duration::try_days(1).unwrap().into();
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
@@ -343,7 +343,7 @@ async fn test_modify() {
     assert_eq!(1, harness.configuration_events_count());
 
     // Now make the schedule weekly
-    let foo_ingest_schedule_2: Schedule = Duration::weeks(1).into();
+    let foo_ingest_schedule_2: Schedule = Duration::try_weeks(1).unwrap().into();
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
@@ -373,7 +373,7 @@ async fn test_dataset_deleted() {
 
     // Make a dataset and configure daily ingestion schedule
     let foo_id = harness.create_root_dataset("foo").await;
-    let foo_ingest_schedule: Schedule = Duration::days(1).into();
+    let foo_ingest_schedule: Schedule = Duration::try_days(1).unwrap().into();
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),

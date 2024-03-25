@@ -844,16 +844,20 @@ async fn make_dataset_test_flows(
         DatasetFlowGenerator::new(dataset_id, flow_event_store.clone(), task_event_store);
 
     let wasya_manual_trigger = FlowTrigger::Manual(FlowTriggerManual {
+        trigger_time: Utc::now(),
         initiator_account_id: FAKE_ACCOUNT_ID.to_string(),
         initiator_account_name: AccountName::new_unchecked("wasya"),
     });
 
     let petya_manual_trigger = FlowTrigger::Manual(FlowTriggerManual {
+        trigger_time: Utc::now(),
         initiator_account_id: FAKE_ACCOUNT_ID.to_string(),
         initiator_account_name: AccountName::new_unchecked("petya"),
     });
 
-    let automatic_trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {});
+    let automatic_trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+        trigger_time: Utc::now(),
+    });
 
     let flow_id_waiting = flow_generator
         .make_new_flow(dataset_flow_type, FlowStatus::Waiting, petya_manual_trigger)
@@ -880,16 +884,20 @@ async fn make_system_test_flows(
     let flow_generator = SystemFlowGenerator::new(flow_event_store.clone(), task_event_store);
 
     let wasya_manual_trigger = FlowTrigger::Manual(FlowTriggerManual {
+        trigger_time: Utc::now(),
         initiator_account_id: FAKE_ACCOUNT_ID.to_string(),
         initiator_account_name: AccountName::new_unchecked("wasya"),
     });
 
     let petya_manual_trigger = FlowTrigger::Manual(FlowTriggerManual {
+        trigger_time: Utc::now(),
         initiator_account_id: FAKE_ACCOUNT_ID.to_string(),
         initiator_account_name: AccountName::new_unchecked("petya"),
     });
 
-    let automatic_trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {});
+    let automatic_trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+        trigger_time: Utc::now(),
+    });
 
     let flow_id_waiting = flow_generator
         .make_new_flow(system_flow_type, FlowStatus::Waiting, petya_manual_trigger)
@@ -1054,23 +1062,23 @@ fn drive_flow_to_status(
     let start_moment = Utc::now();
 
     flow.set_relevant_start_condition(
-        start_moment + Duration::seconds(1),
+        start_moment + Duration::try_seconds(1).unwrap(),
         FlowStartCondition::Schedule(FlowStartConditionSchedule {
-            wake_up_at: start_moment + Duration::minutes(1),
+            wake_up_at: start_moment + Duration::try_minutes(1).unwrap(),
         }),
     )
     .unwrap();
 
     if expected_status != FlowStatus::Waiting {
         let task_id = task_event_store.new_task_id();
-        flow.on_task_scheduled(start_moment + Duration::minutes(5), task_id)
+        flow.on_task_scheduled(start_moment + Duration::try_minutes(5).unwrap(), task_id)
             .unwrap();
-        flow.on_task_running(start_moment + Duration::minutes(7), task_id)
+        flow.on_task_running(start_moment + Duration::try_minutes(7).unwrap(), task_id)
             .unwrap();
 
         if expected_status == FlowStatus::Finished {
             flow.on_task_finished(
-                start_moment + Duration::minutes(10),
+                start_moment + Duration::try_minutes(10).unwrap(),
                 task_id,
                 TaskOutcome::Success(TaskResult::Empty),
             )

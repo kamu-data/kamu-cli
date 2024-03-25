@@ -104,7 +104,6 @@ pub enum FlowStatus {
 pub enum FlowOutcome {
     Success,
     Failed,
-    Cancelled,
     Aborted,
 }
 
@@ -113,7 +112,6 @@ impl From<&kamu_flow_system::FlowOutcome> for FlowOutcome {
         match value {
             kamu_flow_system::FlowOutcome::Success(_) => Self::Success,
             kamu_flow_system::FlowOutcome::Failed => Self::Failed,
-            kamu_flow_system::FlowOutcome::Cancelled => Self::Cancelled,
             kamu_flow_system::FlowOutcome::Aborted => Self::Aborted,
         }
     }

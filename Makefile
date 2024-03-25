@@ -13,6 +13,7 @@ lint:
 	cargo fmt --check
 	cargo test -p kamu-repo-tools
 	cargo deny check
+	# cargo udeps --all-targets
 	cargo clippy --workspace --all-targets -- -D warnings
 
 

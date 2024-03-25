@@ -23,14 +23,14 @@ doctest = false
 
 [dependencies]
 internal-error = { workspace = true }
-opendatafabric = { workspace = true }
+opendatafabric = { workspace = true, features=["arrow"] }
 
 kamu-data-utils = { workspace = true }
 kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-flow-system  = { workspace = true }
-event-bus = { workspace = true }
 event-sourcing = { workspace = true }
+
 
 async-graphql = { version = "6", features = ["chrono", "url", "apollo_tracing"] }
 async-trait = { version = "0.1", default-features = false }
@@ -39,7 +39,6 @@ chrono = "0.4"
 datafusion = { version = "36", default-features = false } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 dill = "0.8"
 futures = "0.3"
-indoc = "1.0.6"
 serde = "1"
 serde_json = "1"
 tokio = { version = "1", default-features = false, features = [] }
@@ -57,7 +56,7 @@ kamu-flow-system-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 
 
-env_logger = "0.10"
+indoc = "2"
 mockall = "0.11"
 tempfile = "3"
 test-group = { version = "1" }

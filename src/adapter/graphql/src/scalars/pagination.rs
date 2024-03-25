@@ -39,10 +39,16 @@ macro_rules! page_based_connection {
             ) -> Self {
                 let (total_pages, has_next_page) = match total_count {
                     0 => (Some(0), false),
-                    tc => (
-                        Some(tc.div_ceil(per_page)),
-                        (tc.div_ceil(per_page) - 1) > current_page,
-                    ),
+                    tc => {
+                        if per_page == 0 {
+                            (Some(0), false)
+                        } else {
+                            (
+                                Some(tc.div_ceil(per_page)),
+                                (tc.div_ceil(per_page) - 1) > current_page,
+                            )
+                        }
+                    }
                 };
 
                 Self {

@@ -172,7 +172,9 @@ async fn test_trigger_ingest_root_dataset() {
         })
     );
 
-    let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let schedule_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
 
     let response = schema
@@ -244,7 +246,9 @@ async fn test_trigger_ingest_root_dataset() {
         })
     );
 
-    let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let running_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
     harness.mimic_task_running(flow_task_id, running_time).await;
 
     let response = schema
@@ -313,7 +317,9 @@ async fn test_trigger_ingest_root_dataset() {
         })
     );
 
-    let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let complete_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
     harness
         .mimic_task_completed(
             flow_task_id,
@@ -515,13 +521,19 @@ async fn test_trigger_execute_transform_derived_dataset() {
         })
     );
 
-    let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let schedule_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
 
-    let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let running_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
     harness.mimic_task_running(flow_task_id, running_time).await;
 
-    let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let complete_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
     harness
         .mimic_task_completed(
             flow_task_id,
@@ -1365,7 +1377,7 @@ async fn test_cancel_waiting_flow() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_cancel_already_cancelled_flow() {
+async fn test_cancel_already_aborted_flow() {
     let harness = FlowRunsHarness::new();
     let create_result = harness.create_root_dataset().await;
 
@@ -1532,7 +1544,12 @@ async fn test_history_of_completed_flow() {
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
     harness
-        .mimic_flow_secondary_trigger(flow_id, FlowTrigger::AutoPolling(FlowTriggerAutoPolling {}))
+        .mimic_flow_secondary_trigger(
+            flow_id,
+            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                trigger_time: Utc::now(),
+            }),
+        )
         .await;
 
     let flow_task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
@@ -1583,7 +1600,9 @@ async fn test_history_of_completed_flow() {
                                         {
                                             "__typename": "FlowEventStartConditionUpdated",
                                             "eventId": "2",
-                                            "startConditionKind": "EXECUTOR"
+                                            "startCondition": {
+                                                "__typename" : "FlowStartConditionExecutor"
+                                            }
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
@@ -1708,8 +1727,8 @@ impl FlowRunsHarness {
             .add::<FlowServiceInMemory>()
             .add::<FlowEventStoreInMem>()
             .add_value(FlowServiceRunConfig::new(
-                Duration::seconds(1),
-                Duration::minutes(1),
+                Duration::try_seconds(1).unwrap(),
+                Duration::try_minutes(1).unwrap(),
             ))
             .add::<TaskSchedulerInMemory>()
             .add::<TaskSystemEventStoreInMemory>()
@@ -1935,7 +1954,10 @@ impl FlowRunsHarness {
                                         primaryTrigger {
                                             __typename
                                             ... on FlowTriggerInputDatasetFlow {
-                                                datasetId
+                                                dataset {
+                                                    id
+                                                    name
+                                                }
                                                 flowType
                                                 flowId
                                             }
@@ -2010,7 +2032,9 @@ impl FlowRunsHarness {
                                                     }
                                                 }
                                                 ... on FlowEventStartConditionUpdated {
-                                                    startConditionKind
+                                                    startCondition {
+                                                        __typename
+                                                    }
                                                 }
                                                 ... on FlowEventTriggerAdded {
                                                     trigger {

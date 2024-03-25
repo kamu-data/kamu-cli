@@ -215,7 +215,6 @@ impl std::fmt::Display for FlowSystemTestListener {
                             match outcome {
                                 FlowOutcome::Success(_) => "Success",
                                 FlowOutcome::Aborted => "Aborted",
-                                FlowOutcome::Cancelled => "Cancelled",
                                 FlowOutcome::Failed => "Failed",
                             }
                         )?;

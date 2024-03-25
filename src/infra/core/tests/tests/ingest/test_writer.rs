@@ -870,6 +870,56 @@ async fn test_data_writer_builder_scan_push_source() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_data_writer_builder_scan_push_source_with_extra_events() {
+    let harness = Harness::new(vec![
+        MetadataFactory::add_push_source()
+            .read(odf::ReadStepNdJson {
+                schema: Some(vec![
+                    "event_time".to_string(),
+                    "city".to_string(),
+                    "population".to_string(),
+                ]),
+                ..Default::default()
+            })
+            .merge(odf::MergeStrategyLedger {
+                primary_key: vec!["event_time".to_string(), "city".to_string()],
+            })
+            .build()
+            .into(),
+        odf::SetLicense {
+            name: "Open Government Licence - Canada".into(),
+            short_name: "OGL-Canada-2.0".into(),
+            spdx_id: Some("OGL-Canada-2.0".into()),
+            website_url: "https://open.canada.ca/en/open-government-licence-canada".into(),
+        }
+        .into(),
+    ])
+    .await;
+
+    let b = DataWriterDataFusion::builder(harness.dataset.clone(), harness.ctx.clone())
+        .with_metadata_state_scanned(None)
+        .await
+        .unwrap();
+
+    assert_matches!(
+        b.metadata_state().unwrap(),
+        DataWriterMetadataState {
+            schema: None,
+            source_event: Some(_),
+            merge_strategy: odf::MergeStrategy::Ledger(_),
+            vocab,
+            prev_offset: None,
+            prev_checkpoint: None,
+            prev_watermark: None,
+            prev_source_state: None,
+            ..
+        } if *vocab == odf::DatasetVocabulary::default()
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 struct Harness {
     temp_dir: tempfile::TempDir,
     dataset: Arc<dyn Dataset>,

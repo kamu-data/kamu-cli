@@ -4,9 +4,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.168.0] - 2024-03-23
+### Changed
+- FlightSQL: For expensive queries `GetFlightInfo` we will only prepare schemas and not compute results - this avoids doing double the work just to return `total_records` and `total_bytes` in `FlightInfo` before result is fetched via `DoGet`
+- Optimized implementation of Datafusion catalog, scheme, and table providers that includes caching and maximally delays the metadata scanning
+
+## [0.167.2] - 2024-03-23
+### Fixed
+- FlightSQL: Improved Python connectivity examples (ADBC, Sqlalchemy, DBAPI2, JDBC)
+- FlightSQL: Fix invalid `location` info in `FlightInfo` that was causing errors in some client libraries
+
+## [0.167.1] - 2024-03-20
+### Fixed
+- Bug when handle created during dataset creation had empty account name in a multi-tenant repo.
+
+## [0.167.0] - 2024-03-19
+### Added
+- Implementation of `ObjectRepository` that can cache small objects on local file system (e.g. to avoid too many calls to S3 repo)
+- Optional `S3RegistryCache` component that can cache the list of datasets under an S3 repo to avoid very expensive bucket prefix listing calls
+
+## [0.166.1] - 2024-03-14
+### Fixed
+- Allow OData adapter to skip fields with unsupported data types instead of chasing
+
+## [0.166.0] - 2024-03-14
+### Added
+- Experimental support for [OData](https://www.odata.org/) protocol
+### Fixed
+- Pulling datasets by account in multi-tenant workspace
+
+## [0.165.0] - 2024-03-12
+### Updated
+- Extended flow history: 
+   - start condition update event now holds a snapshot of the start condition
+   - input dataset trigger now returns a queryable Dataset object instead of simply identifier
+   - dependent dataset flows should not be launched after Up-To-Date input flow
+### Fixed
+- Zero value handling for `per_page` value in GraphQL
+- Flow history: more corrections to show natural time of flow events and keep flow system testable
+- Fixed metadata chain scanning regression
+
+## [0.164.2] - 2024-03-07
+### Changed
+- Using `cargo udeps` to detect unused dependencies during linting
+### Fixed
+- Flow history no longer produces duplicate flow abortion events
+- Flow history no longer shows initiation time that is earlier than the next event's time
+
+## [0.164.1] - 2024-03-06
+### Changed:
+- Flow status `Cancelled` was finally replaced with `Aborted`, unifying cancellation types for simplicity
+### Fixed
+- Flow system now pauses flow configuration, even when cancelling an already completed flow
+
+## [0.164.0] - 2024-03-06
 ### Added
 - Added support of wildcard patterns for `kamu pull` and `kamu push` commands
+- Added `{dataset}/tail` and `/query` REST API endpoints
+### Changed
+- Optimization of passes through metadata chain with API using Visitors
 
 ## [0.163.1] - 2024-03-01
 ### Fixed

@@ -50,6 +50,7 @@ pub struct FlowEventStartConditionUpdated {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
     pub start_condition: FlowStartCondition,
+    pub last_trigger_index: usize,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

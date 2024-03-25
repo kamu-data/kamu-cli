@@ -66,7 +66,7 @@ impl Datasets {
         let account_name = account_ref.account_name_internal();
 
         let mut all_datasets: Vec<_> = dataset_repo
-            .get_datasets_by_owner(account_name.to_owned().into())
+            .get_datasets_by_owner(&account_name.clone().into())
             .try_collect()
             .await?;
         let total_count = all_datasets.len();
