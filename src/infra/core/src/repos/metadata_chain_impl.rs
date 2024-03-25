@@ -221,7 +221,8 @@ where
             self.accept_by_interval(&mut validators, block.prev_block_hash.as_ref(), None)
                 .await?;
 
-            validate_logical_structure_visitor.post_visit()?;
+            // TODO: post visit actions
+            // validate_logical_structure_visitor.post_visit()?;
         }
 
         if opts.update_ref.is_some()

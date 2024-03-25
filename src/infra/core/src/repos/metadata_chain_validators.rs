@@ -342,57 +342,37 @@ impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-struct ExecuteTransformVisitorState<'a> {
-    appended_execute_transform: &'a ExecuteTransform,
-    prev_transform: Option<SetTransform>,
-    prev_schema: Option<SetDataSchema>,
-    prev_query: Option<ExecuteTransform>,
-    next_block_flags: Flag,
-}
-
-enum ValidateLogicalStructureVisitorState<'a> {
-    ExecuteTransform(ExecuteTransformVisitorState<'a>),
+enum ValidateLogicalStructureVisitorState {
     Stopped,
 }
 
-type State<'a> = ValidateLogicalStructureVisitorState<'a>;
+type State = ValidateLogicalStructureVisitorState;
 
-pub struct ValidateLogicalStructureVisitor<'a> {
-    state: State<'a>,
+pub struct ValidateLogicalStructureVisitor {
+    state: State,
 }
 
-impl<'a> ValidateLogicalStructureVisitor<'a> {
-    pub fn new(block: &'a MetadataBlock) -> Self {
+impl ValidateLogicalStructureVisitor {
+    pub fn new(block: &MetadataBlock) -> Self {
         let state = match &block.event {
             MetadataEvent::SetDataSchema(_) => {
                 // TODO: Consider schema evolution rules
                 // TODO: Consider what happens with previously defined sources
                 State::Stopped
             }
-            MetadataEvent::AddData(_) => unreachable!(),
-            // TODO: ensure only used on Derivative datasets
-            MetadataEvent::ExecuteTransform(e) => {
-                State::ExecuteTransform(ExecuteTransformVisitorState {
-                    appended_execute_transform: e,
-                    prev_transform: None,
-                    prev_schema: None,
-                    prev_query: None,
-                    next_block_flags: Flag::SET_DATA_SCHEMA
-                        | Flag::SET_TRANSFORM
-                        | Flag::EXECUTE_TRANSFORM,
-                })
-            }
-            MetadataEvent::SetPollingSource(_) => unreachable!(),
+            MetadataEvent::AddData(_)
+            | MetadataEvent::ExecuteTransform(_)
+            | MetadataEvent::SetPollingSource(_)
+            | MetadataEvent::AddPushSource(_)
+            | MetadataEvent::SetTransform(_) => unreachable!(),
             MetadataEvent::DisablePollingSource(_) => {
                 // TODO: Ensure has previously active polling source
                 unimplemented!("Disabling sources is not yet fully supported")
             }
-            MetadataEvent::AddPushSource(_) => unreachable!(),
             MetadataEvent::DisablePushSource(_) => {
                 // TODO: Ensure has previous push source with matching name
                 unimplemented!("Disabling sources is not yet fully supported")
             }
-            MetadataEvent::SetTransform(_) => unreachable!(),
             MetadataEvent::Seed(_)
             | MetadataEvent::SetVocab(_)
             | MetadataEvent::SetAttachments(_)
@@ -402,174 +382,19 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
 
         Self { state }
     }
-
-    pub fn post_visit(self) -> Result<(), AppendError> {
-        match self.state {
-            State::ExecuteTransform(state) => Self::handle_post_visit_execute_transform(state),
-            State::Stopped => Ok(()),
-        }
-    }
-
-    fn handle_post_visit_execute_transform(
-        ExecuteTransformVisitorState {
-            appended_execute_transform: e,
-            prev_transform,
-            prev_schema,
-            prev_query,
-            ..
-        }: ExecuteTransformVisitorState,
-    ) -> Result<(), AppendError> {
-        // Validate schema was defined if we're adding data
-        if prev_schema.is_none() && e.new_data.is_some() {
-            invalid_event!(
-                e.clone(),
-                "SetDataSchema event must be present before adding data",
-            );
-        }
-
-        // Validate inputs are listed in the same exact order as in SetTransform (or
-        // through recursion, in previous ExecuteTransform)
-        let actual_inputs = e.query_inputs.iter().map(|i| &i.dataset_id);
-        if let Some(prev_transform) = &prev_transform {
-            if actual_inputs.ne(prev_transform
-                .inputs
-                .iter()
-                .map(|i| i.dataset_ref.id().unwrap()))
-            {
-                invalid_event!(
-                    e.clone(),
-                    "Inputs must be listed in same order as initially declared in SetTransform \
-                     event",
-                );
-            }
-        } else if let Some(prev_query) = &prev_query {
-            if actual_inputs.ne(prev_query.query_inputs.iter().map(|i| &i.dataset_id)) {
-                invalid_event!(
-                    e.clone(),
-                    "Inputs must be listed in same order as initially declared in SetTransform \
-                     event",
-                );
-            }
-        } else {
-            invalid_event!(
-                e.clone(),
-                "ExecuteTransform must be preceded by SetTransform event",
-            );
-        }
-
-        // Validate input offset and block sequencing
-        if let Some(prev_query) = &prev_query {
-            for (prev, new) in prev_query.query_inputs.iter().zip(&e.query_inputs) {
-                if new.new_block_hash.is_some() && new.new_block_hash == new.prev_block_hash {
-                    invalid_event!(e.clone(), "Invalid input block interval");
-                }
-
-                if new.new_offset.is_some() && new.new_offset == new.prev_offset {
-                    invalid_event!(e.clone(), "Invalid input offset interval");
-                }
-
-                if new.prev_block_hash.as_ref() != prev.last_block_hash() {
-                    invalid_event!(
-                        e.clone(),
-                        "Input prevBlockHash does not correspond to the last block included in \
-                         the previous query",
-                    );
-                }
-
-                if new.prev_offset != prev.last_offset() {
-                    invalid_event!(
-                        e.clone(),
-                        "Input prevOffset hash does not correspond to the last offset included in \
-                         the previous query",
-                    );
-                }
-
-                if new.new_offset.is_some() && new.new_block_hash.is_none() {
-                    invalid_event!(
-                        e.clone(),
-                        "Input specifies a non-empty offset interval, but its block interval is \
-                         empty",
-                    );
-                }
-            }
-        }
-
-        let expected_prev_checkpoint = prev_query
-            .as_ref()
-            .and_then(|v| v.new_checkpoint.as_ref())
-            .map(|c| &c.physical_hash);
-        let prev_watermark = prev_query.as_ref().and_then(|v| v.new_watermark.as_ref());
-
-        // Validate input/output checkpoint sequencing
-        if e.prev_checkpoint.as_ref() != expected_prev_checkpoint {
-            invalid_event!(
-                e.clone(),
-                "Input checkpoint does not correspond to the last checkpoint in the chain",
-            );
-        }
-
-        // Validate event advances some state
-        if e.new_data.is_none()
-            && e.new_checkpoint.as_ref().map(|v| &v.physical_hash) == e.prev_checkpoint.as_ref()
-            && e.new_watermark.as_ref() == prev_watermark
-        {
-            return Err(AppendValidationError::no_op_event(
-                e.clone(),
-                "Event neither has data nor it advances checkpoint or watermark",
-            )
-            .into());
-        }
-
-        Ok(())
-    }
 }
 
-impl<'a> MetadataChainVisitor for ValidateLogicalStructureVisitor<'a> {
+impl MetadataChainVisitor for ValidateLogicalStructureVisitor {
     type Error = AppendError;
 
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
+    fn initial_decision(&self) -> Decision {
         match &self.state {
-            State::ExecuteTransform(state) => {
-                let e = state.appended_execute_transform;
-
-                if e.is_empty() {
-                    return Err(
-                        AppendValidationError::no_op_event(e.clone(), "Event is empty").into(),
-                    );
-                }
-
-                Ok(Decision::NextOfType(state.next_block_flags))
-            }
-            State::Stopped => Ok(Decision::Stop),
+            State::Stopped => Decision::Stop,
         }
     }
 
-    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+    fn visit(&mut self, _: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         match &mut self.state {
-            State::ExecuteTransform(state) => {
-                match &block.event {
-                    MetadataEvent::SetDataSchema(e) => {
-                        state.prev_schema = Some(e.clone());
-                        state.next_block_flags -= Flag::SET_DATA_SCHEMA;
-                    }
-                    MetadataEvent::SetTransform(e) => {
-                        state.prev_transform = Some(e.clone());
-                        state.next_block_flags -= Flag::SET_TRANSFORM;
-                    }
-                    MetadataEvent::ExecuteTransform(e) => {
-                        state.prev_query = Some(e.clone());
-                        state.next_block_flags -= Flag::EXECUTE_TRANSFORM;
-                    }
-                    _ => unreachable!(),
-                }
-
-                // Note: `prev_transform` is optional
-                if state.prev_schema.is_some() && state.prev_query.is_some() {
-                    state.next_block_flags -= Flag::SET_TRANSFORM;
-                }
-
-                Ok(Decision::NextOfType(state.next_block_flags))
-            }
             State::Stopped => {
                 unreachable!()
             }
@@ -806,6 +631,185 @@ impl<'a> MetadataChainVisitorWithPostVisit for ValidateAddData<'a> {
             return Err(AppendValidationError::no_op_event(
                 e.clone(),
                 "Event neither has data nor it advances checkpoint, watermark, or source state",
+            )
+            .into());
+        }
+
+        Ok(())
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct ValidateExecuteTransform<'a> {
+    appended_execute_transform: &'a ExecuteTransform,
+    prev_transform: Option<SetTransform>,
+    prev_schema: Option<SetDataSchema>,
+    prev_query: Option<ExecuteTransform>,
+    next_block_flags: Flag,
+}
+
+// TODO: extract "Event is empty" visitor
+impl<'a> ValidateExecuteTransform<'a> {
+    pub fn new(e: &'a ExecuteTransform) -> Result<Self, AppendError> {
+        // TODO: ensure only used on Derivative datasets
+
+        if e.is_empty() {
+            return Err(AppendValidationError::no_op_event(e.clone(), "Event is empty").into());
+        }
+
+        Ok(Self {
+            appended_execute_transform: e,
+            prev_transform: None,
+            prev_schema: None,
+            prev_query: None,
+            next_block_flags: Flag::SET_DATA_SCHEMA | Flag::SET_TRANSFORM | Flag::EXECUTE_TRANSFORM,
+        })
+    }
+}
+
+impl<'a> MetadataChainVisitor for ValidateExecuteTransform<'a> {
+    type Error = AppendError;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::NextOfType(self.next_block_flags)
+    }
+
+    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        match &block.event {
+            MetadataEvent::SetDataSchema(e) => {
+                self.prev_schema = Some(e.clone());
+                self.next_block_flags -= Flag::SET_DATA_SCHEMA;
+            }
+            MetadataEvent::SetTransform(e) => {
+                self.prev_transform = Some(e.clone());
+                self.next_block_flags -= Flag::SET_TRANSFORM;
+            }
+            MetadataEvent::ExecuteTransform(e) => {
+                self.prev_query = Some(e.clone());
+                self.next_block_flags -= Flag::EXECUTE_TRANSFORM;
+            }
+            _ => unreachable!(),
+        }
+
+        // Note: `prev_transform` is optional
+        if self.prev_schema.is_some() && self.prev_query.is_some() {
+            self.next_block_flags -= Flag::SET_TRANSFORM;
+        }
+
+        Ok(Decision::NextOfType(self.next_block_flags))
+    }
+}
+
+impl<'a> MetadataChainVisitorWithPostVisit for ValidateExecuteTransform<'a> {
+    type PostVisitError = AppendError;
+
+    fn post_visit(self) -> Result<(), Self::Error> {
+        let ValidateExecuteTransform {
+            appended_execute_transform: e,
+            prev_transform,
+            prev_schema,
+            prev_query,
+            ..
+        } = self;
+
+        // Validate schema was defined if we're adding data
+        if prev_schema.is_none() && e.new_data.is_some() {
+            invalid_event!(
+                e.clone(),
+                "SetDataSchema event must be present before adding data",
+            );
+        }
+
+        // Validate inputs are listed in the same exact order as in SetTransform (or
+        // through recursion, in previous ExecuteTransform)
+        let actual_inputs = e.query_inputs.iter().map(|i| &i.dataset_id);
+        if let Some(prev_transform) = &prev_transform {
+            if actual_inputs.ne(prev_transform
+                .inputs
+                .iter()
+                .map(|i| i.dataset_ref.id().unwrap()))
+            {
+                invalid_event!(
+                    e.clone(),
+                    "Inputs must be listed in same order as initially declared in SetTransform \
+                     event",
+                );
+            }
+        } else if let Some(prev_query) = &prev_query {
+            if actual_inputs.ne(prev_query.query_inputs.iter().map(|i| &i.dataset_id)) {
+                invalid_event!(
+                    e.clone(),
+                    "Inputs must be listed in same order as initially declared in SetTransform \
+                     event",
+                );
+            }
+        } else {
+            invalid_event!(
+                e.clone(),
+                "ExecuteTransform must be preceded by SetTransform event",
+            );
+        }
+
+        // Validate input offset and block sequencing
+        if let Some(prev_query) = &prev_query {
+            for (prev, new) in prev_query.query_inputs.iter().zip(&e.query_inputs) {
+                if new.new_block_hash.is_some() && new.new_block_hash == new.prev_block_hash {
+                    invalid_event!(e.clone(), "Invalid input block interval");
+                }
+
+                if new.new_offset.is_some() && new.new_offset == new.prev_offset {
+                    invalid_event!(e.clone(), "Invalid input offset interval");
+                }
+
+                if new.prev_block_hash.as_ref() != prev.last_block_hash() {
+                    invalid_event!(
+                        e.clone(),
+                        "Input prevBlockHash does not correspond to the last block included in \
+                         the previous query",
+                    );
+                }
+
+                if new.prev_offset != prev.last_offset() {
+                    invalid_event!(
+                        e.clone(),
+                        "Input prevOffset hash does not correspond to the last offset included in \
+                         the previous query",
+                    );
+                }
+
+                if new.new_offset.is_some() && new.new_block_hash.is_none() {
+                    invalid_event!(
+                        e.clone(),
+                        "Input specifies a non-empty offset interval, but its block interval is \
+                         empty",
+                    );
+                }
+            }
+        }
+
+        let expected_prev_checkpoint = prev_query
+            .as_ref()
+            .and_then(|v| v.new_checkpoint.as_ref())
+            .map(|c| &c.physical_hash);
+        let prev_watermark = prev_query.as_ref().and_then(|v| v.new_watermark.as_ref());
+
+        // Validate input/output checkpoint sequencing
+        if e.prev_checkpoint.as_ref() != expected_prev_checkpoint {
+            invalid_event!(
+                e.clone(),
+                "Input checkpoint does not correspond to the last checkpoint in the chain",
+            );
+        }
+
+        // Validate event advances some state
+        if e.new_data.is_none()
+            && e.new_checkpoint.as_ref().map(|v| &v.physical_hash) == e.prev_checkpoint.as_ref()
+            && e.new_watermark.as_ref() == prev_watermark
+        {
+            return Err(AppendValidationError::no_op_event(
+                e.clone(),
+                "Event neither has data nor it advances checkpoint or watermark",
             )
             .into());
         }
