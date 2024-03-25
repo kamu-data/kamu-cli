@@ -109,7 +109,7 @@ impl CompactionListener for CompactionProgress {
         let message = match phase {
             CompactionPhase::GatherChainInfo => "Gathering chain information",
             CompactionPhase::MergeDataslices => "Merging dataslices",
-            CompactionPhase::ReplaceChainHead => "Replacing dataset chain head",
+            CompactionPhase::CommitNewBlocks => "Commiting new blocks",
             CompactionPhase::CleanOldFiles => "Cleaning old dataset files",
         };
         self.curr_progress.set_message(message);

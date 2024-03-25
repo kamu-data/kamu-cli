@@ -1269,6 +1269,10 @@ pub fn cli() -> Command {
                                     .long("hard")
                                     .action(ArgAction::SetTrue)
                                     .help("Perform 'hard' compaction that rewrites the history of a dataset"),
+                                Arg::new("verify")
+                                    .long("verify")
+                                    .action(ArgAction::SetTrue)
+                                    .help("Perform verification of the dataset before running a compaction"),
                             ])
                             .after_help(indoc::indoc!(
                                 r#"

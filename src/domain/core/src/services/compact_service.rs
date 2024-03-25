@@ -144,6 +144,6 @@ impl CompactionMultiListener for NullCompactionMultiListener {}
 pub enum CompactionPhase {
     GatherChainInfo,
     MergeDataslices,
-    ReplaceChainHead,
+    CommitNewBlocks,
     CleanOldFiles,
 }

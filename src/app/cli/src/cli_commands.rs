@@ -486,6 +486,7 @@ pub fn get_command(
                 *(submatches.get_one("max-slice-size").unwrap()),
                 *(submatches.get_one("max-slice-records").unwrap()),
                 submatches.get_flag("hard"),
+                submatches.get_flag("verify"),
             )),
             _ => return Err(CommandInterpretationFailed.into()),
         },

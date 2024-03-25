@@ -148,7 +148,7 @@ impl TransformServiceImpl {
                             system_time: Some(request.system_time),
                             prev_block_hash: Some(Some(&request.head)),
                             check_object_refs: false,
-                            is_reset_head: true,
+                            update_head: true,
                         },
                     )
                     .await?;
@@ -176,7 +176,7 @@ impl TransformServiceImpl {
                     system_time: Some(request.system_time),
                     prev_block_hash: Some(Some(&request.head)),
                     check_object_refs: true,
-                    is_reset_head: true,
+                    update_head: true,
                 },
             )
             .await?;

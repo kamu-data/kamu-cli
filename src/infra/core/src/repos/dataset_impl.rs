@@ -442,7 +442,7 @@ where
 
         tracing::info!(?block, "Committing new block");
 
-        let append_opts = if !opts.is_reset_head {
+        let append_opts = if !opts.update_head {
             AppendOpts {
                 update_ref: None,
                 check_ref_is_prev_block: false,

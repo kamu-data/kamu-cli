@@ -28,6 +28,7 @@ pub struct CompactCommand {
     max_slice_size: u64,
     max_slice_records: u64,
     is_hard: bool,
+    is_verify: bool,
 }
 
 impl CompactCommand {
@@ -39,6 +40,7 @@ impl CompactCommand {
         max_slice_size: u64,
         max_slice_records: u64,
         is_hard: bool,
+        is_verify: bool,
     ) -> Self {
         Self {
             dataset_repo,
@@ -48,6 +50,7 @@ impl CompactCommand {
             max_slice_size,
             max_slice_records,
             is_hard,
+            is_verify,
         }
     }
 
@@ -89,12 +92,15 @@ impl Command for CompactCommand {
             .await
             .map_err(CLIError::failure)?;
 
-        if let Err(err) = self.verify_dataset(&dataset_handle).await {
-            eprintln!(
-                "{}",
-                console::style("Cannot perform compacting, dataset is invalid".to_string()).red()
-            );
-            return Err(err);
+        if self.is_verify {
+            if let Err(err) = self.verify_dataset(&dataset_handle).await {
+                eprintln!(
+                    "{}",
+                    console::style("Cannot perform compacting, dataset is invalid".to_string())
+                        .red()
+                );
+                return Err(err);
+            }
         }
 
         let progress = CompactionMultiProgress::new();
