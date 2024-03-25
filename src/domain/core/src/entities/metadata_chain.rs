@@ -237,6 +237,32 @@ pub trait MetadataChainExt: MetadataChain {
 
         Ok(visitor)
     }
+
+    /// An auxiliary method that simplifies the work if only one custom Visitor
+    /// is used.
+    async fn reduce<S, F, E>(
+        &self,
+        state: S,
+        initial_decision: MetadataVisitorDecision,
+        callback: F,
+    ) -> Result<S, E>
+    where
+        S: Send + Sync,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E>
+            + Send
+            + Sync,
+        E: Error + From<IterBlocksError> + Send + Sync,
+    {
+        // TODO: update GenericCallbackVisitor visitor callback
+        let mut visitor =
+            GenericCallbackVisitor::new(state, initial_decision, |state, (hash, block)| {
+                callback(state, hash, block)
+            });
+
+        self.accept(&mut [&mut visitor]).await?;
+
+        Ok(visitor.into_state())
+    }
 }
 
 impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
