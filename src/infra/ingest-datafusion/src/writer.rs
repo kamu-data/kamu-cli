@@ -861,7 +861,7 @@ impl DataWriterDataFusionBuilder {
         let mut prev_source_state_visitor = GenericCallbackVisitor::new(
             None::<SourceState>,
             Decision::NextOfType(Flag::ADD_DATA),
-            |state, (_, block)| {
+            |state, _, block| {
                 let MetadataEvent::AddData(e) = &block.event else {
                     unreachable!()
                 };
@@ -897,7 +897,7 @@ impl DataWriterDataFusionBuilder {
                 prev_offset: None,
             },
             Decision::NextOfType(Flag::ADD_DATA),
-            |state, (_, block)| {
+            |state, _, block| {
                 let MetadataEvent::AddData(e) = &block.event else {
                     unreachable!()
                 };

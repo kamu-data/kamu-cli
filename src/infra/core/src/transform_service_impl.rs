@@ -594,7 +594,7 @@ impl TransformServiceImpl {
                     finished_range: false,
                 },
                 Decision::NextOfType(Flag::EXECUTE_TRANSFORM),
-                |state, (hash, block)| {
+                |state, hash, block| {
                     if Some(block.sequence_number) < state.tail_sequence_number {
                         state.finished_range = true;
 

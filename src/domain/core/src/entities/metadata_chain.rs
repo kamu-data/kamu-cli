@@ -284,11 +284,7 @@ pub trait MetadataChainExt: MetadataChain {
             + Sync,
         E: Error + From<IterBlocksError> + Send + Sync,
     {
-        // TODO: update GenericCallbackVisitor visitor callback
-        let mut visitor =
-            GenericCallbackVisitor::new(state, initial_decision, |state, (hash, block)| {
-                callback(state, hash, block)
-            });
+        let mut visitor = GenericCallbackVisitor::new(state, initial_decision, callback);
 
         self.accept_by_hash(&mut [&mut visitor], head_hash).await?;
 

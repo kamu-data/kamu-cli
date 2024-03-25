@@ -179,7 +179,7 @@ pub struct GenericCallbackVisitor<S, F, E = InternalError> {
 impl<S, F, E> GenericCallbackVisitor<S, F, E>
 where
     S: Send + Sync,
-    F: Fn(&mut S, HashedMetadataBlockRef) -> Result<Decision, E> + Send + Sync,
+    F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<Decision, E> + Send + Sync,
     E: Error + Send + Sync,
 {
     pub fn new(state: S, initial_decision: Decision, visit_callback: F) -> Self {
@@ -199,7 +199,7 @@ where
 impl<S, F, E> MetadataChainVisitor for GenericCallbackVisitor<S, F, E>
 where
     S: Send + Sync,
-    F: Fn(&mut S, HashedMetadataBlockRef) -> Result<Decision, E> + Send + Sync,
+    F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<Decision, E> + Send + Sync,
     E: Error + Send + Sync,
 {
     type Error = E;
@@ -208,8 +208,8 @@ where
         self.initial_decision.clone()
     }
 
-    fn visit(&mut self, hashed_block_ref: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
-        (self.visit_callback)(&mut self.state, hashed_block_ref)
+    fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        (self.visit_callback)(&mut self.state, hash, block)
     }
 }
 
