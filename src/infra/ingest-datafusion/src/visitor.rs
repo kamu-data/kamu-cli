@@ -44,7 +44,6 @@ pub struct DataWriterDataFusionMetaDataStateVisitor<'a> {
 
     maybe_schema: Option<SchemaRef>,
     maybe_source_event: Option<MetadataEvent>,
-    maybe_set_vocab: Option<SetVocab>,
 
     maybe_prev_checkpoint: Option<Multihash>,
     maybe_prev_watermark: Option<DateTime<Utc>>,
@@ -60,7 +59,6 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
             .union(Flag::DISABLE_POLLING_SOURCE)
             .union(Flag::ADD_PUSH_SOURCE)
             .union(Flag::DISABLE_PUSH_SOURCE)
-            .union(Flag::SET_VOCAB)
             .union(Flag::SEED);
 
         Self {
@@ -72,7 +70,6 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
 
             maybe_schema: None,
             maybe_source_event: None,
-            maybe_set_vocab: None,
 
             maybe_prev_checkpoint: None,
             maybe_prev_watermark: None,
@@ -103,7 +100,8 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
             schema: self.maybe_schema,
             source_event: self.maybe_source_event,
             merge_strategy,
-            vocab: self.maybe_set_vocab.unwrap_or_default().into(),
+            // TODO: remove
+            vocab: SetVocab::default().into(),
             data_slices: self.data_slices,
             prev_offset: self.maybe_prev_offset,
             prev_checkpoint: self.maybe_prev_checkpoint,
@@ -186,10 +184,6 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
         Ok(())
     }
 
-    fn handle_set_vocab(&mut self, e: &SetVocab) {
-        self.maybe_set_vocab = Some(e.clone());
-    }
-
     fn handle_seed(&mut self, e: &Seed) {
         assert_eq!(e.dataset_kind, DatasetKind::Root);
     }
@@ -226,11 +220,6 @@ impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
                     self.next_block_flags -= Flag::ADD_PUSH_SOURCE;
                 }
             }
-            MetadataEvent::SetVocab(e) => {
-                self.handle_set_vocab(e);
-
-                self.next_block_flags -= Flag::SET_VOCAB;
-            }
             MetadataEvent::Seed(e) => {
                 self.handle_seed(e);
 
@@ -240,6 +229,7 @@ impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
                 unimplemented!("Disabling sources is not yet fully supported")
             }
             MetadataEvent::ExecuteTransform(_)
+            | MetadataEvent::SetVocab(_)
             | MetadataEvent::SetTransform(_)
             | MetadataEvent::SetAttachments(_)
             | MetadataEvent::SetInfo(_)

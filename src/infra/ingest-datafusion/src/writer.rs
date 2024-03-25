@@ -852,14 +852,23 @@ impl DataWriterDataFusionBuilder {
             .await
             .int_err()?;
 
+        let mut set_vocab_visitor = SearchSetVocabVisitor::<ScanMetadataError>::default();
         let mut visitor = DataWriterDataFusionMetaDataStateVisitor::new(head.clone(), source_name);
 
         self.dataset
             .as_metadata_chain()
-            .accept_by_hash(&mut [&mut visitor], &head)
+            .accept_by_hash(
+                &mut [
+                    &mut set_vocab_visitor as &mut dyn MetadataChainVisitor<Error = _>,
+                    &mut visitor,
+                ],
+                &head,
+            )
             .await?;
 
-        let metadata_state = visitor.get_metadata_state()?;
+        let mut metadata_state = visitor.get_metadata_state()?;
+        // TODO: temp
+        metadata_state.vocab = set_vocab_visitor.into_event().unwrap_or_default().into();
 
         Ok(self.with_metadata_state(metadata_state))
     }
