@@ -342,13 +342,6 @@ impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-struct AddDataVisitorState<'a> {
-    appended_add_data: &'a AddData,
-    prev_schema: Option<SetDataSchema>,
-    prev_add_data: Option<AddData>,
-    next_block_flags: Flag,
-}
-
 struct ExecuteTransformVisitorState<'a> {
     appended_execute_transform: &'a ExecuteTransform,
     prev_transform: Option<SetTransform>,
@@ -358,7 +351,6 @@ struct ExecuteTransformVisitorState<'a> {
 }
 
 enum ValidateLogicalStructureVisitorState<'a> {
-    AddData(AddDataVisitorState<'a>),
     ExecuteTransform(ExecuteTransformVisitorState<'a>),
     Stopped,
 }
@@ -370,37 +362,6 @@ pub struct ValidateLogicalStructureVisitor<'a> {
 }
 
 impl<'a> ValidateLogicalStructureVisitor<'a> {
-    fn validate_transform(e: &MetadataEvent, transform: &Transform) -> Result<(), AppendError> {
-        let Transform::Sql(transform) = transform;
-        if transform.query.is_some() {
-            invalid_event!(e.clone(), "Transform queries must be normalized");
-        }
-
-        if transform.queries.is_none() || transform.queries.as_ref().unwrap().is_empty() {
-            invalid_event!(e.clone(), "Transform must have at least one query");
-        }
-
-        let queries = transform.queries.as_ref().unwrap();
-
-        if queries.last().unwrap().alias.is_some() {
-            invalid_event!(
-                e.clone(),
-                "Last query in a transform must have no alias an will be treated as an output"
-            );
-        }
-
-        for q in &queries[..queries.len() - 1] {
-            if q.alias.is_none() {
-                invalid_event!(
-                    e.clone(),
-                    "In a transform all queries except the last one must have aliases"
-                );
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn new(block: &'a MetadataBlock) -> Self {
         let state = match &block.event {
             MetadataEvent::SetDataSchema(_) => {
@@ -408,12 +369,7 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
                 // TODO: Consider what happens with previously defined sources
                 State::Stopped
             }
-            MetadataEvent::AddData(e) => State::AddData(AddDataVisitorState {
-                appended_add_data: e,
-                prev_schema: None,
-                prev_add_data: None,
-                next_block_flags: Flag::SET_DATA_SCHEMA | Flag::ADD_DATA,
-            }),
+            MetadataEvent::AddData(_) => unreachable!(),
             // TODO: ensure only used on Derivative datasets
             MetadataEvent::ExecuteTransform(e) => {
                 State::ExecuteTransform(ExecuteTransformVisitorState {
@@ -449,61 +405,9 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
 
     pub fn post_visit(self) -> Result<(), AppendError> {
         match self.state {
-            State::AddData(state) => Self::handle_post_visit_add_data(state),
             State::ExecuteTransform(state) => Self::handle_post_visit_execute_transform(state),
             State::Stopped => Ok(()),
         }
-    }
-
-    fn handle_post_visit_add_data(
-        AddDataVisitorState {
-            appended_add_data: e,
-            prev_schema,
-            prev_add_data,
-            ..
-        }: AddDataVisitorState,
-    ) -> Result<(), AppendError> {
-        // Validate schema was defined before adding any data
-        if prev_schema.is_none() && e.new_data.is_some() {
-            invalid_event!(
-                e.clone(),
-                "SetDataSchema event must be present before adding data",
-            );
-        }
-
-        let expected_prev_checkpoint = prev_add_data
-            .as_ref()
-            .and_then(|v| v.new_checkpoint.as_ref())
-            .map(|c| &c.physical_hash);
-        let prev_watermark = prev_add_data
-            .as_ref()
-            .and_then(|v| v.new_watermark.as_ref());
-        let prev_source_state = prev_add_data
-            .as_ref()
-            .and_then(|v| v.new_source_state.as_ref());
-
-        // Validate input/output checkpoint sequencing
-        if e.prev_checkpoint.as_ref() != expected_prev_checkpoint {
-            invalid_event!(
-                e.clone(),
-                "Input checkpoint does not correspond to the last checkpoint in the chain",
-            );
-        }
-
-        // Validate event advances some state
-        if e.new_data.is_none()
-            && e.new_checkpoint.as_ref().map(|v| &v.physical_hash) == e.prev_checkpoint.as_ref()
-            && e.new_watermark.as_ref() == prev_watermark
-            && e.new_source_state.as_ref() == prev_source_state
-        {
-            return Err(AppendValidationError::no_op_event(
-                e.clone(),
-                "Event neither has data nor it advances checkpoint, watermark, or source state",
-            )
-            .into());
-        }
-
-        Ok(())
     }
 
     fn handle_post_visit_execute_transform(
@@ -625,18 +529,6 @@ impl<'a> MetadataChainVisitor for ValidateLogicalStructureVisitor<'a> {
 
     fn initial_decision(&self) -> Result<Decision, Self::Error> {
         match &self.state {
-            State::AddData(state) => {
-                // TODO: ensure only used on Root datasets
-                let e = state.appended_add_data;
-
-                if e.is_empty() {
-                    return Err(
-                        AppendValidationError::no_op_event(e.clone(), "Event is empty").into(),
-                    );
-                }
-
-                Ok(Decision::NextOfType(state.next_block_flags))
-            }
             State::ExecuteTransform(state) => {
                 let e = state.appended_execute_transform;
 
@@ -654,21 +546,6 @@ impl<'a> MetadataChainVisitor for ValidateLogicalStructureVisitor<'a> {
 
     fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         match &mut self.state {
-            State::AddData(state) => {
-                match &block.event {
-                    MetadataEvent::AddData(e) => {
-                        state.prev_add_data = Some(e.clone());
-                        state.next_block_flags -= Flag::ADD_DATA;
-                    }
-                    MetadataEvent::SetDataSchema(e) => {
-                        state.prev_schema = Some(e.clone());
-                        state.next_block_flags -= Flag::SET_DATA_SCHEMA;
-                    }
-                    _ => unreachable!(),
-                }
-
-                Ok(Decision::NextOfType(state.next_block_flags))
-            }
             State::ExecuteTransform(state) => {
                 match &block.event {
                     MetadataEvent::SetDataSchema(e) => {
@@ -750,13 +627,10 @@ impl MetadataChainVisitor for ValidateAddPushSource {
 pub struct ValidateSetPollingSource {}
 
 impl ValidateSetPollingSource {
-    pub fn new(
-        set_polling_source: &SetPollingSource,
-        block: &MetadataBlock,
-    ) -> Result<Self, AppendError> {
+    pub fn new(e: &SetPollingSource, block: &MetadataBlock) -> Result<Self, AppendError> {
         // Queries must be normalized
-        if let Some(transform) = &set_polling_source.preprocess {
-            Self::validate_transform(&block.event, transform)?;
+        if let Some(transform) = &e.preprocess {
+            validate_transform(&block.event, transform)?;
         }
 
         Ok(Self {})
@@ -822,6 +696,121 @@ impl MetadataChainVisitor for ValidateSetTransform {
 
     fn visit(&mut self, _: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         unreachable!()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub trait MetadataChainVisitorWithPostVisit: MetadataChainVisitor {
+    type PostVisitError: std::error::Error;
+
+    fn post_visit(self) -> Result<(), Self::PostVisitError>;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct ValidateAddData<'a> {
+    appended_add_data: &'a AddData,
+    prev_schema: Option<SetDataSchema>,
+    prev_add_data: Option<AddData>,
+    next_block_flags: Flag,
+}
+
+// TODO: extract "Event is empty" visitor
+impl<'a> ValidateAddData<'a> {
+    pub fn new(add_data: &'a AddData) -> Result<Self, AppendError> {
+        let e = add_data;
+
+        // TODO: ensure only used on Root datasets
+        if e.is_empty() {
+            return Err(AppendValidationError::no_op_event(e.clone(), "Event is empty").into());
+        }
+
+        Ok(Self {
+            appended_add_data: add_data,
+            prev_schema: None,
+            prev_add_data: None,
+            next_block_flags: Flag::SET_DATA_SCHEMA | Flag::ADD_DATA,
+        })
+    }
+}
+
+impl<'a> MetadataChainVisitor for ValidateAddData<'a> {
+    type Error = AppendError;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::NextOfType(self.next_block_flags)
+    }
+
+    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        match &block.event {
+            MetadataEvent::AddData(e) => {
+                self.prev_add_data = Some(e.clone());
+                self.next_block_flags -= Flag::ADD_DATA;
+            }
+            MetadataEvent::SetDataSchema(e) => {
+                self.prev_schema = Some(e.clone());
+                self.next_block_flags -= Flag::SET_DATA_SCHEMA;
+            }
+            _ => unreachable!(),
+        }
+
+        Ok(Decision::NextOfType(self.next_block_flags))
+    }
+}
+
+impl<'a> MetadataChainVisitorWithPostVisit for ValidateAddData<'a> {
+    type PostVisitError = AppendError;
+
+    fn post_visit(self) -> Result<(), Self::Error> {
+        let ValidateAddData {
+            appended_add_data: e,
+            prev_schema,
+            prev_add_data,
+            ..
+        } = self;
+
+        // Validate schema was defined before adding any data
+        if prev_schema.is_none() && e.new_data.is_some() {
+            invalid_event!(
+                e.clone(),
+                "SetDataSchema event must be present before adding data",
+            );
+        }
+
+        let expected_prev_checkpoint = prev_add_data
+            .as_ref()
+            .and_then(|v| v.new_checkpoint.as_ref())
+            .map(|c| &c.physical_hash);
+        let prev_watermark = prev_add_data
+            .as_ref()
+            .and_then(|v| v.new_watermark.as_ref());
+        let prev_source_state = prev_add_data
+            .as_ref()
+            .and_then(|v| v.new_source_state.as_ref());
+
+        // Validate input/output checkpoint sequencing
+        if e.prev_checkpoint.as_ref() != expected_prev_checkpoint {
+            invalid_event!(
+                e.clone(),
+                "Input checkpoint does not correspond to the last checkpoint in the chain",
+            );
+        }
+
+        // Validate event advances some state
+        if e.new_data.is_none()
+            && e.new_checkpoint.as_ref().map(|v| &v.physical_hash) == e.prev_checkpoint.as_ref()
+            && e.new_watermark.as_ref() == prev_watermark
+            && e.new_source_state.as_ref() == prev_source_state
+        {
+            return Err(AppendValidationError::no_op_event(
+                e.clone(),
+                "Event neither has data nor it advances checkpoint, watermark, or source state",
+            )
+            .into());
+        }
+
+        Ok(())
     }
 }
 
