@@ -360,14 +360,6 @@ struct ExecuteTransformVisitorState<'a> {
 enum ValidateLogicalStructureVisitorState<'a> {
     AddData(AddDataVisitorState<'a>),
     ExecuteTransform(ExecuteTransformVisitorState<'a>),
-    SetPollingSource {
-        appended_set_polling_source: &'a SetPollingSource,
-        appended_event: &'a MetadataEvent,
-    },
-    AddPushSource {
-        appended_add_push_source: &'a AddPushSource,
-        appended_event: &'a MetadataEvent,
-    },
     SetTransform {
         appended_set_transform: &'a SetTransform,
         appended_event: &'a MetadataEvent,
@@ -438,18 +430,12 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
                         | Flag::EXECUTE_TRANSFORM,
                 })
             }
-            MetadataEvent::SetPollingSource(e) => State::SetPollingSource {
-                appended_set_polling_source: e,
-                appended_event: &block.event,
-            },
+            MetadataEvent::SetPollingSource(_) => unreachable!(),
             MetadataEvent::DisablePollingSource(_) => {
                 // TODO: Ensure has previously active polling source
                 unimplemented!("Disabling sources is not yet fully supported")
             }
-            MetadataEvent::AddPushSource(e) => State::AddPushSource {
-                appended_add_push_source: e,
-                appended_event: &block.event,
-            },
+            MetadataEvent::AddPushSource(_) => unreachable!(),
             MetadataEvent::DisablePushSource(_) => {
                 // TODO: Ensure has previous push source with matching name
                 unimplemented!("Disabling sources is not yet fully supported")
@@ -472,10 +458,7 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
         match self.state {
             State::AddData(state) => Self::handle_post_visit_add_data(state),
             State::ExecuteTransform(state) => Self::handle_post_visit_execute_transform(state),
-            State::SetPollingSource { .. }
-            | State::AddPushSource { .. }
-            | State::SetTransform { .. }
-            | State::Stopped => Ok(()),
+            State::SetTransform { .. } | State::Stopped => Ok(()),
         }
     }
 
@@ -672,37 +655,6 @@ impl<'a> MetadataChainVisitor for ValidateLogicalStructureVisitor<'a> {
 
                 Ok(Decision::NextOfType(state.next_block_flags))
             }
-            State::SetPollingSource {
-                appended_set_polling_source: e,
-                appended_event,
-            } => {
-                // Queries must be normalized
-                if let Some(transform) = &e.preprocess {
-                    Self::validate_transform(appended_event, transform)?;
-                }
-
-                // Ensure no active push sources
-                Ok(Decision::NextOfType(Flag::ADD_PUSH_SOURCE))
-            }
-            State::AddPushSource {
-                appended_add_push_source: e,
-                appended_event,
-            } => {
-                // Ensure specifies the schema
-                if e.read.schema().is_none() {
-                    invalid_event!(
-                        (*e).clone(),
-                        "Push sources must specify the read schema explicitly",
-                    );
-                }
-
-                // Queries must be normalized
-                if let Some(transform) = &e.preprocess {
-                    Self::validate_transform(appended_event, transform)?;
-                }
-
-                Ok(Decision::NextOfType(Flag::SET_POLLING_SOURCE))
-            }
             State::SetTransform {
                 appended_set_transform: e,
                 appended_event,
@@ -772,31 +724,128 @@ impl<'a> MetadataChainVisitor for ValidateLogicalStructureVisitor<'a> {
 
                 Ok(Decision::NextOfType(state.next_block_flags))
             }
-            State::SetPollingSource { .. } => {
-                let MetadataEvent::AddPushSource(e) = &block.event else {
-                    unreachable!()
-                };
-
-                invalid_event!(
-                    e.clone(),
-                    "Cannot add a polling source while some push sources are still active",
-                );
-            }
-            State::AddPushSource { .. } => {
-                let MetadataEvent::SetPollingSource(e) = &block.event else {
-                    unreachable!()
-                };
-
-                invalid_event!(
-                    e.clone(),
-                    "Cannot add a push source while polling source is still active",
-                );
-            }
             State::Stopped | State::SetTransform { .. } => {
                 unreachable!()
             }
         }
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct ValidateAddPushSource {}
+
+impl ValidateAddPushSource {
+    pub fn new(
+        add_push_source: &AddPushSource,
+        block: &MetadataBlock,
+    ) -> Result<Self, AppendError> {
+        // Ensure specifies the schema
+        if add_push_source.read.schema().is_none() {
+            invalid_event!(
+                add_push_source.clone(),
+                "Push sources must specify the read schema explicitly",
+            );
+        }
+
+        // Queries must be normalized
+        if let Some(transform) = &add_push_source.preprocess {
+            validate_transform(&block.event, transform)?;
+        }
+
+        Ok(Self {})
+    }
+}
+
+impl MetadataChainVisitor for ValidateAddPushSource {
+    type Error = AppendError;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::NextOfType(Flag::SET_POLLING_SOURCE)
+    }
+
+    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        let MetadataEvent::SetPollingSource(e) = &block.event else {
+            unreachable!()
+        };
+
+        invalid_event!(
+            e.clone(),
+            "Cannot add a push source while polling source is still active",
+        );
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct ValidateSetPollingSource {}
+
+impl ValidateSetPollingSource {
+    pub fn new(
+        set_polling_source: &SetPollingSource,
+        block: &MetadataBlock,
+    ) -> Result<Self, AppendError> {
+        // Queries must be normalized
+        if let Some(transform) = &set_polling_source.preprocess {
+            Self::validate_transform(&block.event, transform)?;
+        }
+
+        Ok(Self {})
+    }
+}
+
+impl MetadataChainVisitor for ValidateSetPollingSource {
+    type Error = AppendError;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::NextOfType(Flag::ADD_PUSH_SOURCE)
+    }
+
+    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        let MetadataEvent::AddPushSource(e) = &block.event else {
+            unreachable!()
+        };
+
+        invalid_event!(
+            e.clone(),
+            "Cannot add a polling source while some push sources are still active",
+        );
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Helpers
+///////////////////////////////////////////////////////////////////////////////
+
+fn validate_transform(e: &MetadataEvent, transform: &Transform) -> Result<(), AppendError> {
+    let Transform::Sql(transform) = transform;
+    if transform.query.is_some() {
+        invalid_event!(e.clone(), "Transform queries must be normalized");
+    }
+
+    if transform.queries.is_none() || transform.queries.as_ref().unwrap().is_empty() {
+        invalid_event!(e.clone(), "Transform must have at least one query");
+    }
+
+    let queries = transform.queries.as_ref().unwrap();
+
+    if queries.last().unwrap().alias.is_some() {
+        invalid_event!(
+            e.clone(),
+            "Last query in a transform must have no alias an will be treated as an output"
+        );
+    }
+
+    for q in &queries[..queries.len() - 1] {
+        if q.alias.is_none() {
+            invalid_event!(
+                e.clone(),
+                "In a transform all queries except the last one must have aliases"
+            );
+        }
+    }
+
+    Ok(())
 }
 
 ///////////////////////////////////////////////////////////////////////////////
