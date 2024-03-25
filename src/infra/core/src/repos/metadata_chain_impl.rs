@@ -208,13 +208,13 @@ where
             let mut validate_logical_structure_visitor =
                 ValidateLogicalStructureVisitor::new(&block);
             let mut validators = [
-                &mut ValidateSeedBlockOrderVisitor::new(&block)
+                &mut ValidateSeedBlockOrderVisitor::new(&block)?
                     as &mut dyn MetadataChainVisitor<Error = _>,
                 &mut ValidatePrevBlockExistsVisitor::new(&block),
-                &mut ValidateSequenceNumbersIntegrityVisitor::new(&block),
+                &mut ValidateSequenceNumbersIntegrityVisitor::new(&block)?,
                 &mut ValidateSystemTimeIsMonotonicVisitor::new(&block),
                 &mut ValidateWatermarkIsMonotonicVisitor::new(&block),
-                &mut ValidateOffsetsAreSequentialVisitor::new(&block),
+                &mut ValidateOffsetsAreSequentialVisitor::new(&block)?,
                 &mut validate_logical_structure_visitor,
             ];
 

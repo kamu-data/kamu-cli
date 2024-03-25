@@ -175,10 +175,10 @@ pub trait MetadataChainExt: MetadataChain {
     where
         E: Error + From<IterBlocksError>,
     {
-        let mut decisions = visitors
+        let mut decisions: Vec<_> = visitors
             .iter()
             .map(|visitor| visitor.initial_decision())
-            .collect::<Result<Vec<_>, E>>()?;
+            .collect();
         let mut all_visitors_finished = false;
         let mut current_hash = head_hash.cloned();
 

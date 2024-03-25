@@ -198,8 +198,8 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
 impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
     type Error = ScanMetadataError;
 
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        Ok(Decision::NextOfType(self.next_block_flags))
+    fn initial_decision(&self) -> Decision {
+        Decision::NextOfType(self.next_block_flags)
     }
 
     fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {

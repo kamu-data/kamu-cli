@@ -44,7 +44,7 @@ pub enum MetadataVisitorDecision {
 pub trait MetadataChainVisitor: Sync + Send {
     type Error: std::error::Error;
 
-    fn initial_decision(&self) -> Result<MetadataVisitorDecision, Self::Error>;
+    fn initial_decision(&self) -> MetadataVisitorDecision;
 
     fn visit(
         &mut self,

@@ -107,8 +107,8 @@ where
 {
     type Error = E;
 
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        Ok(Decision::NextOfType(self.requested_flag))
+    fn initial_decision(&self) -> Decision {
+        Decision::NextOfType(self.requested_flag)
     }
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
@@ -186,8 +186,8 @@ where
 {
     type Error = E;
 
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        Ok(Decision::NextOfType(Flag::DATA_BLOCK))
+    fn initial_decision(&self) -> Decision {
+        Decision::NextOfType(Flag::DATA_BLOCK)
     }
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
@@ -251,8 +251,8 @@ where
 {
     type Error = E;
 
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        Ok(Decision::Next)
+    fn initial_decision(&self) -> Decision {
+        Decision::Next
     }
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
@@ -299,8 +299,8 @@ where
 {
     type Error = E;
 
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        Ok(self.initial_decision.clone())
+    fn initial_decision(&self) -> Decision {
+        self.initial_decision.clone()
     }
 
     fn visit(&mut self, hashed_block_ref: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
