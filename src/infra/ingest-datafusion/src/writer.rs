@@ -851,7 +851,7 @@ impl DataWriterDataFusionBuilder {
             .resolve_ref(&self.block_ref)
             .await
             .int_err()?;
-
+        let mut seed_visitor = SearchSeedVisitor::<ScanMetadataError>::default();
         let mut set_vocab_visitor = SearchSetVocabVisitor::<ScanMetadataError>::default();
         let mut set_data_schema_visitor =
             SearchSetDataSchemaVisitor::<ScanMetadataError>::default();
@@ -861,13 +861,20 @@ impl DataWriterDataFusionBuilder {
             .as_metadata_chain()
             .accept_by_hash(
                 &mut [
-                    &mut set_vocab_visitor as &mut dyn MetadataChainVisitor<Error = _>,
-                    &mut set_data_schema_visitor as &mut dyn MetadataChainVisitor<Error = _>,
+                    &mut seed_visitor as &mut dyn MetadataChainVisitor<Error = _>,
+                    &mut set_vocab_visitor,
+                    &mut set_data_schema_visitor,
                     &mut visitor,
                 ],
                 &head,
             )
             .await?;
+
+        {
+            let seed = seed_visitor.into_event().expect("Dataset without blocks");
+
+            assert_eq!(seed.dataset_kind, odf::DatasetKind::Root);
+        }
 
         let mut metadata_state = visitor.get_metadata_state()?;
         // TODO: temp

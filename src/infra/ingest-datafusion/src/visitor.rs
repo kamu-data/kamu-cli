@@ -16,13 +16,11 @@ use kamu_core::{
 use opendatafabric::{
     AddData,
     AddPushSource,
-    DatasetKind,
     MergeStrategy,
     MergeStrategyAppend,
     MetadataEvent,
     MetadataEventTypeFlags as Flag,
     Multihash,
-    Seed,
     SetPollingSource,
     SetVocab,
     SourceState,
@@ -53,8 +51,7 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
             .union(Flag::SET_POLLING_SOURCE)
             .union(Flag::DISABLE_POLLING_SOURCE)
             .union(Flag::ADD_PUSH_SOURCE)
-            .union(Flag::DISABLE_PUSH_SOURCE)
-            .union(Flag::SEED);
+            .union(Flag::DISABLE_PUSH_SOURCE);
 
         Self {
             head,
@@ -172,10 +169,6 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
 
         Ok(())
     }
-
-    fn handle_seed(&mut self, e: &Seed) {
-        assert_eq!(e.dataset_kind, DatasetKind::Root);
-    }
 }
 
 impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
@@ -204,15 +197,11 @@ impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
                     self.next_block_flags -= Flag::ADD_PUSH_SOURCE;
                 }
             }
-            MetadataEvent::Seed(e) => {
-                self.handle_seed(e);
-
-                self.next_block_flags -= Flag::SEED;
-            }
             MetadataEvent::DisablePollingSource(_) | MetadataEvent::DisablePushSource(_) => {
                 unimplemented!("Disabling sources is not yet fully supported")
             }
-            MetadataEvent::ExecuteTransform(_)
+            MetadataEvent::Seed(_)
+            | MetadataEvent::ExecuteTransform(_)
             | MetadataEvent::SetVocab(_)
             | MetadataEvent::SetDataSchema(_)
             | MetadataEvent::SetTransform(_)
