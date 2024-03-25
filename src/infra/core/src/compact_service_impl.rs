@@ -293,25 +293,26 @@ impl CompactServiceImpl {
         Ok((old_data_slices, current_head))
     }
 
-    fn _remove_old_files(
-        &self,
-        chain_files_info: &ChainFilesInfo,
-        old_data_slices: &Vec<Url>,
-    ) -> Result<(), CompactError> {
-        for file_url in old_data_slices {
-            fs::remove_file(file_url.to_file_path().unwrap()).int_err()?;
-        }
+    // fn _remove_old_files(
+    //     &self,
+    //     chain_files_info: &ChainFilesInfo,
+    //     old_data_slices: &Vec<Url>,
+    // ) -> Result<(), CompactError> {
+    //     for file_url in old_data_slices {
+    //         fs::remove_file(file_url.to_file_path().unwrap()).int_err()?;
+    //     }
 
-        let old_head_string = chain_files_info.old_head.as_multibase().to_string();
-        for block_file_url in &chain_files_info._block_file_urls {
-            // Stop cleaning up once we reach block where new chain started
-            if block_file_url.as_str().contains(&old_head_string) {
-                break;
-            }
-            fs::remove_file(block_file_url.to_file_path().unwrap()).int_err()?;
-        }
-        Ok(())
-    }
+    //     let old_head_string =
+    // chain_files_info.old_head.as_multibase().to_string();
+    //     for block_file_url in &chain_files_info._block_file_urls {
+    //         // Stop cleaning up once we reach block where new chain started
+    //         if block_file_url.as_str().contains(&old_head_string) {
+    //             break;
+    //         }
+    //         fs::remove_file(block_file_url.to_file_path().unwrap()).int_err()?;
+    //     }
+    //     Ok(())
+    // }
 }
 
 #[async_trait::async_trait]
