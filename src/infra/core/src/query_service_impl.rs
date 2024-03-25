@@ -361,42 +361,40 @@ impl KamuSchema {
             last_records_to_consider: Option<u64>,
         }
 
-        let mut slice_collector_visitor = GenericCallbackVisitor::new(
-            DataSliceCollectorVisitorState {
-                files: Vec::new(),
-                num_records: 0,
-                last_records_to_consider,
-            },
-            Decision::NextOfType(Flag::DATA_BLOCK),
-            |state, (_, block)| {
-                let new_data = match &block.event {
-                    MetadataEvent::AddData(e) => e.new_data.as_ref(),
-                    MetadataEvent::ExecuteTransform(e) => e.new_data.as_ref(),
-                    _ => return Ok(Decision::NextOfType(Flag::DATA_BLOCK)),
-                };
-                let Some(slice) = new_data else {
-                    return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
-                };
-
-                state.num_records += slice.num_records();
-                state.files.push(slice.physical_hash.clone());
-
-                if let Some(last_records_to_consider) = &state.last_records_to_consider
-                    && *last_records_to_consider <= state.num_records
-                {
-                    return Ok(Decision::Stop);
-                }
-
-                Ok(Decision::NextOfType(Flag::DATA_BLOCK))
-            },
-        );
-
-        dataset
+        let final_state = dataset
             .as_metadata_chain()
-            .accept::<InternalError>(&mut [&mut slice_collector_visitor])
+            .reduce(
+                DataSliceCollectorVisitorState {
+                    files: Vec::new(),
+                    num_records: 0,
+                    last_records_to_consider,
+                },
+                Decision::NextOfType(Flag::DATA_BLOCK),
+                |state, _, block| {
+                    let new_data = match &block.event {
+                        MetadataEvent::AddData(e) => e.new_data.as_ref(),
+                        MetadataEvent::ExecuteTransform(e) => e.new_data.as_ref(),
+                        _ => return Ok(Decision::NextOfType(Flag::DATA_BLOCK)),
+                    };
+                    let Some(slice) = new_data else {
+                        return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
+                    };
+
+                    state.num_records += slice.num_records();
+                    state.files.push(slice.physical_hash.clone());
+
+                    if let Some(last_records_to_consider) = &state.last_records_to_consider
+                        && *last_records_to_consider <= state.num_records
+                    {
+                        return Ok(Decision::Stop);
+                    }
+
+                    Ok::<Decision, InternalError>(Decision::NextOfType(Flag::DATA_BLOCK))
+                },
+            )
             .await?;
 
-        Ok(slice_collector_visitor.into_state().files)
+        Ok(final_state.files)
     }
 
     fn options_for(&self, dataset_handle: &DatasetHandle) -> Option<&DatasetQueryOptions> {
