@@ -170,7 +170,7 @@ async fn test_get_local_datasets_stream_single_tenant() {
     let res: Vec<_> = get_local_datasets_stream(
         dataset_filtering_harness.dataset_repo.as_ref(),
         vec![pattern],
-        dafault_account_name.clone(),
+        &dafault_account_name,
     )
     .try_collect()
     .await
@@ -182,7 +182,7 @@ async fn test_get_local_datasets_stream_single_tenant() {
     let mut res: Vec<_> = get_local_datasets_stream(
         dataset_filtering_harness.dataset_repo.as_ref(),
         vec![pattern],
-        dafault_account_name.clone(),
+        &dafault_account_name,
     )
     .try_collect()
     .await
@@ -195,7 +195,7 @@ async fn test_get_local_datasets_stream_single_tenant() {
     let res: Vec<_> = get_local_datasets_stream(
         dataset_filtering_harness.dataset_repo.as_ref(),
         vec![pattern.clone()],
-        dafault_account_name.clone(),
+        &dafault_account_name,
     )
     .try_collect()
     .await
@@ -226,7 +226,7 @@ async fn test_get_local_datasets_stream_multi_tenant() {
     let res: Vec<_> = get_local_datasets_stream(
         dataset_filtering_harness.dataset_repo.as_ref(),
         vec![pattern],
-        account_1.clone(),
+        &account_1,
     )
     .try_collect()
     .await
@@ -238,7 +238,7 @@ async fn test_get_local_datasets_stream_multi_tenant() {
     let res: Vec<_> = get_local_datasets_stream(
         dataset_filtering_harness.dataset_repo.as_ref(),
         vec![pattern],
-        account_2.clone(),
+        &account_2,
     )
     .try_collect()
     .await
@@ -250,7 +250,7 @@ async fn test_get_local_datasets_stream_multi_tenant() {
     let res: Vec<_> = get_local_datasets_stream(
         dataset_filtering_harness.dataset_repo.as_ref(),
         vec![pattern],
-        account_1.clone(),
+        &account_1,
     )
     .try_collect()
     .await

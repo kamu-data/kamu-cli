@@ -1,3 +1,5 @@
+adbc_driver_manager
+adbc_driver_flightsql
 flightsql-dbapi
 sqlalchemy
 pandas

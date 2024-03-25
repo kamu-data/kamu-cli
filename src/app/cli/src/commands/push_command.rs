@@ -78,7 +78,7 @@ impl PushCommand {
                     "Anonymous account misused, use multi-tenant alias",
                 ))
             }
-            CurrentAccountSubject::Logged(l) => l.account_name.clone(),
+            CurrentAccountSubject::Logged(l) => &l.account_name,
         };
 
         if let Some(remote_ref) = &self.to {

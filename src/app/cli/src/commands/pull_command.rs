@@ -107,14 +107,14 @@ impl PullCommand {
     async fn pull_multi(
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
-        current_account_name: AccountName,
+        current_account_name: &AccountName,
     ) -> Result<Vec<PullResponse>, CLIError> {
         let dataset_refs: Vec<_> = if !self.all {
             filter_datasets_by_any_pattern(
                 self.dataset_repo.as_ref(),
                 self.search_svc.clone(),
                 self.refs.clone(),
-                current_account_name.clone(),
+                current_account_name,
             )
             .try_collect()
             .await?
@@ -161,7 +161,7 @@ impl PullCommand {
                     "Anonymous account misused, use multi-tenant alias",
                 ))
             }
-            CurrentAccountSubject::Logged(l) => l.account_name.clone(),
+            CurrentAccountSubject::Logged(l) => &l.account_name,
         };
         if self.as_name.is_some() {
             self.sync_from(listener).await

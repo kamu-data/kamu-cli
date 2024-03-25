@@ -4,9 +4,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.168.0] - 2024-03-23
+### Changed
+- FlightSQL: For expensive queries `GetFlightInfo` we will only prepare schemas and not compute results - this avoids doing double the work just to return `total_records` and `total_bytes` in `FlightInfo` before result is fetched via `DoGet`
+- Optimized implementation of Datafusion catalog, scheme, and table providers that includes caching and maximally delays the metadata scanning
+
+## [0.167.2] - 2024-03-23
 ### Fixed
-- Pulling datasets by account in multitenant workspace
+- FlightSQL: Improved Python connectivity examples (ADBC, Sqlalchemy, DBAPI2, JDBC)
+- FlightSQL: Fix invalid `location` info in `FlightInfo` that was causing errors in some client libraries
+
+## [0.167.1] - 2024-03-20
+### Fixed
+- Bug when handle created during dataset creation had empty account name in a multi-tenant repo.
+
+## [0.167.0] - 2024-03-19
+### Added
+- Implementation of `ObjectRepository` that can cache small objects on local file system (e.g. to avoid too many calls to S3 repo)
+- Optional `S3RegistryCache` component that can cache the list of datasets under an S3 repo to avoid very expensive bucket prefix listing calls
+
+## [0.166.1] - 2024-03-14
+### Fixed
+- Allow OData adapter to skip fields with unsupported data types instead of chasing
+
+## [0.166.0] - 2024-03-14
+### Added
+- Experimental support for [OData](https://www.odata.org/) protocol
+### Fixed
+- Pulling datasets by account in multi-tenant workspace
 
 ## [0.165.0] - 2024-03-12
 ### Updated
