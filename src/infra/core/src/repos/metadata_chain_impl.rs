@@ -12,12 +12,17 @@ use kamu_core::*;
 use opendatafabric::*;
 
 use crate::{
-    ValidateEventIsNotEmpty,
+    ValidateAddDataVisitor,
+    ValidateAddPushSourceVisitor,
+    ValidateEventIsNotEmptyVisitor,
+    ValidateExecuteTransformVisitor,
     ValidateLogicalStructureVisitor,
     ValidateOffsetsAreSequentialVisitor,
     ValidatePrevBlockExistsVisitor,
     ValidateSeedBlockOrderVisitor,
     ValidateSequenceNumbersIntegrityVisitor,
+    ValidateSetPollingSourceVisitor,
+    ValidateSetTransformVisitor,
     ValidateSystemTimeIsMonotonicVisitor,
     ValidateWatermarkIsMonotonicVisitor,
 };
@@ -208,23 +213,32 @@ where
         if opts.validation == AppendValidation::Full {
             let mut validate_logical_structure_visitor =
                 ValidateLogicalStructureVisitor::new(&block);
+            let mut validate_add_data_visitor = ValidateAddDataVisitor::new(&block)?;
+            let mut validate_execute_transform_visitor =
+                ValidateExecuteTransformVisitor::new(&block)?;
+
             let mut validators = [
-                &mut ValidateSeedBlockOrderVisitor::new(&block)?
-                    as &mut dyn MetadataChainVisitor<Error = _>,
+                &mut validate_add_data_visitor as &mut dyn MetadataChainVisitor<Error = _>,
+                &mut validate_execute_transform_visitor,
+                &mut validate_logical_structure_visitor,
+                //
+                &mut ValidateSeedBlockOrderVisitor::new(&block)?,
                 &mut ValidatePrevBlockExistsVisitor::new(&block),
                 &mut ValidateSequenceNumbersIntegrityVisitor::new(&block)?,
                 &mut ValidateSystemTimeIsMonotonicVisitor::new(&block),
                 &mut ValidateWatermarkIsMonotonicVisitor::new(&block),
-                &mut ValidateEventIsNotEmpty::new(&block)?,
+                &mut ValidateEventIsNotEmptyVisitor::new(&block)?,
                 &mut ValidateOffsetsAreSequentialVisitor::new(&block)?,
-                &mut validate_logical_structure_visitor,
+                &mut ValidateAddPushSourceVisitor::new(&block)?,
+                &mut ValidateSetPollingSourceVisitor::new(&block)?,
+                &mut ValidateSetTransformVisitor::new(&block)?,
             ];
 
             self.accept_by_interval(&mut validators, block.prev_block_hash.as_ref(), None)
                 .await?;
 
-            // TODO: post visit actions
-            // validate_logical_structure_visitor.post_visit()?;
+            validate_add_data_visitor.post_check()?;
+            validate_execute_transform_visitor.post_check()?;
         }
 
         if opts.update_ref.is_some()
