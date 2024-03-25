@@ -8,8 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use datafusion::arrow::datatypes::SchemaRef;
-use internal_error::ResultIntoInternal;
 use kamu_core::{
     HashedMetadataBlockRef,
     MetadataChainVisitor,
@@ -25,7 +23,6 @@ use opendatafabric::{
     MetadataEventTypeFlags as Flag,
     Multihash,
     Seed,
-    SetDataSchema,
     SetPollingSource,
     SetVocab,
     SourceState,
@@ -42,7 +39,6 @@ pub struct DataWriterDataFusionMetaDataStateVisitor<'a> {
     next_block_flags: Flag,
     data_slices: Vec<Multihash>,
 
-    maybe_schema: Option<SchemaRef>,
     maybe_source_event: Option<MetadataEvent>,
 
     maybe_prev_checkpoint: Option<Multihash>,
@@ -53,8 +49,7 @@ pub struct DataWriterDataFusionMetaDataStateVisitor<'a> {
 
 impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
     pub fn new(head: Multihash, maybe_source_name: Option<&'a str>) -> Self {
-        const INITIAL_NEXT_BLOCK_FLAGS: Flag = Flag::SET_DATA_SCHEMA
-            .union(Flag::ADD_DATA)
+        const INITIAL_NEXT_BLOCK_FLAGS: Flag = Flag::ADD_DATA
             .union(Flag::SET_POLLING_SOURCE)
             .union(Flag::DISABLE_POLLING_SOURCE)
             .union(Flag::ADD_PUSH_SOURCE)
@@ -68,7 +63,6 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
             next_block_flags: INITIAL_NEXT_BLOCK_FLAGS,
             data_slices: Vec::new(),
 
-            maybe_schema: None,
             maybe_source_event: None,
 
             maybe_prev_checkpoint: None,
@@ -97,7 +91,8 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
 
         Ok(DataWriterMetadataState {
             head: self.head,
-            schema: self.maybe_schema,
+            // TODO: remove
+            schema: None,
             source_event: self.maybe_source_event,
             merge_strategy,
             // TODO: remove
@@ -108,12 +103,6 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
             prev_watermark: self.maybe_prev_watermark,
             prev_source_state: self.maybe_prev_source_state,
         })
-    }
-
-    fn handle_set_data_schema(&mut self, e: &SetDataSchema) -> Result<(), ScanMetadataError> {
-        self.maybe_schema = Some(e.schema_as_arrow().int_err()?);
-
-        Ok(())
     }
 
     fn handle_add_data(&mut self, e: &AddData) {
@@ -198,11 +187,6 @@ impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
 
     fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         match &block.event {
-            MetadataEvent::SetDataSchema(e) => {
-                self.handle_set_data_schema(e)?;
-
-                self.next_block_flags -= Flag::SET_DATA_SCHEMA;
-            }
             MetadataEvent::AddData(e) => {
                 self.handle_add_data(e);
             }
@@ -230,6 +214,7 @@ impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
             }
             MetadataEvent::ExecuteTransform(_)
             | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetDataSchema(_)
             | MetadataEvent::SetTransform(_)
             | MetadataEvent::SetAttachments(_)
             | MetadataEvent::SetInfo(_)

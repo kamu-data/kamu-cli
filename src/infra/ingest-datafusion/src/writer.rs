@@ -853,6 +853,8 @@ impl DataWriterDataFusionBuilder {
             .int_err()?;
 
         let mut set_vocab_visitor = SearchSetVocabVisitor::<ScanMetadataError>::default();
+        let mut set_data_schema_visitor =
+            SearchSetDataSchemaVisitor::<ScanMetadataError>::default();
         let mut visitor = DataWriterDataFusionMetaDataStateVisitor::new(head.clone(), source_name);
 
         self.dataset
@@ -860,6 +862,7 @@ impl DataWriterDataFusionBuilder {
             .accept_by_hash(
                 &mut [
                     &mut set_vocab_visitor as &mut dyn MetadataChainVisitor<Error = _>,
+                    &mut set_data_schema_visitor as &mut dyn MetadataChainVisitor<Error = _>,
                     &mut visitor,
                 ],
                 &head,
@@ -869,6 +872,12 @@ impl DataWriterDataFusionBuilder {
         let mut metadata_state = visitor.get_metadata_state()?;
         // TODO: temp
         metadata_state.vocab = set_vocab_visitor.into_event().unwrap_or_default().into();
+        metadata_state.schema = set_data_schema_visitor
+            .into_event()
+            .as_ref()
+            .map(odf::SetDataSchema::schema_as_arrow)
+            .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
+            .int_err()?;
 
         Ok(self.with_metadata_state(metadata_state))
     }
