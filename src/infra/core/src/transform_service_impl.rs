@@ -474,18 +474,31 @@ impl TransformServiceImpl {
         let schema_slice = if let Some(h) = data_slices.last() {
             h.clone()
         } else {
-            // TODO: This will not work with schema evolution
-            let mut visitor = <SearchDataBlocksVisitor>::next_filled_new_data();
+            type Flag = MetadataEventTypeFlags;
+            type Decision = MetadataVisitorDecision;
 
             input_chain
-                .accept::<InternalError>(&mut [&mut visitor])
-                .await?;
+                // TODO: This will not work with schema evolution
+                .reduce(
+                    None,
+                    Decision::NextOfType(Flag::ADD_DATA),
+                    |state, _, block| {
+                        let Some(data_block) = block.as_data_stream_block() else {
+                            unreachable!()
+                        };
 
-            visitor
-                .into_event()
-                .and_then(|e| e.new_data)
-                .unwrap() // Already checked that none of the inputs are empty
-                .physical_hash
+                        let Some(new_data) = data_block.event.new_data else {
+                            return Ok(Decision::NextOfType(Flag::ADD_DATA));
+                        };
+
+                        *state = Some(new_data.physical_hash.clone());
+
+                        Ok::<_, InternalError>(Decision::Stop)
+                    },
+                )
+                .await?
+                // Already checked that none of the inputs are empty
+                .unwrap()
         };
 
         let vocab = match vocab_hint {

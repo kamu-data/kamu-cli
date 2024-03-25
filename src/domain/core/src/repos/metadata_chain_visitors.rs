@@ -14,12 +14,9 @@ use internal_error::InternalError;
 use opendatafabric::{
     AsTypedBlock,
     ExecuteTransform,
-    IntoDataStreamBlock,
     MetadataBlock,
-    MetadataBlockDataStream,
     MetadataBlockTyped,
     MetadataEvent,
-    MetadataEventDataStream,
     MetadataEventTypeFlags as Flag,
     Multihash,
     Seed,
@@ -121,98 +118,6 @@ where
         self.hashed_block = Some((hash.clone(), block.clone().into_typed().unwrap()));
 
         Ok(Decision::Stop)
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[allow(clippy::enum_variant_names)]
-enum SearchDataBlocksVisitorKind {
-    NextDataBlock,
-    NextFilledNewWatermark,
-    NextFilledNewData,
-}
-
-pub struct SearchDataBlocksVisitor<E = InternalError> {
-    kind: SearchDataBlocksVisitorKind,
-    hashed_data_block: Option<(Multihash, MetadataBlockDataStream)>,
-    _phantom: PhantomData<E>,
-}
-
-impl<E> SearchDataBlocksVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    pub fn next_data_block() -> Self {
-        Self::new(SearchDataBlocksVisitorKind::NextDataBlock)
-    }
-
-    pub fn next_filled_new_watermark() -> Self {
-        Self::new(SearchDataBlocksVisitorKind::NextFilledNewWatermark)
-    }
-
-    pub fn next_filled_new_data() -> Self {
-        Self::new(SearchDataBlocksVisitorKind::NextFilledNewData)
-    }
-
-    fn new(kind: SearchDataBlocksVisitorKind) -> Self {
-        Self {
-            kind,
-            hashed_data_block: None,
-            _phantom: PhantomData,
-        }
-    }
-
-    pub fn into_hashed_data_block(self) -> Option<(Multihash, MetadataBlockDataStream)> {
-        self.hashed_data_block
-    }
-
-    pub fn into_data_block(self) -> Option<MetadataBlockDataStream> {
-        self.hashed_data_block.map(|(_, block)| block)
-    }
-
-    pub fn into_event(self) -> Option<MetadataEventDataStream> {
-        self.hashed_data_block.map(|(_, block)| block.event)
-    }
-}
-
-pub struct SearchDataBlocksVisitorFactory<E = InternalError> {
-    _phantom: PhantomData<E>,
-}
-
-impl<E> MetadataChainVisitor for SearchDataBlocksVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    type Error = E;
-
-    fn initial_decision(&self) -> Decision {
-        Decision::NextOfType(Flag::DATA_BLOCK)
-    }
-
-    fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
-        let Some(data_block) = block.as_data_stream_block() else {
-            unreachable!()
-        };
-
-        let has_data_block_found = match self.kind {
-            SearchDataBlocksVisitorKind::NextDataBlock => true,
-            SearchDataBlocksVisitorKind::NextFilledNewWatermark => {
-                data_block.event.new_watermark.is_some()
-            }
-            SearchDataBlocksVisitorKind::NextFilledNewData => data_block.event.new_data.is_some(),
-        };
-
-        if has_data_block_found {
-            self.hashed_data_block = Some((
-                hash.clone(),
-                block.clone().into_data_stream_block().unwrap(),
-            ));
-
-            Ok(Decision::Stop)
-        } else {
-            Ok(Decision::NextOfType(Flag::DATA_BLOCK))
-        }
     }
 }
 
