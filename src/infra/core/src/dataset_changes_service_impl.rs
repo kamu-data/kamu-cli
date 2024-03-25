@@ -23,9 +23,15 @@ use kamu_core::{
     InternalError,
     MetadataChainExt,
     MetadataVisitorDecision,
-    SearchDataBlocksVisitor,
 };
-use opendatafabric::{DataSlice, DatasetID, MetadataEvent, Multihash};
+use opendatafabric::{
+    DataSlice,
+    DatasetID,
+    IntoDataStreamBlock,
+    MetadataEvent,
+    MetadataEventTypeFlags,
+    Multihash,
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -78,6 +84,7 @@ impl DatasetChangesServiceImpl {
         old_head: Option<&Multihash>,
         new_head: &Multihash,
     ) -> Result<DatasetIntervalIncrement, InternalError> {
+        type Flag = MetadataEventTypeFlags;
         type Decision = MetadataVisitorDecision;
 
         #[derive(Default)]
@@ -165,14 +172,23 @@ impl DatasetChangesServiceImpl {
             // Did we have any head before?
             if let Some(old_head) = &old_head {
                 // Yes, so try locating the previous watermark containing node
-                let mut visitor = <SearchDataBlocksVisitor>::next_filled_new_watermark();
-
-                dataset
+                let previous_nearest_watermark = dataset
                     .as_metadata_chain()
-                    .accept_by_hash(&mut [&mut visitor], old_head)
-                    .await?;
+                    .reduce_by_hash(
+                        old_head,
+                        None,
+                        Decision::NextOfType(Flag::ADD_DATA),
+                        |state, _, block| {
+                            let Some(data_block) = block.as_data_stream_block() else {
+                                unreachable!()
+                            };
 
-                let previous_nearest_watermark = visitor.into_event().and_then(|e| e.new_watermark);
+                            *state = data_block.event.new_watermark.copied();
+
+                            Ok::<_, InternalError>(Decision::Stop)
+                        },
+                    )
+                    .await?;
 
                 // The "latest" watermark is only an update, if we can find a different
                 // watermark before the searched interval, or if it's a first watermark
