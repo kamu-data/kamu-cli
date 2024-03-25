@@ -312,16 +312,29 @@ impl TransformServiceImpl {
     // TODO: Allow derivative datasets to function with inputs containing no data
     // This will require passing the schema explicitly instead of relying on a file
     async fn is_never_pulled(&self, dataset_ref: &DatasetRef) -> Result<bool, InternalError> {
+        type Flag = MetadataEventTypeFlags;
+        type Decision = MetadataVisitorDecision;
+
         Ok(self
             .dataset_repo
             .get_dataset(dataset_ref)
             .await
             .int_err()?
             .as_metadata_chain()
-            .accept_one(<SearchDataBlocksVisitor>::next_data_block())
+            .reduce(
+                None,
+                Decision::NextOfType(Flag::DATA_BLOCK),
+                |state, _, block| {
+                    let Some(data_block) = block.as_data_stream_block() else {
+                        unreachable!()
+                    };
+
+                    *state = data_block.event.last_offset();
+
+                    Ok::<_, InternalError>(Decision::Stop)
+                },
+            )
             .await?
-            .into_event()
-            .and_then(|e| e.last_offset())
             .is_none())
     }
 
