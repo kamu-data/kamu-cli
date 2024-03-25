@@ -360,10 +360,6 @@ struct ExecuteTransformVisitorState<'a> {
 enum ValidateLogicalStructureVisitorState<'a> {
     AddData(AddDataVisitorState<'a>),
     ExecuteTransform(ExecuteTransformVisitorState<'a>),
-    SetTransform {
-        appended_set_transform: &'a SetTransform,
-        appended_event: &'a MetadataEvent,
-    },
     Stopped,
 }
 
@@ -440,10 +436,7 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
                 // TODO: Ensure has previous push source with matching name
                 unimplemented!("Disabling sources is not yet fully supported")
             }
-            MetadataEvent::SetTransform(e) => State::SetTransform {
-                appended_set_transform: e,
-                appended_event: &block.event,
-            },
+            MetadataEvent::SetTransform(_) => unreachable!(),
             MetadataEvent::Seed(_)
             | MetadataEvent::SetVocab(_)
             | MetadataEvent::SetAttachments(_)
@@ -458,7 +451,7 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
         match self.state {
             State::AddData(state) => Self::handle_post_visit_add_data(state),
             State::ExecuteTransform(state) => Self::handle_post_visit_execute_transform(state),
-            State::SetTransform { .. } | State::Stopped => Ok(()),
+            State::Stopped => Ok(()),
         }
     }
 
@@ -655,30 +648,6 @@ impl<'a> MetadataChainVisitor for ValidateLogicalStructureVisitor<'a> {
 
                 Ok(Decision::NextOfType(state.next_block_flags))
             }
-            State::SetTransform {
-                appended_set_transform: e,
-                appended_event,
-            } => {
-                // Ensure has inputs
-                if e.inputs.is_empty() {
-                    invalid_event!((*e).clone(), "Transform must have at least one input");
-                }
-
-                // Ensure inputs are resolved to IDs and aliases are specified
-                for i in &e.inputs {
-                    if i.dataset_ref.id().is_none() || i.alias.is_none() {
-                        invalid_event!(
-                            (*e).clone(),
-                            "Transform inputs must be resolved to dataset IDs and specify aliases"
-                        );
-                    }
-                }
-
-                // Queries must be normalized
-                Self::validate_transform(appended_event, &e.transform)?;
-
-                Ok(Decision::Stop)
-            }
             State::Stopped => Ok(Decision::Stop),
         }
     }
@@ -724,7 +693,7 @@ impl<'a> MetadataChainVisitor for ValidateLogicalStructureVisitor<'a> {
 
                 Ok(Decision::NextOfType(state.next_block_flags))
             }
-            State::Stopped | State::SetTransform { .. } => {
+            State::Stopped => {
                 unreachable!()
             }
         }
@@ -810,6 +779,49 @@ impl MetadataChainVisitor for ValidateSetPollingSource {
             e.clone(),
             "Cannot add a polling source while some push sources are still active",
         );
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct ValidateSetTransform {}
+
+impl ValidateSetTransform {
+    pub fn new(set_transform: &SetTransform, block: &MetadataBlock) -> Result<Self, AppendError> {
+        // Ensure has inputs
+        if set_transform.inputs.is_empty() {
+            invalid_event!(
+                set_transform.clone(),
+                "Transform must have at least one input"
+            );
+        }
+
+        // Ensure inputs are resolved to IDs and aliases are specified
+        for i in &set_transform.inputs {
+            if i.dataset_ref.id().is_none() || i.alias.is_none() {
+                invalid_event!(
+                    set_transform.clone(),
+                    "Transform inputs must be resolved to dataset IDs and specify aliases"
+                );
+            }
+        }
+
+        // Queries must be normalized
+        validate_transform(&block.event, &set_transform.transform)?;
+
+        Ok(Self {})
+    }
+}
+
+impl MetadataChainVisitor for ValidateSetTransform {
+    type Error = AppendError;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::Stop
+    }
+
+    fn visit(&mut self, _: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        unreachable!()
     }
 }
 
