@@ -12,6 +12,7 @@ use kamu_core::*;
 use opendatafabric::*;
 
 use crate::{
+    ValidateEventIsNotEmpty,
     ValidateLogicalStructureVisitor,
     ValidateOffsetsAreSequentialVisitor,
     ValidatePrevBlockExistsVisitor,
@@ -214,6 +215,7 @@ where
                 &mut ValidateSequenceNumbersIntegrityVisitor::new(&block)?,
                 &mut ValidateSystemTimeIsMonotonicVisitor::new(&block),
                 &mut ValidateWatermarkIsMonotonicVisitor::new(&block),
+                &mut ValidateEventIsNotEmpty::new(&block)?,
                 &mut ValidateOffsetsAreSequentialVisitor::new(&block)?,
                 &mut validate_logical_structure_visitor,
             ];

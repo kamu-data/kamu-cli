@@ -526,6 +526,40 @@ impl MetadataChainVisitor for ValidateSetTransform {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+pub struct ValidateEventIsNotEmpty {}
+
+impl ValidateEventIsNotEmpty {
+    pub fn new(block: &MetadataBlock) -> Result<Self, AppendError> {
+        match &block.event {
+            // // TODO: ensure only used on Root datasets
+            MetadataEvent::AddData(e) if e.is_empty() => {
+                return Err(AppendValidationError::empty_event(e.clone()).into())
+            }
+            // TODO: ensure only used on Derivative datasets
+            MetadataEvent::ExecuteTransform(e) if e.is_empty() => {
+                return Err(AppendValidationError::empty_event(e.clone()).into())
+            }
+            _ => (),
+        };
+
+        Ok(Self {})
+    }
+}
+
+impl MetadataChainVisitor for ValidateEventIsNotEmpty {
+    type Error = AppendError;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::Stop
+    }
+
+    fn visit(&mut self, _: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        unreachable!()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 pub trait MetadataChainVisitorWithPostVisit: MetadataChainVisitor {
     type PostVisitError: std::error::Error;
 
@@ -541,16 +575,8 @@ pub struct ValidateAddData<'a> {
     next_block_flags: Flag,
 }
 
-// TODO: extract "Event is empty" visitor
 impl<'a> ValidateAddData<'a> {
     pub fn new(add_data: &'a AddData) -> Result<Self, AppendError> {
-        let e = add_data;
-
-        // TODO: ensure only used on Root datasets
-        if e.is_empty() {
-            return Err(AppendValidationError::no_op_event(e.clone(), "Event is empty").into());
-        }
-
         Ok(Self {
             appended_add_data: add_data,
             prev_schema: None,
@@ -649,15 +675,8 @@ pub struct ValidateExecuteTransform<'a> {
     next_block_flags: Flag,
 }
 
-// TODO: extract "Event is empty" visitor
 impl<'a> ValidateExecuteTransform<'a> {
     pub fn new(e: &'a ExecuteTransform) -> Result<Self, AppendError> {
-        // TODO: ensure only used on Derivative datasets
-
-        if e.is_empty() {
-            return Err(AppendValidationError::no_op_event(e.clone(), "Event is empty").into());
-        }
-
         Ok(Self {
             appended_execute_transform: e,
             prev_transform: None,

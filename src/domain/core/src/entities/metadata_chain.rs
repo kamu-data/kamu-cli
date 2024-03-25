@@ -574,6 +574,10 @@ impl AppendValidationError {
     pub fn no_op_event(event: impl Into<MetadataEvent>, message: impl Into<String>) -> Self {
         Self::NoOpEvent(NoOpEventError::new(event, message))
     }
+
+    pub fn empty_event(event: impl Into<MetadataEvent>) -> Self {
+        Self::no_op_event(event, "Event is empty")
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
