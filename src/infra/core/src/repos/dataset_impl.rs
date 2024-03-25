@@ -145,64 +145,68 @@ where
             .union(Flag::SET_TRANSFORM)
             .union(Flag::DATA_BLOCK);
 
-        let mut visitor = GenericCallbackVisitor::new(
-            VisitorState {
-                requested_flags: INITIAL_REQUESTED_FLAGS,
-                increment: UpdateSummaryIncrement {
-                    seen_head: Some(current_head.clone()),
-                    ..Default::default()
+        let state = self
+            .metadata_chain
+            .reduce_by_hash(
+                current_head,
+                VisitorState {
+                    requested_flags: INITIAL_REQUESTED_FLAGS,
+                    increment: UpdateSummaryIncrement {
+                        seen_head: Some(current_head.clone()),
+                        ..Default::default()
+                    },
                 },
-            },
-            Decision::NextOfType(INITIAL_REQUESTED_FLAGS),
-            |state, (_, block)| {
-                match &block.event {
-                    MetadataEvent::Seed(e) => {
-                        state.increment.seen_id = Some(e.dataset_id.clone());
-                        state.increment.seen_kind = Some(e.dataset_kind);
-
-                        state.requested_flags -= Flag::SEED;
+                Decision::NextOfType(INITIAL_REQUESTED_FLAGS),
+                |state, hash, block| {
+                    if Some(hash) == last_seen {
+                        return Ok::<Decision, InternalError>(Decision::Stop);
                     }
-                    MetadataEvent::SetTransform(e) => {
-                        state.increment.seen_dependencies = Some(
-                            e.inputs
-                                .iter()
-                                .map(|i| i.dataset_ref.id().cloned().unwrap())
-                                .collect(),
-                        );
 
-                        state.requested_flags -= Flag::SET_TRANSFORM;
-                    }
-                    MetadataEvent::AddData(_) | MetadataEvent::ExecuteTransform(_) => {
-                        let Some(data_block) = block.as_data_stream_block() else {
-                            unreachable!()
-                        };
+                    match &block.event {
+                        MetadataEvent::Seed(e) => {
+                            state.increment.seen_id = Some(e.dataset_id.clone());
+                            state.increment.seen_kind = Some(e.dataset_kind);
 
-                        state
-                            .increment
-                            .seen_last_pulled
-                            .get_or_insert(block.system_time);
-
-                        if let Some(output_data) = data_block.event.new_data {
-                            state.increment.seen_num_records += output_data.num_records();
-                            state.increment.seen_data_size += output_data.size;
+                            state.requested_flags -= Flag::SEED;
                         }
+                        MetadataEvent::SetTransform(e) => {
+                            state.increment.seen_dependencies = Some(
+                                e.inputs
+                                    .iter()
+                                    .map(|i| i.dataset_ref.id().cloned().unwrap())
+                                    .collect(),
+                            );
 
-                        if let Some(checkpoint) = data_block.event.new_checkpoint {
-                            state.increment.seen_checkpoints_size += checkpoint.size;
+                            state.requested_flags -= Flag::SET_TRANSFORM;
                         }
-                    }
-                    _ => {}
-                };
+                        MetadataEvent::AddData(_) | MetadataEvent::ExecuteTransform(_) => {
+                            let Some(data_block) = block.as_data_stream_block() else {
+                                unreachable!()
+                            };
 
-                Ok(Decision::NextOfType(state.requested_flags))
-            },
-        );
+                            state
+                                .increment
+                                .seen_last_pulled
+                                .get_or_insert(block.system_time);
 
-        self.metadata_chain
-            .accept_by_interval::<InternalError>(&mut [&mut visitor], Some(current_head), last_seen)
+                            if let Some(output_data) = data_block.event.new_data {
+                                state.increment.seen_num_records += output_data.num_records();
+                                state.increment.seen_data_size += output_data.size;
+                            }
+
+                            if let Some(checkpoint) = data_block.event.new_checkpoint {
+                                state.increment.seen_checkpoints_size += checkpoint.size;
+                            }
+                        }
+                        _ => {}
+                    };
+
+                    Ok(Decision::NextOfType(state.requested_flags))
+                },
+            )
             .await?;
 
-        Ok(visitor.into_state().increment)
+        Ok(state.increment)
     }
 
     async fn prepare_objects(

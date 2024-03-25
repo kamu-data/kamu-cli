@@ -11,12 +11,13 @@ use chrono::prelude::*;
 use kamu_core::{
     self as domain,
     MetadataChainExt,
-    SearchDataBlocksVisitor,
+    MetadataVisitorDecision,
     SearchSetAttachmentsVisitor,
     SearchSetInfoVisitor,
     SearchSetLicenseVisitor,
     SearchSetVocabVisitor,
 };
+use odf::IntoDataStreamBlock;
 use opendatafabric as odf;
 
 use crate::prelude::*;
@@ -50,14 +51,27 @@ impl DatasetMetadata {
 
     /// Last recorded watermark
     async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
+        type Flag = odf::MetadataEventTypeFlags;
+        type Decision = MetadataVisitorDecision;
+
         Ok(self
             .get_dataset(ctx)
             .await?
             .as_metadata_chain()
-            .accept_one(<SearchDataBlocksVisitor>::next_filled_new_watermark())
-            .await?
-            .into_event()
-            .and_then(|e| e.new_watermark))
+            .reduce(
+                None,
+                Decision::NextOfType(Flag::DATA_BLOCK),
+                |state, _, block| {
+                    let Some(data_block) = block.as_data_stream_block() else {
+                        unreachable!()
+                    };
+
+                    *state = data_block.event.new_watermark.copied();
+
+                    Ok::<_, InternalError>(Decision::Stop)
+                },
+            )
+            .await?)
     }
 
     /// Latest data schema

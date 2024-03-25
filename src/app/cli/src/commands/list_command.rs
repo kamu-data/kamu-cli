@@ -258,26 +258,46 @@ impl Command for ListCommand {
             size.push(summary.data_size);
 
             if self.detail_level > 0 {
-                let mut data_block_visitor = <SearchDataBlocksVisitor>::next_data_block();
-                let mut next_block_visitor = <SearchNextBlockVisitor>::default();
+                type Flag = MetadataEventTypeFlags;
+                type Decision = MetadataVisitorDecision;
 
-                dataset
+                struct State {
+                    num_blocks: u64,
+                    last_watermark: Option<i64>,
+                }
+
+                let state = dataset
                     .as_metadata_chain()
-                    .accept(&mut [&mut data_block_visitor, &mut next_block_visitor])
-                    .await?;
+                    .reduce(
+                        State {
+                            num_blocks: 0,
+                            last_watermark: None,
+                        },
+                        Decision::Next,
+                        |state, _, block| {
+                            if state.num_blocks == 0 {
+                                // TODO: Should be precomputed
+                                state.num_blocks = block.sequence_number + 1;
+                            }
 
-                // TODO: Should be precomputed
-                let num_blocks = next_block_visitor
-                    .into_block()
-                    .map_or(0, |b| b.sequence_number + 1);
-                let last_watermark = data_block_visitor
-                    .into_event()
-                    .and_then(|e| e.new_watermark);
+                            let Some(data_block) = block.as_data_stream_block() else {
+                                return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
+                            };
+
+                            state.last_watermark = data_block
+                                .event
+                                .new_watermark
+                                .map(DateTime::timestamp_micros);
+
+                            Ok::<Decision, InternalError>(Decision::Stop)
+                        },
+                    )
+                    .await?;
 
                 id.push(hdl.id.as_did_str().to_string());
                 head.push(current_head.as_multibase().to_string());
-                blocks.push(num_blocks);
-                watermark.push(last_watermark.map(|t| t.timestamp_micros()));
+                blocks.push(state.num_blocks);
+                watermark.push(state.last_watermark);
             }
         }
 

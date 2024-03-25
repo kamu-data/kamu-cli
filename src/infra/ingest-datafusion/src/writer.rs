@@ -21,10 +21,10 @@ use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
-use odf::{AsTypedBlock, DatasetVocabulary};
+use odf::{AsTypedBlock, DatasetVocabulary, MetadataEvent, Multihash, SourceState};
 use opendatafabric as odf;
 
-use crate::visitor::DataWriterDataFusionMetaDataStateVisitor;
+use crate::visitor::SourceEventVisitor;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -844,6 +844,9 @@ impl DataWriterDataFusionBuilder {
         self,
         source_name: Option<&str>,
     ) -> Result<Self, ScanMetadataError> {
+        type Flag = odf::MetadataEventTypeFlags;
+        type Decision = MetadataVisitorDecision;
+
         // TODO: PERF: Full metadata scan below - this is expensive and should be
         //       improved using skip lists.
 
@@ -853,15 +856,122 @@ impl DataWriterDataFusionBuilder {
             .resolve_ref(&self.block_ref)
             .await
             .int_err()?;
+        let mut seed_visitor = SearchSeedVisitor::<ScanMetadataError>::default();
+        let mut set_vocab_visitor = SearchSetVocabVisitor::<ScanMetadataError>::default();
+        let mut set_data_schema_visitor =
+            SearchSetDataSchemaVisitor::<ScanMetadataError>::default();
+        let mut prev_source_state_visitor = GenericCallbackVisitor::new(
+            None::<SourceState>,
+            Decision::NextOfType(Flag::ADD_DATA),
+            |state, _, block| {
+                let MetadataEvent::AddData(e) = &block.event else {
+                    unreachable!()
+                };
 
-        let mut visitor = DataWriterDataFusionMetaDataStateVisitor::new(head.clone(), source_name);
+                if let Some(ss) = &e.new_source_state
+                    && let Some(sn) = source_name
+                    && sn != ss.source_name.as_str()
+                {
+                    unimplemented!(
+                        "Differentiating between the state of multiple sources is not yet \
+                         supported"
+                    );
+                }
+
+                *state = e.new_source_state.clone();
+
+                Ok(Decision::Stop)
+            },
+        );
+
+        struct AddDataCollectionVisitorState {
+            data_slices: Vec<Multihash>,
+            prev_checkpoint: Option<Multihash>,
+            prev_watermark: Option<DateTime<Utc>>,
+            prev_offset: Option<u64>,
+        }
+
+        let mut add_data_collection_visitor = GenericCallbackVisitor::new(
+            AddDataCollectionVisitorState {
+                data_slices: Vec::new(),
+                prev_checkpoint: None,
+                prev_watermark: None,
+                prev_offset: None,
+            },
+            Decision::NextOfType(Flag::ADD_DATA),
+            |state, _, block| {
+                let MetadataEvent::AddData(e) = &block.event else {
+                    unreachable!()
+                };
+
+                if let Some(output_data) = &e.new_data {
+                    state.data_slices.push(output_data.physical_hash.clone());
+                }
+
+                if state.prev_offset.is_none() {
+                    state.prev_offset = e.last_offset();
+                }
+
+                if state.prev_checkpoint.is_none() {
+                    state.prev_checkpoint =
+                        e.new_checkpoint.as_ref().map(|cp| cp.physical_hash.clone());
+                }
+
+                if state.prev_watermark.is_none() {
+                    state.prev_watermark = e.new_watermark;
+                }
+
+                Ok::<_, ScanMetadataError>(Decision::NextOfType(Flag::ADD_DATA))
+            },
+        );
+        let mut source_event_visitor = SourceEventVisitor::new(source_name);
 
         self.dataset
             .as_metadata_chain()
-            .accept_by_hash(&mut [&mut visitor], &head)
+            .accept_by_hash(
+                &mut [
+                    &mut seed_visitor as &mut dyn MetadataChainVisitor<Error = _>,
+                    &mut set_vocab_visitor,
+                    &mut set_data_schema_visitor,
+                    &mut prev_source_state_visitor,
+                    &mut add_data_collection_visitor,
+                    &mut source_event_visitor,
+                ],
+                &head,
+            )
             .await?;
 
-        let metadata_state = visitor.get_metadata_state()?;
+        {
+            let seed = seed_visitor.into_event().expect("Dataset without blocks");
+
+            assert_eq!(seed.dataset_kind, odf::DatasetKind::Root);
+        }
+
+        let (source_event, merge_strategy) =
+            source_event_visitor.get_source_event_and_merge_strategy()?;
+        let AddDataCollectionVisitorState {
+            data_slices,
+            prev_checkpoint,
+            prev_watermark,
+            prev_offset,
+        } = add_data_collection_visitor.into_state();
+        let metadata_state = DataWriterMetadataState {
+            head,
+            schema: set_data_schema_visitor
+                .into_event()
+                .as_ref()
+                .map(odf::SetDataSchema::schema_as_arrow)
+                .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
+                .int_err()?,
+            source_event,
+            merge_strategy,
+            vocab: set_vocab_visitor.into_event().unwrap_or_default().into(),
+            data_slices,
+            prev_offset,
+            prev_checkpoint,
+            prev_watermark,
+            prev_source_state: prev_source_state_visitor.into_state(),
+        };
 
         Ok(self.with_metadata_state(metadata_state))
     }

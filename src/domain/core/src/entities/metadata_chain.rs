@@ -96,6 +96,13 @@ pub trait MetadataChainExt: MetadataChain {
         }
     }
 
+    /// Returns the specified block by reference if it exists
+    async fn get_block_by_ref(&self, r: &BlockRef) -> Result<MetadataBlock, InternalError> {
+        let h = self.resolve_ref(r).await.int_err()?;
+
+        self.get_block(&h).await.int_err()
+    }
+
     /// Returns the specified block if it exists
     async fn try_get_block(
         &self,
@@ -175,10 +182,10 @@ pub trait MetadataChainExt: MetadataChain {
     where
         E: Error + From<IterBlocksError>,
     {
-        let mut decisions = visitors
+        let mut decisions: Vec<_> = visitors
             .iter()
             .map(|visitor| visitor.initial_decision())
-            .collect::<Result<Vec<_>, E>>()?;
+            .collect();
         let mut all_visitors_finished = false;
         let mut current_hash = head_hash.cloned();
 
@@ -236,6 +243,52 @@ pub trait MetadataChainExt: MetadataChain {
         self.accept(&mut [&mut visitor]).await?;
 
         Ok(visitor)
+    }
+
+    /// An auxiliary method that simplifies the work if only one custom Visitor
+    /// is used.
+    async fn reduce<S, F, E>(
+        &self,
+        state: S,
+        initial_decision: MetadataVisitorDecision,
+        callback: F,
+    ) -> Result<S, E>
+    where
+        S: Send + Sync,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E>
+            + Send
+            + Sync,
+        E: Error + From<IterBlocksError> + Send + Sync,
+    {
+        let head_hash = self
+            .resolve_ref(&BlockRef::Head)
+            .await
+            .map_err(Into::into)?;
+
+        Ok(self
+            .reduce_by_hash(&head_hash, state, initial_decision, callback)
+            .await?)
+    }
+
+    async fn reduce_by_hash<S, F, E>(
+        &self,
+        head_hash: &Multihash,
+        state: S,
+        initial_decision: MetadataVisitorDecision,
+        callback: F,
+    ) -> Result<S, E>
+    where
+        S: Send + Sync,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E>
+            + Send
+            + Sync,
+        E: Error + From<IterBlocksError> + Send + Sync,
+    {
+        let mut visitor = GenericCallbackVisitor::new(state, initial_decision, callback);
+
+        self.accept_by_hash(&mut [&mut visitor], head_hash).await?;
+
+        Ok(visitor.into_state())
     }
 }
 
@@ -573,6 +626,10 @@ pub enum AppendValidationError {
 impl AppendValidationError {
     pub fn no_op_event(event: impl Into<MetadataEvent>, message: impl Into<String>) -> Self {
         Self::NoOpEvent(NoOpEventError::new(event, message))
+    }
+
+    pub fn empty_event(event: impl Into<MetadataEvent>) -> Self {
+        Self::no_op_event(event, "Event is empty")
     }
 }
 

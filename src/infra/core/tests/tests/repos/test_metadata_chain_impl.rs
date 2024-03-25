@@ -1008,7 +1008,7 @@ async fn test_accept() {
     );
     let mut next_of_set_data_schema_visitor = create_next_of_type_visitor(
         MetadataEventTypeFlags::SET_DATA_SCHEMA,
-        NextOfTypeVisitorState::with_expected_visit_call_count(2),
+        NextOfTypeVisitorState::with_expected_visit_call_count(1),
     );
     let mut always_next_visitor = create_always_next_visitor_with_expected_visit_call_count(6);
 
@@ -1066,7 +1066,7 @@ async fn test_accept_stop_on_first_error() {
     let mut always_next_visitor = create_always_next_visitor_with_expected_visit_call_count(2);
     let mut failed_on_type_visitor = create_failed_on_type_visitor_with_expected_visit_call_count(
         MetadataEventTypeFlags::SET_INFO,
-        2,
+        1,
     );
 
     assert_matches!(
@@ -1109,7 +1109,7 @@ mockall::mock! {
     impl MetadataChainVisitor for MetadataChainVisitor {
         type Error = MockError;
 
-        fn initial_decision(&self) -> Result<MetadataVisitorDecision, MockError>;
+        fn initial_decision(&self) -> MetadataVisitorDecision;
 
         fn visit<'a>(&mut self, hashed_block_ref: HashedMetadataBlockRef<'a>) -> Result<MetadataVisitorDecision, MockError>;
     }
@@ -1121,9 +1121,13 @@ fn create_failed_on_type_visitor_with_expected_visit_call_count(
     fail_on_type_flags: MetadataEventTypeFlags,
     visit_call_count: usize,
 ) -> MockMetadataChainVisitor {
-    let mut always_stop_visitor = MockMetadataChainVisitor::new();
+    let mut failed_on_type_visitor = MockMetadataChainVisitor::new();
 
-    always_stop_visitor
+    failed_on_type_visitor
+        .expect_initial_decision()
+        .times(1)
+        .returning(move || MetadataVisitorDecision::NextOfType(fail_on_type_flags));
+    failed_on_type_visitor
         .expect_visit()
         .times(visit_call_count)
         .returning(move |(_, block)| {
@@ -1136,7 +1140,7 @@ fn create_failed_on_type_visitor_with_expected_visit_call_count(
             }
         });
 
-    always_stop_visitor
+    failed_on_type_visitor
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1145,9 +1149,13 @@ fn create_always_stop_visitor() -> MockMetadataChainVisitor {
     let mut always_stop_visitor = MockMetadataChainVisitor::new();
 
     always_stop_visitor
-        .expect_visit()
+        .expect_initial_decision()
         .times(1)
-        .returning(|_| Ok(MetadataVisitorDecision::Stop));
+        .returning(|| MetadataVisitorDecision::Stop);
+    always_stop_visitor
+        .expect_visit()
+        .times(0)
+        .returning(|_| unreachable!());
 
     always_stop_visitor
 }
@@ -1159,6 +1167,10 @@ fn create_always_next_visitor_with_expected_visit_call_count(
 ) -> MockMetadataChainVisitor {
     let mut always_next_visitor = MockMetadataChainVisitor::new();
 
+    always_next_visitor
+        .expect_initial_decision()
+        .times(1)
+        .returning(|| MetadataVisitorDecision::Next);
     always_next_visitor
         .expect_visit()
         .times(visit_call_count)
@@ -1191,6 +1203,10 @@ fn create_next_of_type_visitor(
     let mut always_stop_visitor = MockMetadataChainVisitor::new();
     let expected_visit_call_count = state.lock().unwrap().expected_visit_call_count;
 
+    always_stop_visitor
+        .expect_initial_decision()
+        .times(1)
+        .returning(move || MetadataVisitorDecision::NextOfType(flags));
     always_stop_visitor
         .expect_visit()
         .times(expected_visit_call_count)

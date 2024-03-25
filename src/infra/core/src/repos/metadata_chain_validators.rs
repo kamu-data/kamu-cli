@@ -20,7 +20,6 @@ use kamu_core::{
 };
 use opendatafabric::{
     AddData,
-    AddPushSource,
     ExecuteTransform,
     IntoDataStreamBlock,
     IntoDataStreamEvent,
@@ -30,7 +29,6 @@ use opendatafabric::{
     MetadataEventTypeFlags as Flag,
     Multihash,
     SetDataSchema,
-    SetPollingSource,
     SetTransform,
     Transform,
 };
@@ -39,32 +37,30 @@ use crate::invalid_event;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct ValidateSeedBlockOrderVisitor<'a> {
-    is_seed_appended_block: bool,
-    appended_prev_block_hash: Option<&'a Multihash>,
-}
+pub struct ValidateSeedBlockOrderVisitor {}
 
-impl<'a> ValidateSeedBlockOrderVisitor<'a> {
-    pub fn new(block: &'a MetadataBlock) -> Self {
-        Self {
-            is_seed_appended_block: matches!(&block.event, MetadataEvent::Seed(_)),
-            appended_prev_block_hash: block.prev_block_hash.as_ref(),
-        }
+impl ValidateSeedBlockOrderVisitor {
+    pub fn new(block: &MetadataBlock) -> Result<Self, AppendError> {
+        match block.event {
+            MetadataEvent::Seed(_) if block.prev_block_hash.is_some() => {
+                return Err(AppendValidationError::AppendingSeedBlockToNonEmptyChain.into())
+            }
+            MetadataEvent::Seed(_) => (),
+            _ if block.prev_block_hash.is_none() => {
+                return Err(AppendValidationError::FirstBlockMustBeSeed.into())
+            }
+            _ => (),
+        };
+
+        Ok(Self {})
     }
 }
 
-impl<'a> MetadataChainVisitor for ValidateSeedBlockOrderVisitor<'a> {
+impl MetadataChainVisitor for ValidateSeedBlockOrderVisitor {
     type Error = AppendError;
 
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        match (
-            self.is_seed_appended_block,
-            self.appended_prev_block_hash.is_some(),
-        ) {
-            (true, true) => Err(AppendValidationError::AppendingSeedBlockToNonEmptyChain.into()),
-            (false, false) => Err(AppendValidationError::FirstBlockMustBeSeed.into()),
-            (_, _) => Ok(Decision::Stop),
-        }
+    fn initial_decision(&self) -> Decision {
+        Decision::Stop
     }
 
     fn visit(&mut self, _: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
@@ -89,11 +85,11 @@ impl<'a> ValidatePrevBlockExistsVisitor<'a> {
 impl<'a> MetadataChainVisitor for ValidatePrevBlockExistsVisitor<'a> {
     type Error = AppendError;
 
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
+    fn initial_decision(&self) -> Decision {
         if self.appended_prev_block_hash.is_some() {
-            Ok(Decision::Next)
+            Decision::Next
         } else {
-            Ok(Decision::Stop)
+            Decision::Stop
         }
     }
 
@@ -119,34 +115,32 @@ impl<'a> MetadataChainVisitor for ValidatePrevBlockExistsVisitor<'a> {
 
 pub struct ValidateSequenceNumbersIntegrityVisitor {
     appended_sequence_number: u64,
-    has_appended_prev_block_hash: bool,
 }
 
 impl ValidateSequenceNumbersIntegrityVisitor {
-    pub fn new(block: &MetadataBlock) -> Self {
-        Self {
-            has_appended_prev_block_hash: block.prev_block_hash.is_some(),
-            appended_sequence_number: block.sequence_number,
+    pub fn new(block: &MetadataBlock) -> Result<Self, AppendError> {
+        if block.prev_block_hash.is_none() && block.sequence_number != 0 {
+            return Err(
+                AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
+                    prev_block_hash: None,
+                    prev_block_sequence_number: None,
+                    next_block_sequence_number: block.sequence_number,
+                })
+                .into(),
+            );
         }
+
+        Ok(Self {
+            appended_sequence_number: block.sequence_number,
+        })
     }
 }
 
 impl MetadataChainVisitor for ValidateSequenceNumbersIntegrityVisitor {
     type Error = AppendError;
 
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        if !self.has_appended_prev_block_hash && self.appended_sequence_number != 0 {
-            return Err(
-                AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
-                    prev_block_hash: None,
-                    prev_block_sequence_number: None,
-                    next_block_sequence_number: self.appended_sequence_number,
-                })
-                .into(),
-            );
-        }
-
-        Ok(Decision::Next)
+    fn initial_decision(&self) -> Decision {
+        Decision::Next
     }
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
@@ -182,8 +176,8 @@ impl<'a> ValidateSystemTimeIsMonotonicVisitor<'a> {
 impl<'a> MetadataChainVisitor for ValidateSystemTimeIsMonotonicVisitor<'a> {
     type Error = AppendError;
 
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        Ok(Decision::Next)
+    fn initial_decision(&self) -> Decision {
+        Decision::Next
     }
 
     fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
@@ -198,18 +192,21 @@ impl<'a> MetadataChainVisitor for ValidateSystemTimeIsMonotonicVisitor<'a> {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct ValidateWatermarkIsMonotonicVisitor {
-    #[allow(clippy::option_option)]
-    appended_new_watermark: Option<Option<DateTime<Utc>>>,
+    is_data_block_appended: bool,
+    appended_new_watermark: Option<DateTime<Utc>>,
 }
 
 impl ValidateWatermarkIsMonotonicVisitor {
     pub fn new(block: &MetadataBlock) -> Self {
-        let appended_new_watermark = block
-            .event
-            .as_data_stream_event()
-            .map(|data_block| data_block.new_watermark.copied());
+        let (is_data_block_appended, appended_new_watermark) =
+            if let Some(data_steam_event) = block.event.as_data_stream_event() {
+                (true, data_steam_event.new_watermark.copied())
+            } else {
+                (false, None)
+            };
 
         Self {
+            is_data_block_appended,
             appended_new_watermark,
         }
     }
@@ -218,11 +215,11 @@ impl ValidateWatermarkIsMonotonicVisitor {
 impl MetadataChainVisitor for ValidateWatermarkIsMonotonicVisitor {
     type Error = AppendError;
 
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        if self.appended_new_watermark.is_some() {
-            Ok(Decision::NextOfType(Flag::DATA_BLOCK))
+    fn initial_decision(&self) -> Decision {
+        if self.is_data_block_appended {
+            Decision::NextOfType(Flag::DATA_BLOCK)
         } else {
-            Ok(Decision::Stop)
+            Decision::Stop
         }
     }
 
@@ -231,10 +228,7 @@ impl MetadataChainVisitor for ValidateWatermarkIsMonotonicVisitor {
             unreachable!()
         };
 
-        match (
-            data_steam_event.new_watermark,
-            &self.appended_new_watermark.unwrap(),
-        ) {
+        match (data_steam_event.new_watermark, &self.appended_new_watermark) {
             (Some(_), None) => Err(AppendValidationError::WatermarkIsNotMonotonic.into()),
             (Some(prev_wm), Some(next_wm)) if prev_wm > next_wm => {
                 Err(AppendValidationError::WatermarkIsNotMonotonic.into())
@@ -277,24 +271,28 @@ impl<'a> ValidateOffsetsAreSequentialVisitor<'a> {
         Ok(())
     }
 
-    pub fn new(block: &'a MetadataBlock) -> Self {
-        Self {
+    pub fn new(block: &'a MetadataBlock) -> Result<Self, AppendError> {
+        let maybe_data_block = block.as_data_stream_block();
+
+        if let Some(data_block) = &maybe_data_block {
+            Self::validate_internal_offset_consistency(&block.event, data_block)?;
+        };
+
+        Ok(Self {
             appended_block_event: &block.event,
-            appended_data_block: block.as_data_stream_block(),
-        }
+            appended_data_block: maybe_data_block,
+        })
     }
 }
 
 impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
     type Error = AppendError;
 
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        if let Some(data_block) = &self.appended_data_block {
-            Self::validate_internal_offset_consistency(self.appended_block_event, data_block)?;
-
-            Ok(Decision::NextOfType(Flag::DATA_BLOCK))
+    fn initial_decision(&self) -> Decision {
+        if self.appended_data_block.is_some() {
+            Decision::NextOfType(Flag::DATA_BLOCK)
         } else {
-            Ok(Decision::Stop)
+            Decision::Stop
         }
     }
 
@@ -342,151 +340,267 @@ impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-struct AddDataVisitorState<'a> {
-    appended_add_data: &'a AddData,
+pub struct ValidateUnimplementedEventsVisitor {}
+
+impl ValidateUnimplementedEventsVisitor {
+    pub fn new(block: &MetadataBlock) -> Self {
+        match &block.event {
+            MetadataEvent::DisablePollingSource(_) => {
+                // TODO: Ensure has previously active polling source
+                unimplemented!("Disabling sources is not yet fully supported")
+            }
+            MetadataEvent::DisablePushSource(_) => {
+                // TODO: Ensure has previous push source with matching name
+                unimplemented!("Disabling sources is not yet fully supported")
+            }
+            // TODO: Consider schema evolution rules
+            // TODO: Consider what happens with previously defined sources
+            MetadataEvent::SetDataSchema(_)
+            | MetadataEvent::Seed(_)
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::AddData(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_)
+            | MetadataEvent::ExecuteTransform(_)
+            | MetadataEvent::SetPollingSource(_)
+            | MetadataEvent::AddPushSource(_)
+            | MetadataEvent::SetTransform(_) => {}
+        };
+
+        Self {}
+    }
+}
+
+impl MetadataChainVisitor for ValidateUnimplementedEventsVisitor {
+    type Error = AppendError;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::Stop
+    }
+
+    fn visit(&mut self, _: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        unreachable!()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct ValidateAddPushSourceVisitor {
+    is_push_source_appended: bool,
+}
+
+impl ValidateAddPushSourceVisitor {
+    pub fn new(block: &MetadataBlock) -> Result<Self, AppendError> {
+        let is_push_source_appended = match &block.event {
+            MetadataEvent::AddPushSource(e) => {
+                // Ensure specifies the schema
+                if e.read.schema().is_none() {
+                    invalid_event!(
+                        e.clone(),
+                        "Push sources must specify the read schema explicitly",
+                    );
+                }
+
+                // Queries must be normalized
+                if let Some(transform) = &e.preprocess {
+                    validate_transform(&block.event, transform)?;
+                }
+
+                true
+            }
+            _ => false,
+        };
+
+        Ok(Self {
+            is_push_source_appended,
+        })
+    }
+}
+
+impl MetadataChainVisitor for ValidateAddPushSourceVisitor {
+    type Error = AppendError;
+
+    fn initial_decision(&self) -> Decision {
+        if self.is_push_source_appended {
+            Decision::NextOfType(Flag::SET_POLLING_SOURCE)
+        } else {
+            Decision::Stop
+        }
+    }
+
+    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        let MetadataEvent::SetPollingSource(e) = &block.event else {
+            unreachable!()
+        };
+
+        invalid_event!(
+            e.clone(),
+            "Cannot add a push source while polling source is still active",
+        );
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct ValidateSetPollingSourceVisitor {
+    is_set_polling_source_appended: bool,
+}
+
+impl ValidateSetPollingSourceVisitor {
+    pub fn new(block: &MetadataBlock) -> Result<Self, AppendError> {
+        let is_set_polling_source_appended = match &block.event {
+            MetadataEvent::SetPollingSource(e) => {
+                // Queries must be normalized
+                if let Some(transform) = &e.preprocess {
+                    validate_transform(&block.event, transform)?;
+                }
+
+                true
+            }
+            _ => false,
+        };
+
+        Ok(Self {
+            is_set_polling_source_appended,
+        })
+    }
+}
+
+impl MetadataChainVisitor for ValidateSetPollingSourceVisitor {
+    type Error = AppendError;
+
+    fn initial_decision(&self) -> Decision {
+        if self.is_set_polling_source_appended {
+            Decision::NextOfType(Flag::ADD_PUSH_SOURCE)
+        } else {
+            Decision::Stop
+        }
+    }
+
+    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        let MetadataEvent::AddPushSource(e) = &block.event else {
+            unreachable!()
+        };
+
+        invalid_event!(
+            e.clone(),
+            "Cannot add a polling source while some push sources are still active",
+        );
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct ValidateSetTransformVisitor {}
+
+impl ValidateSetTransformVisitor {
+    pub fn new(block: &MetadataBlock) -> Result<Self, AppendError> {
+        if let MetadataEvent::SetTransform(e) = &block.event {
+            // Ensure has inputs
+            if e.inputs.is_empty() {
+                invalid_event!(e.clone(), "Transform must have at least one input");
+            }
+
+            // Ensure inputs are resolved to IDs and aliases are specified
+            for i in &e.inputs {
+                if i.dataset_ref.id().is_none() || i.alias.is_none() {
+                    invalid_event!(
+                        e.clone(),
+                        "Transform inputs must be resolved to dataset IDs and specify aliases"
+                    );
+                }
+            }
+
+            // Queries must be normalized
+            validate_transform(&block.event, &e.transform)?;
+        }
+
+        Ok(Self {})
+    }
+}
+
+impl MetadataChainVisitor for ValidateSetTransformVisitor {
+    type Error = AppendError;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::Stop
+    }
+
+    fn visit(&mut self, _: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        unreachable!()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct ValidateEventIsNotEmptyVisitor {}
+
+impl ValidateEventIsNotEmptyVisitor {
+    pub fn new(block: &MetadataBlock) -> Result<Self, AppendError> {
+        match &block.event {
+            // TODO: ensure only used on Root datasets
+            MetadataEvent::AddData(e) if e.is_empty() => {
+                return Err(AppendValidationError::empty_event(e.clone()).into())
+            }
+            // TODO: ensure only used on Derivative datasets
+            MetadataEvent::ExecuteTransform(e) if e.is_empty() => {
+                return Err(AppendValidationError::empty_event(e.clone()).into())
+            }
+            _ => (),
+        };
+
+        Ok(Self {})
+    }
+}
+
+impl MetadataChainVisitor for ValidateEventIsNotEmptyVisitor {
+    type Error = AppendError;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::Stop
+    }
+
+    fn visit(&mut self, _: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        unreachable!()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct ValidateAddDataVisitor<'a> {
+    appended_add_data: Option<&'a AddData>,
     prev_schema: Option<SetDataSchema>,
     prev_add_data: Option<AddData>,
     next_block_flags: Flag,
 }
 
-struct ExecuteTransformVisitorState<'a> {
-    appended_execute_transform: &'a ExecuteTransform,
-    prev_transform: Option<SetTransform>,
-    prev_schema: Option<SetDataSchema>,
-    prev_query: Option<ExecuteTransform>,
-    next_block_flags: Flag,
-}
-
-enum ValidateLogicalStructureVisitorState<'a> {
-    AddData(AddDataVisitorState<'a>),
-    ExecuteTransform(ExecuteTransformVisitorState<'a>),
-    SetPollingSource {
-        appended_set_polling_source: &'a SetPollingSource,
-        appended_event: &'a MetadataEvent,
-    },
-    AddPushSource {
-        appended_add_push_source: &'a AddPushSource,
-        appended_event: &'a MetadataEvent,
-    },
-    SetTransform {
-        appended_set_transform: &'a SetTransform,
-        appended_event: &'a MetadataEvent,
-    },
-    Stopped,
-}
-
-type State<'a> = ValidateLogicalStructureVisitorState<'a>;
-
-pub struct ValidateLogicalStructureVisitor<'a> {
-    state: State<'a>,
-}
-
-impl<'a> ValidateLogicalStructureVisitor<'a> {
-    fn validate_transform(e: &MetadataEvent, transform: &Transform) -> Result<(), AppendError> {
-        let Transform::Sql(transform) = transform;
-        if transform.query.is_some() {
-            invalid_event!(e.clone(), "Transform queries must be normalized");
-        }
-
-        if transform.queries.is_none() || transform.queries.as_ref().unwrap().is_empty() {
-            invalid_event!(e.clone(), "Transform must have at least one query");
-        }
-
-        let queries = transform.queries.as_ref().unwrap();
-
-        if queries.last().unwrap().alias.is_some() {
-            invalid_event!(
-                e.clone(),
-                "Last query in a transform must have no alias an will be treated as an output"
-            );
-        }
-
-        for q in &queries[..queries.len() - 1] {
-            if q.alias.is_none() {
-                invalid_event!(
-                    e.clone(),
-                    "In a transform all queries except the last one must have aliases"
-                );
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn new(block: &'a MetadataBlock) -> Self {
-        let state = match &block.event {
-            MetadataEvent::SetDataSchema(_) => {
-                // TODO: Consider schema evolution rules
-                // TODO: Consider what happens with previously defined sources
-                State::Stopped
-            }
-            MetadataEvent::AddData(e) => State::AddData(AddDataVisitorState {
-                appended_add_data: e,
-                prev_schema: None,
-                prev_add_data: None,
-                next_block_flags: Flag::SET_DATA_SCHEMA | Flag::ADD_DATA,
-            }),
-            // TODO: ensure only used on Derivative datasets
-            MetadataEvent::ExecuteTransform(e) => {
-                State::ExecuteTransform(ExecuteTransformVisitorState {
-                    appended_execute_transform: e,
-                    prev_transform: None,
-                    prev_schema: None,
-                    prev_query: None,
-                    next_block_flags: Flag::SET_DATA_SCHEMA
-                        | Flag::SET_TRANSFORM
-                        | Flag::EXECUTE_TRANSFORM,
-                })
-            }
-            MetadataEvent::SetPollingSource(e) => State::SetPollingSource {
-                appended_set_polling_source: e,
-                appended_event: &block.event,
-            },
-            MetadataEvent::DisablePollingSource(_) => {
-                // TODO: Ensure has previously active polling source
-                unimplemented!("Disabling sources is not yet fully supported")
-            }
-            MetadataEvent::AddPushSource(e) => State::AddPushSource {
-                appended_add_push_source: e,
-                appended_event: &block.event,
-            },
-            MetadataEvent::DisablePushSource(_) => {
-                // TODO: Ensure has previous push source with matching name
-                unimplemented!("Disabling sources is not yet fully supported")
-            }
-            MetadataEvent::SetTransform(e) => State::SetTransform {
-                appended_set_transform: e,
-                appended_event: &block.event,
-            },
-            MetadataEvent::Seed(_)
-            | MetadataEvent::SetVocab(_)
-            | MetadataEvent::SetAttachments(_)
-            | MetadataEvent::SetInfo(_)
-            | MetadataEvent::SetLicense(_) => State::Stopped,
+impl<'a> ValidateAddDataVisitor<'a> {
+    pub fn new(block: &'a MetadataBlock) -> Result<Self, AppendError> {
+        let appended_add_data = match &block.event {
+            MetadataEvent::AddData(e) => Some(e),
+            _ => None,
         };
 
-        Self { state }
+        Ok(Self {
+            appended_add_data,
+            prev_schema: None,
+            prev_add_data: None,
+            next_block_flags: Flag::SET_DATA_SCHEMA | Flag::ADD_DATA,
+        })
     }
 
-    pub fn post_visit(self) -> Result<(), AppendError> {
-        match self.state {
-            State::AddData(state) => Self::handle_post_visit_add_data(state),
-            State::ExecuteTransform(state) => Self::handle_post_visit_execute_transform(state),
-            State::SetPollingSource { .. }
-            | State::AddPushSource { .. }
-            | State::SetTransform { .. }
-            | State::Stopped => Ok(()),
-        }
-    }
-
-    fn handle_post_visit_add_data(
-        AddDataVisitorState {
-            appended_add_data: e,
+    pub fn post_check(self) -> Result<(), AppendError> {
+        let ValidateAddDataVisitor {
+            appended_add_data,
             prev_schema,
             prev_add_data,
             ..
-        }: AddDataVisitorState,
-    ) -> Result<(), AppendError> {
+        } = self;
+        let Some(e) = appended_add_data else {
+            return Ok(());
+        };
+
         // Validate schema was defined before adding any data
         if prev_schema.is_none() && e.new_data.is_some() {
             invalid_event!(
@@ -529,16 +643,74 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
 
         Ok(())
     }
+}
 
-    fn handle_post_visit_execute_transform(
-        ExecuteTransformVisitorState {
-            appended_execute_transform: e,
+impl<'a> MetadataChainVisitor for ValidateAddDataVisitor<'a> {
+    type Error = AppendError;
+
+    fn initial_decision(&self) -> Decision {
+        if self.appended_add_data.is_some() {
+            Decision::NextOfType(self.next_block_flags)
+        } else {
+            Decision::Stop
+        }
+    }
+
+    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        match &block.event {
+            MetadataEvent::AddData(e) => {
+                self.prev_add_data = Some(e.clone());
+                self.next_block_flags -= Flag::ADD_DATA;
+            }
+            MetadataEvent::SetDataSchema(e) => {
+                self.prev_schema = Some(e.clone());
+                self.next_block_flags -= Flag::SET_DATA_SCHEMA;
+            }
+            _ => unreachable!(),
+        }
+
+        Ok(Decision::NextOfType(self.next_block_flags))
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct ValidateExecuteTransformVisitor<'a> {
+    appended_execute_transform: Option<&'a ExecuteTransform>,
+    prev_transform: Option<SetTransform>,
+    prev_schema: Option<SetDataSchema>,
+    prev_query: Option<ExecuteTransform>,
+    next_block_flags: Flag,
+}
+
+impl<'a> ValidateExecuteTransformVisitor<'a> {
+    pub fn new(block: &'a MetadataBlock) -> Result<Self, AppendError> {
+        let appended_execute_transform = match &block.event {
+            MetadataEvent::ExecuteTransform(e) => Some(e),
+            _ => None,
+        };
+
+        Ok(Self {
+            appended_execute_transform,
+            prev_transform: None,
+            prev_schema: None,
+            prev_query: None,
+            next_block_flags: Flag::SET_DATA_SCHEMA | Flag::SET_TRANSFORM | Flag::EXECUTE_TRANSFORM,
+        })
+    }
+
+    pub fn post_check(self) -> Result<(), AppendError> {
+        let ValidateExecuteTransformVisitor {
+            appended_execute_transform,
             prev_transform,
             prev_schema,
             prev_query,
             ..
-        }: ExecuteTransformVisitorState,
-    ) -> Result<(), AppendError> {
+        } = self;
+        let Some(e) = appended_execute_transform else {
+            return Ok(());
+        };
+
         // Validate schema was defined if we're adding data
         if prev_schema.is_none() && e.new_data.is_some() {
             invalid_event!(
@@ -644,159 +816,76 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
     }
 }
 
-impl<'a> MetadataChainVisitor for ValidateLogicalStructureVisitor<'a> {
+impl<'a> MetadataChainVisitor for ValidateExecuteTransformVisitor<'a> {
     type Error = AppendError;
 
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        match &self.state {
-            State::AddData(state) => {
-                // TODO: ensure only used on Root datasets
-                let e = state.appended_add_data;
-
-                if e.is_empty() {
-                    return Err(
-                        AppendValidationError::no_op_event(e.clone(), "Event is empty").into(),
-                    );
-                }
-
-                Ok(Decision::NextOfType(state.next_block_flags))
-            }
-            State::ExecuteTransform(state) => {
-                let e = state.appended_execute_transform;
-
-                if e.is_empty() {
-                    return Err(
-                        AppendValidationError::no_op_event(e.clone(), "Event is empty").into(),
-                    );
-                }
-
-                Ok(Decision::NextOfType(state.next_block_flags))
-            }
-            State::SetPollingSource {
-                appended_set_polling_source: e,
-                appended_event,
-            } => {
-                // Queries must be normalized
-                if let Some(transform) = &e.preprocess {
-                    Self::validate_transform(appended_event, transform)?;
-                }
-
-                // Ensure no active push sources
-                Ok(Decision::NextOfType(Flag::ADD_PUSH_SOURCE))
-            }
-            State::AddPushSource {
-                appended_add_push_source: e,
-                appended_event,
-            } => {
-                // Ensure specifies the schema
-                if e.read.schema().is_none() {
-                    invalid_event!(
-                        (*e).clone(),
-                        "Push sources must specify the read schema explicitly",
-                    );
-                }
-
-                // Queries must be normalized
-                if let Some(transform) = &e.preprocess {
-                    Self::validate_transform(appended_event, transform)?;
-                }
-
-                Ok(Decision::NextOfType(Flag::SET_POLLING_SOURCE))
-            }
-            State::SetTransform {
-                appended_set_transform: e,
-                appended_event,
-            } => {
-                // Ensure has inputs
-                if e.inputs.is_empty() {
-                    invalid_event!((*e).clone(), "Transform must have at least one input");
-                }
-
-                // Ensure inputs are resolved to IDs and aliases are specified
-                for i in &e.inputs {
-                    if i.dataset_ref.id().is_none() || i.alias.is_none() {
-                        invalid_event!(
-                            (*e).clone(),
-                            "Transform inputs must be resolved to dataset IDs and specify aliases"
-                        );
-                    }
-                }
-
-                // Queries must be normalized
-                Self::validate_transform(appended_event, &e.transform)?;
-
-                Ok(Decision::Stop)
-            }
-            State::Stopped => Ok(Decision::Stop),
+    fn initial_decision(&self) -> Decision {
+        if self.appended_execute_transform.is_some() {
+            Decision::NextOfType(self.next_block_flags)
+        } else {
+            Decision::Stop
         }
     }
 
     fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
-        match &mut self.state {
-            State::AddData(state) => {
-                match &block.event {
-                    MetadataEvent::AddData(e) => {
-                        state.prev_add_data = Some(e.clone());
-                        state.next_block_flags -= Flag::ADD_DATA;
-                    }
-                    MetadataEvent::SetDataSchema(e) => {
-                        state.prev_schema = Some(e.clone());
-                        state.next_block_flags -= Flag::SET_DATA_SCHEMA;
-                    }
-                    _ => unreachable!(),
-                }
-
-                Ok(Decision::NextOfType(state.next_block_flags))
+        match &block.event {
+            MetadataEvent::SetDataSchema(e) => {
+                self.prev_schema = Some(e.clone());
+                self.next_block_flags -= Flag::SET_DATA_SCHEMA;
             }
-            State::ExecuteTransform(state) => {
-                match &block.event {
-                    MetadataEvent::SetDataSchema(e) => {
-                        state.prev_schema = Some(e.clone());
-                        state.next_block_flags -= Flag::SET_DATA_SCHEMA;
-                    }
-                    MetadataEvent::SetTransform(e) => {
-                        state.prev_transform = Some(e.clone());
-                        state.next_block_flags -= Flag::SET_TRANSFORM;
-                    }
-                    MetadataEvent::ExecuteTransform(e) => {
-                        state.prev_query = Some(e.clone());
-                        state.next_block_flags -= Flag::EXECUTE_TRANSFORM;
-                    }
-                    _ => unreachable!(),
-                }
-
-                // Note: `prev_transform` is optional
-                if state.prev_schema.is_some() && state.prev_query.is_some() {
-                    state.next_block_flags -= Flag::SET_TRANSFORM;
-                }
-
-                Ok(Decision::NextOfType(state.next_block_flags))
+            MetadataEvent::SetTransform(e) => {
+                self.prev_transform = Some(e.clone());
+                self.next_block_flags -= Flag::SET_TRANSFORM;
             }
-            State::SetPollingSource { .. } => {
-                let MetadataEvent::AddPushSource(e) = &block.event else {
-                    unreachable!()
-                };
+            MetadataEvent::ExecuteTransform(e) => {
+                self.prev_query = Some(e.clone());
+                self.next_block_flags -= Flag::EXECUTE_TRANSFORM;
+            }
+            _ => unreachable!(),
+        }
 
-                invalid_event!(
-                    e.clone(),
-                    "Cannot add a polling source while some push sources are still active",
-                );
-            }
-            State::AddPushSource { .. } => {
-                let MetadataEvent::SetPollingSource(e) = &block.event else {
-                    unreachable!()
-                };
+        // Note: `prev_transform` is optional
+        if self.prev_schema.is_some() && self.prev_query.is_some() {
+            self.next_block_flags -= Flag::SET_TRANSFORM;
+        }
 
-                invalid_event!(
-                    e.clone(),
-                    "Cannot add a push source while polling source is still active",
-                );
-            }
-            State::Stopped | State::SetTransform { .. } => {
-                unreachable!()
-            }
+        Ok(Decision::NextOfType(self.next_block_flags))
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Helpers
+///////////////////////////////////////////////////////////////////////////////
+
+fn validate_transform(e: &MetadataEvent, transform: &Transform) -> Result<(), AppendError> {
+    let Transform::Sql(transform) = transform;
+    if transform.query.is_some() {
+        invalid_event!(e.clone(), "Transform queries must be normalized");
+    }
+
+    if transform.queries.is_none() || transform.queries.as_ref().unwrap().is_empty() {
+        invalid_event!(e.clone(), "Transform must have at least one query");
+    }
+
+    let queries = transform.queries.as_ref().unwrap();
+
+    if queries.last().unwrap().alias.is_some() {
+        invalid_event!(
+            e.clone(),
+            "Last query in a transform must have no alias an will be treated as an output"
+        );
+    }
+
+    for q in &queries[..queries.len() - 1] {
+        if q.alias.is_none() {
+            invalid_event!(
+                e.clone(),
+                "In a transform all queries except the last one must have aliases"
+            );
         }
     }
+
+    Ok(())
 }
 
 ///////////////////////////////////////////////////////////////////////////////

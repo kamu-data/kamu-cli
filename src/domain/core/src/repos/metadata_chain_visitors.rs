@@ -14,12 +14,9 @@ use internal_error::InternalError;
 use opendatafabric::{
     AsTypedBlock,
     ExecuteTransform,
-    IntoDataStreamBlock,
     MetadataBlock,
-    MetadataBlockDataStream,
     MetadataBlockTyped,
     MetadataEvent,
-    MetadataEventDataStream,
     MetadataEventTypeFlags as Flag,
     Multihash,
     Seed,
@@ -107,8 +104,8 @@ where
 {
     type Error = E;
 
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        Ok(Decision::NextOfType(self.requested_flag))
+    fn initial_decision(&self) -> Decision {
+        Decision::NextOfType(self.requested_flag)
     }
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
@@ -126,144 +123,6 @@ where
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[allow(clippy::enum_variant_names)]
-enum SearchDataBlocksVisitorKind {
-    NextDataBlock,
-    NextFilledNewWatermark,
-    NextFilledNewData,
-}
-
-pub struct SearchDataBlocksVisitor<E = InternalError> {
-    kind: SearchDataBlocksVisitorKind,
-    hashed_data_block: Option<(Multihash, MetadataBlockDataStream)>,
-    _phantom: PhantomData<E>,
-}
-
-impl<E> SearchDataBlocksVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    pub fn next_data_block() -> Self {
-        Self::new(SearchDataBlocksVisitorKind::NextDataBlock)
-    }
-
-    pub fn next_filled_new_watermark() -> Self {
-        Self::new(SearchDataBlocksVisitorKind::NextFilledNewWatermark)
-    }
-
-    pub fn next_filled_new_data() -> Self {
-        Self::new(SearchDataBlocksVisitorKind::NextFilledNewData)
-    }
-
-    fn new(kind: SearchDataBlocksVisitorKind) -> Self {
-        Self {
-            kind,
-            hashed_data_block: None,
-            _phantom: PhantomData,
-        }
-    }
-
-    pub fn into_hashed_data_block(self) -> Option<(Multihash, MetadataBlockDataStream)> {
-        self.hashed_data_block
-    }
-
-    pub fn into_data_block(self) -> Option<MetadataBlockDataStream> {
-        self.hashed_data_block.map(|(_, block)| block)
-    }
-
-    pub fn into_event(self) -> Option<MetadataEventDataStream> {
-        self.hashed_data_block.map(|(_, block)| block.event)
-    }
-}
-
-pub struct SearchDataBlocksVisitorFactory<E = InternalError> {
-    _phantom: PhantomData<E>,
-}
-
-impl<E> MetadataChainVisitor for SearchDataBlocksVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    type Error = E;
-
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        Ok(Decision::NextOfType(Flag::DATA_BLOCK))
-    }
-
-    fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
-        let Some(data_block) = block.as_data_stream_block() else {
-            unreachable!()
-        };
-
-        let has_data_block_found = match self.kind {
-            SearchDataBlocksVisitorKind::NextDataBlock => true,
-            SearchDataBlocksVisitorKind::NextFilledNewWatermark => {
-                data_block.event.new_watermark.is_some()
-            }
-            SearchDataBlocksVisitorKind::NextFilledNewData => data_block.event.new_data.is_some(),
-        };
-
-        if has_data_block_found {
-            self.hashed_data_block = Some((
-                hash.clone(),
-                block.clone().into_data_stream_block().unwrap(),
-            ));
-
-            Ok(Decision::Stop)
-        } else {
-            Ok(Decision::NextOfType(Flag::DATA_BLOCK))
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub struct SearchNextBlockVisitor<E = InternalError> {
-    hashed_block: Option<(Multihash, MetadataBlock)>,
-    _phantom: PhantomData<E>,
-}
-
-impl<E> Default for SearchNextBlockVisitor<E> {
-    fn default() -> Self {
-        Self {
-            hashed_block: None,
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<E> SearchNextBlockVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    pub fn into_hashed_block(self) -> Option<(Multihash, MetadataBlock)> {
-        self.hashed_block
-    }
-
-    pub fn into_block(self) -> Option<MetadataBlock> {
-        self.hashed_block.map(|(_, block)| block)
-    }
-}
-
-impl<E> MetadataChainVisitor for SearchNextBlockVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    type Error = E;
-
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        Ok(Decision::Next)
-    }
-
-    fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
-        self.hashed_block = Some((hash.clone(), block.clone()));
-
-        Ok(Decision::Stop)
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 pub struct GenericCallbackVisitor<S, F, E = InternalError> {
     state: S,
     initial_decision: Decision,
@@ -274,7 +133,7 @@ pub struct GenericCallbackVisitor<S, F, E = InternalError> {
 impl<S, F, E> GenericCallbackVisitor<S, F, E>
 where
     S: Send + Sync,
-    F: Fn(&mut S, HashedMetadataBlockRef) -> Result<Decision, E> + Send + Sync,
+    F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<Decision, E> + Send + Sync,
     E: Error + Send + Sync,
 {
     pub fn new(state: S, initial_decision: Decision, visit_callback: F) -> Self {
@@ -294,17 +153,17 @@ where
 impl<S, F, E> MetadataChainVisitor for GenericCallbackVisitor<S, F, E>
 where
     S: Send + Sync,
-    F: Fn(&mut S, HashedMetadataBlockRef) -> Result<Decision, E> + Send + Sync,
+    F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<Decision, E> + Send + Sync,
     E: Error + Send + Sync,
 {
     type Error = E;
 
-    fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        Ok(self.initial_decision.clone())
+    fn initial_decision(&self) -> Decision {
+        self.initial_decision.clone()
     }
 
-    fn visit(&mut self, hashed_block_ref: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
-        (self.visit_callback)(&mut self.state, hashed_block_ref)
+    fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        (self.visit_callback)(&mut self.state, hash, block)
     }
 }
 

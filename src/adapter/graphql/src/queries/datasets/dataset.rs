@@ -123,10 +123,8 @@ impl Dataset {
             .get_dataset(ctx)
             .await?
             .as_metadata_chain()
-            .accept_one(<SearchNextBlockVisitor>::default())
+            .get_block_by_ref(&domain::BlockRef::Head)
             .await?
-            .into_block()
-            .expect("Dataset without blocks")
             .system_time)
     }
 

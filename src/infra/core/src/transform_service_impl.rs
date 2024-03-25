@@ -300,16 +300,29 @@ impl TransformServiceImpl {
     // TODO: Allow derivative datasets to function with inputs containing no data
     // This will require passing the schema explicitly instead of relying on a file
     async fn is_never_pulled(&self, dataset_ref: &DatasetRef) -> Result<bool, InternalError> {
+        type Flag = MetadataEventTypeFlags;
+        type Decision = MetadataVisitorDecision;
+
         Ok(self
             .dataset_repo
             .get_dataset(dataset_ref)
             .await
             .int_err()?
             .as_metadata_chain()
-            .accept_one(<SearchDataBlocksVisitor>::next_data_block())
+            .reduce(
+                None,
+                Decision::NextOfType(Flag::DATA_BLOCK),
+                |state, _, block| {
+                    let Some(data_block) = block.as_data_stream_block() else {
+                        unreachable!()
+                    };
+
+                    *state = data_block.event.last_offset();
+
+                    Ok::<_, InternalError>(Decision::Stop)
+                },
+            )
             .await?
-            .into_event()
-            .and_then(|e| e.last_offset())
             .is_none())
     }
 
@@ -341,19 +354,30 @@ impl TransformServiceImpl {
 
         // Determine unprocessed block and offset range
         let last_unprocessed_block = input_chain.resolve_ref(&BlockRef::Head).await.int_err()?;
-        let mut visitor = <SearchDataBlocksVisitor>::next_data_block();
 
-        input_chain
-            .accept_by_interval(
-                &mut [&mut visitor],
-                Some(&last_unprocessed_block),
-                last_processed_block,
+        type Flag = MetadataEventTypeFlags;
+        type Decision = MetadataVisitorDecision;
+
+        let last_unprocessed_offset = input_chain
+            .reduce_by_hash(
+                &last_unprocessed_block,
+                None,
+                Decision::NextOfType(Flag::DATA_BLOCK),
+                |state, hash, block| {
+                    if last_processed_block == Some(hash) {
+                        return Ok(Decision::Stop);
+                    }
+
+                    let Some(data_block) = block.as_data_stream_block() else {
+                        unreachable!()
+                    };
+
+                    *state = data_block.event.last_offset();
+
+                    Ok::<_, InternalError>(Decision::Stop)
+                },
             )
-            .await?;
-
-        let last_unprocessed_offset = visitor
-            .into_event()
-            .and_then(|e| e.last_offset())
+            .await?
             .or(last_processed_offset);
 
         let query_input = ExecuteTransformInput {
@@ -438,18 +462,31 @@ impl TransformServiceImpl {
         let schema_slice = if let Some(h) = data_slices.last() {
             h.clone()
         } else {
-            // TODO: This will not work with schema evolution
-            let mut visitor = <SearchDataBlocksVisitor>::next_filled_new_data();
+            type Flag = MetadataEventTypeFlags;
+            type Decision = MetadataVisitorDecision;
 
             input_chain
-                .accept::<InternalError>(&mut [&mut visitor])
-                .await?;
+                // TODO: This will not work with schema evolution
+                .reduce(
+                    None,
+                    Decision::NextOfType(Flag::DATA_BLOCK),
+                    |state, _, block| {
+                        let Some(data_block) = block.as_data_stream_block() else {
+                            unreachable!()
+                        };
 
-            visitor
-                .into_event()
-                .and_then(|e| e.new_data)
-                .unwrap() // Already checked that none of the inputs are empty
-                .physical_hash
+                        let Some(new_data) = data_block.event.new_data else {
+                            return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
+                        };
+
+                        *state = Some(new_data.physical_hash.clone());
+
+                        Ok::<_, InternalError>(Decision::Stop)
+                    },
+                )
+                .await?
+                // Already checked that none of the inputs are empty
+                .unwrap()
         };
 
         let vocab = match vocab_hint {
@@ -545,7 +582,7 @@ impl TransformServiceImpl {
                     finished_range: false,
                 },
                 Decision::NextOfType(Flag::EXECUTE_TRANSFORM),
-                |state, (hash, block)| {
+                |state, hash, block| {
                     if Some(block.sequence_number) < state.tail_sequence_number {
                         state.finished_range = true;
 

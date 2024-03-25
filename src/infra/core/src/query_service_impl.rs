@@ -161,25 +161,42 @@ impl QueryServiceImpl {
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
+        type Flag = MetadataEventTypeFlags;
+        type Decision = MetadataVisitorDecision;
+
         // TODO: Update to use SetDataSchema event
-        let last_data_slice_opt = dataset
+        let maybe_last_data_slice_hash = dataset
             .as_metadata_chain()
-            .accept_one(<SearchDataBlocksVisitor>::next_filled_new_data())
+            .reduce(
+                None,
+                Decision::NextOfType(Flag::DATA_BLOCK),
+                |state, _, block| {
+                    let Some(data_block) = block.as_data_stream_block() else {
+                        unreachable!()
+                    };
+
+                    let Some(new_data) = data_block.event.new_data else {
+                        return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
+                    };
+
+                    *state = Some(new_data.physical_hash.clone());
+
+                    Ok::<_, InternalError>(Decision::Stop)
+                },
+            )
             .await
             .map_err(|e| {
                 tracing::error!(error = ?e, "Resolving last data slice failed");
                 e
-            })?
-            .into_event()
-            .and_then(|e| e.new_data);
+            })?;
 
-        match last_data_slice_opt {
-            Some(last_data_slice) => {
+        match maybe_last_data_slice_hash {
+            Some(last_data_slice_hash) => {
                 // TODO: Avoid boxing url - requires datafusion to fix API
                 let data_url = Box::new(
                     dataset
                         .as_data_repo()
-                        .get_internal_url(&last_data_slice.physical_hash)
+                        .get_internal_url(&last_data_slice_hash)
                         .await,
                 );
 
