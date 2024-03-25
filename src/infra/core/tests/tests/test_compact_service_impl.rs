@@ -11,12 +11,15 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
+use datafusion::execution::config::SessionConfig;
+use datafusion::execution::context::SessionContext;
 use dill::Component;
 use domain::compact_service::{CompactError, CompactService, NullCompactionMultiListener};
 use event_bus::EventBus;
 use futures::TryStreamExt;
+use indoc::indoc;
 use kamu::domain::*;
-use kamu::testing::{DatasetTestHelper, MetadataFactory};
+use kamu::testing::{DatasetDataHelper, DatasetTestHelper, MetadataFactory};
 use kamu::*;
 use kamu_core::{auth, CurrentAccountSubject};
 use opendatafabric::*;
@@ -42,6 +45,8 @@ async fn test_dataset_compact() {
                 .build(),
         )
         .await;
+
+    let data_helper = harness.dataset_data_helper(&root_dataset_alias).await;
 
     let dataset_handle = harness
         .dataset_repo
@@ -70,6 +75,32 @@ async fn test_dataset_compact() {
         Ok(()),
     );
 
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  REQUIRED INT32 a;
+                  REQUIRED BYTE_ARRAY b (STRING);
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +---+---+
+                | a | b |
+                +---+---+
+                | 1 | a |
+                | 2 | b |
+                | 3 | c |
+                | 4 | d |
+                | 5 | e |
+                +---+---+
+                "#
+            ),
+        )
+        .await;
+
     let new_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
@@ -94,6 +125,38 @@ async fn test_dataset_compact() {
             .await,
         Ok(()),
     );
+
+    // 2 Dataslices will be merged in a one slice
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+            message arrow_schema {
+              REQUIRED INT32 a;
+              REQUIRED BYTE_ARRAY b (STRING);
+            }
+            "#
+            ),
+            indoc!(
+                r#"
+            +---+---+
+            | a | b |
+            +---+---+
+            | 1 | a |
+            | 2 | b |
+            | 3 | c |
+            | 4 | d |
+            | 5 | e |
+            | 1 | a |
+            | 2 | b |
+            | 3 | c |
+            | 4 | d |
+            | 5 | e |
+            +---+---+
+            "#
+            ),
+        )
+        .await;
 
     let new_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
@@ -121,6 +184,33 @@ async fn test_dataset_compact() {
             .await,
         Ok(()),
     );
+
+    // Due to limit we will left last added slice as it is
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+        message arrow_schema {
+          REQUIRED INT32 a;
+          REQUIRED BYTE_ARRAY b (STRING);
+        }
+        "#
+            ),
+            indoc!(
+                r#"
+        +---+---+
+        | a | b |
+        +---+---+
+        | 1 | a |
+        | 2 | b |
+        | 3 | c |
+        | 4 | d |
+        | 5 | e |
+        +---+---+
+        "#
+            ),
+        )
+        .await;
 
     let new_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
@@ -166,6 +256,7 @@ async fn test_dataset_compact() {
 struct CompactTestHarness {
     dataset_repo: Arc<dyn DatasetRepository>,
     compact_svc: Arc<dyn CompactService>,
+    ctx: SessionContext,
 }
 
 impl CompactTestHarness {
@@ -207,6 +298,7 @@ impl CompactTestHarness {
         Self {
             dataset_repo,
             compact_svc,
+            ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
     }
 
@@ -242,15 +334,15 @@ impl CompactTestHarness {
             .unwrap();
     }
 
-    // async fn dataset_data_helper(&self, dataset_alias: &DatasetAlias) ->
-    // DatasetDataHelper {     let dataset = self
-    //         .dataset_repo
-    //         .get_dataset(&dataset_alias.as_local_ref())
-    //         .await
-    //         .unwrap();
+    async fn dataset_data_helper(&self, dataset_alias: &DatasetAlias) -> DatasetDataHelper {
+        let dataset = self
+            .dataset_repo
+            .get_dataset(&dataset_alias.as_local_ref())
+            .await
+            .unwrap();
 
-    //     DatasetDataHelper::new_with_context(dataset, self.ctx.clone())
-    // }
+        DatasetDataHelper::new_with_context(dataset, self.ctx.clone())
+    }
 
     async fn append_add_data_block(&self, dataset_ref: &DatasetRef, data_slice_size: usize) {
         DatasetTestHelper::append_random_data(
