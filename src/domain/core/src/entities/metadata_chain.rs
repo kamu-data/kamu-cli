@@ -260,13 +260,37 @@ pub trait MetadataChainExt: MetadataChain {
             + Sync,
         E: Error + From<IterBlocksError> + Send + Sync,
     {
+        let head_hash = self
+            .resolve_ref(&BlockRef::Head)
+            .await
+            .map_err(Into::into)?;
+
+        Ok(self
+            .reduce_by_hash(&head_hash, state, initial_decision, callback)
+            .await?)
+    }
+
+    async fn reduce_by_hash<S, F, E>(
+        &self,
+        head_hash: &Multihash,
+        state: S,
+        initial_decision: MetadataVisitorDecision,
+        callback: F,
+    ) -> Result<S, E>
+    where
+        S: Send + Sync,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E>
+            + Send
+            + Sync,
+        E: Error + From<IterBlocksError> + Send + Sync,
+    {
         // TODO: update GenericCallbackVisitor visitor callback
         let mut visitor =
             GenericCallbackVisitor::new(state, initial_decision, |state, (hash, block)| {
                 callback(state, hash, block)
             });
 
-        self.accept(&mut [&mut visitor]).await?;
+        self.accept_by_hash(&mut [&mut visitor], head_hash).await?;
 
         Ok(visitor.into_state())
     }
