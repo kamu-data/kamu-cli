@@ -25,13 +25,13 @@ use crate::{ScanMetadataError, SourceNotFoundError};
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct DataWriterDataFusionMetaDataStateVisitor<'a> {
+pub struct SourceEventVisitor<'a> {
     maybe_source_name: Option<&'a str>,
     next_block_flags: Flag,
     maybe_source_event: Option<MetadataEvent>,
 }
 
-impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
+impl<'a> SourceEventVisitor<'a> {
     pub fn new(maybe_source_name: Option<&'a str>) -> Self {
         const INITIAL_NEXT_BLOCK_FLAGS: Flag = Flag::SET_POLLING_SOURCE
             .union(Flag::DISABLE_POLLING_SOURCE)
@@ -106,7 +106,7 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
     }
 }
 
-impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
+impl<'a> MetadataChainVisitor for SourceEventVisitor<'a> {
     type Error = ScanMetadataError;
 
     fn initial_decision(&self) -> Decision {

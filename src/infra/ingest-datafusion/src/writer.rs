@@ -24,7 +24,7 @@ use kamu_core::*;
 use odf::{AsTypedBlock, DatasetVocabulary, MetadataEvent, Multihash, SourceState};
 use opendatafabric as odf;
 
-use crate::visitor::DataWriterDataFusionMetaDataStateVisitor;
+use crate::visitor::SourceEventVisitor;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -922,7 +922,7 @@ impl DataWriterDataFusionBuilder {
                 Ok::<_, ScanMetadataError>(Decision::NextOfType(Flag::ADD_DATA))
             },
         );
-        let mut source_event_visitor = DataWriterDataFusionMetaDataStateVisitor::new(source_name);
+        let mut source_event_visitor = SourceEventVisitor::new(source_name);
 
         self.dataset
             .as_metadata_chain()
