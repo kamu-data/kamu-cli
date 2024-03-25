@@ -16,7 +16,6 @@ use crate::{
     ValidateAddPushSourceVisitor,
     ValidateEventIsNotEmptyVisitor,
     ValidateExecuteTransformVisitor,
-    ValidateLogicalStructureVisitor,
     ValidateOffsetsAreSequentialVisitor,
     ValidatePrevBlockExistsVisitor,
     ValidateSeedBlockOrderVisitor,
@@ -24,6 +23,7 @@ use crate::{
     ValidateSetPollingSourceVisitor,
     ValidateSetTransformVisitor,
     ValidateSystemTimeIsMonotonicVisitor,
+    ValidateUnimplementedEventsVisitor,
     ValidateWatermarkIsMonotonicVisitor,
 };
 
@@ -211,8 +211,8 @@ where
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError> {
         if opts.validation == AppendValidation::Full {
-            let mut validate_logical_structure_visitor =
-                ValidateLogicalStructureVisitor::new(&block);
+            let mut validate_unimplemented_events_visitor =
+                ValidateUnimplementedEventsVisitor::new(&block);
             let mut validate_add_data_visitor = ValidateAddDataVisitor::new(&block)?;
             let mut validate_execute_transform_visitor =
                 ValidateExecuteTransformVisitor::new(&block)?;
@@ -220,7 +220,7 @@ where
             let mut validators = [
                 &mut validate_add_data_visitor as &mut dyn MetadataChainVisitor<Error = _>,
                 &mut validate_execute_transform_visitor,
-                &mut validate_logical_structure_visitor,
+                &mut validate_unimplemented_events_visitor,
                 //
                 &mut ValidateSeedBlockOrderVisitor::new(&block)?,
                 &mut ValidatePrevBlockExistsVisitor::new(&block),

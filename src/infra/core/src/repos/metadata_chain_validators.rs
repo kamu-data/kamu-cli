@@ -340,9 +340,9 @@ impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct ValidateLogicalStructureVisitor {}
+pub struct ValidateUnimplementedEventsVisitor {}
 
-impl ValidateLogicalStructureVisitor {
+impl ValidateUnimplementedEventsVisitor {
     pub fn new(block: &MetadataBlock) -> Self {
         match &block.event {
             MetadataEvent::DisablePollingSource(_) => {
@@ -372,7 +372,7 @@ impl ValidateLogicalStructureVisitor {
     }
 }
 
-impl MetadataChainVisitor for ValidateLogicalStructureVisitor {
+impl MetadataChainVisitor for ValidateUnimplementedEventsVisitor {
     type Error = AppendError;
 
     fn initial_decision(&self) -> Decision {

@@ -374,7 +374,7 @@ impl TransformServiceImpl {
             .reduce_by_hash(
                 &last_unprocessed_block,
                 None,
-                Decision::NextOfType(Flag::ADD_DATA),
+                Decision::NextOfType(Flag::DATA_BLOCK),
                 |state, hash, block| {
                     if last_processed_block == Some(hash) {
                         return Ok(Decision::Stop);
@@ -481,14 +481,14 @@ impl TransformServiceImpl {
                 // TODO: This will not work with schema evolution
                 .reduce(
                     None,
-                    Decision::NextOfType(Flag::ADD_DATA),
+                    Decision::NextOfType(Flag::DATA_BLOCK),
                     |state, _, block| {
                         let Some(data_block) = block.as_data_stream_block() else {
                             unreachable!()
                         };
 
                         let Some(new_data) = data_block.event.new_data else {
-                            return Ok(Decision::NextOfType(Flag::ADD_DATA));
+                            return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
                         };
 
                         *state = Some(new_data.physical_hash.clone());

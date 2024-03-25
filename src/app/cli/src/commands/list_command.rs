@@ -278,11 +278,11 @@ impl Command for ListCommand {
                             if state.num_blocks == 0 {
                                 // TODO: Should be precomputed
                                 state.num_blocks = block.sequence_number + 1;
-
-                                return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
                             }
 
-                            let data_block = block.as_data_stream_block().unwrap();
+                            let Some(data_block) = block.as_data_stream_block() else {
+                                return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
+                            };
 
                             state.last_watermark = data_block
                                 .event

@@ -123,52 +123,6 @@ where
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct SearchNextBlockVisitor<E = InternalError> {
-    hashed_block: Option<(Multihash, MetadataBlock)>,
-    _phantom: PhantomData<E>,
-}
-
-impl<E> Default for SearchNextBlockVisitor<E> {
-    fn default() -> Self {
-        Self {
-            hashed_block: None,
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<E> SearchNextBlockVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    pub fn into_hashed_block(self) -> Option<(Multihash, MetadataBlock)> {
-        self.hashed_block
-    }
-
-    pub fn into_block(self) -> Option<MetadataBlock> {
-        self.hashed_block.map(|(_, block)| block)
-    }
-}
-
-impl<E> MetadataChainVisitor for SearchNextBlockVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    type Error = E;
-
-    fn initial_decision(&self) -> Decision {
-        Decision::Next
-    }
-
-    fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
-        self.hashed_block = Some((hash.clone(), block.clone()));
-
-        Ok(Decision::Stop)
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 pub struct GenericCallbackVisitor<S, F, E = InternalError> {
     state: S,
     initial_decision: Decision,

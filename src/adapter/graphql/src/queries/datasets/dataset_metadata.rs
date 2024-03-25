@@ -60,7 +60,7 @@ impl DatasetMetadata {
             .as_metadata_chain()
             .reduce(
                 None,
-                Decision::NextOfType(Flag::ADD_DATA),
+                Decision::NextOfType(Flag::DATA_BLOCK),
                 |state, _, block| {
                     let Some(data_block) = block.as_data_stream_block() else {
                         unreachable!()
