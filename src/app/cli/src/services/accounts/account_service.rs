@@ -27,7 +27,7 @@ pub const LOGIN_METHOD_PASSWORD: &str = "password";
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AccountService {
-    pub predefined_accounts: HashMap<String, AccountInfo>,
+    pub predefined_accounts: HashMap<AccountName, AccountInfo>,
     pub allow_login_unknown: bool,
 }
 
@@ -40,7 +40,7 @@ impl AccountService {
 
         for predefined_account in &users_config.predefined {
             predefined_accounts.insert(
-                predefined_account.account_name.to_string(),
+                predefined_account.account_name.clone(),
                 predefined_account.clone(),
             );
         }
@@ -122,18 +122,15 @@ impl AccountService {
 
     fn find_account_info_impl(&self, account_name: &AccountName) -> Option<AccountInfo> {
         // The account might be predefined in the configuration
-        self.predefined_accounts.get(account_name.as_str()).cloned()
+        self.predefined_accounts.get(account_name).cloned()
     }
 
     fn get_account_info_impl(
         &self,
-        account_name: &String,
+        account_name: &AccountName,
     ) -> Result<AccountInfo, auth::RejectedCredentialsError> {
         // The account might be predefined in the configuration
-        match self
-            .predefined_accounts
-            .get(&account_name.to_ascii_lowercase())
-        {
+        match self.predefined_accounts.get(account_name) {
             // Use the predefined record
             Some(account_info) => Ok(account_info.clone()),
 
@@ -143,9 +140,9 @@ impl AccountService {
                 if self.allow_login_unknown {
                     Ok(AccountInfo {
                         account_id: FAKE_ACCOUNT_ID.to_string(),
-                        account_name: AccountName::new_unchecked(account_name),
+                        account_name: account_name.clone(),
                         account_type: AccountType::User,
-                        display_name: account_name.clone(),
+                        display_name: account_name.to_string(),
                         avatar_url: None,
                         is_admin: false,
                     })
@@ -193,7 +190,9 @@ impl auth::AuthenticationProvider for AccountService {
 
         // The account might be predefined in the configuration
         let account_info = self
-            .get_account_info_impl(&password_login_credentials.login)
+            .get_account_info_impl(&AccountName::new_unchecked(
+                &password_login_credentials.login,
+            ))
             .map_err(auth::ProviderLoginError::RejectedCredentials)?;
 
         // Store login as provider credentials
@@ -219,7 +218,7 @@ impl auth::AuthenticationProvider for AccountService {
                 .int_err()?;
 
         let account_info = self
-            .get_account_info_impl(&provider_credentials.account_name.to_string())
+            .get_account_info_impl(&provider_credentials.account_name)
             .int_err()?;
 
         Ok(account_info)

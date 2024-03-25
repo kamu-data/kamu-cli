@@ -110,14 +110,14 @@ use like::ILike;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-macro_rules! newtype_istr {
+macro_rules! newtype_str {
     ($typ:ident, $parse:expr, $visitor:ident) => {
-        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[derive(Debug, Clone, Eq)]
         pub struct $typ(Arc<str>);
 
         impl $typ {
             pub fn new_unchecked<S: AsRef<str> + ?Sized>(s: &S) -> Self {
-                Self(Arc::from(Self::into_lowercase(s.as_ref())))
+                Self(Arc::from(s.as_ref()))
             }
 
             pub fn as_str(&self) -> &str {
@@ -163,10 +163,35 @@ macro_rules! newtype_istr {
         impl std::str::FromStr for $typ {
             type Err = ::multiformats::ParseError<$typ>;
             fn from_str(s: &str) -> Result<Self, Self::Err> {
-                match $parse(&$typ::into_lowercase(s)) {
+                match $parse(s) {
                     Some((_, "")) => Ok(Self::new_unchecked(s)),
                     _ => Err(ParseError::new(s)),
                 }
+            }
+        }
+
+        impl PartialEq for $typ {
+            fn eq(&self, other: &$typ) -> bool {
+                self.eq_ignore_ascii_case(other)
+            }
+        }
+
+        impl Hash for $typ {
+            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+                Self::into_lowercase(&self.0).hash(state);
+                Self::into_lowercase(&self.0).hash(state);
+            }
+        }
+
+        impl PartialOrd for $typ {
+            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+
+        impl Ord for $typ {
+            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                Self::into_lowercase(self).cmp(&Self::into_lowercase(other))
             }
         }
 
@@ -218,7 +243,7 @@ macro_rules! newtype_istr {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-newtype_istr!(
+newtype_str!(
     DatasetName,
     Grammar::match_dataset_name,
     DatasetNameSerdeVisitor
@@ -236,7 +261,7 @@ impl DatasetName {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-newtype_istr!(
+newtype_str!(
     DatasetNamePattern,
     Grammar::match_dataset_name_pattern,
     DatasetNamePatternSerdeVisitor
@@ -310,7 +335,7 @@ pub const FAKE_ACCOUNT_ID: &str = "12345";
 
 ////////////////////////////////////////////////////////////////////////////////
 
-newtype_istr!(
+newtype_str!(
     AccountName,
     Grammar::match_account_name,
     AccountNameSerdeVisitor
@@ -318,7 +343,7 @@ newtype_istr!(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-newtype_istr!(RepoName, Grammar::match_repo_name, RepoNameSerdeVisitor);
+newtype_str!(RepoName, Grammar::match_repo_name, RepoNameSerdeVisitor);
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -372,7 +397,7 @@ impl DatasetAlias {
 impl std::str::FromStr for DatasetAlias {
     type Err = ParseError<Self>;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match Grammar::match_dataset_alias(&s.to_ascii_lowercase()) {
+        match Grammar::match_dataset_alias(s) {
             Some((acc, ds, "")) => Ok(Self::new(
                 acc.map(AccountName::new_unchecked),
                 DatasetName::new_unchecked(ds),
@@ -451,7 +476,7 @@ impl DatasetAliasRemote {
 impl std::str::FromStr for DatasetAliasRemote {
     type Err = ParseError<Self>;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match Grammar::match_dataset_alias_remote(&s.to_ascii_lowercase()) {
+        match Grammar::match_dataset_alias_remote(s) {
             Some((repo, acc, ds, "")) => Ok(Self::new(
                 RepoName::new_unchecked(repo),
                 acc.map(AccountName::new_unchecked),

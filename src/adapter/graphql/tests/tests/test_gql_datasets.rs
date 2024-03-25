@@ -24,7 +24,7 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
 #[test_log::test(tokio::test)]
 async fn dataset_by_id_does_not_exist() {
-    let harness = GraphQLDatasetsHarness::new();
+    let harness = GraphQLDatasetsHarness::new(false);
     let res = harness.execute_anonymous_query(indoc!(
             r#"
             {
@@ -52,10 +52,10 @@ async fn dataset_by_id_does_not_exist() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_by_id() {
-    let harness = GraphQLDatasetsHarness::new();
+    let harness = GraphQLDatasetsHarness::new(false);
 
     let foo_result = harness
-        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .create_root_dataset(None, DatasetName::new_unchecked("foo"))
         .await;
 
     let res = harness
@@ -93,8 +93,55 @@ async fn dataset_by_id() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn dataset_by_account_and_name_case_insensetive() {
+    let harness = GraphQLDatasetsHarness::new(true);
+
+    let account_name_str = "KaMu";
+    harness
+        .create_root_dataset(
+            Some(AccountName::new_unchecked(account_name_str)),
+            DatasetName::new_unchecked("Foo"),
+        )
+        .await;
+
+    let res = harness
+        .execute_anonymous_query(
+            indoc!(
+                r#"
+                {
+                    datasets {
+                        byOwnerAndName(accountName: "kAmU", datasetName: "<name>") {
+                            name,
+                            owner { accountName },
+                        }
+                    }
+                }
+                "#
+            )
+            .replace("<name>", "FoO"),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byOwnerAndName": {
+                    "name": "Foo",
+                    "owner": {
+                       "accountName": account_name_str,
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn dataset_create_empty() {
-    let harness = GraphQLDatasetsHarness::new();
+    let harness = GraphQLDatasetsHarness::new(false);
 
     let request_code = indoc::indoc!(
         r#"
@@ -136,7 +183,7 @@ async fn dataset_create_empty() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_create_from_snapshot() {
-    let harness = GraphQLDatasetsHarness::new();
+    let harness = GraphQLDatasetsHarness::new(true);
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name("foo")
@@ -192,7 +239,7 @@ async fn dataset_create_from_snapshot() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_create_from_snapshot_malformed() {
-    let harness = GraphQLDatasetsHarness::new();
+    let harness = GraphQLDatasetsHarness::new(false);
 
     let res = harness
         .execute_authorized_query(indoc!(
@@ -226,10 +273,10 @@ async fn dataset_create_from_snapshot_malformed() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_rename_success() {
-    let harness = GraphQLDatasetsHarness::new();
+    let harness = GraphQLDatasetsHarness::new(false);
 
     let foo_result = harness
-        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .create_root_dataset(None, DatasetName::new_unchecked("foo"))
         .await;
 
     let request_code = indoc!(
@@ -278,10 +325,10 @@ async fn dataset_rename_success() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_rename_no_changes() {
-    let harness = GraphQLDatasetsHarness::new();
+    let harness = GraphQLDatasetsHarness::new(false);
 
     let foo_result = harness
-        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .create_root_dataset(None, DatasetName::new_unchecked("foo"))
         .await;
 
     let res = harness
@@ -328,13 +375,13 @@ async fn dataset_rename_no_changes() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_rename_name_collision() {
-    let harness = GraphQLDatasetsHarness::new();
+    let harness = GraphQLDatasetsHarness::new(false);
 
     let foo_result = harness
-        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .create_root_dataset(None, DatasetName::new_unchecked("foo"))
         .await;
     let _bar_result = harness
-        .create_root_dataset(DatasetName::new_unchecked("bar"))
+        .create_root_dataset(None, DatasetName::new_unchecked("bar"))
         .await;
 
     let res = harness
@@ -381,11 +428,11 @@ async fn dataset_rename_name_collision() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_delete_success() {
-    let harness = GraphQLDatasetsHarness::new();
+    let harness = GraphQLDatasetsHarness::new(false);
     harness.init_dependencies_graph().await;
 
     let foo_result = harness
-        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .create_root_dataset(None, DatasetName::new_unchecked("foo"))
         .await;
 
     let request_code = indoc!(
@@ -431,11 +478,11 @@ async fn dataset_delete_success() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_delete_dangling_ref() {
-    let harness = GraphQLDatasetsHarness::new();
+    let harness = GraphQLDatasetsHarness::new(false);
     harness.init_dependencies_graph().await;
 
     let foo_result = harness
-        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .create_root_dataset(None, DatasetName::new_unchecked("foo"))
         .await;
     let _bar_result = harness
         .create_derived_dataset(
@@ -489,10 +536,10 @@ async fn dataset_delete_dangling_ref() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_view_permissions() {
-    let harness = GraphQLDatasetsHarness::new();
+    let harness = GraphQLDatasetsHarness::new(false);
 
     let foo_result = harness
-        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .create_root_dataset(None, DatasetName::new_unchecked("foo"))
         .await;
 
     let request_code = indoc!(
@@ -544,7 +591,7 @@ struct GraphQLDatasetsHarness {
 }
 
 impl GraphQLDatasetsHarness {
-    pub fn new() -> Self {
+    pub fn new(is_multi_tenant: bool) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -555,7 +602,7 @@ impl GraphQLDatasetsHarness {
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
-                    .with_multi_tenant(false),
+                    .with_multi_tenant(is_multi_tenant),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .add_value(kamu::testing::MockAuthenticationService::built_in())
@@ -588,7 +635,11 @@ impl GraphQLDatasetsHarness {
             .unwrap();
     }
 
-    pub async fn create_root_dataset(&self, name: DatasetName) -> CreateDatasetResult {
+    pub async fn create_root_dataset(
+        &self,
+        account_name: Option<AccountName>,
+        name: DatasetName,
+    ) -> CreateDatasetResult {
         let dataset_repo = self
             .catalog_authorized
             .get_one::<dyn DatasetRepository>()
@@ -596,7 +647,7 @@ impl GraphQLDatasetsHarness {
         dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
-                    .name(DatasetAlias::new(None, name))
+                    .name(DatasetAlias::new(account_name, name))
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
