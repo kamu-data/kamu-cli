@@ -96,6 +96,13 @@ pub trait MetadataChainExt: MetadataChain {
         }
     }
 
+    /// Returns the specified block by reference if it exists
+    async fn get_block_by_ref(&self, r: &BlockRef) -> Result<MetadataBlock, InternalError> {
+        let h = self.resolve_ref(r).await.int_err()?;
+
+        self.get_block(&h).await.int_err()
+    }
+
     /// Returns the specified block if it exists
     async fn try_get_block(
         &self,

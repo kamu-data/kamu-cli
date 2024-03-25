@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use kamu_core::{self as domain, MetadataChainExt, SearchNextBlockVisitor, SearchSeedVisitor};
+use kamu_core::{self as domain, MetadataChainExt, SearchSeedVisitor};
 use opendatafabric as odf;
 
 use crate::prelude::*;
@@ -123,10 +123,8 @@ impl Dataset {
             .get_dataset(ctx)
             .await?
             .as_metadata_chain()
-            .accept_one(<SearchNextBlockVisitor>::default())
+            .get_block_by_ref(&domain::BlockRef::Head)
             .await?
-            .into_block()
-            .expect("Dataset without blocks")
             .system_time)
     }
 
