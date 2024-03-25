@@ -23,7 +23,6 @@ use opendatafabric::{
     Multihash,
     SetPollingSource,
     SetVocab,
-    SourceState,
 };
 
 use crate::{DataWriterMetadataState, ScanMetadataError, SourceNotFoundError};
@@ -41,7 +40,6 @@ pub struct DataWriterDataFusionMetaDataStateVisitor<'a> {
 
     maybe_prev_checkpoint: Option<Multihash>,
     maybe_prev_watermark: Option<DateTime<Utc>>,
-    maybe_prev_source_state: Option<SourceState>,
     maybe_prev_offset: Option<u64>,
 }
 
@@ -64,7 +62,6 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
 
             maybe_prev_checkpoint: None,
             maybe_prev_watermark: None,
-            maybe_prev_source_state: None,
             maybe_prev_offset: None,
         }
     }
@@ -98,7 +95,8 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
             prev_offset: self.maybe_prev_offset,
             prev_checkpoint: self.maybe_prev_checkpoint,
             prev_watermark: self.maybe_prev_watermark,
-            prev_source_state: self.maybe_prev_source_state,
+            // TODO: remove
+            prev_source_state: None,
         })
     }
 
@@ -118,19 +116,6 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
 
         if self.maybe_prev_watermark.is_none() {
             self.maybe_prev_watermark = e.new_watermark;
-        }
-
-        if self.maybe_prev_source_state.is_none() {
-            if let Some(ss) = &e.new_source_state
-                && let Some(source_name) = self.maybe_source_name
-                && source_name != ss.source_name.as_str()
-            {
-                unimplemented!(
-                    "Differentiating between the state of multiple sources is not yet supported"
-                );
-            }
-
-            self.maybe_prev_source_state = e.new_source_state.clone();
         }
     }
 

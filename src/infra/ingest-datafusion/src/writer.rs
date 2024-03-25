@@ -21,7 +21,7 @@ use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
-use odf::{AsTypedBlock, DatasetVocabulary};
+use odf::{AsTypedBlock, DatasetVocabulary, MetadataEvent, SourceState};
 use opendatafabric as odf;
 
 use crate::visitor::DataWriterDataFusionMetaDataStateVisitor;
@@ -842,6 +842,9 @@ impl DataWriterDataFusionBuilder {
         self,
         source_name: Option<&str>,
     ) -> Result<Self, ScanMetadataError> {
+        type Flag = odf::MetadataEventTypeFlags;
+        type Decision = MetadataVisitorDecision;
+
         // TODO: PERF: Full metadata scan below - this is expensive and should be
         //       improved using skip lists.
 
@@ -855,6 +858,30 @@ impl DataWriterDataFusionBuilder {
         let mut set_vocab_visitor = SearchSetVocabVisitor::<ScanMetadataError>::default();
         let mut set_data_schema_visitor =
             SearchSetDataSchemaVisitor::<ScanMetadataError>::default();
+        let mut prev_source_state_visitor = GenericCallbackVisitor::new(
+            None::<SourceState>,
+            Decision::NextOfType(Flag::ADD_DATA),
+            |state, (_, block)| {
+                let MetadataEvent::AddData(e) = &block.event else {
+                    unreachable!()
+                };
+
+                if let Some(ss) = &e.new_source_state
+                    && let Some(sn) = source_name
+                    && sn != ss.source_name.as_str()
+                {
+                    unimplemented!(
+                        "Differentiating between the state of multiple sources is not yet \
+                         supported"
+                    );
+                }
+
+                *state = e.new_source_state.clone();
+
+                Ok(Decision::Stop)
+            },
+        );
+        // TODO: rename
         let mut visitor = DataWriterDataFusionMetaDataStateVisitor::new(head.clone(), source_name);
 
         self.dataset
@@ -864,6 +891,7 @@ impl DataWriterDataFusionBuilder {
                     &mut seed_visitor as &mut dyn MetadataChainVisitor<Error = _>,
                     &mut set_vocab_visitor,
                     &mut set_data_schema_visitor,
+                    &mut prev_source_state_visitor,
                     &mut visitor,
                 ],
                 &head,
@@ -885,6 +913,7 @@ impl DataWriterDataFusionBuilder {
             .map(odf::SetDataSchema::schema_as_arrow)
             .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
             .int_err()?;
+        metadata_state.prev_source_state = prev_source_state_visitor.into_state();
 
         Ok(self.with_metadata_state(metadata_state))
     }
