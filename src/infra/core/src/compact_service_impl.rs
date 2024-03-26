@@ -26,12 +26,13 @@ use kamu_core::compact_service::CompactService;
 use kamu_core::*;
 use opendatafabric::{
     AddData,
+    Checkpoint,
     DatasetHandle,
     DatasetKind,
-    DatasetName,
     MetadataEvent,
     Multihash,
     OffsetInterval,
+    SourceState,
 };
 use url::Url;
 
@@ -49,6 +50,9 @@ struct DataSliceBatchInfo {
     pub data_slices_batch: Vec<Url>,
     pub prev_offset: Option<u64>,
     pub new_offset_interval: Option<OffsetInterval>,
+    pub prev_checkpoint: Option<Multihash>,
+    pub new_checkpoint: Option<Checkpoint>,
+    pub new_source_state: Option<SourceState>,
     pub new_file_path: Option<PathBuf>,
     // Hash of block will not be None value in case
     // when data_slices_batch.len() == 1
@@ -57,7 +61,6 @@ struct DataSliceBatchInfo {
 }
 
 struct ChainFilesInfo {
-    _block_file_urls: Vec<Url>,
     old_head: Multihash,
     data_slice_batches: Vec<DataSliceBatchInfo>,
 }
@@ -86,11 +89,9 @@ impl CompactServiceImpl {
         // Declare mut values for result
 
         let mut old_head: Option<Multihash> = None;
-        let mut block_file_urls: Vec<Url> = vec![];
         let mut data_slice_batch_info: DataSliceBatchInfo = DataSliceBatchInfo::default();
         let mut data_slice_batches: Vec<DataSliceBatchInfo> = vec![];
-        let (mut batch_size, mut new_end_offset_interval, mut batch_records): (u64, u64, u64) =
-            (0, 0, 0);
+        let (mut batch_size, mut new_end_offset_interval, mut batch_records) = (0u64, 0u64, 0u64);
 
         ////////////////////////////////////////////////////////////////////////////////
 
@@ -98,11 +99,8 @@ impl CompactServiceImpl {
         let head = chain.resolve_ref(&BlockRef::Head).await?;
         let mut block_stream = chain.iter_blocks_interval(&head, None, false);
         let object_data_repo = dataset.as_data_repo();
-        let object_block_repo = chain.as_metadata_block_repository();
 
         while let Some((block_hash, block)) = block_stream.try_next().await? {
-            block_file_urls.push(object_block_repo.get_internal_url(&block_hash).await);
-
             match block.event {
                 MetadataEvent::AddData(add_data_event) => {
                     if let Some(output_slice) = &add_data_event.new_data {
@@ -123,8 +121,7 @@ impl CompactServiceImpl {
                             if !data_slice_batch_info.data_slices_batch.is_empty() {
                                 data_slice_batches.push(data_slice_batch_info.clone());
                                 // Reset values for next batch
-                                data_slice_batch_info.hash = None;
-                                data_slice_batch_info.new_offset_interval = None;
+                                data_slice_batch_info = DataSliceBatchInfo::default();
                                 new_end_offset_interval = output_slice.offset_interval.end;
                             }
 
@@ -150,6 +147,14 @@ impl CompactServiceImpl {
                             start: output_slice.offset_interval.start,
                             end: new_end_offset_interval,
                         });
+                        if data_slice_batch_info.new_checkpoint.is_none() {
+                            data_slice_batch_info.new_checkpoint = add_data_event.new_checkpoint;
+                        }
+                        if data_slice_batch_info.new_source_state.is_none() {
+                            data_slice_batch_info.new_source_state =
+                                add_data_event.new_source_state;
+                        }
+                        data_slice_batch_info.prev_checkpoint = add_data_event.prev_checkpoint;
                     }
                 }
                 _ => continue,
@@ -162,7 +167,6 @@ impl CompactServiceImpl {
 
         Ok(ChainFilesInfo {
             data_slice_batches,
-            _block_file_urls: block_file_urls,
             old_head: old_head.unwrap(),
         })
     }
@@ -170,12 +174,11 @@ impl CompactServiceImpl {
     async fn merge_files(
         &self,
         data_slice_batches: &mut Vec<DataSliceBatchInfo>,
-        dataset_name: &DatasetName,
         compact_dir_path: &Path,
     ) -> Result<(), CompactError> {
         let ctx = SessionContext::new();
 
-        for data_slice_batch_info in data_slice_batches {
+        for (index, data_slice_batch_info) in data_slice_batches.iter_mut().enumerate() {
             if data_slice_batch_info.data_slices_batch.len() == 1 {
                 continue;
             }
@@ -190,9 +193,8 @@ impl CompactServiceImpl {
                 .await
                 .int_err()?;
 
-            data_slice_batch_info.new_file_path = Some(compact_dir_path.join(
-                get_random_operation_name_with_prefix(format!("{dataset_name}-").as_str()),
-            ));
+            data_slice_batch_info.new_file_path =
+                Some(compact_dir_path.join(format!("merge-slice-{index}").as_str()));
 
             data_frame
                 .write_parquet(
@@ -214,7 +216,9 @@ impl CompactServiceImpl {
     }
 
     fn create_run_compact_dir(&self) -> Result<PathBuf, CompactError> {
-        let compact_dir_path = self.run_info_dir.join("compact");
+        let compact_dir_path = self
+            .run_info_dir
+            .join(get_random_operation_name_with_prefix("compact-"));
         fs::create_dir_all(&compact_dir_path).int_err()?;
         Ok(compact_dir_path)
     }
@@ -225,7 +229,6 @@ impl CompactServiceImpl {
         chain_files_info: &ChainFilesInfo,
     ) -> Result<(Vec<Url>, Multihash), CompactError> {
         let chain = dataset.as_metadata_chain();
-
         let mut current_head = chain_files_info.old_head.clone();
         let mut old_data_slices: Vec<Url> = vec![];
 
@@ -233,86 +236,67 @@ impl CompactServiceImpl {
             if let Some(block_hash) = data_slice_batch_info.hash.as_ref() {
                 let block = chain.get_block(block_hash).await.int_err()?;
 
-                if let MetadataEvent::AddData(add_data_event) = block.event {
-                    let block_event = MetadataEvent::AddData(AddData {
-                        prev_checkpoint: None,
-                        prev_offset: add_data_event.prev_offset,
-                        new_checkpoint: None,
-                        new_data: add_data_event.new_data,
-                        new_source_state: None,
-                        new_watermark: None,
-                    });
-                    let commit_result = dataset
-                        .commit_event(
-                            block_event,
-                            CommitOpts {
-                                block_ref: &BlockRef::Head,
-                                system_time: Some(Utc::now()),
-                                prev_block_hash: Some(Some(&current_head)),
-                                check_object_refs: false,
-                                update_head: false,
-                            },
-                        )
-                        .await
-                        .int_err()?;
-                    current_head = commit_result.new_head;
-                    continue;
-                }
+                let commit_result = dataset
+                    .commit_event(
+                        block.event,
+                        CommitOpts {
+                            block_ref: &BlockRef::Head,
+                            system_time: Some(Utc::now()),
+                            prev_block_hash: Some(Some(&current_head)),
+                            check_object_refs: false,
+                            update_block_ref: false,
+                        },
+                    )
+                    .await
+                    .int_err()?;
+                current_head = commit_result.new_head;
+                continue;
             }
 
-            let add_data_params = AddDataParams {
-                prev_checkpoint: None,
+            let add_data_file =
+                OwnedFile::new(data_slice_batch_info.new_file_path.as_ref().unwrap());
+
+            let (new_data, _) = dataset
+                .prepare_objects(
+                    data_slice_batch_info.new_offset_interval.clone(),
+                    Some(&add_data_file),
+                    None,
+                )
+                .await?;
+
+            dataset
+                .commit_objects(new_data.as_ref(), Some(add_data_file), None, None)
+                .await?;
+
+            let metadata_event = AddData {
+                prev_checkpoint: data_slice_batch_info.prev_checkpoint.clone(),
                 prev_offset: data_slice_batch_info.prev_offset,
-                new_offset_interval: data_slice_batch_info.new_offset_interval.clone(),
+                new_data,
+                new_checkpoint: data_slice_batch_info.new_checkpoint.clone(),
                 new_watermark: None,
-                new_source_state: None,
+                new_source_state: data_slice_batch_info.new_source_state.clone(),
             };
 
             let commit_result = dataset
-                .commit_add_data(
-                    add_data_params,
-                    Some(OwnedFile::new(
-                        data_slice_batch_info.new_file_path.as_ref().unwrap(),
-                    )),
-                    None,
+                .commit_event(
+                    metadata_event.into(),
                     CommitOpts {
                         block_ref: &BlockRef::Head,
                         system_time: Some(Utc::now()),
                         prev_block_hash: Some(Some(&current_head)),
                         check_object_refs: false,
-                        update_head: false,
+                        update_block_ref: false,
                     },
                 )
                 .await
                 .int_err()?;
-            current_head = commit_result.new_head;
 
+            current_head = commit_result.new_head;
             old_data_slices.extend(data_slice_batch_info.data_slices_batch.clone());
         }
 
         Ok((old_data_slices, current_head))
     }
-
-    // fn _remove_old_files(
-    //     &self,
-    //     chain_files_info: &ChainFilesInfo,
-    //     old_data_slices: &Vec<Url>,
-    // ) -> Result<(), CompactError> {
-    //     for file_url in old_data_slices {
-    //         fs::remove_file(file_url.to_file_path().unwrap()).int_err()?;
-    //     }
-
-    //     let old_head_string =
-    // chain_files_info.old_head.as_multibase().to_string();
-    //     for block_file_url in &chain_files_info._block_file_urls {
-    //         // Stop cleaning up once we reach block where new chain started
-    //         if block_file_url.as_str().contains(&old_head_string) {
-    //             break;
-    //         }
-    //         fs::remove_file(block_file_url.to_file_path().unwrap()).int_err()?;
-    //     }
-    //     Ok(())
-    // }
 }
 
 #[async_trait::async_trait]
@@ -357,12 +341,8 @@ impl CompactService for CompactServiceImpl {
             .await?;
 
         listener.begin_phase(CompactionPhase::MergeDataslices);
-        self.merge_files(
-            &mut chain_files_info.data_slice_batches,
-            &dataset_handle.alias.dataset_name,
-            &compact_dir_path,
-        )
-        .await?;
+        self.merge_files(&mut chain_files_info.data_slice_batches, &compact_dir_path)
+            .await?;
 
         listener.begin_phase(CompactionPhase::CommitNewBlocks);
         let (_old_data_slices, new_head) = self
@@ -381,7 +361,6 @@ impl CompactService for CompactServiceImpl {
                 },
             )
             .await?;
-        // self.remove_old_files(&chain_files_info, &old_data_slices)?;
         listener.success();
 
         Ok(())

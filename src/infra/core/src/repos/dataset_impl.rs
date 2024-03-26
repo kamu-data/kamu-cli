@@ -202,7 +202,68 @@ where
 
         Ok(increment)
     }
+}
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct UpdateSummaryIncrement {
+    seen_id: Option<DatasetID>,
+    seen_kind: Option<DatasetKind>,
+    seen_head: Option<Multihash>,
+    seen_dependencies: Option<Vec<DatasetID>>,
+    seen_last_pulled: Option<DateTime<Utc>>,
+    // TODO: No longer needs to be incremental - can be based on `prevOffset`
+    seen_num_records: u64,
+    seen_data_size: u64,
+    seen_checkpoints_size: u64,
+}
+
+impl UpdateSummaryIncrement {
+    fn seen_chain_beginning(&self) -> bool {
+        // Seed blocks are guaranteed to appear only once in a chain, and only at the
+        // very beginning
+        self.seen_id.is_some()
+    }
+
+    fn into_summary(self) -> DatasetSummary {
+        DatasetSummary {
+            id: self.seen_id.unwrap(),
+            kind: self.seen_kind.unwrap(),
+            last_block_hash: self.seen_head.unwrap(),
+            dependencies: self.seen_dependencies.unwrap_or_default(),
+            last_pulled: self.seen_last_pulled,
+            num_records: self.seen_num_records,
+            data_size: self.seen_data_size,
+            checkpoints_size: self.seen_checkpoints_size,
+        }
+    }
+
+    fn apply_to_summary(self, summary: DatasetSummary) -> DatasetSummary {
+        DatasetSummary {
+            id: self.seen_id.unwrap_or(summary.id),
+            kind: self.seen_kind.unwrap_or(summary.kind),
+            last_block_hash: self.seen_head.unwrap(),
+            dependencies: self.seen_dependencies.unwrap_or(summary.dependencies),
+            last_pulled: self.seen_last_pulled.or(summary.last_pulled),
+            num_records: summary.num_records + self.seen_num_records,
+            data_size: summary.data_size + self.seen_data_size,
+            checkpoints_size: summary.checkpoints_size + self.seen_checkpoints_size,
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait]
+impl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> Dataset
+    for DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
+where
+    MetaChain: MetadataChain + Sync + Send,
+    DataRepo: ObjectRepository + Sync + Send,
+    CheckpointRepo: ObjectRepository + Sync + Send,
+    InfoRepo: NamedObjectRepository + Sync + Send,
+{
     async fn prepare_objects(
         &self,
         offset_interval: Option<OffsetInterval>,
@@ -295,68 +356,7 @@ where
 
         Ok(())
     }
-}
 
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Default)]
-struct UpdateSummaryIncrement {
-    seen_id: Option<DatasetID>,
-    seen_kind: Option<DatasetKind>,
-    seen_head: Option<Multihash>,
-    seen_dependencies: Option<Vec<DatasetID>>,
-    seen_last_pulled: Option<DateTime<Utc>>,
-    // TODO: No longer needs to be incremental - can be based on `prevOffset`
-    seen_num_records: u64,
-    seen_data_size: u64,
-    seen_checkpoints_size: u64,
-}
-
-impl UpdateSummaryIncrement {
-    fn seen_chain_beginning(&self) -> bool {
-        // Seed blocks are guaranteed to appear only once in a chain, and only at the
-        // very beginning
-        self.seen_id.is_some()
-    }
-
-    fn into_summary(self) -> DatasetSummary {
-        DatasetSummary {
-            id: self.seen_id.unwrap(),
-            kind: self.seen_kind.unwrap(),
-            last_block_hash: self.seen_head.unwrap(),
-            dependencies: self.seen_dependencies.unwrap_or_default(),
-            last_pulled: self.seen_last_pulled,
-            num_records: self.seen_num_records,
-            data_size: self.seen_data_size,
-            checkpoints_size: self.seen_checkpoints_size,
-        }
-    }
-
-    fn apply_to_summary(self, summary: DatasetSummary) -> DatasetSummary {
-        DatasetSummary {
-            id: self.seen_id.unwrap_or(summary.id),
-            kind: self.seen_kind.unwrap_or(summary.kind),
-            last_block_hash: self.seen_head.unwrap(),
-            dependencies: self.seen_dependencies.unwrap_or(summary.dependencies),
-            last_pulled: self.seen_last_pulled.or(summary.last_pulled),
-            num_records: summary.num_records + self.seen_num_records,
-            data_size: summary.data_size + self.seen_data_size,
-            checkpoints_size: summary.checkpoints_size + self.seen_checkpoints_size,
-        }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-impl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> Dataset
-    for DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
-where
-    MetaChain: MetadataChain + Sync + Send,
-    DataRepo: ObjectRepository + Sync + Send,
-    CheckpointRepo: ObjectRepository + Sync + Send,
-    InfoRepo: NamedObjectRepository + Sync + Send,
-{
     /// Helper function to append a generic event to metadata chain.
     ///
     /// Warning: Don't use when synchronizing blocks from another dataset.
@@ -442,7 +442,7 @@ where
 
         tracing::info!(?block, "Committing new block");
 
-        let append_opts = if !opts.update_head {
+        let append_opts = if !opts.update_block_ref {
             AppendOpts {
                 update_ref: None,
                 check_ref_is_prev_block: false,

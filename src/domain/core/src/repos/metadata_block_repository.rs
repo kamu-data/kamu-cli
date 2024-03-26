@@ -12,7 +12,6 @@ use bytes::Bytes;
 use internal_error::InternalError;
 use opendatafabric::{MetadataBlock, Multihash};
 use thiserror::Error;
-use url::Url;
 
 use crate::{
     AccessError,
@@ -51,8 +50,6 @@ pub trait MetadataBlockRepository: Send + Sync {
         block_data: &'a [u8],
         options: InsertOpts<'a>,
     ) -> Result<InsertBlockResult, InsertBlockError>;
-
-    async fn get_internal_url(&self, hash: &Multihash) -> Url;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

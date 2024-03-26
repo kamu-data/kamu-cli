@@ -61,6 +61,25 @@ pub trait Dataset: Send + Sync {
         checkpoint: Option<&OwnedFile>,
     ) -> Result<ExecuteTransform, InternalError>;
 
+    /// Helper function to prepare [AddDaat] event parameters
+    /// ([DataSlice] and [Checkpoint])
+    async fn prepare_objects(
+        &self,
+        offset_interval: Option<OffsetInterval>,
+        data: Option<&OwnedFile>,
+        checkpoint: Option<&OwnedFile>,
+    ) -> Result<(Option<DataSlice>, Option<Checkpoint>), InternalError>;
+
+    /// Helper function to commit [AddDaat] event parameters
+    /// ([DataSlice] and [Checkpoint])
+    async fn commit_objects(
+        &self,
+        data_slice: Option<&DataSlice>,
+        data: Option<OwnedFile>,
+        checkpoint_meta: Option<&Checkpoint>,
+        checkpoint: Option<OwnedFile>,
+    ) -> Result<(), InternalError>;
+
     fn as_metadata_chain(&self) -> &dyn MetadataChain;
     fn as_data_repo(&self) -> &dyn ObjectRepository;
     fn as_checkpoint_repo(&self) -> &dyn ObjectRepository;
@@ -99,7 +118,7 @@ pub struct CommitOpts<'a> {
     /// checkpoints in the respective repos
     pub check_object_refs: bool,
     // Whether to reset head to new commited block
-    pub update_head: bool,
+    pub update_block_ref: bool,
 }
 
 impl<'a> Default for CommitOpts<'a> {
@@ -109,7 +128,7 @@ impl<'a> Default for CommitOpts<'a> {
             system_time: None,
             prev_block_hash: None,
             check_object_refs: true,
-            update_head: true,
+            update_block_ref: true,
         }
     }
 }

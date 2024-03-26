@@ -24,7 +24,6 @@ use kamu_core::{
     MetadataBlockRepository,
 };
 use opendatafabric::{MetadataBlock, Multihash};
-use url::Url;
 
 use super::test_metadata_block_repository_shared;
 
@@ -111,7 +110,5 @@ mockall::mock! {
             block_data: &'a [u8],
             options: InsertOpts<'a>,
         ) -> Result<InsertBlockResult, InsertBlockError>;
-
-        async fn get_internal_url(&self, hash: &Multihash) -> Url;
     }
 }
