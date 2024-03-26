@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.169.0] - 2024-03-25
+### Changed
+- Updated embedded Web UI to `v0.17.0`
+### Fixed
+- S3 Repo: Ignore dataset entries without a valid alias and leave them to be cleaned up by GC
+- Caching object repo: Ensure directory exists before writing objects
+
+## [0.168.0] - 2024-03-23
+### Changed
+- FlightSQL: For expensive queries `GetFlightInfo` we will only prepare schemas and not compute results - this avoids doing double the work just to return `total_records` and `total_bytes` in `FlightInfo` before result is fetched via `DoGet`
+- Optimized implementation of Datafusion catalog, scheme, and table providers that includes caching and maximally delays the metadata scanning
+
+## [0.167.2] - 2024-03-23
+### Fixed
+- FlightSQL: Improved Python connectivity examples (ADBC, Sqlalchemy, DBAPI2, JDBC)
+- FlightSQL: Fix invalid `location` info in `FlightInfo` that was causing errors in some client libraries
+
 ## [0.167.1] - 2024-03-20
 ### Fixed
 - Bug when handle created during dataset creation had empty account name in a multi-tenant repo.

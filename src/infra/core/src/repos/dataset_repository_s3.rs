@@ -175,8 +175,8 @@ impl DatasetRepositoryS3 {
     async fn resolve_dataset_alias(
         &self,
         dataset: &dyn Dataset,
-    ) -> Result<DatasetAlias, InternalError> {
-        let bytes = dataset.as_info_repo().get("alias").await.int_err()?;
+    ) -> Result<DatasetAlias, GetNamedError> {
+        let bytes = dataset.as_info_repo().get("alias").await?;
         let dataset_alias_str = std::str::from_utf8(&bytes[..]).int_err()?.trim();
         let dataset_alias = DatasetAlias::try_from(dataset_alias_str).int_err()?;
         Ok(dataset_alias)
@@ -210,7 +210,21 @@ impl DatasetRepositoryS3 {
 
             if let Ok(id) = DatasetID::from_multibase_string(&prefix) {
                 let dataset = self.get_dataset_impl(&id);
-                let dataset_alias = self.resolve_dataset_alias(dataset.as_ref()).await?;
+                let dataset_alias = match self.resolve_dataset_alias(dataset.as_ref()).await {
+                    Ok(alias) => Ok(alias),
+                    Err(GetNamedError::NotFound(_)) => {
+                        tracing::warn!(
+                            s3_prefix = prefix,
+                            "Found dataset entry without a valid alias - this is likely a result \
+                             of interrupted creation or a push - ignoring this entry and leaving \
+                             it to be cleaned up by GC."
+                        );
+                        continue;
+                    }
+                    Err(err) => Err(err),
+                }
+                .int_err()?;
+
                 res.push(DatasetHandle::new(id, dataset_alias));
             }
         }
@@ -311,7 +325,10 @@ impl DatasetRepository for DatasetRepositoryS3 {
                     .await?
                 {
                     let dataset = self.get_dataset_impl(id);
-                    let dataset_alias = self.resolve_dataset_alias(dataset.as_ref()).await?;
+                    let dataset_alias = self
+                        .resolve_dataset_alias(dataset.as_ref())
+                        .await
+                        .int_err()?;
                     Ok(DatasetHandle::new(id.clone(), dataset_alias))
                 } else {
                     Err(GetDatasetError::NotFound(DatasetNotFoundError {

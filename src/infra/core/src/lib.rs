@@ -21,6 +21,7 @@ pub use kamu_core as domain;
 mod auth;
 mod engine;
 pub mod ingest;
+mod query;
 mod repos;
 pub mod testing; // TODO: Put under feature flag
 pub mod utils;

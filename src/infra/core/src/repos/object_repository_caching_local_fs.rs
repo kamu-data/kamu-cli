@@ -102,6 +102,8 @@ where
             Err(err) if err.kind() == ErrorKind::NotFound => {
                 let mut stream = self.wrapped.get_stream(hash).await?;
 
+                self.ensure_cache_dir().int_err()?;
+
                 let mut file = tokio::fs::File::create(cache_path).await.int_err()?;
                 tokio::io::copy(&mut stream, &mut file).await.int_err()?;
                 file.flush().await.int_err()?;
@@ -139,6 +141,7 @@ where
         options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
         let res = self.wrapped.insert_bytes(data, options).await?;
+        self.ensure_cache_dir().int_err()?;
         let cache_path = self.cache_path(&res.hash);
         std::fs::write(cache_path, data).int_err()?;
         Ok(res)
