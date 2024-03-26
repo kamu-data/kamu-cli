@@ -11,7 +11,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use chrono::Utc;
 use datafusion::prelude::*;
 use dill::{component, interface};
 use domain::compact_service::{
@@ -42,6 +41,7 @@ use crate::*;
 pub struct CompactServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_authorizer: Arc<dyn domain::auth::DatasetActionAuthorizer>,
+    time_source: Arc<dyn SystemTimeSource>,
     run_info_dir: PathBuf,
 }
 
@@ -71,11 +71,13 @@ impl CompactServiceImpl {
     pub fn new(
         dataset_authorizer: Arc<dyn domain::auth::DatasetActionAuthorizer>,
         dataset_repo: Arc<dyn DatasetRepository>,
+        time_source: Arc<dyn SystemTimeSource>,
         run_info_dir: PathBuf,
     ) -> Self {
         Self {
             dataset_repo,
             dataset_authorizer,
+            time_source,
             run_info_dir,
         }
     }
@@ -115,8 +117,8 @@ impl CompactServiceImpl {
 
                         let current_records = output_slice.num_records();
 
-                        if batch_size + output_slice.size >= max_slice_size
-                            || batch_records + current_records >= max_slice_records
+                        if batch_size + output_slice.size > max_slice_size
+                            || batch_records + current_records > max_slice_records
                         {
                             if !data_slice_batch_info.data_slices_batch.is_empty() {
                                 data_slice_batches.push(data_slice_batch_info.clone());
@@ -173,7 +175,7 @@ impl CompactServiceImpl {
 
     async fn merge_files(
         &self,
-        data_slice_batches: &mut Vec<DataSliceBatchInfo>,
+        data_slice_batches: &mut [DataSliceBatchInfo],
         compact_dir_path: &Path,
     ) -> Result<(), CompactError> {
         let ctx = SessionContext::new();
@@ -241,7 +243,7 @@ impl CompactServiceImpl {
                         block.event,
                         CommitOpts {
                             block_ref: &BlockRef::Head,
-                            system_time: Some(Utc::now()),
+                            system_time: Some(self.time_source.now()),
                             prev_block_hash: Some(Some(&current_head)),
                             check_object_refs: false,
                             update_block_ref: false,
@@ -282,7 +284,7 @@ impl CompactServiceImpl {
                     metadata_event.into(),
                     CommitOpts {
                         block_ref: &BlockRef::Head,
-                        system_time: Some(Utc::now()),
+                        system_time: Some(self.time_source.now()),
                         prev_block_hash: Some(Some(&current_head)),
                         check_object_refs: false,
                         update_block_ref: false,
