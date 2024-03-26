@@ -153,6 +153,11 @@ impl Dataset {
             can_schedule: can_write,
         })
     }
+
+    /// Various endpoints for interacting with data
+    async fn endpoints(&self) -> DatasetEndpoints<'_> {
+        DatasetEndpoints::new(&self.owner, self.dataset_handle.clone())
+    }
 }
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
