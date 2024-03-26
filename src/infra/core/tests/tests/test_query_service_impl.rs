@@ -271,14 +271,14 @@ async fn test_dataset_arrow_schema_local_fs() {
     test_dataset_arrow_schema(&catalog, &tempdir).await;
 }
 
-#[test_group::group(engine, datafusion)]
+#[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_parquet_schema_s3() {
     let (s3, catalog) = prepare_test_s3_catalog().await;
     test_dataset_parquet_schema(&catalog, &s3.tmp_dir).await;
 }
 
-#[test_group::group(engine, datafusion)]
+#[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_arrow_schema_s3() {
     let (s3, catalog) = prepare_test_s3_catalog().await;
