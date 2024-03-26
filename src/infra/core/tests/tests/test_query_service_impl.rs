@@ -164,7 +164,7 @@ async fn create_catalog_with_s3_workspace(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_dataset_schema_common(catalog: &Catalog, tempdir: &TempDir) {
+async fn test_dataset_parquet_schema(catalog: &Catalog, tempdir: &TempDir) {
     let dataset_alias = create_test_dataset(catalog, tempdir.path()).await;
     let dataset_ref = DatasetRef::from(dataset_alias);
 
@@ -197,7 +197,7 @@ async fn test_dataset_schema_common(catalog: &Catalog, tempdir: &TempDir) {
         })
     );
 }
-async fn test_dataset_arrow_schema_common(catalog: &Catalog, tempdir: &TempDir) {
+async fn test_dataset_arrow_schema(catalog: &Catalog, tempdir: &TempDir) {
     let dataset_alias = create_test_dataset(catalog, tempdir.path()).await;
     let dataset_ref = DatasetRef::from(dataset_alias);
 
@@ -247,8 +247,8 @@ async fn test_dataset_schema_local_fs() {
         MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
     );
 
-    test_dataset_schema_common(&catalog, &tempdir).await;
-    test_dataset_arrow_schema_common(&catalog, &tempdir).await;
+    test_dataset_parquet_schema(&catalog, &tempdir).await;
+    test_dataset_arrow_schema(&catalog, &tempdir).await;
 }
 
 #[test_group::group(engine, datafusion)]
@@ -261,8 +261,8 @@ async fn test_dataset_schema_s3() {
     )
     .await;
 
-    //test_dataset_schema_common(&catalog, &s3.tmp_dir).await;
-    test_dataset_arrow_schema_common(&catalog, &s3.tmp_dir).await;
+    test_dataset_parquet_schema(&catalog, &s3.tmp_dir).await;
+    test_dataset_arrow_schema(&catalog, &s3.tmp_dir).await;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

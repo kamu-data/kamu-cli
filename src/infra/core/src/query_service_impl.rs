@@ -11,9 +11,6 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use datafusion::arrow;
-use datafusion::catalog::schema::SchemaProvider;
-use datafusion::catalog::CatalogProvider;
-use datafusion::datasource::TableProvider;
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
 use datafusion::parquet::arrow::async_reader::ParquetObjectReader;
 use datafusion::parquet::file::metadata::ParquetMetaData;
