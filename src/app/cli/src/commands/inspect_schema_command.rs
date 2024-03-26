@@ -135,11 +135,10 @@ impl Command for InspectSchemaCommand {
                     .await
                     .map_err(Self::query_errors)?
                     .unwrap();
-                #[allow(clippy::all)]
-                let schema = SetDataSchema::from(arrow).schema_as_arrow().unwrap();
+
                 kamu_data_utils::schema::format::write_schema_arrow_json(
                     &mut std::io::stdout(),
-                    &schema,
+                    arrow.as_ref(),
                 )?;
             }
             _ => unreachable!(),

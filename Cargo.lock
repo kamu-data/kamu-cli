@@ -405,6 +405,9 @@ name = "arrow-schema"
 version = "50.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ff3e9c01f7cd169379d269f926892d0e622a704960350d09d331be3ec9e0029"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "arrow-select"
@@ -3682,12 +3685,16 @@ dependencies = [
 name = "kamu-data-utils"
 version = "0.167.1"
 dependencies = [
+ "arrow",
  "arrow-digest",
+ "arrow-json",
  "async-trait",
  "datafusion",
  "digest",
  "opendatafabric",
  "pretty_assertions",
+ "serde",
+ "serde_json",
  "sha3",
  "test-log",
  "thiserror",

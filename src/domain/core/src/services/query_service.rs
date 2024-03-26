@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use datafusion::arrow;
 use datafusion::error::DataFusionError;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::{DataFrame, SessionContext};
-use opendatafabric::{DatasetRef, SetDataSchema};
+use opendatafabric::DatasetRef;
 use thiserror::Error;
 
 use crate::auth::DatasetActionUnauthorizedError;
@@ -51,12 +52,12 @@ pub trait QueryService: Send + Sync {
         options: QueryOptions,
     ) -> Result<DataFrame, QueryError>;
 
-    /// Returns arrow schema of the given dataset, if it is already defined by
-    /// this moment, None otherwise
+    /// Returns a reference-counted arrow schema of the given dataset, if it is
+    /// already defined by this moment, None otherwise
     async fn get_schema(
         &self,
         dataset_ref: &DatasetRef,
-    ) -> Result<Option<SetDataSchema>, QueryError>;
+    ) -> Result<Option<arrow::datatypes::SchemaRef>, QueryError>;
 
     // TODO: Introduce additional options that could be used to narrow down the
     // number of files we collect to construct the dataframe.

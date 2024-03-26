@@ -551,7 +551,6 @@ fn configure_output_format(
         Some("ndjson") => OutputFormat::NdJson,
         Some("json-soa") => OutputFormat::JsonSoA,
         Some("table") => OutputFormat::Table,
-        Some("arrow-json") => OutputFormat::ArrowJson,
         None | Some(_) => {
             if is_tty {
                 OutputFormat::Table

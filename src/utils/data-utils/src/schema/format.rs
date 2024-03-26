@@ -12,7 +12,6 @@ use std::io::Write;
 use datafusion::arrow::datatypes::Schema;
 use datafusion::parquet::basic::{ConvertedType, LogicalType, TimeUnit, Type as PhysicalType};
 use datafusion::parquet::schema::types::Type;
-use serde_json::to_string;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 /// Prints schema in a style of `parquet-schema` output
@@ -43,8 +42,7 @@ pub fn write_schema_arrow_json(
     output: &mut dyn Write,
     schema: &Schema,
 ) -> Result<(), std::io::Error> {
-    let mut writer = ArrowJsonSchemaWriter::new(output);
-    writer.write(schema)?;
+    serde_json::to_writer(output, schema)?;
     Ok(())
 }
 
@@ -66,23 +64,6 @@ pub fn format_schema_arrow(schema: &Schema) -> String {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-
-struct ArrowJsonSchemaWriter<'a> {
-    output: &'a mut dyn Write,
-}
-
-impl<'a> crate::schema::format::ArrowJsonSchemaWriter<'a> {
-    pub fn new(output: &'a mut dyn Write) -> Self {
-        Self { output }
-    }
-
-    pub fn write(&mut self, schema: &Schema) -> Result<(), std::io::Error> {
-        write!(self.output, "{}", to_string(schema).unwrap())?;
-
-        Ok(())
-    }
-}
-
 struct ParquetJsonSchemaWriter<'a> {
     output: &'a mut dyn Write,
 }

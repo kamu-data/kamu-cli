@@ -14,7 +14,7 @@ use std::sync::Arc;
 use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
-use dill::Component;
+use dill::{Catalog, Component};
 use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::{
@@ -164,54 +164,78 @@ async fn create_catalog_with_s3_workspace(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_dataset_schema_common(catalog: dill::Catalog, tempdir: &TempDir) {
-    let dataset_alias = create_test_dataset(&catalog, tempdir.path()).await;
+async fn test_dataset_schema_common(catalog: &Catalog, tempdir: &TempDir) {
+    let dataset_alias = create_test_dataset(catalog, tempdir.path()).await;
     let dataset_ref = DatasetRef::from(dataset_alias);
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let arrow = query_svc.get_schema(&dataset_ref).await.unwrap().unwrap();
+    let schema = query_svc.get_schema_parquet(&dataset_ref).await.unwrap();
+    assert!(schema.is_some());
 
-    match arrow.schema_as_arrow() {
-        Ok(schema) => {
-            let data_schema_string = match serde_json::to_string_pretty(&schema) {
-                Ok(json) => json,
-                Err(err) => {
-                    eprintln!("Failed to serialize schema to JSON: {err}");
-                    return;
+    let mut buf = Vec::new();
+    kamu_data_utils::schema::format::write_schema_parquet_json(&mut buf, &schema.unwrap()).unwrap();
+    let schema_content = String::from_utf8(buf).unwrap();
+    let data_schema_json =
+        serde_json::from_str::<serde_json::Value>(schema_content.as_str()).unwrap();
+
+    assert_eq!(
+        data_schema_json,
+        serde_json::json!({
+            "name": "arrow_schema",
+            "type": "struct",
+            "fields": [{
+                "name": "offset",
+                "repetition": "REQUIRED",
+                "type": "INT64",
+                "logicalType": "INTEGER(64,false)"
+            }, {
+                "name": "blah",
+                "repetition": "REQUIRED",
+                "type": "BYTE_ARRAY",
+                "logicalType": "STRING"
+            }]
+        })
+    );
+}
+async fn test_dataset_arrow_schema_common(catalog: &Catalog, tempdir: &TempDir) {
+    let dataset_alias = create_test_dataset(catalog, tempdir.path()).await;
+    let dataset_ref = DatasetRef::from(dataset_alias);
+
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let schema_ref = query_svc.get_schema(&dataset_ref).await.unwrap().unwrap();
+
+    let mut buf = Vec::new();
+    kamu_data_utils::schema::format::write_schema_arrow_json(&mut buf, schema_ref.as_ref())
+        .unwrap();
+
+    let schema_content = String::from_utf8(buf).unwrap();
+    let data_schema_json =
+        serde_json::from_str::<serde_json::Value>(schema_content.as_str()).unwrap();
+
+    assert_eq!(
+        data_schema_json,
+        serde_json::json!({
+            "fields": [
+                {
+                    "name": "offset",
+                    "data_type": "UInt64",
+                    "nullable": false,
+                    "dict_id": 0,
+                    "dict_is_ordered": false,
+                    "metadata": {}
+                },
+                {
+                    "name": "blah",
+                    "data_type": "Utf8",
+                    "nullable": false,
+                    "dict_id": 0,
+                    "dict_is_ordered": false,
+                    "metadata": {}
                 }
-            };
-
-            assert_eq!(
-                data_schema_string,
-                indoc::indoc!(
-                    r#"{
-                      "fields": [
-                        {
-                          "name": "offset",
-                          "data_type": "UInt64",
-                          "nullable": false,
-                          "dict_id": 0,
-                          "dict_is_ordered": false,
-                          "metadata": {}
-                        },
-                        {
-                          "name": "blah",
-                          "data_type": "Utf8",
-                          "nullable": false,
-                          "dict_id": 0,
-                          "dict_is_ordered": false,
-                          "metadata": {}
-                        }
-                      ],
-                      "metadata": {}
-                    }"#
-                )
-            );
-        }
-        Err(err) => {
-            eprintln!("Failed to serialize schema to JSON: {err}");
-        }
-    }
+            ],
+            "metadata": {}
+        })
+    );
 }
 
 #[test_group::group(engine, datafusion)]
@@ -222,10 +246,12 @@ async fn test_dataset_schema_local_fs() {
         tempdir.path(),
         MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
     );
-    test_dataset_schema_common(catalog, &tempdir).await;
+
+    test_dataset_schema_common(&catalog, &tempdir).await;
+    test_dataset_arrow_schema_common(&catalog, &tempdir).await;
 }
 
-#[test_group::group(containerized, engine, datafusion)]
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_schema_s3() {
     let s3 = LocalS3Server::new().await;
@@ -234,7 +260,9 @@ async fn test_dataset_schema_s3() {
         MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
     )
     .await;
-    test_dataset_schema_common(catalog, &s3.tmp_dir).await;
+
+    //test_dataset_schema_common(&catalog, &s3.tmp_dir).await;
+    test_dataset_arrow_schema_common(&catalog, &s3.tmp_dir).await;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

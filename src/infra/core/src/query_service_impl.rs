@@ -10,6 +10,7 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
+use datafusion::arrow;
 use datafusion::catalog::schema::SchemaProvider;
 use datafusion::catalog::CatalogProvider;
 use datafusion::datasource::TableProvider;
@@ -120,7 +121,7 @@ impl QueryServiceImpl {
     async fn get_schema_impl(
         &self,
         dataset_ref: &DatasetRef,
-    ) -> Result<Option<SetDataSchema>, QueryError> {
+    ) -> Result<Option<arrow::datatypes::SchemaRef>, QueryError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
 
         self.dataset_action_authorizer
@@ -132,21 +133,16 @@ impl QueryServiceImpl {
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
-        // TODO: Update to use SetDataSchema event
-        let last_data_slice_opt = dataset
+        let schema_opt = dataset
             .as_metadata_chain()
             .iter_blocks()
             .filter_map_ok(|(_, b)| b.event.into_variant::<SetDataSchema>())
             .try_first()
             .await
-            .map_err(|e| {
-                tracing::error!(error = ?e, "Resolving last data slice failed");
-                e
-            })
             .int_err()?;
 
-        match last_data_slice_opt {
-            Some(last_data_slice) => Ok(Some(last_data_slice)),
+        match schema_opt {
+            Some(schema) => Ok(Option::from(schema.schema_as_arrow().unwrap())),
             None => Ok(None),
         }
     }
@@ -266,7 +262,7 @@ impl QueryService for QueryServiceImpl {
     async fn get_schema(
         &self,
         dataset_ref: &DatasetRef,
-    ) -> Result<Option<SetDataSchema>, QueryError> {
+    ) -> Result<Option<arrow::datatypes::SchemaRef>, QueryError> {
         self.get_schema_impl(dataset_ref).await
     }
 
