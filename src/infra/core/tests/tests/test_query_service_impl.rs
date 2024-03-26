@@ -238,30 +238,50 @@ async fn test_dataset_arrow_schema(catalog: &Catalog, tempdir: &TempDir) {
     );
 }
 
-#[test_group::group(engine, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_dataset_schema_local_fs() {
+fn prepare_test_catalog() -> (TempDir, Catalog) {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
         MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
     );
-
-    test_dataset_parquet_schema(&catalog, &tempdir).await;
-    test_dataset_arrow_schema(&catalog, &tempdir).await;
+    (tempdir, catalog)
 }
 
-#[test_group::group(engine, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_dataset_schema_s3() {
+async fn prepare_test_s3_catalog() -> (LocalS3Server, Catalog) {
     let s3 = LocalS3Server::new().await;
     let catalog = create_catalog_with_s3_workspace(
         &s3,
         MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
     )
     .await;
+    (s3, catalog)
+}
 
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_dataset_parquet_schema_local_fs() {
+    let (tempdir, catalog) = prepare_test_catalog();
+    test_dataset_parquet_schema(&catalog, &tempdir).await;
+}
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_dataset_arrow_schema_local_fs() {
+    let (tempdir, catalog) = prepare_test_catalog();
+    test_dataset_arrow_schema(&catalog, &tempdir).await;
+}
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_dataset_parquet_schema_s3() {
+    let (s3, catalog) = prepare_test_s3_catalog().await;
     test_dataset_parquet_schema(&catalog, &s3.tmp_dir).await;
+}
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_dataset_arrow_schema_s3() {
+    let (s3, catalog) = prepare_test_s3_catalog().await;
     test_dataset_arrow_schema(&catalog, &s3.tmp_dir).await;
 }
 

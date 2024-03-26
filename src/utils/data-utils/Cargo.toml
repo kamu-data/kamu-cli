@@ -24,8 +24,8 @@ doctest = false
 [dependencies]
 opendatafabric = { workspace = true }
 
-arrow="50.0.0"
-arrow-json="50.0.0"
+arrow = { version = "50", default-features = false}
+arrow-json = { version = "50", default-features = false}
 arrow-digest = { version = "50", default-features = false }
 datafusion = { version = "36", default-features = false, features = ["parquet", "serde"] }
 tracing = { version = "0.1", default-features = false }
