@@ -62,6 +62,7 @@ struct DataSliceBatchInfo {
 
 struct ChainFilesInfo {
     old_head: Multihash,
+    offset_column: String,
     data_slice_batches: Vec<DataSliceBatchInfo>,
 }
 
@@ -91,6 +92,7 @@ impl CompactServiceImpl {
         // Declare mut values for result
 
         let mut old_head: Option<Multihash> = None;
+        let mut offset_column: Option<String> = None;
         let mut data_slice_batch_info: DataSliceBatchInfo = DataSliceBatchInfo::default();
         let mut data_slice_batches: Vec<DataSliceBatchInfo> = vec![];
         let (mut batch_size, mut new_end_offset_interval, mut batch_records) = (0u64, 0u64, 0u64);
@@ -159,6 +161,9 @@ impl CompactServiceImpl {
                         data_slice_batch_info.prev_checkpoint = add_data_event.prev_checkpoint;
                     }
                 }
+                MetadataEvent::SetVocab(set_vocab_event) => {
+                    offset_column = set_vocab_event.offset_column;
+                }
                 _ => continue,
             }
         }
@@ -169,6 +174,7 @@ impl CompactServiceImpl {
 
         Ok(ChainFilesInfo {
             data_slice_batches,
+            offset_column: offset_column.unwrap_or("offset".to_owned()),
             old_head: old_head.unwrap(),
         })
     }
@@ -176,6 +182,7 @@ impl CompactServiceImpl {
     async fn merge_files(
         &self,
         data_slice_batches: &mut [DataSliceBatchInfo],
+        offset_column: &str,
         compact_dir_path: &Path,
     ) -> Result<(), CompactError> {
         let ctx = SessionContext::new();
@@ -193,25 +200,22 @@ impl CompactServiceImpl {
                     },
                 )
                 .await
+                .int_err()?
+                .sort(vec![col(offset_column).sort(true, false)])
                 .int_err()?;
 
-            data_slice_batch_info.new_file_path =
-                Some(compact_dir_path.join(format!("merge-slice-{index}").as_str()));
+            let new_file_path = compact_dir_path.join(format!("merge-slice-{index}").as_str());
 
             data_frame
                 .write_parquet(
-                    data_slice_batch_info
-                        .new_file_path
-                        .as_ref()
-                        .unwrap()
-                        .to_str()
-                        .unwrap(),
+                    new_file_path.to_str().unwrap(),
                     datafusion::dataframe::DataFrameWriteOptions::new()
                         .with_single_file_output(true),
                     None,
                 )
                 .await
                 .int_err()?;
+            data_slice_batch_info.new_file_path = Some(new_file_path);
         }
 
         Ok(())
@@ -343,8 +347,12 @@ impl CompactService for CompactServiceImpl {
             .await?;
 
         listener.begin_phase(CompactionPhase::MergeDataslices);
-        self.merge_files(&mut chain_files_info.data_slice_batches, &compact_dir_path)
-            .await?;
+        self.merge_files(
+            &mut chain_files_info.data_slice_batches,
+            chain_files_info.offset_column.as_str(),
+            &compact_dir_path,
+        )
+        .await?;
 
         listener.begin_phase(CompactionPhase::CommitNewBlocks);
         let (_old_data_slices, new_head) = self
