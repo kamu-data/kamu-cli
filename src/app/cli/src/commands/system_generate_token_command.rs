@@ -11,27 +11,32 @@ use std::sync::Arc;
 
 use internal_error::*;
 use kamu::AuthenticationServiceImpl;
+use opendatafabric::AccountName;
 
+use crate::accounts::{PasswordProviderCredentials, LOGIN_METHOD_PASSWORD};
 use crate::{CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct GenerateTokenCommand {
     auth_service: Arc<AuthenticationServiceImpl>,
-    gh_login: String,
-    gh_access_token: String,
+    login: String,
+    gh_access_token: Option<String>,
+    expiration_time_sec: usize,
 }
 
 impl GenerateTokenCommand {
     pub fn new(
         auth_service: Arc<AuthenticationServiceImpl>,
-        gh_login: String,
-        gh_access_token: String,
+        login: String,
+        gh_access_token: Option<String>,
+        expiration_time_sec: usize,
     ) -> Self {
         Self {
             auth_service,
-            gh_login,
+            login,
             gh_access_token,
+            expiration_time_sec,
         }
     }
 }
@@ -43,16 +48,26 @@ impl Command for GenerateTokenCommand {
     }
 
     async fn run(&mut self) -> Result<(), CLIError> {
-        let provider_credentials_json =
-            serde_json::to_string(&kamu_adapter_oauth::GithubProviderCredentials {
-                access_token: self.gh_access_token.clone(),
-            })
-            .int_err()?;
+        let (login_method, provider_credentials_json) =
+            if let Some(gh_access_token) = &self.gh_access_token {
+                let creds = serde_json::to_string(&kamu_adapter_oauth::GithubProviderCredentials {
+                    access_token: gh_access_token.clone(),
+                })
+                .int_err()?;
+                (kamu_adapter_oauth::LOGIN_METHOD_GITHUB, creds)
+            } else {
+                let creds = serde_json::to_string(&PasswordProviderCredentials {
+                    account_name: AccountName::try_from(&self.login).unwrap(),
+                })
+                .int_err()?;
+                (LOGIN_METHOD_PASSWORD, creds)
+            };
 
         let token = self.auth_service.make_access_token(
-            self.gh_login.clone(),
-            kamu_adapter_oauth::LOGIN_METHOD_GITHUB,
+            self.login.clone(),
+            login_method,
             provider_credentials_json,
+            self.expiration_time_sec,
         )?;
 
         println!("{token}");

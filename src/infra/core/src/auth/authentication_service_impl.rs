@@ -36,6 +36,7 @@ use serde::{Deserialize, Serialize};
 
 const KAMU_JWT_ISSUER: &str = "dev.kamu";
 const KAMU_JWT_ALGORITHM: Algorithm = Algorithm::HS384;
+const EXPIRATION_TIME_SEC: usize = 24 * 60 * 60; // 1 day in seconds
 
 pub const ENV_VAR_KAMU_JWT_SECRET: &str = "KAMU_JWT_SECRET";
 
@@ -111,12 +112,11 @@ impl AuthenticationServiceImpl {
         subject: String,
         login_method: &str,
         provider_credentials_json: String,
+        expiration_time_sec: usize,
     ) -> Result<String, InternalError> {
-        const EXPIRE_AFTER_SEC: usize = 24 * 60 * 60; // 1 day in seconds
-
         let current_time = self.time_source.now();
         let iat = usize::try_from(current_time.timestamp()).unwrap();
-        let exp = iat + EXPIRE_AFTER_SEC;
+        let exp = iat + expiration_time_sec;
         let claims = KamuAccessTokenClaims {
             iat,
             exp,
@@ -183,6 +183,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
                 provider_response.account_info.account_name.to_string(),
                 login_method,
                 provider_response.provider_credentials_json,
+                EXPIRATION_TIME_SEC,
             )?,
             account_info: provider_response.account_info,
         })

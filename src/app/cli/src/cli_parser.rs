@@ -1235,14 +1235,19 @@ pub fn cli() -> Command {
                         Command::new("generate-token")
                             .about("Generate a platform token from a known secret for debugging")
                             .args([
-                                Arg::new("gh-login")
-                                    .long("gh-login")
+                                Arg::new("login")
+                                    .long("login")
                                     .required(true)
-                                    .help("GitHub account login"),
+                                    .help("Account name"),
                                 Arg::new("gh-access-token")
                                     .long("gh-access-token")
-                                    .required(true)
+                                    .required(false)
                                     .help("An existing GitHub access token"),
+                                Arg::new("expiration-time-sec")
+                                    .long("expiration-time-sec")
+                                    .value_parser(value_parser!(usize))
+                                    .default_value("3600")
+                                    .help("Token expiration time in seconds"),
                             ]),
                     ]),
                 tabular_output_params(
