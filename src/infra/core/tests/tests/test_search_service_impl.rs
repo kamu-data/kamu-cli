@@ -22,6 +22,8 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let dataset_local_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
     let repo_name = RepoName::new_unchecked("repo");
     let dataset_remote_alias = DatasetAliasRemote::try_from("repo/bar").unwrap();
+    let datasets_dir = tmp_workspace_dir.join("datasets");
+    std::fs::create_dir(&datasets_dir).unwrap();
 
     let catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
@@ -29,7 +31,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
             DatasetRepositoryLocalFs::builder()
-                .with_root(tmp_workspace_dir.join("datasets"))
+                .with_root(datasets_dir)
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()

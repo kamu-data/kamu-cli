@@ -933,6 +933,9 @@ struct Harness {
 impl Harness {
     async fn new(dataset_events: Vec<odf::MetadataEvent>) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
+        let datasets_dir = temp_dir.path().join("datasets");
+        std::fs::create_dir(&datasets_dir).unwrap();
+
         let system_time = Utc.with_ymd_and_hms(2010, 1, 1, 12, 0, 0).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
@@ -942,7 +945,7 @@ impl Harness {
             .add_value(CurrentAccountSubject::new_test())
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
-                    .with_root(temp_dir.path().join("datasets"))
+                    .with_root(datasets_dir)
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()

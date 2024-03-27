@@ -32,6 +32,9 @@ impl LocalFsRepoHarness {
         dataset_action_authorizer: TDatasetActionAuthorizer,
         multi_tenant: bool,
     ) -> Self {
+        let datasets_dir = tempdir.path().join("datasets");
+        std::fs::create_dir(&datasets_dir).unwrap();
+
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
@@ -40,7 +43,7 @@ impl LocalFsRepoHarness {
             .bind::<dyn auth::DatasetActionAuthorizer, TDatasetActionAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
-                    .with_root(tempdir.path().join("datasets"))
+                    .with_root(datasets_dir)
                     .with_multi_tenant(multi_tenant),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()

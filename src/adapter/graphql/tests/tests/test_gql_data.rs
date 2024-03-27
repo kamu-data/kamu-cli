@@ -23,12 +23,15 @@ use opendatafabric::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 fn create_catalog_with_local_workspace(tempdir: &Path, is_multitenant: bool) -> dill::Catalog {
+    let datasets_dir = tempdir.join("datasets");
+    std::fs::create_dir(&datasets_dir).unwrap();
+
     dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add::<DependencyGraphServiceInMemory>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
-                .with_root(tempdir.join("datasets"))
+                .with_root(datasets_dir)
                 .with_current_account_subject(Arc::new(CurrentAccountSubject::new_test()))
                 .with_multi_tenant(is_multitenant),
         )

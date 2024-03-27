@@ -23,12 +23,14 @@ use crate::utils::authentication_catalogs;
 #[test_log::test(tokio::test)]
 async fn test_current_push_sources() {
     let tempdir = tempfile::tempdir().unwrap();
+    let datasets_dir = tempdir.path().join("datasets");
+    std::fs::create_dir(&datasets_dir).unwrap();
 
     let base_catalog = CatalogBuilder::new()
         .add::<EventBus>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
-                .with_root(tempdir.path().join("datasets"))
+                .with_root(datasets_dir)
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
