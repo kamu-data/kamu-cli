@@ -45,12 +45,16 @@ fn create_catalog_with_local_workspace(tempdir: &Path, is_multitenant: bool) -> 
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) {
+async fn create_test_dataset(
+    catalog: &dill::Catalog,
+    tempdir: &Path,
+    account_name: Option<AccountName>,
+) {
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
     let dataset = dataset_repo
         .create_dataset(
-            &DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
+            &DatasetAlias::new(account_name, DatasetName::new_unchecked("foo")),
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                 .build_typed(),
         )
@@ -107,7 +111,7 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) {
 async fn test_dataset_schema_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(tempdir.path(), false);
-    create_test_dataset(&catalog, tempdir.path()).await;
+    create_test_dataset(&catalog, tempdir.path(), None).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -161,12 +165,17 @@ async fn test_dataset_schema_local_fs() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(engine, datafusion)]
+// #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_case_insensetive_schema_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(tempdir.path(), true);
-    create_test_dataset(&catalog, tempdir.path()).await;
+    create_test_dataset(
+        &catalog,
+        tempdir.path(),
+        Some(AccountName::new_unchecked("KaMu")),
+    )
+    .await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -225,7 +234,7 @@ async fn test_dataset_case_insensetive_schema_local_fs() {
 async fn test_dataset_tail_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(tempdir.path(), false);
-    create_test_dataset(&catalog, tempdir.path()).await;
+    create_test_dataset(&catalog, tempdir.path(), None).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -266,7 +275,7 @@ async fn test_dataset_tail_local_fs() {
 async fn test_dataset_tail_empty_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(tempdir.path(), false);
-    create_test_dataset(&catalog, tempdir.path()).await;
+    create_test_dataset(&catalog, tempdir.path(), None).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema

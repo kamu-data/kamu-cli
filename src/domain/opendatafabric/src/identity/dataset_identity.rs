@@ -293,7 +293,7 @@ impl DatasetAliasPattern {
     }
 
     pub fn matches(&self, dataset_handle: &DatasetHandle) -> bool {
-        self.account_name == dataset_handle.alias.account_name
+        (self.account_name.is_none() || self.account_name == dataset_handle.alias.account_name)
             && self
                 .dataset_name_pattern
                 .matches(&dataset_handle.alias.dataset_name)
