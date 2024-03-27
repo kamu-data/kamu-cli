@@ -7,17 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod authentication_common;
-pub use authentication_common::*;
+mod db_transaction_manager;
+mod mysql_transaction_manager;
+mod postgres_transaction_manager;
 
-mod authentication_provider;
-pub use authentication_provider::*;
-
-mod authentication_service;
-pub use authentication_service::*;
-
-mod dataset_action_authorizer;
-pub use dataset_action_authorizer::*;
-
-mod odf_server_access_token_resolver;
-pub use odf_server_access_token_resolver::*;
+pub use db_transaction_manager::*;
+pub use mysql_transaction_manager::*;
+pub use postgres_transaction_manager::*;

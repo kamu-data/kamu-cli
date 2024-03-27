@@ -43,6 +43,7 @@ event-bus = { workspace = true }
 kamu-data-utils = { workspace = true }
 opendatafabric = { workspace = true }
 kamu = { workspace = true }
+kamu-accounts = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-adapter-auth-oso = { workspace = true }
@@ -53,10 +54,9 @@ kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
 
-# Database
 database-common = { workspace = true }
-database-sqlx-postgres = { workspace = true }
-database-sqlx-mysql =  { workspace = true }
+kamu-accounts-postgres = { workspace = true }
+kamu-accounts-mysql = { workspace = true }
 
 # CLI
 chrono-humanize = "0.2"  # Human readable durations

@@ -78,8 +78,8 @@ pub async fn run(
             configure_base_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
 
         // TODO: read database settings from configuration, and make it optional
-        // let db_configuration = DatabaseConfiguration::local_mariadb();
-        // configure_database_components(&mut base_catalog_builder, &db_configuration)?;
+        //let db_configuration = DatabaseConfiguration::local_postgres();
+        //configure_database_components(&mut base_catalog_builder, &db_configuration)?;
 
         base_catalog_builder
             .add_value(dependencies_graph_repository)
@@ -167,7 +167,9 @@ async fn database_test(catalog: &Catalog) -> Result<(), InternalError> {
     let maybe_transaction_manager = catalog.get_one::<dyn DatabaseTransactionManager>().ok();
     if maybe_transaction_manager.is_some() {
         run_transactional(catalog, |catalog| async move {
-            let account_repository = catalog.get_one::<dyn auth::AccountRepository>().unwrap();
+            let account_repository = catalog
+                .get_one::<dyn kamu_accounts::AccountRepository>()
+                .unwrap();
             println!(
                 "{:?}",
                 account_repository
@@ -337,18 +339,26 @@ fn configure_database_components(
 ) -> Result<(), InternalError> {
     match db_configuration.provider {
         DatabaseProvider::Postgres => {
-            database_sqlx_postgres::PostgresPlugin::init_database_components(
+            database_common::PostgresPlugin::init_database_components(
                 catalog_builder,
                 db_configuration,
             )
-            .int_err()
+            .int_err()?;
+
+            catalog_builder.add::<kamu_accounts_postgres::PostgresAccountRepository>();
+
+            Ok(())
         }
         DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
-            database_sqlx_mysql::MySqlPlugin::init_database_components(
+            database_common::MySqlPlugin::init_database_components(
                 catalog_builder,
                 db_configuration,
             )
-            .int_err()
+            .int_err()?;
+
+            catalog_builder.add::<kamu_accounts_mysql::MySqlAccountRepository>();
+
+            Ok(())
         }
     }
 }

@@ -3,6 +3,9 @@ ODF_CRATE_DIR=./src/domain/opendatafabric
 LICENSE_HEADER=docs/license_header.txt
 TEST_LOG_PARAMS=RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug
 
+POSTGRES_CRATES := ./src/infra/accounts/postgres
+MYSQL_CRATES := ./src/infra/accounts/mysql
+ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES)
 
 ###############################################################################
 # Lint
@@ -15,8 +18,7 @@ lint:
 	cargo deny check
 	# cargo udeps --all-targets
 	cargo clippy --workspace --all-targets -- -D warnings
-	( cd ./src/database/sqlx-mysql && cargo sqlx prepare --check )
-	( cd ./src/database/sqlx-postgres && cargo sqlx prepare --check )
+	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare --check);)
 
 
 ###############################################################################
@@ -44,7 +46,7 @@ sqlx-local-setup-postgres:
 	echo "DATABASE_URL=postgres://root:root@localhost:5432/kamu-api-server" > ./src/database/sqlx-postgres/.env
 	sleep 3  # Letting the container to start
 	until PGPASSWORD=root psql -h localhost -U root -p 5432 -d root -c '\q'; do sleep 3; done
-	( cd ./src/database/sqlx-postgres && sqlx database create && sqlx migrate run --source ../migrations/postgres )
+	$(foreach crate,$(POSTGRES_CRATES),( cd $(crate) && sqlx database create && sqlx migrate run --source ../../../database/migrations/postgres );)
 
 .PHONY: sqlx-local-setup-mariadb
 sqlx-local-setup-mariadb:
@@ -54,7 +56,7 @@ sqlx-local-setup-mariadb:
 	echo "DATABASE_URL=mariadb://root:root@localhost:3306/kamu-api-server" > ./src/database/sqlx-mysql/.env
 	sleep 3  # Letting the container to start
 	until mariadb -h localhost -P 3306 -u root --password=root sys --protocol=tcp -e "SELECT 'Hello'" -b; do sleep 3; done	
-	( cd ./src/database/sqlx-mysql && sqlx database create && sqlx migrate run --source ../migrations/mysql )		
+	$(foreach crate,$(MYSQL_CRATES),( cd $(crate) && sqlx database create && sqlx migrate run --source ../../../database/migrations/mysql );)
 
 ###############################################################################
 # Sqlx Prepare (update data for offline compilation)
@@ -62,8 +64,7 @@ sqlx-local-setup-mariadb:
 
 .PHONY: sqlx-prepare
 sqlx-prepare:
-	( cd ./src/database/sqlx-mysql && cargo sqlx prepare )
-	( cd ./src/database/sqlx-postgres && cargo sqlx prepare )
+	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare );)
 
 ###############################################################################
 # Test

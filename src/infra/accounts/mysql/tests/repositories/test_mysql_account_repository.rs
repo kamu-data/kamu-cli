@@ -8,18 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{SubsecRound, Utc};
-use database_common::models::{AccountModel, AccountOrigin};
-use database_common::run_transactional;
-use database_sqlx_mysql::{MySqlAccountRepository, MySqlTransactionManager};
+use database_common::{run_transactional, MySqlTransactionManager};
 use dill::{Catalog, CatalogBuilder};
-use kamu_core::auth::AccountRepository;
+use kamu_accounts::{AccountModel, AccountOrigin, AccountRepository};
+use kamu_accounts_mysql::MySqlAccountRepository;
 use sqlx::MySqlPool;
 use uuid::Uuid;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
-#[test_log::test(sqlx::test(migrations = "../migrations/mysql"))]
+#[test_log::test(sqlx::test(migrations = "../../../database/migrations/mysql"))]
 async fn test_missing_account_not_found(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
@@ -41,7 +40,7 @@ async fn test_missing_account_not_found(mysql_pool: MySqlPool) {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
-#[test_log::test(sqlx::test(migrations = "../migrations/mysql"))]
+#[test_log::test(sqlx::test(migrations = "../../../database/migrations/mysql"))]
 async fn test_insert_and_locate_account(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 

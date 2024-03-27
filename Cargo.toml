@@ -14,14 +14,15 @@ members = [
     "src/utils/tracing-perfetto",
     # Database
     "src/database/database-common",
-    "src/database/sqlx-postgres",
-    "src/database/sqlx-mysql",
     # Domain
     "src/domain/opendatafabric",
+    "src/domain/accounts",
     "src/domain/core",
     "src/domain/task-system",
     "src/domain/flow-system",
     # Infra
+    "src/infra/accounts/mysql",
+    "src/infra/accounts/postgres",
     "src/infra/core",
     "src/infra/ingest-datafusion",
     "src/infra/task-system-inmem",
@@ -54,11 +55,10 @@ kamu-datafusion-cli = { version = "0.169.0", path = "src/utils/datafusion-cli", 
 tracing-perfetto = { version = "0.169.0", path = "src/utils/tracing-perfetto", default-features = false }
 # Database
 database-common = { version = "0.169.0", path="src/database/database-common", default-features = false }
-database-sqlx-postgres = { version = "0.169.0", path="src/database/sqlx-postgres", default-features = false }
-database-sqlx-mysql = { version = "0.169.0", path="src/database/sqlx-mysql", default-features = false }
 # Domain
 opendatafabric = { version = "0.169.0", path = "src/domain/opendatafabric", default-features = false }
 kamu-core = { version = "0.169.0", path = "src/domain/core", default-features = false }
+kamu-accounts = { version = "0.169.0", path = "src/domain/accounts", default-features = false }
 kamu-task-system = { version = "0.169.0", path = "src/domain/task-system", default-features = false }
 kamu-flow-system = { version = "0.169.0", path = "src/domain/flow-system", default-features = false }
 # Infra
@@ -66,6 +66,8 @@ kamu = { version = "0.169.0", path = "src/infra/core", default-features = false 
 kamu-ingest-datafusion = { version = "0.169.0", path = "src/infra/ingest-datafusion", default-features = false }
 kamu-task-system-inmem = { version = "0.169.0", path = "src/infra/task-system-inmem", default-features = false }
 kamu-flow-system-inmem = { version = "0.169.0", path = "src/infra/flow-system-inmem", default-features = false }
+kamu-accounts-mysql = { version = "0.169.0", path = "src/infra/accounts/mysql", default-features = false }
+kamu-accounts-postgres = { version = "0.169.0", path = "src/infra/accounts/postgres", default-features = false }
 # Adapters
 kamu-adapter-auth-oso = { version = "0.169.0", path = "src/adapter/auth-oso", default-features = false }
 kamu-adapter-flight-sql = { version = "0.169.0", path = "src/adapter/flight-sql", default-features = false }

@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabaseConfiguration, DatabaseError};
 use dill::*;
 use sqlx::MySqlPool;
 
-use crate::{MySqlAccountRepository, MySqlTransactionManager};
+use crate::{DatabaseConfiguration, DatabaseError, MySqlTransactionManager};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,7 +31,6 @@ impl MySqlPlugin {
         catalog_builder.add::<Self>();
         catalog_builder.add_value(mysql_pool);
         catalog_builder.add::<MySqlTransactionManager>();
-        catalog_builder.add::<MySqlAccountRepository>();
 
         Ok(())
     }

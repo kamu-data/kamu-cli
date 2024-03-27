@@ -7,41 +7,42 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabaseTransactionManager, TransactionRef};
 use dill::*;
-use kamu_core::{InternalError, ResultIntoInternal};
-use sqlx::MySqlPool;
+use internal_error::{InternalError, ResultIntoInternal};
+use sqlx::PgPool;
+
+use crate::{DatabaseTransactionManager, TransactionRef};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MySqlTransactionManager {
-    mysql_pool: MySqlPool,
+pub struct PostgresTransactionManager {
+    pg_pool: PgPool,
 }
 
 #[component(pub)]
 #[interface(dyn DatabaseTransactionManager)]
-impl MySqlTransactionManager {
-    pub fn new(mysql_pool: MySqlPool) -> Self {
-        Self { mysql_pool }
+impl PostgresTransactionManager {
+    pub fn new(pg_pool: PgPool) -> Self {
+        Self { pg_pool }
     }
 }
 
 #[async_trait::async_trait]
-impl DatabaseTransactionManager for MySqlTransactionManager {
+impl DatabaseTransactionManager for PostgresTransactionManager {
     async fn make_transaction(&self) -> Result<TransactionRef, InternalError> {
-        let mysql_transaction = self.mysql_pool.begin().await.int_err()?;
-        Ok(TransactionRef::new(mysql_transaction))
+        let postgres_transaction = self.pg_pool.begin().await.int_err()?;
+        Ok(TransactionRef::new(postgres_transaction))
     }
 
     async fn commit_transaction(&self, transaction: TransactionRef) -> Result<(), InternalError> {
-        let mysql_transaction = transaction.into_inner::<sqlx::MySql>();
-        mysql_transaction.commit().await.int_err()?;
+        let postgres_transaction = transaction.into_inner::<sqlx::Postgres>();
+        postgres_transaction.commit().await.int_err()?;
         Ok(())
     }
 
     async fn rollback_transaction(&self, transaction: TransactionRef) -> Result<(), InternalError> {
-        let mysql_transaction = transaction.into_inner::<sqlx::MySql>();
-        mysql_transaction.rollback().await.int_err()?;
+        let postgres_transaction = transaction.into_inner::<sqlx::Postgres>();
+        postgres_transaction.rollback().await.int_err()?;
         Ok(())
     }
 }

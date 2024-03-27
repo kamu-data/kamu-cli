@@ -1,6 +1,6 @@
 [package]
-name = "database-sqlx-mysql"
-description = "MySql/MariaDB specific implementation of database access layer"
+name = "kamu-accounts-mysql"
+description = "MySql-specific implementation of accounts domain"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -23,30 +23,23 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+kamu-accounts = { workspace = true }
 internal-error = { workspace = true }
-kamu-core = { workspace = true }
-opendatafabric = { workspace = true }
 
-async-trait = "0.1"
-dill = "0.8"
+async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-secrecy = "0.8"
-thiserror = { version = "1", default-features = false }
-tokio = { version = "1", default-features = false, features = ["sync"] }
-serde = "1"
-uuid = { version = "1", features = ["v4"] }
-
-[dependencies.sqlx]
-version = "0.7"
-default-features = false
-features = [
+dill = "0.8"
+sqlx = { version = "0.7", default-features = false, features = [
     "runtime-tokio-rustls",
     "macros",
     "mysql",
     "uuid",
-    "chrono",
-    "migrate"
-]
+    "chrono"
+]}
+thiserror = { version = "1", default-features = false }
+tracing = { version = "0.1", default-features = false }
+uuid = { version = "1", features = ["v4"] }
+
 
 [dev-dependencies]
 test-log = { version = "0.2", features = ["trace"] }

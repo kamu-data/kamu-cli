@@ -1975,48 +1975,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "database-sqlx-mysql"
-version = "0.169.0"
-dependencies = [
- "async-trait",
- "chrono",
- "database-common",
- "dill",
- "internal-error",
- "kamu-core",
- "opendatafabric",
- "secrecy",
- "serde",
- "sqlx",
- "test-group",
- "test-log",
- "thiserror",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "database-sqlx-postgres"
-version = "0.169.0"
-dependencies = [
- "async-trait",
- "chrono",
- "database-common",
- "dill",
- "internal-error",
- "kamu-core",
- "opendatafabric",
- "secrecy",
- "serde",
- "sqlx",
- "test-group",
- "test-log",
- "thiserror",
- "tokio",
- "uuid",
-]
-
-[[package]]
 name = "datafusion"
 version = "36.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3564,6 +3522,56 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-accounts"
+version = "0.169.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "internal-error",
+ "serde",
+ "sqlx",
+ "thiserror",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-accounts-mysql"
+version = "0.169.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "internal-error",
+ "kamu-accounts",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "thiserror",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-accounts-postgres"
+version = "0.169.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "internal-error",
+ "kamu-accounts",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "thiserror",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "kamu-adapter-auth-oso"
 version = "0.169.0"
 dependencies = [
@@ -3754,8 +3762,6 @@ dependencies = [
  "container-runtime",
  "ctrlc",
  "database-common",
- "database-sqlx-mysql",
- "database-sqlx-postgres",
  "datafusion",
  "dill",
  "dirs",
@@ -3772,6 +3778,9 @@ dependencies = [
  "internal-error",
  "itertools 0.11.0",
  "kamu",
+ "kamu-accounts",
+ "kamu-accounts-mysql",
+ "kamu-accounts-postgres",
  "kamu-adapter-auth-oso",
  "kamu-adapter-flight-sql",
  "kamu-adapter-graphql",

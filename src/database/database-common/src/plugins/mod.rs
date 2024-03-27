@@ -7,10 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod mysql_plugin;
 mod postgres_plugin;
-mod postgres_transaction_manager;
-mod repositories;
 
+pub use mysql_plugin::*;
 pub use postgres_plugin::*;
-pub use postgres_transaction_manager::*;
-pub use repositories::*;

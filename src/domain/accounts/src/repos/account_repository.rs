@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::models::AccountModel;
 use internal_error::InternalError;
 use thiserror::Error;
+
+use crate::AccountModel;
 
 ///////////////////////////////////////////////////////////////////////////////
 

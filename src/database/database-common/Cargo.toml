@@ -39,6 +39,7 @@ features = [
     "runtime-tokio-rustls",
     "macros",
     "mysql",
+    "postgres",
     "uuid",
     "chrono",
     "migrate"

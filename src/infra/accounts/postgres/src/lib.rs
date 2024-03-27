@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod account;
+// Re-exports
+pub use kamu_accounts as domain;
 
-pub use account::*;
+mod repositories;
+
+pub use repositories::*;

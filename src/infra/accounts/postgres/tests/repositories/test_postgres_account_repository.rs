@@ -8,18 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{SubsecRound, Utc};
-use database_common::models::{AccountModel, AccountOrigin};
-use database_common::run_transactional;
-use database_sqlx_postgres::{PostgresAccountRepository, PostgresTransactionManager};
+use database_common::{run_transactional, PostgresTransactionManager};
 use dill::{Catalog, CatalogBuilder};
-use kamu_core::auth::AccountRepository;
+use kamu_accounts::{AccountModel, AccountOrigin, AccountRepository};
+use kamu_accounts_postgres::PostgresAccountRepository;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../migrations/postgres"))]
+#[test_log::test(sqlx::test(migrations = "../../../database/migrations/postgres"))]
 async fn test_missing_account_not_found(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
@@ -41,7 +40,7 @@ async fn test_missing_account_not_found(pg_pool: PgPool) {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../migrations/postgres"))]
+#[test_log::test(sqlx::test(migrations = "../../../database/migrations/postgres"))]
 async fn test_insert_and_locate_account(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 

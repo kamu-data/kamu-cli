@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabaseConfiguration, DatabaseError};
 use dill::*;
 use sqlx::PgPool;
 
-use crate::{PostgresAccountRepository, PostgresTransactionManager};
+use crate::{DatabaseConfiguration, DatabaseError, PostgresTransactionManager};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,7 +31,6 @@ impl PostgresPlugin {
         catalog_builder.add::<Self>();
         catalog_builder.add_value(pg_pool);
         catalog_builder.add::<PostgresTransactionManager>();
-        catalog_builder.add::<PostgresAccountRepository>();
 
         Ok(())
     }
