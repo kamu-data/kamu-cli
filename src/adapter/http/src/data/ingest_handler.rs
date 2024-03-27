@@ -62,6 +62,7 @@ pub async fn dataset_ingest_handler(
         // Per note above, we're not including any extra information about the result
         // of the ingest operation at this point to accommodate async execution
         Ok(_) => Ok(()),
+        Err(PushIngestError::ReadError(e)) => Err(ApiError::bad_request(e)),
         Err(PushIngestError::SourceNotFound(e)) => Err(ApiError::bad_request(e)),
         Err(PushIngestError::UnsupportedMediaType(_)) => {
             Err(ApiError::new_unsupported_media_type())
