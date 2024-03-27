@@ -7,10 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub mod cached_object;
-pub mod datasets_filtering;
-pub mod docker_images;
-pub mod ipfs_wrapper;
-pub mod s3_context;
-pub mod simple_transfer_protocol;
-pub mod smart_transfer_protocol;
+#![feature(fn_traits)]
+
+mod common;
+
+pub use common::*;

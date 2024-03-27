@@ -28,8 +28,7 @@ use jsonwebtoken::{
 use kamu_core::auth::*;
 use kamu_core::SystemTimeSource;
 use opendatafabric::AccountName;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+use random_names::get_random_name;
 use serde::{Deserialize, Serialize};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -42,11 +41,7 @@ pub const ENV_VAR_KAMU_JWT_SECRET: &str = "KAMU_JWT_SECRET";
 ///////////////////////////////////////////////////////////////////////////////
 
 pub fn set_random_jwt_secret() {
-    let random_jwt_secret: String = thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(64)
-        .map(char::from)
-        .collect();
+    let random_jwt_secret = get_random_name(None, 64);
 
     std::env::set_var(ENV_VAR_KAMU_JWT_SECRET, random_jwt_secret);
 }

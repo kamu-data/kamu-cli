@@ -10,13 +10,14 @@
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 
-pub fn get_random_operation_name_with_prefix(prefix: &str) -> String {
-    let mut name = String::with_capacity(10 + prefix.len());
+pub fn get_random_name(prefix_maybe: Option<&str>, random_length: usize) -> String {
+    let prefix = prefix_maybe.unwrap_or("");
+    let mut name = String::with_capacity(random_length + prefix.len());
     name.push_str(prefix);
     name.extend(
         rand::thread_rng()
             .sample_iter(&Alphanumeric)
-            .take(10)
+            .take(random_length)
             .map(char::from),
     );
     name

@@ -17,6 +17,7 @@ use std::time::Duration;
 use container_runtime::*;
 use internal_error::*;
 use kamu::*;
+use random_names::get_random_name;
 
 use crate::error::{CommandRunError, SubprocessError};
 use crate::WorkspaceLayout;
@@ -162,7 +163,7 @@ impl SqlShellImpl {
 
         let mut cmd = self.container_runtime.run_cmd(RunArgs {
             image: self.image.clone(),
-            container_name: Some(get_random_name_with_prefix("kamu-spark-shell-")),
+            container_name: Some(get_random_name(Some("kamu-spark-shell-"), 10)),
             user: Some("root".to_owned()),
             network: Some("host".to_owned()),
             tty: true,

@@ -33,9 +33,9 @@ use opendatafabric::{
     OffsetInterval,
     SourceState,
 };
+use random_names::get_random_name;
 use url::Url;
 
-use crate::utils::random_names_helper::get_random_operation_name_with_prefix;
 use crate::*;
 
 pub struct CompactServiceImpl {
@@ -224,7 +224,7 @@ impl CompactServiceImpl {
     fn create_run_compact_dir(&self) -> Result<PathBuf, CompactError> {
         let compact_dir_path = self
             .run_info_dir
-            .join(get_random_operation_name_with_prefix("compact-"));
+            .join(get_random_name(Some("compact-"), 10));
         fs::create_dir_all(&compact_dir_path).int_err()?;
         Ok(compact_dir_path)
     }
