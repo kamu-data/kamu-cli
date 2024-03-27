@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::cmp::Ordering;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -45,25 +46,41 @@ pub struct CompactServiceImpl {
     run_info_dir: PathBuf,
 }
 
+#[derive(Debug)]
+enum DataSliceBatch {
+    CompactedBatch(Box<DataSliceBatchInfo>),
+    // Hash of block will not be None value in case
+    // when we will get only one block in batch
+    // and will be used tp not rewriting such blocks
+    SingleBlock(Multihash),
+}
+
+#[derive(Debug, Default, Clone)]
+struct DataSliceBatchUpperBound {
+    pub new_source_state: Option<SourceState>,
+    pub new_checkpoint: Option<Checkpoint>,
+    pub end_offset: u64,
+}
+
+#[derive(Debug, Default, Clone)]
+struct DataSliceBatchLowerBound {
+    pub prev_offset: Option<u64>,
+    pub prev_checkpoint: Option<Multihash>,
+    pub start_offset: u64,
+}
+
 #[derive(Debug, Default, Clone)]
 struct DataSliceBatchInfo {
     pub data_slices_batch: Vec<Url>,
-    pub prev_offset: Option<u64>,
-    pub new_offset_interval: Option<OffsetInterval>,
-    pub prev_checkpoint: Option<Multihash>,
-    pub new_checkpoint: Option<Checkpoint>,
-    pub new_source_state: Option<SourceState>,
+    pub upper_bound: DataSliceBatchUpperBound,
+    pub lower_bound: DataSliceBatchLowerBound,
     pub new_file_path: Option<PathBuf>,
-    // Hash of block will not be None value in case
-    // when data_slices_batch.len() == 1
-    // and will be used tp not rewriting such blocks
-    pub hash: Option<Multihash>,
 }
 
 struct ChainFilesInfo {
     old_head: Multihash,
     offset_column: String,
-    data_slice_batches: Vec<DataSliceBatchInfo>,
+    data_slice_batches: Vec<DataSliceBatch>,
 }
 
 #[component(pub)]
@@ -93,9 +110,10 @@ impl CompactServiceImpl {
 
         let mut old_head: Option<Multihash> = None;
         let mut offset_column: Option<String> = None;
+        let mut current_hash: Option<Multihash> = None;
         let mut data_slice_batch_info: DataSliceBatchInfo = DataSliceBatchInfo::default();
-        let mut data_slice_batches: Vec<DataSliceBatchInfo> = vec![];
-        let (mut batch_size, mut new_end_offset_interval, mut batch_records) = (0u64, 0u64, 0u64);
+        let mut data_slice_batches: Vec<DataSliceBatch> = vec![];
+        let (mut batch_size, mut batch_records) = (0u64, 0u64);
 
         ////////////////////////////////////////////////////////////////////////////////
 
@@ -113,8 +131,13 @@ impl CompactServiceImpl {
                         let data_slice_url = object_data_repo
                             .get_internal_url(&output_slice.physical_hash)
                             .await;
+
+                        // Setting the end offset interval needs to be here because we
+                        // have to get it at the begining of iteration unlike
+                        // other values which will be set at the end of iteration
                         if data_slice_batch_info.data_slices_batch.is_empty() {
-                            new_end_offset_interval = output_slice.offset_interval.end;
+                            data_slice_batch_info.upper_bound.end_offset =
+                                output_slice.offset_interval.end;
                         }
 
                         let current_records = output_slice.num_records();
@@ -122,11 +145,21 @@ impl CompactServiceImpl {
                         if batch_size + output_slice.size > max_slice_size
                             || batch_records + current_records > max_slice_records
                         {
+                            match data_slice_batch_info.data_slices_batch.len().cmp(&1) {
+                                Ordering::Equal => data_slice_batches
+                                    .push(DataSliceBatch::SingleBlock(current_hash.unwrap())),
+                                Ordering::Greater => {
+                                    data_slice_batches.push(DataSliceBatch::CompactedBatch(
+                                        Box::new(data_slice_batch_info.clone()),
+                                    ));
+                                }
+                                _ => (),
+                            };
                             if !data_slice_batch_info.data_slices_batch.is_empty() {
-                                data_slice_batches.push(data_slice_batch_info.clone());
                                 // Reset values for next batch
                                 data_slice_batch_info = DataSliceBatchInfo::default();
-                                new_end_offset_interval = output_slice.offset_interval.end;
+                                data_slice_batch_info.upper_bound.end_offset =
+                                    output_slice.offset_interval.end;
                             }
 
                             data_slice_batch_info.data_slices_batch = vec![data_slice_url];
@@ -136,29 +169,25 @@ impl CompactServiceImpl {
                             data_slice_batch_info.data_slices_batch.push(data_slice_url);
                             batch_size += output_slice.size;
                             batch_records += current_records;
-                            if data_slice_batch_info.data_slices_batch.len() > 1 {
-                                data_slice_batch_info.hash = None;
-                            }
                         }
 
-                        if data_slice_batch_info.hash.is_none()
-                            && data_slice_batch_info.data_slices_batch.len() <= 1
-                        {
-                            data_slice_batch_info.hash = Some(block_hash.clone());
+                        // Set lower bound values
+                        data_slice_batch_info.lower_bound.prev_checkpoint =
+                            add_data_event.prev_checkpoint;
+                        data_slice_batch_info.lower_bound.prev_offset = add_data_event.prev_offset;
+                        data_slice_batch_info.lower_bound.start_offset =
+                            output_slice.offset_interval.start;
+                        current_hash = Some(block_hash);
+
+                        // Set upper bound values
+                        if data_slice_batch_info.upper_bound.new_checkpoint.is_none() {
+                            data_slice_batch_info.upper_bound.new_checkpoint =
+                                add_data_event.new_checkpoint;
                         }
-                        data_slice_batch_info.prev_offset = add_data_event.prev_offset;
-                        data_slice_batch_info.new_offset_interval = Some(OffsetInterval {
-                            start: output_slice.offset_interval.start,
-                            end: new_end_offset_interval,
-                        });
-                        if data_slice_batch_info.new_checkpoint.is_none() {
-                            data_slice_batch_info.new_checkpoint = add_data_event.new_checkpoint;
-                        }
-                        if data_slice_batch_info.new_source_state.is_none() {
-                            data_slice_batch_info.new_source_state =
+                        if data_slice_batch_info.upper_bound.new_source_state.is_none() {
+                            data_slice_batch_info.upper_bound.new_source_state =
                                 add_data_event.new_source_state;
                         }
-                        data_slice_batch_info.prev_checkpoint = add_data_event.prev_checkpoint;
                     }
                 }
                 MetadataEvent::SetVocab(set_vocab_event) => {
@@ -168,9 +197,15 @@ impl CompactServiceImpl {
             }
         }
 
-        if !data_slice_batch_info.data_slices_batch.is_empty() {
-            data_slice_batches.push(data_slice_batch_info);
-        }
+        match data_slice_batch_info.data_slices_batch.len().cmp(&1) {
+            Ordering::Equal => {
+                data_slice_batches.push(DataSliceBatch::SingleBlock(current_hash.unwrap()));
+            }
+            Ordering::Greater => data_slice_batches.push(DataSliceBatch::CompactedBatch(Box::new(
+                data_slice_batch_info,
+            ))),
+            _ => (),
+        };
 
         Ok(ChainFilesInfo {
             data_slice_batches,
@@ -181,41 +216,40 @@ impl CompactServiceImpl {
 
     async fn merge_files(
         &self,
-        data_slice_batches: &mut [DataSliceBatchInfo],
+        data_slice_batches: &mut [DataSliceBatch],
         offset_column: &str,
         compact_dir_path: &Path,
     ) -> Result<(), CompactError> {
         let ctx = SessionContext::new();
 
-        for (index, data_slice_batch_info) in data_slice_batches.iter_mut().enumerate() {
-            if data_slice_batch_info.data_slices_batch.len() == 1 {
-                continue;
+        for (index, data_slice_batch) in data_slice_batches.iter_mut().enumerate() {
+            if let DataSliceBatch::CompactedBatch(data_slice_batch_info) = data_slice_batch {
+                let data_frame = ctx
+                    .read_parquet(
+                        data_slice_batch_info.data_slices_batch.clone(),
+                        datafusion::execution::options::ParquetReadOptions {
+                            file_extension: "",
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .int_err()?
+                    .sort(vec![col(offset_column).sort(true, false)])
+                    .int_err()?;
+
+                let new_file_path = compact_dir_path.join(format!("merge-slice-{index}").as_str());
+
+                data_frame
+                    .write_parquet(
+                        new_file_path.to_str().unwrap(),
+                        datafusion::dataframe::DataFrameWriteOptions::new()
+                            .with_single_file_output(true),
+                        None,
+                    )
+                    .await
+                    .int_err()?;
+                data_slice_batch_info.new_file_path = Some(new_file_path);
             }
-            let data_frame = ctx
-                .read_parquet(
-                    data_slice_batch_info.data_slices_batch.clone(),
-                    datafusion::execution::options::ParquetReadOptions {
-                        file_extension: "",
-                        ..Default::default()
-                    },
-                )
-                .await
-                .int_err()?
-                .sort(vec![col(offset_column).sort(true, false)])
-                .int_err()?;
-
-            let new_file_path = compact_dir_path.join(format!("merge-slice-{index}").as_str());
-
-            data_frame
-                .write_parquet(
-                    new_file_path.to_str().unwrap(),
-                    datafusion::dataframe::DataFrameWriteOptions::new()
-                        .with_single_file_output(true),
-                    None,
-                )
-                .await
-                .int_err()?;
-            data_slice_batch_info.new_file_path = Some(new_file_path);
         }
 
         Ok(())
@@ -238,67 +272,72 @@ impl CompactServiceImpl {
         let mut current_head = chain_files_info.old_head.clone();
         let mut old_data_slices: Vec<Url> = vec![];
 
-        for data_slice_batch_info in chain_files_info.data_slice_batches.iter().rev() {
-            if let Some(block_hash) = data_slice_batch_info.hash.as_ref() {
-                let block = chain.get_block(block_hash).await.int_err()?;
+        for data_slice_batch in chain_files_info.data_slice_batches.iter().rev() {
+            match data_slice_batch {
+                DataSliceBatch::SingleBlock(block_hash) => {
+                    let block = chain.get_block(block_hash).await.int_err()?;
 
-                let commit_result = dataset
-                    .commit_event(
-                        block.event,
-                        CommitOpts {
-                            block_ref: &BlockRef::Head,
-                            system_time: Some(self.time_source.now()),
-                            prev_block_hash: Some(Some(&current_head)),
-                            check_object_refs: false,
-                            update_block_ref: false,
-                        },
-                    )
-                    .await
-                    .int_err()?;
-                current_head = commit_result.new_head;
-                continue;
+                    let commit_result = dataset
+                        .commit_event(
+                            block.event,
+                            CommitOpts {
+                                block_ref: &BlockRef::Head,
+                                system_time: Some(self.time_source.now()),
+                                prev_block_hash: Some(Some(&current_head)),
+                                check_object_refs: false,
+                                update_block_ref: false,
+                            },
+                        )
+                        .await
+                        .int_err()?;
+                    current_head = commit_result.new_head;
+                }
+                DataSliceBatch::CompactedBatch(data_slice_batch_info) => {
+                    let add_data_file =
+                        OwnedFile::new(data_slice_batch_info.new_file_path.as_ref().unwrap());
+                    let new_offset_interval = OffsetInterval {
+                        start: data_slice_batch_info.lower_bound.start_offset,
+                        end: data_slice_batch_info.upper_bound.end_offset,
+                    };
+
+                    let (new_data, _) = dataset
+                        .prepare_objects(Some(new_offset_interval), Some(&add_data_file), None)
+                        .await?;
+
+                    dataset
+                        .commit_objects(new_data.as_ref(), Some(add_data_file), None, None)
+                        .await?;
+
+                    let metadata_event = AddData {
+                        prev_checkpoint: data_slice_batch_info.lower_bound.prev_checkpoint.clone(),
+                        prev_offset: data_slice_batch_info.lower_bound.prev_offset,
+                        new_data,
+                        new_checkpoint: data_slice_batch_info.upper_bound.new_checkpoint.clone(),
+                        new_watermark: None,
+                        new_source_state: data_slice_batch_info
+                            .upper_bound
+                            .new_source_state
+                            .clone(),
+                    };
+
+                    let commit_result = dataset
+                        .commit_event(
+                            metadata_event.into(),
+                            CommitOpts {
+                                block_ref: &BlockRef::Head,
+                                system_time: Some(self.time_source.now()),
+                                prev_block_hash: Some(Some(&current_head)),
+                                check_object_refs: false,
+                                update_block_ref: false,
+                            },
+                        )
+                        .await
+                        .int_err()?;
+
+                    current_head = commit_result.new_head;
+                    old_data_slices.extend(data_slice_batch_info.data_slices_batch.clone());
+                }
             }
-
-            let add_data_file =
-                OwnedFile::new(data_slice_batch_info.new_file_path.as_ref().unwrap());
-
-            let (new_data, _) = dataset
-                .prepare_objects(
-                    data_slice_batch_info.new_offset_interval.clone(),
-                    Some(&add_data_file),
-                    None,
-                )
-                .await?;
-
-            dataset
-                .commit_objects(new_data.as_ref(), Some(add_data_file), None, None)
-                .await?;
-
-            let metadata_event = AddData {
-                prev_checkpoint: data_slice_batch_info.prev_checkpoint.clone(),
-                prev_offset: data_slice_batch_info.prev_offset,
-                new_data,
-                new_checkpoint: data_slice_batch_info.new_checkpoint.clone(),
-                new_watermark: None,
-                new_source_state: data_slice_batch_info.new_source_state.clone(),
-            };
-
-            let commit_result = dataset
-                .commit_event(
-                    metadata_event.into(),
-                    CommitOpts {
-                        block_ref: &BlockRef::Head,
-                        system_time: Some(self.time_source.now()),
-                        prev_block_hash: Some(Some(&current_head)),
-                        check_object_refs: false,
-                        update_block_ref: false,
-                    },
-                )
-                .await
-                .int_err()?;
-
-            current_head = commit_result.new_head;
-            old_data_slices.extend(data_slice_batch_info.data_slices_batch.clone());
         }
 
         Ok((old_data_slices, current_head))

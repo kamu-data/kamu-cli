@@ -227,8 +227,8 @@ async fn test_dataset_compact() {
             .compact_svc
             .compact_dataset(
                 &dataset_handle,
-                1024,
-                MAX_SLICE_RECORDS,
+                MAX_SLICE_SIZE,
+                6,
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,

@@ -61,7 +61,7 @@ pub trait Dataset: Send + Sync {
         checkpoint: Option<&OwnedFile>,
     ) -> Result<ExecuteTransform, InternalError>;
 
-    /// Helper function to prepare [AddDaat] event parameters
+    /// Helper function to prepare [AddData] event parameters
     /// ([DataSlice] and [Checkpoint])
     async fn prepare_objects(
         &self,
@@ -70,7 +70,7 @@ pub trait Dataset: Send + Sync {
         checkpoint: Option<&OwnedFile>,
     ) -> Result<(Option<DataSlice>, Option<Checkpoint>), InternalError>;
 
-    /// Helper function to commit [AddDaat] event parameters
+    /// Helper function to commit [AddData] event parameters
     /// ([DataSlice] and [Checkpoint])
     async fn commit_objects(
         &self,
