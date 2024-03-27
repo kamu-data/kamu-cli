@@ -124,14 +124,21 @@ impl ODataCollectionContext {
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
     ) -> Self {
-        let scheme = std::env::var("KAMU_PROTOCOL_SCHEME").unwrap_or_else(|_| String::from("http"));
+        // TODO: Use value from config not envvar
+        //       https://github.com/kamu-data/kamu-node/issues/45
+        let base_url = std::env::var("KAMU_BASE_URL").unwrap_or_else(|_| {
+            let scheme =
+                std::env::var("KAMU_PROTOCOL_SCHEME").unwrap_or_else(|_| String::from("http"));
+
+            format!("{scheme}://{host}")
+        });
         let (base_path, _) = uri
             .path_and_query()
             .unwrap()
             .path()
             .rsplit_once('/')
             .unwrap();
-        let mut service_base_url = format!("{scheme}://{host}{base_path}");
+        let mut service_base_url = format!("{base_url}{base_path}");
         if service_base_url.ends_with('/') {
             service_base_url.pop();
         }
