@@ -211,6 +211,8 @@ impl ServerHarness {
         dataset_action_authorizer: MockDatasetActionAuthorizer,
     ) -> Self {
         let temp_dir = tempfile::TempDir::new().unwrap();
+        let datasets_dir = temp_dir.path().join("datasets");
+        std::fs::create_dir(&datasets_dir).unwrap();
 
         let mut catalog_builder = dill::CatalogBuilder::new();
         catalog_builder.add::<EventBus>();
@@ -227,7 +229,7 @@ impl ServerHarness {
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_multi_tenant(false)
-                    .with_root(temp_dir.path().join("datasets")),
+                    .with_root(datasets_dir),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 

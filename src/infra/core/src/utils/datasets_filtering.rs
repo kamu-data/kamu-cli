@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::pin::Pin;
-use std::str::FromStr;
 use std::sync::Arc;
 
 use futures::{future, StreamExt, TryStreamExt};
@@ -156,7 +155,7 @@ pub fn matches_remote_ref_pattern(
     match remote_ref_pattern {
         DatasetRefAnyPattern::Ref(_) | DatasetRefAnyPattern::PatternLocal(_) => unreachable!(),
         DatasetRefAnyPattern::PatternAmbiguous(repo_name, dataset_name_pattern) => {
-            let repo_name = RepoName::from_str(&repo_name.pattern).unwrap();
+            let repo_name = RepoName::new_unchecked(&repo_name.pattern);
             repo_name == dataset_alias_remote.repo_name
                 && dataset_name_pattern.matches(&dataset_alias_remote.dataset_name)
         }
@@ -199,8 +198,9 @@ pub fn matches_local_ref_pattern(
             dataset_name_pattern.matches(&dataset_handle.alias.dataset_name)
         }
         DatasetRefAnyPattern::PatternAmbiguous(account_name, dataset_name_pattern) => {
-            let account_name = AccountName::from_str(&account_name.pattern).unwrap();
-            Some(account_name) == dataset_handle.alias.account_name
+            let account_name = AccountName::new_unchecked(&account_name.pattern);
+            (dataset_handle.alias.account_name.is_some()
+                && &account_name == dataset_handle.alias.account_name.as_ref().unwrap())
                 && dataset_name_pattern.matches(&dataset_handle.alias.dataset_name)
         }
     }

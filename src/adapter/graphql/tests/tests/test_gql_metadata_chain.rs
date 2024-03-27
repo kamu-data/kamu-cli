@@ -25,23 +25,11 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
 #[test_log::test(tokio::test)]
 async fn test_metadata_chain_events() {
-    let tempdir = tempfile::tempdir().unwrap();
-
-    let base_catalog = dill::CatalogBuilder::new()
-        .add::<EventBus>()
-        .add::<DependencyGraphServiceInMemory>()
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(tempdir.path().join("datasets"))
-                .with_multi_tenant(false),
-        )
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .build();
+    let harness = GraphQLMetadataChainHarness::new(false);
 
     // Init dataset
-    let (_, catalog_authorized) = authentication_catalogs(&base_catalog);
-    let dataset_repo = catalog_authorized
+    let dataset_repo = harness
+        .catalog_authorized
         .get_one::<dyn DatasetRepository>()
         .unwrap();
     let create_result = dataset_repo
@@ -124,7 +112,7 @@ async fn test_metadata_chain_events() {
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
-        .execute(async_graphql::Request::new(request_code.clone()).data(catalog_authorized))
+        .execute(async_graphql::Request::new(request_code.clone()).data(harness.catalog_authorized))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
@@ -177,23 +165,10 @@ async fn test_metadata_chain_events() {
 
 #[test_log::test(tokio::test)]
 async fn metadata_chain_append_event() {
-    let tempdir = tempfile::tempdir().unwrap();
+    let harness = GraphQLMetadataChainHarness::new(false);
 
-    let base_catalog = dill::CatalogBuilder::new()
-        .add::<EventBus>()
-        .add::<DependencyGraphServiceInMemory>()
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(tempdir.path().join("datasets"))
-                .with_multi_tenant(false),
-        )
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .build();
-
-    let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog);
-
-    let dataset_repo = catalog_authorized
+    let dataset_repo = harness
+        .catalog_authorized
         .get_one::<dyn DatasetRepository>()
         .unwrap();
     let create_result = dataset_repo
@@ -243,12 +218,12 @@ async fn metadata_chain_append_event() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
     let res = schema
-        .execute(async_graphql::Request::new(request_code.clone()).data(catalog_anonymous))
+        .execute(async_graphql::Request::new(request_code.clone()).data(harness.catalog_anonymous))
         .await;
     expect_anonymous_access_error(res);
 
     let res = schema
-        .execute(async_graphql::Request::new(request_code.clone()).data(catalog_authorized))
+        .execute(async_graphql::Request::new(request_code.clone()).data(harness.catalog_authorized))
         .await;
     assert!(res.is_ok(), "{res:?}");
     assert_eq!(
@@ -273,23 +248,10 @@ async fn metadata_chain_append_event() {
 
 #[test_log::test(tokio::test)]
 async fn metadata_update_readme_new() {
-    let tempdir = tempfile::tempdir().unwrap();
+    let harness = GraphQLMetadataChainHarness::new(false);
 
-    let base_catalog = dill::CatalogBuilder::new()
-        .add::<EventBus>()
-        .add::<DependencyGraphServiceInMemory>()
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(tempdir.path().join("datasets"))
-                .with_multi_tenant(false),
-        )
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .build();
-
-    let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog);
-
-    let dataset_repo = catalog_authorized
+    let dataset_repo = harness
+        .catalog_authorized
         .get_one::<dyn DatasetRepository>()
         .unwrap();
     let create_result = dataset_repo
@@ -329,14 +291,16 @@ async fn metadata_update_readme_new() {
 
     let res = schema
         .execute(
-            async_graphql::Request::new(new_readme_request_code.clone()).data(catalog_anonymous),
+            async_graphql::Request::new(new_readme_request_code.clone())
+                .data(harness.catalog_anonymous),
         )
         .await;
     expect_anonymous_access_error(res);
 
     let res = schema
         .execute(
-            async_graphql::Request::new(new_readme_request_code).data(catalog_authorized.clone()),
+            async_graphql::Request::new(new_readme_request_code)
+                .data(harness.catalog_authorized.clone()),
         )
         .await;
 
@@ -397,7 +361,7 @@ async fn metadata_update_readme_new() {
                 )
                 .replace("<id>", &create_result.dataset_handle.id.to_string()),
             )
-            .data(catalog_authorized.clone()),
+            .data(harness.catalog_authorized.clone()),
         )
         .await;
 
@@ -435,7 +399,7 @@ async fn metadata_update_readme_new() {
                 )
                 .replace("<id>", &create_result.dataset_handle.id.to_string()),
             )
-            .data(catalog_authorized.clone()),
+            .data(harness.catalog_authorized.clone()),
         )
         .await;
 
@@ -488,7 +452,7 @@ async fn metadata_update_readme_new() {
                 )
                 .replace("<id>", &create_result.dataset_handle.id.to_string()),
             )
-            .data(catalog_authorized),
+            .data(harness.catalog_authorized),
         )
         .await;
 
@@ -533,3 +497,37 @@ async fn assert_attachments_eq(dataset: Arc<dyn Dataset>, expected: SetAttachmen
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
+
+struct GraphQLMetadataChainHarness {
+    _tempdir: tempfile::TempDir,
+    catalog_authorized: dill::Catalog,
+    catalog_anonymous: dill::Catalog,
+}
+
+impl GraphQLMetadataChainHarness {
+    fn new(is_multi_tenant: bool) -> Self {
+        let tempdir = tempfile::tempdir().unwrap();
+        let datasets_dir = tempdir.path().join("datasets");
+        std::fs::create_dir(&datasets_dir).unwrap();
+
+        let base_catalog = dill::CatalogBuilder::new()
+            .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(datasets_dir)
+                    .with_multi_tenant(is_multi_tenant),
+            )
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .build();
+
+        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog);
+
+        Self {
+            _tempdir: tempdir,
+            catalog_anonymous,
+            catalog_authorized,
+        }
+    }
+}

@@ -39,15 +39,14 @@ impl Datasets {
         account_name: AccountName,
         dataset_name: DatasetName,
     ) -> Result<Option<Dataset>> {
-        let account = Account::from_account_name(account_name.clone().into());
-
         let dataset_alias = odf::DatasetAlias::new(Some(account_name.into()), dataset_name.into());
 
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let hdl = dataset_repo
             .try_resolve_dataset_ref(&dataset_alias.into_local_ref())
             .await?;
-        Ok(hdl.map(|h| Dataset::new(account, h)))
+
+        Ok(hdl.map(|h| Dataset::new(Account::from_dataset_alias(ctx, &h.alias), h)))
     }
 
     #[graphql(skip)]

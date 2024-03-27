@@ -18,6 +18,8 @@ use opendatafabric::*;
 #[tokio::test]
 async fn query() {
     let tempdir = tempfile::tempdir().unwrap();
+    let datasets_dir = tempdir.path().join("datasets");
+    std::fs::create_dir(&datasets_dir).unwrap();
 
     let cat = dill::CatalogBuilder::new()
         .add::<EventBus>()
@@ -26,7 +28,7 @@ async fn query() {
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
-                .with_root(tempdir.path().join("datasets"))
+                .with_root(datasets_dir)
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()

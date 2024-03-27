@@ -83,6 +83,9 @@ async fn do_test_sync(
         &dataset_alias_2,
     );
 
+    let datasets_dir = tmp_workspace_dir.join("datasets");
+    std::fs::create_dir(&datasets_dir).unwrap();
+
     let catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add::<DependencyGraphServiceInMemory>()
@@ -93,7 +96,7 @@ async fn do_test_sync(
         .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
-                .with_root(tmp_workspace_dir.join("datasets"))
+                .with_root(datasets_dir)
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()

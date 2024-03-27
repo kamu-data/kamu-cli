@@ -209,6 +209,32 @@ async fn test_routing_dataset_name() {
     await_client_server_flow!(server, client);
 }
 
+#[test_log::test(tokio::test)]
+async fn test_routing_dataset_name_case_insensetive() {
+    let repo = setup_repo().await;
+
+    let server = setup_server(
+        repo.catalog,
+        "/:dataset_name",
+        |Path(p): Path<DatasetByName>| DatasetAlias::new(None, p.dataset_name).into_local_ref(),
+    );
+
+    let dataset_url = url::Url::parse(&format!(
+        "http://{}/{}/",
+        server.local_addr(),
+        repo.created_dataset
+            .dataset_handle
+            .alias
+            .dataset_name
+            .to_ascii_uppercase()
+    ))
+    .unwrap();
+
+    let client = setup_client(dataset_url, repo.created_dataset.head);
+
+    await_client_server_flow!(server, client);
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(dead_code)]

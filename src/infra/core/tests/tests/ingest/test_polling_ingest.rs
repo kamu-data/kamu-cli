@@ -1085,8 +1085,10 @@ impl IngestTestHarness {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = temp_dir.path().join("run");
         let cache_dir = temp_dir.path().join("cache");
+        let datasets_dir = temp_dir.path().join("datasets");
         std::fs::create_dir(&run_info_dir).unwrap();
         std::fs::create_dir(&cache_dir).unwrap();
+        std::fs::create_dir(&datasets_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
             .add_value(ContainerRuntimeConfig::default())
@@ -1100,7 +1102,7 @@ impl IngestTestHarness {
             .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
-                    .with_root(temp_dir.path().join("datasets"))
+                    .with_root(datasets_dir)
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()

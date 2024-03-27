@@ -492,6 +492,39 @@ impl DatasetSingleTenantStorageStrategy {
                 }
             })
     }
+
+    async fn attempt_resolve_dataset_alias(
+        &self,
+        dataset_alias: &DatasetAlias,
+    ) -> Result<DatasetHandle, ResolveDatasetError> {
+        assert!(
+            !dataset_alias.is_multi_tenant()
+                || dataset_alias.account_name.as_ref().unwrap() == DEFAULT_ACCOUNT_NAME,
+            "Multi-tenant refs shouldn't have reached down to here with earlier validations"
+        );
+
+        let dataset_path = self.dataset_path_impl(dataset_alias);
+        if !dataset_path.exists() {
+            return Err(ResolveDatasetError::NotFound(DatasetNotFoundError {
+                dataset_ref: dataset_alias.as_local_ref(),
+            }));
+        }
+
+        self.resolve_dataset_handle(&dataset_path, dataset_alias)
+            .await
+    }
+
+    async fn resolve_dataset_handle(
+        &self,
+        dataset_path: &PathBuf,
+        dataset_alias: &DatasetAlias,
+    ) -> Result<DatasetHandle, ResolveDatasetError> {
+        let summary = self
+            .attempt_resolving_summary_via_path(dataset_path, dataset_alias)
+            .await?;
+
+        Ok(DatasetHandle::new(summary.id, dataset_alias.clone()))
+    }
 }
 
 #[async_trait]
@@ -517,7 +550,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
                 }
                 let dataset_name = DatasetName::try_from(&dataset_dir_entry.file_name()).int_err()?;
                 let dataset_alias = DatasetAlias::new(None, dataset_name);
-                match self.resolve_dataset_alias(&dataset_alias).await {
+                match self.attempt_resolve_dataset_alias(&dataset_alias).await {
                     Ok(hdl) => { yield hdl; Ok(()) }
                     Err(ResolveDatasetError::NotFound(_)) => Ok(()),
                     Err(e) => Err(e.int_err())
@@ -546,15 +579,27 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
 
         let dataset_path = self.dataset_path_impl(dataset_alias);
         if !dataset_path.exists() {
+            use tokio_stream::StreamExt;
+
+            let mut all_datasets_stream = self.get_all_datasets();
+
+            while let Some(dataset_handle) = all_datasets_stream.try_next().await.unwrap() {
+                if &dataset_handle.alias == dataset_alias {
+                    return self
+                        .resolve_dataset_handle(
+                            &self.root.join(&dataset_handle.alias.dataset_name),
+                            &dataset_handle.alias,
+                        )
+                        .await;
+                }
+            }
             return Err(ResolveDatasetError::NotFound(DatasetNotFoundError {
                 dataset_ref: dataset_alias.as_local_ref(),
             }));
         }
-        let summary = self
-            .attempt_resolving_summary_via_path(&dataset_path, dataset_alias)
-            .await?;
 
-        Ok(DatasetHandle::new(summary.id, dataset_alias.clone()))
+        self.resolve_dataset_handle(&dataset_path, dataset_alias)
+            .await
     }
 
     async fn resolve_dataset_id(
@@ -727,6 +772,32 @@ impl DatasetMultiTenantStorageStrategy {
             }
         })
     }
+
+    fn resolve_account_dir(
+        &self,
+        account_name: &AccountName,
+    ) -> Result<PathBuf, ResolveDatasetError> {
+        let account_dataset_dir_path = self.root.join(account_name);
+
+        if !account_dataset_dir_path.is_dir() {
+            let read_accout_dirs = std::fs::read_dir(self.root.as_path()).int_err()?;
+
+            for read_accout_dir in read_accout_dirs {
+                let account_dir_name = AccountName::new_unchecked(
+                    read_accout_dir
+                        .int_err()?
+                        .file_name()
+                        .to_str()
+                        .unwrap_or(""),
+                );
+                if account_name == &account_dir_name {
+                    return Ok(self.root.join(account_dir_name));
+                }
+            }
+        }
+
+        Ok(account_dataset_dir_path)
+    }
 }
 
 #[async_trait]
@@ -791,8 +862,8 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
         dataset_alias: &DatasetAlias,
     ) -> Result<DatasetHandle, ResolveDatasetError> {
         let effective_account_name = self.effective_account_name(dataset_alias);
+        let account_dataset_dir_path = self.resolve_account_dir(effective_account_name)?;
 
-        let account_dataset_dir_path = self.root.join(effective_account_name);
         if account_dataset_dir_path.is_dir() {
             let read_dataset_dir = std::fs::read_dir(account_dataset_dir_path).int_err()?;
 
