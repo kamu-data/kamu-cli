@@ -64,21 +64,10 @@ Prerequisites:
 Clone the repository:
 ```shell
 git clone git@github.com:kamu-data/kamu-cli.git
-cd kamu-cli
 ```
-
-Setup local databases for `sqlx`:
-```shell
-make sqlx-setup-local
-```
-Note: this step is mandatory for project build to succeed as `sqlx` framework demands database to be accessible at compile-time:
- * it creates Docker containers with empty databases
- * it applies all database migrations from scratch
- * it generates `.env` files in specific crates to point to databases running in Docker containers by setting `DATABASE_URL` variables.
-
-
 Build the project:
 ```shell
+cd kamu-cli
 cargo build
 ```
 
@@ -109,27 +98,41 @@ If you need to run some tests under `Docker` use:
 KAMU_CONTAINER_RUNTIME_TYPE=docker cargo test <some_test>
 ```
 
-### Run Linters
-Use the following command:
-```sh
-make lint
+### Build with Databases
+
+By default, we define `SQLX_OFFLINE=true` environment variable to ensure the compilation succeeds without access to a live database.
+The default mode is fine in most of the cases, assuming the developer's assignment is not related to databases/repositories directly.
+
+When databases have to be touched, the setup of local database containers must be configured using the following script:
+```shell
+make sqlx-local-setup
 ```
-This will do a number of highly useful checks:
-* Rust formatting check
-* License headers check
-* Dependecies check: detecting issues with existing dependencies, detecting unused dependencies
-* Rust coding practices checks (Clippy)
-* SQLX offline data check (`sqlx` data for offline compliation must be up-to-date with the database schema)
 
+This mode:
+ * creates Docker containers with empty databases
+ * applies all database migrations from scratch
+ * generates `.env` files in specific crates to point to databases running in Docker containers by setting `DATABASE_URL` variables
+   as well as to disable `SQLX_OFFLINE` variable in those crates
 
-### Prepare SQLX offline data
-If any of the existing SQL queries were modified or new queries were added, `sqlx` data for offline compilation must be re-generated:
-```sh
+This setup ensures any SQL queries are automatically checked against live database schema at compile-time.
+This is highly useful when queries have to be written or modified.
+
+After the database-specific assignment is over, it makes sense to re-enable default mode by running another script:
+```shell
 make sqlx-prepare
+make sqlx-local-clean
 ```
+
+The first step, `make sqlx-prepare`, analyzes SQL queries in the code and generates the latest up-to-date data 
+for offline checking of queries (`.sqlx` directories). It is necessary to commit them into the version control
+ to share the latest updates with other developers, as well as to pass through GitHub pipeline actions.
 
 Note that running `make lint` will detect if re-generation is necessary before pushing changes.
 Otherwise, GitHub CI flows will likely fail to build the project due to database schema differences.
+
+The second step, `make sqlx-local-clean` would reverse `make sqlx-local-setup` by:
+ * stopping and removing Docker containers with the databases
+ * removing `.env` files in database-specific crates, which re-enables `SQLX_OFFLINE=true` for the entire repository.
 
 
 ### Database migrations
@@ -143,6 +146,19 @@ Typical commands to work with migrations include:
 * `sqlx migrate info --source <migrations_dir_path> ` to print information about currently applied migration within the database
 
 
+### Run Linters
+Use the following command:
+```sh
+make lint
+```
+This will do a number of highly useful checks:
+* Rust formatting check
+* License headers check
+* Dependecies check: detecting issues with existing dependencies, detecting unused dependencies
+* Rust coding practices checks (Clippy)
+* SQLX offline data check (`sqlx` data for offline compliation must be up-to-date with the database schema)
+
+
 ### Run Tests
 Before you run tests for the first time you need to run:
 ```sh
@@ -151,14 +167,19 @@ make test-setup
 
 This will download all necessary images for containerized tests.
 
-You can run all tests as:
+You can run all tests except database-specific as:
 ```sh
 make test
 ```
 
-In most cases you can skip tests involving very heavy Spark and Flink engines by running:
+In most cases you can skip tests involving very heavy Spark and Flink engines and databases by running:
 ```sh
 make test-fast
+```
+
+If testing with databases is required, use:
+```sh
+make test-full
 ```
 
 These are just wrappers on top of [Nextest](https://nexte.st/) that [control](/.config/nextest.toml) test concurrency and retries.
@@ -256,9 +277,6 @@ In the `/src` directory you will find:
   - Crates here contain **specific implementations of services and repositories** (e.g. repository that stores data in S3)
   - Crate directories are named as `<domain>-<technology>`, e.g. `object-repository-s3` while crate names will typically have `kamu-<domain>-<technology>` prefix
   - Infrastructure layer only operates on entities and interfaces defined in `domain` layer
-- `database`
-  - Crates here utilize `sqlx` framework and contain **database-specific repository implementations**
-  - Crate directories are named as `sqlx-<database>`, e.g. `sqlx-postgres` or `sqlx-mysql`
 - `app`
   - Crates here **combine all layers above into functional applications**
 
