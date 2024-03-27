@@ -223,6 +223,7 @@ type DataSchema {
 enum DataSchemaFormat {
 	PARQUET
 	PARQUET_JSON
+	ARROW_JSON
 }
 
 type DataSlice {

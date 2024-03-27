@@ -18,7 +18,7 @@ pub(crate) mod mutations;
 pub(crate) mod prelude;
 pub(crate) mod queries;
 mod root;
-pub(crate) mod scalars;
+pub mod scalars;
 pub(crate) mod utils;
 
 pub use root::*;

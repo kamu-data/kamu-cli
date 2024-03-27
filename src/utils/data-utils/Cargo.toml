@@ -24,8 +24,10 @@ doctest = false
 [dependencies]
 opendatafabric = { workspace = true }
 
+arrow = { version = "50", default-features = false }
+arrow-json = { version = "50", default-features = false }
 arrow-digest = { version = "50", default-features = false }
-datafusion = { version = "36", default-features = false, features = ["parquet"] }
+datafusion = { version = "36", default-features = false, features = ["parquet", "serde"] }
 tracing = { version = "0.1", default-features = false }
 
 async-trait = "0.1"
@@ -34,7 +36,8 @@ pretty_assertions = { version = "1" }
 sha3 = "0.10"
 thiserror = { version = "1", default-features = false }
 url = "2"
-
+serde = {version = "1", default-features = false }
+serde_json = {version = "1"}
 
 [dev-dependencies]
 test-log = { version = "0.2", features = ["trace"] }

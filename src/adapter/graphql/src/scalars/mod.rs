@@ -10,7 +10,7 @@
 mod account;
 mod data_batch;
 mod data_query;
-mod data_schema;
+pub mod data_schema;
 mod dataset_id_name;
 mod engine_desc;
 mod event_id;
