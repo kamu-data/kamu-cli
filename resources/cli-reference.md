@@ -1161,12 +1161,15 @@ Validate a Kamu token
 
 Generate a platform token from a known secret for debugging
 
-**Usage:** `kamu system generate-token --gh-login <gh-login> --gh-access-token <gh-access-token>`
+**Usage:** `kamu system generate-token [OPTIONS] --login <login>`
 
 **Options:**
 
-* `--gh-login <GH-LOGIN>` — GitHub account login
+* `--login <LOGIN>` — Account name
 * `--gh-access-token <GH-ACCESS-TOKEN>` — An existing GitHub access token
+* `--expiration-time-sec <EXPIRATION-TIME-SEC>` — Token expiration time in seconds
+
+  Default value: `3600`
 
 
 
