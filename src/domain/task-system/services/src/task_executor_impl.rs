@@ -16,7 +16,7 @@ use kamu_task_system::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct TaskExecutorInMemory {
+pub struct TaskExecutorImpl {
     task_sched: Arc<dyn TaskScheduler>,
     event_store: Arc<dyn TaskSystemEventStore>,
     event_bus: Arc<EventBus>,
@@ -29,7 +29,7 @@ pub struct TaskExecutorInMemory {
 #[component(pub)]
 #[interface(dyn TaskExecutor)]
 #[scope(Singleton)]
-impl TaskExecutorInMemory {
+impl TaskExecutorImpl {
     pub fn new(
         task_sched: Arc<dyn TaskScheduler>,
         event_store: Arc<dyn TaskSystemEventStore>,
@@ -73,7 +73,7 @@ impl TaskExecutorInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl TaskExecutor for TaskExecutorInMemory {
+impl TaskExecutor for TaskExecutorImpl {
     // TODO: Error and panic handling strategy
     async fn run(&self) -> Result<(), InternalError> {
         loop {

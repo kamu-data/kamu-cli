@@ -13,6 +13,8 @@ use kamu_task_system_inmem::domain::*;
 use kamu_task_system_inmem::*;
 use opendatafabric::*;
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_event_store_empty() {
     let event_store = TaskSystemEventStoreInMemory::new();
@@ -40,6 +42,8 @@ async fn test_event_store_empty() {
 
     assert_eq!(tasks, []);
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_event_store_get_streams() {
@@ -112,3 +116,5 @@ async fn test_event_store_get_streams() {
     // Ensure reverse chronological order
     assert_eq!(&tasks[..], [task_id_2, task_id_1]);
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

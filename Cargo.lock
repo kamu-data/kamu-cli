@@ -3636,6 +3636,7 @@ dependencies = [
  "kamu-flow-system-inmem",
  "kamu-task-system",
  "kamu-task-system-inmem",
+ "kamu-task-system-services",
  "mockall",
  "opendatafabric",
  "serde",
@@ -3791,6 +3792,7 @@ dependencies = [
  "kamu-datafusion-cli",
  "kamu-flow-system-inmem",
  "kamu-task-system-inmem",
+ "kamu-task-system-services",
  "libc",
  "merge",
  "mime",
@@ -3941,6 +3943,7 @@ dependencies = [
  "kamu-flow-system",
  "kamu-task-system",
  "kamu-task-system-inmem",
+ "kamu-task-system-services",
  "mockall",
  "opendatafabric",
  "pretty_assertions",
@@ -4014,19 +4017,28 @@ dependencies = [
  "chrono",
  "enum-variants",
  "event-sourcing",
- "internal-error",
  "kamu-core",
  "opendatafabric",
- "serde",
- "serde_with",
  "thiserror",
  "tokio-stream",
- "tracing",
- "url",
 ]
 
 [[package]]
 name = "kamu-task-system-inmem"
+version = "0.169.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dill",
+ "futures",
+ "kamu-task-system",
+ "opendatafabric",
+ "test-log",
+ "tokio",
+]
+
+[[package]]
+name = "kamu-task-system-services"
 version = "0.169.0"
 dependencies = [
  "async-stream",
@@ -4037,16 +4049,11 @@ dependencies = [
  "futures",
  "kamu-core",
  "kamu-task-system",
+ "kamu-task-system-inmem",
  "opendatafabric",
- "serde",
- "serde_with",
  "test-log",
- "thiserror",
  "tokio",
- "tokio-stream",
  "tracing",
- "tracing-subscriber",
- "url",
 ]
 
 [[package]]

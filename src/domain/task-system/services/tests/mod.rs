@@ -7,13 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(error_generic_member_access)]
-#![feature(hash_set_entry)]
-#![feature(let_chains)]
+#![feature(assert_matches)]
 
-// Re-exports
-pub use kamu_task_system as domain;
-
-mod task_system_event_store_inmem;
-
-pub use task_system_event_store_inmem::*;
+mod tests;

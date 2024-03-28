@@ -11,14 +11,17 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use kamu_core::SystemTimeSourceStub;
-use kamu_task_system_inmem::domain::*;
-use kamu_task_system_inmem::*;
+use kamu_task_system::{LogicalPlan, Probe, TaskScheduler, TaskState, TaskStatus};
+use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
+use kamu_task_system_services::TaskSchedulerImpl;
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_creates_task() {
     let event_store = Arc::new(TaskSystemEventStoreInMemory::new());
     let time_source = Arc::new(SystemTimeSourceStub::new());
-    let task_sched = TaskSchedulerInMemory::new(event_store, time_source);
+    let task_sched = TaskSchedulerImpl::new(event_store, time_source);
 
     let logical_plan_expected: LogicalPlan = Probe { ..Probe::default() }.into();
 
@@ -42,7 +45,7 @@ async fn test_creates_task() {
 async fn test_queues_tasks() {
     let event_store = Arc::new(TaskSystemEventStoreInMemory::new());
     let time_source = Arc::new(SystemTimeSourceStub::new());
-    let task_sched = TaskSchedulerInMemory::new(event_store, time_source);
+    let task_sched = TaskSchedulerImpl::new(event_store, time_source);
 
     let task_id_1 = task_sched
         .create_task(Probe { ..Probe::default() }.into())
@@ -65,7 +68,7 @@ async fn test_queues_tasks() {
 async fn test_task_cancellation() {
     let event_store = Arc::new(TaskSystemEventStoreInMemory::new());
     let time_source = Arc::new(SystemTimeSourceStub::new());
-    let task_sched = TaskSchedulerInMemory::new(event_store, time_source);
+    let task_sched = TaskSchedulerImpl::new(event_store, time_source);
 
     let task_id_1 = task_sched
         .create_task(Probe { ..Probe::default() }.into())

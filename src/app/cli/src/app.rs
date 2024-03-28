@@ -294,9 +294,9 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
 
-    b.add::<kamu_task_system_inmem::TaskSchedulerInMemory>();
+    b.add::<kamu_task_system_services::TaskSchedulerImpl>();
 
-    b.add::<kamu_task_system_inmem::TaskExecutorInMemory>();
+    b.add::<kamu_task_system_services::TaskExecutorImpl>();
 
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
