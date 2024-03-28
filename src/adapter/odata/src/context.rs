@@ -44,14 +44,14 @@ pub(crate) struct ODataServiceContext {
 
 impl ODataServiceContext {
     pub(crate) fn new(
-        host: &axum::headers::Host,
         uri: &http::Uri,
         catalog: Catalog,
         account_name: Option<AccountName>,
     ) -> Self {
-        // TODO: Find out scheme the API is served through (e.g. if there is an LB)
-        let scheme = "http";
-        let mut service_base_url = format!("{scheme}://{host}{uri}");
+        let config = catalog.get_one::<Config>().unwrap();
+        let base_url = &config.protocols.base_url_rest;
+
+        let mut service_base_url = format!("{base_url}{uri}");
         if service_base_url.ends_with('/') {
             service_base_url.pop();
         }
@@ -118,20 +118,14 @@ pub(crate) struct ODataCollectionContext {
 
 impl ODataCollectionContext {
     pub(crate) fn new(
-        host: &axum::headers::Host,
         uri: &http::Uri,
         catalog: Catalog,
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
     ) -> Self {
-        // TODO: Use value from config not envvar
-        //       https://github.com/kamu-data/kamu-node/issues/45
-        let base_url = std::env::var("KAMU_BASE_URL").unwrap_or_else(|_| {
-            let scheme =
-                std::env::var("KAMU_PROTOCOL_SCHEME").unwrap_or_else(|_| String::from("http"));
+        let config = catalog.get_one::<Config>().unwrap();
+        let base_url = &config.protocols.base_url_rest;
 
-            format!("{scheme}://{host}")
-        });
         let (base_path, _) = uri
             .path_and_query()
             .unwrap()

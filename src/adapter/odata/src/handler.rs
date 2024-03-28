@@ -32,56 +32,50 @@ use crate::context::*;
 
 pub async fn odata_service_handler_st(
     catalog: axum::extract::Extension<Catalog>,
-    host: axum::extract::TypedHeader<axum::headers::Host>,
     uri: axum::extract::OriginalUri,
 ) -> axum::response::Response<String> {
-    odata_service_handler_common(catalog, host, uri, None).await
+    odata_service_handler_common(catalog, uri, None).await
 }
 
 pub async fn odata_service_handler_mt(
     catalog: axum::extract::Extension<Catalog>,
-    host: axum::extract::TypedHeader<axum::headers::Host>,
     uri: axum::extract::OriginalUri,
     axum::extract::Path(account_name): axum::extract::Path<AccountName>,
 ) -> axum::response::Response<String> {
-    odata_service_handler_common(catalog, host, uri, Some(account_name)).await
+    odata_service_handler_common(catalog, uri, Some(account_name)).await
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 pub async fn odata_metadata_handler_st(
     catalog: axum::extract::Extension<Catalog>,
-    host: axum::extract::TypedHeader<axum::headers::Host>,
     uri: axum::extract::OriginalUri,
 ) -> axum::response::Response<String> {
-    odata_metadata_handler_common(catalog, host, uri, None).await
+    odata_metadata_handler_common(catalog, uri, None).await
 }
 
 pub async fn odata_metadata_handler_mt(
     catalog: axum::extract::Extension<Catalog>,
-    host: axum::extract::TypedHeader<axum::headers::Host>,
     uri: axum::extract::OriginalUri,
     axum::extract::Path(account_name): axum::extract::Path<AccountName>,
 ) -> axum::response::Response<String> {
-    odata_metadata_handler_common(catalog, host, uri, Some(account_name)).await
+    odata_metadata_handler_common(catalog, uri, Some(account_name)).await
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 pub async fn odata_collection_handler_st(
     catalog: axum::extract::Extension<Catalog>,
-    host: axum::extract::TypedHeader<axum::headers::Host>,
     uri: axum::extract::OriginalUri,
     axum::extract::Path(dataset_name): axum::extract::Path<DatasetName>,
     headers: axum::http::HeaderMap,
     query: axum::extract::Query<QueryParamsRaw>,
 ) -> axum::response::Response<String> {
-    odata_collection_handler_common(catalog, host, uri, None, dataset_name, headers, query).await
+    odata_collection_handler_common(catalog, uri, None, dataset_name, headers, query).await
 }
 
 pub async fn odata_collection_handler_mt(
     catalog: axum::extract::Extension<Catalog>,
-    host: axum::extract::TypedHeader<axum::headers::Host>,
     uri: axum::extract::OriginalUri,
     axum::extract::Path((account_name, dataset_name)): axum::extract::Path<(
         AccountName,
@@ -92,7 +86,6 @@ pub async fn odata_collection_handler_mt(
 ) -> axum::response::Response<String> {
     odata_collection_handler_common(
         catalog,
-        host,
         uri,
         Some(account_name),
         dataset_name,
@@ -108,11 +101,10 @@ pub async fn odata_collection_handler_mt(
 
 pub async fn odata_service_handler_common(
     axum::extract::Extension(catalog): axum::extract::Extension<Catalog>,
-    axum::extract::TypedHeader(host): axum::extract::TypedHeader<axum::headers::Host>,
     axum::extract::OriginalUri(uri): axum::extract::OriginalUri,
     account_name: Option<AccountName>,
 ) -> axum::response::Response<String> {
-    let ctx = ODataServiceContext::new(&host, &uri, catalog, account_name);
+    let ctx = ODataServiceContext::new(&uri, catalog, account_name);
     datafusion_odata::handlers::odata_service_handler(axum::Extension(Arc::new(ctx))).await
 }
 
@@ -120,11 +112,10 @@ pub async fn odata_service_handler_common(
 
 pub async fn odata_metadata_handler_common(
     axum::extract::Extension(catalog): axum::extract::Extension<Catalog>,
-    axum::extract::TypedHeader(host): axum::extract::TypedHeader<axum::headers::Host>,
     axum::extract::OriginalUri(uri): axum::extract::OriginalUri,
     account_name: Option<AccountName>,
 ) -> axum::response::Response<String> {
-    let ctx = ODataServiceContext::new(&host, &uri, catalog, account_name);
+    let ctx = ODataServiceContext::new(&uri, catalog, account_name);
     datafusion_odata::handlers::odata_metadata_handler(axum::Extension(Arc::new(ctx))).await
 }
 
@@ -132,7 +123,6 @@ pub async fn odata_metadata_handler_common(
 
 pub async fn odata_collection_handler_common(
     axum::extract::Extension(catalog): axum::extract::Extension<Catalog>,
-    axum::extract::TypedHeader(host): axum::extract::TypedHeader<axum::headers::Host>,
     axum::extract::OriginalUri(uri): axum::extract::OriginalUri,
     account_name: Option<AccountName>,
     dataset_name: DatasetName,
@@ -161,7 +151,7 @@ pub async fn odata_collection_handler_common(
         .await
         .unwrap();
 
-    let ctx = ODataCollectionContext::new(&host, &uri, catalog, dataset_handle, dataset);
+    let ctx = ODataCollectionContext::new(&uri, catalog, dataset_handle, dataset);
     datafusion_odata::handlers::odata_collection_handler(
         axum::Extension(Arc::new(ctx)),
         query,
