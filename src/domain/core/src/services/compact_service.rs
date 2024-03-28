@@ -22,7 +22,7 @@ pub trait CompactService: Send + Sync {
         max_slice_size: u64,
         max_slice_records: u64,
         listener: Option<Arc<dyn CompactionMultiListener>>,
-    ) -> Result<(), CompactError>;
+    ) -> Result<CompactResult, CompactError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -145,4 +145,10 @@ pub enum CompactionPhase {
     GatherChainInfo,
     MergeDataslices,
     CommitNewBlocks,
+}
+
+#[derive(Debug)]
+pub enum CompactResult {
+    Finished,
+    CleanUpRequired,
 }

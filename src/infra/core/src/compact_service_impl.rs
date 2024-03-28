@@ -16,6 +16,7 @@ use datafusion::prelude::*;
 use dill::{component, interface};
 use domain::compact_service::{
     CompactError,
+    CompactResult,
     CompactionMultiListener,
     CompactionPhase,
     InvalidDatasetKindError,
@@ -355,7 +356,7 @@ impl CompactService for CompactServiceImpl {
         max_slice_size: u64,
         max_slice_records: u64,
         multi_listener: Option<Arc<dyn CompactionMultiListener>>,
-    ) -> Result<(), CompactError> {
+    ) -> Result<CompactResult, CompactError> {
         let listener = multi_listener
             .and_then(|l| l.begin_compact(dataset_handle))
             .unwrap_or(Arc::new(NullCompactionListener {}));
@@ -413,6 +414,6 @@ impl CompactService for CompactServiceImpl {
             .await?;
         listener.success();
 
-        Ok(())
+        Ok(CompactResult::Finished)
     }
 }

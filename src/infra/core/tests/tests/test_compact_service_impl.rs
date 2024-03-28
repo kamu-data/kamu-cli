@@ -14,7 +14,12 @@ use chrono::{NaiveDate, TimeDelta, TimeZone, Utc};
 use datafusion::execution::config::SessionConfig;
 use datafusion::execution::context::SessionContext;
 use dill::Component;
-use domain::compact_service::{CompactError, CompactService, NullCompactionMultiListener};
+use domain::compact_service::{
+    CompactError,
+    CompactResult,
+    CompactService,
+    NullCompactionMultiListener,
+};
 use event_bus::EventBus;
 use futures::TryStreamExt;
 use indoc::{formatdoc, indoc};
@@ -100,7 +105,7 @@ async fn test_dataset_compact() {
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(()),
+        Ok(CompactResult::Finished),
     );
 
     data_helper
@@ -163,7 +168,7 @@ async fn test_dataset_compact() {
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(()),
+        Ok(CompactResult::Finished),
     );
 
     // 2 Dataslices will be merged in a one slice
@@ -232,7 +237,7 @@ async fn test_dataset_compact() {
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(()),
+        Ok(CompactResult::Finished),
     );
 
     // Due to limit we will left last added slice as it is
@@ -399,7 +404,7 @@ async fn test_large_dataset_compact() {
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(()),
+        Ok(CompactResult::Finished),
     );
 
     let new_blocks = harness
