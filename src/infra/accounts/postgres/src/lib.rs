@@ -10,6 +10,6 @@
 // Re-exports
 pub use kamu_accounts as domain;
 
-mod repositories;
+mod repos;
 
-pub use repositories::*;
+pub use repos::*;
