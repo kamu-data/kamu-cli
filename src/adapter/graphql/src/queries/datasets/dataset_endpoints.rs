@@ -52,10 +52,7 @@ impl<'a> DatasetEndpoints<'a> {
         let url = format!("{base_url}{}", self.dataset_handle.alias);
 
         let push_command = format!("kamu push {url}");
-        let pull_command = format!(
-            "kamu pull {url} --as {}",
-            self.dataset_handle.alias.dataset_name
-        );
+        let pull_command = format!("kamu pull {url}");
 
         Ok(CliProtocolDesc {
             pull_command,
