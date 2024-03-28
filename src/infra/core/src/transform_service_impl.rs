@@ -312,29 +312,15 @@ impl TransformServiceImpl {
     // TODO: Allow derivative datasets to function with inputs containing no data
     // This will require passing the schema explicitly instead of relying on a file
     async fn is_never_pulled(&self, dataset_ref: &DatasetRef) -> Result<bool, InternalError> {
-        type Flag = MetadataEventTypeFlags;
-        type Decision = MetadataVisitorDecision;
+        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
 
-        Ok(self
-            .dataset_repo
-            .get_dataset(dataset_ref)
+        Ok(dataset
+            .as_metadata_chain()
+            .last_data_block()
             .await
             .int_err()?
-            .as_metadata_chain()
-            .reduce(
-                None,
-                Decision::NextOfType(Flag::DATA_BLOCK),
-                |state, _, block| {
-                    let Some(data_block) = block.as_data_stream_block() else {
-                        unreachable!()
-                    };
-
-                    *state = data_block.event.last_offset();
-
-                    Ok::<_, InternalError>(Decision::Stop)
-                },
-            )
-            .await?
+            .into_event()
+            .map(|event| event.last_offset())
             .is_none())
     }
 
@@ -474,29 +460,13 @@ impl TransformServiceImpl {
         let schema_slice = if let Some(h) = data_slices.last() {
             h.clone()
         } else {
-            type Flag = MetadataEventTypeFlags;
-            type Decision = MetadataVisitorDecision;
-
             input_chain
-                // TODO: This will not work with schema evolution
-                .reduce(
-                    None,
-                    Decision::NextOfType(Flag::DATA_BLOCK),
-                    |state, _, block| {
-                        let Some(data_block) = block.as_data_stream_block() else {
-                            unreachable!()
-                        };
-
-                        let Some(new_data) = data_block.event.new_data else {
-                            return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
-                        };
-
-                        *state = Some(new_data.physical_hash.clone());
-
-                        Ok::<_, InternalError>(Decision::Stop)
-                    },
-                )
-                .await?
+                .last_data_block()
+                .await
+                .int_err()?
+                .into_event()
+                .and_then(|event| event.new_data)
+                .map(|new_data| new_data.physical_hash)
                 // Already checked that none of the inputs are empty
                 .unwrap()
         };
