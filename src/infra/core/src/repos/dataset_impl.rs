@@ -202,6 +202,112 @@ where
 
         Ok(increment)
     }
+
+    async fn prepare_objects(
+        &self,
+        offset_interval: Option<OffsetInterval>,
+        data: Option<&OwnedFile>,
+        checkpoint_ref: Option<&CheckpointRef>,
+    ) -> Result<(Option<DataSlice>, Option<Checkpoint>), InternalError> {
+        let data_slice = if let Some(offset_interval) = offset_interval {
+            let data = data.unwrap();
+            let path = data.as_path().to_path_buf();
+            let logical_hash = tokio::task::spawn_blocking(move || {
+                kamu_data_utils::data::hash::get_parquet_logical_hash(&path)
+            })
+            .await
+            .int_err()?
+            .int_err()?;
+
+            let path = data.as_path().to_path_buf();
+            let physical_hash = tokio::task::spawn_blocking(move || {
+                kamu_data_utils::data::hash::get_file_physical_hash(&path)
+            })
+            .await
+            .int_err()?
+            .int_err()?;
+
+            Some(DataSlice {
+                logical_hash,
+                physical_hash,
+                offset_interval,
+                size: std::fs::metadata(data.as_path()).int_err()?.len(),
+            })
+        } else {
+            assert!(data.is_none());
+            None
+        };
+
+        let checkpoint = if let Some(checkpoint_ref) = checkpoint_ref {
+            match checkpoint_ref {
+                CheckpointRef::Existed(hash) => {
+                    let size = self.as_checkpoint_repo().get_size(hash).await.int_err()?;
+                    Some(Checkpoint {
+                        physical_hash: hash.clone(),
+                        size,
+                    })
+                }
+                CheckpointRef::New(checkpoint_file) => {
+                    let path = checkpoint_file.as_path().to_path_buf();
+                    let physical_hash = tokio::task::spawn_blocking(move || {
+                        kamu_data_utils::data::hash::get_file_physical_hash(&path)
+                    })
+                    .await
+                    .int_err()?
+                    .int_err()?;
+
+                    Some(Checkpoint {
+                        physical_hash,
+                        size: std::fs::metadata(checkpoint_file.as_path())
+                            .int_err()?
+                            .len(),
+                    })
+                }
+            }
+        } else {
+            None
+        };
+
+        Ok((data_slice, checkpoint))
+    }
+
+    async fn commit_objects(
+        &self,
+        data_slice: Option<&DataSlice>,
+        data: Option<OwnedFile>,
+        checkpoint_meta: Option<&Checkpoint>,
+        checkpoint: Option<OwnedFile>,
+    ) -> Result<(), InternalError> {
+        if let Some(data_slice) = data_slice {
+            self.as_data_repo()
+                .insert_file_move(
+                    &data.unwrap().into_inner(),
+                    InsertOpts {
+                        precomputed_hash: Some(&data_slice.physical_hash),
+                        expected_hash: None,
+                        size_hint: Some(data_slice.size),
+                    },
+                )
+                .await
+                .int_err()?;
+        }
+
+        if let Some(checkpoint_meta) = checkpoint_meta {
+            self.as_checkpoint_repo()
+                .insert_file_move(
+                    &checkpoint.unwrap().into_inner(),
+                    InsertOpts {
+                        precomputed_hash: Some(&checkpoint_meta.physical_hash),
+                        expected_hash: None,
+                        size_hint: Some(checkpoint_meta.size),
+                    },
+                )
+                .await
+                .int_err()?;
+        }
+
+        Ok(())
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -264,99 +370,6 @@ where
     CheckpointRepo: ObjectRepository + Sync + Send,
     InfoRepo: NamedObjectRepository + Sync + Send,
 {
-    async fn prepare_objects(
-        &self,
-        offset_interval: Option<OffsetInterval>,
-        data: Option<&OwnedFile>,
-        checkpoint: Option<&OwnedFile>,
-    ) -> Result<(Option<DataSlice>, Option<Checkpoint>), InternalError> {
-        let data_slice = if let Some(offset_interval) = offset_interval {
-            let data = data.unwrap();
-            let path = data.as_path().to_path_buf();
-            let logical_hash = tokio::task::spawn_blocking(move || {
-                kamu_data_utils::data::hash::get_parquet_logical_hash(&path)
-            })
-            .await
-            .int_err()?
-            .int_err()?;
-
-            let path = data.as_path().to_path_buf();
-            let physical_hash = tokio::task::spawn_blocking(move || {
-                kamu_data_utils::data::hash::get_file_physical_hash(&path)
-            })
-            .await
-            .int_err()?
-            .int_err()?;
-
-            Some(DataSlice {
-                logical_hash,
-                physical_hash,
-                offset_interval,
-                size: std::fs::metadata(data.as_path()).int_err()?.len(),
-            })
-        } else {
-            assert!(data.is_none());
-            None
-        };
-
-        let checkpoint = if let Some(checkpoint) = checkpoint {
-            let path = checkpoint.as_path().to_path_buf();
-            let physical_hash = tokio::task::spawn_blocking(move || {
-                kamu_data_utils::data::hash::get_file_physical_hash(&path)
-            })
-            .await
-            .int_err()?
-            .int_err()?;
-
-            Some(Checkpoint {
-                physical_hash,
-                size: std::fs::metadata(checkpoint.as_path()).int_err()?.len(),
-            })
-        } else {
-            None
-        };
-
-        Ok((data_slice, checkpoint))
-    }
-
-    async fn commit_objects(
-        &self,
-        data_slice: Option<&DataSlice>,
-        data: Option<OwnedFile>,
-        checkpoint_meta: Option<&Checkpoint>,
-        checkpoint: Option<OwnedFile>,
-    ) -> Result<(), InternalError> {
-        if let Some(data_slice) = data_slice {
-            self.as_data_repo()
-                .insert_file_move(
-                    &data.unwrap().into_inner(),
-                    InsertOpts {
-                        precomputed_hash: Some(&data_slice.physical_hash),
-                        expected_hash: None,
-                        size_hint: Some(data_slice.size),
-                    },
-                )
-                .await
-                .int_err()?;
-        }
-
-        if let Some(checkpoint_meta) = checkpoint_meta {
-            self.as_checkpoint_repo()
-                .insert_file_move(
-                    &checkpoint.unwrap().into_inner(),
-                    InsertOpts {
-                        precomputed_hash: Some(&checkpoint_meta.physical_hash),
-                        expected_hash: None,
-                        size_hint: Some(checkpoint_meta.size),
-                    },
-                )
-                .await
-                .int_err()?;
-        }
-
-        Ok(())
-    }
-
     /// Helper function to append a generic event to metadata chain.
     ///
     /// Warning: Don't use when synchronizing blocks from another dataset.
@@ -485,14 +498,14 @@ where
         &self,
         params: AddDataParams,
         data_file: Option<OwnedFile>,
-        checkpoint_file: Option<OwnedFile>,
+        checkpoint_ref: Option<CheckpointRef>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError> {
         let (new_data, new_checkpoint) = self
             .prepare_objects(
                 params.new_offset_interval,
                 data_file.as_ref(),
-                checkpoint_file.as_ref(),
+                checkpoint_ref.as_ref(),
             )
             .await?;
 
@@ -500,7 +513,7 @@ where
             new_data.as_ref(),
             data_file,
             new_checkpoint.as_ref(),
-            checkpoint_file,
+            checkpoint_ref.and_then(std::convert::Into::into),
         )
         .await?;
 
@@ -531,18 +544,18 @@ where
         &self,
         execute_transform: ExecuteTransformParams,
         data: Option<OwnedFile>,
-        checkpoint: Option<OwnedFile>,
+        checkpoint_ref: Option<CheckpointRef>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError> {
         let event = self
-            .prepare_execute_transform(execute_transform, data.as_ref(), checkpoint.as_ref())
+            .prepare_execute_transform(execute_transform, data.as_ref(), checkpoint_ref.as_ref())
             .await?;
 
         self.commit_objects(
             event.new_data.as_ref(),
             data,
             event.new_checkpoint.as_ref(),
-            checkpoint,
+            checkpoint_ref.and_then(std::convert::Into::into),
         )
         .await?;
 
@@ -560,10 +573,10 @@ where
         &self,
         params: ExecuteTransformParams,
         data_file: Option<&OwnedFile>,
-        checkpoint: Option<&OwnedFile>,
+        checkpoint_ref: Option<&CheckpointRef>,
     ) -> Result<ExecuteTransform, InternalError> {
         let (new_data, new_checkpoint) = self
-            .prepare_objects(params.new_offset_interval, data_file, checkpoint)
+            .prepare_objects(params.new_offset_interval, data_file, checkpoint_ref)
             .await?;
 
         Ok(ExecuteTransform {

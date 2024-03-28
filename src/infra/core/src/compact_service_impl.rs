@@ -25,13 +25,14 @@ use futures::stream::TryStreamExt;
 use kamu_core::compact_service::CompactService;
 use kamu_core::*;
 use opendatafabric::{
-    AddData,
     Checkpoint,
     DatasetHandle,
     DatasetKind,
+    DatasetVocabulary,
     MetadataEvent,
     Multihash,
     OffsetInterval,
+    SetVocab,
     SourceState,
 };
 use random_names::get_random_name;
@@ -109,8 +110,8 @@ impl CompactServiceImpl {
         // Declare mut values for result
 
         let mut old_head: Option<Multihash> = None;
-        let mut offset_column: Option<String> = None;
         let mut current_hash: Option<Multihash> = None;
+        let mut vocab_event: Option<SetVocab> = None;
         let mut data_slice_batch_info: DataSliceBatchInfo = DataSliceBatchInfo::default();
         let mut data_slice_batches: Vec<DataSliceBatch> = vec![];
         let (mut batch_size, mut batch_records) = (0u64, 0u64);
@@ -191,9 +192,9 @@ impl CompactServiceImpl {
                     }
                 }
                 MetadataEvent::SetVocab(set_vocab_event) => {
-                    offset_column = set_vocab_event.offset_column;
+                    vocab_event = Some(set_vocab_event);
                 }
-                _ => continue,
+                _ => (),
             }
         }
 
@@ -206,10 +207,11 @@ impl CompactServiceImpl {
             ))),
             _ => (),
         };
+        let vocab: DatasetVocabulary = vocab_event.unwrap_or_default().into();
 
         Ok(ChainFilesInfo {
             data_slice_batches,
-            offset_column: offset_column.unwrap_or("offset".to_owned()),
+            offset_column: vocab.offset_column,
             old_head: old_head.unwrap(),
         })
     }
@@ -234,6 +236,8 @@ impl CompactServiceImpl {
                     )
                     .await
                     .int_err()?
+                    // TODO: PERF: Consider passing sort order hint to `read_parquet` to let DF now
+                    // that the data is already pre-sorted
                     .sort(vec![col(offset_column).sort(true, false)])
                     .int_err()?;
 
@@ -293,36 +297,34 @@ impl CompactServiceImpl {
                     current_head = commit_result.new_head;
                 }
                 DataSliceBatch::CompactedBatch(data_slice_batch_info) => {
-                    let add_data_file =
-                        OwnedFile::new(data_slice_batch_info.new_file_path.as_ref().unwrap());
                     let new_offset_interval = OffsetInterval {
                         start: data_slice_batch_info.lower_bound.start_offset,
                         end: data_slice_batch_info.upper_bound.end_offset,
                     };
 
-                    let (new_data, _) = dataset
-                        .prepare_objects(Some(new_offset_interval), Some(&add_data_file), None)
-                        .await?;
-
-                    dataset
-                        .commit_objects(new_data.as_ref(), Some(add_data_file), None, None)
-                        .await?;
-
-                    let metadata_event = AddData {
+                    let add_data_params = AddDataParams {
                         prev_checkpoint: data_slice_batch_info.lower_bound.prev_checkpoint.clone(),
                         prev_offset: data_slice_batch_info.lower_bound.prev_offset,
-                        new_data,
-                        new_checkpoint: data_slice_batch_info.upper_bound.new_checkpoint.clone(),
-                        new_watermark: None,
+                        new_offset_interval: Some(new_offset_interval),
                         new_source_state: data_slice_batch_info
                             .upper_bound
                             .new_source_state
                             .clone(),
+                        new_watermark: None,
                     };
+                    let new_checkpoint_ref = data_slice_batch_info
+                        .upper_bound
+                        .new_checkpoint
+                        .clone()
+                        .map(|r| CheckpointRef::Existed(r.physical_hash));
 
                     let commit_result = dataset
-                        .commit_event(
-                            metadata_event.into(),
+                        .commit_add_data(
+                            add_data_params,
+                            Some(OwnedFile::new(
+                                data_slice_batch_info.new_file_path.as_ref().unwrap(),
+                            )),
+                            new_checkpoint_ref,
                             CommitOpts {
                                 block_ref: &BlockRef::Head,
                                 system_time: Some(self.time_source.now()),
@@ -398,7 +400,6 @@ impl CompactService for CompactServiceImpl {
             .commit_new_blocks(dataset.clone(), &chain_files_info)
             .await?;
 
-        listener.begin_phase(CompactionPhase::CleanOldFiles);
         dataset
             .as_metadata_chain()
             .set_ref(

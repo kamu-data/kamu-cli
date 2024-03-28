@@ -171,7 +171,7 @@ impl TransformServiceImpl {
             .commit_execute_transform(
                 params,
                 response.new_data,
-                response.new_checkpoint,
+                response.new_checkpoint.map(CheckpointRef::New),
                 CommitOpts {
                     block_ref: &request.block_ref,
                     system_time: Some(request.system_time),
@@ -851,7 +851,11 @@ impl TransformService for TransformServiceImpl {
                         .prepare_execute_transform(
                             params,
                             response.new_data.as_ref(),
-                            response.new_checkpoint.as_ref(),
+                            response
+                                .new_checkpoint
+                                .as_ref()
+                                .map(|r| CheckpointRef::New(r.clone()))
+                                .as_ref(),
                         )
                         .await?;
 

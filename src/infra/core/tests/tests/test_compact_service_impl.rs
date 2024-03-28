@@ -305,7 +305,7 @@ async fn test_dataset_compact() {
     );
 }
 
-#[test_group::group(ingest, datafusion, compact)]
+// #[test_group::group(ingest, datafusion, compact)]
 #[tokio::test]
 async fn test_large_dataset_compact() {
     let harness = CompactTestHarness::new();

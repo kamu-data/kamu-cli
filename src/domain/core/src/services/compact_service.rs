@@ -145,5 +145,4 @@ pub enum CompactionPhase {
     GatherChainInfo,
     MergeDataslices,
     CommitNewBlocks,
-    CleanOldFiles,
 }

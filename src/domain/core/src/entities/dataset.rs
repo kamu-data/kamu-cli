@@ -36,7 +36,7 @@ pub trait Dataset: Send + Sync {
         &self,
         add_data: AddDataParams,
         data: Option<OwnedFile>,
-        checkpoint: Option<OwnedFile>,
+        checkpoint_ref: Option<CheckpointRef>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError>;
 
@@ -48,7 +48,7 @@ pub trait Dataset: Send + Sync {
         &self,
         execute_transform: ExecuteTransformParams,
         data: Option<OwnedFile>,
-        checkpoint: Option<OwnedFile>,
+        checkpoint_ref: Option<CheckpointRef>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError>;
 
@@ -58,27 +58,8 @@ pub trait Dataset: Send + Sync {
         &self,
         execute_transform: ExecuteTransformParams,
         data: Option<&OwnedFile>,
-        checkpoint: Option<&OwnedFile>,
+        checkpoint_ref: Option<&CheckpointRef>,
     ) -> Result<ExecuteTransform, InternalError>;
-
-    /// Helper function to prepare [AddData] event parameters
-    /// ([DataSlice] and [Checkpoint])
-    async fn prepare_objects(
-        &self,
-        offset_interval: Option<OffsetInterval>,
-        data: Option<&OwnedFile>,
-        checkpoint: Option<&OwnedFile>,
-    ) -> Result<(Option<DataSlice>, Option<Checkpoint>), InternalError>;
-
-    /// Helper function to commit [AddData] event parameters
-    /// ([DataSlice] and [Checkpoint])
-    async fn commit_objects(
-        &self,
-        data_slice: Option<&DataSlice>,
-        data: Option<OwnedFile>,
-        checkpoint_meta: Option<&Checkpoint>,
-        checkpoint: Option<OwnedFile>,
-    ) -> Result<(), InternalError>;
 
     fn as_metadata_chain(&self) -> &dyn MetadataChain;
     fn as_data_repo(&self) -> &dyn ObjectRepository;
@@ -238,4 +219,21 @@ pub struct ExecuteTransformParams {
     /// should either carry the same watermark or specify a new (greater) one.
     /// Thus, watermarks are monotonically non-decreasing.
     pub new_watermark: Option<DateTime<Utc>>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub enum CheckpointRef {
+    New(OwnedFile),
+    Existed(Multihash),
+}
+
+impl From<CheckpointRef> for Option<OwnedFile> {
+    fn from(val: CheckpointRef) -> Self {
+        match val {
+            CheckpointRef::Existed(_) => None,
+            CheckpointRef::New(owned_file) => Some(owned_file),
+        }
+    }
 }

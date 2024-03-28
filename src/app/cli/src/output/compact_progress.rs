@@ -110,7 +110,6 @@ impl CompactionListener for CompactionProgress {
             CompactionPhase::GatherChainInfo => "Gathering chain information",
             CompactionPhase::MergeDataslices => "Merging dataslices",
             CompactionPhase::CommitNewBlocks => "Commiting new blocks",
-            CompactionPhase::CleanOldFiles => "Cleaning old dataset files",
         };
         self.curr_progress.set_message(message);
     }
