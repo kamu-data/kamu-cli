@@ -14,9 +14,12 @@ use internal_error::InternalError;
 use opendatafabric::{
     AsTypedBlock,
     ExecuteTransform,
+    IntoDataStreamBlock,
     MetadataBlock,
+    MetadataBlockDataStream,
     MetadataBlockTyped,
     MetadataEvent,
+    MetadataEventDataStream,
     MetadataEventTypeFlags as Flag,
     Multihash,
     Seed,
@@ -116,6 +119,63 @@ where
         }
 
         self.hashed_block = Some((hash.clone(), block.clone().into_typed().unwrap()));
+
+        Ok(Decision::Stop)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct SearchSingleDataBlockVisitor<E> {
+    hashed_block: Option<(Multihash, MetadataBlockDataStream)>,
+    _phantom: PhantomData<E>,
+}
+
+impl<E> SearchSingleDataBlockVisitor<E>
+where
+    E: Error + Send + Sync,
+{
+    pub fn new() -> Self {
+        Self {
+            hashed_block: None,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn into_hashed_block(self) -> Option<(Multihash, MetadataBlockDataStream)> {
+        self.hashed_block
+    }
+
+    pub fn into_block(self) -> Option<MetadataBlockDataStream> {
+        self.hashed_block.map(|(_, block)| block)
+    }
+
+    pub fn into_event(self) -> Option<MetadataEventDataStream> {
+        self.hashed_block.map(|(_, block)| block.event)
+    }
+}
+
+impl<E> MetadataChainVisitor for SearchSingleDataBlockVisitor<E>
+where
+    E: Error + Send + Sync,
+{
+    type Error = E;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::NextOfType(Flag::DATA_BLOCK)
+    }
+
+    fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        let flag = Flag::from(&block.event);
+
+        if !Flag::DATA_BLOCK.contains(flag) {
+            return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
+        }
+
+        self.hashed_block = Some((
+            hash.clone(),
+            block.clone().into_data_stream_block().unwrap(),
+        ));
 
         Ok(Decision::Stop)
     }

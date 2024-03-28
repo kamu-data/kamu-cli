@@ -290,6 +290,12 @@ pub trait MetadataChainExt: MetadataChain {
 
         Ok(visitor.into_state())
     }
+
+    async fn last_data_block(
+        &self,
+    ) -> Result<SearchSingleDataBlockVisitor<IterBlocksError>, IterBlocksError> {
+        self.accept_one(SearchSingleDataBlockVisitor::new()).await
+    }
 }
 
 impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
