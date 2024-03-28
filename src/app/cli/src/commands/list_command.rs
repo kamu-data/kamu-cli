@@ -258,46 +258,25 @@ impl Command for ListCommand {
             size.push(summary.data_size);
 
             if self.detail_level > 0 {
-                type Flag = MetadataEventTypeFlags;
-                type Decision = MetadataVisitorDecision;
-
-                struct State {
-                    num_blocks: u64,
-                    last_watermark: Option<i64>,
-                }
-
-                let state = dataset
+                let num_blocks = dataset
                     .as_metadata_chain()
-                    .reduce(
-                        State {
-                            num_blocks: 0,
-                            last_watermark: None,
-                        },
-                        Decision::Next,
-                        |state, _, block| {
-                            if state.num_blocks == 0 {
-                                // TODO: Should be precomputed
-                                state.num_blocks = block.sequence_number + 1;
-                            }
-
-                            let Some(data_block) = block.as_data_stream_block() else {
-                                return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
-                            };
-
-                            state.last_watermark = data_block
-                                .event
-                                .new_watermark
-                                .map(DateTime::timestamp_micros);
-
-                            Ok::<Decision, InternalError>(Decision::Stop)
-                        },
-                    )
-                    .await?;
+                    .get_block(&current_head)
+                    .await
+                    .int_err()?
+                    .sequence_number
+                    + 1;
+                let last_watermark = dataset
+                    .as_metadata_chain()
+                    .last_data_block()
+                    .await
+                    .int_err()?
+                    .into_event()
+                    .and_then(|event| event.new_watermark.map(|t| t.timestamp_micros()));
 
                 id.push(hdl.id.as_did_str().to_string());
                 head.push(current_head.as_multibase().to_string());
-                blocks.push(state.num_blocks);
-                watermark.push(state.last_watermark);
+                blocks.push(num_blocks);
+                watermark.push(last_watermark);
             }
         }
 

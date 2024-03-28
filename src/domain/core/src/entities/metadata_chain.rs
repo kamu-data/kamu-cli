@@ -230,6 +230,10 @@ pub trait MetadataChainExt: MetadataChain {
             current_hash = block.prev_block_hash;
         }
 
+        for visitor in visitors {
+            visitor.finish()?;
+        }
+
         Ok(())
     }
 
@@ -245,50 +249,128 @@ pub trait MetadataChainExt: MetadataChain {
         Ok(visitor)
     }
 
-    /// An auxiliary method that simplifies the work if only one custom Visitor
-    /// is used.
-    async fn reduce<S, F, E>(
+    /// Same as [Self::accept_one()], allowing us to define the block
+    /// (by block hash) from which we will start the traverse
+    async fn accept_one_by_hash<V, E>(&self, head_hash: &Multihash, mut visitor: V) -> Result<V, E>
+    where
+        V: MetadataChainVisitor<Error = E>,
+        E: Error + From<IterBlocksError>,
+    {
+        self.accept_by_interval(&mut [&mut visitor], Some(head_hash), None)
+            .await?;
+
+        Ok(visitor)
+    }
+
+    /// Method that allows you to apply the reduce operation over a chain
+    ///
+    /// Note: there is also a method [Self::try_reduce()] that allows you to
+    /// apply a fallible callback
+    async fn reduce<S, F>(
         &self,
         state: S,
         initial_decision: MetadataVisitorDecision,
         callback: F,
-    ) -> Result<S, E>
+    ) -> Result<S, IterBlocksError>
     where
         S: Send + Sync,
-        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E>
-            + Send
-            + Sync,
-        E: Error + From<IterBlocksError> + Send + Sync,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> MetadataVisitorDecision + Send + Sync,
     {
-        let head_hash = self
-            .resolve_ref(&BlockRef::Head)
-            .await
-            .map_err(Into::into)?;
+        let head_hash = self.resolve_ref(&BlockRef::Head).await?;
 
         Ok(self
             .reduce_by_hash(&head_hash, state, initial_decision, callback)
             .await?)
     }
 
-    async fn reduce_by_hash<S, F, E>(
+    /// Same as [Self::reduce()], allowing us to define the block (by hash)
+    /// from which we will start the traverse
+    async fn reduce_by_hash<S, F>(
         &self,
         head_hash: &Multihash,
         state: S,
         initial_decision: MetadataVisitorDecision,
         callback: F,
-    ) -> Result<S, E>
+    ) -> Result<S, IterBlocksError>
     where
         S: Send + Sync,
-        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E>
-            + Send
-            + Sync,
-        E: Error + From<IterBlocksError> + Send + Sync,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> MetadataVisitorDecision + Send + Sync,
     {
-        let mut visitor = GenericCallbackVisitor::new(state, initial_decision, callback);
+        let mut visitor =
+            GenericCallbackVisitor::<S, F, IterBlocksError>::new(state, initial_decision, callback);
 
         self.accept_by_hash(&mut [&mut visitor], head_hash).await?;
 
         Ok(visitor.into_state())
+    }
+
+    /// Method that allows you to apply the reduce operation over a chain
+    ///
+    /// Note: there is also a method [Self::reduce()] that allows you to
+    /// apply an infallible callback
+    async fn try_reduce<S, F>(
+        &self,
+        state: S,
+        initial_decision: MetadataVisitorDecision,
+        callback: F,
+    ) -> Result<S, IterBlocksError>
+    where
+        S: Send + Sync,
+        F: Fn(
+                &mut S,
+                &Multihash,
+                &MetadataBlock,
+            ) -> Result<MetadataVisitorDecision, IterBlocksError>
+            + Send
+            + Sync,
+    {
+        let head_hash = self.resolve_ref(&BlockRef::Head).await?;
+
+        Ok(self
+            .try_reduce_by_hash(&head_hash, state, initial_decision, callback)
+            .await?)
+    }
+
+    /// Same as [Self::try_reduce()], allowing us to define the block (by hash)
+    /// from which we will start the traverse
+    async fn try_reduce_by_hash<S, F>(
+        &self,
+        head_hash: &Multihash,
+        state: S,
+        initial_decision: MetadataVisitorDecision,
+        callback: F,
+    ) -> Result<S, IterBlocksError>
+    where
+        S: Send + Sync,
+        F: Fn(
+                &mut S,
+                &Multihash,
+                &MetadataBlock,
+            ) -> Result<MetadataVisitorDecision, IterBlocksError>
+            + Send
+            + Sync,
+    {
+        let mut visitor = GenericFallibleCallbackVisitor::new(state, initial_decision, callback);
+
+        self.accept_by_hash(&mut [&mut visitor], head_hash).await?;
+
+        Ok(visitor.into_state())
+    }
+
+    /// Method that searches for the last data block
+    async fn last_data_block(
+        &self,
+    ) -> Result<SearchSingleDataBlockVisitor<IterBlocksError>, IterBlocksError> {
+        self.accept_one(SearchSingleDataBlockVisitor::next()).await
+    }
+
+    /// Same as [Self::last_data_block()], but skipping date blocks that have no
+    /// real data
+    async fn last_data_block_with_new_data(
+        &self,
+    ) -> Result<SearchSingleDataBlockVisitor<IterBlocksError>, IterBlocksError> {
+        self.accept_one(SearchSingleDataBlockVisitor::next_with_new_data())
+            .await
     }
 }
 

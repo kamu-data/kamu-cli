@@ -11,13 +11,11 @@ use chrono::prelude::*;
 use kamu_core::{
     self as domain,
     MetadataChainExt,
-    MetadataVisitorDecision,
     SearchSetAttachmentsVisitor,
     SearchSetInfoVisitor,
     SearchSetLicenseVisitor,
     SearchSetVocabVisitor,
 };
-use odf::IntoDataStreamBlock;
 use opendatafabric as odf;
 
 use crate::prelude::*;
@@ -51,27 +49,15 @@ impl DatasetMetadata {
 
     /// Last recorded watermark
     async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
-        type Flag = odf::MetadataEventTypeFlags;
-        type Decision = MetadataVisitorDecision;
+        let dataset = self.get_dataset(ctx).await?;
 
-        Ok(self
-            .get_dataset(ctx)
-            .await?
+        Ok(dataset
             .as_metadata_chain()
-            .reduce(
-                None,
-                Decision::NextOfType(Flag::DATA_BLOCK),
-                |state, _, block| {
-                    let Some(data_block) = block.as_data_stream_block() else {
-                        unreachable!()
-                    };
-
-                    *state = data_block.event.new_watermark.copied();
-
-                    Ok::<_, InternalError>(Decision::Stop)
-                },
-            )
-            .await?)
+            .last_data_block()
+            .await
+            .int_err()?
+            .into_block()
+            .and_then(|b| b.event.new_watermark))
     }
 
     /// Latest data schema
@@ -201,11 +187,11 @@ impl DatasetMetadata {
 
     /// Current descriptive information about the dataset
     async fn current_info(&self, ctx: &Context<'_>) -> Result<SetInfo> {
-        Ok(self
-            .get_dataset(ctx)
-            .await?
+        let dataset = self.get_dataset(ctx).await?;
+
+        Ok(dataset
             .as_metadata_chain()
-            .accept_one(<SearchSetInfoVisitor>::default())
+            .accept_one(<SearchSetInfoVisitor>::create())
             .await?
             .into_event()
             .map_or(
@@ -220,11 +206,11 @@ impl DatasetMetadata {
     /// Current readme file as discovered from attachments associated with the
     /// dataset
     async fn current_readme(&self, ctx: &Context<'_>) -> Result<Option<String>> {
-        Ok(self
-            .get_dataset(ctx)
-            .await?
+        let dataset = self.get_dataset(ctx).await?;
+
+        Ok(dataset
             .as_metadata_chain()
-            .accept_one(<SearchSetAttachmentsVisitor>::default())
+            .accept_one(<SearchSetAttachmentsVisitor>::create())
             .await?
             .into_event()
             .and_then(|e| {
@@ -240,11 +226,11 @@ impl DatasetMetadata {
 
     /// Current license associated with the dataset
     async fn current_license(&self, ctx: &Context<'_>) -> Result<Option<SetLicense>> {
-        Ok(self
-            .get_dataset(ctx)
-            .await?
+        let dataset = self.get_dataset(ctx).await?;
+
+        Ok(dataset
             .as_metadata_chain()
-            .accept_one(<SearchSetLicenseVisitor>::default())
+            .accept_one(<SearchSetLicenseVisitor>::create())
             .await?
             .into_event()
             .map(Into::into))
@@ -252,11 +238,11 @@ impl DatasetMetadata {
 
     /// Current vocabulary associated with the dataset
     async fn current_vocab(&self, ctx: &Context<'_>) -> Result<Option<SetVocab>> {
-        Ok(self
-            .get_dataset(ctx)
-            .await?
+        let dataset = self.get_dataset(ctx).await?;
+
+        Ok(dataset
             .as_metadata_chain()
-            .accept_one(<SearchSetVocabVisitor>::default())
+            .accept_one(<SearchSetVocabVisitor>::create())
             .await?
             .into_event()
             .map(Into::into))

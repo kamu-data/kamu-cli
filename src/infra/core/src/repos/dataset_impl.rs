@@ -133,80 +133,74 @@ where
         current_head: &Multihash,
         last_seen: Option<&Multihash>,
     ) -> Result<UpdateSummaryIncrement, GetSummaryError> {
-        type Flag = MetadataEventTypeFlags;
-        type Decision = MetadataVisitorDecision;
+        use tokio_stream::StreamExt;
 
-        struct VisitorState {
-            requested_flags: Flag,
-            increment: UpdateSummaryIncrement,
-        }
+        let mut block_stream =
+            self.metadata_chain
+                .iter_blocks_interval(current_head, last_seen, true);
+        let mut increment = UpdateSummaryIncrement {
+            seen_head: Some(current_head.clone()),
+            ..Default::default()
+        };
 
-        const INITIAL_REQUESTED_FLAGS: Flag = Flag::SEED
-            .union(Flag::SET_TRANSFORM)
-            .union(Flag::DATA_BLOCK);
+        while let Some((_, block)) = block_stream.try_next().await.int_err()? {
+            match block.event {
+                MetadataEvent::Seed(seed) => {
+                    increment.seen_id.get_or_insert(seed.dataset_id);
+                    increment.seen_kind.get_or_insert(seed.dataset_kind);
+                }
+                MetadataEvent::SetTransform(set_transform) => {
+                    if increment.seen_dependencies.is_none() {
+                        increment.seen_dependencies = Some(
+                            set_transform
+                                .inputs
+                                .into_iter()
+                                .map(|i| i.dataset_ref.id().cloned().unwrap())
+                                .collect(),
+                        );
+                    }
+                }
+                MetadataEvent::AddData(add_data) => {
+                    increment.seen_last_pulled.get_or_insert(block.system_time);
 
-        let state = self
-            .metadata_chain
-            .reduce_by_hash(
-                current_head,
-                VisitorState {
-                    requested_flags: INITIAL_REQUESTED_FLAGS,
-                    increment: UpdateSummaryIncrement {
-                        seen_head: Some(current_head.clone()),
-                        ..Default::default()
-                    },
-                },
-                Decision::NextOfType(INITIAL_REQUESTED_FLAGS),
-                |state, hash, block| {
-                    if Some(hash) == last_seen {
-                        return Ok::<Decision, InternalError>(Decision::Stop);
+                    if let Some(output_data) = add_data.new_data {
+                        let iv = output_data.offset_interval;
+                        increment.seen_num_records += iv.end - iv.start + 1;
+
+                        increment.seen_data_size += output_data.size;
                     }
 
-                    match &block.event {
-                        MetadataEvent::Seed(e) => {
-                            state.increment.seen_id = Some(e.dataset_id.clone());
-                            state.increment.seen_kind = Some(e.dataset_kind);
+                    if let Some(checkpoint) = add_data.new_checkpoint {
+                        increment.seen_checkpoints_size += checkpoint.size;
+                    }
+                }
+                MetadataEvent::ExecuteTransform(execute_transform) => {
+                    increment.seen_last_pulled.get_or_insert(block.system_time);
 
-                            state.requested_flags -= Flag::SEED;
-                        }
-                        MetadataEvent::SetTransform(e) => {
-                            state.increment.seen_dependencies = Some(
-                                e.inputs
-                                    .iter()
-                                    .map(|i| i.dataset_ref.id().cloned().unwrap())
-                                    .collect(),
-                            );
+                    if let Some(output_data) = execute_transform.new_data {
+                        let iv = output_data.offset_interval;
+                        increment.seen_num_records += iv.end - iv.start + 1;
 
-                            state.requested_flags -= Flag::SET_TRANSFORM;
-                        }
-                        MetadataEvent::AddData(_) | MetadataEvent::ExecuteTransform(_) => {
-                            let Some(data_block) = block.as_data_stream_block() else {
-                                unreachable!()
-                            };
+                        increment.seen_data_size += output_data.size;
+                    }
 
-                            state
-                                .increment
-                                .seen_last_pulled
-                                .get_or_insert(block.system_time);
+                    if let Some(checkpoint) = execute_transform.new_checkpoint {
+                        increment.seen_checkpoints_size += checkpoint.size;
+                    }
+                }
+                MetadataEvent::SetDataSchema(_)
+                | MetadataEvent::SetAttachments(_)
+                | MetadataEvent::SetInfo(_)
+                | MetadataEvent::SetLicense(_)
+                | MetadataEvent::SetVocab(_)
+                | MetadataEvent::SetPollingSource(_)
+                | MetadataEvent::DisablePollingSource(_)
+                | MetadataEvent::AddPushSource(_)
+                | MetadataEvent::DisablePushSource(_) => (),
+            }
+        }
 
-                            if let Some(output_data) = data_block.event.new_data {
-                                state.increment.seen_num_records += output_data.num_records();
-                                state.increment.seen_data_size += output_data.size;
-                            }
-
-                            if let Some(checkpoint) = data_block.event.new_checkpoint {
-                                state.increment.seen_checkpoints_size += checkpoint.size;
-                            }
-                        }
-                        _ => {}
-                    };
-
-                    Ok(Decision::NextOfType(state.requested_flags))
-                },
-            )
-            .await?;
-
-        Ok(state.increment)
+        Ok(increment)
     }
 
     async fn prepare_objects(

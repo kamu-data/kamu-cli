@@ -589,60 +589,6 @@ impl<'a> ValidateAddDataVisitor<'a> {
             next_block_flags: Flag::SET_DATA_SCHEMA | Flag::ADD_DATA,
         })
     }
-
-    pub fn post_check(self) -> Result<(), AppendError> {
-        let ValidateAddDataVisitor {
-            appended_add_data,
-            prev_schema,
-            prev_add_data,
-            ..
-        } = self;
-        let Some(e) = appended_add_data else {
-            return Ok(());
-        };
-
-        // Validate schema was defined before adding any data
-        if prev_schema.is_none() && e.new_data.is_some() {
-            invalid_event!(
-                e.clone(),
-                "SetDataSchema event must be present before adding data",
-            );
-        }
-
-        let expected_prev_checkpoint = prev_add_data
-            .as_ref()
-            .and_then(|v| v.new_checkpoint.as_ref())
-            .map(|c| &c.physical_hash);
-        let prev_watermark = prev_add_data
-            .as_ref()
-            .and_then(|v| v.new_watermark.as_ref());
-        let prev_source_state = prev_add_data
-            .as_ref()
-            .and_then(|v| v.new_source_state.as_ref());
-
-        // Validate input/output checkpoint sequencing
-        if e.prev_checkpoint.as_ref() != expected_prev_checkpoint {
-            invalid_event!(
-                e.clone(),
-                "Input checkpoint does not correspond to the last checkpoint in the chain",
-            );
-        }
-
-        // Validate event advances some state
-        if e.new_data.is_none()
-            && e.new_checkpoint.as_ref().map(|v| &v.physical_hash) == e.prev_checkpoint.as_ref()
-            && e.new_watermark.as_ref() == prev_watermark
-            && e.new_source_state.as_ref() == prev_source_state
-        {
-            return Err(AppendValidationError::no_op_event(
-                e.clone(),
-                "Event neither has data nor it advances checkpoint, watermark, or source state",
-            )
-            .into());
-        }
-
-        Ok(())
-    }
 }
 
 impl<'a> MetadataChainVisitor for ValidateAddDataVisitor<'a> {
@@ -671,6 +617,60 @@ impl<'a> MetadataChainVisitor for ValidateAddDataVisitor<'a> {
 
         Ok(Decision::NextOfType(self.next_block_flags))
     }
+
+    fn finish(&self) -> Result<(), Self::Error> {
+        let ValidateAddDataVisitor {
+            appended_add_data,
+            prev_schema,
+            prev_add_data,
+            ..
+        } = self;
+        let Some(e) = appended_add_data else {
+            return Ok(());
+        };
+
+        // Validate schema was defined before adding any data
+        if prev_schema.is_none() && e.new_data.is_some() {
+            invalid_event!(
+                (*e).clone(),
+                "SetDataSchema event must be present before adding data",
+            );
+        }
+
+        let expected_prev_checkpoint = prev_add_data
+            .as_ref()
+            .and_then(|v| v.new_checkpoint.as_ref())
+            .map(|c| &c.physical_hash);
+        let prev_watermark = prev_add_data
+            .as_ref()
+            .and_then(|v| v.new_watermark.as_ref());
+        let prev_source_state = prev_add_data
+            .as_ref()
+            .and_then(|v| v.new_source_state.as_ref());
+
+        // Validate input/output checkpoint sequencing
+        if e.prev_checkpoint.as_ref() != expected_prev_checkpoint {
+            invalid_event!(
+                (*e).clone(),
+                "Input checkpoint does not correspond to the last checkpoint in the chain",
+            );
+        }
+
+        // Validate event advances some state
+        if e.new_data.is_none()
+            && e.new_checkpoint.as_ref().map(|v| &v.physical_hash) == e.prev_checkpoint.as_ref()
+            && e.new_watermark.as_ref() == prev_watermark
+            && e.new_source_state.as_ref() == prev_source_state
+        {
+            return Err(AppendValidationError::no_op_event(
+                (*e).clone(),
+                "Event neither has data nor it advances checkpoint, watermark, or source state",
+            )
+            .into());
+        }
+
+        Ok(())
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -697,122 +697,6 @@ impl<'a> ValidateExecuteTransformVisitor<'a> {
             prev_query: None,
             next_block_flags: Flag::SET_DATA_SCHEMA | Flag::SET_TRANSFORM | Flag::EXECUTE_TRANSFORM,
         })
-    }
-
-    pub fn post_check(self) -> Result<(), AppendError> {
-        let ValidateExecuteTransformVisitor {
-            appended_execute_transform,
-            prev_transform,
-            prev_schema,
-            prev_query,
-            ..
-        } = self;
-        let Some(e) = appended_execute_transform else {
-            return Ok(());
-        };
-
-        // Validate schema was defined if we're adding data
-        if prev_schema.is_none() && e.new_data.is_some() {
-            invalid_event!(
-                e.clone(),
-                "SetDataSchema event must be present before adding data",
-            );
-        }
-
-        // Validate inputs are listed in the same exact order as in SetTransform (or
-        // through recursion, in previous ExecuteTransform)
-        let actual_inputs = e.query_inputs.iter().map(|i| &i.dataset_id);
-        if let Some(prev_transform) = &prev_transform {
-            if actual_inputs.ne(prev_transform
-                .inputs
-                .iter()
-                .map(|i| i.dataset_ref.id().unwrap()))
-            {
-                invalid_event!(
-                    e.clone(),
-                    "Inputs must be listed in same order as initially declared in SetTransform \
-                     event",
-                );
-            }
-        } else if let Some(prev_query) = &prev_query {
-            if actual_inputs.ne(prev_query.query_inputs.iter().map(|i| &i.dataset_id)) {
-                invalid_event!(
-                    e.clone(),
-                    "Inputs must be listed in same order as initially declared in SetTransform \
-                     event",
-                );
-            }
-        } else {
-            invalid_event!(
-                e.clone(),
-                "ExecuteTransform must be preceded by SetTransform event",
-            );
-        }
-
-        // Validate input offset and block sequencing
-        if let Some(prev_query) = &prev_query {
-            for (prev, new) in prev_query.query_inputs.iter().zip(&e.query_inputs) {
-                if new.new_block_hash.is_some() && new.new_block_hash == new.prev_block_hash {
-                    invalid_event!(e.clone(), "Invalid input block interval");
-                }
-
-                if new.new_offset.is_some() && new.new_offset == new.prev_offset {
-                    invalid_event!(e.clone(), "Invalid input offset interval");
-                }
-
-                if new.prev_block_hash.as_ref() != prev.last_block_hash() {
-                    invalid_event!(
-                        e.clone(),
-                        "Input prevBlockHash does not correspond to the last block included in \
-                         the previous query",
-                    );
-                }
-
-                if new.prev_offset != prev.last_offset() {
-                    invalid_event!(
-                        e.clone(),
-                        "Input prevOffset hash does not correspond to the last offset included in \
-                         the previous query",
-                    );
-                }
-
-                if new.new_offset.is_some() && new.new_block_hash.is_none() {
-                    invalid_event!(
-                        e.clone(),
-                        "Input specifies a non-empty offset interval, but its block interval is \
-                         empty",
-                    );
-                }
-            }
-        }
-
-        let expected_prev_checkpoint = prev_query
-            .as_ref()
-            .and_then(|v| v.new_checkpoint.as_ref())
-            .map(|c| &c.physical_hash);
-        let prev_watermark = prev_query.as_ref().and_then(|v| v.new_watermark.as_ref());
-
-        // Validate input/output checkpoint sequencing
-        if e.prev_checkpoint.as_ref() != expected_prev_checkpoint {
-            invalid_event!(
-                e.clone(),
-                "Input checkpoint does not correspond to the last checkpoint in the chain",
-            );
-        }
-
-        // Validate event advances some state
-        if e.new_data.is_none()
-            && e.new_checkpoint.as_ref().map(|v| &v.physical_hash) == e.prev_checkpoint.as_ref()
-            && e.new_watermark.as_ref() == prev_watermark
-        {
-            return Err(AppendValidationError::no_op_event(
-                e.clone(),
-                "Event neither has data nor it advances checkpoint or watermark",
-            )
-            .into());
-        }
-
-        Ok(())
     }
 }
 
@@ -850,6 +734,122 @@ impl<'a> MetadataChainVisitor for ValidateExecuteTransformVisitor<'a> {
         }
 
         Ok(Decision::NextOfType(self.next_block_flags))
+    }
+
+    fn finish(&self) -> Result<(), Self::Error> {
+        let ValidateExecuteTransformVisitor {
+            appended_execute_transform,
+            prev_transform,
+            prev_schema,
+            prev_query,
+            ..
+        } = self;
+        let Some(e) = appended_execute_transform else {
+            return Ok(());
+        };
+
+        // Validate schema was defined if we're adding data
+        if prev_schema.is_none() && e.new_data.is_some() {
+            invalid_event!(
+                (*e).clone(),
+                "SetDataSchema event must be present before adding data",
+            );
+        }
+
+        // Validate inputs are listed in the same exact order as in SetTransform (or
+        // through recursion, in previous ExecuteTransform)
+        let actual_inputs = e.query_inputs.iter().map(|i| &i.dataset_id);
+        if let Some(prev_transform) = &prev_transform {
+            if actual_inputs.ne(prev_transform
+                .inputs
+                .iter()
+                .map(|i| i.dataset_ref.id().unwrap()))
+            {
+                invalid_event!(
+                    (*e).clone(),
+                    "Inputs must be listed in same order as initially declared in SetTransform \
+                     event",
+                );
+            }
+        } else if let Some(prev_query) = &prev_query {
+            if actual_inputs.ne(prev_query.query_inputs.iter().map(|i| &i.dataset_id)) {
+                invalid_event!(
+                    (*e).clone(),
+                    "Inputs must be listed in same order as initially declared in SetTransform \
+                     event",
+                );
+            }
+        } else {
+            invalid_event!(
+                (*e).clone(),
+                "ExecuteTransform must be preceded by SetTransform event",
+            );
+        }
+
+        // Validate input offset and block sequencing
+        if let Some(prev_query) = &prev_query {
+            for (prev, new) in prev_query.query_inputs.iter().zip(&e.query_inputs) {
+                if new.new_block_hash.is_some() && new.new_block_hash == new.prev_block_hash {
+                    invalid_event!((*e).clone(), "Invalid input block interval");
+                }
+
+                if new.new_offset.is_some() && new.new_offset == new.prev_offset {
+                    invalid_event!((*e).clone(), "Invalid input offset interval");
+                }
+
+                if new.prev_block_hash.as_ref() != prev.last_block_hash() {
+                    invalid_event!(
+                        (*e).clone(),
+                        "Input prevBlockHash does not correspond to the last block included in \
+                         the previous query",
+                    );
+                }
+
+                if new.prev_offset != prev.last_offset() {
+                    invalid_event!(
+                        (*e).clone(),
+                        "Input prevOffset hash does not correspond to the last offset included in \
+                         the previous query",
+                    );
+                }
+
+                if new.new_offset.is_some() && new.new_block_hash.is_none() {
+                    invalid_event!(
+                        (*e).clone(),
+                        "Input specifies a non-empty offset interval, but its block interval is \
+                         empty",
+                    );
+                }
+            }
+        }
+
+        let expected_prev_checkpoint = prev_query
+            .as_ref()
+            .and_then(|v| v.new_checkpoint.as_ref())
+            .map(|c| &c.physical_hash);
+        let prev_watermark = prev_query.as_ref().and_then(|v| v.new_watermark.as_ref());
+
+        // Validate input/output checkpoint sequencing
+        if e.prev_checkpoint.as_ref() != expected_prev_checkpoint {
+            invalid_event!(
+                (*e).clone(),
+                "Input checkpoint does not correspond to the last checkpoint in the chain",
+            );
+        }
+
+        // Validate event advances some state
+        if e.new_data.is_none()
+            && e.new_checkpoint.as_ref().map(|v| &v.physical_hash) == e.prev_checkpoint.as_ref()
+            && e.new_watermark.as_ref() == prev_watermark
+        {
+            return Err(AppendValidationError::no_op_event(
+                (*e).clone(),
+                "Event neither has data nor it advances checkpoint or watermark",
+            )
+            .into());
+        }
+
+        Ok(())
     }
 }
 

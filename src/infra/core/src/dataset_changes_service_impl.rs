@@ -9,8 +9,9 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use dill::*;
+use futures::TryStreamExt;
+use internal_error::ResultIntoInternal;
 use kamu_core::{
     BlockRef,
     Dataset,
@@ -22,16 +23,9 @@ use kamu_core::{
     GetRefError,
     InternalError,
     MetadataChainExt,
-    MetadataVisitorDecision,
+    SearchSingleDataBlockVisitor,
 };
-use opendatafabric::{
-    DataSlice,
-    DatasetID,
-    IntoDataStreamBlock,
-    MetadataEvent,
-    MetadataEventTypeFlags,
-    Multihash,
-};
+use opendatafabric::{DataSlice, DatasetID, MetadataEvent, Multihash};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -84,84 +78,66 @@ impl DatasetChangesServiceImpl {
         old_head: Option<&Multihash>,
         new_head: &Multihash,
     ) -> Result<DatasetIntervalIncrement, InternalError> {
-        type Flag = MetadataEventTypeFlags;
-        type Decision = MetadataVisitorDecision;
+        // Analysis outputs
+        let mut num_blocks = 0;
+        let mut num_records = 0;
+        let mut updated_watermark = None;
 
-        #[derive(Default)]
-        struct DataBlockAnalysisVisitorState {
-            // Analysis outputs
-            num_blocks: u64,
-            num_records: u64,
-            updated_watermark: Option<DateTime<Utc>>,
-            // The watermark seen nearest to new head
-            latest_watermark: Option<DateTime<Utc>>,
+        // The watermark seen nearest to new head
+        let mut latest_watermark = None;
+
+        // Scan blocks (from new head to old head)
+        let mut block_stream = dataset
+            .as_metadata_chain()
+            .iter_blocks_interval(new_head, old_head, false);
+
+        while let Some((_, block)) = block_stream.try_next().await.int_err()? {
+            // Each block counts
+            num_blocks += 1;
+
+            // Count added records in data blocks
+            num_records += match &block.event {
+                MetadataEvent::AddData(add_data) => add_data
+                    .new_data
+                    .as_ref()
+                    .map(DataSlice::num_records)
+                    .unwrap_or_default(),
+                MetadataEvent::ExecuteTransform(execute_transform) => execute_transform
+                    .new_data
+                    .as_ref()
+                    .map(DataSlice::num_records)
+                    .unwrap_or_default(),
+                _ => 0,
+            };
+
+            // If we haven't decided on the updated watermark yet, analyze watermarks
+            if updated_watermark.is_none() {
+                // Extract watermark of this block, if present
+                let block_watermark = match &block.event {
+                    MetadataEvent::AddData(add_data) => add_data.new_watermark,
+                    MetadataEvent::ExecuteTransform(execute_transform) => {
+                        execute_transform.new_watermark
+                    }
+                    _ => None,
+                };
+                if let Some(block_watermark) = block_watermark {
+                    // Did we have a watermark already since the start of scanning?
+                    if let Some(latest_watermark_ref) = latest_watermark.as_ref() {
+                        // Yes, so if we see a different watermark now, it means it was
+                        // updated in this pull result
+                        if block_watermark != *latest_watermark_ref {
+                            updated_watermark = Some(*latest_watermark_ref);
+                        }
+                    } else {
+                        // No, so remember the latest watermark
+                        latest_watermark = Some(block_watermark);
+                    }
+                }
+            }
         }
 
-        let state = dataset
-            .as_metadata_chain()
-            .reduce_by_hash(
-                new_head,
-                DataBlockAnalysisVisitorState::default(),
-                MetadataVisitorDecision::Next,
-                |state, hash, block| {
-                    if Some(hash) == old_head {
-                        return Ok::<Decision, InternalError>(Decision::Stop);
-                    }
-
-                    // Each block counts
-                    state.num_blocks += 1;
-
-                    // Count added records in data blocks
-                    state.num_records += match &block.event {
-                        MetadataEvent::AddData(add_data) => add_data
-                            .new_data
-                            .as_ref()
-                            .map(DataSlice::num_records)
-                            .unwrap_or_default(),
-                        MetadataEvent::ExecuteTransform(execute_transform) => execute_transform
-                            .new_data
-                            .as_ref()
-                            .map(DataSlice::num_records)
-                            .unwrap_or_default(),
-                        _ => 0,
-                    };
-
-                    // If we haven't decided on the updated watermark yet, analyze watermarks
-                    if state.updated_watermark.is_none() {
-                        // Extract watermark of this block, if present
-                        let block_watermark = match &block.event {
-                            MetadataEvent::AddData(add_data) => add_data.new_watermark,
-                            MetadataEvent::ExecuteTransform(execute_transform) => {
-                                execute_transform.new_watermark
-                            }
-                            _ => None,
-                        };
-                        if let Some(block_watermark) = block_watermark {
-                            // Did we have a watermark already since the start of scanning?
-                            if let Some(latest_watermark_ref) = state.latest_watermark.as_ref() {
-                                // Yes, so if we see a different watermark now, it means it was
-                                // updated in this pull result
-                                if block_watermark != *latest_watermark_ref {
-                                    state.updated_watermark = Some(*latest_watermark_ref);
-                                }
-                            } else {
-                                // No, so remember the latest watermark
-                                state.latest_watermark = Some(block_watermark);
-                            }
-                        }
-                    }
-
-                    Ok(Decision::Next)
-                },
-            )
-            .await?;
-
-        let DataBlockAnalysisVisitorState {
-            num_blocks,
-            num_records,
-            mut updated_watermark,
-            latest_watermark,
-        } = state;
+        // Drop stream to unborrow old_head/new_head references
+        drop(block_stream);
 
         // We have reach the end of pulled interval.
         // If we've seen some watermark, but not the previous one within the changed
@@ -174,21 +150,10 @@ impl DatasetChangesServiceImpl {
                 // Yes, so try locating the previous watermark containing node
                 let previous_nearest_watermark = dataset
                     .as_metadata_chain()
-                    .reduce_by_hash(
-                        old_head,
-                        None,
-                        Decision::NextOfType(Flag::DATA_BLOCK),
-                        |state, _, block| {
-                            let Some(data_block) = block.as_data_stream_block() else {
-                                unreachable!()
-                            };
-
-                            *state = data_block.event.new_watermark.copied();
-
-                            Ok::<_, InternalError>(Decision::Stop)
-                        },
-                    )
-                    .await?;
+                    .accept_one_by_hash(old_head, <SearchSingleDataBlockVisitor>::next())
+                    .await?
+                    .into_event()
+                    .and_then(|event| event.new_watermark);
 
                 // The "latest" watermark is only an update, if we can find a different
                 // watermark before the searched interval, or if it's a first watermark

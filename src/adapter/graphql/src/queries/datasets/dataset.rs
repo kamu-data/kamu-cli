@@ -106,11 +106,11 @@ impl Dataset {
     // TODO: PERF: Avoid traversing the entire chain
     /// Creation time of the first metadata block in the chain
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        Ok(self
-            .get_dataset(ctx)
-            .await?
+        let dataset = self.get_dataset(ctx).await?;
+
+        Ok(dataset
             .as_metadata_chain()
-            .accept_one(<SearchSeedVisitor>::default())
+            .accept_one(<SearchSeedVisitor>::create())
             .await?
             .into_block()
             .expect("Dataset without blocks")
@@ -119,9 +119,9 @@ impl Dataset {
 
     /// Creation time of the most recent metadata block in the chain
     async fn last_updated_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        Ok(self
-            .get_dataset(ctx)
-            .await?
+        let dataset = self.get_dataset(ctx).await?;
+
+        Ok(dataset
             .as_metadata_chain()
             .get_block_by_ref(&domain::BlockRef::Head)
             .await?

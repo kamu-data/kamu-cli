@@ -50,6 +50,10 @@ pub trait MetadataChainVisitor: Sync + Send {
         &mut self,
         hashed_block_ref: HashedMetadataBlockRef,
     ) -> Result<MetadataVisitorDecision, Self::Error>;
+
+    fn finish(&self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

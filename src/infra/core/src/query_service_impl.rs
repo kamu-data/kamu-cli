@@ -161,34 +161,19 @@ impl QueryServiceImpl {
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
-        type Flag = MetadataEventTypeFlags;
-        type Decision = MetadataVisitorDecision;
-
         // TODO: Update to use SetDataSchema event
         let maybe_last_data_slice_hash = dataset
             .as_metadata_chain()
-            .reduce(
-                None,
-                Decision::NextOfType(Flag::DATA_BLOCK),
-                |state, _, block| {
-                    let Some(data_block) = block.as_data_stream_block() else {
-                        unreachable!()
-                    };
-
-                    let Some(new_data) = data_block.event.new_data else {
-                        return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
-                    };
-
-                    *state = Some(new_data.physical_hash.clone());
-
-                    Ok::<_, InternalError>(Decision::Stop)
-                },
-            )
+            .last_data_block_with_new_data()
             .await
+            .int_err()
             .map_err(|e| {
                 tracing::error!(error = ?e, "Resolving last data slice failed");
                 e
-            })?;
+            })?
+            .into_event()
+            .and_then(|event| event.new_data)
+            .map(|new_data| new_data.physical_hash);
 
         match maybe_last_data_slice_hash {
             Some(last_data_slice_hash) => {
@@ -241,7 +226,7 @@ impl QueryService for QueryServiceImpl {
 
         let vocab: DatasetVocabulary = dataset
             .as_metadata_chain()
-            .accept_one(<SearchSetVocabVisitor>::default())
+            .accept_one(<SearchSetVocabVisitor>::create())
             .await?
             .into_event()
             .unwrap_or_default()
