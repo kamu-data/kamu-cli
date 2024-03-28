@@ -43,18 +43,9 @@ pub(crate) struct ODataServiceContext {
 }
 
 impl ODataServiceContext {
-    pub(crate) fn new(
-        uri: &http::Uri,
-        catalog: Catalog,
-        account_name: Option<AccountName>,
-    ) -> Self {
+    pub(crate) fn new(catalog: Catalog, account_name: Option<AccountName>) -> Self {
         let config = catalog.get_one::<Config>().unwrap();
-        let base_url = &config.protocols.base_url_rest;
-
-        let mut service_base_url = format!("{base_url}{uri}");
-        if service_base_url.ends_with('/') {
-            service_base_url.pop();
-        }
+        let service_base_url = config.protocols.odata_base_url();
 
         Self {
             catalog,
@@ -118,24 +109,12 @@ pub(crate) struct ODataCollectionContext {
 
 impl ODataCollectionContext {
     pub(crate) fn new(
-        uri: &http::Uri,
         catalog: Catalog,
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
     ) -> Self {
         let config = catalog.get_one::<Config>().unwrap();
-        let base_url = &config.protocols.base_url_rest;
-
-        let (base_path, _) = uri
-            .path_and_query()
-            .unwrap()
-            .path()
-            .rsplit_once('/')
-            .unwrap();
-        let mut service_base_url = format!("{base_url}{base_path}");
-        if service_base_url.ends_with('/') {
-            service_base_url.pop();
-        }
+        let service_base_url = config.protocols.odata_base_url();
 
         Self {
             catalog,

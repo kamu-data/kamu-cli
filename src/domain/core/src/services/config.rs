@@ -54,4 +54,10 @@ pub struct Protocols {
     pub base_url_flightsql: Url,
 }
 
+impl Protocols {
+    pub fn odata_base_url(&self) -> String {
+        format!("{}odata", self.base_url_rest)
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
