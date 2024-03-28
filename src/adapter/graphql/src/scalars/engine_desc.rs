@@ -13,7 +13,6 @@ use crate::prelude::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Describes
 #[derive(SimpleObject)]
 pub struct EngineDesc {
     /// A short name of the engine, e.g. "Spark", "Flink".
