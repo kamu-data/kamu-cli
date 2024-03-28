@@ -12,6 +12,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use datafusion::prelude::*;
 use dill::{component, interface};
 use domain::compact_service::{
@@ -48,9 +49,10 @@ pub struct CompactServiceImpl {
     run_info_dir: PathBuf,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 enum DataSliceBatch {
-    CompactedBatch(Box<DataSliceBatchInfo>),
+    CompactedBatch(DataSliceBatchInfo),
     // Hash of block will not be None value in case
     // when we will get only one block in batch
     // and will be used tp not rewriting such blocks
@@ -60,6 +62,7 @@ enum DataSliceBatch {
 #[derive(Debug, Default, Clone)]
 struct DataSliceBatchUpperBound {
     pub new_source_state: Option<SourceState>,
+    pub new_watermark: Option<DateTime<Utc>>,
     pub new_checkpoint: Option<Checkpoint>,
     pub end_offset: u64,
 }
@@ -128,8 +131,6 @@ impl CompactServiceImpl {
             match block.event {
                 MetadataEvent::AddData(add_data_event) => {
                     if let Some(output_slice) = &add_data_event.new_data {
-                        old_head = block.prev_block_hash.clone();
-
                         let data_slice_url = object_data_repo
                             .get_internal_url(&output_slice.physical_hash)
                             .await;
@@ -147,17 +148,13 @@ impl CompactServiceImpl {
                         if batch_size + output_slice.size > max_slice_size
                             || batch_records + current_records > max_slice_records
                         {
-                            match data_slice_batch_info.data_slices_batch.len().cmp(&1) {
-                                Ordering::Equal => data_slice_batches
-                                    .push(DataSliceBatch::SingleBlock(current_hash.unwrap())),
-                                Ordering::Greater => {
-                                    data_slice_batches.push(DataSliceBatch::CompactedBatch(
-                                        Box::new(data_slice_batch_info.clone()),
-                                    ));
-                                }
-                                _ => (),
-                            };
-                            if !data_slice_batch_info.data_slices_batch.is_empty() {
+                            let is_appended =
+                                CompactServiceImpl::append_add_data_batch_to_chain_info(
+                                    &mut data_slice_batches,
+                                    &current_hash,
+                                    &mut data_slice_batch_info,
+                                );
+                            if is_appended {
                                 // Reset values for next batch
                                 data_slice_batch_info = DataSliceBatchInfo::default();
                                 data_slice_batch_info.upper_bound.end_offset =
@@ -190,24 +187,30 @@ impl CompactServiceImpl {
                             data_slice_batch_info.upper_bound.new_source_state =
                                 add_data_event.new_source_state;
                         }
+                        if data_slice_batch_info.upper_bound.new_watermark.is_none() {
+                            data_slice_batch_info.upper_bound.new_watermark =
+                                add_data_event.new_watermark;
+                        }
                     }
                 }
-                MetadataEvent::SetVocab(set_vocab_event) => {
-                    vocab_event = Some(set_vocab_event);
+                MetadataEvent::Seed(_) => old_head = Some(block_hash),
+                event => {
+                    if let MetadataEvent::SetVocab(set_vocab_event) = event {
+                        vocab_event = Some(set_vocab_event);
+                    }
+                    let is_appended = CompactServiceImpl::append_add_data_batch_to_chain_info(
+                        &mut data_slice_batches,
+                        &current_hash,
+                        &mut data_slice_batch_info,
+                    );
+                    data_slice_batches.push(DataSliceBatch::SingleBlock(block_hash.clone()));
+                    if is_appended {
+                        data_slice_batch_info = DataSliceBatchInfo::default();
+                    }
                 }
-                _ => (),
             }
         }
 
-        match data_slice_batch_info.data_slices_batch.len().cmp(&1) {
-            Ordering::Equal => {
-                data_slice_batches.push(DataSliceBatch::SingleBlock(current_hash.unwrap()));
-            }
-            Ordering::Greater => data_slice_batches.push(DataSliceBatch::CompactedBatch(Box::new(
-                data_slice_batch_info,
-            ))),
-            _ => (),
-        };
         let vocab: DatasetVocabulary = vocab_event.unwrap_or_default().into();
 
         Ok(ChainFilesInfo {
@@ -215,6 +218,26 @@ impl CompactServiceImpl {
             offset_column: vocab.offset_column,
             old_head: old_head.unwrap(),
         })
+    }
+
+    fn append_add_data_batch_to_chain_info(
+        data_slice_batches: &mut Vec<DataSliceBatch>,
+        hash: &Option<Multihash>,
+        data_slice_batch_info: &mut DataSliceBatchInfo,
+    ) -> bool {
+        match data_slice_batch_info.data_slices_batch.len().cmp(&1) {
+            Ordering::Equal => {
+                data_slice_batches
+                    .push(DataSliceBatch::SingleBlock(hash.as_ref().unwrap().clone()));
+            }
+            Ordering::Greater => {
+                data_slice_batches.push(DataSliceBatch::CompactedBatch(
+                    data_slice_batch_info.clone(),
+                ));
+            }
+            _ => return false,
+        }
+        true
     }
 
     async fn merge_files(
@@ -311,7 +334,7 @@ impl CompactServiceImpl {
                             .upper_bound
                             .new_source_state
                             .clone(),
-                        new_watermark: None,
+                        new_watermark: data_slice_batch_info.upper_bound.new_watermark,
                     };
                     let new_checkpoint_ref = data_slice_batch_info
                         .upper_bound

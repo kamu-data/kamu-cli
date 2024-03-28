@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use chrono::{NaiveDate, TimeDelta, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, TimeDelta, TimeZone, Utc};
 use datafusion::execution::config::SessionConfig;
 use datafusion::execution::context::SessionContext;
 use dill::Component;
@@ -32,7 +32,7 @@ use opendatafabric::*;
 const MAX_SLICE_SIZE: u64 = 1024 * 1024 * 1024;
 const MAX_SLICE_RECORDS: u64 = 10000;
 
-#[test_group::group(ingest, datafusion, compact)]
+// #[test_group::group(ingest, datafusion, compact)]
 #[tokio::test]
 async fn test_dataset_compact() {
     let harness = CompactTestHarness::new();
@@ -139,7 +139,14 @@ async fn test_dataset_compact() {
     let new_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
+
     assert_eq!(old_blocks.len(), new_blocks.len());
+    let (_, last_old_block) = old_blocks.first().unwrap();
+    let (_, last_new_block) = new_blocks.first().unwrap();
+    assert!(CompactTestHarness::assert_add_data_block_events(
+        &last_old_block.event,
+        &last_new_block.event
+    ));
 
     let data_str = indoc!(
         "
@@ -209,6 +216,12 @@ async fn test_dataset_compact() {
 
     // We compacted two data slices and blocks into one
     assert_eq!(old_blocks.len() - 1, new_blocks.len());
+    let (_, last_old_block) = old_blocks.first().unwrap();
+    let (_, last_new_block) = new_blocks.first().unwrap();
+    assert!(CompactTestHarness::assert_add_data_block_events(
+        &last_old_block.event,
+        &last_new_block.event
+    ));
 
     let data_str = indoc!(
         "
@@ -276,6 +289,107 @@ async fn test_dataset_compact() {
     // Shoud save original amount of blocks
     // such as size is equal to max-slice-size
     assert_eq!(old_blocks.len(), new_blocks.len());
+    let (_, last_old_block) = old_blocks.first().unwrap();
+    let (last_new_block_hash, last_new_block) = new_blocks.first().unwrap();
+    assert!(CompactTestHarness::assert_add_data_block_events(
+        &last_old_block.event,
+        &last_new_block.event
+    ));
+
+    harness
+        .commit_set_licence_block(&root_dataset_alias.as_local_ref(), last_new_block_hash)
+        .await;
+
+    let data_str = indoc!(
+        "
+        date,city,population
+        2020-01-10,A,7000
+        2020-01-11,B,8000
+        2020-01-12,C,7000
+        "
+    );
+
+    harness
+        .ingest_data(data_str.to_string(), &root_dataset_alias.as_local_ref())
+        .await;
+
+    let data_str = indoc!(
+        "
+            date,city,population
+            2020-01-13,A,1000
+            2020-01-14,B,2000
+            2020-01-15,C,3000
+            "
+    );
+
+    harness
+        .ingest_data(data_str.to_string(), &root_dataset_alias.as_local_ref())
+        .await;
+
+    let old_blocks = harness
+        .get_dataset_blocks(&root_dataset_alias.as_local_ref())
+        .await;
+
+    assert_matches!(
+        harness
+            .compact_svc
+            .compact_dataset(
+                &dataset_handle,
+                MAX_SLICE_SIZE,
+                6,
+                Some(Arc::new(NullCompactionMultiListener {}))
+            )
+            .await,
+        Ok(CompactResult::Finished),
+    );
+
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT32 op;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY city (STRING);
+                  OPTIONAL INT64 population;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----+----------------------+----------------------+------+------------+
+                | offset | op | system_time          | date                 | city | population |
+                +--------+----+----------------------+----------------------+------+------------+
+                | 9      | 0  | 2050-01-01T12:00:00Z | 2020-01-10T00:00:00Z | A    | 7000       |
+                | 10     | 0  | 2050-01-01T12:00:00Z | 2020-01-11T00:00:00Z | B    | 8000       |
+                | 11     | 0  | 2050-01-01T12:00:00Z | 2020-01-12T00:00:00Z | C    | 7000       |
+                | 12     | 0  | 2050-01-01T12:00:00Z | 2020-01-13T00:00:00Z | A    | 1000       |
+                | 13     | 0  | 2050-01-01T12:00:00Z | 2020-01-14T00:00:00Z | B    | 2000       |
+                | 14     | 0  | 2050-01-01T12:00:00Z | 2020-01-15T00:00:00Z | C    | 3000       |
+                +--------+----+----------------------+----------------------+------+------------+
+                "#
+            ),
+        )
+        .await;
+
+    let new_blocks = harness
+        .get_dataset_blocks(&root_dataset_alias.as_local_ref())
+        .await;
+
+    // Only last 2 blocks will be merged into one
+    assert_eq!(old_blocks.len() - 1, new_blocks.len());
+    let (_, last_old_block) = old_blocks.first().unwrap();
+    let (_, last_new_block) = new_blocks.first().unwrap();
+    assert!(CompactTestHarness::assert_add_data_block_events(
+        &last_old_block.event,
+        &last_new_block.event
+    ));
+    assert!(CompactTestHarness::assert_non_add_data_events(
+        &old_blocks,
+        &new_blocks
+    ));
 
     let derive_dataset_name = DatasetName::new_unchecked("derive-foo");
     let derive_dataset_alias = DatasetAlias::new(None, derive_dataset_name.clone());
@@ -455,6 +569,7 @@ struct CompactTestHarness {
     dataset_repo: Arc<dyn DatasetRepository>,
     compact_svc: Arc<dyn CompactService>,
     push_ingest_svc: Arc<dyn PushIngestService>,
+    current_date_tame: DateTime<Utc>,
     ctx: SessionContext,
 }
 
@@ -469,6 +584,7 @@ impl CompactTestHarness {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = temp_dir.path().join("run");
         std::fs::create_dir(&run_info_dir).unwrap();
+        let current_date_tame = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
@@ -482,9 +598,7 @@ impl CompactTestHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_value(SystemTimeSourceStub::new_set(
-                Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
-            ))
+            .add_value(SystemTimeSourceStub::new_set(current_date_tame))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<EngineProvisionerNull>()
             .add_builder(CompactServiceImpl::builder().with_run_info_dir(run_info_dir.clone()))
@@ -508,6 +622,7 @@ impl CompactTestHarness {
             dataset_repo,
             compact_svc,
             push_ingest_svc,
+            current_date_tame,
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
     }
@@ -581,5 +696,83 @@ impl CompactTestHarness {
             .ingest_from_file_stream(dataset_ref, None, Box::new(data), None, None)
             .await
             .unwrap();
+    }
+
+    async fn commit_set_licence_block(&self, dataset_ref: &DatasetRef, head: &Multihash) {
+        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.unwrap();
+        let event = SetLicense {
+            short_name: "sl1".to_owned(),
+            name: "set_license1".to_owned(),
+            spdx_id: None,
+            website_url: "http://set-license.com".to_owned(),
+        };
+
+        dataset
+            .commit_event(
+                event.into(),
+                CommitOpts {
+                    block_ref: &BlockRef::Head,
+                    system_time: Some(self.current_date_tame),
+                    prev_block_hash: Some(Some(head)),
+                    check_object_refs: false,
+                    update_block_ref: false,
+                },
+            )
+            .await
+            .unwrap();
+    }
+
+    fn assert_add_data_block_events(
+        old_block_event: &MetadataEvent,
+        new_block_event: &MetadataEvent,
+    ) -> bool {
+        if let MetadataEvent::AddData(old_add_data_event) = old_block_event
+            && let MetadataEvent::AddData(new_add_data_event) = new_block_event
+        {
+            return old_add_data_event.prev_checkpoint == new_add_data_event.prev_checkpoint
+                && old_add_data_event
+                    .new_data
+                    .as_ref()
+                    .unwrap()
+                    .offset_interval
+                    .end
+                    == new_add_data_event
+                        .new_data
+                        .as_ref()
+                        .unwrap()
+                        .offset_interval
+                        .end
+                && old_add_data_event.new_source_state == new_add_data_event.new_source_state
+                && old_add_data_event.new_watermark == new_add_data_event.new_watermark;
+        }
+        false
+    }
+
+    fn assert_non_add_data_events(
+        old_chain: &[(Multihash, MetadataBlock)],
+        new_chain: &[(Multihash, MetadataBlock)],
+    ) -> bool {
+        let mut new_non_add_data_event_index = 0;
+        for (old_hash, old_block) in old_chain {
+            if let MetadataEvent::AddData(_) = old_block.event {
+                continue;
+            }
+            let mut old_add_data_event_index = 0;
+            for (new_hash, new_block) in new_chain {
+                if let MetadataEvent::AddData(_) = new_block.event {
+                    continue;
+                }
+                if old_add_data_event_index < new_non_add_data_event_index {
+                    old_add_data_event_index += 1;
+                    continue;
+                }
+                if new_hash != old_hash || old_block != new_block {
+                    return false;
+                }
+                break;
+            }
+            new_non_add_data_event_index += 1;
+        }
+        true
     }
 }
