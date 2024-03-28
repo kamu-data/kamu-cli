@@ -17,6 +17,7 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use opendatafabric::*;
+use url::Url;
 
 use super::test_api_server::TestAPIServer;
 
@@ -293,6 +294,10 @@ impl TestHarness {
             )
             .bind::<dyn PushIngestService, PushIngestServiceImpl>()
             .add::<QueryServiceImpl>()
+            .add_value(Config::new(Protocols {
+                base_url_rest: Url::parse("http://127.0.0.1:8080").unwrap(),
+                base_url_flightsql: Url::parse("grpc://localhost:50050").unwrap(),
+            }))
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
