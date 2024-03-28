@@ -15,7 +15,9 @@ use kamu_core::SystemTimeSource;
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
 
-pub struct TaskSchedulerInMemory {
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct TaskSchedulerImpl {
     state: Arc<Mutex<State>>,
     event_store: Arc<dyn TaskSystemEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -26,10 +28,12 @@ struct State {
     task_queue: VecDeque<TaskID>,
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[component(pub)]
 #[interface(dyn TaskScheduler)]
 #[scope(Singleton)]
-impl TaskSchedulerInMemory {
+impl TaskSchedulerImpl {
     pub fn new(
         event_store: Arc<dyn TaskSystemEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
@@ -42,8 +46,10 @@ impl TaskSchedulerInMemory {
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
-impl TaskScheduler for TaskSchedulerInMemory {
+impl TaskScheduler for TaskSchedulerImpl {
     #[tracing::instrument(level = "info", skip_all, fields(?logical_plan))]
     async fn create_task(&self, logical_plan: LogicalPlan) -> Result<TaskState, CreateTaskError> {
         let mut task = Task::new(
@@ -160,3 +166,5 @@ impl TaskScheduler for TaskSchedulerInMemory {
         Ok(Some(task_id))
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

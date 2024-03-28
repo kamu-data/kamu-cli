@@ -56,13 +56,16 @@ Prerequisites:
     * `cargo binstall cargo-deny -y` - for linting dependencies
     * `cargo binstall cargo-udeps -y` - for linting dependencies (detecting unused)
   * To keep all these cargo tools up-to-date use `cargo install-update -a`
+* Database tools:
+  * Install Postgres command line client `psql`: `sudo apt-get install -y postgresql-client`
+  * Install MariaDB command line client `mariadb`: `sudo apt install -y mariadb-client`
+  * Install `sqlx-cli`: `cargo binstall sqlx-cli -y`
 
 Clone the repository:
 ```shell
 git clone git@github.com:kamu-data/kamu-cli.git
 ```
-
-Build it:
+Build the project:
 ```shell
 cd kamu-cli
 cargo build
@@ -95,6 +98,66 @@ If you need to run some tests under `Docker` use:
 KAMU_CONTAINER_RUNTIME_TYPE=docker cargo test <some_test>
 ```
 
+### Build with Databases
+
+By default, we define `SQLX_OFFLINE=true` environment variable to ensure the compilation succeeds without access to a live database.
+The default mode is fine in most of the cases, assuming the developer's assignment is not related to databases/repositories directly.
+
+When databases have to be touched, the setup of local database containers must be configured using the following script:
+```shell
+make sqlx-local-setup
+```
+
+This mode:
+ * creates Docker containers with empty databases
+ * applies all database migrations from scratch
+ * generates `.env` files in specific crates to point to databases running in Docker containers by setting `DATABASE_URL` variables
+   as well as to disable `SQLX_OFFLINE` variable in those crates
+
+This setup ensures any SQL queries are automatically checked against live database schema at compile-time.
+This is highly useful when queries have to be written or modified.
+
+After the database-specific assignment is over, it makes sense to re-enable default mode by running another script:
+```shell
+make sqlx-prepare
+make sqlx-local-clean
+```
+
+The first step, `make sqlx-prepare`, analyzes SQL queries in the code and generates the latest up-to-date data 
+for offline checking of queries (`.sqlx` directories). It is necessary to commit them into the version control
+ to share the latest updates with other developers, as well as to pass through GitHub pipeline actions.
+
+Note that running `make lint` will detect if re-generation is necessary before pushing changes.
+Otherwise, GitHub CI flows will likely fail to build the project due to database schema differences.
+
+The second step, `make sqlx-local-clean` would reverse `make sqlx-local-setup` by:
+ * stopping and removing Docker containers with the databases
+ * removing `.env` files in database-specific crates, which re-enables `SQLX_OFFLINE=true` for the entire repository.
+
+
+### Database migrations
+Any change to the database structure requires writing SQL migration scripts.
+The scripts are stored in `./src/database/migrations/<db-engine>` folders, and they are unique per database type.
+The migration commands should be launched within database-specific crate folders, such as `./src/database/sqlx-postgres`. Alternatively, you will need to define `DATABASE_URL` variable manually.
+
+Typical commands to work with migrations include:
+* `sqlx migrate add --source <migrations_dir_path> <descriptoin>` to add a new migration
+* `sqlx migrate run --source <migrations_dir_path>` to apply migrations to the database
+* `sqlx migrate info --source <migrations_dir_path> ` to print information about currently applied migration within the database
+
+
+### Run Linters
+Use the following command:
+```sh
+make lint
+```
+This will do a number of highly useful checks:
+* Rust formatting check
+* License headers check
+* Dependecies check: detecting issues with existing dependencies, detecting unused dependencies
+* Rust coding practices checks (Clippy)
+* SQLX offline data check (`sqlx` data for offline compliation must be up-to-date with the database schema)
+
 
 ### Run Tests
 Before you run tests for the first time you need to run:
@@ -104,14 +167,19 @@ make test-setup
 
 This will download all necessary images for containerized tests.
 
-You can run all tests as:
+You can run all tests except database-specific as:
 ```sh
 make test
 ```
 
-In most cases you can skip tests involving very heavy Spark and Flink engines by running:
+In most cases you can skip tests involving very heavy Spark and Flink engines and databases by running:
 ```sh
 make test-fast
+```
+
+If testing with databases is required, use:
+```sh
+make test-full
 ```
 
 These are just wrappers on top of [Nextest](https://nexte.st/) that [control](/.config/nextest.toml) test concurrency and retries.
@@ -242,8 +310,11 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
   - `datafusion` - tests that use Apache DataFusion
   - `spark` - tests that use Apache Spark
   - `flink` - tests that use Apache Flink
+- `database` - for tests that involve any database interaction, subsequently grouped by:
+  - `mysql` - tests that use MySQL/MariaDB
+  - `postgres` - tests that use PostreSQL
 - `ingest` - tests that test data ingestion path
-- `transfrom` - tests that test data transformation path
+- `transform` - tests that test data transformation path
 - `query` - tests that test data query path
 - `flaky` - special group for tests that sometimes fail and need to be retried (use very sparingly and create tickets)
 - `setup` - special group for tests that initialize the environment (e.g. pull container images) - this group is run by CI before executing the rest of the tests

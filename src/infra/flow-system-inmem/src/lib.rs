@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 #![feature(let_chains)]
-#![feature(async_closure)]
 
 // Re-exports
 pub use kamu_flow_system as domain;

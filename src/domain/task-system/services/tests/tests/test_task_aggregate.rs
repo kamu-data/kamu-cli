@@ -10,8 +10,10 @@
 use std::assert_matches::assert_matches;
 
 use chrono::Utc;
-use kamu_task_system_inmem::domain::*;
 use kamu_task_system_inmem::*;
+use kamu_task_system_services::domain::*;
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_task_agg_create_new() {
@@ -35,6 +37,8 @@ async fn test_task_agg_create_new() {
     assert_eq!(task.status, TaskStatus::Queued);
     assert_eq!(task.logical_plan, LogicalPlan::Probe(Probe::default()));
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_task_save_load_update() {
@@ -78,6 +82,8 @@ async fn test_task_save_load_update() {
     assert_eq!(task.status, TaskStatus::Finished(TaskOutcome::Cancelled));
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_task_agg_illegal_transition() {
     let event_store = TaskSystemEventStoreInMemory::new();
@@ -91,3 +97,5 @@ async fn test_task_agg_illegal_transition() {
 
     assert_matches!(task.run(Utc::now(),), Err(ProjectionError { .. }));
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

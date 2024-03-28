@@ -13,9 +13,13 @@ use dill::*;
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct TaskSystemEventStoreInMemory {
     inner: EventStoreInMemory<TaskState, State>,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 struct State {
@@ -51,6 +55,8 @@ impl EventStoreState<TaskState> for State {
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[component(pub)]
 #[interface(dyn TaskSystemEventStore)]
 #[scope(Singleton)]
@@ -76,6 +82,8 @@ impl TaskSystemEventStoreInMemory {
         }
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl EventStore<TaskState> for TaskSystemEventStoreInMemory {
@@ -103,6 +111,8 @@ impl EventStore<TaskState> for TaskSystemEventStoreInMemory {
         self.inner.save_events(task_id, events).await
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl TaskSystemEventStore for TaskSystemEventStoreInMemory {
@@ -141,3 +151,5 @@ impl TaskSystemEventStore for TaskSystemEventStoreInMemory {
         g.tasks_by_dataset.get(dataset_id).map_or(0, Vec::len)
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

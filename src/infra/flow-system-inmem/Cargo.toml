@@ -25,6 +25,7 @@ doctest = false
 opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
+kamu-task-system-services = { workspace = true }
 kamu-flow-system = { workspace = true }
 event-bus = { workspace = true }
 

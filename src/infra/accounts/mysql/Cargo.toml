@@ -1,6 +1,6 @@
 [package]
-name = "kamu-task-system"
-description = "Domain model of a task system that manages various workloads in a compute node"
+name = "kamu-accounts-mysql"
+description = "MySql-specific implementation of accounts domain"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -22,19 +22,25 @@ doctest = false
 
 
 [dependencies]
-enum-variants = { workspace = true }
-event-sourcing ={ workspace = true }
+database-common = { workspace = true }
+kamu-accounts = { workspace = true }
 internal-error = { workspace = true }
-opendatafabric = { workspace = true }
-kamu-core = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
+dill = "0.8"
+sqlx = { version = "0.7", default-features = false, features = [
+    "runtime-tokio-rustls",
+    "macros",
+    "mysql",
+    "uuid",
+    "chrono"
+]}
 thiserror = { version = "1", default-features = false }
-tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
-url = { version = "2", default-features = false }
+uuid = { version = "1", features = ["v4"] }
 
-# TODO: Make serde optional
-serde = { version = "1", default-features = false, features = ["derive"] }
-serde_with = { version = "3", default-features = false }
+
+[dev-dependencies]
+test-log = { version = "0.2", features = ["trace"] }
+test-group = { version = "1" }

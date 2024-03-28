@@ -8,5 +8,3 @@
 // by the Apache License, Version 2.0.
 
 mod test_event_store_inmem;
-mod test_task_aggregate;
-mod test_task_scheduler_inmem;
