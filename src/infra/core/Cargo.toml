@@ -36,6 +36,7 @@ opendatafabric = { workspace = true }
 event-bus = { workspace = true }
 kamu-core = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
+random-names = { workspace = true }
 
 # Serialization
 flatbuffers = "23"

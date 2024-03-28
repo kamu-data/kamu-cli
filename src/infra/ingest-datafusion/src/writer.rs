@@ -736,6 +736,7 @@ impl DataWriter for DataWriterDataFusion {
                             system_time: Some(staged.system_time),
                             prev_block_hash: Some(Some(&self.meta.head)),
                             check_object_refs: false,
+                            update_block_ref: true,
                         },
                     )
                     .await?;
@@ -757,6 +758,7 @@ impl DataWriter for DataWriterDataFusion {
                     system_time: Some(staged.system_time),
                     prev_block_hash: Some(Some(&self.meta.head)),
                     check_object_refs: false,
+                    update_block_ref: true,
                 },
             )
             .await?;

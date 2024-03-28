@@ -207,7 +207,7 @@ where
         &self,
         offset_interval: Option<OffsetInterval>,
         data: Option<&OwnedFile>,
-        checkpoint: Option<&OwnedFile>,
+        checkpoint_ref: Option<&CheckpointRef>,
     ) -> Result<(Option<DataSlice>, Option<Checkpoint>), InternalError> {
         let data_slice = if let Some(offset_interval) = offset_interval {
             let data = data.unwrap();
@@ -238,19 +238,32 @@ where
             None
         };
 
-        let checkpoint = if let Some(checkpoint) = checkpoint {
-            let path = checkpoint.as_path().to_path_buf();
-            let physical_hash = tokio::task::spawn_blocking(move || {
-                kamu_data_utils::data::hash::get_file_physical_hash(&path)
-            })
-            .await
-            .int_err()?
-            .int_err()?;
+        let checkpoint = if let Some(checkpoint_ref) = checkpoint_ref {
+            match checkpoint_ref {
+                CheckpointRef::Existed(hash) => {
+                    let size = self.as_checkpoint_repo().get_size(hash).await.int_err()?;
+                    Some(Checkpoint {
+                        physical_hash: hash.clone(),
+                        size,
+                    })
+                }
+                CheckpointRef::New(checkpoint_file) => {
+                    let path = checkpoint_file.as_path().to_path_buf();
+                    let physical_hash = tokio::task::spawn_blocking(move || {
+                        kamu_data_utils::data::hash::get_file_physical_hash(&path)
+                    })
+                    .await
+                    .int_err()?
+                    .int_err()?;
 
-            Some(Checkpoint {
-                physical_hash,
-                size: std::fs::metadata(checkpoint.as_path()).int_err()?.len(),
-            })
+                    Some(Checkpoint {
+                        physical_hash,
+                        size: std::fs::metadata(checkpoint_file.as_path())
+                            .int_err()?
+                            .len(),
+                    })
+                }
+            }
         } else {
             None
         };
@@ -442,16 +455,17 @@ where
 
         tracing::info!(?block, "Committing new block");
 
-        let new_head = chain
-            .append(
-                block,
-                AppendOpts {
-                    update_ref: Some(opts.block_ref),
-                    check_ref_is_prev_block: true,
-                    ..AppendOpts::default()
-                },
-            )
-            .await?;
+        let append_opts = if !opts.update_block_ref {
+            AppendOpts {
+                update_ref: None,
+                check_ref_is_prev_block: false,
+                ..AppendOpts::default()
+            }
+        } else {
+            AppendOpts::default()
+        };
+
+        let new_head = chain.append(block, append_opts).await?;
 
         tracing::info!(%new_head, "Committed new block");
 
@@ -484,14 +498,14 @@ where
         &self,
         params: AddDataParams,
         data_file: Option<OwnedFile>,
-        checkpoint_file: Option<OwnedFile>,
+        checkpoint_ref: Option<CheckpointRef>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError> {
         let (new_data, new_checkpoint) = self
             .prepare_objects(
                 params.new_offset_interval,
                 data_file.as_ref(),
-                checkpoint_file.as_ref(),
+                checkpoint_ref.as_ref(),
             )
             .await?;
 
@@ -499,7 +513,7 @@ where
             new_data.as_ref(),
             data_file,
             new_checkpoint.as_ref(),
-            checkpoint_file,
+            checkpoint_ref.and_then(std::convert::Into::into),
         )
         .await?;
 
@@ -530,18 +544,18 @@ where
         &self,
         execute_transform: ExecuteTransformParams,
         data: Option<OwnedFile>,
-        checkpoint: Option<OwnedFile>,
+        checkpoint_ref: Option<CheckpointRef>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError> {
         let event = self
-            .prepare_execute_transform(execute_transform, data.as_ref(), checkpoint.as_ref())
+            .prepare_execute_transform(execute_transform, data.as_ref(), checkpoint_ref.as_ref())
             .await?;
 
         self.commit_objects(
             event.new_data.as_ref(),
             data,
             event.new_checkpoint.as_ref(),
-            checkpoint,
+            checkpoint_ref.and_then(std::convert::Into::into),
         )
         .await?;
 
@@ -559,10 +573,10 @@ where
         &self,
         params: ExecuteTransformParams,
         data_file: Option<&OwnedFile>,
-        checkpoint: Option<&OwnedFile>,
+        checkpoint_ref: Option<&CheckpointRef>,
     ) -> Result<ExecuteTransform, InternalError> {
         let (new_data, new_checkpoint) = self
-            .prepare_objects(params.new_offset_interval, data_file, checkpoint)
+            .prepare_objects(params.new_offset_interval, data_file, checkpoint_ref)
             .await?;
 
         Ok(ExecuteTransform {

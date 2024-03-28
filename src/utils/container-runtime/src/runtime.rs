@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 
+use random_names::get_random_name;
 use tokio::process::Command;
 
 use super::errors::*;
@@ -284,7 +285,7 @@ impl ContainerRuntime {
         &self,
         network_prefix: &str,
     ) -> Result<NetworkHandle, ContainerRuntimeError> {
-        let network_name = get_random_name_with_prefix(network_prefix);
+        let network_name = get_random_name(Some(network_prefix), 10);
         let output = self.create_network_cmd(&network_name).output().await?;
 
         if !output.status.success() {

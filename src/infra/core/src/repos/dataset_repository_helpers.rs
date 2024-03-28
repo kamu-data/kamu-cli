@@ -15,23 +15,13 @@ use internal_error::*;
 use kamu_core::events::DatasetEventDependenciesUpdated;
 use kamu_core::*;
 use opendatafabric::*;
+use random_names::get_random_name;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn get_staging_name() -> String {
-    use rand::distributions::Alphanumeric;
-    use rand::Rng;
-
-    let mut name = String::with_capacity(16);
-    name.push_str(".pending-");
-    name.extend(
-        rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(10)
-            .map(char::from),
-    );
-
-    name
+    let prefix = ".pending-";
+    get_random_name(Some(prefix), 16)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

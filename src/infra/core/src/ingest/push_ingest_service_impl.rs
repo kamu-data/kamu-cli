@@ -17,6 +17,7 @@ use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_ingest_datafusion::*;
 use opendatafabric::*;
+use random_names::get_random_name;
 use tokio::io::AsyncRead;
 
 use super::ingest_common;
@@ -76,7 +77,7 @@ impl PushIngestServiceImpl {
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
-        let operation_id = ingest_common::next_operation_id();
+        let operation_id = get_random_name(None, 10);
         let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
         std::fs::create_dir_all(&operation_dir).int_err()?;
 
