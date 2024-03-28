@@ -12,11 +12,11 @@ use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct Config {
+pub struct ServerUrlConfig {
     pub protocols: Protocols,
 }
 
-impl Config {
+impl ServerUrlConfig {
     pub fn load() -> Result<Self, InternalError> {
         // TODO: Use value from config not envvar
         //       https://github.com/kamu-data/kamu-node/issues/45

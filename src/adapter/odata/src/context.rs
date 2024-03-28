@@ -44,7 +44,7 @@ pub(crate) struct ODataServiceContext {
 
 impl ODataServiceContext {
     pub(crate) fn new(catalog: Catalog, account_name: Option<AccountName>) -> Self {
-        let config = catalog.get_one::<Config>().unwrap();
+        let config = catalog.get_one::<ServerUrlConfig>().unwrap();
         let service_base_url = config.protocols.odata_base_url();
 
         Self {
@@ -113,7 +113,7 @@ impl ODataCollectionContext {
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
     ) -> Self {
-        let config = catalog.get_one::<Config>().unwrap();
+        let config = catalog.get_one::<ServerUrlConfig>().unwrap();
         let service_base_url = config.protocols.odata_base_url();
 
         Self {

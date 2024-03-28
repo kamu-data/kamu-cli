@@ -10,7 +10,6 @@
 // Re-exports
 pub use container_runtime::{NullPullImageListener, PullImageListener};
 
-pub mod config;
 pub mod dataset_changes_service;
 pub mod dependency_graph_repository;
 pub mod dependency_graph_service;
@@ -26,11 +25,11 @@ pub mod remote_repository_registry;
 pub mod reset_service;
 pub mod resource_loader;
 pub mod search_service;
+pub mod server_url_config;
 pub mod sync_service;
 pub mod transform_service;
 pub mod verification_service;
 
-pub use config::*;
 pub use dataset_changes_service::*;
 pub use dependency_graph_repository::*;
 pub use dependency_graph_service::*;
@@ -46,6 +45,7 @@ pub use remote_repository_registry::*;
 pub use reset_service::*;
 pub use resource_loader::*;
 pub use search_service::*;
+pub use server_url_config::*;
 pub use sync_service::*;
 pub use transform_service::*;
 pub use verification_service::*;

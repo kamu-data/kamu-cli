@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_core::Config;
+use kamu_core::ServerUrlConfig;
 use opendatafabric as odf;
 
 use crate::prelude::*;
@@ -18,7 +18,7 @@ use crate::queries::*;
 pub struct DatasetEndpoints<'a> {
     owner: &'a Account,
     dataset_handle: odf::DatasetHandle,
-    config: Arc<Config>,
+    config: Arc<ServerUrlConfig>,
 }
 
 #[Object]
@@ -27,7 +27,7 @@ impl<'a> DatasetEndpoints<'a> {
     pub fn new(
         owner: &'a Account,
         dataset_handle: odf::DatasetHandle,
-        config: Arc<Config>,
+        config: Arc<ServerUrlConfig>,
     ) -> Self {
         Self {
             owner,

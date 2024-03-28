@@ -279,7 +279,7 @@ impl TestHarness {
             )
             .bind::<dyn PushIngestService, PushIngestServiceImpl>()
             .add::<QueryServiceImpl>()
-            .add_value(Config::new(Protocols {
+            .add_value(ServerUrlConfig::new(Protocols {
                 base_url_rest: Url::parse("http://example.com").unwrap(),
                 base_url_flightsql: Url::parse("grpc://localhost:50050").unwrap(),
             }))

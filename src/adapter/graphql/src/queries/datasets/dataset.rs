@@ -9,7 +9,7 @@
 
 use chrono::prelude::*;
 use futures::TryStreamExt;
-use kamu_core::{self as domain, Config, MetadataChainExt, TryStreamExtExt};
+use kamu_core::{self as domain, MetadataChainExt, ServerUrlConfig, TryStreamExtExt};
 use opendatafabric as odf;
 
 use crate::prelude::*;
@@ -156,7 +156,7 @@ impl Dataset {
 
     /// Various endpoints for interacting with data
     async fn endpoints(&self, ctx: &Context<'_>) -> DatasetEndpoints<'_> {
-        let config = from_catalog::<Config>(ctx).unwrap();
+        let config = from_catalog::<ServerUrlConfig>(ctx).unwrap();
 
         DatasetEndpoints::new(&self.owner, self.dataset_handle.clone(), config)
     }
