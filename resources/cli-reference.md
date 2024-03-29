@@ -423,7 +423,7 @@ List all datasets in the workspace
 * `--all-accounts`
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
-  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`, `arrow-json`
+  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`
 
 
 **Examples:**
@@ -809,7 +809,7 @@ Lists known repositories
 
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
-  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`, `arrow-json`
+  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`
 
 
 
@@ -859,7 +859,7 @@ Lists remote aliases
 
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
-  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`, `arrow-json`
+  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`
 
 
 
@@ -916,7 +916,7 @@ Searches for datasets in the registered repositories
 * `--repo <REPO>` — Repository name(s) to search in
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
-  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`, `arrow-json`
+  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`
 
 
 Search is delegated to the repository implementations and its capabilities depend on the type of the repo. Whereas smart repos may support advanced full-text search, simple storage-only repos may be limited to a substring search by dataset name.
@@ -955,7 +955,7 @@ Executes an SQL query or drops you into an SQL shell
 
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
-  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`, `arrow-json`
+  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`
 
 
 SQL shell allows you to explore data of all dataset in your workspace using one of the supported data processing engines. This can be a great way to prepare and test a query that you cal later turn into derivative dataset.
@@ -1189,7 +1189,7 @@ Displays a sample of most recent records in a dataset
   Default value: `0`
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
-  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`, `arrow-json`
+  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`
 
 
 This command can be thought of as a shortcut for:

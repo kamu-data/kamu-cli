@@ -24,8 +24,7 @@ fn tabular_output_params(app: Command) -> Command {
                 "csv",
                 "json",
                 "ndjson",
-                "json-soa",
-                "arrow-json", /* "vertical",
+                "json-soa", /* "vertical",
                                * "tsv",
                                * "xmlattrs",
                                * "xmlelements", */
