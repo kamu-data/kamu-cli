@@ -92,8 +92,8 @@ async fn test_dataset_compact() {
         .ingest_data(data_str.to_string(), &root_dataset_alias.as_local_ref())
         .await;
 
-    // seed <- add_push_source <- set_vocab <- set_data_schema <- add_data(3
-    // records)
+    // seed <- add_push_source <- set_vocab <- set_schema <- set_data_schema <-
+    // add_data(3 records)
     let old_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
@@ -144,7 +144,7 @@ async fn test_dataset_compact() {
         )
         .await;
 
-    // seed <- add_push_source <- set_vocab <- add_data(3 records)
+    // seed <- add_push_source <- set_vocab <- set_schema <- add_data(3 records)
     let new_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
@@ -230,7 +230,7 @@ async fn test_dataset_compact() {
         )
         .await;
 
-    // seed <- add_push_source <- set_vocab <- add_data(6 records)
+    // seed <- add_push_source <- set_vocab <- set_schema <- add_data(6 records)
     let new_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
@@ -413,8 +413,8 @@ async fn test_dataset_compact_limits() {
             )
             .await;
 
-    // seed <- add_push_source <- set_vocab <- add_data(6r) <- add_data(6r) <-
-    // add_data(4r)
+    // seed <- add_push_source <- set_vocab <- set_schema <- add_data(6r) <-
+    // add_data(6r) <- add_data(4r)
     let new_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
@@ -593,8 +593,8 @@ async fn test_dataset_compact_keep_all_non_data_blocks() {
         )
         .await;
 
-    // seed <- add_push_source <- set_vocab <- add_data(6r) <- set_licence <-
-    // add_data(6r)
+    // seed <- add_push_source <- set_vocab <- set_scheme <- add_data(6r) <-
+    // set_licence <- add_data(6r)
     let new_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
@@ -606,9 +606,10 @@ async fn test_dataset_compact_keep_all_non_data_blocks() {
         &last_old_block.event,
         &last_new_block.event
     ));
+
     assert!(CompactTestHarness::assert_new_block_propagates_extra_info(
         &old_blocks,
-        &new_blocks
+        &new_blocks,
     ));
 }
 
@@ -1002,12 +1003,12 @@ impl CompactTestHarness {
         old_chain: &[(Multihash, MetadataBlock)],
         new_chain: &[(Multihash, MetadataBlock)],
     ) -> bool {
-        let mut new_non_add_data_event_index = 0;
+        let mut new_non_add_data_event_index = 0u32;
         for (_, old_block) in old_chain {
             if let MetadataEvent::AddData(_) = old_block.event {
                 continue;
             }
-            let mut old_add_data_event_index = 0;
+            let mut old_add_data_event_index = 0u32;
             for (_, new_block) in new_chain {
                 if let MetadataEvent::AddData(_) = new_block.event {
                     continue;
