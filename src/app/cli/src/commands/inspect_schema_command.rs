@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::sync::Arc;
+use datafusion::arrow::datatypes::SchemaRef;
 
 use datafusion::parquet::schema::types::Type;
 use kamu::domain::*;
@@ -97,6 +98,19 @@ impl InspectSchemaCommand {
         Ok(())
     }
 
+    fn print_schema_parquet_json(&self, schema: &Type) -> Result<(), CLIError> {
+        kamu_data_utils::schema::format::write_schema_parquet_json(&mut std::io::stdout(), schema)?;
+        Ok(())
+    }
+
+    fn print_schema_arrow_json(&self, arrow: &SchemaRef) -> Result<(), CLIError> {
+        kamu_data_utils::schema::format::write_schema_arrow_json(
+            &mut std::io::stdout(),
+            arrow.as_ref(),
+        )?;
+        Ok(())
+    }
+
     fn query_errors(e: QueryError) -> CLIError {
         match e {
             QueryError::DatasetNotFound(e) => CLIError::usage_error_from(e),
@@ -124,9 +138,13 @@ impl Command for InspectSchemaCommand {
                 let schema = self.get_parquet_schema().await?;
                 self.print_schema_ddl(&schema);
             }
-            Some("parquet-json") => {
+            Some("parquet") => {
                 let schema = self.get_parquet_schema().await?;
                 self.print_schema_parquet(&schema)?;
+            }
+            Some("parquet-json") => {
+                let schema = self.get_parquet_schema().await?;
+                self.print_schema_parquet_json(&schema)?;
             }
             Some("arrow-json") => {
                 let arrow = self
@@ -136,10 +154,7 @@ impl Command for InspectSchemaCommand {
                     .map_err(Self::query_errors)?
                     .unwrap();
 
-                kamu_data_utils::schema::format::write_schema_arrow_json(
-                    &mut std::io::stdout(),
-                    arrow.as_ref(),
-                )?;
+                self.print_schema_arrow_json(&arrow)?;
             }
             _ => unreachable!(),
         }
