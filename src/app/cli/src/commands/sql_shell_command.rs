@@ -90,7 +90,7 @@ impl SqlShellCommand {
                 &self.workspace_layout,
                 match self.output_config.format {
                     OutputFormat::Csv => Some("csv"),
-                    OutputFormat::Parquet => Some("parquet"),
+                    OutputFormat::Json => Some("json"),
                     OutputFormat::NdJson => {
                         unimplemented!("Line-delimited Json is not yet supported by this command")
                     }
