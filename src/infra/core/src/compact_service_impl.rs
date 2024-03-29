@@ -84,6 +84,7 @@ struct DataSliceBatchInfo {
 
 struct ChainFilesInfo {
     old_head: Multihash,
+    old_num_blocks: usize,
     offset_column: String,
     data_slice_batches: Vec<DataSliceBatch>,
 }
@@ -113,6 +114,7 @@ impl CompactServiceImpl {
     ) -> Result<ChainFilesInfo, CompactError> {
         // Declare mut values for result
 
+        let mut old_num_blocks: usize = 0;
         let mut old_head: Option<Multihash> = None;
         let mut current_hash: Option<Multihash> = None;
         let mut vocab_event: Option<SetVocab> = None;
@@ -128,6 +130,7 @@ impl CompactServiceImpl {
         let object_data_repo = dataset.as_data_repo();
 
         while let Some((block_hash, block)) = block_stream.try_next().await? {
+            old_num_blocks += 1;
             match block.event {
                 MetadataEvent::AddData(add_data_event) => {
                     if let Some(output_slice) = &add_data_event.new_data {
@@ -217,6 +220,7 @@ impl CompactServiceImpl {
             data_slice_batches,
             offset_column: vocab.offset_column,
             old_head: old_head.unwrap(),
+            old_num_blocks,
         })
     }
 
@@ -295,10 +299,12 @@ impl CompactServiceImpl {
         &self,
         dataset: Arc<dyn Dataset>,
         chain_files_info: &ChainFilesInfo,
-    ) -> Result<(Vec<Url>, Multihash), CompactError> {
+    ) -> Result<(Vec<Url>, Multihash, usize), CompactError> {
         let chain = dataset.as_metadata_chain();
         let mut current_head = chain_files_info.old_head.clone();
         let mut old_data_slices: Vec<Url> = vec![];
+        // set it to 1 to include seed block
+        let mut new_num_blocks: usize = 1;
 
         for data_slice_batch in chain_files_info.data_slice_batches.iter().rev() {
             match data_slice_batch {
@@ -364,9 +370,10 @@ impl CompactServiceImpl {
                     old_data_slices.extend(data_slice_batch_info.data_slices_batch.clone());
                 }
             }
+            new_num_blocks += 1;
         }
 
-        Ok((old_data_slices, current_head))
+        Ok((old_data_slices, current_head, new_num_blocks))
     }
 }
 
@@ -411,6 +418,12 @@ impl CompactService for CompactServiceImpl {
             .gather_chain_info(dataset.clone(), max_slice_size, max_slice_records)
             .await?;
 
+        // if slices amount +1(seed block) eq to amount of blocks we will not perform
+        // compaction
+        if chain_files_info.data_slice_batches.len() + 1 == chain_files_info.old_num_blocks {
+            return Ok(CompactResult::NothingToDo);
+        }
+
         listener.begin_phase(CompactionPhase::MergeDataslices);
         self.merge_files(
             &mut chain_files_info.data_slice_batches,
@@ -420,7 +433,7 @@ impl CompactService for CompactServiceImpl {
         .await?;
 
         listener.begin_phase(CompactionPhase::CommitNewBlocks);
-        let (_old_data_slices, new_head) = self
+        let (_old_data_slices, new_head, new_num_blocks) = self
             .commit_new_blocks(dataset.clone(), &chain_files_info)
             .await?;
 
@@ -437,6 +450,11 @@ impl CompactService for CompactServiceImpl {
             .await?;
         listener.success();
 
-        Ok(CompactResult::Finished)
+        Ok(CompactResult::Success {
+            old_head: chain_files_info.old_head,
+            new_head,
+            old_num_blocks: chain_files_info.old_num_blocks,
+            new_num_blocks,
+        })
     }
 }

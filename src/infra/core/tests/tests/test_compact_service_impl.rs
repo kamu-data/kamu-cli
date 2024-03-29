@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, NaiveDate, TimeDelta, TimeZone, Utc};
 use datafusion::execution::config::SessionConfig;
@@ -29,10 +29,12 @@ use kamu::*;
 use kamu_core::{auth, CurrentAccountSubject};
 use opendatafabric::*;
 
+use super::test_pull_service_impl::TestTransformService;
+
 const MAX_SLICE_SIZE: u64 = 1024 * 1024 * 1024;
 const MAX_SLICE_RECORDS: u64 = 10000;
 
-// #[test_group::group(ingest, datafusion, compact)]
+#[test_group::group(ingest, datafusion, compact)]
 #[tokio::test]
 async fn test_dataset_compact() {
     let harness = CompactTestHarness::new();
@@ -71,7 +73,6 @@ async fn test_dataset_compact() {
         .await;
 
     let data_helper = harness.dataset_data_helper(&root_dataset_alias).await;
-
     let dataset_handle = harness
         .dataset_repo
         .resolve_dataset_ref(&root_dataset_alias.as_local_ref())
@@ -91,6 +92,8 @@ async fn test_dataset_compact() {
         .ingest_data(data_str.to_string(), &root_dataset_alias.as_local_ref())
         .await;
 
+    // seed <- add_push_source <- set_vocab <- set_data_schema <- add_data(3
+    // records)
     let old_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
@@ -105,7 +108,12 @@ async fn test_dataset_compact() {
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(CompactResult::Finished),
+        Ok(CompactResult::NothingToDo)
+    );
+    assert!(
+        harness
+            .verify_dataset(&root_dataset_alias.as_local_ref())
+            .await
     );
 
     data_helper
@@ -136,14 +144,14 @@ async fn test_dataset_compact() {
         )
         .await;
 
+    // seed <- add_push_source <- set_vocab <- add_data(3 records)
     let new_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
 
-    assert_eq!(old_blocks.len(), new_blocks.len());
     let (_, last_old_block) = old_blocks.first().unwrap();
     let (_, last_new_block) = new_blocks.first().unwrap();
-    assert!(CompactTestHarness::assert_add_data_block_events(
+    assert!(CompactTestHarness::assert_last_add_data_block_event(
         &last_old_block.event,
         &last_new_block.event
     ));
@@ -161,6 +169,8 @@ async fn test_dataset_compact() {
         .ingest_data(data_str.to_string(), &root_dataset_alias.as_local_ref())
         .await;
 
+    // seed <- add_push_source <- set_vocab <- set_schema <- add_data(3 records) <-
+    // add_data(3 records)
     let old_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
@@ -175,7 +185,17 @@ async fn test_dataset_compact() {
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(CompactResult::Finished),
+        Ok(CompactResult::Success {
+            new_head,
+            old_head,
+            new_num_blocks: 5,
+            old_num_blocks: 6
+        }) if new_head != old_head,
+    );
+    assert!(
+        harness
+            .verify_dataset(&root_dataset_alias.as_local_ref())
+            .await
     );
 
     // 2 Dataslices will be merged in a one slice
@@ -210,32 +230,133 @@ async fn test_dataset_compact() {
         )
         .await;
 
+    // seed <- add_push_source <- set_vocab <- add_data(6 records)
     let new_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
 
     // We compacted two data slices and blocks into one
-    assert_eq!(old_blocks.len() - 1, new_blocks.len());
     let (_, last_old_block) = old_blocks.first().unwrap();
     let (_, last_new_block) = new_blocks.first().unwrap();
-    assert!(CompactTestHarness::assert_add_data_block_events(
+    assert!(CompactTestHarness::assert_last_add_data_block_event(
         &last_old_block.event,
         &last_new_block.event
     ));
+}
+
+#[test_group::group(ingest, datafusion, compact)]
+#[tokio::test]
+async fn test_dataset_compact_limits() {
+    let harness = CompactTestHarness::new();
+
+    let root_dataset_name = DatasetName::new_unchecked("foo");
+    let root_dataset_alias = DatasetAlias::new(None, root_dataset_name.clone());
+
+    harness
+        .create_dataset(
+            MetadataFactory::dataset_snapshot()
+                .name(root_dataset_name.as_str())
+                .kind(DatasetKind::Root)
+                .push_event(
+                    MetadataFactory::add_push_source()
+                        .read(ReadStepCsv {
+                            header: Some(true),
+                            schema: Some(
+                                ["date TIMESTAMP", "city STRING", "population BIGINT"]
+                                    .iter()
+                                    .map(|s| (*s).to_string())
+                                    .collect(),
+                            ),
+                            ..ReadStepCsv::default()
+                        })
+                        .merge(MergeStrategyLedger {
+                            primary_key: vec!["date".to_string(), "city".to_string()],
+                        })
+                        .build(),
+                )
+                .push_event(SetVocab {
+                    event_time_column: Some("date".to_string()),
+                    ..Default::default()
+                })
+                .build(),
+        )
+        .await;
+
+    let data_helper = harness.dataset_data_helper(&root_dataset_alias).await;
+    let dataset_handle = harness
+        .dataset_repo
+        .resolve_dataset_ref(&root_dataset_alias.as_local_ref())
+        .await
+        .unwrap();
 
     let data_str = indoc!(
         "
-        date,city,population
-        2020-01-07,A,1000
-        2020-01-08,B,2000
-        2020-01-09,C,3000
-        "
+            date,city,population
+            2020-01-01,A,1000
+            2020-01-02,B,2000
+            2020-01-03,C,3000
+            "
     );
 
     harness
         .ingest_data(data_str.to_string(), &root_dataset_alias.as_local_ref())
         .await;
 
+    let data_str = indoc!(
+        "
+            date,city,population
+            2020-01-04,A,4000
+            2020-01-05,B,5000
+            2020-01-06,C,6000
+            "
+    );
+
+    harness
+        .ingest_data(data_str.to_string(), &root_dataset_alias.as_local_ref())
+        .await;
+
+    let data_str = indoc!(
+        "
+            date,city,population
+            2020-01-07,A,7000
+            2020-01-08,B,8000
+            2020-01-09,C,9000
+            2020-01-10,D,10000
+            2020-01-11,F,11000
+            2020-01-12,G,12000
+            "
+    );
+
+    harness
+        .ingest_data(data_str.to_string(), &root_dataset_alias.as_local_ref())
+        .await;
+
+    let data_str = indoc!(
+        "
+            date,city,population
+            2020-01-13,D,13000
+            2020-01-14,F,14000
+            2020-01-15,G,15000
+            "
+    );
+
+    harness
+        .ingest_data(data_str.to_string(), &root_dataset_alias.as_local_ref())
+        .await;
+
+    let data_str = indoc!(
+        "
+            date,city,population
+            2020-01-16,A,16000
+            "
+    );
+
+    harness
+        .ingest_data(data_str.to_string(), &root_dataset_alias.as_local_ref())
+        .await;
+
+    // seed <- add_push_source <- set_vocab <- set_schema <- add_data(3r) <-
+    // add_data(3r) <- add_data(6r) <- add_data(3r) <- add_data(1r)
     let old_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
@@ -250,62 +371,148 @@ async fn test_dataset_compact() {
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(CompactResult::Finished),
+        Ok(CompactResult::Success {
+            new_head,
+            old_head,
+            new_num_blocks: 7,
+            old_num_blocks: 9
+        }) if new_head != old_head,
+    );
+    assert!(
+        harness
+            .verify_dataset(&root_dataset_alias.as_local_ref())
+            .await
     );
 
-    // Due to limit we will left last added slice as it is
     data_helper
-        .assert_last_data_eq(
-            indoc!(
-                r#"
-                message arrow_schema {
-                  OPTIONAL INT64 offset;
-                  REQUIRED INT32 op;
-                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
-                }
-                "#
-            ),
-            indoc!(
-                r#"
-                +--------+----+----------------------+----------------------+------+------------+
-                | offset | op | system_time          | date                 | city | population |
-                +--------+----+----------------------+----------------------+------+------------+
-                | 6      | 0  | 2050-01-01T12:00:00Z | 2020-01-07T00:00:00Z | A    | 1000       |
-                | 7      | 0  | 2050-01-01T12:00:00Z | 2020-01-08T00:00:00Z | B    | 2000       |
-                | 8      | 0  | 2050-01-01T12:00:00Z | 2020-01-09T00:00:00Z | C    | 3000       |
-                +--------+----+----------------------+----------------------+------+------------+
-                "#
-            ),
-        )
-        .await;
+            .assert_last_data_eq(
+                indoc!(
+                    r#"
+                    message arrow_schema {
+                      OPTIONAL INT64 offset;
+                      REQUIRED INT32 op;
+                      REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                      OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                      OPTIONAL BYTE_ARRAY city (STRING);
+                      OPTIONAL INT64 population;
+                    }
+                    "#
+                ),
+                indoc!(
+                    r#"
+                    +--------+----+----------------------+----------------------+------+------------+
+                    | offset | op | system_time          | date                 | city | population |
+                    +--------+----+----------------------+----------------------+------+------------+
+                    | 12     | 0  | 2050-01-01T12:00:00Z | 2020-01-13T00:00:00Z | D    | 13000      |
+                    | 13     | 0  | 2050-01-01T12:00:00Z | 2020-01-14T00:00:00Z | F    | 14000      |
+                    | 14     | 0  | 2050-01-01T12:00:00Z | 2020-01-15T00:00:00Z | G    | 15000      |
+                    | 15     | 0  | 2050-01-01T12:00:00Z | 2020-01-16T00:00:00Z | A    | 16000      |
+                    +--------+----+----------------------+----------------------+------+------------+
+                    "#
+                ),
+            )
+            .await;
 
+    // seed <- add_push_source <- set_vocab <- add_data(6r) <- add_data(6r) <-
+    // add_data(4r)
     let new_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
 
     // Shoud save original amount of blocks
     // such as size is equal to max-slice-size
-    assert_eq!(old_blocks.len(), new_blocks.len());
     let (_, last_old_block) = old_blocks.first().unwrap();
-    let (last_new_block_hash, last_new_block) = new_blocks.first().unwrap();
-    assert!(CompactTestHarness::assert_add_data_block_events(
+    let (_, last_new_block) = new_blocks.first().unwrap();
+    assert!(CompactTestHarness::assert_last_add_data_block_event(
         &last_old_block.event,
         &last_new_block.event
     ));
+}
+
+#[test_group::group(ingest, datafusion, compact)]
+#[tokio::test]
+async fn test_dataset_compact_keep_all_non_data_blocks() {
+    let harness = CompactTestHarness::new();
+
+    let root_dataset_name = DatasetName::new_unchecked("foo");
+    let root_dataset_alias = DatasetAlias::new(None, root_dataset_name.clone());
 
     harness
-        .commit_set_licence_block(&root_dataset_alias.as_local_ref(), last_new_block_hash)
+        .create_dataset(
+            MetadataFactory::dataset_snapshot()
+                .name(root_dataset_name.as_str())
+                .kind(DatasetKind::Root)
+                .push_event(
+                    MetadataFactory::add_push_source()
+                        .read(ReadStepCsv {
+                            header: Some(true),
+                            schema: Some(
+                                ["date TIMESTAMP", "city STRING", "population BIGINT"]
+                                    .iter()
+                                    .map(|s| (*s).to_string())
+                                    .collect(),
+                            ),
+                            ..ReadStepCsv::default()
+                        })
+                        .merge(MergeStrategyLedger {
+                            primary_key: vec!["date".to_string(), "city".to_string()],
+                        })
+                        .build(),
+                )
+                .push_event(SetVocab {
+                    event_time_column: Some("date".to_string()),
+                    ..Default::default()
+                })
+                .build(),
+        )
+        .await;
+
+    let data_helper = harness.dataset_data_helper(&root_dataset_alias).await;
+    let dataset_handle = harness
+        .dataset_repo
+        .resolve_dataset_ref(&root_dataset_alias.as_local_ref())
+        .await
+        .unwrap();
+
+    let data_str = indoc!(
+        "
+                date,city,population
+                2020-01-01,A,1000
+                2020-01-02,B,2000
+                2020-01-03,C,3000
+                "
+    );
+
+    harness
+        .ingest_data(data_str.to_string(), &root_dataset_alias.as_local_ref())
+        .await;
+
+    let data_str = indoc!(
+        "
+            date,city,population
+            2020-01-04,A,4000
+            2020-01-05,B,5000
+            2020-01-06,C,6000
+            "
+    );
+
+    harness
+        .ingest_data(data_str.to_string(), &root_dataset_alias.as_local_ref())
+        .await;
+
+    let current_head = harness
+        .get_dataset_head(&dataset_handle.as_local_ref())
+        .await;
+    harness
+        .commit_set_licence_block(&root_dataset_alias.as_local_ref(), &current_head)
         .await;
 
     let data_str = indoc!(
         "
         date,city,population
-        2020-01-10,A,7000
-        2020-01-11,B,8000
-        2020-01-12,C,7000
+        2020-01-07,A,7000
+        2020-01-08,B,8000
+        2020-01-09,C,9000
         "
     );
 
@@ -316,9 +523,9 @@ async fn test_dataset_compact() {
     let data_str = indoc!(
         "
             date,city,population
-            2020-01-13,A,1000
-            2020-01-14,B,2000
-            2020-01-15,C,3000
+            2020-01-10,A,10000
+            2020-01-11,B,11000
+            2020-01-12,C,12000
             "
     );
 
@@ -326,6 +533,8 @@ async fn test_dataset_compact() {
         .ingest_data(data_str.to_string(), &root_dataset_alias.as_local_ref())
         .await;
 
+    // seed <- add_push_source <- set_vocab <- set_schema <- add_data(3r) <-
+    // add_data(3r) <- set_licence <- add_data(3r) <- add_data(3r)
     let old_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
@@ -336,11 +545,21 @@ async fn test_dataset_compact() {
             .compact_dataset(
                 &dataset_handle,
                 MAX_SLICE_SIZE,
-                6,
+                MAX_SLICE_RECORDS,
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(CompactResult::Finished),
+        Ok(CompactResult::Success {
+            new_head,
+            old_head,
+            new_num_blocks: 7,
+            old_num_blocks: 9
+        }) if new_head != old_head,
+    );
+    assert!(
+        harness
+            .verify_dataset(&root_dataset_alias.as_local_ref())
+            .await
     );
 
     data_helper
@@ -362,34 +581,41 @@ async fn test_dataset_compact() {
                 +--------+----+----------------------+----------------------+------+------------+
                 | offset | op | system_time          | date                 | city | population |
                 +--------+----+----------------------+----------------------+------+------------+
-                | 9      | 0  | 2050-01-01T12:00:00Z | 2020-01-10T00:00:00Z | A    | 7000       |
-                | 10     | 0  | 2050-01-01T12:00:00Z | 2020-01-11T00:00:00Z | B    | 8000       |
-                | 11     | 0  | 2050-01-01T12:00:00Z | 2020-01-12T00:00:00Z | C    | 7000       |
-                | 12     | 0  | 2050-01-01T12:00:00Z | 2020-01-13T00:00:00Z | A    | 1000       |
-                | 13     | 0  | 2050-01-01T12:00:00Z | 2020-01-14T00:00:00Z | B    | 2000       |
-                | 14     | 0  | 2050-01-01T12:00:00Z | 2020-01-15T00:00:00Z | C    | 3000       |
+                | 6      | 0  | 2050-01-01T12:00:00Z | 2020-01-07T00:00:00Z | A    | 7000       |
+                | 7      | 0  | 2050-01-01T12:00:00Z | 2020-01-08T00:00:00Z | B    | 8000       |
+                | 8      | 0  | 2050-01-01T12:00:00Z | 2020-01-09T00:00:00Z | C    | 9000       |
+                | 9      | 0  | 2050-01-01T12:00:00Z | 2020-01-10T00:00:00Z | A    | 10000      |
+                | 10     | 0  | 2050-01-01T12:00:00Z | 2020-01-11T00:00:00Z | B    | 11000      |
+                | 11     | 0  | 2050-01-01T12:00:00Z | 2020-01-12T00:00:00Z | C    | 12000      |
                 +--------+----+----------------------+----------------------+------+------------+
                 "#
             ),
         )
         .await;
 
+    // seed <- add_push_source <- set_vocab <- add_data(6r) <- set_licence <-
+    // add_data(6r)
     let new_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
 
-    // Only last 2 blocks will be merged into one
-    assert_eq!(old_blocks.len() - 1, new_blocks.len());
+    // The first two and the last two dataslices were merged
     let (_, last_old_block) = old_blocks.first().unwrap();
     let (_, last_new_block) = new_blocks.first().unwrap();
-    assert!(CompactTestHarness::assert_add_data_block_events(
+    assert!(CompactTestHarness::assert_last_add_data_block_event(
         &last_old_block.event,
         &last_new_block.event
     ));
-    assert!(CompactTestHarness::assert_non_add_data_events(
+    assert!(CompactTestHarness::assert_new_block_propagates_extra_info(
         &old_blocks,
         &new_blocks
     ));
+}
+
+#[test_group::group(compact)]
+#[tokio::test]
+async fn test_dataset_compact_derive_error() {
+    let harness = CompactTestHarness::new();
 
     let derive_dataset_name = DatasetName::new_unchecked("derive-foo");
     let derive_dataset_alias = DatasetAlias::new(None, derive_dataset_name.clone());
@@ -424,7 +650,7 @@ async fn test_dataset_compact() {
     );
 }
 
-// #[test_group::group(ingest, datafusion, compact)]
+#[test_group::group(ingest, datafusion, compact)]
 #[tokio::test]
 async fn test_large_dataset_compact() {
     let harness = CompactTestHarness::new();
@@ -518,15 +744,22 @@ async fn test_large_dataset_compact() {
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(CompactResult::Finished),
+        Ok(CompactResult::Success {
+            new_head,
+            old_head,
+            new_num_blocks: 24,
+            old_num_blocks: 104
+        }) if new_head != old_head,
+    );
+    assert!(
+        harness
+            .verify_dataset(&root_dataset_alias.as_local_ref())
+            .await
     );
 
     let new_blocks = harness
         .get_dataset_blocks(&root_dataset_alias.as_local_ref())
         .await;
-
-    // We compacted all data slices and blocks into 20
-    assert_eq!(new_blocks.len(), 24);
 
     // check the last block data and offsets
     data_helper
@@ -563,12 +796,24 @@ async fn test_large_dataset_compact() {
             ),
         )
         .await;
+
+    let (_, last_old_block) = old_blocks.first().unwrap();
+    let (_, last_new_block) = new_blocks.first().unwrap();
+    assert!(CompactTestHarness::assert_last_add_data_block_event(
+        &last_old_block.event,
+        &last_new_block.event
+    ));
+    assert!(CompactTestHarness::assert_new_block_propagates_extra_info(
+        &old_blocks,
+        &new_blocks
+    ));
 }
 
 struct CompactTestHarness {
     dataset_repo: Arc<dyn DatasetRepository>,
     compact_svc: Arc<dyn CompactService>,
     push_ingest_svc: Arc<dyn PushIngestService>,
+    verification_svc: Arc<dyn VerificationService>,
     current_date_tame: DateTime<Utc>,
     ctx: SessionContext,
 }
@@ -612,16 +857,21 @@ impl CompactTestHarness {
                     .with_run_info_dir(run_info_dir),
             )
             .bind::<dyn PushIngestService, PushIngestServiceImpl>()
+            .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
+            .bind::<dyn TransformService, TestTransformService>()
+            .add::<VerificationServiceImpl>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
         let compact_svc = catalog.get_one::<dyn CompactService>().unwrap();
         let push_ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
+        let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
 
         Self {
             dataset_repo,
             compact_svc,
             push_ingest_svc,
+            verification_svc,
             current_date_tame,
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
@@ -715,14 +965,14 @@ impl CompactTestHarness {
                     system_time: Some(self.current_date_tame),
                     prev_block_hash: Some(Some(head)),
                     check_object_refs: false,
-                    update_block_ref: false,
+                    update_block_ref: true,
                 },
             )
             .await
             .unwrap();
     }
 
-    fn assert_add_data_block_events(
+    fn assert_last_add_data_block_event(
         old_block_event: &MetadataEvent,
         new_block_event: &MetadataEvent,
     ) -> bool {
@@ -748,17 +998,17 @@ impl CompactTestHarness {
         false
     }
 
-    fn assert_non_add_data_events(
+    fn assert_new_block_propagates_extra_info(
         old_chain: &[(Multihash, MetadataBlock)],
         new_chain: &[(Multihash, MetadataBlock)],
     ) -> bool {
         let mut new_non_add_data_event_index = 0;
-        for (old_hash, old_block) in old_chain {
+        for (_, old_block) in old_chain {
             if let MetadataEvent::AddData(_) = old_block.event {
                 continue;
             }
             let mut old_add_data_event_index = 0;
-            for (new_hash, new_block) in new_chain {
+            for (_, new_block) in new_chain {
                 if let MetadataEvent::AddData(_) = new_block.event {
                     continue;
                 }
@@ -766,7 +1016,7 @@ impl CompactTestHarness {
                     old_add_data_event_index += 1;
                     continue;
                 }
-                if new_hash != old_hash || old_block != new_block {
+                if old_block.event != new_block.event {
                     return false;
                 }
                 break;
@@ -774,5 +1024,19 @@ impl CompactTestHarness {
             new_non_add_data_event_index += 1;
         }
         true
+    }
+
+    async fn verify_dataset(&self, dataset_ref: &DatasetRef) -> bool {
+        let result = self
+            .verification_svc
+            .verify(
+                dataset_ref,
+                (None, None),
+                VerificationOptions::default(),
+                None,
+            )
+            .await;
+
+        result.outcome.is_ok()
     }
 }

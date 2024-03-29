@@ -851,11 +851,7 @@ impl TransformService for TransformServiceImpl {
                         .prepare_execute_transform(
                             params,
                             response.new_data.as_ref(),
-                            response
-                                .new_checkpoint
-                                .as_ref()
-                                .map(|r| CheckpointRef::New(r.clone()))
-                                .as_ref(),
+                            response.new_checkpoint.map(CheckpointRef::New).as_ref(),
                         )
                         .await?;
 

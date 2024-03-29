@@ -147,8 +147,13 @@ pub enum CompactionPhase {
     CommitNewBlocks,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CompactResult {
-    Finished,
-    CleanUpRequired,
+    NothingToDo,
+    Success {
+        old_head: Multihash,
+        new_head: Multihash,
+        old_num_blocks: usize,
+        new_num_blocks: usize,
+    },
 }
