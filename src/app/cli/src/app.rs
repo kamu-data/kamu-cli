@@ -547,7 +547,7 @@ fn configure_output_format(
 
     let format = match format_str {
         Some("csv") => OutputFormat::Csv,
-        Some("parquet") => OutputFormat::Parquet,
+        Some("json") => OutputFormat::Json,
         Some("ndjson") => OutputFormat::NdJson,
         Some("json-soa") => OutputFormat::JsonSoA,
         Some("table") => OutputFormat::Table,
@@ -555,7 +555,7 @@ fn configure_output_format(
             if is_tty {
                 OutputFormat::Table
             } else {
-                OutputFormat::Parquet
+                OutputFormat::Json
             }
         }
     };
