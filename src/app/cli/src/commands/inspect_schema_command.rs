@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use std::sync::Arc;
-use datafusion::arrow::datatypes::SchemaRef;
 
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::parquet::schema::types::Type;
 use kamu::domain::*;
 use opendatafabric::*;

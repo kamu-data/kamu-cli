@@ -20,14 +20,11 @@ fn tabular_output_params(app: Command) -> Command {
             .short('o')
             .value_name("FMT")
             .value_parser([
-                "table",
-                "csv",
-                "json",
-                "ndjson",
+                "table", "csv", "json", "ndjson",
                 "json-soa", /* "vertical",
-                               * "tsv",
-                               * "xmlattrs",
-                               * "xmlelements", */
+                            * "tsv",
+                            * "xmlattrs",
+                            * "xmlelements", */
             ])
             .help("Format to display the results in"),
         /*Arg::new("no-color")
