@@ -279,8 +279,12 @@ fn get_base_dataset_url(
 /////////////////////////////////////////////////////////////////////////////////
 
 fn get_api_server_url(host: &str) -> Url {
-    let scheme = std::env::var("KAMU_PROTOCOL_SCHEME").unwrap_or_else(|_| String::from("http"));
-    Url::parse(&format!("{scheme}://{host}")).unwrap()
+    // TODO: Use value from config not envvar
+    //       https://github.com/kamu-data/kamu-node/issues/45
+    let raw_base_url =
+        std::env::var("KAMU_BASE_URL_REST").unwrap_or_else(|_| format!("http://{host}"));
+
+    Url::parse(&raw_base_url).unwrap()
 }
 
 /////////////////////////////////////////////////////////////////////////////////

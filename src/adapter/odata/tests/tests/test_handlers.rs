@@ -17,6 +17,7 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use opendatafabric::*;
+use url::Url;
 
 use super::test_api_server::TestAPIServer;
 
@@ -45,12 +46,7 @@ async fn test_service_handler() {
 
     let client = async move {
         let cl = reqwest::Client::new();
-        let res = cl
-            .get(&service_url)
-            .header("host", "example.com")
-            .send()
-            .await
-            .unwrap();
+        let res = cl.get(&service_url).send().await.unwrap();
         assert_eq!(res.status(), http::StatusCode::OK);
         assert_eq!(
             res.headers()["content-type"],
@@ -95,12 +91,7 @@ async fn test_metadata_handler() {
 
     let client = async move {
         let cl = reqwest::Client::new();
-        let res = cl
-            .get(&service_url)
-            .header("host", "example.com")
-            .send()
-            .await
-            .unwrap();
+        let res = cl.get(&service_url).send().await.unwrap();
         assert_eq!(res.status(), http::StatusCode::OK);
         assert_eq!(
             res.headers()["content-type"],
@@ -153,12 +144,7 @@ async fn test_collection_handler() {
 
     let client = async move {
         let cl = reqwest::Client::new();
-        let res = cl
-            .get(&collection_url)
-            .header("host", "example.com")
-            .send()
-            .await
-            .unwrap();
+        let res = cl.get(&collection_url).send().await.unwrap();
         assert_eq!(res.status(), http::StatusCode::OK);
         assert_eq!(
             res.headers()["content-type"],
@@ -293,6 +279,10 @@ impl TestHarness {
             )
             .bind::<dyn PushIngestService, PushIngestServiceImpl>()
             .add::<QueryServiceImpl>()
+            .add_value(ServerUrlConfig::new(Protocols {
+                base_url_rest: Url::parse("http://example.com").unwrap(),
+                base_url_flightsql: Url::parse("grpc://localhost:50050").unwrap(),
+            }))
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
