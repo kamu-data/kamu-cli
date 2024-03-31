@@ -231,7 +231,7 @@ async fn test_dataset_compact_watermark_only_blocks() {
             None,
             None,
             CommitOpts {
-                system_time: Some(harness.current_date_tame),
+                system_time: Some(harness.current_date_time),
                 ..CommitOpts::default()
             },
         )
@@ -268,7 +268,7 @@ async fn test_dataset_compact_watermark_only_blocks() {
             None,
             None,
             CommitOpts {
-                system_time: Some(harness.current_date_tame),
+                system_time: Some(harness.current_date_time),
                 ..CommitOpts::default()
             },
         )
@@ -696,24 +696,18 @@ async fn test_dataset_compact_derive_error() {
     let created = harness
         .create_dataset(
             MetadataFactory::dataset_snapshot()
-                .name("derive-foo")
+                .name("derive.foo")
                 .kind(DatasetKind::Derivative)
                 .push_event(MetadataFactory::set_data_schema().build())
                 .build(),
         )
         .await;
 
-    let dataset_handle = harness
-        .dataset_repo
-        .resolve_dataset_ref(&created.dataset_handle.as_local_ref())
-        .await
-        .unwrap();
-
     assert_matches!(
         harness
             .compact_svc
             .compact_dataset(
-                &dataset_handle,
+                &created.dataset_handle,
                 MAX_SLICE_SIZE,
                 MAX_SLICE_RECORDS,
                 Some(Arc::new(NullCompactionMultiListener {}))
@@ -841,40 +835,40 @@ async fn test_large_dataset_compact() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct CompactTestHarness {
+    _temp_dir: tempfile::TempDir,
     dataset_repo: Arc<dyn DatasetRepository>,
     compact_svc: Arc<dyn CompactService>,
     push_ingest_svc: Arc<dyn PushIngestService>,
     verification_svc: Arc<dyn VerificationService>,
-    current_date_tame: DateTime<Utc>,
+    current_date_time: DateTime<Utc>,
     ctx: SessionContext,
 }
 
 impl CompactTestHarness {
     fn new() -> Self {
-        Self::new_local_with_authorizer(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new())
+        Self::new_local()
     }
 
-    fn new_local_with_authorizer<TDatasetAuthorizer: auth::DatasetActionAuthorizer + 'static>(
-        dataset_action_authorizer: TDatasetAuthorizer,
-    ) -> Self {
+    fn new_local() -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = temp_dir.path().join("run");
+        let datasets_dir = temp_dir.path().join("datasets");
         std::fs::create_dir(&run_info_dir).unwrap();
-        let current_date_tame = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
+        std::fs::create_dir(&datasets_dir).unwrap();
+        let current_date_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
-            .add_value(dataset_action_authorizer)
-            .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
-                    .with_root(temp_dir.path().join("datasets"))
+                    .with_root(datasets_dir)
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_value(SystemTimeSourceStub::new_set(current_date_tame))
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add_value(SystemTimeSourceStub::new_set(current_date_time))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<EngineProvisionerNull>()
             .add_builder(CompactServiceImpl::builder().with_run_info_dir(run_info_dir.clone()))
@@ -899,11 +893,12 @@ impl CompactTestHarness {
         let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
 
         Self {
+            _temp_dir: temp_dir,
             dataset_repo,
             compact_svc,
             push_ingest_svc,
             verification_svc,
-            current_date_tame,
+            current_date_time,
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
     }
@@ -1018,7 +1013,7 @@ impl CompactTestHarness {
                 event.into(),
                 CommitOpts {
                     block_ref: &BlockRef::Head,
-                    system_time: Some(self.current_date_tame),
+                    system_time: Some(self.current_date_time),
                     prev_block_hash: Some(Some(head)),
                     check_object_refs: false,
                     update_block_ref: true,
