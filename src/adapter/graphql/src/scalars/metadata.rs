@@ -17,7 +17,7 @@ use crate::queries::Account;
 // MetadataBlockExtended
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
+#[derive(Debug, SimpleObject, Clone, PartialEq, Eq)]
 pub struct MetadataBlockExtended {
     pub block_hash: Multihash,
     pub prev_block_hash: Option<Multihash>,

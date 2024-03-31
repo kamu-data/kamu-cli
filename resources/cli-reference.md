@@ -392,8 +392,9 @@ Shows the dataset schema
 
 * `-o`, `--output-format <FMT>` — Format of an output
 
-  Possible values: `ddl`, `parquet`, `json`
+  Possible values: `ddl`, `parquet`, `parquet-json`, `arrow-json`
 
+* `--from-data-file`
 
 Displays the schema of the dataset. Note that dataset schemas can evolve over time and by default the latest schema will be shown.
 
