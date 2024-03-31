@@ -168,6 +168,7 @@ pub fn get_command(
                         .clone(),
                 )?,
                 schema_matches.get_one("output-format").map(String::as_str),
+                schema_matches.get_flag("from-data-file"),
             )),
             _ => return Err(CommandInterpretationFailed.into()),
         },
@@ -462,8 +463,9 @@ pub fn get_command(
             )),
             Some(("generate-token", gen_matches)) => Box::new(GenerateTokenCommand::new(
                 cli_catalog.get_one()?,
-                gen_matches.get_one("gh-login").cloned().unwrap(),
-                gen_matches.get_one("gh-access-token").cloned().unwrap(),
+                gen_matches.get_one("login").cloned().unwrap(),
+                gen_matches.get_one("gh-access-token").cloned(),
+                *gen_matches.get_one::<usize>("expiration-time-sec").unwrap(),
             )),
             Some(("ipfs", ipfs_matches)) => match ipfs_matches.subcommand() {
                 Some(("add", add_matches)) => Box::new(SystemIpfsAddCommand::new(
@@ -475,6 +477,19 @@ pub fn get_command(
                 )),
                 _ => return Err(CommandInterpretationFailed.into()),
             },
+            Some(("compact", submatches)) => Box::new(CompactCommand::new(
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                validate_dataset_ref(
+                    cli_catalog,
+                    submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
+                )?,
+                *(submatches.get_one("max-slice-size").unwrap()),
+                *(submatches.get_one("max-slice-records").unwrap()),
+                submatches.get_flag("hard"),
+                submatches.get_flag("verify"),
+            )),
             _ => return Err(CommandInterpretationFailed.into()),
         },
         Some(("tail", submatches)) => Box::new(TailCommand::new(

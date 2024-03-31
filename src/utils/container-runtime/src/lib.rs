@@ -11,7 +11,6 @@
 #![feature(error_generic_member_access)]
 
 mod args;
-mod common;
 mod config;
 mod container;
 mod errors;
@@ -21,7 +20,6 @@ mod runtime;
 mod terminate;
 
 pub use args::*;
-pub use common::*;
 pub use config::*;
 pub use container::*;
 pub use errors::{ContainerRuntimeError, ImagePullError, TimeoutError, WaitForResourceError};

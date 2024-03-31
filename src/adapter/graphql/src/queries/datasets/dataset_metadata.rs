@@ -76,17 +76,22 @@ impl DatasetMetadata {
         ctx: &Context<'_>,
         format: Option<DataSchemaFormat>,
     ) -> Result<Option<DataSchema>> {
+        // TODO: Default to Arrow eventually
         let format = format.unwrap_or(DataSchemaFormat::Parquet);
 
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
-        let res_schema = query_svc
+
+        if let Some(schema) = query_svc
             .get_schema(&self.dataset_handle.as_local_ref())
             .await
-            .int_err()?;
-
-        match res_schema {
-            Some(schema) => Ok(Some(DataSchema::from_parquet_schema(&schema, format)?)),
-            None => Ok(None),
+            .int_err()?
+        {
+            Ok(Option::from(DataSchema::from_arrow_schema(
+                schema.as_ref(),
+                format,
+            )))
+        } else {
+            Ok(None)
         }
     }
 

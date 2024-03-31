@@ -7,21 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(error_generic_member_access)]
-#![feature(error_in_core)]
-#![feature(int_roundings)]
-#![feature(async_closure)]
-#![feature(let_chains)]
+#![feature(fn_traits)]
 
-pub mod extensions;
-pub(crate) mod mutations;
-pub(crate) mod prelude;
-pub(crate) mod queries;
-mod root;
-pub mod scalars;
-pub(crate) mod utils;
+mod common;
 
-pub use root::*;
-
-pub mod guards;
-pub use guards::*;
+pub use common::*;

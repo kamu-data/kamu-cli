@@ -7,8 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod compact_progress;
 mod output_config;
 mod verify_progress;
+
+pub use compact_progress::*;
 pub use output_config::*;
 pub use verify_progress::*;
 

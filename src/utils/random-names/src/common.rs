@@ -7,16 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub fn get_random_name_with_prefix(prefix: impl AsRef<str>) -> String {
-    use rand::distributions::Alphanumeric;
-    use rand::Rng;
+use rand::distributions::Alphanumeric;
+use rand::Rng;
 
-    let mut name = String::with_capacity(10 + prefix.as_ref().len());
-    name.push_str(prefix.as_ref());
+pub fn get_random_name(prefix_maybe: Option<&str>, random_length: usize) -> String {
+    let prefix = prefix_maybe.unwrap_or("");
+    let mut name = String::with_capacity(random_length + prefix.len());
+    name.push_str(prefix);
     name.extend(
         rand::thread_rng()
             .sample_iter(&Alphanumeric)
-            .take(10)
+            .take(random_length)
             .map(char::from),
     );
     name

@@ -6,11 +6,11 @@
 // As of the Change Date specified in that file, in accordance with
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
-
 mod auth;
 mod engine;
 mod ingest;
 mod repos;
+mod test_compact_service_impl;
 mod test_dataset_changes_service_impl;
 mod test_datasets_filtering;
 mod test_dependency_graph_inmem;

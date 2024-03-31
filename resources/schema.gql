@@ -121,6 +121,11 @@ type Checkpoint {
 	size: Int!
 }
 
+type CliProtocolDesc {
+	pullCommand: String!
+	pushCommand: String!
+}
+
 interface CommitResult {
 	message: String!
 }
@@ -223,6 +228,7 @@ type DataSchema {
 enum DataSchemaFormat {
 	PARQUET
 	PARQUET_JSON
+	ARROW_JSON
 }
 
 type DataSlice {
@@ -279,6 +285,10 @@ type Dataset {
 	Permissions of the current user
 	"""
 	permissions: DatasetPermissions!
+	"""
+	Various endpoints for interacting with data
+	"""
+	endpoints: DatasetEndpoints!
 }
 
 scalar DatasetAlias
@@ -330,6 +340,18 @@ type DatasetData {
 
 type DatasetEdge {
 	node: Dataset!
+}
+
+type DatasetEndpoints {
+	webLink: LinkProtocolDesc!
+	cli: CliProtocolDesc!
+	rest: RestProtocolDesc!
+	flightsql: FlightSqlDesc!
+	jdbc: JdbcDesc!
+	postgresql: PostgreSqlDesl!
+	kafka: KafkaProtocolDesc!
+	websocket: WebSocketProtocolDesc!
+	odata: OdataProtocolDesc!
 }
 
 type DatasetFlowConfigs {
@@ -557,9 +579,6 @@ type DisablePushSource {
 	sourceName: String!
 }
 
-"""
-Describes
-"""
 type EngineDesc {
 	"""
 	A short name of the engine, e.g. "Spark", "Flink".
@@ -638,6 +657,10 @@ type FetchStepUrl {
 	eventTime: EventTimeSource
 	cache: SourceCaching
 	headers: [RequestHeader!]
+}
+
+type FlightSqlDesc {
+	url: String!
 }
 
 
@@ -893,6 +916,18 @@ input InitiatorFilterInput @oneOf {
 }
 
 
+type JdbcDesc {
+	url: String!
+}
+
+type KafkaProtocolDesc {
+	url: String!
+}
+
+type LinkProtocolDesc {
+	url: String!
+}
+
 type LoginResponse {
 	accessToken: String!
 	account: Account!
@@ -1010,6 +1045,11 @@ type NoChanges implements CommitResult & UpdateReadmeResult {
 	message: String!
 }
 
+type OdataProtocolDesc {
+	serviceUrl: String!
+	collectionUrl: String!
+}
+
 type OffsetInterval {
 	start: Int!
 	end: Int!
@@ -1033,6 +1073,10 @@ type PageBasedInfo {
 	stays the same
 	"""
 	totalPages: Int
+}
+
+type PostgreSqlDesl {
+	url: String!
 }
 
 union PrepStep = PrepStepDecompress | PrepStepPipe
@@ -1167,6 +1211,12 @@ type RenameResultSuccess implements RenameResult {
 type RequestHeader {
 	name: String!
 	value: String!
+}
+
+type RestProtocolDesc {
+	tailUrl: String!
+	queryUrl: String!
+	pushUrl: String!
 }
 
 input ScheduleInput @oneOf {
@@ -1469,6 +1519,10 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 
 interface UpdateReadmeResult {
 	message: String!
+}
+
+type WebSocketProtocolDesc {
+	url: String!
 }
 
 schema {

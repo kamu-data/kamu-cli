@@ -18,6 +18,7 @@ use kamu_core::engine::*;
 use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::*;
+use random_names::get_random_name;
 
 pub struct TransformServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
@@ -148,6 +149,7 @@ impl TransformServiceImpl {
                             system_time: Some(request.system_time),
                             prev_block_hash: Some(Some(&request.head)),
                             check_object_refs: false,
+                            update_block_ref: true,
                         },
                     )
                     .await?;
@@ -169,12 +171,13 @@ impl TransformServiceImpl {
             .commit_execute_transform(
                 params,
                 response.new_data,
-                response.new_checkpoint,
+                response.new_checkpoint.map(CheckpointRef::New),
                 CommitOpts {
                     block_ref: &request.block_ref,
                     system_time: Some(request.system_time),
                     prev_block_hash: Some(Some(&request.head)),
                     check_object_refs: true,
+                    update_block_ref: true,
                 },
             )
             .await?;
@@ -301,7 +304,7 @@ impl TransformServiceImpl {
         }
 
         Ok(Some(TransformRequestExt {
-            operation_id: self.next_operation_id(),
+            operation_id: get_random_name(None, 10),
             dataset_handle: dataset_handle.clone(),
             block_ref,
             head,
@@ -313,21 +316,6 @@ impl TransformServiceImpl {
             inputs,
             prev_checkpoint: prev_query.and_then(|q| q.new_checkpoint.map(|c| c.physical_hash)),
         }))
-    }
-
-    fn next_operation_id(&self) -> String {
-        use rand::distributions::Alphanumeric;
-        use rand::Rng;
-
-        let mut name = String::with_capacity(16);
-        name.extend(
-            rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(10)
-                .map(char::from),
-        );
-
-        name
     }
 
     // TODO: Allow derivative datasets to function with inputs containing no data
@@ -663,7 +651,7 @@ impl TransformServiceImpl {
 
             let step = VerificationStep {
                 request: TransformRequestExt {
-                    operation_id: self.next_operation_id(),
+                    operation_id: get_random_name(None, 10),
                     dataset_handle: dataset_handle.clone(),
                     block_ref: BlockRef::Head,
                     head: block_t.prev_block_hash.unwrap().clone(),
@@ -863,7 +851,7 @@ impl TransformService for TransformServiceImpl {
                         .prepare_execute_transform(
                             params,
                             response.new_data.as_ref(),
-                            response.new_checkpoint.as_ref(),
+                            response.new_checkpoint.map(CheckpointRef::New).as_ref(),
                         )
                         .await?;
 

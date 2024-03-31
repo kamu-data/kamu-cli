@@ -392,8 +392,9 @@ Shows the dataset schema
 
 * `-o`, `--output-format <FMT>` — Format of an output
 
-  Possible values: `ddl`, `parquet`, `json`
+  Possible values: `ddl`, `parquet`, `parquet-json`, `arrow-json`
 
+* `--from-data-file`
 
 Displays the schema of the dataset. Note that dataset schemas can evolve over time and by default the latest schema will be shown.
 
@@ -1020,6 +1021,7 @@ Command group for system-level functionality
 * `ipfs` — IPFS helpers
 * `check-token` — Validate a Kamu token
 * `generate-token` — Generate a platform token from a known secret for debugging
+* `compact` — Compact a dataset
 
 
 
@@ -1160,12 +1162,53 @@ Validate a Kamu token
 
 Generate a platform token from a known secret for debugging
 
-**Usage:** `kamu system generate-token --gh-login <gh-login> --gh-access-token <gh-access-token>`
+**Usage:** `kamu system generate-token [OPTIONS] --login <login>`
 
 **Options:**
 
-* `--gh-login <GH-LOGIN>` — GitHub account login
+* `--login <LOGIN>` — Account name
 * `--gh-access-token <GH-ACCESS-TOKEN>` — An existing GitHub access token
+* `--expiration-time-sec <EXPIRATION-TIME-SEC>` — Token expiration time in seconds
+
+  Default value: `3600`
+
+
+
+## `kamu system compact`
+
+Compact a dataset
+
+**Usage:** `kamu system compact [OPTIONS] <dataset>...`
+
+**Arguments:**
+
+* `<DATASET>` — Local dataset reference(s)
+
+**Options:**
+
+* `--max-slice-size <SIZE>` — Maximum size of a single data slice file in bytes
+
+  Default value: `1073741824`
+* `--max-slice-records <RECORDS>` — Maximum amount of records in a single data slice file
+
+  Default value: `10000`
+* `--hard` — Perform 'hard' compaction that rewrites the history of a dataset
+* `--verify` — Perform verification of the dataset before running a compaction
+
+For datasets that get frequent small appends the number of data slices can grow over time and affect the performance of querying. This command allows to merge multiple small data slices into a few large files, which can be beneficial in terms of size from more compact encoding, and in query performance, as data engines will have to scan through far fewer file headers.
+
+There are two types of compactions: soft and hard.
+
+Soft compactions produce new files while leaving the old blocks intact. This allows for faster queries, while still preserving the accurate history of how dataset evolved over time.
+
+Hard compactions rewrite the history of the dataset as if data was originally written in big batches. They allow to shrink the history of a dataset to just a few blocks, reclaim the space used by old data files, but at the expense of history loss. Hard compactions will rewrite the metadata chain, changing block hashes. Therefore they will **break all downstream datasets** that depend on them.
+
+**Examples:**
+
+Perform a history-altering hard compaction:
+
+    kamu system compact --hard my.dataset
+
 
 
 

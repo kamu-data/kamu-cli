@@ -26,6 +26,7 @@ mod repos;
 pub mod testing; // TODO: Put under feature flag
 pub mod utils;
 
+mod compact_service_impl;
 mod dataset_changes_service_impl;
 mod dataset_config;
 mod dataset_layout;
@@ -45,6 +46,7 @@ mod transform_service_impl;
 mod verification_service_impl;
 
 pub use auth::*;
+pub use compact_service_impl::*;
 pub use dataset_changes_service_impl::*;
 pub use dataset_config::*;
 pub use dataset_layout::*;

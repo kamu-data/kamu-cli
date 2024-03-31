@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use dill::*;
+use kamu::domain::compact_service::CompactService;
 use kamu::domain::*;
 use kamu::*;
 
@@ -70,6 +71,8 @@ pub async fn run(
 
         let mut base_catalog_builder =
             configure_base_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
+
+        base_catalog_builder.add_value(ServerUrlConfig::load()?);
 
         base_catalog_builder
             .add_value(dependencies_graph_repository)
@@ -233,6 +236,11 @@ pub fn configure_base_catalog(
     b.add::<TransformServiceImpl>();
 
     b.add::<VerificationServiceImpl>();
+
+    b.add_builder(
+        CompactServiceImpl::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()),
+    );
+    b.bind::<dyn CompactService, CompactServiceImpl>();
 
     b.add::<SearchServiceImpl>();
 

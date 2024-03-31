@@ -28,25 +28,21 @@ use jsonwebtoken::{
 use kamu_core::auth::*;
 use kamu_core::SystemTimeSource;
 use opendatafabric::AccountName;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+use random_names::get_random_name;
 use serde::{Deserialize, Serialize};
 
 ///////////////////////////////////////////////////////////////////////////////
 
 const KAMU_JWT_ISSUER: &str = "dev.kamu";
 const KAMU_JWT_ALGORITHM: Algorithm = Algorithm::HS384;
+const EXPIRATION_TIME_SEC: usize = 24 * 60 * 60; // 1 day in seconds
 
 pub const ENV_VAR_KAMU_JWT_SECRET: &str = "KAMU_JWT_SECRET";
 
 ///////////////////////////////////////////////////////////////////////////////
 
 pub fn set_random_jwt_secret() {
-    let random_jwt_secret: String = thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(64)
-        .map(char::from)
-        .collect();
+    let random_jwt_secret = get_random_name(None, 64);
 
     std::env::set_var(ENV_VAR_KAMU_JWT_SECRET, random_jwt_secret);
 }
@@ -111,12 +107,11 @@ impl AuthenticationServiceImpl {
         subject: String,
         login_method: &str,
         provider_credentials_json: String,
+        expiration_time_sec: usize,
     ) -> Result<String, InternalError> {
-        const EXPIRE_AFTER_SEC: usize = 24 * 60 * 60; // 1 day in seconds
-
         let current_time = self.time_source.now();
         let iat = usize::try_from(current_time.timestamp()).unwrap();
-        let exp = iat + EXPIRE_AFTER_SEC;
+        let exp = iat + expiration_time_sec;
         let claims = KamuAccessTokenClaims {
             iat,
             exp,
@@ -183,6 +178,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
                 provider_response.account_info.account_name.to_string(),
                 login_method,
                 provider_response.provider_credentials_json,
+                EXPIRATION_TIME_SEC,
             )?,
             account_info: provider_response.account_info,
         })

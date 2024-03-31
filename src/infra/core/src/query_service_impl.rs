@@ -10,6 +10,7 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
+use datafusion::arrow;
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
 use datafusion::parquet::arrow::async_reader::ParquetObjectReader;
 use datafusion::parquet::file::metadata::ParquetMetaData;
@@ -116,6 +117,36 @@ impl QueryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn get_schema_impl(
         &self,
+        dataset_ref: &DatasetRef,
+    ) -> Result<Option<arrow::datatypes::SchemaRef>, QueryError> {
+        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, DatasetAction::Read)
+            .await?;
+
+        let dataset = self
+            .dataset_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
+
+        let schema_opt = dataset
+            .as_metadata_chain()
+            .iter_blocks()
+            .filter_map_ok(|(_, b)| b.event.into_variant::<SetDataSchema>())
+            .try_first()
+            .await
+            .int_err()?;
+
+        match schema_opt {
+            Some(schema) => Ok(Option::from(schema.schema_as_arrow().unwrap())),
+            None => Ok(None),
+        }
+    }
+
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn get_schema_parquet_impl(
+        &self,
         session_context: &SessionContext,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<Type>, QueryError> {
@@ -130,7 +161,6 @@ impl QueryServiceImpl {
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
-        // TODO: Update to use SetDataSchema event
         let last_data_slice_opt = dataset
             .as_metadata_chain()
             .iter_blocks()
@@ -226,9 +256,20 @@ impl QueryService for QueryServiceImpl {
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]
-    async fn get_schema(&self, dataset_ref: &DatasetRef) -> Result<Option<Type>, QueryError> {
+    async fn get_schema(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> Result<Option<arrow::datatypes::SchemaRef>, QueryError> {
+        self.get_schema_impl(dataset_ref).await
+    }
+
+    #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]
+    async fn get_schema_parquet_file(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> Result<Option<Type>, QueryError> {
         let ctx = self.session_context(QueryOptions::default());
-        self.get_schema_impl(&ctx, dataset_ref).await
+        self.get_schema_parquet_impl(&ctx, dataset_ref).await
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]

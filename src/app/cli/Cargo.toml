@@ -52,6 +52,7 @@ kamu-adapter-http = { workspace = true }
 kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
+random-names = { workspace = true }
 
 # CLI
 chrono-humanize = "0.2"  # Human readable durations
@@ -114,7 +115,6 @@ glob = "0.3"  # Used for path completions
 indoc = "2"
 itertools = "0.11"
 libc = "0.2"  # Signal names
-rand = "0.8"
 regex = "1"
 shlex = "1"  # Parsing partial input for custom completions
 signal-hook = "0.3"  # Signal handling

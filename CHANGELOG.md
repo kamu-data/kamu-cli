@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Added
+- Support `ArrowJson` schema output format in QGL API and CLI commands
+- New `kamu system compact <dataset>` command that compacts dataslices for the given dataset
+
+## [0.170.0] - 2024-03-29
+### Added
+- Added GrapqQL Dataset Endpoints object
+### Changed
+- REST API: `/ingest` endpoint will return HTTP 400 error when data cannot be read correctly
+- Improved API token generation command
+
+## [0.169.0] - 2024-03-25
+### Changed
+- Updated embedded Web UI to `v0.17.0`
+### Fixed
+- S3 Repo: Ignore dataset entries without a valid alias and leave them to be cleaned up by GC
+- Caching object repo: Ensure directory exists before writing objects
+
 ## [0.168.0] - 2024-03-23
 ### Changed
 - FlightSQL: For expensive queries `GetFlightInfo` we will only prepare schemas and not compute results - this avoids doing double the work just to return `total_records` and `total_bytes` in `FlightInfo` before result is fetched via `DoGet`
