@@ -33,7 +33,7 @@ impl DataFrameExt for DataFrame {
                 .fields()
                 .iter()
                 .filter(|f| !front_cols.contains(&f.name().as_str()))
-                .map(|f| col(f.unqualified_column())),
+                .map(|f| col(Column::from_name(f.name()))),
         );
 
         assert_eq!(columns.len(), self.schema().fields().len());
@@ -47,7 +47,7 @@ impl DataFrameExt for DataFrame {
             .fields()
             .iter()
             .filter(|f| !cols.contains(&f.name().as_str()))
-            .map(|f| col(f.unqualified_column()))
+            .map(|f| col(Column::from_name(f.name())))
             .collect();
 
         self.select(columns)

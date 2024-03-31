@@ -74,8 +74,8 @@ license-files = [
 unknown-git = "deny"
 unknown-registry = "deny"
 allow-git = [
-    # TODO: Remove after we switch to datafusion 33.0.0 release
-    "https://github.com/apache/arrow-datafusion"
+    "https://github.com/apache/arrow-datafusion",
+    "https://github.com/kamu-data/datafusion-odata"
 ]
 
 

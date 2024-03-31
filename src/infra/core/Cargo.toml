@@ -57,7 +57,7 @@ ringbuf = "0.3"
 zip = "0.6"
 
 # Data
-datafusion = { version = "36", default-features = false }
+datafusion = { version = "37", default-features = false }
 object_store = { version = "0.9", features = ["aws"] }
 digest = "0.10"
 sha3 = "0.10"

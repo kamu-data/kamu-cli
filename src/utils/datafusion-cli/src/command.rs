@@ -21,7 +21,6 @@ use std::fs::File;
 use std::io::BufReader;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Instant;
 
 use clap::ValueEnum;
 use datafusion::arrow::array::{ArrayRef, StringArray};
@@ -30,6 +29,7 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::common::exec_err;
 use datafusion::error::{DataFusionError, Result};
 use datafusion::prelude::SessionContext;
+use datafusion_common::instant::Instant;
 
 use crate::exec::exec_from_lines;
 use crate::functions::{display_all_functions, Function};

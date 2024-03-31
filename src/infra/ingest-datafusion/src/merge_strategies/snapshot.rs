@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use datafusion::common::{DFSchema, OwnedTableReference};
+use datafusion::common::DFSchema;
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::{LogicalPlanBuilder, Operator};
 use datafusion::prelude::*;
@@ -98,6 +98,7 @@ impl MergeStrategySnapshot {
                     partition_by: self.primary_key.iter().map(col).collect(),
                     order_by: vec![col(&self.vocab.offset_column).sort(false, false)],
                     window_frame: datafusion::logical_expr::WindowFrame::new(Some(false)),
+                    null_treatment: None,
                 },
             )
             .alias(rank_col)])
@@ -126,9 +127,12 @@ impl MergeStrategySnapshot {
     fn get_cdc_filter(
         &self,
         new_schema: &DFSchema,
-        old_qual: TableReference<'static>,
-        new_qual: TableReference<'static>,
+        old_qual: &TableReference,
+        new_qual: &TableReference,
     ) -> Expr {
+        let old_qual = old_qual.to_owned_reference();
+        let new_qual = new_qual.to_owned_reference();
+
         let columns: Vec<_> = if let Some(compare_columns) = &self.compare_columns {
             compare_columns.iter().map(String::as_str).collect()
         } else {
@@ -247,8 +251,8 @@ impl MergeStrategySnapshot {
         new: DataFrame,
     ) -> Result<DataFrame, DataFusionErrorWrapped> {
         // TODO: Schema evolution
-        let a_old: OwnedTableReference = "old".into();
-        let a_new: OwnedTableReference = "new".into();
+        let a_old = TableReference::bare("old");
+        let a_new = TableReference::bare("new");
         let old_col = |name: &str| -> Expr { Expr::Column(Column::new(Some(a_old.clone()), name)) };
         let new_col = |name: &str| -> Expr { Expr::Column(Column::new(Some(a_new.clone()), name)) };
 
@@ -288,7 +292,7 @@ impl MergeStrategySnapshot {
         let old = LogicalPlanBuilder::from(old).alias(a_old.clone())?;
         let new = LogicalPlanBuilder::from(new).alias(a_new.clone())?;
 
-        let filter = self.get_cdc_filter(new.schema().as_ref(), a_old.clone(), a_new.clone());
+        let filter = self.get_cdc_filter(new.schema().as_ref(), &a_old, &a_new);
 
         let cdc = old
             .join(

@@ -69,6 +69,7 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::common::DFSchema;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::{DataFrame, SessionContext};
+use prost::bytes::Bytes;
 use prost::Message;
 use tonic::codegen::tokio_stream::Stream;
 use tonic::metadata::MetadataValue;
@@ -274,7 +275,7 @@ impl KamuFlightSqlService {
                             continue;
                         }
 
-                        let table = schema.table(&table_name).await.unwrap();
+                        let table = schema.table(&table_name).await.unwrap().unwrap();
 
                         col_catalog_name.push(catalog_name.clone());
                         col_db_schema_name.push(schema_name.clone());
@@ -543,6 +544,8 @@ impl KamuFlightSqlService {
         let fieps = vec![FlightEndpoint {
             ticket: Some(Ticket { ticket }),
             location: vec![],
+            expiration_time: None,
+            app_metadata: Bytes::new(),
         }];
 
         let flight_desc = FlightDescriptor {
@@ -557,6 +560,7 @@ impl KamuFlightSqlService {
             total_records,
             total_bytes,
             ordered: false,
+            app_metadata: Bytes::new(),
         };
         tracing::debug!(
             schema = ?schema.as_ref(),
@@ -585,6 +589,8 @@ impl KamuFlightSqlService {
         let fieps = vec![FlightEndpoint {
             ticket: Some(Ticket { ticket }),
             location: vec![],
+            expiration_time: None,
+            app_metadata: Bytes::new(),
         }];
 
         let flight_desc = FlightDescriptor {
@@ -599,6 +605,7 @@ impl KamuFlightSqlService {
             total_records: -1,
             total_bytes: -1,
             ordered: false,
+            app_metadata: Bytes::new(),
         };
         tracing::debug!(
             schema = ?df.schema(),

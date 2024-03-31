@@ -22,15 +22,15 @@ doctest = false
 
 
 [dependencies]
-arrow-flight = { version = "50", features = ["flight-sql-experimental"] }
+arrow-flight = { version = "51", features = ["flight-sql-experimental"] }
 async-trait = { version = "0.1", default-features = false }
 base64 = { version = "0.21", default-features = false }
 dashmap = { version = "5", default-features = false }
-datafusion = { version = "36", default-features = false }
+datafusion = { version = "37", default-features = false }
 futures = "0.3"
 like = { version = "0.3", default-features = false }
 prost = { version = "0.12", default-features = false }
-tonic = { version = "0.10", default-features = false }
+tonic = { version = "0.11", default-features = false }
 tracing = { version = "0.1", default-features = false }
 uuid = { version = "1", default-features = false }
 

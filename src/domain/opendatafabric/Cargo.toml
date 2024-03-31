@@ -56,10 +56,10 @@ serde_yaml = "0.9"
 
 # gRPC
 prost = "0.12"
-tonic = "0.10"
+tonic = "0.11"
 
 # Optional
-arrow = { optional = true, version = "50", default-features = false, features = ["ipc"] }
+arrow = { optional = true, version = "51", default-features = false, features = ["ipc"] }
 
 [dev-dependencies]
 indoc = "2"

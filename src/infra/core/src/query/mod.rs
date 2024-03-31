@@ -19,6 +19,7 @@ use datafusion::common::{Constraints, Statistics};
 use datafusion::datasource::empty::EmptyTable;
 use datafusion::datasource::listing::{ListingTable, ListingTableConfig};
 use datafusion::datasource::{TableProvider, TableType};
+use datafusion::error::DataFusionError;
 use datafusion::execution::context::{DataFilePaths, SessionState};
 use datafusion::execution::options::ReadOptions;
 use datafusion::logical_expr::LogicalPlan;
@@ -242,23 +243,31 @@ impl SchemaProvider for KamuSchema {
         .unwrap_or(false)
     }
 
-    async fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
+    async fn table(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>, DataFusionError> {
         let Ok(alias) = DatasetAlias::try_from(name) else {
-            return None;
+            return Ok(None);
         };
 
         let table = {
-            let cache = self.ensure_cache().await.unwrap();
+            let cache = self
+                .ensure_cache()
+                .await
+                .map_err(|e| DataFusionError::External(e.into()))?;
+
             cache.tables.as_ref().unwrap().get(&alias).cloned()
         };
 
         if let Some(table) = table {
             // HACK: We pre-initialize the schema here because `TableProvider::schema()` is
             // not async
-            table.get_table_schema().await.unwrap();
-            Some(table)
+            table
+                .get_table_schema()
+                .await
+                .map_err(|e| DataFusionError::External(e.into()))?;
+
+            Ok(Some(table))
         } else {
-            None
+            Ok(None)
         }
     }
 }
@@ -363,7 +372,8 @@ impl KamuTable {
 
         let table_paths = file_urls.to_urls().int_err()?;
         let session_config = self.session_context.copied_config();
-        let listing_options = options.to_listing_options(&session_config);
+        let listing_options = options
+            .to_listing_options(&session_config, self.session_context.copied_table_options());
 
         let resolved_schema = options
             .get_resolved_schema(

@@ -24,10 +24,10 @@ doctest = false
 [dependencies]
 opendatafabric = { workspace = true }
 
-arrow = { version = "50", default-features = false }
-arrow-json = { version = "50", default-features = false }
-arrow-digest = { version = "50", default-features = false }
-datafusion = { version = "36", default-features = false, features = ["parquet", "serde"] }
+arrow = { version = "51", default-features = false }
+arrow-json = { version = "51", default-features = false }
+arrow-digest = { version = "51", default-features = false }
+datafusion = { version = "37", default-features = false, features = ["parquet", "serde"] }
 tracing = { version = "0.1", default-features = false }
 
 async-trait = "0.1"

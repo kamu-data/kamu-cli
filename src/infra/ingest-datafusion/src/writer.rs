@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -15,8 +16,8 @@ use chrono::{DateTime, TimeZone, Utc};
 use datafusion::arrow::array::Array;
 use datafusion::arrow::datatypes::{DataType, Field, SchemaRef, TimeUnit};
 use datafusion::common::DFSchema;
+use datafusion::config::{ColumnOptions, ParquetOptions, TableParquetOptions};
 use datafusion::dataframe::DataFrameWriteOptions;
-use datafusion::parquet::file::properties::WriterProperties;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::*;
@@ -157,17 +158,17 @@ impl DataWriterDataFusion {
         for field in df.schema().fields() {
             let expr = match field.data_type() {
                 DataType::Timestamp(TimeUnit::Millisecond, Some(tz)) if tz.as_ref() == "UTC" => {
-                    col(field.unqualified_column())
+                    col(Column::from_name(field.name()))
                 }
                 DataType::Timestamp(_, _) => {
                     noop = false;
                     cast(
-                        col(field.unqualified_column()),
+                        col(Column::from_name(field.name())),
                         DataType::Timestamp(TimeUnit::Millisecond, Some(utc_tz.clone())),
                     )
                     .alias(field.name())
                 }
-                _ => col(field.unqualified_column()),
+                _ => col(Column::from_name(field.name())),
             };
             select.push(expr);
         }
@@ -338,6 +339,7 @@ impl DataWriterDataFusion {
                     partition_by: vec![],
                     order_by: self.merge_strategy.sort_order(),
                     window_frame: expr::WindowFrame::new(Some(false)),
+                    null_treatment: None,
                 }),
             )
             .int_err()?;
@@ -401,21 +403,35 @@ impl DataWriterDataFusion {
     }
 
     // TODO: Externalize configuration
-    fn get_write_properties(&self) -> WriterProperties {
+    fn get_write_properties(&self) -> TableParquetOptions {
         // TODO: `offset` column is sorted integers so we could use delta encoding, but
         // Flink does not support it.
         // See: https://github.com/kamu-data/kamu-engine-flink/issues/3
-        WriterProperties::builder()
-            .set_writer_version(datafusion::parquet::file::properties::WriterVersion::PARQUET_1_0)
-            .set_compression(datafusion::parquet::basic::Compression::SNAPPY)
-            // op column is low cardinality and best encoded as RLE_DICTIONARY
-            .set_column_dictionary_enabled(
-                self.meta.vocab.operation_type_column.as_str().into(),
-                true,
-            )
-            // system_time value will be the same for all rows in a batch
-            .set_column_dictionary_enabled(self.meta.vocab.system_time_column.as_str().into(), true)
-            .build()
+        TableParquetOptions {
+            global: ParquetOptions {
+                writer_version: "1.0".into(),
+                compression: Some("snappy".into()),
+                ..Default::default()
+            },
+            column_specific_options: HashMap::from([
+                (
+                    // op column is low cardinality and best encoded as RLE_DICTIONARY
+                    self.meta.vocab.operation_type_column.clone(),
+                    ColumnOptions {
+                        dictionary_enabled: Some(true),
+                        ..Default::default()
+                    },
+                ),
+                (
+                    self.meta.vocab.system_time_column.clone(),
+                    ColumnOptions {
+                        // system_time value will be the same for all rows in a batch
+                        dictionary_enabled: Some(true),
+                        ..Default::default()
+                    },
+                ),
+            ]),
+        }
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?path))]

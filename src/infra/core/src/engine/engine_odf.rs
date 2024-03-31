@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 
 use container_runtime::*;
+use datafusion::config::{ParquetOptions, TableParquetOptions};
 use kamu_core::engine::*;
 use kamu_core::*;
 use odf::engine::{EngineGrpcClient, ExecuteRawQueryError, ExecuteTransformError};
@@ -274,14 +276,14 @@ impl Engine for ODFEngine {
             .write_parquet(
                 host_input_data_path.as_os_str().to_str().unwrap(),
                 datafusion::dataframe::DataFrameWriteOptions::new().with_single_file_output(true),
-                Some(
-                    datafusion::parquet::file::properties::WriterProperties::builder()
-                        .set_writer_version(
-                            datafusion::parquet::file::properties::WriterVersion::PARQUET_1_0,
-                        )
-                        .set_compression(datafusion::parquet::basic::Compression::SNAPPY)
-                        .build(),
-                ),
+                Some(TableParquetOptions {
+                    global: ParquetOptions {
+                        writer_version: "1.0".into(),
+                        compression: Some("snappy".into()),
+                        ..Default::default()
+                    },
+                    column_specific_options: HashMap::new(),
+                }),
             )
             .await
             .int_err()?;

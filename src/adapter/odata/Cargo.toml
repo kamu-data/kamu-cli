@@ -27,9 +27,9 @@ kamu-core = { workspace = true }
 
 axum = { version = "0.6", features = ["headers"] }
 chrono = { version = "0.4", default-features = false }
-datafusion = { version = "36", default-features = false }
+datafusion = { version = "37", default-features = false }
 # ToDo remove version pin after we will migrate axum to new major version
-datafusion-odata = { version = "= 36.0.0", default-features = false }
+datafusion-odata = { version = "= 37.1.0", default-features = false }
 dill = { version = "0.8" }
 futures = { version = "0.3", default-features = false }
 http = "0.2"
