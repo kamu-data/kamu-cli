@@ -264,7 +264,7 @@ impl QueryService for QueryServiceImpl {
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]
-    async fn get_schema_parquet(
+    async fn get_schema_parquet_file(
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<Type>, QueryError> {

@@ -10,7 +10,6 @@
 mod test_accounts;
 mod test_auth;
 mod test_error_handling;
-mod test_from_data_schema;
 mod test_gql_data;
 mod test_gql_dataset_flow_configs;
 mod test_gql_dataset_flow_runs;

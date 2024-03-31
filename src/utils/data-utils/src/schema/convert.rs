@@ -11,11 +11,18 @@ use std::sync::Arc;
 
 use datafusion::arrow::datatypes::Schema;
 use datafusion::common::DFSchema;
-use datafusion::parquet::schema::types::Type;
+use datafusion::parquet::schema::types::{SchemaDescriptor, Type};
 
 pub fn arrow_schema_to_parquet_schema(arrow_schema: &Schema) -> Arc<Type> {
     let parquet_schema = datafusion::parquet::arrow::arrow_to_parquet_schema(arrow_schema).unwrap();
     parquet_schema.root_schema_ptr()
+}
+
+pub fn parquet_schema_to_arrow_schema(parquet_schema: Arc<Type>) -> Arc<Schema> {
+    let schema_desc = SchemaDescriptor::new(parquet_schema);
+    let arrow_schema =
+        datafusion::parquet::arrow::parquet_to_arrow_schema(&schema_desc, None).unwrap();
+    Arc::new(arrow_schema)
 }
 
 pub fn dataframe_schema_to_parquet_schema(df_schema: &DFSchema) -> Arc<Type> {

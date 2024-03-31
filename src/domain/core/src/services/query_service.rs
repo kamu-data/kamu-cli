@@ -53,11 +53,18 @@ pub trait QueryService: Send + Sync {
     ) -> Result<DataFrame, QueryError>;
 
     /// Returns a reference-counted arrow schema of the given dataset, if it is
-    /// already defined by this moment, None otherwise
+    /// already defined by this moment, `None` otherwise
     async fn get_schema(
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<arrow::datatypes::SchemaRef>, QueryError>;
+
+    /// Returns parquet schema of the last data file in a given dataset, if any
+    /// files were written, `None` otherwise
+    async fn get_schema_parquet_file(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> Result<Option<Type>, QueryError>;
 
     // TODO: Introduce additional options that could be used to narrow down the
     // number of files we collect to construct the dataframe.
@@ -65,12 +72,6 @@ pub trait QueryService: Send + Sync {
     /// Returns a [DataFrame] representing the contents of an entire dataset
     async fn get_data(&self, dataset_ref: &DatasetRef) -> Result<DataFrame, QueryError>;
 
-    /// Returns parquet schema of the given dataset, if it is already defined by
-    /// this moment, None otherwise
-    async fn get_schema_parquet(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Option<Type>, QueryError>;
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;
 }

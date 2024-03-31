@@ -20,6 +20,7 @@ pub struct InspectSchemaCommand {
     query_svc: Arc<dyn QueryService>,
     dataset_ref: DatasetRef,
     output_format: Option<String>,
+    from_data_file: bool,
 }
 
 impl InspectSchemaCommand {
@@ -27,12 +28,22 @@ impl InspectSchemaCommand {
         query_svc: Arc<dyn QueryService>,
         dataset_ref: DatasetRef,
         output_format: Option<&str>,
+        from_data_file: bool,
     ) -> Self {
         Self {
             query_svc,
             dataset_ref,
             output_format: output_format.map(ToOwned::to_owned),
+            from_data_file,
         }
+    }
+
+    fn print_schema_unavailable(&self) {
+        eprintln!(
+            "{}: Dataset schema is not yet available: {}",
+            console::style("Warning").yellow(),
+            self.dataset_ref.alias().unwrap(),
+        );
     }
 
     fn print_schema_ddl(&self, schema: &Type) {
@@ -93,24 +104,6 @@ impl InspectSchemaCommand {
         }
     }
 
-    fn print_schema_parquet(&self, schema: &Type) -> Result<(), CLIError> {
-        kamu_data_utils::schema::format::write_schema_parquet(&mut std::io::stdout(), schema)?;
-        Ok(())
-    }
-
-    fn print_schema_parquet_json(&self, schema: &Type) -> Result<(), CLIError> {
-        kamu_data_utils::schema::format::write_schema_parquet_json(&mut std::io::stdout(), schema)?;
-        Ok(())
-    }
-
-    fn print_schema_arrow_json(&self, arrow: &SchemaRef) -> Result<(), CLIError> {
-        kamu_data_utils::schema::format::write_schema_arrow_json(
-            &mut std::io::stdout(),
-            arrow.as_ref(),
-        )?;
-        Ok(())
-    }
-
     fn query_errors(e: QueryError) -> CLIError {
         match e {
             QueryError::DatasetNotFound(e) => CLIError::usage_error_from(e),
@@ -120,13 +113,53 @@ impl InspectSchemaCommand {
         }
     }
 
-    async fn get_parquet_schema(&mut self) -> Result<Type, CLIError> {
-        Ok(self
-            .query_svc
-            .get_schema_parquet(&self.dataset_ref)
-            .await
-            .map_err(Self::query_errors)?
-            .unwrap())
+    async fn get_arrow_schema(&mut self) -> Result<Option<SchemaRef>, CLIError> {
+        if !self.from_data_file {
+            self.query_svc
+                .get_schema(&self.dataset_ref)
+                .await
+                .map_err(Self::query_errors)
+        } else {
+            let Some(parquet_schema) = self
+                .query_svc
+                .get_schema_parquet_file(&self.dataset_ref)
+                .await
+                .map_err(Self::query_errors)?
+            else {
+                return Ok(None);
+            };
+
+            Ok(Some(
+                kamu_data_utils::schema::convert::parquet_schema_to_arrow_schema(Arc::new(
+                    parquet_schema,
+                )),
+            ))
+        }
+    }
+
+    async fn get_parquet_schema(&mut self) -> Result<Option<Arc<Type>>, CLIError> {
+        if !self.from_data_file {
+            let Some(arrow_schema) = self
+                .query_svc
+                .get_schema(&self.dataset_ref)
+                .await
+                .map_err(Self::query_errors)?
+            else {
+                return Ok(None);
+            };
+
+            Ok(Some(
+                kamu_data_utils::schema::convert::arrow_schema_to_parquet_schema(&arrow_schema),
+            ))
+        } else {
+            let schema = self
+                .query_svc
+                .get_schema_parquet_file(&self.dataset_ref)
+                .await
+                .map_err(Self::query_errors)?;
+
+            Ok(schema.map(Arc::new))
+        }
     }
 }
 
@@ -135,26 +168,41 @@ impl Command for InspectSchemaCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         match self.output_format.as_deref() {
             None | Some("ddl") => {
-                let schema = self.get_parquet_schema().await?;
-                self.print_schema_ddl(&schema);
+                if let Some(schema) = self.get_parquet_schema().await? {
+                    self.print_schema_ddl(&schema);
+                } else {
+                    self.print_schema_unavailable();
+                }
             }
             Some("parquet") => {
-                let schema = self.get_parquet_schema().await?;
-                self.print_schema_parquet(&schema)?;
+                if let Some(schema) = self.get_parquet_schema().await? {
+                    kamu_data_utils::schema::format::write_schema_parquet(
+                        &mut std::io::stdout(),
+                        &schema,
+                    )?;
+                } else {
+                    self.print_schema_unavailable();
+                }
             }
             Some("parquet-json") => {
-                let schema = self.get_parquet_schema().await?;
-                self.print_schema_parquet_json(&schema)?;
+                if let Some(schema) = self.get_parquet_schema().await? {
+                    kamu_data_utils::schema::format::write_schema_parquet_json(
+                        &mut std::io::stdout(),
+                        &schema,
+                    )?;
+                } else {
+                    self.print_schema_unavailable();
+                }
             }
             Some("arrow-json") => {
-                let arrow = self
-                    .query_svc
-                    .get_schema(&self.dataset_ref)
-                    .await
-                    .map_err(Self::query_errors)?
-                    .unwrap();
-
-                self.print_schema_arrow_json(&arrow)?;
+                if let Some(schema) = self.get_arrow_schema().await? {
+                    kamu_data_utils::schema::format::write_schema_arrow_json(
+                        &mut std::io::stdout(),
+                        schema.as_ref(),
+                    )?;
+                } else {
+                    self.print_schema_unavailable();
+                }
             }
             _ => unreachable!(),
         }

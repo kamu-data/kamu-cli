@@ -128,7 +128,24 @@ async fn test_metadata_chain_events() {
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    let expected_schema = r#"{"fields":[{"name":"city","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"population","data_type":"Int64","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}}],"metadata":{}}"#;
+    let expected_schema = value!({
+        "fields":[{
+            "name": "city",
+            "data_type": "Utf8",
+            "nullable": false,
+            "dict_id": 0,
+            "dict_is_ordered": false,
+            "metadata": {}
+        },{
+            "name": "population",
+            "data_type": "Int64",
+            "nullable": false,
+            "dict_id": 0,
+            "dict_is_ordered": false,
+            "metadata": {}
+        }],
+        "metadata":{}
+    });
 
     assert_eq!(
         res.data,

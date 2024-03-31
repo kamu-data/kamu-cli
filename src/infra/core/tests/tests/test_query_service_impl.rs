@@ -169,7 +169,10 @@ async fn test_dataset_parquet_schema(catalog: &Catalog, tempdir: &TempDir) {
     let dataset_ref = DatasetRef::from(dataset_alias);
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let schema = query_svc.get_schema_parquet(&dataset_ref).await.unwrap();
+    let schema = query_svc
+        .get_schema_parquet_file(&dataset_ref)
+        .await
+        .unwrap();
     assert!(schema.is_some());
 
     let mut buf = Vec::new();

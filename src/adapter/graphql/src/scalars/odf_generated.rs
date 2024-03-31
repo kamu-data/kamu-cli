@@ -1060,9 +1060,8 @@ impl From<odf::SetDataSchema> for SetDataSchema {
     fn from(v: odf::SetDataSchema) -> Self {
         // TODO: Error handling?
         // TODO: Externalize format decision?
-        let arrow_schema_ref = v.schema_as_arrow().unwrap();
-        let arrow_schema = arrow_schema_ref.as_ref();
-        let schema = DataSchema::from_arrow_schema(arrow_schema);
+        let arrow_schema = v.schema_as_arrow().unwrap();
+        let schema = DataSchema::from_arrow_schema(&arrow_schema, DataSchemaFormat::ParquetJson);
         Self { schema }
     }
 }

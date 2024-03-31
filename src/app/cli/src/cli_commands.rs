@@ -168,6 +168,7 @@ pub fn get_command(
                         .clone(),
                 )?,
                 schema_matches.get_one("output-format").map(String::as_str),
+                submatches.get_flag("from-data-file"),
             )),
             _ => return Err(CommandInterpretationFailed.into()),
         },

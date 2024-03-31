@@ -76,56 +76,22 @@ impl DatasetMetadata {
         ctx: &Context<'_>,
         format: Option<DataSchemaFormat>,
     ) -> Result<Option<DataSchema>> {
+        // TODO: Default to Arrow eventually
+        let format = format.unwrap_or(DataSchemaFormat::Parquet);
+
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
 
-        match format {
-            Some(DataSchemaFormat::ArrowJson) => {
-                let schema_ref_opt = query_svc
-                    .get_schema(&self.dataset_handle.as_local_ref())
-                    .await
-                    .int_err()?;
-
-                match schema_ref_opt {
-                    Some(schema_ref) => Ok(Option::from(DataSchema::from_arrow_schema(
-                        schema_ref.as_ref(),
-                    ))),
-                    None => Ok(None),
-                }
-            }
-            Some(DataSchemaFormat::Parquet) => {
-                let schema = query_svc
-                    .get_schema_parquet(&self.dataset_handle.as_local_ref())
-                    .await
-                    .int_err()?;
-
-                let mut buf = Vec::new();
-                kamu_data_utils::schema::format::write_schema_parquet(&mut buf, &schema.unwrap())
-                    .unwrap();
-
-                Ok(Option::from(DataSchema {
-                    format: DataSchemaFormat::Parquet,
-                    content: String::from_utf8(buf).unwrap(),
-                }))
-            }
-            Some(DataSchemaFormat::ParquetJson) => {
-                let schema = query_svc
-                    .get_schema_parquet(&self.dataset_handle.as_local_ref())
-                    .await
-                    .int_err()?;
-
-                let mut buf = Vec::new();
-                kamu_data_utils::schema::format::write_schema_parquet_json(
-                    &mut buf,
-                    &schema.unwrap(),
-                )
-                .unwrap();
-
-                Ok(Option::from(DataSchema {
-                    format: DataSchemaFormat::ParquetJson,
-                    content: String::from_utf8(buf).unwrap(),
-                }))
-            }
-            _ => unimplemented!(),
+        if let Some(schema) = query_svc
+            .get_schema(&self.dataset_handle.as_local_ref())
+            .await
+            .int_err()?
+        {
+            Ok(Option::from(DataSchema::from_arrow_schema(
+                schema.as_ref(),
+                format,
+            )))
+        } else {
+            Ok(None)
         }
     }
 
