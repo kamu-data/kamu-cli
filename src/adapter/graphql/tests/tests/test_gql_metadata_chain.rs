@@ -128,24 +128,7 @@ async fn test_metadata_chain_events() {
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    let expected_schema = value!({
-        "fields":[{
-            "name": "city",
-            "data_type": "Utf8",
-            "nullable": false,
-            "dict_id": 0,
-            "dict_is_ordered": false,
-            "metadata": {}
-        },{
-            "name": "population",
-            "data_type": "Int64",
-            "nullable": false,
-            "dict_id": 0,
-            "dict_is_ordered": false,
-            "metadata": {}
-        }],
-        "metadata":{}
-    });
+    let expected_schema = r#"{"name": "arrow_schema", "type": "struct", "fields": [{"name": "city", "repetition": "REQUIRED", "type": "BYTE_ARRAY", "logicalType": "STRING"}, {"name": "population", "repetition": "REQUIRED", "type": "INT64"}]}"#;
 
     assert_eq!(
         res.data,
@@ -170,7 +153,7 @@ async fn test_metadata_chain_events() {
                                     "event": {
                                         "__typename": "SetDataSchema",
                                         "schema": {
-                                            "format": "ARROW_JSON",
+                                            "format": "PARQUET_JSON",
                                             "content": expected_schema,
                                         }
                                     }

@@ -66,7 +66,7 @@ impl DataSchema {
             _ => unreachable!(),
         }
         DataSchema {
-            format: DataSchemaFormat::ArrowJson,
+            format,
             content: String::from_utf8(buf).unwrap(),
         }
     }

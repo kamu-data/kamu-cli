@@ -394,6 +394,7 @@ Shows the dataset schema
 
   Possible values: `ddl`, `parquet`, `parquet-json`, `arrow-json`
 
+* `--from-data-file`
 
 Displays the schema of the dataset. Note that dataset schemas can evolve over time and by default the latest schema will be shown.
 
