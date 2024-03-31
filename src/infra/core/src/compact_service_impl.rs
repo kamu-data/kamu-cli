@@ -18,6 +18,7 @@ use dill::{component, interface};
 use domain::compact_service::{
     CompactError,
     CompactResult,
+    CompactionListener,
     CompactionMultiListener,
     CompactionPhase,
     InvalidDatasetKindError,
@@ -375,42 +376,14 @@ impl CompactServiceImpl {
 
         Ok((old_data_slices, current_head, new_num_blocks))
     }
-}
 
-#[async_trait::async_trait]
-impl CompactService for CompactServiceImpl {
-    #[tracing::instrument(level = "info", skip_all)]
-    async fn compact_dataset(
+    async fn compact_dataset_impl(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset: Arc<dyn Dataset>,
         max_slice_size: u64,
         max_slice_records: u64,
-        multi_listener: Option<Arc<dyn CompactionMultiListener>>,
+        listener: Arc<dyn CompactionListener>,
     ) -> Result<CompactResult, CompactError> {
-        let listener = multi_listener
-            .and_then(|l| l.begin_compact(dataset_handle))
-            .unwrap_or(Arc::new(NullCompactionListener {}));
-        self.dataset_authorizer
-            .check_action_allowed(dataset_handle, domain::auth::DatasetAction::Write)
-            .await?;
-
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
-
-        let dataset_kind = dataset
-            .get_summary(GetSummaryOpts::default())
-            .await
-            .int_err()?
-            .kind;
-
-        if dataset_kind != DatasetKind::Root {
-            return Err(CompactError::InvalidDatasetKind(InvalidDatasetKindError {
-                dataset_name: dataset_handle.alias.dataset_name.clone(),
-            }));
-        }
-
         let compact_dir_path = self.create_run_compact_dir()?;
 
         listener.begin_phase(CompactionPhase::GatherChainInfo);
@@ -448,13 +421,67 @@ impl CompactService for CompactServiceImpl {
                 },
             )
             .await?;
-        listener.success();
 
-        Ok(CompactResult::Success {
+        let res = CompactResult::Success {
             old_head: chain_files_info.old_head,
             new_head,
             old_num_blocks: chain_files_info.old_num_blocks,
             new_num_blocks,
-        })
+        };
+
+        listener.success(&res);
+
+        Ok(res)
+    }
+}
+
+#[async_trait::async_trait]
+impl CompactService for CompactServiceImpl {
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn compact_dataset(
+        &self,
+        dataset_handle: &DatasetHandle,
+        max_slice_size: u64,
+        max_slice_records: u64,
+        multi_listener: Option<Arc<dyn CompactionMultiListener>>,
+    ) -> Result<CompactResult, CompactError> {
+        self.dataset_authorizer
+            .check_action_allowed(dataset_handle, domain::auth::DatasetAction::Write)
+            .await?;
+
+        let dataset = self
+            .dataset_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
+
+        let dataset_kind = dataset
+            .get_summary(GetSummaryOpts::default())
+            .await
+            .int_err()?
+            .kind;
+
+        if dataset_kind != DatasetKind::Root {
+            return Err(CompactError::InvalidDatasetKind(InvalidDatasetKindError {
+                dataset_name: dataset_handle.alias.dataset_name.clone(),
+            }));
+        }
+
+        let listener = multi_listener
+            .and_then(|l| l.begin_compact(dataset_handle))
+            .unwrap_or(Arc::new(NullCompactionListener {}));
+
+        match self
+            .compact_dataset_impl(dataset, max_slice_size, max_slice_records, listener.clone())
+            .await
+        {
+            Ok(res) => {
+                listener.success(&res);
+                Ok(res)
+            }
+            Err(err) => {
+                listener.error(&err);
+                Err(err)
+            }
+        }
     }
 }

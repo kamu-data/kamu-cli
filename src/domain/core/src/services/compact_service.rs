@@ -117,10 +117,8 @@ pub struct InvalidDatasetKindError {
 
 pub trait CompactionListener: Send + Sync {
     fn begin(&self) {}
-    // ToDo add result
-    fn success(&self) {}
-    // ToDo add error
-    fn error(&self) {}
+    fn success(&self, _res: &CompactResult) {}
+    fn error(&self, _err: &CompactError) {}
 
     fn begin_phase(&self, _phase: CompactionPhase) {}
     fn end_phase(&self, _phase: CompactionPhase) {}

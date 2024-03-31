@@ -207,7 +207,7 @@ where
         &self,
         offset_interval: Option<OffsetInterval>,
         data: Option<&OwnedFile>,
-        checkpoint_ref: Option<&CheckpointRef>,
+        checkpoint: Option<&CheckpointRef>,
     ) -> Result<(Option<DataSlice>, Option<Checkpoint>), InternalError> {
         let data_slice = if let Some(offset_interval) = offset_interval {
             let data = data.unwrap();
@@ -238,8 +238,8 @@ where
             None
         };
 
-        let checkpoint = if let Some(checkpoint_ref) = checkpoint_ref {
-            match checkpoint_ref {
+        let checkpoint = if let Some(checkpoint) = checkpoint {
+            match checkpoint {
                 CheckpointRef::Existed(hash) => {
                     let size = self.as_checkpoint_repo().get_size(hash).await.int_err()?;
                     Some(Checkpoint {
@@ -498,14 +498,14 @@ where
         &self,
         params: AddDataParams,
         data_file: Option<OwnedFile>,
-        checkpoint_ref: Option<CheckpointRef>,
+        checkpoint: Option<CheckpointRef>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError> {
         let (new_data, new_checkpoint) = self
             .prepare_objects(
                 params.new_offset_interval,
                 data_file.as_ref(),
-                checkpoint_ref.as_ref(),
+                checkpoint.as_ref(),
             )
             .await?;
 
@@ -513,7 +513,7 @@ where
             new_data.as_ref(),
             data_file,
             new_checkpoint.as_ref(),
-            checkpoint_ref.and_then(std::convert::Into::into),
+            checkpoint.and_then(std::convert::Into::into),
         )
         .await?;
 
@@ -544,18 +544,18 @@ where
         &self,
         execute_transform: ExecuteTransformParams,
         data: Option<OwnedFile>,
-        checkpoint_ref: Option<CheckpointRef>,
+        checkpoint: Option<CheckpointRef>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError> {
         let event = self
-            .prepare_execute_transform(execute_transform, data.as_ref(), checkpoint_ref.as_ref())
+            .prepare_execute_transform(execute_transform, data.as_ref(), checkpoint.as_ref())
             .await?;
 
         self.commit_objects(
             event.new_data.as_ref(),
             data,
             event.new_checkpoint.as_ref(),
-            checkpoint_ref.and_then(std::convert::Into::into),
+            checkpoint.and_then(std::convert::Into::into),
         )
         .await?;
 
@@ -573,10 +573,10 @@ where
         &self,
         params: ExecuteTransformParams,
         data_file: Option<&OwnedFile>,
-        checkpoint_ref: Option<&CheckpointRef>,
+        checkpoint: Option<&CheckpointRef>,
     ) -> Result<ExecuteTransform, InternalError> {
         let (new_data, new_checkpoint) = self
-            .prepare_objects(params.new_offset_interval, data_file, checkpoint_ref)
+            .prepare_objects(params.new_offset_interval, data_file, checkpoint)
             .await?;
 
         Ok(ExecuteTransform {

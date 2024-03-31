@@ -36,7 +36,7 @@ pub trait Dataset: Send + Sync {
         &self,
         add_data: AddDataParams,
         data: Option<OwnedFile>,
-        checkpoint_ref: Option<CheckpointRef>,
+        checkpoint: Option<CheckpointRef>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError>;
 
@@ -48,7 +48,7 @@ pub trait Dataset: Send + Sync {
         &self,
         execute_transform: ExecuteTransformParams,
         data: Option<OwnedFile>,
-        checkpoint_ref: Option<CheckpointRef>,
+        checkpoint: Option<CheckpointRef>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError>;
 
@@ -58,7 +58,7 @@ pub trait Dataset: Send + Sync {
         &self,
         execute_transform: ExecuteTransformParams,
         data: Option<&OwnedFile>,
-        checkpoint_ref: Option<&CheckpointRef>,
+        checkpoint: Option<&CheckpointRef>,
     ) -> Result<ExecuteTransform, InternalError>;
 
     fn as_metadata_chain(&self) -> &dyn MetadataChain;
