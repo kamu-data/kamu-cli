@@ -233,7 +233,7 @@ impl auth::AuthenticationProvider for AccountService {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct PasswordProviderCredentials {
+pub(crate) struct PasswordProviderCredentials {
     pub account_name: AccountName,
 }
 

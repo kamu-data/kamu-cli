@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.170.0] - 2024-03-29
+### Added
+- Added GrapqQL Dataset Endpoints object
+### Changed
+- REST API: `/ingest` endpoint will return HTTP 400 error when data cannot be read correctly
+- Improved API token generation command
+
 ## [0.169.0] - 2024-03-25
 ### Changed
 - Updated embedded Web UI to `v0.17.0`

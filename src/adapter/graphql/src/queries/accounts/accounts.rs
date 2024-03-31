@@ -26,7 +26,6 @@ impl Accounts {
     }
 
     /// Returns account by its name
-    #[allow(unused_variables)]
     async fn by_name(&self, ctx: &Context<'_>, name: AccountName) -> Result<Option<Account>> {
         let authentication_service =
             from_catalog::<dyn kamu_core::auth::AuthenticationService>(ctx).unwrap();

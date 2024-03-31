@@ -10,7 +10,8 @@
 mod account;
 mod data_batch;
 mod data_query;
-pub mod data_schema;
+mod data_schema;
+mod dataset_endpoints;
 mod dataset_id_name;
 mod engine_desc;
 mod event_id;
@@ -28,6 +29,7 @@ pub(crate) use account::*;
 pub(crate) use data_batch::*;
 pub(crate) use data_query::*;
 pub(crate) use data_schema::*;
+pub(crate) use dataset_endpoints::*;
 pub(crate) use dataset_id_name::*;
 pub(crate) use engine_desc::*;
 pub(crate) use event_id::*;
