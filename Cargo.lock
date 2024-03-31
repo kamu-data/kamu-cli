@@ -1575,7 +1575,7 @@ dependencies = [
  "cfg-if",
  "dill",
  "libc",
- "rand",
+ "random-names",
  "regex",
  "serde",
  "tempfile",
@@ -3374,6 +3374,7 @@ dependencies = [
  "petgraph",
  "pin-project",
  "rand",
+ "random-names",
  "regex",
  "reqwest",
  "ringbuf",
@@ -3626,7 +3627,7 @@ dependencies = [
  "num-format",
  "opendatafabric",
  "prettytable-rs",
- "rand",
+ "random-names",
  "read_input",
  "regex",
  "reqwest",
@@ -5237,6 +5238,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom",
+]
+
+[[package]]
+name = "random-names"
+version = "0.170.0"
+dependencies = [
+ "rand",
 ]
 
 [[package]]

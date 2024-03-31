@@ -477,6 +477,19 @@ pub fn get_command(
                 )),
                 _ => return Err(CommandInterpretationFailed.into()),
             },
+            Some(("compact", submatches)) => Box::new(CompactCommand::new(
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                validate_dataset_ref(
+                    cli_catalog,
+                    submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
+                )?,
+                *(submatches.get_one("max-slice-size").unwrap()),
+                *(submatches.get_one("max-slice-records").unwrap()),
+                submatches.get_flag("hard"),
+                submatches.get_flag("verify"),
+            )),
             _ => return Err(CommandInterpretationFailed.into()),
         },
         Some(("tail", submatches)) => Box::new(TailCommand::new(

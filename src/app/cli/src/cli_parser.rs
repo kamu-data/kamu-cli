@@ -1253,6 +1253,53 @@ pub fn cli() -> Command {
                                     .default_value("3600")
                                     .help("Token expiration time in seconds"),
                             ]),
+                        Command::new("compact")
+                            .about("Compact a dataset")
+                            .args([
+                                Arg::new("dataset")
+                                    .action(ArgAction::Append)
+                                    .index(1)
+                                    .required(true)
+                                    .value_parser(value_parse_dataset_ref_local)
+                                    .help("Local dataset reference(s)"),
+                                Arg::new("max-slice-size")
+                                    .long("max-slice-size")
+                                    .value_parser(value_parser!(u64))
+                                    .value_name("SIZE")
+                                    .default_value("1073741824")
+                                    .help("Maximum size of a single data slice file in bytes"),
+                                Arg::new("max-slice-records")
+                                    .long("max-slice-records")
+                                    .value_parser(value_parser!(u64))
+                                    .value_name("RECORDS")
+                                    .default_value("10000")
+                                    .help("Maximum amount of records in a single data slice file"),
+                                Arg::new("hard")
+                                    .long("hard")
+                                    .action(ArgAction::SetTrue)
+                                    .help("Perform 'hard' compaction that rewrites the history of a dataset"),
+                                Arg::new("verify")
+                                    .long("verify")
+                                    .action(ArgAction::SetTrue)
+                                    .help("Perform verification of the dataset before running a compaction"),
+                            ])
+                            .after_help(indoc::indoc!(
+                                r#"
+                                For datasets that get frequent small appends the number of data slices can grow over time and affect the performance of querying. This command allows to merge multiple small data slices into a few large files, which can be beneficial in terms of size from more compact encoding, and in query performance, as data engines will have to scan through far fewer file headers.
+
+                                There are two types of compactions: soft and hard.
+
+                                Soft compactions produce new files while leaving the old blocks intact. This allows for faster queries, while still preserving the accurate history of how dataset evolved over time.
+
+                                Hard compactions rewrite the history of the dataset as if data was originally written in big batches. They allow to shrink the history of a dataset to just a few blocks, reclaim the space used by old data files, but at the expense of history loss. Hard compactions will rewrite the metadata chain, changing block hashes. Therefore they will **break all downstream datasets** that depend on them.
+
+                                **Examples:**
+
+                                Perform a history-altering hard compaction:
+
+                                    kamu system compact --hard my.dataset
+                                "#
+                            )),
                     ]),
                 tabular_output_params(
                     Command::new("tail")

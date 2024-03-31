@@ -128,7 +128,7 @@ impl DatasetTestHelper {
                 new_source_state: None,
             },
             Some(OwnedFile::new(data_path)),
-            Some(OwnedFile::new(checkpoint_path)),
+            Some(CheckpointRef::New(OwnedFile::new(checkpoint_path))),
             CommitOpts::default(),
         )
         .await

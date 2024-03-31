@@ -66,37 +66,3 @@ pub(crate) fn new_session_context(
 
     SessionContext::new_with_config_rt(config, runtime)
 }
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn next_operation_id() -> String {
-    use rand::distributions::Alphanumeric;
-    use rand::Rng;
-
-    let mut name = String::with_capacity(16);
-    name.extend(
-        rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(10)
-            .map(char::from),
-    );
-
-    name
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn get_random_cache_key(prefix: &str) -> String {
-    use rand::distributions::Alphanumeric;
-    use rand::Rng;
-
-    let mut name = String::with_capacity(10 + prefix.len());
-    name.push_str(prefix);
-    name.extend(
-        rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(10)
-            .map(char::from),
-    );
-    name
-}

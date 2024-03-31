@@ -14,7 +14,7 @@ use std::process::Output;
 use std::sync::Arc;
 
 use console::style;
-use container_runtime::{get_random_name_with_prefix, ContainerRuntime, RunArgs};
+use container_runtime::{ContainerRuntime, RunArgs};
 use futures::TryStreamExt;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::engine::normalize_logs;
@@ -26,6 +26,7 @@ use kamu::domain::{
     VerificationService,
 };
 use kamu::utils::docker_images::BUSYBOX;
+use random_names::get_random_name;
 use thiserror::Error;
 
 use super::{CLIError, Command};
@@ -265,7 +266,7 @@ impl DiagnosticCheck for CheckContainerRuntimeRootlessRun {
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
         let run_args = RunArgs {
             image: BUSYBOX.to_string(),
-            container_name: Some(get_random_name_with_prefix("kamu-check-rootless-run-")),
+            container_name: Some(get_random_name(Some("kamu-check-rootless-run-"), 10)),
             ..RunArgs::default()
         };
 
@@ -308,7 +309,7 @@ impl DiagnosticCheck for CheckContainerRuntimeVolumeMount {
         let _ = OwnedFile::new(file_path);
         let run_args = RunArgs {
             image: BUSYBOX.to_string(),
-            container_name: Some(get_random_name_with_prefix("kamu-check-volume-mount-")),
+            container_name: Some(get_random_name(Some("kamu-check-volume-mount-"), 10)),
             ..RunArgs::default()
         };
 

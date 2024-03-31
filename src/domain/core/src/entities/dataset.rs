@@ -36,7 +36,7 @@ pub trait Dataset: Send + Sync {
         &self,
         add_data: AddDataParams,
         data: Option<OwnedFile>,
-        checkpoint: Option<OwnedFile>,
+        checkpoint: Option<CheckpointRef>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError>;
 
@@ -48,7 +48,7 @@ pub trait Dataset: Send + Sync {
         &self,
         execute_transform: ExecuteTransformParams,
         data: Option<OwnedFile>,
-        checkpoint: Option<OwnedFile>,
+        checkpoint: Option<CheckpointRef>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError>;
 
@@ -58,7 +58,7 @@ pub trait Dataset: Send + Sync {
         &self,
         execute_transform: ExecuteTransformParams,
         data: Option<&OwnedFile>,
-        checkpoint: Option<&OwnedFile>,
+        checkpoint: Option<&CheckpointRef>,
     ) -> Result<ExecuteTransform, InternalError>;
 
     fn as_metadata_chain(&self) -> &dyn MetadataChain;
@@ -98,6 +98,8 @@ pub struct CommitOpts<'a> {
     /// Whether to check for presence of linked objects like data and
     /// checkpoints in the respective repos
     pub check_object_refs: bool,
+    // Whether to reset head to new commited block
+    pub update_block_ref: bool,
 }
 
 impl<'a> Default for CommitOpts<'a> {
@@ -107,6 +109,7 @@ impl<'a> Default for CommitOpts<'a> {
             system_time: None,
             prev_block_hash: None,
             check_object_refs: true,
+            update_block_ref: true,
         }
     }
 }
@@ -216,4 +219,21 @@ pub struct ExecuteTransformParams {
     /// should either carry the same watermark or specify a new (greater) one.
     /// Thus, watermarks are monotonically non-decreasing.
     pub new_watermark: Option<DateTime<Utc>>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub enum CheckpointRef {
+    New(OwnedFile),
+    Existed(Multihash),
+}
+
+impl From<CheckpointRef> for Option<OwnedFile> {
+    fn from(val: CheckpointRef) -> Self {
+        match val {
+            CheckpointRef::Existed(_) => None,
+            CheckpointRef::New(owned_file) => Some(owned_file),
+        }
+    }
 }
