@@ -181,20 +181,19 @@ impl CompactServiceImpl {
                         data_slice_batch_info.lower_bound.start_offset =
                             output_slice.offset_interval.start;
                         current_hash = Some(block_hash);
-
-                        // Set upper bound values
-                        if data_slice_batch_info.upper_bound.new_checkpoint.is_none() {
-                            data_slice_batch_info.upper_bound.new_checkpoint =
-                                add_data_event.new_checkpoint;
-                        }
-                        if data_slice_batch_info.upper_bound.new_source_state.is_none() {
-                            data_slice_batch_info.upper_bound.new_source_state =
-                                add_data_event.new_source_state;
-                        }
-                        if data_slice_batch_info.upper_bound.new_watermark.is_none() {
-                            data_slice_batch_info.upper_bound.new_watermark =
-                                add_data_event.new_watermark;
-                        }
+                    }
+                    // Set upper bound values
+                    if data_slice_batch_info.upper_bound.new_checkpoint.is_none() {
+                        data_slice_batch_info.upper_bound.new_checkpoint =
+                            add_data_event.new_checkpoint;
+                    }
+                    if data_slice_batch_info.upper_bound.new_source_state.is_none() {
+                        data_slice_batch_info.upper_bound.new_source_state =
+                            add_data_event.new_source_state;
+                    }
+                    if data_slice_batch_info.upper_bound.new_watermark.is_none() {
+                        data_slice_batch_info.upper_bound.new_watermark =
+                            add_data_event.new_watermark;
                     }
                 }
                 MetadataEvent::Seed(_) => old_head = Some(block_hash),
