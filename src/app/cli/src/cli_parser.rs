@@ -486,8 +486,12 @@ pub fn cli() -> Command {
                                     .long("output-format")
                                     .short('o')
                                     .value_name("FMT")
-                                    .value_parser(["ddl", "parquet", "json"])
+                                    .value_parser(["ddl", "parquet", "parquet-json", "arrow-json"])
                                     .help("Format of an output"),
+                                Arg::new("from-data-file")
+                                    .long("from-data-file")
+                                    .action(ArgAction::SetTrue)
+                                    .hide(true)
                             ])
                             .after_help(indoc::indoc!(
                                 r#"

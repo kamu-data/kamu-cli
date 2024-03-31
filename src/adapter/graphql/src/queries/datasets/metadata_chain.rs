@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use kamu_core::{self as domain, MetadataChainExt};
 use opendatafabric as odf;
 
@@ -111,7 +111,6 @@ impl MetadataChain {
 
     // TODO: Add ref parameter (defaulting to "head")
     // TODO: Support before/after style iteration
-    // TODO: PERF: Avoid traversing entire chain
     /// Iterates all metadata blocks in the reverse chronological order
     #[tracing::instrument(level = "info", skip_all)]
     async fn blocks(
@@ -120,32 +119,30 @@ impl MetadataChain {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<MetadataBlockConnection> {
-        let dataset = self.get_dataset(ctx).await?;
-
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_BLOCKS_PER_PAGE);
 
-        let blocks: Vec<_> = dataset
-            .as_metadata_chain()
-            .iter_blocks()
-            .try_collect()
-            .await
-            .int_err()?;
+        let dataset = self.get_dataset(ctx).await?;
+        let chain = dataset.as_metadata_chain();
 
-        let total_count = blocks.len();
+        let head = chain.resolve_ref(&domain::BlockRef::Head).await.int_err()?;
+        let total_count =
+            usize::try_from(chain.get_block(&head).await.int_err()?.sequence_number).unwrap() + 1;
 
-        let nodes: Vec<_> = blocks
-            .into_iter()
+        let mut block_stream = chain
+            .iter_blocks_interval(&head, None, false)
             .skip(page * per_page)
-            .take(per_page)
-            .map(|(hash, block)| {
-                MetadataBlockExtended::new(
-                    hash,
-                    block,
-                    Account::from_dataset_alias(ctx, &self.dataset_handle.alias),
-                )
-            })
-            .collect();
+            .take(per_page);
+
+        let mut nodes = Vec::new();
+        while let Some((hash, block)) = block_stream.try_next().await.int_err()? {
+            let block = MetadataBlockExtended::new(
+                hash,
+                block,
+                Account::from_dataset_alias(ctx, &self.dataset_handle.alias),
+            );
+            nodes.push(block);
+        }
 
         Ok(MetadataBlockConnection::new(
             nodes,

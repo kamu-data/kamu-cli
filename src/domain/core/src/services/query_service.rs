@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use datafusion::arrow;
 use datafusion::error::DataFusionError;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::{DataFrame, SessionContext};
@@ -51,9 +52,19 @@ pub trait QueryService: Send + Sync {
         options: QueryOptions,
     ) -> Result<DataFrame, QueryError>;
 
-    /// Returns the schema of the given dataset, if it is already defined by
-    /// this moment, None otherwise
-    async fn get_schema(&self, dataset_ref: &DatasetRef) -> Result<Option<Type>, QueryError>;
+    /// Returns a reference-counted arrow schema of the given dataset, if it is
+    /// already defined by this moment, `None` otherwise
+    async fn get_schema(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> Result<Option<arrow::datatypes::SchemaRef>, QueryError>;
+
+    /// Returns parquet schema of the last data file in a given dataset, if any
+    /// files were written, `None` otherwise
+    async fn get_schema_parquet_file(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> Result<Option<Type>, QueryError>;
 
     // TODO: Introduce additional options that could be used to narrow down the
     // number of files we collect to construct the dataframe.
