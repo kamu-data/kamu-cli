@@ -21,7 +21,7 @@ use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
-use odf::{AsTypedBlock, DatasetVocabulary, MetadataEvent, SourceState};
+use odf::{AsTypedBlock, DatasetVocabulary, MetadataEvent};
 use opendatafabric as odf;
 
 use crate::visitor::SourceEventVisitor;
@@ -859,29 +859,7 @@ impl DataWriterDataFusionBuilder {
         let mut seed_visitor = SearchSeedVisitor::create();
         let mut set_vocab_visitor = SearchSetVocabVisitor::create();
         let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::create();
-        let mut prev_source_state_visitor = GenericCallbackVisitor::new(
-            None::<SourceState>,
-            Decision::NextOfType(Flag::ADD_DATA),
-            |state, _, block| {
-                let MetadataEvent::AddData(e) = &block.event else {
-                    unreachable!()
-                };
-
-                if let Some(ss) = &e.new_source_state
-                    && let Some(sn) = source_name
-                    && sn != ss.source_name.as_str()
-                {
-                    unimplemented!(
-                        "Differentiating between the state of multiple sources is not yet \
-                         supported"
-                    );
-                }
-
-                *state = e.new_source_state.clone();
-
-                Decision::Stop
-            },
-        );
+        let mut prev_source_state_visitor = SetDataSchemaVisitor::new(source_name);
         let mut add_data_visitor = SearchAddDataVisitor::create();
         let mut add_data_collection_visitor = GenericCallbackVisitor::new(
             Vec::new(),

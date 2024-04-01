@@ -31,6 +31,7 @@ use opendatafabric::{
     SetPollingSource,
     SetTransform,
     SetVocab,
+    SourceState,
     VariantOf,
 };
 
@@ -350,6 +351,61 @@ where
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         Ok((self.visit_callback)(&mut self.state, hash, block))
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct SetDataSchemaVisitor<'a, E = InternalError> {
+    source_name: Option<&'a str>,
+    source_state: Option<SourceState>,
+    _phantom: PhantomData<E>,
+}
+
+impl<'a, E> SetDataSchemaVisitor<'a, E>
+where
+    E: Error + Send + Sync,
+{
+    pub fn new(source_name: Option<&'a str>) -> Self {
+        Self {
+            source_name,
+            source_state: None,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn into_state(self) -> Option<SourceState> {
+        self.source_state
+    }
+}
+
+impl<E> MetadataChainVisitor for SetDataSchemaVisitor<'_, E>
+where
+    E: Error + Send + Sync,
+{
+    type Error = E;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::NextOfType(Flag::ADD_DATA)
+    }
+
+    fn visit(&mut self, (_hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        let MetadataEvent::AddData(e) = &block.event else {
+            unreachable!()
+        };
+
+        if let Some(ss) = &e.new_source_state
+            && let Some(sn) = self.source_name
+            && sn != ss.source_name.as_str()
+        {
+            unimplemented!(
+                "Differentiating between the state of multiple sources is not yet supported"
+            );
+        }
+
+        self.source_state = e.new_source_state.clone();
+
+        Ok(Decision::Stop)
     }
 }
 
