@@ -364,7 +364,7 @@ pub trait MetadataChainExt: MetadataChain {
         self.accept_one(SearchSingleDataBlockVisitor::next()).await
     }
 
-    /// Same as [Self::last_data_block()], but skipping date blocks that have no
+    /// Same as [Self::last_data_block()], but skipping data blocks that have no
     /// real data
     async fn last_data_block_with_new_data(
         &self,
