@@ -109,7 +109,7 @@ pub struct SearchSingleTypedBlockVisitor<T> {
 
 impl<T> SearchSingleTypedBlockVisitor<T>
 where
-    T: VariantOf<MetadataEvent> + Send + Sync,
+    T: VariantOf<MetadataEvent> + Send,
 {
     pub fn new(requested_flag: Flag) -> Self {
         Self {
@@ -162,7 +162,7 @@ where
 
 impl<T> MetadataChainVisitor for SearchSingleTypedBlockVisitor<T>
 where
-    T: VariantOf<MetadataEvent> + Send + Sync,
+    T: VariantOf<MetadataEvent> + Send,
 {
     type Error = VisitorError;
 
@@ -266,8 +266,8 @@ pub struct GenericCallbackVisitor<S, F> {
 
 impl<S, F> GenericCallbackVisitor<S, F>
 where
-    S: Send + Sync,
-    F: Fn(&mut S, &Multihash, &MetadataBlock) -> Decision + Send + Sync,
+    S: Send,
+    F: Fn(&mut S, &Multihash, &MetadataBlock) -> Decision + Send,
 {
     pub fn new(state: S, initial_decision: Decision, visit_callback: F) -> Self {
         Self {
@@ -294,8 +294,8 @@ where
 
 impl<S, F> MetadataChainVisitor for GenericCallbackVisitor<S, F>
 where
-    S: Send + Sync,
-    F: Fn(&mut S, &Multihash, &MetadataBlock) -> Decision + Send + Sync,
+    S: Send,
+    F: Fn(&mut S, &Multihash, &MetadataBlock) -> Decision + Send,
 {
     type Error = VisitorError;
 
@@ -366,9 +366,9 @@ pub struct GenericFallibleCallbackVisitor<S, F, E = InternalError> {
 
 impl<S, F, E> GenericFallibleCallbackVisitor<S, F, E>
 where
-    S: Send + Sync,
-    F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<Decision, E> + Send + Sync,
-    E: Error + Send + Sync,
+    S: Send,
+    F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<Decision, E> + Send,
+    E: Error + Send,
 {
     pub fn new(state: S, initial_decision: Decision, visit_callback: F) -> Self {
         Self {
@@ -386,9 +386,9 @@ where
 
 impl<S, F, E> MetadataChainVisitor for GenericFallibleCallbackVisitor<S, F, E>
 where
-    S: Send + Sync,
-    F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<Decision, E> + Send + Sync,
-    E: Error + Send + Sync,
+    S: Send,
+    F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<Decision, E> + Send,
+    E: Error + Send,
 {
     type Error = E;
 
