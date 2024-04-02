@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use kamu_core::{self as domain, MetadataChainExt, SearchNextBlockVisitor, SearchSeedVisitor, ServerUrlConfig};
+use kamu_core::{self as domain, MetadataChainExt, SearchSeedVisitor, ServerUrlConfig};
 use opendatafabric as odf;
 
 use crate::prelude::*;
