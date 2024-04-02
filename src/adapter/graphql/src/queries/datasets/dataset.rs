@@ -110,8 +110,9 @@ impl Dataset {
 
         Ok(dataset
             .as_metadata_chain()
-            .accept_one(<SearchSeedVisitor>::create())
-            .await?
+            .accept_one(SearchSeedVisitor::create())
+            .await
+            .int_err()?
             .into_block()
             .expect("Dataset without blocks")
             .system_time)

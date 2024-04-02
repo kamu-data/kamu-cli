@@ -296,10 +296,10 @@ pub trait MetadataChainExt: MetadataChain {
         S: Send + Sync,
         F: Fn(&mut S, &Multihash, &MetadataBlock) -> MetadataVisitorDecision + Send + Sync,
     {
-        let mut visitor =
-            GenericCallbackVisitor::<S, F, IterBlocksError>::new(state, initial_decision, callback);
+        let mut visitor = GenericCallbackVisitor::new(state, initial_decision, callback);
 
-        self.accept_by_hash(&mut [&mut visitor], head_hash).await?;
+        self.accept_by_hash::<IterBlocksError>(&mut [&mut visitor], head_hash)
+            .await?;
 
         Ok(visitor.into_state())
     }
@@ -358,19 +358,20 @@ pub trait MetadataChainExt: MetadataChain {
     }
 
     /// Method that searches for the last data block
-    async fn last_data_block(
-        &self,
-    ) -> Result<SearchSingleDataBlockVisitor<IterBlocksError>, IterBlocksError> {
-        self.accept_one(SearchSingleDataBlockVisitor::next()).await
+    async fn last_data_block(&self) -> Result<SearchSingleDataBlockVisitor, IterBlocksError> {
+        let visitor = SearchSingleDataBlockVisitor::next();
+
+        Ok(self.accept_one(visitor).await?)
     }
 
     /// Same as [Self::last_data_block()], but skipping data blocks that have no
     /// real data
     async fn last_data_block_with_new_data(
         &self,
-    ) -> Result<SearchSingleDataBlockVisitor<IterBlocksError>, IterBlocksError> {
-        self.accept_one(SearchSingleDataBlockVisitor::next_with_new_data())
-            .await
+    ) -> Result<SearchSingleDataBlockVisitor, IterBlocksError> {
+        let visitor = SearchSingleDataBlockVisitor::next_with_new_data();
+
+        Ok(self.accept_one(visitor).await?)
     }
 }
 
@@ -535,15 +536,6 @@ impl From<GetBlockError> for IterBlocksError {
             GetBlockError::BlockMalformed(e) => Self::BlockMalformed(e),
             GetBlockError::Access(e) => Self::Access(e),
             GetBlockError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-impl From<IterBlocksError> for InternalError {
-    fn from(v: IterBlocksError) -> Self {
-        match v {
-            IterBlocksError::Internal(e) => e,
-            e => e.int_err(),
         }
     }
 }

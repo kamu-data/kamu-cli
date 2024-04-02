@@ -210,14 +210,14 @@ impl TransformServiceImpl {
         // TODO: PERF: Search for source, vocab, and data schema result in full scan
         let (source, schema, set_vocab, prev_query) = {
             // TODO: Support transform evolution
-            let mut set_transform_visitor = <SearchSetTransformVisitor>::create();
-            let mut set_vocab_visitor = <SearchSetVocabVisitor>::create();
-            let mut set_data_schema_visitor = <SearchSetDataSchemaVisitor>::create();
-            let mut execute_transform_visitor = <SearchExecuteTransformVisitor>::create();
+            let mut set_transform_visitor = SearchSetTransformVisitor::create().wrap_err();
+            let mut set_vocab_visitor = SearchSetVocabVisitor::create().wrap_err();
+            let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::create().wrap_err();
+            let mut execute_transform_visitor = SearchExecuteTransformVisitor::create().wrap_err();
 
             dataset
                 .as_metadata_chain()
-                .accept_by_hash(
+                .accept_by_hash::<IterBlocksError>(
                     &mut [
                         &mut set_transform_visitor,
                         &mut set_vocab_visitor,
@@ -226,18 +226,20 @@ impl TransformServiceImpl {
                     ],
                     &head,
                 )
-                .await?;
+                .await
+                .map_err(ErrorIntoInternal::int_err)?;
 
             (
-                set_transform_visitor.into_event(),
+                set_transform_visitor.into_inner().into_event(),
                 set_data_schema_visitor
+                    .into_inner()
                     .into_event()
                     .as_ref()
                     .map(SetDataSchema::schema_as_arrow)
                     .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
                     .int_err()?,
-                set_vocab_visitor.into_event(),
-                execute_transform_visitor.into_event(),
+                set_vocab_visitor.into_inner().into_event(),
+                execute_transform_visitor.into_inner().into_event(),
             )
         };
 
@@ -343,9 +345,10 @@ impl TransformServiceImpl {
         let last_unprocessed_offset = input_chain
             .accept_one_by_hash(
                 &last_unprocessed_block,
-                <SearchSingleDataBlockVisitor>::next(),
+                SearchSingleDataBlockVisitor::next(),
             )
-            .await?
+            .await
+            .int_err()?
             .into_event()
             .and_then(|event| event.last_offset())
             .or(last_processed_offset);
@@ -478,7 +481,8 @@ impl TransformServiceImpl {
         Ok(dataset
             .as_metadata_chain()
             .accept_one(<SearchSetVocabVisitor>::create())
-            .await?
+            .await
+            .map_err(ErrorIntoInternal::int_err)?
             .into_event()
             .unwrap_or_default()
             .into())
@@ -514,9 +518,12 @@ impl TransformServiceImpl {
 
         let (source, set_vocab, schema, blocks, finished_range) = {
             // TODO: Support dataset evolution
-            let mut set_transform_visitor = <SearchSetTransformVisitor>::create();
-            let mut set_vocab_visitor = <SearchSetVocabVisitor>::create();
-            let mut set_data_schema_visitor = <SearchSetDataSchemaVisitor>::create();
+            let mut set_transform_visitor = SearchSetTransformVisitor::create()
+                .with_map_err(|e| VerificationError::Internal(e.int_err()));
+            let mut set_vocab_visitor = SearchSetVocabVisitor::create()
+                .with_map_err(|e| VerificationError::Internal(e.int_err()));
+            let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::create()
+                .with_map_err(|e| VerificationError::Internal(e.int_err()));
 
             type Flag = MetadataEventTypeFlags;
             type Decision = MetadataVisitorDecision;
@@ -527,7 +534,7 @@ impl TransformServiceImpl {
                 finished_range: bool,
             }
 
-            let mut execute_transform_collector_visitor = GenericFallibleCallbackVisitor::new(
+            let mut execute_transform_collector_visitor = GenericCallbackVisitor::new(
                 ExecuteTransformCollectorVisitor {
                     tail_sequence_number,
                     blocks: Vec::new(),
@@ -538,7 +545,7 @@ impl TransformServiceImpl {
                     if Some(block.sequence_number) < state.tail_sequence_number {
                         state.finished_range = true;
 
-                        return Ok(Decision::Stop);
+                        return Decision::Stop;
                     };
 
                     let block_flag = Flag::from(&block.event);
@@ -550,15 +557,16 @@ impl TransformServiceImpl {
                     if Some(block.sequence_number) == state.tail_sequence_number {
                         state.finished_range = true;
 
-                        Ok(Decision::Stop)
+                        Decision::Stop
                     } else {
-                        Ok(Decision::NextOfType(Flag::EXECUTE_TRANSFORM))
+                        Decision::NextOfType(Flag::EXECUTE_TRANSFORM)
                     }
                 },
-            );
+            )
+            .with_map_err(|e| VerificationError::Internal(e.int_err()));
 
             metadata_chain
-                .accept::<InternalError>(&mut [
+                .accept(&mut [
                     &mut set_transform_visitor,
                     &mut set_vocab_visitor,
                     &mut set_data_schema_visitor,
@@ -570,12 +578,15 @@ impl TransformServiceImpl {
                 blocks,
                 finished_range,
                 ..
-            } = execute_transform_collector_visitor.into_state();
+            } = execute_transform_collector_visitor
+                .into_inner()
+                .into_state();
 
             (
-                set_transform_visitor.into_event(),
-                set_vocab_visitor.into_event(),
+                set_transform_visitor.into_inner().into_event(),
+                set_vocab_visitor.into_inner().into_event(),
                 set_data_schema_visitor
+                    .into_inner()
                     .into_event()
                     .as_ref()
                     .map(SetDataSchema::schema_as_arrow)
@@ -728,7 +739,8 @@ impl TransformService for TransformServiceImpl {
             .as_metadata_chain()
             // TODO: Support transform evolution
             .accept_one(<SearchSetTransformVisitor>::create())
-            .await?
+            .await
+            .map_err(ErrorIntoInternal::int_err)?
             .into_hashed_block())
     }
 

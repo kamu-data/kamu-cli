@@ -55,8 +55,9 @@ impl DatasetMetadataMut {
 
         let old_attachments = dataset
             .as_metadata_chain()
-            .accept_one(<SearchSetAttachmentsVisitor>::create())
-            .await?
+            .accept_one(SearchSetAttachmentsVisitor::create())
+            .await
+            .map_err(ErrorIntoInternal::int_err)?
             .into_event()
             .map(|e| {
                 let odf::Attachments::Embedded(at) = e.attachments;

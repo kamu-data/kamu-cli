@@ -96,7 +96,7 @@ impl DatasetDataHelper {
     pub async fn get_last_set_data_schema_block(&self) -> MetadataBlockTyped<SetDataSchema> {
         self.dataset
             .as_metadata_chain()
-            .accept_one(<SearchSetDataSchemaVisitor>::create())
+            .accept_one(SearchSetDataSchemaVisitor::create())
             .await
             .unwrap()
             .into_block()

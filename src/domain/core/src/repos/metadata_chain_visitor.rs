@@ -62,22 +62,10 @@ pub trait MetadataChainVisitor: Sync + Send {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-/// Trait is needed to generalize [`MetadataChainVisitor`] error type. This is
-/// necessary when we are going to use several Visitors at the same time, e.g.
-/// using method [`MetadataChainExt::accept()`]
-pub trait MetadataChainVisitorHolder: Send {
-    type Error: std::error::Error;
-
-    fn visit(
-        &mut self,
-        hashed_block_ref: HashedMetadataBlockRef,
-    ) -> Result<MetadataVisitorDecision, Self::Error>;
-}
-
 pub struct MetadataChainVisitorHolderImpl<V, F, E1, E2>
 where
     V: MetadataChainVisitor<Error = E1>,
-    F: Fn(Result<MetadataVisitorDecision, E1>) -> Result<MetadataVisitorDecision, E2>,
+    F: Fn(E1) -> E2,
     E1: std::error::Error,
     E2: std::error::Error,
 {
@@ -86,48 +74,81 @@ where
     _phantom: PhantomData<E2>,
 }
 
-impl<V, F, E1, E2> MetadataChainVisitorHolder for MetadataChainVisitorHolderImpl<V, F, E1, E2>
+impl<V, F, E1, E2> MetadataChainVisitorHolderImpl<V, F, E1, E2>
 where
     V: MetadataChainVisitor<Error = E1>,
-    F: Fn(Result<MetadataVisitorDecision, E1>) -> Result<MetadataVisitorDecision, E2> + Send,
+    F: Fn(E1) -> E2 + Send,
     E1: std::error::Error,
     E2: std::error::Error + Send,
 {
+    fn new(visitor: V, map_err_fn: F) -> Self {
+        Self {
+            visitor,
+            map_err_fn,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn into_inner(self) -> V {
+        self.visitor
+    }
+}
+
+impl<V, F, E1, E2> MetadataChainVisitor for MetadataChainVisitorHolderImpl<V, F, E1, E2>
+where
+    V: MetadataChainVisitor<Error = E1>,
+    F: Fn(E1) -> E2 + Send + Sync,
+    E1: std::error::Error,
+    E2: std::error::Error + Send + Sync,
+{
     type Error = E2;
+
+    fn initial_decision(&self) -> MetadataVisitorDecision {
+        self.visitor.initial_decision()
+    }
 
     fn visit(
         &mut self,
         hashed_block_ref: HashedMetadataBlockRef,
     ) -> Result<MetadataVisitorDecision, Self::Error> {
-        match self.visitor.visit(hashed_block_ref) {
-            Ok(r) => Ok(r),
-            e => (self.map_err_fn)(e),
-        }
+        self.visitor
+            .visit(hashed_block_ref)
+            .map_err(|e| (self.map_err_fn)(e))
+    }
+
+    fn finish(&self) -> Result<(), Self::Error> {
+        self.visitor.finish().map_err(|e| (self.map_err_fn)(e))
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub trait MetadataChainVisitorExt: MetadataChainVisitor {
-    /// Method for converting a [`MetadataChainVisitor`] to
-    /// [`MetadataChainVisitorHolder`] using the error conversion function
-    fn map_err<'a, E>(
-        self,
-        map_err_fn: impl Fn(Result<MetadataVisitorDecision, Self::Error>) -> Result<MetadataVisitorDecision, E>
-            + Send,
-    ) -> impl MetadataChainVisitorHolder<Error = E>
+pub struct MetadataChainVisitorHolderFactory {}
+
+impl MetadataChainVisitorHolderFactory {
+    pub fn create<V, F, E1, E2>(
+        visitor: V,
+        map_err_fn: F,
+    ) -> MetadataChainVisitorHolderImpl<V, impl Fn(E1) -> E2, E1, E2>
     where
-        Self: Sized,
-        E: std::error::Error + Send,
+        V: MetadataChainVisitor<Error = E1>,
+        F: Fn(E1) -> E2 + Send,
+        E1: std::error::Error,
+        E2: std::error::Error + Send,
     {
-        MetadataChainVisitorHolderImpl {
-            visitor: self,
-            map_err_fn,
-            _phantom: PhantomData,
-        }
+        MetadataChainVisitorHolderImpl::new(visitor, map_err_fn)
+    }
+
+    pub fn create_infallible<V, E1, E2>(
+        visitor: V,
+    ) -> MetadataChainVisitorHolderImpl<V, impl Fn(E1) -> E2, E1, E2>
+    where
+        V: MetadataChainVisitor<Error = E1>,
+        E1: std::error::Error,
+        E2: std::error::Error + Send,
+    {
+        MetadataChainVisitorHolderImpl::new(visitor, |_| -> E2 { unreachable!() })
     }
 }
-
-impl<T> MetadataChainVisitorExt for T where T: MetadataChainVisitor {}
 
 ///////////////////////////////////////////////////////////////////////////////

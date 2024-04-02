@@ -35,159 +35,116 @@ use opendatafabric::{
     VariantOf,
 };
 
-use crate::{HashedMetadataBlockRef, MetadataChainVisitor, MetadataVisitorDecision as Decision};
+use crate::{
+    HashedMetadataBlockRef,
+    IterBlocksError,
+    MetadataChainVisitor,
+    MetadataChainVisitorHolderFactory,
+    MetadataChainVisitorHolderImpl,
+    MetadataVisitorDecision as Decision,
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct SearchSetVocabVisitor<E = InternalError> {
-    _phantom: PhantomData<E>,
-}
+// TODO: use Infallible/!
+type VisitorError = IterBlocksError;
 
-impl<E> SearchSetVocabVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    pub fn create() -> SearchSingleTypedBlockVisitor<SetVocab, E> {
-        SearchSingleTypedBlockVisitor::new(Flag::SET_VOCAB)
-    }
-}
+///////////////////////////////////////////////////////////////////////////////
 
-pub struct SearchSeedVisitor<E = InternalError> {
-    _phantom: PhantomData<E>,
-}
+macro_rules! typed_search_single_typed_block_visitor_impl {
+    ($name:ident, $event_struct:ty, $block_type_flags:expr) => {
+        pub struct $name {}
 
-impl<E> SearchSeedVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    pub fn create() -> SearchSingleTypedBlockVisitor<Seed, E> {
-        SearchSingleTypedBlockVisitor::new(Flag::SEED)
-    }
-}
-
-pub struct SearchSetPollingSourceVisitor<E = InternalError> {
-    _phantom: PhantomData<E>,
-}
-
-impl<E> SearchSetPollingSourceVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    pub fn create() -> SearchSingleTypedBlockVisitor<SetPollingSource, E> {
-        SearchSingleTypedBlockVisitor::new(Flag::SET_POLLING_SOURCE)
-    }
-}
-
-pub struct SearchSetTransformVisitor<E = InternalError> {
-    _phantom: PhantomData<E>,
-}
-
-impl<E> SearchSetTransformVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    pub fn create() -> SearchSingleTypedBlockVisitor<SetTransform, E> {
-        SearchSingleTypedBlockVisitor::new(Flag::SET_TRANSFORM)
-    }
-}
-
-pub struct SearchSetDataSchemaVisitor<E = InternalError> {
-    _phantom: PhantomData<E>,
-}
-
-impl<E> SearchSetDataSchemaVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    pub fn create() -> SearchSingleTypedBlockVisitor<SetDataSchema, E> {
-        SearchSingleTypedBlockVisitor::new(Flag::SET_DATA_SCHEMA)
-    }
-}
-
-pub struct SearchExecuteTransformVisitor<E = InternalError> {
-    _phantom: PhantomData<E>,
-}
-
-impl<E> SearchExecuteTransformVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    pub fn create() -> SearchSingleTypedBlockVisitor<ExecuteTransform, E> {
-        SearchSingleTypedBlockVisitor::new(Flag::EXECUTE_TRANSFORM)
-    }
-}
-
-pub struct SearchSetInfoVisitor<E = InternalError> {
-    _phantom: PhantomData<E>,
-}
-
-impl<E> SearchSetInfoVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    pub fn create() -> SearchSingleTypedBlockVisitor<SetInfo, E> {
-        SearchSingleTypedBlockVisitor::new(Flag::SET_INFO)
-    }
-}
-
-pub struct SearchSetAttachmentsVisitor<E = InternalError> {
-    _phantom: PhantomData<E>,
-}
-
-impl<E> SearchSetAttachmentsVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    pub fn create() -> SearchSingleTypedBlockVisitor<SetAttachments, E> {
-        SearchSingleTypedBlockVisitor::new(Flag::SET_ATTACHMENTS)
-    }
-}
-
-pub struct SearchSetLicenseVisitor<E = InternalError> {
-    _phantom: PhantomData<E>,
-}
-
-impl<E> SearchSetLicenseVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    pub fn create() -> SearchSingleTypedBlockVisitor<SetLicense, E> {
-        SearchSingleTypedBlockVisitor::new(Flag::SET_LICENSE)
-    }
-}
-
-pub struct SearchAddDataVisitor<E = InternalError> {
-    _phantom: PhantomData<E>,
-}
-
-impl<E> SearchAddDataVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    pub fn create() -> SearchSingleTypedBlockVisitor<AddData, E> {
-        SearchSingleTypedBlockVisitor::new(Flag::ADD_DATA)
-    }
+        impl $name {
+            pub fn create() -> SearchSingleTypedBlockVisitor<$event_struct> {
+                SearchSingleTypedBlockVisitor::new($block_type_flags)
+            }
+        }
+    };
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct SearchSingleTypedBlockVisitor<T, E> {
+typed_search_single_typed_block_visitor_impl!(SearchSetVocabVisitor, SetVocab, Flag::SET_VOCAB);
+typed_search_single_typed_block_visitor_impl!(SearchSeedVisitor, Seed, Flag::SEED);
+typed_search_single_typed_block_visitor_impl!(
+    SearchSetPollingSourceVisitor,
+    SetPollingSource,
+    Flag::SET_POLLING_SOURCE
+);
+typed_search_single_typed_block_visitor_impl!(
+    SearchSetTransformVisitor,
+    SetTransform,
+    Flag::SET_TRANSFORM
+);
+typed_search_single_typed_block_visitor_impl!(
+    SearchSetDataSchemaVisitor,
+    SetDataSchema,
+    Flag::SET_DATA_SCHEMA
+);
+typed_search_single_typed_block_visitor_impl!(
+    SearchExecuteTransformVisitor,
+    ExecuteTransform,
+    Flag::EXECUTE_TRANSFORM
+);
+typed_search_single_typed_block_visitor_impl!(SearchSetInfoVisitor, SetInfo, Flag::SET_INFO);
+typed_search_single_typed_block_visitor_impl!(
+    SearchSetAttachmentsVisitor,
+    SetAttachments,
+    Flag::SET_ATTACHMENTS
+);
+typed_search_single_typed_block_visitor_impl!(
+    SearchSetLicenseVisitor,
+    SetLicense,
+    Flag::SET_LICENSE
+);
+typed_search_single_typed_block_visitor_impl!(SearchAddDataVisitor, AddData, Flag::ADD_DATA);
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct SearchSingleTypedBlockVisitor<T> {
     requested_flag: Flag,
     hashed_block: Option<(Multihash, MetadataBlockTyped<T>)>,
-    _phantom: PhantomData<E>,
 }
 
-impl<T, E> SearchSingleTypedBlockVisitor<T, E>
+impl<T> SearchSingleTypedBlockVisitor<T>
 where
     T: VariantOf<MetadataEvent> + Send + Sync,
-    E: Error + Send + Sync,
 {
     pub fn new(requested_flag: Flag) -> Self {
         Self {
             requested_flag,
             hashed_block: None,
-            _phantom: PhantomData,
         }
+    }
+
+    pub fn wrap_err<E>(
+        self,
+    ) -> MetadataChainVisitorHolderImpl<
+        SearchSingleTypedBlockVisitor<T>,
+        impl Fn(VisitorError) -> E,
+        VisitorError,
+        E,
+    >
+    where
+        E: Error + Send,
+    {
+        MetadataChainVisitorHolderFactory::create_infallible(self)
+    }
+
+    pub fn with_map_err<E>(
+        self,
+        map_err_fn: impl Fn(VisitorError) -> E + Send,
+    ) -> MetadataChainVisitorHolderImpl<
+        SearchSingleTypedBlockVisitor<T>,
+        impl Fn(VisitorError) -> E,
+        VisitorError,
+        E,
+    >
+    where
+        E: Error + Send,
+    {
+        MetadataChainVisitorHolderFactory::create(self, map_err_fn)
     }
 
     pub fn into_hashed_block(self) -> Option<(Multihash, MetadataBlockTyped<T>)> {
@@ -203,12 +160,11 @@ where
     }
 }
 
-impl<T, E> MetadataChainVisitor for SearchSingleTypedBlockVisitor<T, E>
+impl<T> MetadataChainVisitor for SearchSingleTypedBlockVisitor<T>
 where
     T: VariantOf<MetadataEvent> + Send + Sync,
-    E: Error + Send + Sync,
 {
-    type Error = E;
+    type Error = VisitorError;
 
     fn initial_decision(&self) -> Decision {
         Decision::NextOfType(self.requested_flag)
@@ -234,16 +190,12 @@ enum SearchSingleDataBlockVisitorKind {
     NextFilledNewData,
 }
 
-pub struct SearchSingleDataBlockVisitor<E = InternalError> {
+pub struct SearchSingleDataBlockVisitor {
     kind: SearchSingleDataBlockVisitorKind,
     hashed_block: Option<(Multihash, MetadataBlockDataStream)>,
-    _phantom: PhantomData<E>,
 }
 
-impl<E> SearchSingleDataBlockVisitor<E>
-where
-    E: Error + Send + Sync,
-{
+impl SearchSingleDataBlockVisitor {
     pub fn next() -> Self {
         Self::new(SearchSingleDataBlockVisitorKind::NextDataBlock)
     }
@@ -256,7 +208,6 @@ where
         Self {
             kind,
             hashed_block: None,
-            _phantom: PhantomData,
         }
     }
 
@@ -273,11 +224,8 @@ where
     }
 }
 
-impl<E> MetadataChainVisitor for SearchSingleDataBlockVisitor<E>
-where
-    E: Error + Send + Sync,
-{
-    type Error = E;
+impl MetadataChainVisitor for SearchSingleDataBlockVisitor {
+    type Error = VisitorError;
 
     fn initial_decision(&self) -> Decision {
         Decision::NextOfType(Flag::DATA_BLOCK)
@@ -310,26 +258,33 @@ where
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct GenericCallbackVisitor<S, F, E = InternalError> {
+pub struct GenericCallbackVisitor<S, F> {
     state: S,
     initial_decision: Decision,
     visit_callback: F,
-    _phantom: PhantomData<E>,
 }
 
-impl<S, F, E> GenericCallbackVisitor<S, F, E>
+impl<S, F> GenericCallbackVisitor<S, F>
 where
     S: Send + Sync,
     F: Fn(&mut S, &Multihash, &MetadataBlock) -> Decision + Send + Sync,
-    E: Error + Send + Sync,
 {
     pub fn new(state: S, initial_decision: Decision, visit_callback: F) -> Self {
         Self {
             state,
             initial_decision,
             visit_callback,
-            _phantom: PhantomData,
         }
+    }
+
+    pub fn with_map_err<E>(
+        self,
+        map_err_fn: impl Fn(VisitorError) -> E + Send,
+    ) -> MetadataChainVisitorHolderImpl<Self, impl Fn(VisitorError) -> E, VisitorError, E>
+    where
+        E: Error + Send,
+    {
+        MetadataChainVisitorHolderFactory::create(self, map_err_fn)
     }
 
     pub fn into_state(self) -> S {
@@ -337,13 +292,12 @@ where
     }
 }
 
-impl<S, F, E> MetadataChainVisitor for GenericCallbackVisitor<S, F, E>
+impl<S, F> MetadataChainVisitor for GenericCallbackVisitor<S, F>
 where
     S: Send + Sync,
     F: Fn(&mut S, &Multihash, &MetadataBlock) -> Decision + Send + Sync,
-    E: Error + Send + Sync,
 {
-    type Error = E;
+    type Error = VisitorError;
 
     fn initial_decision(&self) -> Decision {
         self.initial_decision.clone()
@@ -356,21 +310,16 @@ where
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct SetDataSchemaVisitor<'a, E = InternalError> {
+pub struct SetDataSchemaVisitor<'a> {
     source_name: Option<&'a str>,
     source_state: Option<SourceState>,
-    _phantom: PhantomData<E>,
 }
 
-impl<'a, E> SetDataSchemaVisitor<'a, E>
-where
-    E: Error + Send + Sync,
-{
+impl<'a> SetDataSchemaVisitor<'a> {
     pub fn new(source_name: Option<&'a str>) -> Self {
         Self {
             source_name,
             source_state: None,
-            _phantom: PhantomData,
         }
     }
 
@@ -379,11 +328,8 @@ where
     }
 }
 
-impl<E> MetadataChainVisitor for SetDataSchemaVisitor<'_, E>
-where
-    E: Error + Send + Sync,
-{
-    type Error = E;
+impl MetadataChainVisitor for SetDataSchemaVisitor<'_> {
+    type Error = VisitorError;
 
     fn initial_decision(&self) -> Decision {
         Decision::NextOfType(Flag::ADD_DATA)

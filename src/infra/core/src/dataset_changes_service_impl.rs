@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::{
     BlockRef,
     Dataset,
@@ -150,8 +150,9 @@ impl DatasetChangesServiceImpl {
                 // Yes, so try locating the previous watermark containing node
                 let previous_nearest_watermark = dataset
                     .as_metadata_chain()
-                    .accept_one_by_hash(old_head, <SearchSingleDataBlockVisitor>::next())
-                    .await?
+                    .accept_one_by_hash(old_head, SearchSingleDataBlockVisitor::next())
+                    .await
+                    .map_err(ErrorIntoInternal::int_err)?
                     .into_event()
                     .and_then(|event| event.new_watermark);
 

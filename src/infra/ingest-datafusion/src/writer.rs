@@ -856,54 +856,65 @@ impl DataWriterDataFusionBuilder {
             .resolve_ref(&self.block_ref)
             .await
             .int_err()?;
-        let mut seed_visitor = SearchSeedVisitor::create();
-        let mut set_vocab_visitor = SearchSetVocabVisitor::create();
-        let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::create();
-        let mut prev_source_state_visitor = SetDataSchemaVisitor::new(source_name);
-        let mut add_data_visitor = SearchAddDataVisitor::create();
-        let mut add_data_collection_visitor = GenericCallbackVisitor::new(
-            Vec::new(),
-            Decision::NextOfType(Flag::ADD_DATA),
-            |state, _, block| {
-                let MetadataEvent::AddData(e) = &block.event else {
-                    unreachable!()
-                };
-
-                if let Some(output_data) = &e.new_data {
-                    state.push(output_data.physical_hash.clone());
-                }
-
-                Decision::NextOfType(Flag::ADD_DATA)
-            },
+        let mut seed_visitor = SearchSeedVisitor::create().wrap_err();
+        let mut set_vocab_visitor = SearchSetVocabVisitor::create().wrap_err();
+        let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::create().wrap_err();
+        let mut prev_source_state_visitor = MetadataChainVisitorHolderFactory::create(
+            SetDataSchemaVisitor::new(source_name),
+            |e| -> ScanMetadataError { e.int_err().into() },
         );
-        let mut source_event_visitor = SourceEventVisitor::new(source_name);
+        let mut add_data_visitor = SearchAddDataVisitor::create().wrap_err();
+        let mut add_data_collection_visitor =
+            MetadataChainVisitorHolderFactory::create_infallible(GenericCallbackVisitor::new(
+                Vec::new(),
+                Decision::NextOfType(Flag::ADD_DATA),
+                |state, _, block| {
+                    let MetadataEvent::AddData(e) = &block.event else {
+                        unreachable!()
+                    };
+
+                    if let Some(output_data) = &e.new_data {
+                        state.push(output_data.physical_hash.clone());
+                    }
+
+                    Decision::NextOfType(Flag::ADD_DATA)
+                },
+            ));
+        let mut source_event_visitor = MetadataChainVisitorHolderFactory::create(
+            SourceEventVisitor::new(source_name),
+            |e| -> ScanMetadataError { e.int_err().into() },
+        );
 
         self.dataset
             .as_metadata_chain()
             .accept_by_hash(
                 &mut [
-                    &mut seed_visitor as &mut dyn MetadataChainVisitor<Error = _>,
+                    &mut source_event_visitor,
+                    &mut seed_visitor,
                     &mut set_vocab_visitor,
                     &mut add_data_visitor,
                     &mut set_data_schema_visitor,
                     &mut prev_source_state_visitor,
                     &mut add_data_collection_visitor,
-                    &mut source_event_visitor,
                 ],
                 &head,
             )
             .await?;
 
         {
-            let seed = seed_visitor.into_event().expect("Dataset without blocks");
+            let seed = seed_visitor
+                .into_inner()
+                .into_event()
+                .expect("Dataset without blocks");
 
             assert_eq!(seed.dataset_kind, odf::DatasetKind::Root);
         }
 
-        let (source_event, merge_strategy) =
-            source_event_visitor.get_source_event_and_merge_strategy()?;
+        let (source_event, merge_strategy) = source_event_visitor
+            .into_inner()
+            .get_source_event_and_merge_strategy()?;
         let (prev_offset, prev_watermark, prev_checkpoint) = {
-            match add_data_visitor.into_event() {
+            match add_data_visitor.into_inner().into_event() {
                 Some(e) => (
                     e.last_offset(),
                     e.new_watermark,
@@ -915,6 +926,7 @@ impl DataWriterDataFusionBuilder {
         let metadata_state = DataWriterMetadataState {
             head,
             schema: set_data_schema_visitor
+                .into_inner()
                 .into_event()
                 .as_ref()
                 .map(odf::SetDataSchema::schema_as_arrow)
@@ -922,12 +934,16 @@ impl DataWriterDataFusionBuilder {
                 .int_err()?,
             source_event,
             merge_strategy,
-            vocab: set_vocab_visitor.into_event().unwrap_or_default().into(),
-            data_slices: add_data_collection_visitor.into_state(),
+            vocab: set_vocab_visitor
+                .into_inner()
+                .into_event()
+                .unwrap_or_default()
+                .into(),
+            data_slices: add_data_collection_visitor.into_inner().into_state(),
             prev_offset,
             prev_checkpoint,
             prev_watermark,
-            prev_source_state: prev_source_state_visitor.into_state(),
+            prev_source_state: prev_source_state_visitor.into_inner().into_state(),
         };
 
         Ok(self.with_metadata_state(metadata_state))
