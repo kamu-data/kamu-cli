@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -113,6 +113,18 @@ impl DatasetRepositoryLocalFs {
         Ok(DatasetLayout::new(
             self.storage_strategy.get_dataset_path(&dataset_handle),
         ))
+    }
+
+    fn get_canonical_path_param(dataset_path: &Path) -> Result<(PathBuf, String), InternalError> {
+        let canonical_dataset_path = std::fs::canonicalize(dataset_path).int_err()?;
+        let dataset_name_str = canonical_dataset_path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+
+        Ok((canonical_dataset_path, dataset_name_str))
     }
 }
 
@@ -241,7 +253,21 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
 
         // It's okay to create a new dataset by this point
         let dataset_id = seed_block.event.dataset_id.clone();
-        let dataset_handle = DatasetHandle::new(dataset_id, dataset_alias.clone());
+        let dataset_handle = if let Some(account_name) = &dataset_alias.account_name {
+            let (_, canonical_account_name) = self
+                .storage_strategy
+                .resolve_account_dir(account_name)
+                .int_err()?;
+            let canonical_dataset_alias = DatasetAlias::new(
+                Some(canonical_account_name),
+                dataset_alias.dataset_name.clone(),
+            );
+
+            DatasetHandle::new(dataset_id, canonical_dataset_alias)
+        } else {
+            DatasetHandle::new(dataset_id, dataset_alias.clone())
+        };
+
         let dataset_path = self.storage_strategy.get_dataset_path(&dataset_handle);
         let layout = DatasetLayout::create(&dataset_path).int_err()?;
         let dataset = Self::build_dataset(layout, self.event_bus.clone());
@@ -430,6 +456,11 @@ trait DatasetStorageStrategy: Sync + Send {
         dataset_handle: &DatasetHandle,
         new_name: &DatasetName,
     ) -> Result<(), InternalError>;
+
+    fn resolve_account_dir(
+        &self,
+        account_name: &AccountName,
+    ) -> Result<(PathBuf, AccountName), ResolveDatasetError>;
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -476,10 +507,11 @@ impl DatasetSingleTenantStorageStrategy {
         &self,
         dataset_path: &PathBuf,
         dataset_alias: &DatasetAlias,
-    ) -> Result<DatasetSummary, ResolveDatasetError> {
+    ) -> Result<(DatasetSummary, DatasetAlias), ResolveDatasetError> {
         let layout = DatasetLayout::new(dataset_path);
         let dataset = DatasetRepositoryLocalFs::build_dataset(layout, self.event_bus.clone());
-        dataset
+
+        let dataset_summary = dataset
             .get_summary(GetSummaryOpts::default())
             .await
             .map_err(|e| {
@@ -490,28 +522,16 @@ impl DatasetSingleTenantStorageStrategy {
                 } else {
                     ResolveDatasetError::Internal(e.int_err())
                 }
-            })
-    }
+            })?;
 
-    async fn attempt_resolve_dataset_alias(
-        &self,
-        dataset_alias: &DatasetAlias,
-    ) -> Result<DatasetHandle, ResolveDatasetError> {
-        assert!(
-            !dataset_alias.is_multi_tenant()
-                || dataset_alias.account_name.as_ref().unwrap() == DEFAULT_ACCOUNT_NAME,
-            "Multi-tenant refs shouldn't have reached down to here with earlier validations"
-        );
+        let (_, canonical_dataset_name) =
+            DatasetRepositoryLocalFs::get_canonical_path_param(dataset_path)?;
+        let canonical_dataset_alias = DatasetAlias {
+            dataset_name: DatasetName::new_unchecked(canonical_dataset_name.as_str()),
+            account_name: None,
+        };
 
-        let dataset_path = self.dataset_path_impl(dataset_alias);
-        if !dataset_path.exists() {
-            return Err(ResolveDatasetError::NotFound(DatasetNotFoundError {
-                dataset_ref: dataset_alias.as_local_ref(),
-            }));
-        }
-
-        self.resolve_dataset_handle(&dataset_path, dataset_alias)
-            .await
+        Ok((dataset_summary, canonical_dataset_alias))
     }
 
     async fn resolve_dataset_handle(
@@ -519,11 +539,14 @@ impl DatasetSingleTenantStorageStrategy {
         dataset_path: &PathBuf,
         dataset_alias: &DatasetAlias,
     ) -> Result<DatasetHandle, ResolveDatasetError> {
-        let summary = self
+        let (summary, canonical_dataset_alias) = self
             .attempt_resolving_summary_via_path(dataset_path, dataset_alias)
             .await?;
 
-        Ok(DatasetHandle::new(summary.id, dataset_alias.clone()))
+        Ok(DatasetHandle::new(
+            summary.id,
+            canonical_dataset_alias.clone(),
+        ))
     }
 }
 
@@ -550,7 +573,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
                 }
                 let dataset_name = DatasetName::try_from(&dataset_dir_entry.file_name()).int_err()?;
                 let dataset_alias = DatasetAlias::new(None, dataset_name);
-                match self.attempt_resolve_dataset_alias(&dataset_alias).await {
+                match self.resolve_dataset_handle(&dataset_dir_entry.path(), &dataset_alias).await {
                     Ok(hdl) => { yield hdl; Ok(()) }
                     Err(ResolveDatasetError::NotFound(_)) => Ok(()),
                     Err(e) => Err(e.int_err())
@@ -623,12 +646,12 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
 
             let dataset_path = self.dataset_path_impl(&alias);
 
-            let summary = self
+            let (summary, canonical_dataset_alias) = self
                 .attempt_resolving_summary_via_path(&dataset_path, &alias)
                 .await?;
 
             if summary.id == *dataset_id {
-                return Ok(DatasetHandle::new(summary.id, alias));
+                return Ok(DatasetHandle::new(summary.id, canonical_dataset_alias));
             }
         }
 
@@ -655,6 +678,16 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         let new_dataset_path = old_dataset_path.parent().unwrap().join(new_name);
         std::fs::rename(old_dataset_path, new_dataset_path).int_err()?;
         Ok(())
+    }
+
+    fn resolve_account_dir(
+        &self,
+        _account_name: &AccountName,
+    ) -> Result<(PathBuf, AccountName), ResolveDatasetError> {
+        Ok((
+            self.root.join(DEFAULT_ACCOUNT_NAME),
+            AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
+        ))
     }
 }
 
@@ -772,32 +805,6 @@ impl DatasetMultiTenantStorageStrategy {
             }
         })
     }
-
-    fn resolve_account_dir(
-        &self,
-        account_name: &AccountName,
-    ) -> Result<PathBuf, ResolveDatasetError> {
-        let account_dataset_dir_path = self.root.join(account_name);
-
-        if !account_dataset_dir_path.is_dir() {
-            let read_accout_dirs = std::fs::read_dir(self.root.as_path()).int_err()?;
-
-            for read_accout_dir in read_accout_dirs {
-                let account_dir_name = AccountName::new_unchecked(
-                    read_accout_dir
-                        .int_err()?
-                        .file_name()
-                        .to_str()
-                        .unwrap_or(""),
-                );
-                if account_name == &account_dir_name {
-                    return Ok(self.root.join(account_dir_name));
-                }
-            }
-        }
-
-        Ok(account_dataset_dir_path)
-    }
 }
 
 #[async_trait]
@@ -862,10 +869,14 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
         dataset_alias: &DatasetAlias,
     ) -> Result<DatasetHandle, ResolveDatasetError> {
         let effective_account_name = self.effective_account_name(dataset_alias);
-        let account_dataset_dir_path = self.resolve_account_dir(effective_account_name)?;
+        let (account_dataset_dir_path, _) = self.resolve_account_dir(effective_account_name)?;
 
         if account_dataset_dir_path.is_dir() {
-            let read_dataset_dir = std::fs::read_dir(account_dataset_dir_path).int_err()?;
+            let read_dataset_dir = std::fs::read_dir(account_dataset_dir_path).map_err(|_| {
+                ResolveDatasetError::NotFound(DatasetNotFoundError {
+                    dataset_ref: dataset_alias.as_local_ref(),
+                })
+            })?;
 
             for r_dataset_dir in read_dataset_dir {
                 let dataset_dir_entry = r_dataset_dir.int_err()?;
@@ -961,6 +972,39 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
             .await?;
 
         Ok(())
+    }
+
+    fn resolve_account_dir(
+        &self,
+        account_name: &AccountName,
+    ) -> Result<(PathBuf, AccountName), ResolveDatasetError> {
+        let account_dataset_dir_path = self.root.join(account_name);
+
+        if !account_dataset_dir_path.is_dir() {
+            let read_accout_dirs = std::fs::read_dir(self.root.as_path()).int_err()?;
+
+            for read_accout_dir in read_accout_dirs {
+                let account_dir_name = AccountName::new_unchecked(
+                    read_accout_dir
+                        .int_err()?
+                        .file_name()
+                        .to_str()
+                        .unwrap_or(""),
+                );
+                if account_name == &account_dir_name {
+                    return Ok((self.root.join(&account_dir_name), account_dir_name));
+                }
+            }
+            return Ok((account_dataset_dir_path, account_name.clone()));
+        }
+
+        let (canonical_account_dataset_dir_path, canonical_account_name) =
+            DatasetRepositoryLocalFs::get_canonical_path_param(&account_dataset_dir_path)?;
+
+        Ok((
+            canonical_account_dataset_dir_path,
+            AccountName::new_unchecked(canonical_account_name.as_str()),
+        ))
     }
 }
 
