@@ -39,8 +39,8 @@ use crate::{
     HashedMetadataBlockRef,
     IterBlocksError,
     MetadataChainVisitor,
+    MetadataChainVisitorHolder,
     MetadataChainVisitorHolderFactory,
-    MetadataChainVisitorHolderImpl,
     MetadataVisitorDecision as Decision,
 };
 
@@ -120,7 +120,7 @@ where
 
     pub fn wrap_err<E>(
         self,
-    ) -> MetadataChainVisitorHolderImpl<
+    ) -> MetadataChainVisitorHolder<
         SearchSingleTypedBlockVisitor<T>,
         impl Fn(VisitorError) -> E,
         VisitorError,
@@ -135,7 +135,7 @@ where
     pub fn with_map_err<E>(
         self,
         map_err_fn: impl Fn(VisitorError) -> E + Send,
-    ) -> MetadataChainVisitorHolderImpl<
+    ) -> MetadataChainVisitorHolder<
         SearchSingleTypedBlockVisitor<T>,
         impl Fn(VisitorError) -> E,
         VisitorError,
@@ -280,7 +280,7 @@ where
     pub fn with_map_err<E>(
         self,
         map_err_fn: impl Fn(VisitorError) -> E + Send,
-    ) -> MetadataChainVisitorHolderImpl<Self, impl Fn(VisitorError) -> E, VisitorError, E>
+    ) -> MetadataChainVisitorHolder<Self, impl Fn(VisitorError) -> E, VisitorError, E>
     where
         E: Error + Send,
     {

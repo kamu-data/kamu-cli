@@ -62,7 +62,10 @@ pub trait MetadataChainVisitor: Send {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct MetadataChainVisitorHolderImpl<V, F, E1, E2>
+/// Trait is needed to generalize [`MetadataChainVisitor`] error type. This is
+/// necessary when we are going to use several Visitors at the same time, e.g.
+/// using method [`MetadataChainExt::accept()`]
+pub struct MetadataChainVisitorHolder<V, F, E1, E2>
 where
     V: MetadataChainVisitor<Error = E1>,
     F: Fn(E1) -> E2,
@@ -74,7 +77,7 @@ where
     _phantom: PhantomData<E2>,
 }
 
-impl<V, F, E1, E2> MetadataChainVisitorHolderImpl<V, F, E1, E2>
+impl<V, F, E1, E2> MetadataChainVisitorHolder<V, F, E1, E2>
 where
     V: MetadataChainVisitor<Error = E1>,
     F: Fn(E1) -> E2 + Send,
@@ -94,7 +97,7 @@ where
     }
 }
 
-impl<V, F, E1, E2> MetadataChainVisitor for MetadataChainVisitorHolderImpl<V, F, E1, E2>
+impl<V, F, E1, E2> MetadataChainVisitor for MetadataChainVisitorHolder<V, F, E1, E2>
 where
     V: MetadataChainVisitor<Error = E1>,
     F: Fn(E1) -> E2 + Send + Sync,
@@ -129,25 +132,25 @@ impl MetadataChainVisitorHolderFactory {
     pub fn create<V, F, E1, E2>(
         visitor: V,
         map_err_fn: F,
-    ) -> MetadataChainVisitorHolderImpl<V, impl Fn(E1) -> E2, E1, E2>
+    ) -> MetadataChainVisitorHolder<V, impl Fn(E1) -> E2, E1, E2>
     where
         V: MetadataChainVisitor<Error = E1>,
         F: Fn(E1) -> E2 + Send,
         E1: std::error::Error,
         E2: std::error::Error + Send,
     {
-        MetadataChainVisitorHolderImpl::new(visitor, map_err_fn)
+        MetadataChainVisitorHolder::new(visitor, map_err_fn)
     }
 
     pub fn create_infallible<V, E1, E2>(
         visitor: V,
-    ) -> MetadataChainVisitorHolderImpl<V, impl Fn(E1) -> E2, E1, E2>
+    ) -> MetadataChainVisitorHolder<V, impl Fn(E1) -> E2, E1, E2>
     where
         V: MetadataChainVisitor<Error = E1>,
         E1: std::error::Error,
         E2: std::error::Error + Send,
     {
-        MetadataChainVisitorHolderImpl::new(visitor, |_| -> E2 { unreachable!() })
+        MetadataChainVisitorHolder::new(visitor, |_| -> E2 { unreachable!() })
     }
 }
 
