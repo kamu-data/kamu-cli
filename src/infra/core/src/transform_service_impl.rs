@@ -480,7 +480,7 @@ impl TransformServiceImpl {
 
         Ok(dataset
             .as_metadata_chain()
-            .accept_one(<SearchSetVocabVisitor>::create())
+            .accept_one(SearchSetVocabVisitor::create())
             .await
             .int_err()?
             .into_event()
@@ -732,13 +732,12 @@ impl TransformService for TransformServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError> {
-        Ok(self
-            .dataset_repo
-            .get_dataset(dataset_ref)
-            .await?
+        let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
+
+        // TODO: Support transform evolution
+        Ok(dataset
             .as_metadata_chain()
-            // TODO: Support transform evolution
-            .accept_one(<SearchSetTransformVisitor>::create())
+            .accept_one(SearchSetTransformVisitor::create())
             .await
             .int_err()?
             .into_hashed_block())

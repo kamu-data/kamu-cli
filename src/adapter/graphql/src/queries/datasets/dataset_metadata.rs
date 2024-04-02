@@ -232,7 +232,7 @@ impl DatasetMetadata {
 
         Ok(dataset
             .as_metadata_chain()
-            .accept_one(<SearchSetLicenseVisitor>::create())
+            .accept_one(SearchSetLicenseVisitor::create())
             .await
             .int_err()?
             .into_event()
@@ -245,7 +245,7 @@ impl DatasetMetadata {
 
         Ok(dataset
             .as_metadata_chain()
-            .accept_one(<SearchSetVocabVisitor>::create())
+            .accept_one(SearchSetVocabVisitor::create())
             .await
             .int_err()?
             .into_event()

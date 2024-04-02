@@ -581,13 +581,12 @@ impl PollingIngestService for PollingIngestServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError> {
-        Ok(self
-            .dataset_repo
-            .get_dataset(dataset_ref)
-            .await?
+        let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
+
+        // TODO: Support source evolution
+        Ok(dataset
             .as_metadata_chain()
-            // TODO: Support source evolution
-            .accept_one(<SearchSetPollingSourceVisitor>::create())
+            .accept_one(SearchSetPollingSourceVisitor::create())
             .await
             .int_err()?
             .into_hashed_block())
