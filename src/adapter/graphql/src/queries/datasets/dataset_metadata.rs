@@ -193,7 +193,7 @@ impl DatasetMetadata {
             .as_metadata_chain()
             .accept_one(SearchSetInfoVisitor::create())
             .await
-            .map_err(ErrorIntoInternal::int_err)?
+            .int_err()?
             .into_event()
             .map_or(
                 SetInfo {
@@ -213,7 +213,7 @@ impl DatasetMetadata {
             .as_metadata_chain()
             .accept_one(SearchSetAttachmentsVisitor::create())
             .await
-            .map_err(ErrorIntoInternal::int_err)?
+            .int_err()?
             .into_event()
             .and_then(|e| {
                 let odf::Attachments::Embedded(at) = e.attachments;
@@ -234,7 +234,7 @@ impl DatasetMetadata {
             .as_metadata_chain()
             .accept_one(<SearchSetLicenseVisitor>::create())
             .await
-            .map_err(ErrorIntoInternal::int_err)?
+            .int_err()?
             .into_event()
             .map(Into::into))
     }
@@ -247,7 +247,7 @@ impl DatasetMetadata {
             .as_metadata_chain()
             .accept_one(<SearchSetVocabVisitor>::create())
             .await
-            .map_err(ErrorIntoInternal::int_err)?
+            .int_err()?
             .into_event()
             .map(Into::into))
     }

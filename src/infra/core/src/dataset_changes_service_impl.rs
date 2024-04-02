@@ -152,7 +152,7 @@ impl DatasetChangesServiceImpl {
                     .as_metadata_chain()
                     .accept_one_by_hash(old_head, SearchSingleDataBlockVisitor::next())
                     .await
-                    .map_err(ErrorIntoInternal::int_err)?
+                    .int_err()?
                     .into_event()
                     .and_then(|event| event.new_watermark);
 

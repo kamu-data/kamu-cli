@@ -228,7 +228,7 @@ impl QueryService for QueryServiceImpl {
             .as_metadata_chain()
             .accept_one(<SearchSetVocabVisitor>::create())
             .await
-            .map_err(ErrorIntoInternal::int_err)?
+            .int_err()?
             .into_event()
             .unwrap_or_default()
             .into();

@@ -227,7 +227,7 @@ impl TransformServiceImpl {
                     &head,
                 )
                 .await
-                .map_err(ErrorIntoInternal::int_err)?;
+                .int_err()?;
 
             (
                 set_transform_visitor.into_inner().into_event(),
@@ -482,7 +482,7 @@ impl TransformServiceImpl {
             .as_metadata_chain()
             .accept_one(<SearchSetVocabVisitor>::create())
             .await
-            .map_err(ErrorIntoInternal::int_err)?
+            .int_err()?
             .into_event()
             .unwrap_or_default()
             .into())
@@ -740,7 +740,7 @@ impl TransformService for TransformServiceImpl {
             // TODO: Support transform evolution
             .accept_one(<SearchSetTransformVisitor>::create())
             .await
-            .map_err(ErrorIntoInternal::int_err)?
+            .int_err()?
             .into_hashed_block())
     }
 

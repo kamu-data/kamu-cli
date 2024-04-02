@@ -589,7 +589,7 @@ impl PollingIngestService for PollingIngestServiceImpl {
             // TODO: Support source evolution
             .accept_one(<SearchSetPollingSourceVisitor>::create())
             .await
-            .map_err(ErrorIntoInternal::int_err)?
+            .int_err()?
             .into_hashed_block())
     }
 
