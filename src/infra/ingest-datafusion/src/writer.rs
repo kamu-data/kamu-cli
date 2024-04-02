@@ -880,10 +880,7 @@ impl DataWriterDataFusionBuilder {
                     Decision::NextOfType(Flag::ADD_DATA)
                 },
             ));
-        let mut source_event_visitor = MetadataChainVisitorHolderFactory::create(
-            SourceEventVisitor::new(source_name),
-            |e| -> ScanMetadataError { e.int_err().into() },
-        );
+        let mut source_event_visitor = SourceEventVisitor::new(source_name);
 
         self.dataset
             .as_metadata_chain()
@@ -910,9 +907,8 @@ impl DataWriterDataFusionBuilder {
             assert_eq!(seed.dataset_kind, odf::DatasetKind::Root);
         }
 
-        let (source_event, merge_strategy) = source_event_visitor
-            .into_inner()
-            .get_source_event_and_merge_strategy()?;
+        let (source_event, merge_strategy) =
+            source_event_visitor.get_source_event_and_merge_strategy()?;
         let (prev_offset, prev_watermark, prev_checkpoint) = {
             match add_data_visitor.into_inner().into_event() {
                 Some(e) => (
