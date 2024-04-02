@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::marker::PhantomData;
+
 use opendatafabric::{MetadataEventTypeFlags, Multihash};
 
 use crate::HashedMetadataBlockRef;
@@ -51,9 +53,81 @@ pub trait MetadataChainVisitor: Sync + Send {
         hashed_block_ref: HashedMetadataBlockRef,
     ) -> Result<MetadataVisitorDecision, Self::Error>;
 
+    /// Overridden to place logic executed AFTER the end of iterating through
+    /// the chain
     fn finish(&self) -> Result<(), Self::Error> {
         Ok(())
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+/// Trait is needed to generalize [`MetadataChainVisitor`] error type. This is
+/// necessary when we are going to use several Visitors at the same time, e.g.
+/// using method [`MetadataChainExt::accept()`]
+pub trait MetadataChainVisitorHolder: Send {
+    type Error: std::error::Error;
+
+    fn visit(
+        &mut self,
+        hashed_block_ref: HashedMetadataBlockRef,
+    ) -> Result<MetadataVisitorDecision, Self::Error>;
+}
+
+pub struct MetadataChainVisitorHolderImpl<V, F, E1, E2>
+where
+    V: MetadataChainVisitor<Error = E1>,
+    F: Fn(Result<MetadataVisitorDecision, E1>) -> Result<MetadataVisitorDecision, E2>,
+    E1: std::error::Error,
+    E2: std::error::Error,
+{
+    visitor: V,
+    map_err_fn: F,
+    _phantom: PhantomData<E2>,
+}
+
+impl<V, F, E1, E2> MetadataChainVisitorHolder for MetadataChainVisitorHolderImpl<V, F, E1, E2>
+where
+    V: MetadataChainVisitor<Error = E1>,
+    F: Fn(Result<MetadataVisitorDecision, E1>) -> Result<MetadataVisitorDecision, E2> + Send,
+    E1: std::error::Error,
+    E2: std::error::Error + Send,
+{
+    type Error = E2;
+
+    fn visit(
+        &mut self,
+        hashed_block_ref: HashedMetadataBlockRef,
+    ) -> Result<MetadataVisitorDecision, Self::Error> {
+        match self.visitor.visit(hashed_block_ref) {
+            Ok(r) => Ok(r),
+            e => (self.map_err_fn)(e),
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub trait MetadataChainVisitorExt: MetadataChainVisitor {
+    /// Method for converting a [`MetadataChainVisitor`] to
+    /// [`MetadataChainVisitorHolder`] using the error conversion function
+    fn map_err<'a, E>(
+        self,
+        map_err_fn: impl Fn(Result<MetadataVisitorDecision, Self::Error>) -> Result<MetadataVisitorDecision, E>
+            + Send,
+    ) -> impl MetadataChainVisitorHolder<Error = E>
+    where
+        Self: Sized,
+        E: std::error::Error + Send,
+    {
+        MetadataChainVisitorHolderImpl {
+            visitor: self,
+            map_err_fn,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<T> MetadataChainVisitorExt for T where T: MetadataChainVisitor {}
 
 ///////////////////////////////////////////////////////////////////////////////
