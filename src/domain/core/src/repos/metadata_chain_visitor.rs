@@ -62,22 +62,13 @@ pub trait MetadataChainVisitor: Sync + Send {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-/// Trait is needed to generalize [`MetadataChainVisitor`] error type. This is
+/// Struct is needed to generalize [`MetadataChainVisitor`] error type. This is
 /// necessary when we are going to use several Visitors at the same time, e.g.
 /// using method [`MetadataChainExt::accept()`]
-pub trait MetadataChainVisitorHolder: Send {
-    type Error: std::error::Error;
-
-    fn visit(
-        &mut self,
-        hashed_block_ref: HashedMetadataBlockRef,
-    ) -> Result<MetadataVisitorDecision, Self::Error>;
-}
-
-pub struct MetadataChainVisitorHolderImpl<V, F, E1, E2>
+pub struct MetadataChainVisitorWithErrMapper<V, F, E1, E2>
 where
     V: MetadataChainVisitor<Error = E1>,
-    F: Fn(Result<MetadataVisitorDecision, E1>) -> Result<MetadataVisitorDecision, E2>,
+    F: Fn(E1) -> E2,
     E1: std::error::Error,
     E2: std::error::Error,
 {
@@ -86,23 +77,30 @@ where
     _phantom: PhantomData<E2>,
 }
 
-impl<V, F, E1, E2> MetadataChainVisitorHolder for MetadataChainVisitorHolderImpl<V, F, E1, E2>
+impl<V, F, E1, E2> MetadataChainVisitor for MetadataChainVisitorWithErrMapper<V, F, E1, E2>
 where
     V: MetadataChainVisitor<Error = E1>,
-    F: Fn(Result<MetadataVisitorDecision, E1>) -> Result<MetadataVisitorDecision, E2> + Send,
+    F: Fn(E1) -> E2 + Send + Sync,
     E1: std::error::Error,
-    E2: std::error::Error + Send,
+    E2: std::error::Error + Send + Sync,
 {
     type Error = E2;
+
+    fn initial_decision(&self) -> MetadataVisitorDecision {
+        self.visitor.initial_decision()
+    }
 
     fn visit(
         &mut self,
         hashed_block_ref: HashedMetadataBlockRef,
     ) -> Result<MetadataVisitorDecision, Self::Error> {
-        match self.visitor.visit(hashed_block_ref) {
-            Ok(r) => Ok(r),
-            e => (self.map_err_fn)(e),
-        }
+        self.visitor
+            .visit(hashed_block_ref)
+            .map_err(|e| (self.map_err_fn)(e))
+    }
+
+    fn finish(&self) -> Result<(), Self::Error> {
+        self.visitor.finish().map_err(|e| (self.map_err_fn)(e))
     }
 }
 
@@ -113,14 +111,13 @@ pub trait MetadataChainVisitorExt: MetadataChainVisitor {
     /// [`MetadataChainVisitorHolder`] using the error conversion function
     fn map_err<'a, E>(
         self,
-        map_err_fn: impl Fn(Result<MetadataVisitorDecision, Self::Error>) -> Result<MetadataVisitorDecision, E>
-            + Send,
-    ) -> impl MetadataChainVisitorHolder<Error = E>
+        map_err_fn: impl Fn(Self::Error) -> E + Send + Sync,
+    ) -> impl MetadataChainVisitor<Error = E>
     where
         Self: Sized,
-        E: std::error::Error + Send,
+        E: std::error::Error + Send + Sync,
     {
-        MetadataChainVisitorHolderImpl {
+        MetadataChainVisitorWithErrMapper {
             visitor: self,
             map_err_fn,
             _phantom: PhantomData,
