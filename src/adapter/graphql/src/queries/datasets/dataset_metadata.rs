@@ -8,9 +8,15 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use kamu_core::{self as domain, MetadataChainExt, TryStreamExtExt};
+use kamu_core::{
+    self as domain,
+    MetadataChainExt,
+    SearchSetAttachmentsVisitor,
+    SearchSetInfoVisitor,
+    SearchSetLicenseVisitor,
+    SearchSetVocabVisitor,
+};
 use opendatafabric as odf;
-use opendatafabric::{AsTypedBlock, VariantOf};
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -36,22 +42,6 @@ impl DatasetMetadata {
         Ok(dataset)
     }
 
-    #[graphql(skip)]
-    async fn get_last_block_of_type<T: VariantOf<odf::MetadataEvent>>(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<Option<odf::MetadataBlockTyped<T>>> {
-        let dataset = self.get_dataset(ctx).await?;
-        let block = dataset
-            .as_metadata_chain()
-            .iter_blocks_ref(&domain::BlockRef::Head)
-            .filter_map_ok(|(_, b)| b.into_typed::<T>())
-            .try_first()
-            .await
-            .int_err()?;
-        Ok(block)
-    }
-
     /// Access to the temporal metadata chain of the dataset
     async fn chain(&self) -> MetadataChain {
         MetadataChain::new(self.dataset_handle.clone())
@@ -59,15 +49,15 @@ impl DatasetMetadata {
 
     /// Last recorded watermark
     async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
-        let ds = self.get_dataset(ctx).await?;
-        Ok(ds
+        let dataset = self.get_dataset(ctx).await?;
+
+        Ok(dataset
             .as_metadata_chain()
-            .iter_blocks_ref(&domain::BlockRef::Head)
-            .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.new_watermark)
-            .try_first()
+            .last_data_block()
             .await
-            .int_err()?)
+            .int_err()?
+            .into_block()
+            .and_then(|b| b.event.new_watermark))
     }
 
     /// Latest data schema
@@ -197,51 +187,68 @@ impl DatasetMetadata {
 
     /// Current descriptive information about the dataset
     async fn current_info(&self, ctx: &Context<'_>) -> Result<SetInfo> {
-        Ok(self
-            .get_last_block_of_type::<odf::SetInfo>(ctx)
-            .await?
+        let dataset = self.get_dataset(ctx).await?;
+
+        Ok(dataset
+            .as_metadata_chain()
+            .accept_one(SearchSetInfoVisitor::new())
+            .await
+            .int_err()?
+            .into_event()
             .map_or(
                 SetInfo {
                     description: None,
                     keywords: None,
                 },
-                |b| b.event.into(),
+                Into::into,
             ))
     }
 
     /// Current readme file as discovered from attachments associated with the
     /// dataset
     async fn current_readme(&self, ctx: &Context<'_>) -> Result<Option<String>> {
-        if let Some(attachments) = self
-            .get_last_block_of_type::<odf::SetAttachments>(ctx)
-            .await?
-        {
-            match attachments.event.attachments {
-                odf::Attachments::Embedded(embedded) => Ok(embedded
-                    .items
+        let dataset = self.get_dataset(ctx).await?;
+
+        Ok(dataset
+            .as_metadata_chain()
+            .accept_one(SearchSetAttachmentsVisitor::new())
+            .await
+            .int_err()?
+            .into_event()
+            .and_then(|e| {
+                let odf::Attachments::Embedded(at) = e.attachments;
+
+                at.items
                     .into_iter()
                     .filter(|i| i.path == "README.md")
                     .map(|i| i.content)
-                    .next()),
-            }
-        } else {
-            Ok(None)
-        }
+                    .next()
+            }))
     }
 
     /// Current license associated with the dataset
     async fn current_license(&self, ctx: &Context<'_>) -> Result<Option<SetLicense>> {
-        Ok(self
-            .get_last_block_of_type::<odf::SetLicense>(ctx)
-            .await?
-            .map(|b| b.event.into()))
+        let dataset = self.get_dataset(ctx).await?;
+
+        Ok(dataset
+            .as_metadata_chain()
+            .accept_one(SearchSetLicenseVisitor::new())
+            .await
+            .int_err()?
+            .into_event()
+            .map(Into::into))
     }
 
     /// Current vocabulary associated with the dataset
     async fn current_vocab(&self, ctx: &Context<'_>) -> Result<Option<SetVocab>> {
-        Ok(self
-            .get_last_block_of_type::<odf::SetVocab>(ctx)
-            .await?
-            .map(|b| b.event.into()))
+        let dataset = self.get_dataset(ctx).await?;
+
+        Ok(dataset
+            .as_metadata_chain()
+            .accept_one(SearchSetVocabVisitor::new())
+            .await
+            .int_err()?
+            .into_event()
+            .map(Into::into))
     }
 }

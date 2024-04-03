@@ -299,14 +299,16 @@ impl KamuTable {
 
     #[tracing::instrument(level="info", skip_all, fields(dataset_handle = ?self.dataset_handle))]
     async fn init_table_schema(&self) -> Result<SchemaRef, InternalError> {
-        if let Some((_, schema_block)) = self
+        let maybe_set_data_schema = self
             .dataset
             .as_metadata_chain()
-            .last_of_type::<SetDataSchema>()
+            .accept_one(SearchSetDataSchemaVisitor::new())
             .await
             .int_err()?
-        {
-            schema_block.event.schema_as_arrow().int_err()
+            .into_event();
+
+        if let Some(set_data_schema) = maybe_set_data_schema {
+            set_data_schema.schema_as_arrow().int_err()
         } else {
             Ok(Arc::new(Schema::empty()))
         }
@@ -405,28 +407,51 @@ impl KamuTable {
             .as_ref()
             .and_then(|o| o.last_records_to_consider);
 
-        let mut files = Vec::new();
-        let mut num_records = 0;
+        type Flag = MetadataEventTypeFlags;
+        type Decision = MetadataVisitorDecision;
 
-        let mut slices = self
-            .dataset
-            .as_metadata_chain()
-            .iter_blocks()
-            .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.new_data);
-
-        while let Some(slice) = slices.try_next().await.int_err()? {
-            num_records += slice.num_records();
-            files.push(slice.physical_hash);
-
-            if last_records_to_consider.is_some()
-                && last_records_to_consider.unwrap() <= num_records
-            {
-                break;
-            }
+        struct DataSliceCollectorVisitorState {
+            files: Vec<Multihash>,
+            num_records: u64,
+            last_records_to_consider: Option<u64>,
         }
 
-        Ok(files)
+        let final_state = self
+            .dataset
+            .as_metadata_chain()
+            .reduce(
+                DataSliceCollectorVisitorState {
+                    files: Vec::new(),
+                    num_records: 0,
+                    last_records_to_consider,
+                },
+                Decision::NextOfType(Flag::DATA_BLOCK),
+                |state, _hash, block| {
+                    let new_data = match &block.event {
+                        MetadataEvent::AddData(e) => e.new_data.as_ref(),
+                        MetadataEvent::ExecuteTransform(e) => e.new_data.as_ref(),
+                        _ => unreachable!(),
+                    };
+                    let Some(slice) = new_data else {
+                        return Decision::NextOfType(Flag::DATA_BLOCK);
+                    };
+
+                    state.num_records += slice.num_records();
+                    state.files.push(slice.physical_hash.clone());
+
+                    if let Some(last_records_to_consider) = &state.last_records_to_consider
+                        && *last_records_to_consider <= state.num_records
+                    {
+                        return Decision::Stop;
+                    }
+
+                    Decision::NextOfType(Flag::DATA_BLOCK)
+                },
+            )
+            .await
+            .int_err()?;
+
+        Ok(final_state.files)
     }
 }
 

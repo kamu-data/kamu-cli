@@ -161,26 +161,27 @@ impl QueryServiceImpl {
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
-        let last_data_slice_opt = dataset
+        // TODO: Update to use SetDataSchema event
+        let maybe_last_data_slice_hash = dataset
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.new_data)
-            .try_first()
+            .last_data_block_with_new_data()
             .await
+            .int_err()
             .map_err(|e| {
                 tracing::error!(error = ?e, "Resolving last data slice failed");
                 e
-            })
-            .int_err()?;
+            })?
+            .into_event()
+            .and_then(|event| event.new_data)
+            .map(|new_data| new_data.physical_hash);
 
-        match last_data_slice_opt {
-            Some(last_data_slice) => {
+        match maybe_last_data_slice_hash {
+            Some(last_data_slice_hash) => {
                 // TODO: Avoid boxing url - requires datafusion to fix API
                 let data_url = Box::new(
                     dataset
                         .as_data_repo()
-                        .get_internal_url(&last_data_slice.physical_hash)
+                        .get_internal_url(&last_data_slice_hash)
                         .await,
                 );
 
@@ -223,14 +224,12 @@ impl QueryService for QueryServiceImpl {
     ) -> Result<DataFrame, QueryError> {
         let (dataset, df) = self.single_dataset(dataset_ref, Some(skip + limit)).await?;
 
-        // TODO: PERF: Avoid full scan of metadata
         let vocab: DatasetVocabulary = dataset
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(_, b)| b.event.into_variant::<SetVocab>())
-            .try_first()
+            .accept_one(SearchSetVocabVisitor::new())
             .await
             .int_err()?
+            .into_event()
             .unwrap_or_default()
             .into();
 

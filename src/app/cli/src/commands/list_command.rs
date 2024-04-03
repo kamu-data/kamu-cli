@@ -258,24 +258,25 @@ impl Command for ListCommand {
             size.push(summary.data_size);
 
             if self.detail_level > 0 {
-                // TODO: Should be precomputed
-                let mut num_blocks = 0;
-                let mut last_watermark: Option<DateTime<Utc>> = None;
-                let mut blocks_stream = dataset.as_metadata_chain().iter_blocks();
-                while let Some((_, b)) = blocks_stream.try_next().await? {
-                    if num_blocks == 0 {
-                        num_blocks = b.sequence_number + 1;
-                    }
-                    if let Some(b) = b.as_data_stream_block() {
-                        last_watermark = b.event.new_watermark.copied();
-                        break;
-                    }
-                }
+                let num_blocks = dataset
+                    .as_metadata_chain()
+                    .get_block(&current_head)
+                    .await
+                    .int_err()?
+                    .sequence_number
+                    + 1;
+                let last_watermark = dataset
+                    .as_metadata_chain()
+                    .last_data_block()
+                    .await
+                    .int_err()?
+                    .into_event()
+                    .and_then(|event| event.new_watermark.map(|t| t.timestamp_micros()));
 
                 id.push(hdl.id.as_did_str().to_string());
                 head.push(current_head.as_multibase().to_string());
                 blocks.push(num_blocks);
-                watermark.push(last_watermark.map(|t| t.timestamp_micros()));
+                watermark.push(last_watermark);
             }
         }
 

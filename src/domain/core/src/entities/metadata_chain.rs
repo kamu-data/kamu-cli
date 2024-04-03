@@ -12,7 +12,7 @@ use std::fmt::Display;
 
 use async_trait::async_trait;
 use internal_error::*;
-use opendatafabric::{MetadataBlock, MetadataBlockTyped, MetadataEvent, Multihash, VariantOf};
+use opendatafabric::{MetadataBlock, MetadataEvent, MetadataEventTypeFlags, Multihash};
 use thiserror::Error;
 
 use super::metadata_stream::DynMetadataStream;
@@ -96,6 +96,13 @@ pub trait MetadataChainExt: MetadataChain {
         }
     }
 
+    /// Returns the specified block by reference if it exists
+    async fn get_block_by_ref(&self, r: &BlockRef) -> Result<MetadataBlock, InternalError> {
+        let h = self.resolve_ref(r).await.int_err()?;
+
+        self.get_block(&h).await.int_err()
+    }
+
     /// Returns the specified block if it exists
     async fn try_get_block(
         &self,
@@ -106,34 +113,6 @@ pub trait MetadataChainExt: MetadataChain {
             Err(GetBlockError::NotFound(_)) => Ok(None),
             Err(e) => Err(e.int_err()),
         }
-    }
-
-    /// Same as [Self::last_of_type_ref] defaulting to the head reference
-    async fn last_of_type<E: VariantOf<MetadataEvent>>(
-        &self,
-    ) -> Result<Option<(Multihash, MetadataBlockTyped<E>)>, IterBlocksError> {
-        self.last_of_type_ref(&BlockRef::Head).await
-    }
-
-    /// Finds the last block (chronologically) carrying an instance of the
-    /// specified event type
-    async fn last_of_type_ref<E: VariantOf<MetadataEvent>>(
-        &self,
-        r: &BlockRef,
-    ) -> Result<Option<(Multihash, MetadataBlockTyped<E>)>, IterBlocksError> {
-        use futures::StreamExt;
-        use opendatafabric::AsTypedBlock;
-
-        let mut stream = self.iter_blocks_ref(r);
-        // TODO: PERF: Implement faster traversal of typed blocks
-        while let Some(r) = stream.next().await {
-            let (h, b) = r?;
-            if let Some(b) = b.into_typed::<E>() {
-                return Ok(Some((h, b)));
-            }
-        }
-
-        Ok(None)
     }
 
     /// Convenience function to iterate blocks starting with the `head`
@@ -148,85 +127,109 @@ pub trait MetadataChainExt: MetadataChain {
         self.iter_blocks_interval_ref(head, None)
     }
 
+    /// A method of accepting Visitors ([MetadataChainVisitor]) that allows us
+    /// to go through the metadata chain once and, if desired,
+    /// bypassing blocks of no interest.
     async fn accept<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
-    ) -> Result<(), E>
+    ) -> Result<(), AcceptVisitorError<E>>
     where
-        E: Error + From<IterBlocksError>,
+        E: Error + Send,
     {
         self.accept_by_ref(visitors, &BlockRef::Head).await
     }
 
+    /// Same as [Self::accept()], allowing us to define the block (by hash) from
+    /// which we will start the traverse
     async fn accept_by_hash<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
         head_hash: &Multihash,
-    ) -> Result<(), E>
+    ) -> Result<(), AcceptVisitorError<E>>
     where
-        E: Error + From<IterBlocksError>,
+        E: Error + Send,
     {
-        let mut decisions = vec![Decision::Next; visitors.len()];
-
-        self.accept_by_hash_with_decisions(&mut decisions, visitors, head_hash)
+        self.accept_by_interval(visitors, Some(head_hash), None)
             .await
     }
 
+    /// Same as [Self::accept()], allowing us to define the block
+    /// (by block reference) from which we will start the traverse
     async fn accept_by_ref<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
         head: &BlockRef,
-    ) -> Result<(), E>
+    ) -> Result<(), AcceptVisitorError<E>>
     where
-        E: Error + From<IterBlocksError>,
+        E: Error + Send,
     {
-        let head_hash = self.resolve_ref(head).await.map_err(Into::into)?;
+        let head_hash = self
+            .resolve_ref(head)
+            .await
+            .map_err(IterBlocksError::from)?;
 
         self.accept_by_hash(visitors, &head_hash).await
     }
 
-    async fn accept_by_hash_with_decisions<E>(
+    /// Same as [Self::accept()], allowing us to define the block interval under
+    /// which we will be making the traverse.
+    ///
+    /// Note: the interval is `[head, tail)` - tail is exclusive
+    async fn accept_by_interval<E>(
         &self,
-        decisions: &mut [Decision],
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
-        head_hash: &Multihash,
-    ) -> Result<(), E>
+        head_hash: Option<&Multihash>,
+        tail_hash: Option<&Multihash>,
+    ) -> Result<(), AcceptVisitorError<E>>
     where
-        E: Error + From<IterBlocksError>,
+        E: Error + Send,
     {
+        let mut decisions: Vec<_> = visitors
+            .iter()
+            .map(|visitor| visitor.initial_decision())
+            .collect();
         let mut all_visitors_finished = false;
-        let mut current_hash = Some(head_hash.clone());
+        let mut current_hash = head_hash.cloned();
 
         // TODO: PERF: Add traversal optimizations such as skip-lists
         while let Some(hash) = current_hash
             && !all_visitors_finished
+            && tail_hash != Some(&hash)
         {
-            let block = self.get_block(&hash).await.map_err(Into::into)?;
+            let block = self.get_block(&hash).await.map_err(IterBlocksError::from)?;
             let hashed_block_ref = (&hash, &block);
 
             let mut stopped_visitors = 0;
 
             for (decision, visitor) in decisions.iter_mut().zip(visitors.iter_mut()) {
                 match decision {
-                    Decision::Stop => {
+                    MetadataVisitorDecision::Stop => {
                         stopped_visitors += 1;
                     }
-                    Decision::NextOfType(type_flags) if type_flags.is_empty() => {
+                    MetadataVisitorDecision::NextOfType(type_flags) if type_flags.is_empty() => {
                         stopped_visitors += 1;
+                        *decision = MetadataVisitorDecision::Stop;
                     }
-                    Decision::Next => {
-                        *decision = visitor.visit(hashed_block_ref)?;
+                    MetadataVisitorDecision::Next => {
+                        *decision = visitor
+                            .visit(hashed_block_ref)
+                            .map_err(AcceptVisitorError::Visitor)?;
                     }
-                    Decision::NextWithHash(requested_hash) => {
+                    MetadataVisitorDecision::NextWithHash(requested_hash) => {
                         if hash == *requested_hash {
-                            *decision = visitor.visit(hashed_block_ref)?;
+                            *decision = visitor
+                                .visit(hashed_block_ref)
+                                .map_err(AcceptVisitorError::Visitor)?;
                         }
                     }
-                    Decision::NextOfType(requested_flags) => {
-                        let block_flag = MetadataBlockTypeFlags::from(&block);
+                    MetadataVisitorDecision::NextOfType(requested_flags) => {
+                        let block_flag = MetadataEventTypeFlags::from(&block.event);
 
                         if requested_flags.contains(block_flag) {
-                            *decision = visitor.visit(hashed_block_ref)?;
+                            *decision = visitor
+                                .visit(hashed_block_ref)
+                                .map_err(AcceptVisitorError::Visitor)?;
                         }
                     }
                 }
@@ -236,7 +239,148 @@ pub trait MetadataChainExt: MetadataChain {
             current_hash = block.prev_block_hash;
         }
 
+        for visitor in visitors {
+            visitor.finish().map_err(AcceptVisitorError::Visitor)?;
+        }
+
         Ok(())
+    }
+
+    /// An auxiliary method that simplifies the work if only one Visitor is
+    /// used.
+    async fn accept_one<V, E>(&self, mut visitor: V) -> Result<V, AcceptVisitorError<E>>
+    where
+        V: MetadataChainVisitor<Error = E>,
+        E: Error + Send,
+    {
+        self.accept(&mut [&mut visitor]).await?;
+
+        Ok(visitor)
+    }
+
+    /// Same as [Self::accept_one()], allowing us to define the block
+    /// (by block hash) from which we will start the traverse
+    async fn accept_one_by_hash<V, E>(
+        &self,
+        head_hash: &Multihash,
+        mut visitor: V,
+    ) -> Result<V, AcceptVisitorError<E>>
+    where
+        V: MetadataChainVisitor<Error = E>,
+        E: Error + Send,
+    {
+        self.accept_by_interval(&mut [&mut visitor], Some(head_hash), None)
+            .await?;
+
+        Ok(visitor)
+    }
+
+    /// Method that allows you to apply the reduce operation over a chain
+    ///
+    /// Note: there is also a method [Self::try_reduce()] that allows you to
+    /// apply a fallible callback
+    async fn reduce<S, F>(
+        &self,
+        state: S,
+        initial_decision: MetadataVisitorDecision,
+        callback: F,
+    ) -> Result<S, IterBlocksError>
+    where
+        S: Send,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> MetadataVisitorDecision + Send,
+    {
+        let head_hash = self.resolve_ref(&BlockRef::Head).await?;
+
+        Ok(self
+            .reduce_by_hash(&head_hash, state, initial_decision, callback)
+            .await?)
+    }
+
+    /// Same as [Self::reduce()], allowing us to define the block (by hash)
+    /// from which we will start the traverse
+    async fn reduce_by_hash<S, F>(
+        &self,
+        head_hash: &Multihash,
+        state: S,
+        initial_decision: MetadataVisitorDecision,
+        callback: F,
+    ) -> Result<S, IterBlocksError>
+    where
+        S: Send,
+        F: Send,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> MetadataVisitorDecision,
+    {
+        let mut visitor = GenericCallbackVisitor::new(state, initial_decision, callback);
+
+        self.accept_by_hash(&mut [&mut visitor], head_hash)
+            .await
+            .map_err(IterBlocksError::from)?;
+
+        Ok(visitor.into_state())
+    }
+
+    /// Method that allows you to apply the reduce operation over a chain
+    ///
+    /// Note: there is also a method [Self::reduce()] that allows you to
+    /// apply an infallible callback
+    async fn try_reduce<S, F, E>(
+        &self,
+        state: S,
+        initial_decision: MetadataVisitorDecision,
+        callback: F,
+    ) -> Result<S, AcceptVisitorError<E>>
+    where
+        S: Send,
+        F: Send,
+        E: Error + Send,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E>,
+    {
+        let head_hash = self
+            .resolve_ref(&BlockRef::Head)
+            .await
+            .map_err(IterBlocksError::from)?;
+
+        self.try_reduce_by_hash(&head_hash, state, initial_decision, callback)
+            .await
+    }
+
+    /// Same as [Self::try_reduce()], allowing us to define the block (by hash)
+    /// from which we will start the traverse
+    async fn try_reduce_by_hash<S, F, E>(
+        &self,
+        head_hash: &Multihash,
+        state: S,
+        initial_decision: MetadataVisitorDecision,
+        callback: F,
+    ) -> Result<S, AcceptVisitorError<E>>
+    where
+        S: Send,
+        F: Send,
+        E: Error + Send,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E>,
+    {
+        let mut visitor = GenericFallibleCallbackVisitor::new(state, initial_decision, callback);
+
+        self.accept_by_hash(&mut [&mut visitor], head_hash).await?;
+
+        Ok(visitor.into_state())
+    }
+
+    /// Method that searches for the last data block
+    async fn last_data_block(&self) -> Result<SearchSingleDataBlockVisitor, IterBlocksError> {
+        let visitor = SearchSingleDataBlockVisitor::next();
+
+        self.accept_one(visitor).await.map_err(Into::into)
+    }
+
+    /// Same as [Self::last_data_block()], but skipping data blocks that have no
+    /// real data
+    async fn last_data_block_with_new_data(
+        &self,
+    ) -> Result<SearchSingleDataBlockVisitor, IterBlocksError> {
+        let visitor = SearchSingleDataBlockVisitor::next_with_new_data();
+
+        self.accept_one(visitor).await.map_err(Into::into)
     }
 }
 
@@ -408,6 +552,31 @@ impl From<GetBlockError> for IterBlocksError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+pub enum AcceptVisitorError<E> {
+    #[error(transparent)]
+    Traversal(IterBlocksError),
+    #[error(transparent)]
+    Visitor(E),
+}
+
+impl<E> From<IterBlocksError> for AcceptVisitorError<E> {
+    fn from(value: IterBlocksError) -> Self {
+        Self::Traversal(value)
+    }
+}
+
+impl From<AcceptVisitorError<Infallible>> for IterBlocksError {
+    fn from(value: AcceptVisitorError<Infallible>) -> Self {
+        match value {
+            AcceptVisitorError::Traversal(err) => err,
+            AcceptVisitorError::Visitor(_) => unreachable!(),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
 pub enum SetRefError {
     #[error(transparent)]
     BlockNotFound(BlockNotFoundError),
@@ -476,15 +645,6 @@ impl From<SetRefError> for AppendError {
             SetRefError::CASFailed(e) => Self::RefCASFailed(e),
             SetRefError::Access(e) => Self::Access(e),
             SetRefError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-impl From<IterBlocksError> for AppendError {
-    fn from(v: IterBlocksError) -> Self {
-        match v {
-            IterBlocksError::BlockNotFound(e) => AppendValidationError::PrevBlockNotFound(e).into(),
-            e => e.int_err().into(),
         }
     }
 }
@@ -565,6 +725,10 @@ pub enum AppendValidationError {
 impl AppendValidationError {
     pub fn no_op_event(event: impl Into<MetadataEvent>, message: impl Into<String>) -> Self {
         Self::NoOpEvent(NoOpEventError::new(event, message))
+    }
+
+    pub fn empty_event(event: impl Into<MetadataEvent>) -> Self {
+        Self::no_op_event(event, "Event is empty")
     }
 }
 

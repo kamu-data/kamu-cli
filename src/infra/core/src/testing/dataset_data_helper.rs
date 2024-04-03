@@ -96,11 +96,10 @@ impl DatasetDataHelper {
     pub async fn get_last_set_data_schema_block(&self) -> MetadataBlockTyped<SetDataSchema> {
         self.dataset
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(_, b)| b.into_typed::<SetDataSchema>())
-            .try_first()
+            .accept_one(SearchSetDataSchemaVisitor::new())
             .await
             .unwrap()
+            .into_block()
             .unwrap()
     }
 

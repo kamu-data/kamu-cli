@@ -7,73 +7,182 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::hash::Hash;
+use std::marker::PhantomData;
 
-use bitflags::bitflags;
-use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
+use opendatafabric::{MetadataEventTypeFlags, Multihash};
 
-use crate::HashedMetadataBlockRef;
-
-///////////////////////////////////////////////////////////////////////////////
-
-// TODO: Follow-up change: generate in the ODF land
-bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    pub struct MetadataBlockTypeFlags: u32 {
-        const ADD_DATA = 1 << 0;
-        const EXECUTE_TRANSFORM = 1 << 1;
-        const SEED = 1 << 2;
-        const SET_POLLING_SOURCE = 1 << 3;
-        const SET_TRANSFORM = 1 << 4;
-        const SET_VOCAB = 1 << 5;
-        const SET_ATTACHMENTS = 1 << 6;
-        const SET_INFO = 1 << 7;
-        const SET_LICENSE = 1 << 8;
-        const SET_DATA_SCHEMA = 1 << 9;
-        const ADD_PUSH_SOURCE = 1 << 10;
-        const DISABLE_PUSH_SOURCE = 1 << 11;
-        const DISABLE_POLLING_SOURCE = 1 << 12;
-        //
-        const DATA_BLOCK = Self::ADD_DATA.bits() | Self::EXECUTE_TRANSFORM.bits();
-    }
-}
-
-impl From<&MetadataBlock> for MetadataBlockTypeFlags {
-    fn from(block: &MetadataBlock) -> Self {
-        match block.event {
-            MetadataEvent::AddData(_) => Self::ADD_DATA,
-            MetadataEvent::ExecuteTransform(_) => Self::EXECUTE_TRANSFORM,
-            MetadataEvent::Seed(_) => Self::SEED,
-            MetadataEvent::SetPollingSource(_) => Self::SET_POLLING_SOURCE,
-            MetadataEvent::SetTransform(_) => Self::SET_TRANSFORM,
-            MetadataEvent::SetVocab(_) => Self::SET_VOCAB,
-            MetadataEvent::SetAttachments(_) => Self::SET_ATTACHMENTS,
-            MetadataEvent::SetInfo(_) => Self::SET_INFO,
-            MetadataEvent::SetLicense(_) => Self::SET_LICENSE,
-            MetadataEvent::SetDataSchema(_) => Self::SET_DATA_SCHEMA,
-            MetadataEvent::AddPushSource(_) => Self::ADD_PUSH_SOURCE,
-            MetadataEvent::DisablePushSource(_) => Self::DISABLE_PUSH_SOURCE,
-            MetadataEvent::DisablePollingSource(_) => Self::DISABLE_POLLING_SOURCE,
-        }
-    }
-}
+use crate::{HashedMetadataBlockRef, Infallible};
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Decision {
+pub enum MetadataVisitorDecision {
+    /// Stop Marker. A visitor who has reported the end of work will not be
+    /// invited to visit again
     Stop,
+    /// A request for the previous block
     Next,
+    /// A request for a specific previous block, specifying its hash.
+    /// Reserved for long jumps through the metadata chain
     NextWithHash(Multihash),
-    NextOfType(MetadataBlockTypeFlags),
+    /// A request for previous blocks, of specific types, using flags.
+    ///
+    /// # Examples
+    /// ```
+    /// // Request for SetVocab block
+    /// return MetadataVisitorDecision::NextOfType(MetadataEventTypeFlags::SET_VOCAB);
+    ///
+    /// // Request for data blocks (ADD_DATA || EXECUTE_TRANSFORM)
+    /// return MetadataVisitorDecision::NextOfType(MetadataEventTypeFlags::DATA_BLOCK);
+    ///
+    /// // Request for a list of blocks of different types
+    /// return MetadataVisitorDecision::NextOfType(MetadataEventTypeFlags::SET_ATTACHMENTS | MetadataEventTypeFlags::SET_LICENSE);
+    /// ```
+    NextOfType(MetadataEventTypeFlags),
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub trait MetadataChainVisitor: Sync + Send {
-    type Error: std::error::Error;
+pub trait MetadataChainVisitor: Send {
+    type Error: std::error::Error + Send;
 
-    fn visit(&mut self, hashed_block_ref: HashedMetadataBlockRef) -> Result<Decision, Self::Error>;
+    fn initial_decision(&self) -> MetadataVisitorDecision;
+
+    fn visit(
+        &mut self,
+        hashed_block_ref: HashedMetadataBlockRef,
+    ) -> Result<MetadataVisitorDecision, Self::Error>;
+
+    /// Overridden to place logic executed AFTER the end of iterating through
+    /// the chain
+    fn finish(&self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/// Allows syntax such as `let wrapped_visitor = my_visitor.map_err(|e| ...)`.
+pub trait MetadataChainVisitorExt<E1>
+where
+    Self: MetadataChainVisitor<Error = E1>,
+    Self: Sized,
+    E1: std::error::Error,
+{
+    fn map_err<E2, F>(self, f: F) -> MetadataChainVisitorMapError<Self, F, E1, E2>
+    where
+        E2: std::error::Error + Send,
+        F: Fn(E1) -> E2 + Send;
+}
+
+impl<T, E1> MetadataChainVisitorExt<E1> for T
+where
+    E1: std::error::Error,
+    T: MetadataChainVisitor<Error = E1>,
+{
+    fn map_err<E2, F>(self, f: F) -> MetadataChainVisitorMapError<Self, F, E1, E2>
+    where
+        E2: std::error::Error + Send,
+        F: Fn(E1) -> E2 + Send,
+    {
+        MetadataChainVisitorMapError::new(self, f)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/// Allows to convert infallible visitor into a type that agrees with others on
+/// what error should be returned. Similar to
+/// [`MetadataChainVisitorExt::map_err()`] but for infalible errors.
+pub trait MetadataChainVisitorExtInfallible
+where
+    Self: MetadataChainVisitor<Error = Infallible>,
+    Self: Sized,
+{
+    fn adapt_err<E2>(
+        self,
+    ) -> MetadataChainVisitorMapError<Self, fn(Infallible) -> E2, Infallible, E2>
+    where
+        E2: std::error::Error + Send;
+}
+
+impl<T> MetadataChainVisitorExtInfallible for T
+where
+    T: MetadataChainVisitor<Error = Infallible>,
+{
+    fn adapt_err<E2>(
+        self,
+    ) -> MetadataChainVisitorMapError<Self, fn(Infallible) -> E2, Infallible, E2>
+    where
+        E2: std::error::Error + Send,
+    {
+        MetadataChainVisitorMapError::new(self, Infallible::into)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/// Wraps the [`MetadataChainVisitor`] to convert the error type, similarly to
+/// [`Result::map_err()`]. This is necessary when using several visitors at
+/// once, e.g. in the [`MetadataChainExt::accept()`] method to make all visitors
+/// agree on one error type..
+pub struct MetadataChainVisitorMapError<V, F, E1, E2>
+where
+    V: MetadataChainVisitor<Error = E1>,
+    F: Fn(E1) -> E2,
+    E1: std::error::Error,
+    E2: std::error::Error,
+{
+    visitor: V,
+    map_err_fn: F,
+    _phantom: PhantomData<E2>,
+}
+
+impl<V, F, E1, E2> MetadataChainVisitorMapError<V, F, E1, E2>
+where
+    V: MetadataChainVisitor<Error = E1>,
+    F: Fn(E1) -> E2 + Send,
+    E1: std::error::Error,
+    E2: std::error::Error + Send,
+{
+    fn new(visitor: V, map_err_fn: F) -> Self {
+        Self {
+            visitor,
+            map_err_fn,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn into_inner(self) -> V {
+        self.visitor
+    }
+}
+
+impl<V, F, E1, E2> MetadataChainVisitor for MetadataChainVisitorMapError<V, F, E1, E2>
+where
+    V: MetadataChainVisitor<Error = E1>,
+    F: Fn(E1) -> E2 + Send,
+    E1: std::error::Error,
+    E2: std::error::Error + Send,
+{
+    type Error = E2;
+
+    fn initial_decision(&self) -> MetadataVisitorDecision {
+        self.visitor.initial_decision()
+    }
+
+    fn visit(
+        &mut self,
+        hashed_block_ref: HashedMetadataBlockRef,
+    ) -> Result<MetadataVisitorDecision, Self::Error> {
+        self.visitor
+            .visit(hashed_block_ref)
+            .map_err(&self.map_err_fn)
+    }
+
+    fn finish(&self) -> Result<(), Self::Error> {
+        self.visitor.finish().map_err(&self.map_err_fn)
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

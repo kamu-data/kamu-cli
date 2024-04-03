@@ -584,15 +584,12 @@ impl PollingIngestService for PollingIngestServiceImpl {
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
 
         // TODO: Support source evolution
-        let source = dataset
+        Ok(dataset
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(h, b)| b.into_typed::<SetPollingSource>().map(|b| (h, b)))
-            .try_first()
+            .accept_one(SearchSetPollingSourceVisitor::new())
             .await
-            .int_err()?;
-
-        Ok(source)
+            .int_err()?
+            .into_hashed_block())
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
