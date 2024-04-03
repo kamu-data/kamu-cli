@@ -859,7 +859,7 @@ impl DataWriterDataFusionBuilder {
         let mut seed_visitor = SearchSeedVisitor::new().adapt_err();
         let mut set_vocab_visitor = SearchSetVocabVisitor::new().adapt_err();
         let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::new().adapt_err();
-        let mut prev_source_state_visitor = SetDataSchemaVisitor::new(source_name).adapt_err();
+        let mut prev_source_state_visitor = SearchSourceStateVisitor::new(source_name).adapt_err();
         let mut add_data_visitor = SearchAddDataVisitor::new().adapt_err();
         let mut add_data_collection_visitor = GenericCallbackVisitor::new(
             Vec::new(),

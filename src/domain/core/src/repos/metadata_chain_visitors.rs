@@ -110,12 +110,12 @@ typed_search_single_typed_block_visitor_impl!(SearchAddDataVisitor, AddData, Fla
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct SetDataSchemaVisitor<'a> {
+pub struct SearchSourceStateVisitor<'a> {
     source_name: Option<&'a str>,
     source_state: Option<SourceState>,
 }
 
-impl<'a> SetDataSchemaVisitor<'a> {
+impl<'a> SearchSourceStateVisitor<'a> {
     pub fn new(source_name: Option<&'a str>) -> Self {
         Self {
             source_name,
@@ -128,7 +128,7 @@ impl<'a> SetDataSchemaVisitor<'a> {
     }
 }
 
-impl MetadataChainVisitor for SetDataSchemaVisitor<'_> {
+impl MetadataChainVisitor for SearchSourceStateVisitor<'_> {
     type Error = Infallible;
 
     fn initial_decision(&self) -> Decision {
