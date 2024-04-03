@@ -252,21 +252,12 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         }
 
         // It's okay to create a new dataset by this point
-        let dataset_id = seed_block.event.dataset_id.clone();
-        let dataset_handle = if let Some(account_name) = &dataset_alias.account_name {
-            let (_, canonical_account_name) = self
-                .storage_strategy
-                .resolve_account_dir(account_name)
-                .int_err()?;
-            let canonical_dataset_alias = DatasetAlias::new(
-                Some(canonical_account_name),
-                dataset_alias.dataset_name.clone(),
-            );
-
-            DatasetHandle::new(dataset_id, canonical_dataset_alias)
-        } else {
-            DatasetHandle::new(dataset_id, dataset_alias.clone())
-        };
+        let dataset_handle = DatasetHandle::new(
+            seed_block.event.dataset_id.clone(),
+            self.storage_strategy
+                .canonical_dataset_alias(dataset_alias)
+                .int_err()?,
+        );
 
         let dataset_path = self.storage_strategy.get_dataset_path(&dataset_handle);
         let layout = DatasetLayout::create(&dataset_path).int_err()?;
@@ -457,10 +448,10 @@ trait DatasetStorageStrategy: Sync + Send {
         new_name: &DatasetName,
     ) -> Result<(), InternalError>;
 
-    fn resolve_account_dir(
+    fn canonical_dataset_alias(
         &self,
-        account_name: &AccountName,
-    ) -> Result<(PathBuf, AccountName), ResolveDatasetError>;
+        raw_alias: &DatasetAlias,
+    ) -> Result<DatasetAlias, ResolveDatasetError>;
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -680,11 +671,11 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         Ok(())
     }
 
-    fn resolve_account_dir(
+    fn canonical_dataset_alias(
         &self,
-        _account_name: &AccountName,
-    ) -> Result<(PathBuf, AccountName), ResolveDatasetError> {
-        unreachable!()
+        raw_alias: &DatasetAlias,
+    ) -> Result<DatasetAlias, ResolveDatasetError> {
+        Ok(raw_alias.clone())
     }
 }
 
@@ -801,6 +792,39 @@ impl DatasetMultiTenantStorageStrategy {
                 }?;
             }
         })
+    }
+
+    fn resolve_account_dir(
+        &self,
+        account_name: &AccountName,
+    ) -> Result<(PathBuf, AccountName), ResolveDatasetError> {
+        let account_dataset_dir_path = self.root.join(account_name);
+
+        if !account_dataset_dir_path.is_dir() {
+            let read_account_dirs = std::fs::read_dir(self.root.as_path()).int_err()?;
+
+            for read_account_dir in read_account_dirs {
+                let account_dir_name = AccountName::new_unchecked(
+                    read_account_dir
+                        .int_err()?
+                        .file_name()
+                        .to_str()
+                        .unwrap_or(""),
+                );
+                if account_name == &account_dir_name {
+                    return Ok((self.root.join(&account_dir_name), account_dir_name));
+                }
+            }
+            return Ok((account_dataset_dir_path, account_name.clone()));
+        }
+
+        let (canonical_account_dataset_dir_path, canonical_account_name) =
+            DatasetRepositoryLocalFs::get_canonical_path_param(&account_dataset_dir_path)?;
+
+        Ok((
+            canonical_account_dataset_dir_path,
+            AccountName::new_unchecked(canonical_account_name.as_str()),
+        ))
     }
 }
 
@@ -971,37 +995,16 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
         Ok(())
     }
 
-    fn resolve_account_dir(
+    fn canonical_dataset_alias(
         &self,
-        account_name: &AccountName,
-    ) -> Result<(PathBuf, AccountName), ResolveDatasetError> {
-        let account_dataset_dir_path = self.root.join(account_name);
-
-        if !account_dataset_dir_path.is_dir() {
-            let read_account_dirs = std::fs::read_dir(self.root.as_path()).int_err()?;
-
-            for read_account_dir in read_account_dirs {
-                let account_dir_name = AccountName::new_unchecked(
-                    read_account_dir
-                        .int_err()?
-                        .file_name()
-                        .to_str()
-                        .unwrap_or(""),
-                );
-                if account_name == &account_dir_name {
-                    return Ok((self.root.join(&account_dir_name), account_dir_name));
-                }
-            }
-            return Ok((account_dataset_dir_path, account_name.clone()));
-        }
-
-        let (canonical_account_dataset_dir_path, canonical_account_name) =
-            DatasetRepositoryLocalFs::get_canonical_path_param(&account_dataset_dir_path)?;
-
-        Ok((
-            canonical_account_dataset_dir_path,
-            AccountName::new_unchecked(canonical_account_name.as_str()),
-        ))
+        raw_alias: &DatasetAlias,
+    ) -> Result<DatasetAlias, ResolveDatasetError> {
+        Ok(if let Some(account_name) = &raw_alias.account_name {
+            let (_, canonical_account_name) = self.resolve_account_dir(account_name).int_err()?;
+            DatasetAlias::new(Some(canonical_account_name), raw_alias.dataset_name.clone())
+        } else {
+            raw_alias.clone()
+        })
     }
 }
 
