@@ -17,8 +17,8 @@ pub trait Terminate {
     const BLOCKING_TICK_TIMEOUT: Duration = Duration::from_millis(50);
 
     /// Attempts to gracefully terminate the child process.
-    /// On Unix platforms will sent SIGTERM signal and try waiting for process
-    /// to exit before sending SIGKILL.
+    /// On Unix platforms will be sent SIGTERM signal and try waiting for
+    /// a process to exit before sending SIGKILL.
     async fn terminate(&mut self, timeout: Duration) -> std::io::Result<TerminateStatus>;
 
     /// A blocking version of [Terminate::terminate()]

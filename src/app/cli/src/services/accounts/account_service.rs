@@ -82,7 +82,7 @@ impl AccountService {
                     if account.eq(&default_account_name) {
                         default_account_name
                     } else {
-                        account.clone() // Use account as user name, when there
+                        account.clone() // Use account as username, when there
                                         // is no data
                     },
                     true,
@@ -147,7 +147,7 @@ impl AccountService {
                         is_admin: false,
                     })
                 } else {
-                    // Otherwise we don't recognized this user between predefined
+                    // Otherwise we don't recognize this user between predefined
                     Err(auth::RejectedCredentialsError::new(
                         "Login of unknown accounts is disabled".to_string(),
                     ))

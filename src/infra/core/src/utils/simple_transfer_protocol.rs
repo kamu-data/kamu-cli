@@ -348,7 +348,7 @@ impl SimpleTransferProtocol {
                     expected_hash: Some(&checkpoint.physical_hash),
                     // This hint is necessary only for S3 implementation that does not
                     // currently support streaming uploads
-                    // without knowing Content-Length. We should remove it in future.
+                    // without knowing Content-Length. We should remove it in the future.
                     size_hint: Some(checkpoint.size),
                 },
             )

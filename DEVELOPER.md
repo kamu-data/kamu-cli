@@ -79,7 +79,7 @@ When needing to test against a specific official release you can install it unde
 curl -s "https://get.kamu.dev" | KAMU_ALIAS=kamu-release sh
 ```
 
-New to Rust? Check out these [IDE configuration tip](#ide-tips).
+New to Rust? Check out these [IDE configuration tips](#ide-configuration).
 
 
 ### Configure Podman as Default Runtime (Recommended)

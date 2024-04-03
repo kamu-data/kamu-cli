@@ -84,7 +84,7 @@ struct ErrorBacktraceFormatter<'a>(&'a dyn std::error::Error);
 
 impl<'a> std::fmt::Display for ErrorBacktraceFormatter<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Uses the inner-most captured backtrace
+        // Uses the innermost captured backtrace
         let mut error = Some(self.0);
         let mut backtrace = None;
         while let Some(e) = error {

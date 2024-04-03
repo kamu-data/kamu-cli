@@ -78,7 +78,7 @@ impl Dataset {
         self.dataset_handle.alias.clone().into()
     }
 
-    /// Returns the kind of a dataset (Root or Derivative)
+    /// Returns the kind of dataset (Root or Derivative)
     async fn kind(&self, ctx: &Context<'_>) -> Result<DatasetKind> {
         let dataset = self.get_dataset(ctx).await?;
         let summary = dataset

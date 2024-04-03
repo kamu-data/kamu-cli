@@ -25,7 +25,7 @@ use crate::utils::s3_context::AsyncReadObj;
 /// A read-through and (partially) a write-through caching layer for
 /// [`ObjectRepository`] using a local file system.
 ///
-/// Currently caches objects forever, so a cache directory cleanup has to be
+/// Currently, caches objects forever, so a cache directory cleanup has to be
 /// handled separately.
 pub struct ObjectRepositoryCachingLocalFs<WrappedRepo> {
     wrapped: WrappedRepo,

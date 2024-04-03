@@ -93,7 +93,7 @@ fn keep_only_maxrows(s: &str, maxrows: usize) -> String {
 
     assert!(lines.len() >= maxrows + 4); // 4 lines for top and bottom border
 
-    let last_line = &lines[lines.len() - 1]; // bottom border line
+    let last_line = &lines[lines.len() - 1]; // bottom borderline
 
     let spaces = last_line.len().saturating_sub(4);
     let dotted_line = format!("| .{:<spaces$}|", "", spaces = spaces);

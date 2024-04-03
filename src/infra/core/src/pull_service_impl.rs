@@ -312,7 +312,7 @@ impl PullServiceImpl {
     }
 
     fn infer_local_name_from_url(&self, url: &Url) -> Result<DatasetName, PullError> {
-        // Try use last path segment for a name (ignoring the trailing slash)
+        // Try to use last path segment for a name (ignoring the trailing slash)
         if let Some(path) = url.path_segments() {
             if let Some(last_segment) = path.rev().find(|s| !s.is_empty()) {
                 if let Ok(name) = DatasetName::try_from(last_segment) {

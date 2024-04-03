@@ -57,7 +57,7 @@ where
         self.root.join(hash.as_multibase().to_stack_string())
     }
 
-    // TODO: We should newtype Path and ensure repositoris are created for
+    // TODO: We should newtype Path and ensure repositories are created for
     // directories that exist
     fn get_path_write(&self, hash: &Multihash) -> Result<PathBuf, std::io::Error> {
         if !self.root.exists() {

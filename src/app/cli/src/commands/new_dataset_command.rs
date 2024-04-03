@@ -105,7 +105,7 @@ impl NewDatasetCommand {
                               - date
                               - city
                           # Lets you manipulate names of the system columns to avoid conflicts
-                          # or use names better suited for yout data.
+                          # or use names better suited for your data.
                           # See: https://docs.kamu.dev/odf/reference/#setvocab
                         - kind: SetVocab
                           eventTimeColumn: date
@@ -149,7 +149,7 @@ impl NewDatasetCommand {
                                 population + 1 as population
                               from `com.example.city-populations`
                         # Lets you manipulate names of the system columns to avoid
-                        # conflicts or use names better suited for yout data.
+                        # conflicts or use names better suited for your data.
                         # See: https://docs.kamu.dev/odf/reference/#setvocab
                         - kind: SetVocab
                           eventTimeColumn: date

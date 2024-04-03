@@ -123,7 +123,7 @@ impl VerifyCommand {
             self.check_remote_datasets(requests).await;
 
         if !missed_remote_dependencies.is_empty() {
-            let missed_dependiency_warnings: Vec<String> = missed_remote_dependencies
+            let missed_dependency_warnings: Vec<String> = missed_remote_dependencies
                 .iter()
                 .map(|remote_ref_dependency| {
                     format!(
@@ -139,7 +139,7 @@ impl VerifyCommand {
                 console::style(format!(
                     "Unable verify derivative transformation for some dataset(s). Please download \
                      next dependencies: \n{}\nor add --integrity flag and try again",
-                    missed_dependiency_warnings.join("\n"),
+                    missed_dependency_warnings.join("\n"),
                 ))
                 .yellow()
             );
@@ -157,15 +157,15 @@ impl VerifyCommand {
     }
 
     // Return tuple with filtered VerificationRequests(check existing)
-    //   with list of missed remote dependencies
+    //   with a list of missed remote dependencies
     async fn check_remote_datasets(
         &self,
-        verifiation_requests: Vec<VerificationRequest>,
+        verification_requests: Vec<VerificationRequest>,
     ) -> (Vec<VerificationRequest>, Vec<RemoteRefDependency>) {
         let mut result = vec![];
         let mut missed_dependencies = vec![];
 
-        for verification_request in &verifiation_requests {
+        for verification_request in &verification_requests {
             if let Ok(dataset_handle) = self
                 .dataset_repo
                 .resolve_dataset_ref(&verification_request.dataset_ref)

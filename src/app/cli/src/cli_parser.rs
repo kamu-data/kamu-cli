@@ -805,7 +805,7 @@ pub fn cli() -> Command {
                         r#"
                         Use this command to share your new dataset or new data with others. All changes performed by this command are atomic and non-destructive. This command will analyze the state of the dataset at the repository and will only upload data and metadata that wasn't previously seen.
 
-                        Similarly to git, if someone else modified the dataset concurrently with you - your push will be rejected and you will have to resolve the conflict.
+                        Similarly to git, if someone else modified the dataset concurrently with you - your push will be rejected, and you will have to resolve the conflict.
 
                         **Examples:**
 
@@ -850,7 +850,7 @@ pub fn cli() -> Command {
 
                         **Examples:**
 
-                        Renaming is often useful when you pull a remote dataset by URL and it gets auto-assigned not the most convenient name:
+                        Renaming is often useful when you pull a remote dataset by URL, and it gets auto-assigned not the most convenient name:
 
                             kamu pull ipfs://bafy...a0da
                             kamu rename bafy...a0da my.dataset
@@ -1012,7 +1012,7 @@ pub fn cli() -> Command {
                             ])
                             .after_help(indoc::indoc!(
                                 r#"
-                                When you pull and push datasets from repositories kamu uses aliases to let you avoid specifying the full remote referente each time. Aliases are usually created the first time you do a push or pull and saved for later. If you have an unusual setup (e.g. pushing to multiple repositories) you can use this command to manage the aliases.
+                                When you pull and push datasets from repositories kamu uses aliases to let you avoid specifying the full remote reference each time. Aliases are usually created the first time you do a push or pull and saved for later. If you have an unusual setup (e.g. pushing to multiple repositories) you can use this command to manage the aliases.
 
                                 **Examples:**
 
@@ -1108,7 +1108,7 @@ pub fn cli() -> Command {
                             Arg::new("url")
                                 .long("url")
                                 .value_name("URL")
-                                .help("URL of a running JDBC server (e.g jdbc:hive2://example.com:10000)"),
+                                .help("URL of a running JDBC server (e.g. jdbc:hive2://example.com:10000)"),
                             Arg::new("command")
                                 .short('c')
                                 .long("command")
@@ -1291,7 +1291,7 @@ pub fn cli() -> Command {
 
                                 Soft compactions produce new files while leaving the old blocks intact. This allows for faster queries, while still preserving the accurate history of how dataset evolved over time.
 
-                                Hard compactions rewrite the history of the dataset as if data was originally written in big batches. They allow to shrink the history of a dataset to just a few blocks, reclaim the space used by old data files, but at the expense of history loss. Hard compactions will rewrite the metadata chain, changing block hashes. Therefore they will **break all downstream datasets** that depend on them.
+                                Hard compactions rewrite the history of the dataset as if data was originally written in big batches. They allow to shrink the history of a dataset to just a few blocks, reclaim the space used by old data files, but at the expense of history loss. Hard compactions will rewrite the metadata chain, changing block hashes. Therefore, they will **break all downstream datasets** that depend on them.
 
                                 **Examples:**
 
