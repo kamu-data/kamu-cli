@@ -9,7 +9,6 @@
 
 use chrono::{DateTime, Utc};
 use kamu_core::{
-    AppendError,
     AppendValidationError,
     HashedMetadataBlockRef,
     MetadataChainVisitor,
@@ -38,14 +37,14 @@ use crate::invalid_event;
 pub struct ValidateSeedBlockOrderVisitor {}
 
 impl ValidateSeedBlockOrderVisitor {
-    pub fn new(block: &MetadataBlock) -> Result<Self, AppendError> {
+    pub fn new(block: &MetadataBlock) -> Result<Self, AppendValidationError> {
         match block.event {
             MetadataEvent::Seed(_) if block.prev_block_hash.is_some() => {
-                return Err(AppendValidationError::AppendingSeedBlockToNonEmptyChain.into())
+                return Err(AppendValidationError::AppendingSeedBlockToNonEmptyChain)
             }
             MetadataEvent::Seed(_) => (),
             _ if block.prev_block_hash.is_none() => {
-                return Err(AppendValidationError::FirstBlockMustBeSeed.into())
+                return Err(AppendValidationError::FirstBlockMustBeSeed)
             }
             _ => (),
         };
@@ -55,7 +54,7 @@ impl ValidateSeedBlockOrderVisitor {
 }
 
 impl MetadataChainVisitor for ValidateSeedBlockOrderVisitor {
-    type Error = AppendError;
+    type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {
         Decision::Stop
@@ -73,16 +72,15 @@ pub struct ValidateSequenceNumbersIntegrityVisitor {
 }
 
 impl ValidateSequenceNumbersIntegrityVisitor {
-    pub fn new(block: &MetadataBlock) -> Result<Self, AppendError> {
+    pub fn new(block: &MetadataBlock) -> Result<Self, AppendValidationError> {
         if block.prev_block_hash.is_none() && block.sequence_number != 0 {
-            return Err(
-                AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
+            return Err(AppendValidationError::SequenceIntegrity(
+                SequenceIntegrityError {
                     prev_block_hash: None,
                     prev_block_sequence_number: None,
                     next_block_sequence_number: block.sequence_number,
-                })
-                .into(),
-            );
+                },
+            ));
         }
 
         Ok(Self {
@@ -92,7 +90,7 @@ impl ValidateSequenceNumbersIntegrityVisitor {
 }
 
 impl MetadataChainVisitor for ValidateSequenceNumbersIntegrityVisitor {
-    type Error = AppendError;
+    type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {
         Decision::Next
@@ -100,14 +98,13 @@ impl MetadataChainVisitor for ValidateSequenceNumbersIntegrityVisitor {
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         if block.sequence_number != (self.appended_sequence_number - 1) {
-            return Err(
-                AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
+            return Err(AppendValidationError::SequenceIntegrity(
+                SequenceIntegrityError {
                     prev_block_hash: Some(hash.clone()),
                     prev_block_sequence_number: Some(block.sequence_number),
                     next_block_sequence_number: self.appended_sequence_number,
-                })
-                .into(),
-            );
+                },
+            ));
         }
 
         Ok(Decision::Stop)
@@ -129,7 +126,7 @@ impl<'a> ValidateSystemTimeIsMonotonicVisitor<'a> {
 }
 
 impl<'a> MetadataChainVisitor for ValidateSystemTimeIsMonotonicVisitor<'a> {
-    type Error = AppendError;
+    type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {
         Decision::Next
@@ -137,7 +134,7 @@ impl<'a> MetadataChainVisitor for ValidateSystemTimeIsMonotonicVisitor<'a> {
 
     fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         if *self.appended_system_time < block.system_time {
-            return Err(AppendValidationError::SystemTimeIsNotMonotonic.into());
+            return Err(AppendValidationError::SystemTimeIsNotMonotonic);
         }
 
         Ok(Decision::Stop)
@@ -168,7 +165,7 @@ impl ValidateWatermarkIsMonotonicVisitor {
 }
 
 impl MetadataChainVisitor for ValidateWatermarkIsMonotonicVisitor {
-    type Error = AppendError;
+    type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {
         if self.is_data_block_appended {
@@ -184,9 +181,9 @@ impl MetadataChainVisitor for ValidateWatermarkIsMonotonicVisitor {
         };
 
         match (data_steam_event.new_watermark, &self.appended_new_watermark) {
-            (Some(_), None) => Err(AppendValidationError::WatermarkIsNotMonotonic.into()),
+            (Some(_), None) => Err(AppendValidationError::WatermarkIsNotMonotonic),
             (Some(prev_wm), Some(next_wm)) if prev_wm > next_wm => {
-                Err(AppendValidationError::WatermarkIsNotMonotonic.into())
+                Err(AppendValidationError::WatermarkIsNotMonotonic)
             }
             _ => Ok(Decision::Stop),
         }
@@ -204,7 +201,7 @@ impl<'a> ValidateOffsetsAreSequentialVisitor<'a> {
     fn validate_internal_offset_consistency(
         event: &MetadataEvent,
         data_block: &MetadataBlockDataStreamRef,
-    ) -> Result<(), AppendError> {
+    ) -> Result<(), AppendValidationError> {
         if let Some(new_data) = data_block.event.new_data {
             let expected_start_offset = data_block.event.prev_offset.map_or(0, |v| v + 1);
 
@@ -214,8 +211,7 @@ impl<'a> ValidateOffsetsAreSequentialVisitor<'a> {
                         expected_start_offset,
                         new_data.offset_interval.start,
                     ),
-                )
-                .into());
+                ));
             }
 
             if new_data.offset_interval.end < new_data.offset_interval.start {
@@ -226,7 +222,7 @@ impl<'a> ValidateOffsetsAreSequentialVisitor<'a> {
         Ok(())
     }
 
-    pub fn new(block: &'a MetadataBlock) -> Result<Self, AppendError> {
+    pub fn new(block: &'a MetadataBlock) -> Result<Self, AppendValidationError> {
         let maybe_data_block = block.as_data_stream_block();
 
         if let Some(data_block) = &maybe_data_block {
@@ -241,7 +237,7 @@ impl<'a> ValidateOffsetsAreSequentialVisitor<'a> {
 }
 
 impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
-    type Error = AppendError;
+    type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {
         if self.appended_data_block.is_some() {
@@ -280,8 +276,7 @@ impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
                         expected_start_offset,
                         new_data.offset_interval.start,
                     ),
-                )
-                .into());
+                ));
             }
 
             if new_data.offset_interval.end < new_data.offset_interval.start {
@@ -328,7 +323,7 @@ impl ValidateUnimplementedEventsVisitor {
 }
 
 impl MetadataChainVisitor for ValidateUnimplementedEventsVisitor {
-    type Error = AppendError;
+    type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {
         Decision::Stop
@@ -346,7 +341,7 @@ pub struct ValidateAddPushSourceVisitor {
 }
 
 impl ValidateAddPushSourceVisitor {
-    pub fn new(block: &MetadataBlock) -> Result<Self, AppendError> {
+    pub fn new(block: &MetadataBlock) -> Result<Self, AppendValidationError> {
         let is_push_source_appended = match &block.event {
             MetadataEvent::AddPushSource(e) => {
                 // Ensure specifies the schema
@@ -374,7 +369,7 @@ impl ValidateAddPushSourceVisitor {
 }
 
 impl MetadataChainVisitor for ValidateAddPushSourceVisitor {
-    type Error = AppendError;
+    type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {
         if self.is_push_source_appended {
@@ -403,7 +398,7 @@ pub struct ValidateSetPollingSourceVisitor {
 }
 
 impl ValidateSetPollingSourceVisitor {
-    pub fn new(block: &MetadataBlock) -> Result<Self, AppendError> {
+    pub fn new(block: &MetadataBlock) -> Result<Self, AppendValidationError> {
         let is_set_polling_source_appended = match &block.event {
             MetadataEvent::SetPollingSource(e) => {
                 // Queries must be normalized
@@ -423,7 +418,7 @@ impl ValidateSetPollingSourceVisitor {
 }
 
 impl MetadataChainVisitor for ValidateSetPollingSourceVisitor {
-    type Error = AppendError;
+    type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {
         if self.is_set_polling_source_appended {
@@ -450,7 +445,7 @@ impl MetadataChainVisitor for ValidateSetPollingSourceVisitor {
 pub struct ValidateSetTransformVisitor {}
 
 impl ValidateSetTransformVisitor {
-    pub fn new(block: &MetadataBlock) -> Result<Self, AppendError> {
+    pub fn new(block: &MetadataBlock) -> Result<Self, AppendValidationError> {
         if let MetadataEvent::SetTransform(e) = &block.event {
             // Ensure has inputs
             if e.inputs.is_empty() {
@@ -476,7 +471,7 @@ impl ValidateSetTransformVisitor {
 }
 
 impl MetadataChainVisitor for ValidateSetTransformVisitor {
-    type Error = AppendError;
+    type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {
         Decision::Stop
@@ -492,15 +487,15 @@ impl MetadataChainVisitor for ValidateSetTransformVisitor {
 pub struct ValidateEventIsNotEmptyVisitor {}
 
 impl ValidateEventIsNotEmptyVisitor {
-    pub fn new(block: &MetadataBlock) -> Result<Self, AppendError> {
+    pub fn new(block: &MetadataBlock) -> Result<Self, AppendValidationError> {
         match &block.event {
             // TODO: ensure only used on Root datasets
             MetadataEvent::AddData(e) if e.is_empty() => {
-                return Err(AppendValidationError::empty_event(e.clone()).into())
+                return Err(AppendValidationError::empty_event(e.clone()))
             }
             // TODO: ensure only used on Derivative datasets
             MetadataEvent::ExecuteTransform(e) if e.is_empty() => {
-                return Err(AppendValidationError::empty_event(e.clone()).into())
+                return Err(AppendValidationError::empty_event(e.clone()))
             }
             _ => (),
         };
@@ -510,7 +505,7 @@ impl ValidateEventIsNotEmptyVisitor {
 }
 
 impl MetadataChainVisitor for ValidateEventIsNotEmptyVisitor {
-    type Error = AppendError;
+    type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {
         Decision::Stop
@@ -547,7 +542,7 @@ impl<'a> ValidateAddDataVisitor<'a> {
 }
 
 impl<'a> MetadataChainVisitor for ValidateAddDataVisitor<'a> {
-    type Error = AppendError;
+    type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {
         if self.appended_add_data.is_some() {
@@ -620,8 +615,7 @@ impl<'a> MetadataChainVisitor for ValidateAddDataVisitor<'a> {
             return Err(AppendValidationError::no_op_event(
                 (*e).clone(),
                 "Event neither has data nor it advances checkpoint, watermark, or source state",
-            )
-            .into());
+            ));
         }
 
         Ok(())
@@ -656,7 +650,7 @@ impl<'a> ValidateExecuteTransformVisitor<'a> {
 }
 
 impl<'a> MetadataChainVisitor for ValidateExecuteTransformVisitor<'a> {
-    type Error = AppendError;
+    type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {
         if self.appended_execute_transform.is_some() {
@@ -800,8 +794,7 @@ impl<'a> MetadataChainVisitor for ValidateExecuteTransformVisitor<'a> {
             return Err(AppendValidationError::no_op_event(
                 (*e).clone(),
                 "Event neither has data nor it advances checkpoint or watermark",
-            )
-            .into());
+            ));
         }
 
         Ok(())
@@ -812,7 +805,10 @@ impl<'a> MetadataChainVisitor for ValidateExecuteTransformVisitor<'a> {
 // Helpers
 ///////////////////////////////////////////////////////////////////////////////
 
-fn validate_transform(e: &MetadataEvent, transform: &Transform) -> Result<(), AppendError> {
+fn validate_transform(
+    e: &MetadataEvent,
+    transform: &Transform,
+) -> Result<(), AppendValidationError> {
     let Transform::Sql(transform) = transform;
     if transform.query.is_some() {
         invalid_event!(e.clone(), "Transform queries must be normalized");

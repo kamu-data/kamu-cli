@@ -19,8 +19,7 @@ macro_rules! invalid_event {
     ($e:expr, $msg:expr $(,)?) => {
         return Err(kamu_core::AppendValidationError::InvalidEvent(
             kamu_core::InvalidEventError::new($e, $msg),
-        )
-        .into());
+        ));
     };
 }
 
@@ -218,7 +217,7 @@ where
                 .await
             {
                 Ok(()) => Ok(()),
-                Err(AcceptVisitorError::Visitor(err)) => Err(err),
+                Err(AcceptVisitorError::Visitor(err)) => Err(AppendError::InvalidBlock(err)),
                 // Detect non-existing prev block situation
                 Err(AcceptVisitorError::Traversal(IterBlocksError::BlockNotFound(err)))
                     if Some(&err.hash) == block.prev_block_hash.as_ref() =>
