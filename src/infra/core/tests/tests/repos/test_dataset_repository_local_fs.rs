@@ -32,6 +32,9 @@ impl LocalFsRepoHarness {
         dataset_action_authorizer: TDatasetActionAuthorizer,
         multi_tenant: bool,
     ) -> Self {
+        let datasets_dir = tempdir.path().join("datasets");
+        std::fs::create_dir(&datasets_dir).unwrap();
+
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
@@ -40,7 +43,7 @@ impl LocalFsRepoHarness {
             .bind::<dyn auth::DatasetActionAuthorizer, TDatasetActionAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
-                    .with_root(tempdir.path().join("datasets"))
+                    .with_root(datasets_dir)
                     .with_multi_tenant(multi_tenant),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
@@ -294,6 +297,42 @@ async fn test_iterate_datasets_multi_tenant() {
 
     test_dataset_repository_shared::test_iterate_datasets_multi_tenant(
         harness.dataset_repo.as_ref(),
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_create_and_get_case_insensetive_dataset() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let harness = LocalFsRepoHarness::create(
+        &tempdir,
+        auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        false,
+    );
+
+    test_dataset_repository_shared::test_create_and_get_case_insensetive_dataset(
+        harness.dataset_repo.as_ref(),
+        None,
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_create_and_get_case_insensetive_dataset_multi_tenant() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let harness = LocalFsRepoHarness::create(
+        &tempdir,
+        auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        true,
+    );
+
+    test_dataset_repository_shared::test_create_and_get_case_insensetive_dataset(
+        harness.dataset_repo.as_ref(),
+        Some(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
     )
     .await;
 }

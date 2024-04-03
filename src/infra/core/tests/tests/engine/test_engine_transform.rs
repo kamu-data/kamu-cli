@@ -211,8 +211,10 @@ async fn test_transform_common(transform: Transform) {
     let tempdir = tempfile::tempdir().unwrap();
     let run_info_dir = tempdir.path().join("run");
     let cache_dir = tempdir.path().join("cache");
+    let datasets_dir = tempdir.path().join("datasets");
     std::fs::create_dir(&run_info_dir).unwrap();
     std::fs::create_dir(&cache_dir).unwrap();
+    std::fs::create_dir(&datasets_dir).unwrap();
 
     let catalog = dill::CatalogBuilder::new()
         .add_value(ContainerRuntimeConfig::default())
@@ -223,7 +225,7 @@ async fn test_transform_common(transform: Transform) {
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
             DatasetRepositoryLocalFs::builder()
-                .with_root(tempdir.path().join("datasets"))
+                .with_root(datasets_dir)
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()

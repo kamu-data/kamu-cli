@@ -61,6 +61,89 @@ pub async fn test_create_dataset(repo: &dyn DatasetRepository, account_name: Opt
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_create_and_get_case_insensetive_dataset(
+    repo: &dyn DatasetRepository,
+    account_name: Option<AccountName>,
+) {
+    let dataset_alias_to_create =
+        DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("Foo"));
+
+    assert_matches!(
+        repo.get_dataset(&dataset_alias_to_create.as_local_ref())
+            .await
+            .err()
+            .unwrap(),
+        GetDatasetError::NotFound(_)
+    );
+
+    let create_result = repo
+        .create_dataset(
+            &dataset_alias_to_create,
+            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+                .build_typed(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(create_result.dataset_handle.alias, dataset_alias_to_create);
+
+    let account_name_uppercase = account_name.clone().map(|account_name_value| {
+        AccountName::new_unchecked(&account_name_value.to_ascii_uppercase())
+    });
+
+    let dataset_alias_in_another_registry =
+        DatasetAlias::new(account_name_uppercase, DatasetName::new_unchecked("foO"));
+
+    // We should see the dataset
+    assert!(repo
+        .get_dataset(&dataset_alias_in_another_registry.as_local_ref())
+        .await
+        .is_ok());
+
+    // Test creation another dataset for existing account with different symbols
+    // registry
+    let new_dataset_alias_to_create = DatasetAlias::new(
+        account_name
+            .clone()
+            .map(|a| AccountName::new_unchecked(a.to_uppercase().as_str())),
+        DatasetName::new_unchecked("BaR"),
+    );
+
+    let snapshot = MetadataFactory::dataset_snapshot()
+        .name(new_dataset_alias_to_create.clone())
+        .kind(DatasetKind::Root)
+        .push_event(MetadataFactory::set_polling_source().build())
+        .build();
+
+    let create_result = repo.create_dataset_from_snapshot(snapshot).await.unwrap();
+
+    // Assert dataset_name eq to new alias and account_name eq to old existing one
+    assert_eq!(
+        create_result.dataset_handle.alias.dataset_name,
+        new_dataset_alias_to_create.dataset_name
+    );
+    assert_eq!(
+        create_result.dataset_handle.alias.account_name,
+        dataset_alias_to_create.account_name
+    );
+
+    // Now test name collision
+    let create_result = repo
+        .create_dataset(
+            &dataset_alias_in_another_registry,
+            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+                .build_typed(),
+        )
+        .await;
+
+    assert_matches!(
+        create_result.err(),
+        Some(CreateDatasetError::NameCollision(_))
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_create_dataset_same_name_multiple_tenants(repo: &dyn DatasetRepository) {
     let dataset_alias_my = DatasetAlias::new(
         Some(AccountName::new_unchecked("my")),

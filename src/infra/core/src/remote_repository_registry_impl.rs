@@ -36,6 +36,23 @@ impl RemoteRepositoryRegistryImpl {
         std::fs::create_dir_all(&repos_dir)?;
         Ok(Self::new(repos_dir))
     }
+
+    pub fn get_repository_file_path(&self, repo_name: &RepoName) -> Option<PathBuf> {
+        let file_path = self.repos_dir.join(repo_name);
+
+        if !file_path.exists() {
+            // run full scan to support case-insensetive matches
+            let all_repositories_stream = self.get_all_repositories();
+            for repository_name in all_repositories_stream {
+                if &repository_name == repo_name {
+                    return Some(self.repos_dir.join(repository_name));
+                }
+            }
+            return None;
+        }
+
+        Some(file_path)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -54,25 +71,22 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
     }
 
     fn get_repository(&self, repo_name: &RepoName) -> Result<RepositoryAccessInfo, GetRepoError> {
-        let file_path = self.repos_dir.join(repo_name);
-
-        if !file_path.exists() {
-            return Err(RepositoryNotFoundError {
-                repo_name: repo_name.clone(),
-            }
-            .into());
+        if let Some(file_path) = self.get_repository_file_path(repo_name) {
+            let file = std::fs::File::open(file_path).int_err()?;
+            let manifest: Manifest<RepositoryAccessInfo> =
+                serde_yaml::from_reader(&file).int_err()?;
+            assert_eq!(manifest.kind, "Repository");
+            return Ok(manifest.content);
         }
 
-        let file = std::fs::File::open(&file_path).int_err()?;
-        let manifest: Manifest<RepositoryAccessInfo> = serde_yaml::from_reader(&file).int_err()?;
-        assert_eq!(manifest.kind, "Repository");
-        Ok(manifest.content)
+        Err(RepositoryNotFoundError {
+            repo_name: repo_name.clone(),
+        }
+        .into())
     }
 
     fn add_repository(&self, repo_name: &RepoName, mut url: Url) -> Result<(), AddRepoError> {
-        let file_path = self.repos_dir.join(repo_name);
-
-        if file_path.exists() {
+        if self.get_repository_file_path(repo_name).is_some() {
             return Err(RepositoryAlreadyExistsError {
                 repo_name: repo_name.clone(),
             }
@@ -90,23 +104,20 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
             content: RepositoryAccessInfo { url },
         };
 
-        let file = std::fs::File::create(&file_path).int_err()?;
+        let file = std::fs::File::create(self.repos_dir.join(repo_name)).int_err()?;
         serde_yaml::to_writer(file, &manifest).int_err()?;
         Ok(())
     }
 
     fn delete_repository(&self, repo_name: &RepoName) -> Result<(), DeleteRepoError> {
-        let file_path = self.repos_dir.join(repo_name);
-
-        if !file_path.exists() {
-            return Err(RepositoryNotFoundError {
-                repo_name: repo_name.clone(),
-            }
-            .into());
+        if let Some(file_path) = self.get_repository_file_path(repo_name) {
+            std::fs::remove_file(file_path).int_err()?;
+            return Ok(());
         }
-
-        std::fs::remove_file(&file_path).int_err()?;
-        Ok(())
+        Err(RepositoryNotFoundError {
+            repo_name: repo_name.clone(),
+        }
+        .into())
     }
 }
 

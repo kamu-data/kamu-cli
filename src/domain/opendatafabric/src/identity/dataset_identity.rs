@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::convert::{AsRef, TryFrom};
+use std::hash::Hash;
 use std::sync::Arc;
 use std::{cmp, fmt, ops};
 
@@ -104,13 +106,13 @@ macro_rules! impl_serde {
 }
 
 pub(crate) use impl_serde;
-use like::Like;
+use like::ILike;
 
 ////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! newtype_str {
     ($typ:ident, $parse:expr, $visitor:ident) => {
-        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[derive(Debug, Clone, Eq)]
         pub struct $typ(Arc<str>);
 
         impl $typ {
@@ -128,6 +130,15 @@ macro_rules! newtype_str {
 
             pub fn from_inner_unchecked(s: Arc<str>) -> Self {
                 Self(s)
+            }
+
+            pub fn into_lowercase(s: &str) -> Cow<'_, str> {
+                let bytes = s.as_bytes();
+                if !bytes.iter().any(u8::is_ascii_uppercase) {
+                    Cow::Borrowed(s)
+                } else {
+                    Cow::Owned(s.to_ascii_lowercase())
+                }
             }
         }
 
@@ -156,6 +167,30 @@ macro_rules! newtype_str {
                     Some((_, "")) => Ok(Self::new_unchecked(s)),
                     _ => Err(ParseError::new(s)),
                 }
+            }
+        }
+
+        impl PartialEq for $typ {
+            fn eq(&self, other: &$typ) -> bool {
+                self.eq_ignore_ascii_case(other)
+            }
+        }
+
+        impl Hash for $typ {
+            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+                Self::into_lowercase(&self.0).hash(state);
+            }
+        }
+
+        impl PartialOrd for $typ {
+            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+
+        impl Ord for $typ {
+            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                Self::into_lowercase(self).cmp(&Self::into_lowercase(other))
             }
         }
 
@@ -233,7 +268,7 @@ newtype_str!(
 
 impl DatasetNamePattern {
     pub fn matches(&self, dataset_name: &DatasetName) -> bool {
-        Like::<false>::like(dataset_name.as_str(), self).unwrap()
+        ILike::<false>::ilike(dataset_name.as_str(), self).unwrap()
     }
 }
 

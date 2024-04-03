@@ -22,15 +22,18 @@ use opendatafabric::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
+fn create_catalog_with_local_workspace(tempdir: &Path, is_multitenant: bool) -> dill::Catalog {
+    let datasets_dir = tempdir.join("datasets");
+    std::fs::create_dir(&datasets_dir).unwrap();
+
     dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add::<DependencyGraphServiceInMemory>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
-                .with_root(tempdir.join("datasets"))
+                .with_root(datasets_dir)
                 .with_current_account_subject(Arc::new(CurrentAccountSubject::new_test()))
-                .with_multi_tenant(false),
+                .with_multi_tenant(is_multitenant),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add::<QueryServiceImpl>()
@@ -42,12 +45,16 @@ fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) {
+async fn create_test_dataset(
+    catalog: &dill::Catalog,
+    tempdir: &Path,
+    account_name: Option<AccountName>,
+) {
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
     let dataset = dataset_repo
         .create_dataset(
-            &DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
+            &DatasetAlias::new(account_name, DatasetName::new_unchecked("foo")),
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                 .build_typed(),
         )
@@ -103,8 +110,8 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) {
 #[test_log::test(tokio::test)]
 async fn test_dataset_schema_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(tempdir.path());
-    create_test_dataset(&catalog, tempdir.path()).await;
+    let catalog = create_catalog_with_local_workspace(tempdir.path(), true);
+    create_test_dataset(&catalog, tempdir.path(), None).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -162,8 +169,8 @@ async fn test_dataset_schema_local_fs() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_tail_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(tempdir.path());
-    create_test_dataset(&catalog, tempdir.path()).await;
+    let catalog = create_catalog_with_local_workspace(tempdir.path(), true);
+    create_test_dataset(&catalog, tempdir.path(), None).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -203,8 +210,8 @@ async fn test_dataset_tail_local_fs() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_tail_empty_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(tempdir.path());
-    create_test_dataset(&catalog, tempdir.path()).await;
+    let catalog = create_catalog_with_local_workspace(tempdir.path(), true);
+    create_test_dataset(&catalog, tempdir.path(), None).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
