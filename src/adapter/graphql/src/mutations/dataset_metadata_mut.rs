@@ -7,9 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{self as domain, MetadataChainExt, TryStreamExtExt};
+use kamu_core::{self as domain, MetadataChainExt, SearchSetAttachmentsVisitor};
 use opendatafabric as odf;
-use opendatafabric::{AsTypedBlock, VariantOf};
 
 use super::{CommitResultAppendError, CommitResultSuccess, NoChanges};
 use crate::mutations::MetadataChainMut;
@@ -38,22 +37,6 @@ impl DatasetMetadataMut {
         Ok(dataset)
     }
 
-    #[graphql(skip)]
-    async fn get_last_block_of_type<T: VariantOf<odf::MetadataEvent>>(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<Option<odf::MetadataBlockTyped<T>>> {
-        let dataset = self.get_dataset(ctx).await?;
-        let block = dataset
-            .as_metadata_chain()
-            .iter_blocks_ref(&domain::BlockRef::Head)
-            .filter_map_ok(|(_, b)| b.into_typed::<T>())
-            .try_first()
-            .await
-            .int_err()?;
-        Ok(block)
-    }
-
     /// Access to the mutable metadata chain of the dataset
     async fn chain(&self) -> MetadataChainMut {
         MetadataChainMut::new(self.dataset_handle.clone())
@@ -70,11 +53,15 @@ impl DatasetMetadataMut {
 
         let dataset = self.get_dataset(ctx).await?;
 
-        let old_attachments = self
-            .get_last_block_of_type::<odf::SetAttachments>(ctx)
-            .await?
-            .map(|b| {
-                let odf::Attachments::Embedded(at) = b.event.attachments;
+        let old_attachments = dataset
+            .as_metadata_chain()
+            .accept_one(SearchSetAttachmentsVisitor::new())
+            .await
+            .int_err()?
+            .into_event()
+            .map(|e| {
+                let odf::Attachments::Embedded(at) = e.attachments;
+
                 at
             });
 

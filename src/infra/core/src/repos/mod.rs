@@ -41,7 +41,6 @@ pub use metadata_block_repository_caching_inmem::*;
 pub use metadata_block_repository_helpers::*;
 pub use metadata_block_repository_impl::*;
 pub use metadata_chain_impl::*;
-pub use metadata_chain_validators::*;
 pub use named_object_repository_http::*;
 pub use named_object_repository_in_memory::*;
 pub use named_object_repository_ipfs_http::*;

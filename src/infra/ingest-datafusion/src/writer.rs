@@ -21,10 +21,10 @@ use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
-use odf::{AsTypedBlock, DatasetVocabulary};
+use odf::{AsTypedBlock, DatasetVocabulary, MetadataEvent};
 use opendatafabric as odf;
 
-use crate::visitor::DataWriterDataFusionMetaDataStateVisitor;
+use crate::visitor::SourceEventVisitor;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -844,6 +844,9 @@ impl DataWriterDataFusionBuilder {
         self,
         source_name: Option<&str>,
     ) -> Result<Self, ScanMetadataError> {
+        type Flag = odf::MetadataEventTypeFlags;
+        type Decision = MetadataVisitorDecision;
+
         // TODO: PERF: Full metadata scan below - this is expensive and should be
         //       improved using skip lists.
 
@@ -853,16 +856,88 @@ impl DataWriterDataFusionBuilder {
             .resolve_ref(&self.block_ref)
             .await
             .int_err()?;
+        let mut seed_visitor = SearchSeedVisitor::new().adapt_err();
+        let mut set_vocab_visitor = SearchSetVocabVisitor::new().adapt_err();
+        let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::new().adapt_err();
+        let mut prev_source_state_visitor = SearchSourceStateVisitor::new(source_name).adapt_err();
+        let mut add_data_visitor = SearchAddDataVisitor::new().adapt_err();
+        let mut add_data_collection_visitor = GenericCallbackVisitor::new(
+            Vec::new(),
+            Decision::NextOfType(Flag::ADD_DATA),
+            |state, _, block| {
+                let MetadataEvent::AddData(e) = &block.event else {
+                    unreachable!()
+                };
 
-        let (decision, mut visitor) =
-            DataWriterDataFusionMetaDataStateVisitor::new(head.clone(), source_name);
+                if let Some(output_data) = &e.new_data {
+                    state.push(output_data.physical_hash.clone());
+                }
+
+                Decision::NextOfType(Flag::ADD_DATA)
+            },
+        )
+        .adapt_err();
+        let mut source_event_visitor = SourceEventVisitor::new(source_name);
 
         self.dataset
             .as_metadata_chain()
-            .accept_by_hash_with_decisions(&mut [decision], &mut [&mut visitor], &head)
+            .accept_by_hash(
+                &mut [
+                    &mut source_event_visitor,
+                    &mut seed_visitor,
+                    &mut set_vocab_visitor,
+                    &mut add_data_visitor,
+                    &mut set_data_schema_visitor,
+                    &mut prev_source_state_visitor,
+                    &mut add_data_collection_visitor,
+                ],
+                &head,
+            )
             .await?;
 
-        let metadata_state = visitor.get_metadata_state()?;
+        {
+            let seed = seed_visitor
+                .into_inner()
+                .into_event()
+                .expect("Dataset without blocks");
+
+            assert_eq!(seed.dataset_kind, odf::DatasetKind::Root);
+        }
+
+        let (source_event, merge_strategy) =
+            source_event_visitor.get_source_event_and_merge_strategy()?;
+        let (prev_offset, prev_watermark, prev_checkpoint) = {
+            match add_data_visitor.into_inner().into_event() {
+                Some(e) => (
+                    e.last_offset(),
+                    e.new_watermark,
+                    e.new_checkpoint.map(|cp| cp.physical_hash),
+                ),
+                None => (None, None, None),
+            }
+        };
+        let metadata_state = DataWriterMetadataState {
+            head,
+            schema: set_data_schema_visitor
+                .into_inner()
+                .into_event()
+                .as_ref()
+                .map(odf::SetDataSchema::schema_as_arrow)
+                .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
+                .int_err()?,
+            source_event,
+            merge_strategy,
+            vocab: set_vocab_visitor
+                .into_inner()
+                .into_event()
+                .unwrap_or_default()
+                .into(),
+            data_slices: add_data_collection_visitor.into_inner().into_state(),
+            prev_offset,
+            prev_checkpoint,
+            prev_watermark,
+            prev_source_state: prev_source_state_visitor.into_inner().into_state(),
+        };
 
         Ok(self.with_metadata_state(metadata_state))
     }
@@ -924,9 +999,12 @@ pub enum ScanMetadataError {
     ),
 }
 
-impl From<IterBlocksError> for ScanMetadataError {
-    fn from(v: IterBlocksError) -> Self {
-        v.int_err().into()
+impl From<AcceptVisitorError<ScanMetadataError>> for ScanMetadataError {
+    fn from(v: AcceptVisitorError<ScanMetadataError>) -> Self {
+        match v {
+            AcceptVisitorError::Visitor(err) => err,
+            AcceptVisitorError::Traversal(err) => Self::Internal(err.int_err()),
+        }
     }
 }
 

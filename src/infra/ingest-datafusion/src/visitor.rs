@@ -7,83 +7,49 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
-use datafusion::arrow::datatypes::SchemaRef;
-use internal_error::ResultIntoInternal;
-use kamu_core::{Decision, HashedMetadataBlockRef, MetadataBlockTypeFlags, MetadataChainVisitor};
+use kamu_core::{
+    HashedMetadataBlockRef,
+    MetadataChainVisitor,
+    MetadataVisitorDecision as Decision,
+};
 use opendatafabric::{
-    AddData,
     AddPushSource,
-    DatasetKind,
     MergeStrategy,
     MergeStrategyAppend,
     MetadataEvent,
-    Multihash,
-    Seed,
-    SetDataSchema,
+    MetadataEventTypeFlags as Flag,
     SetPollingSource,
-    SetVocab,
-    SourceState,
 };
 
-use crate::{DataWriterMetadataState, ScanMetadataError, SourceNotFoundError};
+use crate::{ScanMetadataError, SourceNotFoundError};
 
 ///////////////////////////////////////////////////////////////////////////////
 
-type Flag = MetadataBlockTypeFlags;
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub struct DataWriterDataFusionMetaDataStateVisitor<'a> {
-    head: Multihash,
+pub struct SourceEventVisitor<'a> {
     maybe_source_name: Option<&'a str>,
-
-    next_block_flags: MetadataBlockTypeFlags,
-    data_slices: Vec<Multihash>,
-
-    maybe_schema: Option<SchemaRef>,
+    next_block_flags: Flag,
     maybe_source_event: Option<MetadataEvent>,
-    maybe_set_vocab: Option<SetVocab>,
-
-    maybe_prev_checkpoint: Option<Multihash>,
-    maybe_prev_watermark: Option<DateTime<Utc>>,
-    maybe_prev_source_state: Option<SourceState>,
-    maybe_prev_offset: Option<u64>,
 }
 
-impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
-    pub fn new(head: Multihash, maybe_source_name: Option<&'a str>) -> (Decision, Self) {
-        let next_block_flags = Flag::SET_DATA_SCHEMA
-            | Flag::ADD_DATA
-            | Flag::SET_POLLING_SOURCE
-            | Flag::DISABLE_POLLING_SOURCE
-            | Flag::ADD_PUSH_SOURCE
-            | Flag::DISABLE_PUSH_SOURCE
-            | Flag::SET_VOCAB
-            | Flag::SEED;
+impl<'a> SourceEventVisitor<'a> {
+    pub fn new(maybe_source_name: Option<&'a str>) -> Self {
+        const INITIAL_NEXT_BLOCK_FLAGS: Flag = Flag::SET_POLLING_SOURCE
+            .union(Flag::DISABLE_POLLING_SOURCE)
+            .union(Flag::ADD_PUSH_SOURCE)
+            .union(Flag::DISABLE_PUSH_SOURCE);
 
-        (
-            Decision::NextOfType(next_block_flags),
-            Self {
-                head,
-                maybe_source_name,
+        Self {
+            maybe_source_name,
 
-                next_block_flags,
-                data_slices: Vec::new(),
+            next_block_flags: INITIAL_NEXT_BLOCK_FLAGS,
 
-                maybe_schema: None,
-                maybe_source_event: None,
-                maybe_set_vocab: None,
-
-                maybe_prev_checkpoint: None,
-                maybe_prev_watermark: None,
-                maybe_prev_source_state: None,
-                maybe_prev_offset: None,
-            },
-        )
+            maybe_source_event: None,
+        }
     }
 
-    pub fn get_metadata_state(self) -> Result<DataWriterMetadataState, ScanMetadataError> {
+    pub fn get_source_event_and_merge_strategy(
+        self,
+    ) -> Result<(Option<MetadataEvent>, MergeStrategy), ScanMetadataError> {
         let merge_strategy = match (&self.maybe_source_event, self.maybe_source_name) {
             // Source found
             (Some(e), _) => match e {
@@ -100,56 +66,7 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
             )),
         }?;
 
-        Ok(DataWriterMetadataState {
-            head: self.head,
-            schema: self.maybe_schema,
-            source_event: self.maybe_source_event,
-            merge_strategy,
-            vocab: self.maybe_set_vocab.unwrap_or_default().into(),
-            data_slices: self.data_slices,
-            prev_offset: self.maybe_prev_offset,
-            prev_checkpoint: self.maybe_prev_checkpoint,
-            prev_watermark: self.maybe_prev_watermark,
-            prev_source_state: self.maybe_prev_source_state,
-        })
-    }
-
-    fn handle_set_data_schema(&mut self, e: &SetDataSchema) -> Result<(), ScanMetadataError> {
-        self.maybe_schema = Some(e.schema_as_arrow().int_err()?);
-
-        Ok(())
-    }
-
-    fn handle_add_data(&mut self, e: &AddData) {
-        if let Some(output_data) = &e.new_data {
-            self.data_slices.push(output_data.physical_hash.clone());
-        }
-
-        if self.maybe_prev_offset.is_none() {
-            self.maybe_prev_offset = e.last_offset();
-        }
-
-        if self.maybe_prev_checkpoint.is_none() {
-            self.maybe_prev_checkpoint =
-                e.new_checkpoint.as_ref().map(|cp| cp.physical_hash.clone());
-        }
-
-        if self.maybe_prev_watermark.is_none() {
-            self.maybe_prev_watermark = e.new_watermark;
-        }
-
-        if self.maybe_prev_source_state.is_none() {
-            if let Some(ss) = &e.new_source_state
-                && let Some(source_name) = self.maybe_source_name
-                && source_name != ss.source_name.as_str()
-            {
-                unimplemented!(
-                    "Differentiating between the state of multiple sources is not yet supported"
-                );
-            }
-
-            self.maybe_prev_source_state = e.new_source_state.clone();
-        }
+        Ok((self.maybe_source_event, merge_strategy))
     }
 
     fn handle_set_polling_source(&mut self, e: &SetPollingSource) -> Result<(), ScanMetadataError> {
@@ -187,29 +104,17 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
 
         Ok(())
     }
-
-    fn handle_set_vocab(&mut self, e: &SetVocab) {
-        self.maybe_set_vocab = Some(e.clone());
-    }
-
-    fn handle_seed(&mut self, e: &Seed) {
-        assert_eq!(e.dataset_kind, DatasetKind::Root);
-    }
 }
 
-impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
+impl<'a> MetadataChainVisitor for SourceEventVisitor<'a> {
     type Error = ScanMetadataError;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::NextOfType(self.next_block_flags)
+    }
 
     fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         match &block.event {
-            MetadataEvent::SetDataSchema(e) => {
-                self.handle_set_data_schema(e)?;
-
-                self.next_block_flags -= Flag::SET_DATA_SCHEMA;
-            }
-            MetadataEvent::AddData(e) => {
-                self.handle_add_data(e);
-            }
             MetadataEvent::SetPollingSource(e) => {
                 self.handle_set_polling_source(e)?;
 
@@ -224,20 +129,14 @@ impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
                     self.next_block_flags -= Flag::ADD_PUSH_SOURCE;
                 }
             }
-            MetadataEvent::SetVocab(e) => {
-                self.handle_set_vocab(e);
-
-                self.next_block_flags -= Flag::SET_VOCAB;
-            }
-            MetadataEvent::Seed(e) => {
-                self.handle_seed(e);
-
-                self.next_block_flags -= Flag::SEED;
-            }
             MetadataEvent::DisablePollingSource(_) | MetadataEvent::DisablePushSource(_) => {
                 unimplemented!("Disabling sources is not yet fully supported")
             }
-            MetadataEvent::ExecuteTransform(_)
+            MetadataEvent::Seed(_)
+            | MetadataEvent::AddData(_)
+            | MetadataEvent::ExecuteTransform(_)
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetDataSchema(_)
             | MetadataEvent::SetTransform(_)
             | MetadataEvent::SetAttachments(_)
             | MetadataEvent::SetInfo(_)

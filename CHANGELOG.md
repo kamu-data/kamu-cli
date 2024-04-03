@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Support `ArrowJson` schema output format in QGL API and CLI commands
 - New `kamu system compact <dataset>` command that compacts dataslices for the given dataset
+### Changed
+- Next batch of optimizations of metadata chain traversal through API using Visitors
 
 ## [0.170.0] - 2024-03-29
 ### Added

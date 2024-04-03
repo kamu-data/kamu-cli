@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use futures::TryStreamExt;
-use kamu_core::{self as domain, MetadataChainExt, ServerUrlConfig, TryStreamExtExt};
+use kamu_core::{self as domain, MetadataChainExt, SearchSeedVisitor, ServerUrlConfig};
 use opendatafabric as odf;
 
 use crate::prelude::*;
@@ -108,29 +107,26 @@ impl Dataset {
     /// Creation time of the first metadata block in the chain
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
         let dataset = self.get_dataset(ctx).await?;
-        let seed = dataset
+
+        Ok(dataset
             .as_metadata_chain()
-            .iter_blocks_ref(&domain::BlockRef::Head)
-            .map_ok(|(_, b)| b)
-            .try_last()
+            .accept_one(SearchSeedVisitor::new())
             .await
             .int_err()?
-            .expect("Dataset without blocks");
-        Ok(seed.system_time)
+            .into_block()
+            .expect("Dataset without blocks")
+            .system_time)
     }
 
     /// Creation time of the most recent metadata block in the chain
     async fn last_updated_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
         let dataset = self.get_dataset(ctx).await?;
-        let head = dataset
+
+        Ok(dataset
             .as_metadata_chain()
-            .iter_blocks_ref(&domain::BlockRef::Head)
-            .map_ok(|(_, b)| b)
-            .try_first()
-            .await
-            .int_err()?
-            .expect("Dataset without blocks");
-        Ok(head.system_time)
+            .get_block_by_ref(&domain::BlockRef::Head)
+            .await?
+            .system_time)
     }
 
     /// Permissions of the current user
