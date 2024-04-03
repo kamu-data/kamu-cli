@@ -95,7 +95,7 @@ pub async fn exec_from_lines(
         }
     }
 
-    // run the left over query if the last statement doesn't contain ‘;’
+    // run the leftover query if the last statement doesn't contain ‘;’
     // ignore if it only consists of '\n'
     if query.contains(|c| c != '\n') {
         exec_and_print(ctx, print_options, query).await?;

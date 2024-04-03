@@ -159,7 +159,7 @@ impl EngineProvisionerLocal {
             self.container_runtime.config.network_ns,
         ) {
             (None | Some(0), NetworkNamespaceType::Host) | (Some(1), _) => 1,
-            // TODO: Use available memory to deretmine the optimal limit
+            // TODO: Use available memory to determine the optimal limit
             (None | Some(0), NetworkNamespaceType::Private) => outstanding_handles + 1,
             (Some(multi), NetworkNamespaceType::Private) => multi,
             (Some(multi), NetworkNamespaceType::Host) => {

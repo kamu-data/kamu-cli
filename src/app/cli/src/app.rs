@@ -176,7 +176,7 @@ pub fn prepare_dependencies_graph_repository(
         .add_value(current_account_subject)
         .add::<kamu::domain::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<kamu::DependencyGraphServiceInMemory>()
-        // Don't add it's own initializer, leave optional dependency uninitialized
+        // Don't add its own initializer, leave optional dependency uninitialized
         .build();
 
     let dataset_repo = special_catalog_for_graph.get_one().unwrap();
@@ -288,7 +288,7 @@ pub fn configure_base_catalog(
 
     b.add::<accounts::AccountService>();
 
-    // No Github login possible for single-tenant workspace
+    // No GitHub login possible for single-tenant workspace
     if multi_tenant_workspace {
         b.add::<kamu_adapter_oauth::OAuthGithub>();
     }

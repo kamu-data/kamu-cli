@@ -80,7 +80,7 @@ pub async fn create_dataset_from_snapshot_impl(
             }
             MetadataEvent::SetDataSchema(_) => {
                 // It shouldn't be common to provide schema as part of the snapshot. In most
-                // cases it will inferred upon first ingest/transform. But no reason not to
+                // cases, it will be inferred upon first ingest/transform. But no reason not to
                 // allow it.
                 Ok(())
             }

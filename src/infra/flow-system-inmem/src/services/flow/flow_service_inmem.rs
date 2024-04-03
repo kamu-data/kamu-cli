@@ -141,7 +141,7 @@ impl FlowServiceInMemory {
             .into_iter()
             .partition(|config| matches!(config.rule, FlowConfigurationRule::Schedule(_)));
 
-        // Activate all configs, ensuring schedule configs preceeds non-schedule configs
+        // Activate all configs, ensuring schedule configs precedes non-schedule configs
         // (this i.e. forces all root datasets to be updated earlier than the derived)
         //
         // Thought: maybe we need topological sorting by derived relations as well to
@@ -516,10 +516,10 @@ impl FlowServiceInMemory {
         let accumulated_something = accumulated_records_count > 0 || watermark_modified;
 
         // The condition is satisfied if
-        //   - we crossed the number of new records threshold
+        //   - we crossed the number of new records thresholds
         //   - or waited long enough, assuming
         //      - there is at least some change of the inputs
-        //      - watmermark got touched
+        //      - watermark got touched
         let satisfied = accumulated_something
             && (accumulated_records_count >= batching_rule.min_records_to_await()
                 || evaluation_time >= batching_deadline);

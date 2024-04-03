@@ -118,7 +118,7 @@ impl CompactionListener for CompactionProgress {
                 self.curr_progress.finish_with_message(
                     self.spinner_message(
                         console::style(format!(
-                            "Dataset compacted succesfully ({old_num_blocks} -> {new_num_blocks} \
+                            "Dataset compacted successfully ({old_num_blocks} -> {new_num_blocks} \
                              blocks)"
                         ))
                         .green(),
@@ -132,7 +132,7 @@ impl CompactionListener for CompactionProgress {
         let message = match phase {
             CompactionPhase::GatherChainInfo => "Gathering chain information",
             CompactionPhase::MergeDataslices => "Merging dataslices",
-            CompactionPhase::CommitNewBlocks => "Commiting new blocks",
+            CompactionPhase::CommitNewBlocks => "Committing new blocks",
         };
         self.curr_progress.set_message(message);
     }

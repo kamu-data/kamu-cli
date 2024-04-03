@@ -34,8 +34,9 @@ use kamu::domain::*;
 ///
 /// A conversion between the domain error and [`ApiError`] has to exist. We on
 /// purpose avoid [From] and [Into] traits and using [`IntoApiError`] instead as
-/// we want this conversion to be explicit - it's too easy to put a questionmark
-/// operator on a fallible operation without thinking what it will actually do.
+/// we want this conversion to be explicit - it's too easy to put a question
+/// mark operator on a fallible operation without thinking what it will actually
+/// do.
 ///
 /// Note that in between handlers different errors have different meaning, e.g.
 /// an absence of a dataset in one handler should lead to `404 Not Found`, while

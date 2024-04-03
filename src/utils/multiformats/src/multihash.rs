@@ -31,7 +31,7 @@ pub const DEFAULT_MULTIHASH_MULTIBASE_ENCODING: Multibase = Multibase::Base16;
 /// exact length of it
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Multihash {
-    /// The digest buffer (may be longer than the digest)
+    /// The digest buffer (maybe longer than the digest)
     buf: [u8; MAX_MULTIHASH_DIGEST_LEN],
     /// The actual length of the digest in bytes
     len: usize,

@@ -43,7 +43,7 @@ pub struct SystemDiagnoseCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
     container_runtime: Arc<ContainerRuntime>,
-    is_in_workpace: bool,
+    is_in_workspace: bool,
     run_info_dir: PathBuf,
 }
 
@@ -52,14 +52,14 @@ impl SystemDiagnoseCommand {
         dataset_repo: Arc<dyn DatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
         container_runtime: Arc<ContainerRuntime>,
-        is_in_workpace: bool,
+        is_in_workspace: bool,
         run_info_dir: PathBuf,
     ) -> Self {
         Self {
             dataset_repo,
             verification_svc,
             container_runtime,
-            is_in_workpace,
+            is_in_workspace,
             run_info_dir,
         }
     }
@@ -92,7 +92,7 @@ impl Command for SystemDiagnoseCommand {
             }),
         ];
         // Add checks which required workspace initialization
-        if self.is_in_workpace {
+        if self.is_in_workspace {
             diagnostic_checks.push(Box::new(CheckWorkspaceConsistent {
                 dataset_repo: self.dataset_repo.clone(),
                 verification_svc: self.verification_svc.clone(),
@@ -110,7 +110,7 @@ impl Command for SystemDiagnoseCommand {
             }
         }
 
-        if !self.is_in_workpace {
+        if !self.is_in_workspace {
             writeln!(out, "{}", style("Directory is not kamu workspace").yellow())?;
         }
         Ok(())

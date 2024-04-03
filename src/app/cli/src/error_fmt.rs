@@ -47,7 +47,7 @@ impl<'a> PrettyCLIError<'a> {
         }
 
         if self.include_backtraces {
-            // Print the inner most backtrace
+            // Print the innermost backtrace
             for e in error_chain.iter().rev() {
                 if let Some(bt) = core::error::request_ref::<Backtrace>(e) {
                     if bt.status() == BacktraceStatus::Captured {
@@ -120,7 +120,7 @@ impl<'a> PrettyCLIError<'a> {
             }
 
             if self.include_backtraces {
-                // Print the inner most backtrace
+                // Print the innermost backtrace
                 for e in error_chain.iter().rev() {
                     if let Some(bt) = core::error::request_ref::<Backtrace>(e) {
                         if bt.status() == BacktraceStatus::Captured {

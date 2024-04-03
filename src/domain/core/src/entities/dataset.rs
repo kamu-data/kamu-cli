@@ -95,10 +95,10 @@ pub struct CommitOpts<'a> {
     pub system_time: Option<DateTime<Utc>>,
     /// Compare-and-swap semantics to ensure there were no concurrent updates
     pub prev_block_hash: Option<Option<&'a Multihash>>,
-    /// Whether to check for presence of linked objects like data and
+    /// Whether to check for the presence of linked objects like data and
     /// checkpoints in the respective repos
     pub check_object_refs: bool,
-    // Whether to reset head to new commited block
+    // Whether to reset head to new committed block
     pub update_block_ref: bool,
 }
 

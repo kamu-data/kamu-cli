@@ -208,8 +208,8 @@ impl ContainerRunCommand {
         self
     }
 
-    /// Adds a range of volume mounts. For convenience mounts can be specified
-    /// as pairs `("/host/path", "/container/paht")` or as triplets
+    /// Adds a range of volume mounts. For convenience, mounts can be specified
+    /// as pairs `("/host/path", "/container/path")` or as triplets
     /// `("/host", "/container", VolumeAccess::ReadOnly)`
     pub fn volumes<I, V>(mut self, v: I) -> Self
     where
@@ -223,7 +223,7 @@ impl ContainerRunCommand {
     }
 
     /// Add a volume mount. For convenience can be specified as a pair
-    /// `("/host/path", "/container/paht")` or as a triplet `("/host",
+    /// `("/host/path", "/container/path")` or as a triplet `("/host",
     /// "/container", VolumeAccess::ReadOnly)`
     pub fn volume(mut self, spec: impl Into<VolumeSpec>) -> Self {
         self.args.volumes.push(spec.into());
