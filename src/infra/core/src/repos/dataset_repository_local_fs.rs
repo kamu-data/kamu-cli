@@ -684,10 +684,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         &self,
         _account_name: &AccountName,
     ) -> Result<(PathBuf, AccountName), ResolveDatasetError> {
-        Ok((
-            self.root.join(DEFAULT_ACCOUNT_NAME),
-            AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
-        ))
+        unreachable!()
     }
 }
 
