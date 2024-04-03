@@ -302,7 +302,7 @@ impl KamuTable {
         let maybe_set_data_schema = self
             .dataset
             .as_metadata_chain()
-            .accept_one(SearchSetDataSchemaVisitor::create())
+            .accept_one(SearchSetDataSchemaVisitor::new())
             .await
             .int_err()?
             .into_event();

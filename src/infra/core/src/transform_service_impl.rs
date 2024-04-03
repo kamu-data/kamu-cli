@@ -210,14 +210,14 @@ impl TransformServiceImpl {
         // TODO: PERF: Search for source, vocab, and data schema result in full scan
         let (source, schema, set_vocab, prev_query) = {
             // TODO: Support transform evolution
-            let mut set_transform_visitor = SearchSetTransformVisitor::create().adapt_err();
-            let mut set_vocab_visitor = SearchSetVocabVisitor::create().adapt_err();
-            let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::create().adapt_err();
-            let mut execute_transform_visitor = SearchExecuteTransformVisitor::create().adapt_err();
+            let mut set_transform_visitor = SearchSetTransformVisitor::new();
+            let mut set_vocab_visitor = SearchSetVocabVisitor::new();
+            let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::new();
+            let mut execute_transform_visitor = SearchExecuteTransformVisitor::new();
 
             dataset
                 .as_metadata_chain()
-                .accept_by_hash::<IterBlocksError>(
+                .accept_by_hash(
                     &mut [
                         &mut set_transform_visitor,
                         &mut set_vocab_visitor,
@@ -230,16 +230,15 @@ impl TransformServiceImpl {
                 .int_err()?;
 
             (
-                set_transform_visitor.into_inner().into_event(),
+                set_transform_visitor.into_event(),
                 set_data_schema_visitor
-                    .into_inner()
                     .into_event()
                     .as_ref()
                     .map(SetDataSchema::schema_as_arrow)
                     .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
                     .int_err()?,
-                set_vocab_visitor.into_inner().into_event(),
-                execute_transform_visitor.into_inner().into_event(),
+                set_vocab_visitor.into_event(),
+                execute_transform_visitor.into_event(),
             )
         };
 
@@ -480,7 +479,7 @@ impl TransformServiceImpl {
 
         Ok(dataset
             .as_metadata_chain()
-            .accept_one(SearchSetVocabVisitor::create())
+            .accept_one(SearchSetVocabVisitor::new())
             .await
             .int_err()?
             .into_event()
@@ -518,9 +517,9 @@ impl TransformServiceImpl {
 
         let (source, set_vocab, schema, blocks, finished_range) = {
             // TODO: Support dataset evolution
-            let mut set_transform_visitor = SearchSetTransformVisitor::create();
-            let mut set_vocab_visitor = SearchSetVocabVisitor::create();
-            let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::create();
+            let mut set_transform_visitor = SearchSetTransformVisitor::new();
+            let mut set_vocab_visitor = SearchSetVocabVisitor::new();
+            let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::new();
 
             type Flag = MetadataEventTypeFlags;
             type Decision = MetadataVisitorDecision;
@@ -731,7 +730,7 @@ impl TransformService for TransformServiceImpl {
         // TODO: Support transform evolution
         Ok(dataset
             .as_metadata_chain()
-            .accept_one(SearchSetTransformVisitor::create())
+            .accept_one(SearchSetTransformVisitor::new())
             .await
             .int_err()?
             .into_hashed_block())

@@ -586,7 +586,7 @@ impl PollingIngestService for PollingIngestServiceImpl {
         // TODO: Support source evolution
         Ok(dataset
             .as_metadata_chain()
-            .accept_one(SearchSetPollingSourceVisitor::create())
+            .accept_one(SearchSetPollingSourceVisitor::new())
             .await
             .int_err()?
             .into_hashed_block())

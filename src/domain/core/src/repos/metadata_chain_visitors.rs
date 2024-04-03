@@ -63,7 +63,8 @@ macro_rules! typed_search_single_typed_block_visitor_impl {
         pub struct $name {}
 
         impl $name {
-            pub fn create() -> SearchSingleTypedBlockVisitor<$event_struct> {
+            #[allow(clippy::new_ret_no_self)]
+            pub fn new() -> SearchSingleTypedBlockVisitor<$event_struct> {
                 SearchSingleTypedBlockVisitor::new($block_type_flags)
             }
         }

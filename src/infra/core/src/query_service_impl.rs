@@ -226,7 +226,7 @@ impl QueryService for QueryServiceImpl {
 
         let vocab: DatasetVocabulary = dataset
             .as_metadata_chain()
-            .accept_one(SearchSetVocabVisitor::create())
+            .accept_one(SearchSetVocabVisitor::new())
             .await
             .int_err()?
             .into_event()

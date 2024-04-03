@@ -55,7 +55,7 @@ impl DatasetMetadataMut {
 
         let old_attachments = dataset
             .as_metadata_chain()
-            .accept_one(SearchSetAttachmentsVisitor::create())
+            .accept_one(SearchSetAttachmentsVisitor::new())
             .await
             .int_err()?
             .into_event()

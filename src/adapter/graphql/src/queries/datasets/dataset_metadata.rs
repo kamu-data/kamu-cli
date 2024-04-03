@@ -191,7 +191,7 @@ impl DatasetMetadata {
 
         Ok(dataset
             .as_metadata_chain()
-            .accept_one(SearchSetInfoVisitor::create())
+            .accept_one(SearchSetInfoVisitor::new())
             .await
             .int_err()?
             .into_event()
@@ -211,7 +211,7 @@ impl DatasetMetadata {
 
         Ok(dataset
             .as_metadata_chain()
-            .accept_one(SearchSetAttachmentsVisitor::create())
+            .accept_one(SearchSetAttachmentsVisitor::new())
             .await
             .int_err()?
             .into_event()
@@ -232,7 +232,7 @@ impl DatasetMetadata {
 
         Ok(dataset
             .as_metadata_chain()
-            .accept_one(SearchSetLicenseVisitor::create())
+            .accept_one(SearchSetLicenseVisitor::new())
             .await
             .int_err()?
             .into_event()
@@ -245,7 +245,7 @@ impl DatasetMetadata {
 
         Ok(dataset
             .as_metadata_chain()
-            .accept_one(SearchSetVocabVisitor::create())
+            .accept_one(SearchSetVocabVisitor::new())
             .await
             .int_err()?
             .into_event()

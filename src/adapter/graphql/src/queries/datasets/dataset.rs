@@ -110,7 +110,7 @@ impl Dataset {
 
         Ok(dataset
             .as_metadata_chain()
-            .accept_one(SearchSeedVisitor::create())
+            .accept_one(SearchSeedVisitor::new())
             .await
             .int_err()?
             .into_block()
