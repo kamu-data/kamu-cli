@@ -179,7 +179,6 @@ macro_rules! newtype_str {
         impl Hash for $typ {
             fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
                 Self::into_lowercase(&self.0).hash(state);
-                Self::into_lowercase(&self.0).hash(state);
             }
         }
 

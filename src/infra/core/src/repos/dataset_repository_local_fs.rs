@@ -981,11 +981,11 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
         let account_dataset_dir_path = self.root.join(account_name);
 
         if !account_dataset_dir_path.is_dir() {
-            let read_accout_dirs = std::fs::read_dir(self.root.as_path()).int_err()?;
+            let read_account_dirs = std::fs::read_dir(self.root.as_path()).int_err()?;
 
-            for read_accout_dir in read_accout_dirs {
+            for read_account_dir in read_account_dirs {
                 let account_dir_name = AccountName::new_unchecked(
-                    read_accout_dir
+                    read_account_dir
                         .int_err()?
                         .file_name()
                         .to_str()
