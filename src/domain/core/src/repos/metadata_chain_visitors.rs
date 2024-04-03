@@ -35,19 +35,26 @@ use opendatafabric::{
     VariantOf,
 };
 
-use crate::{
-    HashedMetadataBlockRef,
-    IterBlocksError,
-    MetadataChainVisitor,
-    MetadataChainVisitorHolder,
-    MetadataChainVisitorHolderFactory,
-    MetadataVisitorDecision as Decision,
-};
+use crate::{HashedMetadataBlockRef, MetadataChainVisitor, MetadataVisitorDecision as Decision};
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// TODO: use Infallible/!
-type VisitorError = IterBlocksError;
+mod infallible {
+    /// This is a special error type used for visitors that do not return
+    /// errors. Type is declared in a way that it cannot ever be constructed.
+    #[derive(thiserror::Error, Debug)]
+    #[error("Infallible")]
+    pub struct Infallible(u8);
+
+    impl Infallible {
+        /// This error can be safely converted into any other error, since it
+        /// will never exist in runtime
+        pub fn into<T>(self) -> T {
+            unreachable!()
+        }
+    }
+}
+pub use infallible::Infallible;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -102,6 +109,53 @@ typed_search_single_typed_block_visitor_impl!(SearchAddDataVisitor, AddData, Fla
 
 ///////////////////////////////////////////////////////////////////////////////
 
+pub struct SetDataSchemaVisitor<'a> {
+    source_name: Option<&'a str>,
+    source_state: Option<SourceState>,
+}
+
+impl<'a> SetDataSchemaVisitor<'a> {
+    pub fn new(source_name: Option<&'a str>) -> Self {
+        Self {
+            source_name,
+            source_state: None,
+        }
+    }
+
+    pub fn into_state(self) -> Option<SourceState> {
+        self.source_state
+    }
+}
+
+impl MetadataChainVisitor for SetDataSchemaVisitor<'_> {
+    type Error = Infallible;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::NextOfType(Flag::ADD_DATA)
+    }
+
+    fn visit(&mut self, (_hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        let MetadataEvent::AddData(e) = &block.event else {
+            unreachable!()
+        };
+
+        if let Some(ss) = &e.new_source_state
+            && let Some(sn) = self.source_name
+            && sn != ss.source_name.as_str()
+        {
+            unimplemented!(
+                "Differentiating between the state of multiple sources is not yet supported"
+            );
+        }
+
+        self.source_state = e.new_source_state.clone();
+
+        Ok(Decision::Stop)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 pub struct SearchSingleTypedBlockVisitor<T> {
     requested_flag: Flag,
     hashed_block: Option<(Multihash, MetadataBlockTyped<T>)>,
@@ -116,35 +170,6 @@ where
             requested_flag,
             hashed_block: None,
         }
-    }
-
-    pub fn wrap_err<E>(
-        self,
-    ) -> MetadataChainVisitorHolder<
-        SearchSingleTypedBlockVisitor<T>,
-        impl Fn(VisitorError) -> E,
-        VisitorError,
-        E,
-    >
-    where
-        E: Error + Send,
-    {
-        MetadataChainVisitorHolderFactory::create_infallible(self)
-    }
-
-    pub fn with_map_err<E>(
-        self,
-        map_err_fn: impl Fn(VisitorError) -> E + Send,
-    ) -> MetadataChainVisitorHolder<
-        SearchSingleTypedBlockVisitor<T>,
-        impl Fn(VisitorError) -> E,
-        VisitorError,
-        E,
-    >
-    where
-        E: Error + Send,
-    {
-        MetadataChainVisitorHolderFactory::create(self, map_err_fn)
     }
 
     pub fn into_hashed_block(self) -> Option<(Multihash, MetadataBlockTyped<T>)> {
@@ -164,7 +189,7 @@ impl<T> MetadataChainVisitor for SearchSingleTypedBlockVisitor<T>
 where
     T: VariantOf<MetadataEvent> + Send,
 {
-    type Error = VisitorError;
+    type Error = Infallible;
 
     fn initial_decision(&self) -> Decision {
         Decision::NextOfType(self.requested_flag)
@@ -225,7 +250,7 @@ impl SearchSingleDataBlockVisitor {
 }
 
 impl MetadataChainVisitor for SearchSingleDataBlockVisitor {
-    type Error = VisitorError;
+    type Error = Infallible;
 
     fn initial_decision(&self) -> Decision {
         Decision::NextOfType(Flag::DATA_BLOCK)
@@ -277,16 +302,6 @@ where
         }
     }
 
-    pub fn with_map_err<E>(
-        self,
-        map_err_fn: impl Fn(VisitorError) -> E + Send,
-    ) -> MetadataChainVisitorHolder<Self, impl Fn(VisitorError) -> E, VisitorError, E>
-    where
-        E: Error + Send,
-    {
-        MetadataChainVisitorHolderFactory::create(self, map_err_fn)
-    }
-
     pub fn into_state(self) -> S {
         self.state
     }
@@ -297,7 +312,7 @@ where
     S: Send,
     F: Fn(&mut S, &Multihash, &MetadataBlock) -> Decision + Send,
 {
-    type Error = VisitorError;
+    type Error = Infallible;
 
     fn initial_decision(&self) -> Decision {
         self.initial_decision.clone()
@@ -305,53 +320,6 @@ where
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         Ok((self.visit_callback)(&mut self.state, hash, block))
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub struct SetDataSchemaVisitor<'a> {
-    source_name: Option<&'a str>,
-    source_state: Option<SourceState>,
-}
-
-impl<'a> SetDataSchemaVisitor<'a> {
-    pub fn new(source_name: Option<&'a str>) -> Self {
-        Self {
-            source_name,
-            source_state: None,
-        }
-    }
-
-    pub fn into_state(self) -> Option<SourceState> {
-        self.source_state
-    }
-}
-
-impl MetadataChainVisitor for SetDataSchemaVisitor<'_> {
-    type Error = VisitorError;
-
-    fn initial_decision(&self) -> Decision {
-        Decision::NextOfType(Flag::ADD_DATA)
-    }
-
-    fn visit(&mut self, (_hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
-        let MetadataEvent::AddData(e) = &block.event else {
-            unreachable!()
-        };
-
-        if let Some(ss) = &e.new_source_state
-            && let Some(sn) = self.source_name
-            && sn != ss.source_name.as_str()
-        {
-            unimplemented!(
-                "Differentiating between the state of multiple sources is not yet supported"
-            );
-        }
-
-        self.source_state = e.new_source_state.clone();
-
-        Ok(Decision::Stop)
     }
 }
 

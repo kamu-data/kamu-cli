@@ -133,9 +133,9 @@ pub trait MetadataChainExt: MetadataChain {
     async fn accept<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
-    ) -> Result<(), E>
+    ) -> Result<(), AcceptVisitorError<E>>
     where
-        E: Error + From<IterBlocksError>,
+        E: Error + Send,
     {
         self.accept_by_ref(visitors, &BlockRef::Head).await
     }
@@ -146,9 +146,9 @@ pub trait MetadataChainExt: MetadataChain {
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
         head_hash: &Multihash,
-    ) -> Result<(), E>
+    ) -> Result<(), AcceptVisitorError<E>>
     where
-        E: Error + From<IterBlocksError>,
+        E: Error + Send,
     {
         self.accept_by_interval(visitors, Some(head_hash), None)
             .await
@@ -160,11 +160,14 @@ pub trait MetadataChainExt: MetadataChain {
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
         head: &BlockRef,
-    ) -> Result<(), E>
+    ) -> Result<(), AcceptVisitorError<E>>
     where
-        E: Error + From<IterBlocksError>,
+        E: Error + Send,
     {
-        let head_hash = self.resolve_ref(head).await.map_err(Into::into)?;
+        let head_hash = self
+            .resolve_ref(head)
+            .await
+            .map_err(IterBlocksError::from)?;
 
         self.accept_by_hash(visitors, &head_hash).await
     }
@@ -178,9 +181,9 @@ pub trait MetadataChainExt: MetadataChain {
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
         head_hash: Option<&Multihash>,
         tail_hash: Option<&Multihash>,
-    ) -> Result<(), E>
+    ) -> Result<(), AcceptVisitorError<E>>
     where
-        E: Error + From<IterBlocksError>,
+        E: Error + Send,
     {
         let mut decisions: Vec<_> = visitors
             .iter()
@@ -194,7 +197,7 @@ pub trait MetadataChainExt: MetadataChain {
             && !all_visitors_finished
             && tail_hash != Some(&hash)
         {
-            let block = self.get_block(&hash).await.map_err(Into::into)?;
+            let block = self.get_block(&hash).await.map_err(IterBlocksError::from)?;
             let hashed_block_ref = (&hash, &block);
 
             let mut stopped_visitors = 0;
@@ -209,18 +212,24 @@ pub trait MetadataChainExt: MetadataChain {
                         *decision = MetadataVisitorDecision::Stop;
                     }
                     MetadataVisitorDecision::Next => {
-                        *decision = visitor.visit(hashed_block_ref)?;
+                        *decision = visitor
+                            .visit(hashed_block_ref)
+                            .map_err(AcceptVisitorError::Visitor)?;
                     }
                     MetadataVisitorDecision::NextWithHash(requested_hash) => {
                         if hash == *requested_hash {
-                            *decision = visitor.visit(hashed_block_ref)?;
+                            *decision = visitor
+                                .visit(hashed_block_ref)
+                                .map_err(AcceptVisitorError::Visitor)?;
                         }
                     }
                     MetadataVisitorDecision::NextOfType(requested_flags) => {
                         let block_flag = MetadataEventTypeFlags::from(&block.event);
 
                         if requested_flags.contains(block_flag) {
-                            *decision = visitor.visit(hashed_block_ref)?;
+                            *decision = visitor
+                                .visit(hashed_block_ref)
+                                .map_err(AcceptVisitorError::Visitor)?;
                         }
                     }
                 }
@@ -231,7 +240,7 @@ pub trait MetadataChainExt: MetadataChain {
         }
 
         for visitor in visitors {
-            visitor.finish()?;
+            visitor.finish().map_err(AcceptVisitorError::Visitor)?;
         }
 
         Ok(())
@@ -239,10 +248,10 @@ pub trait MetadataChainExt: MetadataChain {
 
     /// An auxiliary method that simplifies the work if only one Visitor is
     /// used.
-    async fn accept_one<V, E>(&self, mut visitor: V) -> Result<V, E>
+    async fn accept_one<V, E>(&self, mut visitor: V) -> Result<V, AcceptVisitorError<E>>
     where
         V: MetadataChainVisitor<Error = E>,
-        E: Error + From<IterBlocksError>,
+        E: Error + Send,
     {
         self.accept(&mut [&mut visitor]).await?;
 
@@ -251,10 +260,14 @@ pub trait MetadataChainExt: MetadataChain {
 
     /// Same as [Self::accept_one()], allowing us to define the block
     /// (by block hash) from which we will start the traverse
-    async fn accept_one_by_hash<V, E>(&self, head_hash: &Multihash, mut visitor: V) -> Result<V, E>
+    async fn accept_one_by_hash<V, E>(
+        &self,
+        head_hash: &Multihash,
+        mut visitor: V,
+    ) -> Result<V, AcceptVisitorError<E>>
     where
         V: MetadataChainVisitor<Error = E>,
-        E: Error + From<IterBlocksError>,
+        E: Error + Send,
     {
         self.accept_by_interval(&mut [&mut visitor], Some(head_hash), None)
             .await?;
@@ -294,12 +307,14 @@ pub trait MetadataChainExt: MetadataChain {
     ) -> Result<S, IterBlocksError>
     where
         S: Send,
-        F: Fn(&mut S, &Multihash, &MetadataBlock) -> MetadataVisitorDecision + Send,
+        F: Send,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> MetadataVisitorDecision,
     {
         let mut visitor = GenericCallbackVisitor::new(state, initial_decision, callback);
 
-        self.accept_by_hash::<IterBlocksError>(&mut [&mut visitor], head_hash)
-            .await?;
+        self.accept_by_hash(&mut [&mut visitor], head_hash)
+            .await
+            .map_err(IterBlocksError::from)?;
 
         Ok(visitor.into_state())
     }
@@ -308,45 +323,41 @@ pub trait MetadataChainExt: MetadataChain {
     ///
     /// Note: there is also a method [Self::reduce()] that allows you to
     /// apply an infallible callback
-    async fn try_reduce<S, F>(
+    async fn try_reduce<S, F, E>(
         &self,
         state: S,
         initial_decision: MetadataVisitorDecision,
         callback: F,
-    ) -> Result<S, IterBlocksError>
+    ) -> Result<S, AcceptVisitorError<E>>
     where
         S: Send,
-        F: Fn(
-                &mut S,
-                &Multihash,
-                &MetadataBlock,
-            ) -> Result<MetadataVisitorDecision, IterBlocksError>
-            + Send,
+        F: Send,
+        E: Error + Send,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E>,
     {
-        let head_hash = self.resolve_ref(&BlockRef::Head).await?;
+        let head_hash = self
+            .resolve_ref(&BlockRef::Head)
+            .await
+            .map_err(IterBlocksError::from)?;
 
-        Ok(self
-            .try_reduce_by_hash(&head_hash, state, initial_decision, callback)
-            .await?)
+        self.try_reduce_by_hash(&head_hash, state, initial_decision, callback)
+            .await
     }
 
     /// Same as [Self::try_reduce()], allowing us to define the block (by hash)
     /// from which we will start the traverse
-    async fn try_reduce_by_hash<S, F>(
+    async fn try_reduce_by_hash<S, F, E>(
         &self,
         head_hash: &Multihash,
         state: S,
         initial_decision: MetadataVisitorDecision,
         callback: F,
-    ) -> Result<S, IterBlocksError>
+    ) -> Result<S, AcceptVisitorError<E>>
     where
         S: Send,
-        F: Fn(
-                &mut S,
-                &Multihash,
-                &MetadataBlock,
-            ) -> Result<MetadataVisitorDecision, IterBlocksError>
-            + Send,
+        F: Send,
+        E: Error + Send,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E>,
     {
         let mut visitor = GenericFallibleCallbackVisitor::new(state, initial_decision, callback);
 
@@ -359,7 +370,7 @@ pub trait MetadataChainExt: MetadataChain {
     async fn last_data_block(&self) -> Result<SearchSingleDataBlockVisitor, IterBlocksError> {
         let visitor = SearchSingleDataBlockVisitor::next();
 
-        Ok(self.accept_one(visitor).await?)
+        self.accept_one(visitor).await.map_err(Into::into)
     }
 
     /// Same as [Self::last_data_block()], but skipping data blocks that have no
@@ -369,7 +380,7 @@ pub trait MetadataChainExt: MetadataChain {
     ) -> Result<SearchSingleDataBlockVisitor, IterBlocksError> {
         let visitor = SearchSingleDataBlockVisitor::next_with_new_data();
 
-        Ok(self.accept_one(visitor).await?)
+        self.accept_one(visitor).await.map_err(Into::into)
     }
 }
 
@@ -541,6 +552,31 @@ impl From<GetBlockError> for IterBlocksError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+pub enum AcceptVisitorError<E> {
+    #[error(transparent)]
+    Traversal(IterBlocksError),
+    #[error(transparent)]
+    Visitor(E),
+}
+
+impl<E> From<IterBlocksError> for AcceptVisitorError<E> {
+    fn from(value: IterBlocksError) -> Self {
+        Self::Traversal(value)
+    }
+}
+
+impl From<AcceptVisitorError<Infallible>> for IterBlocksError {
+    fn from(value: AcceptVisitorError<Infallible>) -> Self {
+        match value {
+            AcceptVisitorError::Traversal(err) => err,
+            AcceptVisitorError::Visitor(_) => unreachable!(),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
 pub enum SetRefError {
     #[error(transparent)]
     BlockNotFound(BlockNotFoundError),
@@ -609,15 +645,6 @@ impl From<SetRefError> for AppendError {
             SetRefError::CASFailed(e) => Self::RefCASFailed(e),
             SetRefError::Access(e) => Self::Access(e),
             SetRefError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-impl From<IterBlocksError> for AppendError {
-    fn from(v: IterBlocksError) -> Self {
-        match v {
-            IterBlocksError::BlockNotFound(e) => AppendValidationError::PrevBlockNotFound(e).into(),
-            e => e.int_err().into(),
         }
     }
 }

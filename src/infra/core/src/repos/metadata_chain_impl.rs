@@ -11,21 +11,7 @@ use async_trait::async_trait;
 use kamu_core::*;
 use opendatafabric::*;
 
-use crate::{
-    ValidateAddDataVisitor,
-    ValidateAddPushSourceVisitor,
-    ValidateEventIsNotEmptyVisitor,
-    ValidateExecuteTransformVisitor,
-    ValidateOffsetsAreSequentialVisitor,
-    ValidatePrevBlockExistsVisitor,
-    ValidateSeedBlockOrderVisitor,
-    ValidateSequenceNumbersIntegrityVisitor,
-    ValidateSetPollingSourceVisitor,
-    ValidateSetTransformVisitor,
-    ValidateSystemTimeIsMonotonicVisitor,
-    ValidateUnimplementedEventsVisitor,
-    ValidateWatermarkIsMonotonicVisitor,
-};
+use super::metadata_chain_validators::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -212,12 +198,11 @@ where
     ) -> Result<Multihash, AppendError> {
         if opts.validation == AppendValidation::Full {
             let mut validators = [
-                &mut ValidateAddDataVisitor::new(&block)?
+                &mut ValidateAddDataVisitor::new(&block)
                     as &mut dyn MetadataChainVisitor<Error = _>,
-                &mut ValidateExecuteTransformVisitor::new(&block)?,
+                &mut ValidateExecuteTransformVisitor::new(&block),
                 &mut ValidateUnimplementedEventsVisitor::new(&block),
                 &mut ValidateSeedBlockOrderVisitor::new(&block)?,
-                &mut ValidatePrevBlockExistsVisitor::new(&block),
                 &mut ValidateSequenceNumbersIntegrityVisitor::new(&block)?,
                 &mut ValidateSystemTimeIsMonotonicVisitor::new(&block),
                 &mut ValidateWatermarkIsMonotonicVisitor::new(&block),
@@ -228,8 +213,22 @@ where
                 &mut ValidateSetTransformVisitor::new(&block)?,
             ];
 
-            self.accept_by_interval(&mut validators, block.prev_block_hash.as_ref(), None)
-                .await?;
+            match self
+                .accept_by_interval(&mut validators, block.prev_block_hash.as_ref(), None)
+                .await
+            {
+                Ok(()) => Ok(()),
+                Err(AcceptVisitorError::Visitor(err)) => Err(err),
+                // Detect non-existing prev block situation
+                Err(AcceptVisitorError::Traversal(IterBlocksError::BlockNotFound(err)))
+                    if Some(&err.hash) == block.prev_block_hash.as_ref() =>
+                {
+                    Err(AppendValidationError::PrevBlockNotFound(err).into())
+                }
+                Err(AcceptVisitorError::Traversal(err)) => {
+                    Err(AppendError::Internal(err.int_err()))
+                }
+            }?;
         }
 
         if opts.update_ref.is_some()

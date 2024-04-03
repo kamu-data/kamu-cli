@@ -1077,7 +1077,7 @@ async fn test_accept_stop_on_first_error() {
                 &mut failed_on_type_visitor,
             ])
             .await,
-        Err(MockError::SomethingFailed)
+        Err(AcceptVisitorError::Visitor(MockError::SomethingFailed))
     );
 }
 
@@ -1092,12 +1092,6 @@ pub enum MockError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-impl From<IterBlocksError> for MockError {
-    fn from(v: IterBlocksError) -> Self {
-        v.int_err().into()
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

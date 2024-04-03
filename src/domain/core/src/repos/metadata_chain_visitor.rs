@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 
 use opendatafabric::{MetadataEventTypeFlags, Multihash};
 
-use crate::HashedMetadataBlockRef;
+use crate::{HashedMetadataBlockRef, Infallible};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -44,7 +44,7 @@ pub enum MetadataVisitorDecision {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub trait MetadataChainVisitor: Send {
-    type Error: std::error::Error;
+    type Error: std::error::Error + Send;
 
     fn initial_decision(&self) -> MetadataVisitorDecision;
 
@@ -62,10 +62,71 @@ pub trait MetadataChainVisitor: Send {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-/// Trait is needed to generalize [`MetadataChainVisitor`] error type. This is
-/// necessary when we are going to use several Visitors at the same time, e.g.
-/// using method [`MetadataChainExt::accept()`]
-pub struct MetadataChainVisitorHolder<V, F, E1, E2>
+/// Allows syntax such as `let wrapped_visitor = my_visitor.map_err(|e| ...)`.
+pub trait MetadataChainVisitorExt<E1>
+where
+    Self: MetadataChainVisitor<Error = E1>,
+    Self: Sized,
+    E1: std::error::Error,
+{
+    fn map_err<E2, F>(self, f: F) -> MetadataChainVisitorMapError<Self, F, E1, E2>
+    where
+        E2: std::error::Error + Send,
+        F: Fn(E1) -> E2 + Send;
+}
+
+impl<T, E1> MetadataChainVisitorExt<E1> for T
+where
+    E1: std::error::Error,
+    T: MetadataChainVisitor<Error = E1>,
+{
+    fn map_err<E2, F>(self, f: F) -> MetadataChainVisitorMapError<Self, F, E1, E2>
+    where
+        E2: std::error::Error + Send,
+        F: Fn(E1) -> E2 + Send,
+    {
+        MetadataChainVisitorMapError::new(self, f)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/// Allows to convert infallible visitor into a type that agrees with others on
+/// what error should be returned. Similar to
+/// [`MetadataChainVisitorExt::map_err()`] but for infalible errors.
+pub trait MetadataChainVisitorExtInfallible
+where
+    Self: MetadataChainVisitor<Error = Infallible>,
+    Self: Sized,
+{
+    fn adapt_err<E2>(
+        self,
+    ) -> MetadataChainVisitorMapError<Self, fn(Infallible) -> E2, Infallible, E2>
+    where
+        E2: std::error::Error + Send;
+}
+
+impl<T> MetadataChainVisitorExtInfallible for T
+where
+    T: MetadataChainVisitor<Error = Infallible>,
+{
+    fn adapt_err<E2>(
+        self,
+    ) -> MetadataChainVisitorMapError<Self, fn(Infallible) -> E2, Infallible, E2>
+    where
+        E2: std::error::Error + Send,
+    {
+        MetadataChainVisitorMapError::new(self, Infallible::into)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/// Wraps the [`MetadataChainVisitor`] to convert the error type, similarly to
+/// [`Result::map_err()`]. This is necessary when using several visitors at
+/// once, e.g. in the [`MetadataChainExt::accept()`] method to make all visitors
+/// agree on one error type..
+pub struct MetadataChainVisitorMapError<V, F, E1, E2>
 where
     V: MetadataChainVisitor<Error = E1>,
     F: Fn(E1) -> E2,
@@ -77,7 +138,7 @@ where
     _phantom: PhantomData<E2>,
 }
 
-impl<V, F, E1, E2> MetadataChainVisitorHolder<V, F, E1, E2>
+impl<V, F, E1, E2> MetadataChainVisitorMapError<V, F, E1, E2>
 where
     V: MetadataChainVisitor<Error = E1>,
     F: Fn(E1) -> E2 + Send,
@@ -97,12 +158,12 @@ where
     }
 }
 
-impl<V, F, E1, E2> MetadataChainVisitor for MetadataChainVisitorHolder<V, F, E1, E2>
+impl<V, F, E1, E2> MetadataChainVisitor for MetadataChainVisitorMapError<V, F, E1, E2>
 where
     V: MetadataChainVisitor<Error = E1>,
-    F: Fn(E1) -> E2 + Send + Sync,
+    F: Fn(E1) -> E2 + Send,
     E1: std::error::Error,
-    E2: std::error::Error + Send + Sync,
+    E2: std::error::Error + Send,
 {
     type Error = E2;
 
@@ -116,41 +177,11 @@ where
     ) -> Result<MetadataVisitorDecision, Self::Error> {
         self.visitor
             .visit(hashed_block_ref)
-            .map_err(|e| (self.map_err_fn)(e))
+            .map_err(&self.map_err_fn)
     }
 
     fn finish(&self) -> Result<(), Self::Error> {
-        self.visitor.finish().map_err(|e| (self.map_err_fn)(e))
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub struct MetadataChainVisitorHolderFactory {}
-
-impl MetadataChainVisitorHolderFactory {
-    pub fn create<V, F, E1, E2>(
-        visitor: V,
-        map_err_fn: F,
-    ) -> MetadataChainVisitorHolder<V, impl Fn(E1) -> E2, E1, E2>
-    where
-        V: MetadataChainVisitor<Error = E1>,
-        F: Fn(E1) -> E2 + Send,
-        E1: std::error::Error,
-        E2: std::error::Error + Send,
-    {
-        MetadataChainVisitorHolder::new(visitor, map_err_fn)
-    }
-
-    pub fn create_infallible<V, E1, E2>(
-        visitor: V,
-    ) -> MetadataChainVisitorHolder<V, impl Fn(E1) -> E2, E1, E2>
-    where
-        V: MetadataChainVisitor<Error = E1>,
-        E1: std::error::Error,
-        E2: std::error::Error + Send,
-    {
-        MetadataChainVisitorHolder::new(visitor, |_| -> E2 { unreachable!() })
+        self.visitor.finish().map_err(&self.map_err_fn)
     }
 }
 

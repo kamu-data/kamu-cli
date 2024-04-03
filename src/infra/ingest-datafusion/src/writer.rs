@@ -856,30 +856,27 @@ impl DataWriterDataFusionBuilder {
             .resolve_ref(&self.block_ref)
             .await
             .int_err()?;
-        let mut seed_visitor = SearchSeedVisitor::create().wrap_err();
-        let mut set_vocab_visitor = SearchSetVocabVisitor::create().wrap_err();
-        let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::create().wrap_err();
-        let mut prev_source_state_visitor = MetadataChainVisitorHolderFactory::create(
-            SetDataSchemaVisitor::new(source_name),
-            |e| -> ScanMetadataError { e.int_err().into() },
-        );
-        let mut add_data_visitor = SearchAddDataVisitor::create().wrap_err();
-        let mut add_data_collection_visitor =
-            MetadataChainVisitorHolderFactory::create_infallible(GenericCallbackVisitor::new(
-                Vec::new(),
-                Decision::NextOfType(Flag::ADD_DATA),
-                |state, _, block| {
-                    let MetadataEvent::AddData(e) = &block.event else {
-                        unreachable!()
-                    };
+        let mut seed_visitor = SearchSeedVisitor::create().adapt_err();
+        let mut set_vocab_visitor = SearchSetVocabVisitor::create().adapt_err();
+        let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::create().adapt_err();
+        let mut prev_source_state_visitor = SetDataSchemaVisitor::new(source_name).adapt_err();
+        let mut add_data_visitor = SearchAddDataVisitor::create().adapt_err();
+        let mut add_data_collection_visitor = GenericCallbackVisitor::new(
+            Vec::new(),
+            Decision::NextOfType(Flag::ADD_DATA),
+            |state, _, block| {
+                let MetadataEvent::AddData(e) = &block.event else {
+                    unreachable!()
+                };
 
-                    if let Some(output_data) = &e.new_data {
-                        state.push(output_data.physical_hash.clone());
-                    }
+                if let Some(output_data) = &e.new_data {
+                    state.push(output_data.physical_hash.clone());
+                }
 
-                    Decision::NextOfType(Flag::ADD_DATA)
-                },
-            ));
+                Decision::NextOfType(Flag::ADD_DATA)
+            },
+        )
+        .adapt_err();
         let mut source_event_visitor = SourceEventVisitor::new(source_name);
 
         self.dataset
@@ -1002,9 +999,12 @@ pub enum ScanMetadataError {
     ),
 }
 
-impl From<IterBlocksError> for ScanMetadataError {
-    fn from(v: IterBlocksError) -> Self {
-        v.int_err().into()
+impl From<AcceptVisitorError<ScanMetadataError>> for ScanMetadataError {
+    fn from(v: AcceptVisitorError<ScanMetadataError>) -> Self {
+        match v {
+            AcceptVisitorError::Visitor(err) => err,
+            AcceptVisitorError::Traversal(err) => Self::Internal(err.int_err()),
+        }
     }
 }
 

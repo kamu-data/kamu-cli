@@ -210,10 +210,10 @@ impl TransformServiceImpl {
         // TODO: PERF: Search for source, vocab, and data schema result in full scan
         let (source, schema, set_vocab, prev_query) = {
             // TODO: Support transform evolution
-            let mut set_transform_visitor = SearchSetTransformVisitor::create().wrap_err();
-            let mut set_vocab_visitor = SearchSetVocabVisitor::create().wrap_err();
-            let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::create().wrap_err();
-            let mut execute_transform_visitor = SearchExecuteTransformVisitor::create().wrap_err();
+            let mut set_transform_visitor = SearchSetTransformVisitor::create().adapt_err();
+            let mut set_vocab_visitor = SearchSetVocabVisitor::create().adapt_err();
+            let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::create().adapt_err();
+            let mut execute_transform_visitor = SearchExecuteTransformVisitor::create().adapt_err();
 
             dataset
                 .as_metadata_chain()
@@ -518,12 +518,9 @@ impl TransformServiceImpl {
 
         let (source, set_vocab, schema, blocks, finished_range) = {
             // TODO: Support dataset evolution
-            let mut set_transform_visitor = SearchSetTransformVisitor::create()
-                .with_map_err(|e| VerificationError::Internal(e.int_err()));
-            let mut set_vocab_visitor = SearchSetVocabVisitor::create()
-                .with_map_err(|e| VerificationError::Internal(e.int_err()));
-            let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::create()
-                .with_map_err(|e| VerificationError::Internal(e.int_err()));
+            let mut set_transform_visitor = SearchSetTransformVisitor::create();
+            let mut set_vocab_visitor = SearchSetVocabVisitor::create();
+            let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::create();
 
             type Flag = MetadataEventTypeFlags;
             type Decision = MetadataVisitorDecision;
@@ -562,8 +559,7 @@ impl TransformServiceImpl {
                         Decision::NextOfType(Flag::EXECUTE_TRANSFORM)
                     }
                 },
-            )
-            .with_map_err(|e| VerificationError::Internal(e.int_err()));
+            );
 
             metadata_chain
                 .accept(&mut [
@@ -572,21 +568,19 @@ impl TransformServiceImpl {
                     &mut set_data_schema_visitor,
                     &mut execute_transform_collector_visitor,
                 ])
-                .await?;
+                .await
+                .int_err()?;
 
             let ExecuteTransformCollectorVisitor {
                 blocks,
                 finished_range,
                 ..
-            } = execute_transform_collector_visitor
-                .into_inner()
-                .into_state();
+            } = execute_transform_collector_visitor.into_state();
 
             (
-                set_transform_visitor.into_inner().into_event(),
-                set_vocab_visitor.into_inner().into_event(),
+                set_transform_visitor.into_event(),
+                set_vocab_visitor.into_event(),
                 set_data_schema_visitor
-                    .into_inner()
                     .into_event()
                     .as_ref()
                     .map(SetDataSchema::schema_as_arrow)

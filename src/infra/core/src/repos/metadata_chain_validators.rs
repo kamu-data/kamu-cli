@@ -11,7 +11,6 @@ use chrono::{DateTime, Utc};
 use kamu_core::{
     AppendError,
     AppendValidationError,
-    BlockNotFoundError,
     HashedMetadataBlockRef,
     MetadataChainVisitor,
     MetadataVisitorDecision as Decision,
@@ -27,7 +26,6 @@ use opendatafabric::{
     MetadataBlockDataStreamRef,
     MetadataEvent,
     MetadataEventTypeFlags as Flag,
-    Multihash,
     SetDataSchema,
     SetTransform,
     Transform,
@@ -65,49 +63,6 @@ impl MetadataChainVisitor for ValidateSeedBlockOrderVisitor {
 
     fn visit(&mut self, _: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         unreachable!()
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub struct ValidatePrevBlockExistsVisitor<'a> {
-    appended_prev_block_hash: Option<&'a Multihash>,
-}
-
-impl<'a> ValidatePrevBlockExistsVisitor<'a> {
-    pub fn new(block: &'a MetadataBlock) -> Self {
-        Self {
-            appended_prev_block_hash: block.prev_block_hash.as_ref(),
-        }
-    }
-}
-
-impl<'a> MetadataChainVisitor for ValidatePrevBlockExistsVisitor<'a> {
-    type Error = AppendError;
-
-    fn initial_decision(&self) -> Decision {
-        if self.appended_prev_block_hash.is_some() {
-            Decision::Next
-        } else {
-            Decision::Stop
-        }
-    }
-
-    fn visit(&mut self, (hash, _): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
-        let Some(appended_prev_block_hash) = self.appended_prev_block_hash else {
-            unreachable!()
-        };
-
-        if appended_prev_block_hash != hash {
-            return Err(
-                AppendValidationError::PrevBlockNotFound(BlockNotFoundError {
-                    hash: appended_prev_block_hash.clone(),
-                })
-                .into(),
-            );
-        }
-
-        Ok(Decision::Stop)
     }
 }
 
@@ -576,18 +531,18 @@ pub struct ValidateAddDataVisitor<'a> {
 }
 
 impl<'a> ValidateAddDataVisitor<'a> {
-    pub fn new(block: &'a MetadataBlock) -> Result<Self, AppendError> {
+    pub fn new(block: &'a MetadataBlock) -> Self {
         let appended_add_data = match &block.event {
             MetadataEvent::AddData(e) => Some(e),
             _ => None,
         };
 
-        Ok(Self {
+        Self {
             appended_add_data,
             prev_schema: None,
             prev_add_data: None,
             next_block_flags: Flag::SET_DATA_SCHEMA | Flag::ADD_DATA,
-        })
+        }
     }
 }
 
@@ -684,19 +639,19 @@ pub struct ValidateExecuteTransformVisitor<'a> {
 }
 
 impl<'a> ValidateExecuteTransformVisitor<'a> {
-    pub fn new(block: &'a MetadataBlock) -> Result<Self, AppendError> {
+    pub fn new(block: &'a MetadataBlock) -> Self {
         let appended_execute_transform = match &block.event {
             MetadataEvent::ExecuteTransform(e) => Some(e),
             _ => None,
         };
 
-        Ok(Self {
+        Self {
             appended_execute_transform,
             prev_transform: None,
             prev_schema: None,
             prev_query: None,
             next_block_flags: Flag::SET_DATA_SCHEMA | Flag::SET_TRANSFORM | Flag::EXECUTE_TRANSFORM,
-        })
+        }
     }
 }
 
