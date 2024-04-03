@@ -17,7 +17,7 @@ kamu add \
     datasets/account.transactions.yaml
 
 kamu pull account.transactions account.tokens.transfers
-kamu pull --set-watermark `date --iso-8601=s` account.transactions
-kamu pull --set-watermark `date --iso-8601=s` account.tokens.transfers
+kamu pull --set-watermark "$(date --iso-8601=s)" account.transactions
+kamu pull --set-watermark "$(date --iso-8601=s)" account.tokens.transfers
 
 kamu pull --all

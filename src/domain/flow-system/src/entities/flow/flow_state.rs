@@ -35,7 +35,7 @@ pub struct FlowState {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct FlowTimingRecords {
-    /// Task scheduled and awaiting for exeuction since time
+    /// Task scheduled and waiting for execution since time
     pub awaiting_executor_since: Option<DateTime<Utc>>,
     /// Started running at time
     pub running_since: Option<DateTime<Utc>>,

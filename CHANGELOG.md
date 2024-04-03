@@ -94,7 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplified flow statuses within Flow System (no more Queued or Scheduled status)
 - Extended flow start conditions with more debug information for UI needs
 - Simplified flow cancellation API:
-    - Cancelling in Waiting/Running states is accepted, and aborts the flow and it's associated tasks
+    - Cancelling in Waiting/Running states is accepted, and aborts the flow, and it's associated tasks
     - Cancelling in Waiting/Running states also automatically pauses flow configuration
 
 ## [0.162.1] - 2024-02-28
@@ -142,7 +142,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.157.0] - 2024-02-12
 ### Added
-- Complete support for `arm64` architecture (including M-series Apple silicon)
+- Complete support for `arm64` architecture (including M-series Apple Silicon)
   - `kamu-cli` now depends on multi-platform Datafusion, Spark, Flink, and Jupyter images allowing you to run data processing at native CPU speeds
 ### Changed
 - Spark engine is upgraded to latest version of Spark 3.5
@@ -152,7 +152,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.156.3] - 2024-02-09
 ### Added
-- Native support for `arm64` architecture (including M-series Apple silicon) in `kamu-cli` and `kamu-engine-datafusion`
+- Native support for `arm64` architecture (including M-series Apple Silicon) in `kamu-cli` and `kamu-engine-datafusion`
   - Note: Flink and Spark engine images still don't provide `arm64` architecture and continue to require QEMU
 ### Changed
 - Flow system scheduling rules improved to respect system-wide throttling setting and take last successful run into account when rescheduling a flow or after a restart

@@ -27,7 +27,7 @@ pub struct LogCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     dataset_ref: DatasetRef,
-    outout_format: Option<String>,
+    output_format: Option<String>,
     filter: Option<String>,
     limit: usize,
     output_config: Arc<OutputConfig>,
@@ -47,7 +47,7 @@ impl LogCommand {
             dataset_repo,
             dataset_action_authorizer,
             dataset_ref,
-            outout_format: outout_format.map(ToOwned::to_owned),
+            output_format: outout_format.map(ToOwned::to_owned),
             filter: filter.map(ToOwned::to_owned),
             limit,
             output_config,
@@ -88,7 +88,7 @@ impl Command for LogCommand {
             .await?;
 
         let mut renderer: Box<dyn MetadataRenderer> = match (
-            self.outout_format.as_deref(),
+            self.output_format.as_deref(),
             self.output_config.is_tty && self.output_config.verbosity_level == 0,
         ) {
             (None, true) => Box::new(PagedAsciiRenderer::new(id_to_alias_lookup, self.limit)),

@@ -352,7 +352,7 @@ where
     }
 
     fn finish(&mut self) -> Result<(), std::io::Error> {
-        // BUG: Header doesn't render when there are no data rows in the table
+        // BUG: Header doesn't render when there are no data rows in the table,
         // so we add an empty row
         if self.rows_written == 0 {
             let row = self.table.add_empty_row();

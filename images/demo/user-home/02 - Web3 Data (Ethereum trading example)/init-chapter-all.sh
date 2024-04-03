@@ -13,7 +13,7 @@ kamu pull "${REPO_BASE_URL}co.alphavantage.tickers.daily.spy"
 kamu add -r datasets/
 
 kamu pull account.transactions account.tokens.transfers
-kamu pull --set-watermark `date --iso-8601=s` account.transactions
-kamu pull --set-watermark `date --iso-8601=s` account.tokens.transfers
+kamu pull --set-watermark "$(date --iso-8601=s)" account.transactions
+kamu pull --set-watermark "$(date --iso-8601=s)" account.tokens.transfers
 
 kamu pull --all

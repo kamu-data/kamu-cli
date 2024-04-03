@@ -140,7 +140,7 @@ impl NotebookServerImpl {
                     .to_string(),
                 "--port".to_owned(),
                 jupyter_port_in_container.to_string(),
-                // TODO: Remove show_banner option after Sparkmagic supports novebook >= 7.0.0
+                // TODO: Remove show_banner option after Sparkmagic supports notebook >= 7.0.0
                 // See: https://github.com/jupyter-incubator/sparkmagic/issues/885
                 "--NotebookApp.show_banner=False".to_string(),
             ])

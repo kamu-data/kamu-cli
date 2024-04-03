@@ -93,7 +93,7 @@ where
 
 /// Allows to convert infallible visitor into a type that agrees with others on
 /// what error should be returned. Similar to
-/// [`MetadataChainVisitorExt::map_err()`] but for infalible errors.
+/// [`MetadataChainVisitorExt::map_err()`] but for infallible errors.
 pub trait MetadataChainVisitorExtInfallible
 where
     Self: MetadataChainVisitor<Error = Infallible>,

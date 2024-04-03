@@ -140,7 +140,7 @@ impl CompactServiceImpl {
                             .await;
 
                         // Setting the end offset interval needs to be here because we
-                        // have to get it at the begining of iteration unlike
+                        // have to get it at the beginning of iteration unlike
                         // other values which will be set at the end of iteration
                         if data_slice_batch_info.data_slices_batch.is_empty() {
                             data_slice_batch_info.upper_bound.end_offset =
