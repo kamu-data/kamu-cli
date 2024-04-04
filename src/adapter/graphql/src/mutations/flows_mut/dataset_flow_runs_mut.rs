@@ -16,10 +16,12 @@ use super::{
     ensure_scheduling_permission,
     FlowInDatasetError,
     FlowIncompatibleDatasetKind,
+    FlowMissingDatasetPollingSource,
     FlowNotFound,
 };
 use crate::prelude::*;
 use crate::queries::Flow;
+use crate::utils::ensure_polling_source_exists;
 use crate::{utils, LoggedInGuard};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -48,6 +50,11 @@ impl DatasetFlowRunsMut {
         }
 
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
+        if !ensure_polling_source_exists(ctx, &self.dataset_handle).await? {
+            return Ok(TriggerFlowResult::MissingDatasetPollingSource(
+                FlowMissingDatasetPollingSource,
+            ));
+        }
 
         // TODO: for some datasets launching manually might not be an option:
         //   i.e., root datasets with push sources require input data to arrive
@@ -122,6 +129,7 @@ impl DatasetFlowRunsMut {
 enum TriggerFlowResult {
     Success(TriggerFlowSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
+    MissingDatasetPollingSource(FlowMissingDatasetPollingSource),
 }
 
 #[derive(SimpleObject)]

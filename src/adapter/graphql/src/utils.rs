@@ -109,6 +109,21 @@ pub(crate) async fn get_task(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+pub(crate) async fn ensure_polling_source_exists(
+    ctx: &Context<'_>,
+    dataset_handle: &DatasetHandle,
+) -> Result<bool, InternalError> {
+    let polling_ingest_svc = from_catalog::<dyn kamu_core::PollingIngestService>(ctx).unwrap();
+    let source = polling_ingest_svc
+        .get_active_polling_source(&dataset_handle.as_local_ref())
+        .await
+        .int_err()?;
+
+    Ok(source.is_some())
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 /// This wrapper is unfortunately necessary because of poor error handling
 /// strategy of async-graphql that:
 ///

@@ -91,7 +91,15 @@ pub(crate) async fn ensure_expected_dataset_kind(
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////
+#[derive(Debug, Clone)]
+pub struct FlowMissingDatasetPollingSource;
+
+#[Object]
+impl FlowMissingDatasetPollingSource {
+    pub async fn message(&self) -> String {
+        "Polling source is required".to_string()
+    }
+}
 
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
