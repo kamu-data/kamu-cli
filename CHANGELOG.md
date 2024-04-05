@@ -4,16 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.171.0] - 2024-04-05
 ### Added
 - Support `ArrowJson` schema output format in QGL API and CLI commands
 - New `kamu system compact <dataset>` command that compacts dataslices for the given dataset
 ### Changed
-- Case insensitive comparisons of `dataset`s, `account`s and `repo`s
+- Case-insensitive comparisons of `dataset`s, `account`s and `repo`s
 
 ## [0.170.0] - 2024-03-29
 ### Added
-- Added GrapqQL Dataset Endpoints object
+- Added GraphQL Dataset Endpoints object
 ### Changed
 - REST API: `/ingest` endpoint will return HTTP 400 error when data cannot be read correctly
 - Improved API token generation command
