@@ -156,7 +156,7 @@ impl DatasetMetadata {
         Ok(source.map_or(
             Some(SetPollingSource {
                 fetch: FetchStep::Url(FetchStepUrl {
-                    url: "".to_string(),
+                    url: String::new(),
                     event_time: None,
                     cache: None,
                     headers: None,
@@ -206,7 +206,7 @@ impl DatasetMetadata {
             Some(SetTransform {
                 inputs: vec![],
                 transform: Transform::Sql(TransformSql {
-                    engine: "".to_string(),
+                    engine: String::new(),
                     version: None,
                     queries: vec![],
                     temporal_tables: None,
