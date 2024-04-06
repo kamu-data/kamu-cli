@@ -137,7 +137,7 @@ The second step, `make sqlx-local-clean` would reverse `make sqlx-local-setup` b
 
 ### Database migrations
 Any change to the database structure requires writing SQL migration scripts.
-The scripts are stored in `./src/database/migrations/<db-engine>` folders, and they are unique per database type.
+The scripts are stored in `./migrations/<db-engine>/` folders, and they are unique per database type.
 The migration commands should be launched within database-specific crate folders, such as `./src/database/sqlx-postgres`. Alternatively, you will need to define `DATABASE_URL` variable manually.
 
 Typical commands to work with migrations include:

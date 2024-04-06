@@ -51,7 +51,7 @@ sqlx-local-setup-postgres:
 	$(foreach crate,$(POSTGRES_CRATES),$(call Setup_EnvFile,postgres,5432,$(crate)))
 	sleep 3  # Letting the container to start
 	until PGPASSWORD=root psql -h localhost -U root -p 5432 -d root -c '\q'; do sleep 3; done
-	$(foreach crate,$(POSTGRES_CRATES),( cd $(crate) && sqlx database create && sqlx migrate run --source ../../../database/migrations/postgres );)
+	$(foreach crate,$(POSTGRES_CRATES),( cd $(crate) && sqlx database create && sqlx migrate run --source ../../../../migrations/postgres );)
 
 .PHONY: sqlx-local-setup-mariadb
 sqlx-local-setup-mariadb:
@@ -61,7 +61,7 @@ sqlx-local-setup-mariadb:
 	$(foreach crate,$(MYSQL_CRATES),$(call Setup_EnvFile,mysql,3306,$(crate)))
 	sleep 3  # Letting the container to start
 	until mariadb -h localhost -P 3306 -u root --password=root sys --protocol=tcp -e "SELECT 'Hello'" -b; do sleep 3; done	
-	$(foreach crate,$(MYSQL_CRATES),( cd $(crate) && sqlx database create && sqlx migrate run --source ../../../database/migrations/mysql );)
+	$(foreach crate,$(MYSQL_CRATES),( cd $(crate) && sqlx database create && sqlx migrate run --source ../../../../migrations/mysql );)
 
 .PHONY: sqlx-local-clean
 sqlx-local-clean: sqlx-local-clean-postgres sqlx-local-clean-mariadb

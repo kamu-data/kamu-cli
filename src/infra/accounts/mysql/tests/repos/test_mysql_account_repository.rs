@@ -18,7 +18,7 @@ use uuid::Uuid;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
-#[test_log::test(sqlx::test(migrations = "../../../database/migrations/mysql"))]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_missing_account_not_found(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
@@ -40,7 +40,7 @@ async fn test_missing_account_not_found(mysql_pool: MySqlPool) {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
-#[test_log::test(sqlx::test(migrations = "../../../database/migrations/mysql"))]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_insert_and_locate_account(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 

@@ -193,7 +193,7 @@ impl TaskSystemEventStore for TaskSystemEventStorePostgres {
                         WHERE dataset_id = $1
                         ORDER  BY task_id, event_time ASC
                 )
-                ORDER BY event_time DESC
+                ORDER BY task_id DESC
                 LIMIT $2 OFFSET $3
                 "#,
                 dataset_id.to_string(),

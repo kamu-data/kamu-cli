@@ -15,7 +15,7 @@ use sqlx::PgPool;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../database/migrations/postgres"))]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_event_store_empty(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
@@ -30,7 +30,7 @@ async fn test_event_store_empty(pg_pool: PgPool) {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../database/migrations/postgres"))]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_event_store_get_streams(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
@@ -45,7 +45,7 @@ async fn test_event_store_get_streams(pg_pool: PgPool) {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../database/migrations/postgres"))]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_event_store_get_events_with_windowing(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
@@ -60,7 +60,7 @@ async fn test_event_store_get_events_with_windowing(pg_pool: PgPool) {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../database/migrations/postgres"))]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_event_store_get_events_by_tasks(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
@@ -75,7 +75,7 @@ async fn test_event_store_get_events_by_tasks(pg_pool: PgPool) {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../database/migrations/postgres"))]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_event_store_get_dataset_tasks(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 

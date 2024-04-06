@@ -18,7 +18,7 @@ use uuid::Uuid;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../database/migrations/postgres"))]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_missing_account_not_found(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
@@ -40,7 +40,7 @@ async fn test_missing_account_not_found(pg_pool: PgPool) {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../database/migrations/postgres"))]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_insert_and_locate_account(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
