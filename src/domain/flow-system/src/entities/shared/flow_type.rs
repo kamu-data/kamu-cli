@@ -9,8 +9,6 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-use opendatafabric::{DatasetKind, MetadataEvent};
-
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub enum DatasetFlowType {
     Ingest,
@@ -30,38 +28,6 @@ impl DatasetFlowType {
             DatasetFlowType::Compaction => None,
         }
     }
-
-    // pub fn dataset_polling_source_required(
-    //     &self,
-    //     dataset_kind: DatasetKind,
-    //     event: MetadataEvent,
-    // ) -> bool {
-    //     match event {
-    //         MetadataEvent::SetPollingSource(_) => match self {
-    //             Self::Ingest => match dataset_kind {
-    //                 DatasetKind::Root => true,
-    //                 DatasetKind::Derivative => false,
-    //             },
-    //             Self::ExecuteTransform => match dataset_kind {
-    //                 DatasetKind::Root => false,
-    //                 DatasetKind::Derivative => true,
-    //             },
-    //             Self::Compaction => false,
-    //         },
-    //         MetadataEvent::SetTransform(_) => match self {
-    //             Self::Ingest => match dataset_kind {
-    //                 DatasetKind::Root => true,
-    //                 DatasetKind::Derivative => false,
-    //             },
-    //             Self::ExecuteTransform => match dataset_kind {
-    //                 DatasetKind::Root => false,
-    //                 DatasetKind::Derivative => true,
-    //             },
-    //             Self::Compaction => false,
-    //         },
-    //         _ => false,
-    //     }
-    // }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

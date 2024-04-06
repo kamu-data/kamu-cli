@@ -10,12 +10,27 @@
 use std::sync::Arc;
 
 use async_graphql::value;
+use container_runtime::ContainerRuntime;
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
-use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
-use kamu_core::{auth, CreateDatasetResult, DatasetRepository, SystemTimeSourceDefault};
+use kamu::{
+    DataFormatRegistryImpl,
+    DatasetRepositoryLocalFs,
+    DependencyGraphServiceInMemory,
+    EngineProvisionerNull,
+    ObjectStoreRegistryImpl,
+    PollingIngestServiceImpl,
+    TransformServiceImpl,
+};
+use kamu_core::{
+    auth,
+    CreateDatasetResult,
+    DatasetRepository,
+    PollingIngestService,
+    SystemTimeSourceDefault,
+};
 use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowConfigurationServiceInMemory};
 use opendatafabric::*;
 
@@ -27,7 +42,7 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 async fn test_crud_time_delta_root_dataset() {
     let harness = FlowConfigHarness::new();
 
-    let create_result = harness.create_root_dataset().await;
+    let create_result = harness.create_root_dataset(true).await;
 
     let request_code = indoc!(
         r#"
@@ -178,7 +193,7 @@ async fn test_crud_time_delta_root_dataset() {
 async fn test_time_delta_validation() {
     let harness = FlowConfigHarness::new();
 
-    let create_result = harness.create_root_dataset().await;
+    let create_result = harness.create_root_dataset(true).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -249,7 +264,7 @@ async fn test_time_delta_validation() {
 async fn test_crud_cron_root_dataset() {
     let harness = FlowConfigHarness::new();
 
-    let create_result = harness.create_root_dataset().await;
+    let create_result = harness.create_root_dataset(true).await;
 
     let request_code = indoc!(
         r#"
@@ -437,8 +452,8 @@ async fn test_crud_cron_root_dataset() {
 async fn test_crud_batching_derived_dataset() {
     let harness = FlowConfigHarness::new();
 
-    harness.create_root_dataset().await;
-    let create_derived_result = harness.create_derived_dataset().await;
+    harness.create_root_dataset(true).await;
+    let create_derived_result = harness.create_derived_dataset(true).await;
 
     let request_code = indoc!(
         r#"
@@ -549,8 +564,8 @@ async fn test_crud_batching_derived_dataset() {
 async fn test_batching_config_validation() {
     let harness = FlowConfigHarness::new();
 
-    harness.create_root_dataset().await;
-    let create_derived_result = harness.create_derived_dataset().await;
+    harness.create_root_dataset(true).await;
+    let create_derived_result = harness.create_derived_dataset(true).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -677,8 +692,8 @@ async fn test_pause_resume_dataset_flows() {
 
     let harness = FlowConfigHarness::new();
 
-    let create_root_result = harness.create_root_dataset().await;
-    let create_derived_result = harness.create_derived_dataset().await;
+    let create_root_result = harness.create_root_dataset(true).await;
+    let create_derived_result = harness.create_derived_dataset(true).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -917,11 +932,95 @@ async fn test_pause_resume_dataset_flows() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_conditions_not_met_for_flows() {
+    let harness = FlowConfigHarness::new();
+    let create_root_result = harness.create_root_dataset(false).await;
+    let create_derived_result = harness.create_derived_dataset(false).await;
+
+    ////
+
+    let mutation_code = FlowConfigHarness::set_config_batching_mutation(
+        &create_root_result.dataset_handle.id,
+        "INGEST",
+        false,
+        1,
+        (30, "MINUTES"),
+    );
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "configs": {
+                            "setConfigBatching": {
+                                "__typename": "FlowPreconditionsNotMet",
+                                "message": "Flow didn't met preconditions: 'polling source does not exist'",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    ////
+
+    let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
+        &create_derived_result.dataset_handle.id,
+        "EXECUTE_TRANSFORM",
+        false,
+        "0 */2 * * *",
+    );
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "configs": {
+                            "setConfigSchedule": {
+                                "__typename": "FlowPreconditionsNotMet",
+                                "message": "Flow didn't met preconditions: 'set transform does not exist'",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_incorrect_dataset_kinds_for_flow_type() {
     let harness = FlowConfigHarness::new();
 
-    let create_root_result = harness.create_root_dataset().await;
-    let create_derived_result = harness.create_derived_dataset().await;
+    let create_root_result = harness.create_root_dataset(true).await;
+    let create_derived_result = harness.create_derived_dataset(true).await;
 
     ////
 
@@ -1039,8 +1138,8 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 async fn test_anonymous_setters_fail() {
     let harness = FlowConfigHarness::new();
 
-    let create_root_result = harness.create_root_dataset().await;
-    let create_derived_result = harness.create_derived_dataset().await;
+    let create_root_result = harness.create_root_dataset(true).await;
+    let create_derived_result = harness.create_derived_dataset(true).await;
 
     let mutation_codes = [
         FlowConfigHarness::set_config_time_delta_mutation(
@@ -1100,7 +1199,11 @@ impl FlowConfigHarness {
     fn new() -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
+        let run_info_dir = tempdir.path().join("run");
+        let cache_dir = tempdir.path().join("cache");
         std::fs::create_dir(&datasets_dir).unwrap();
+        std::fs::create_dir(&run_info_dir).unwrap();
+        std::fs::create_dir(&cache_dir).unwrap();
 
         let catalog_base = dill::CatalogBuilder::new()
             .add::<EventBus>()
@@ -1111,6 +1214,17 @@ impl FlowConfigHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .add::<SystemTimeSourceDefault>()
+            .add::<DataFormatRegistryImpl>()
+            .add_value(ContainerRuntime::default())
+            .add_builder(
+                PollingIngestServiceImpl::builder()
+                    .with_cache_dir(cache_dir)
+                    .with_run_info_dir(run_info_dir),
+            )
+            .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
+            .add::<TransformServiceImpl>()
+            .add::<EngineProvisionerNull>()
+            .add::<ObjectStoreRegistryImpl>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
             .add::<FlowConfigurationServiceInMemory>()
@@ -1133,31 +1247,34 @@ impl FlowConfigHarness {
         }
     }
 
-    async fn create_root_dataset(&self) -> CreateDatasetResult {
+    async fn create_root_dataset(&self, with_polling_source: bool) -> CreateDatasetResult {
+        let mut snapshot = MetadataFactory::dataset_snapshot()
+            .kind(DatasetKind::Root)
+            .name("foo");
+        if with_polling_source {
+            snapshot = snapshot.push_event(MetadataFactory::set_polling_source().build());
+        }
+
         self.dataset_repo
-            .create_dataset_from_snapshot(
-                MetadataFactory::dataset_snapshot()
-                    .kind(DatasetKind::Root)
-                    .name("foo")
-                    .build(),
-            )
+            .create_dataset_from_snapshot(snapshot.build())
             .await
             .unwrap()
     }
 
-    async fn create_derived_dataset(&self) -> CreateDatasetResult {
-        self.dataset_repo
-            .create_dataset_from_snapshot(
-                MetadataFactory::dataset_snapshot()
-                    .name("bar")
-                    .kind(DatasetKind::Derivative)
-                    .push_event(
-                        MetadataFactory::set_transform()
-                            .inputs_from_refs(["foo"])
-                            .build(),
-                    )
+    async fn create_derived_dataset(&self, with_set_transform: bool) -> CreateDatasetResult {
+        let mut snapshot = MetadataFactory::dataset_snapshot()
+            .name("bar")
+            .kind(DatasetKind::Derivative);
+        if with_set_transform {
+            snapshot = snapshot.push_event(
+                MetadataFactory::set_transform()
+                    .inputs_from_refs(["foo"])
                     .build(),
-            )
+            );
+        }
+
+        self.dataset_repo
+            .create_dataset_from_snapshot(snapshot.build())
             .await
             .unwrap()
     }

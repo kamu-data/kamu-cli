@@ -14,7 +14,6 @@ use crate::mutations::{check_if_flow_belongs_to_dataset, FlowInDatasetError, Flo
 use crate::prelude::*;
 use crate::queries::Flow;
 use crate::utils;
-use crate::utils::ensure_polling_source_exists;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -63,9 +62,6 @@ impl DatasetFlowRuns {
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
-        if !ensure_polling_source_exists(ctx, &self.dataset_handle).await? {
-            return Ok(FlowConnection::new(vec![], page, per_page, 0));
-        }
 
         let flows_state_listing = flow_service
             .list_all_flows_by_dataset(

@@ -13,15 +13,15 @@ use {kamu_flow_system as fs, opendatafabric as odf};
 use super::{
     check_if_flow_belongs_to_dataset,
     ensure_expected_dataset_kind,
+    ensure_flow_preconditions,
     ensure_scheduling_permission,
     FlowInDatasetError,
     FlowIncompatibleDatasetKind,
-    FlowMissingDatasetPollingSource,
     FlowNotFound,
+    FlowPreconditionsNotMet,
 };
 use crate::prelude::*;
 use crate::queries::Flow;
-use crate::utils::ensure_polling_source_exists;
 use crate::{utils, LoggedInGuard};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -50,10 +50,11 @@ impl DatasetFlowRunsMut {
         }
 
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
-        if !ensure_polling_source_exists(ctx, &self.dataset_handle).await? {
-            return Ok(TriggerFlowResult::MissingDatasetPollingSource(
-                FlowMissingDatasetPollingSource,
-            ));
+
+        if let Some(e) =
+            ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type).await?
+        {
+            return Ok(TriggerFlowResult::PreconditionsNotMet(e));
         }
 
         // TODO: for some datasets launching manually might not be an option:
@@ -129,7 +130,7 @@ impl DatasetFlowRunsMut {
 enum TriggerFlowResult {
     Success(TriggerFlowSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
-    MissingDatasetPollingSource(FlowMissingDatasetPollingSource),
+    PreconditionsNotMet(FlowPreconditionsNotMet),
 }
 
 #[derive(SimpleObject)]

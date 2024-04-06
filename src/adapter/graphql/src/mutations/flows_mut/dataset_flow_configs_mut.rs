@@ -21,8 +21,10 @@ use opendatafabric as odf;
 
 use super::{
     ensure_expected_dataset_kind,
+    ensure_flow_preconditions,
     ensure_scheduling_permission,
     FlowIncompatibleDatasetKind,
+    FlowPreconditionsNotMet,
 };
 use crate::prelude::*;
 use crate::LoggedInGuard;
@@ -55,6 +57,11 @@ impl DatasetFlowConfigsMut {
         }
 
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
+        if let Some(e) =
+            ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type).await?
+        {
+            return Ok(SetFlowConfigResult::PreconditionsNotMet(e));
+        }
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
         let configuration_rule = match schedule {
@@ -114,6 +121,11 @@ impl DatasetFlowConfigsMut {
         }
 
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
+        if let Some(e) =
+            ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type).await?
+        {
+            return Ok(SetFlowConfigResult::PreconditionsNotMet(e));
+        }
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
 
@@ -223,6 +235,7 @@ enum SetFlowConfigResult {
     Success(SetFlowConfigSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
     InvalidBatchingConfig(FlowInvalidBatchingConfig),
+    PreconditionsNotMet(FlowPreconditionsNotMet),
 }
 
 #[derive(SimpleObject)]
