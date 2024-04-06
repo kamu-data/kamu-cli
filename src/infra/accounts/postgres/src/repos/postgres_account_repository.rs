@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::{LazyTransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 
@@ -22,7 +22,7 @@ pub struct PostgresAccountRepository {
 #[component(pub)]
 #[interface(dyn AccountRepository)]
 impl PostgresAccountRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
+    pub fn new(transaction: LazyTransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
         }
@@ -37,6 +37,11 @@ impl AccountRepository for PostgresAccountRepository {
     ) -> Result<(), AccountRepositoryError> {
         let mut tr = self.transaction.lock().await;
 
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(AccountRepositoryError::Internal)?;
+
         sqlx::query!(
             r#"
             INSERT INTO accounts (id, email, account_name, display_name, origin, registered_at)
@@ -49,7 +54,7 @@ impl AccountRepository for PostgresAccountRepository {
             account_model.origin as AccountOrigin,
             account_model.registered_at,
         )
-        .execute(tr.connection_mut())
+        .execute(connection_mut)
         .await
         .int_err()
         .map_err(AccountRepositoryError::Internal)?;
@@ -63,6 +68,11 @@ impl AccountRepository for PostgresAccountRepository {
     ) -> Result<Option<AccountModel>, AccountRepositoryError> {
         let mut tr = self.transaction.lock().await;
 
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(AccountRepositoryError::Internal)?;
+
         let account_data = sqlx::query_as!(
             AccountModel,
             r#"
@@ -72,7 +82,7 @@ impl AccountRepository for PostgresAccountRepository {
             "#,
             email
         )
-        .fetch_optional(tr.connection_mut())
+        .fetch_optional(connection_mut)
         .await
         .int_err()
         .map_err(AccountRepositoryError::Internal)?;

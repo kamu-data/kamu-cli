@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::{LazyTransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use opendatafabric::AccountID;
@@ -23,7 +23,7 @@ pub struct MySqlAccountRepository {
 #[component(pub)]
 #[interface(dyn AccountRepository)]
 impl MySqlAccountRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
+    pub fn new(transaction: LazyTransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
         }
@@ -38,6 +38,11 @@ impl AccountRepository for MySqlAccountRepository {
     ) -> Result<(), AccountRepositoryError> {
         let mut tr = self.transaction.lock().await;
 
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(AccountRepositoryError::Internal)?;
+
         sqlx::query_as!(
             AccountModel,
             r#"
@@ -51,7 +56,7 @@ impl AccountRepository for MySqlAccountRepository {
             account_model.origin as AccountOrigin,
             account_model.registered_at,
         )
-        .execute(tr.connection_mut())
+        .execute(connection_mut)
         .await
         .int_err()
         .map_err(AccountRepositoryError::Internal)?;
@@ -65,6 +70,11 @@ impl AccountRepository for MySqlAccountRepository {
     ) -> Result<Option<AccountModel>, AccountRepositoryError> {
         let mut tr = self.transaction.lock().await;
 
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(AccountRepositoryError::Internal)?;
+
         let account_data = sqlx::query_as!(
             AccountModel,
             r#"
@@ -73,7 +83,7 @@ impl AccountRepository for MySqlAccountRepository {
               WHERE email = ?
             "#,
             email
-        ).fetch_optional(tr.connection_mut())
+        ).fetch_optional(connection_mut)
             .await
             .int_err()
             .map_err(AccountRepositoryError::Internal)?;

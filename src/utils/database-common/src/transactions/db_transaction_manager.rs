@@ -12,18 +12,24 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use dill::{Catalog, CatalogBuilder};
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use tokio::sync::Mutex;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DatabaseTransactionManager: Send + Sync {
-    async fn make_transaction(&self) -> Result<TransactionRef, InternalError>;
+    async fn make_lazy_transaction_ref(&self) -> Result<LazyTransactionRef, InternalError>;
 
-    async fn commit_transaction(&self, transaction: TransactionRef) -> Result<(), InternalError>;
+    async fn commit_transaction(
+        &self,
+        transaction_ref: LazyTransactionRef,
+    ) -> Result<(), InternalError>;
 
-    async fn rollback_transaction(&self, transaction: TransactionRef) -> Result<(), InternalError>;
+    async fn rollback_transaction(
+        &self,
+        transaction_ref: LazyTransactionRef,
+    ) -> Result<(), InternalError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -42,12 +48,12 @@ where
         .unwrap();
 
     // Start transaction
-    let transaction = db_transaction_manager.make_transaction().await?;
+    let transaction_ref = db_transaction_manager.make_lazy_transaction_ref().await?;
 
     // Create a chained catalog for transaction-aware components,
     // but keep a local copy of transaction pointer
     let chained_catalog = CatalogBuilder::new_chained(base_catalog)
-        .add_value(transaction.clone())
+        .add_value(transaction_ref.clone())
         .build();
 
     // Run transactional code in the callback
@@ -58,7 +64,7 @@ where
         // In case everything succeeded, commit the transaction
         Ok(_) => {
             db_transaction_manager
-                .commit_transaction(transaction)
+                .commit_transaction(transaction_ref)
                 .await?;
             Ok(())
         }
@@ -66,7 +72,7 @@ where
         // Otherwise, do an explicit rollback
         Err(e) => {
             db_transaction_manager
-                .rollback_transaction(transaction)
+                .rollback_transaction(transaction_ref)
                 .await?;
             Err(e)
         }
@@ -82,22 +88,38 @@ where
 /// lock must be held only for the duration of the DB query and released when
 /// passing control into other components.
 #[derive(Clone)]
-pub struct TransactionRef {
-    p: Arc<Mutex<Box<dyn Any + Send>>>,
+pub struct LazyTransactionRef {
+    inner: Arc<Mutex<LazyTransactionRefInner>>,
 }
 
-impl TransactionRef {
-    pub fn new<DB: sqlx::Database>(transaction: sqlx::Transaction<'static, DB>) -> Self {
+impl LazyTransactionRef {
+    pub fn new<DB: sqlx::Database>(connection_pool: sqlx::pool::Pool<DB>) -> Self {
         Self {
-            p: Arc::new(Mutex::new(Box::new(transaction))),
+            inner: Arc::new(Mutex::new(LazyTransactionRefInner::new(connection_pool))),
         }
     }
 
-    /// Extracts the inner [`sqlx::Transaction`]. Will panic if there are any
-    /// outstanding strong reference held.
-    pub fn into_inner<DB: sqlx::Database>(self) -> sqlx::Transaction<'static, DB> {
-        let m = Arc::try_unwrap(self.p).unwrap().into_inner();
-        *m.downcast::<sqlx::Transaction<'static, DB>>().unwrap()
+    pub fn into_maybe_transaction<DB: sqlx::Database>(
+        self,
+    ) -> Option<sqlx::Transaction<'static, DB>> {
+        let m = Arc::try_unwrap(self.inner).unwrap().into_inner();
+        m.maybe_transaction
+            .map(|t| *t.downcast::<sqlx::Transaction<'static, DB>>().unwrap())
+    }
+}
+
+#[derive(Debug)]
+pub struct LazyTransactionRefInner {
+    connection_pool: Box<dyn Any + Send>,
+    maybe_transaction: Option<Box<dyn Any + Send>>,
+}
+
+impl LazyTransactionRefInner {
+    fn new<DB: sqlx::Database>(connection_pool: sqlx::pool::Pool<DB>) -> Self {
+        Self {
+            connection_pool: Box::new(connection_pool),
+            maybe_transaction: None,
+        }
     }
 }
 
@@ -105,12 +127,12 @@ impl TransactionRef {
 /// information to [`TransactionGuard`] to safely access typed
 /// [`sqlx::Transaction`] object.
 pub struct TransactionRefT<DB: sqlx::Database> {
-    tr: TransactionRef,
+    tr: LazyTransactionRef,
     _phantom: PhantomData<DB>,
 }
 
 impl<DB: sqlx::Database> TransactionRefT<DB> {
-    pub fn new(tr: TransactionRef) -> Self {
+    pub fn new(tr: LazyTransactionRef) -> Self {
         Self {
             tr,
             _phantom: PhantomData,
@@ -118,12 +140,12 @@ impl<DB: sqlx::Database> TransactionRefT<DB> {
     }
 
     pub async fn lock(&self) -> TransactionGuard<'_, DB> {
-        TransactionGuard::new(self.tr.p.lock().await)
+        TransactionGuard::new(self.tr.inner.lock().await)
     }
 }
 
-impl<DB: sqlx::Database> From<TransactionRef> for TransactionRefT<DB> {
-    fn from(value: TransactionRef) -> Self {
+impl<DB: sqlx::Database> From<LazyTransactionRef> for TransactionRefT<DB> {
+    fn from(value: LazyTransactionRef) -> Self {
         Self::new(value)
     }
 }
@@ -133,22 +155,33 @@ impl<DB: sqlx::Database> From<TransactionRef> for TransactionRefT<DB> {
 /// lock must be held only for the duration of the DB query and released when
 /// passing control into other components.
 pub struct TransactionGuard<'a, DB: sqlx::Database> {
-    guard: tokio::sync::MutexGuard<'a, Box<dyn Any + Send>>,
+    guard: tokio::sync::MutexGuard<'a, LazyTransactionRefInner>,
     _phantom: PhantomData<DB>,
 }
 
 impl<'a, DB: sqlx::Database> TransactionGuard<'a, DB> {
-    pub fn new(guard: tokio::sync::MutexGuard<'a, Box<dyn Any + Send>>) -> Self {
+    pub fn new(guard: tokio::sync::MutexGuard<'a, LazyTransactionRefInner>) -> Self {
         Self {
             guard,
             _phantom: PhantomData,
         }
     }
 
-    pub fn connection_mut(&mut self) -> &mut DB::Connection {
-        self.guard
+    pub async fn connection_mut(&mut self) -> Result<&mut DB::Connection, InternalError> {
+        if self.guard.maybe_transaction.is_none() {
+            let pool = self
+                .guard
+                .connection_pool
+                .downcast_mut::<sqlx::pool::Pool<DB>>()
+                .unwrap();
+            let transaction = pool.begin().await.int_err()?;
+            self.guard.maybe_transaction = Some(Box::new(transaction));
+        }
+
+        let transaction = self.guard.maybe_transaction.as_deref_mut().unwrap();
+        Ok(transaction
             .downcast_mut::<sqlx::Transaction<'static, DB>>()
-            .unwrap()
+            .unwrap())
     }
 }
 

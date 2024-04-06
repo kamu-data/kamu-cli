@@ -11,7 +11,7 @@ use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use sqlx::PgPool;
 
-use crate::{DatabaseTransactionManager, TransactionRef};
+use crate::{DatabaseTransactionManager, LazyTransactionRef};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,20 +29,33 @@ impl PostgresTransactionManager {
 
 #[async_trait::async_trait]
 impl DatabaseTransactionManager for PostgresTransactionManager {
-    async fn make_transaction(&self) -> Result<TransactionRef, InternalError> {
-        let postgres_transaction = self.pg_pool.begin().await.int_err()?;
-        Ok(TransactionRef::new(postgres_transaction))
+    async fn make_lazy_transaction_ref(&self) -> Result<LazyTransactionRef, InternalError> {
+        Ok(LazyTransactionRef::new(self.pg_pool.clone()))
     }
 
-    async fn commit_transaction(&self, transaction: TransactionRef) -> Result<(), InternalError> {
-        let postgres_transaction = transaction.into_inner::<sqlx::Postgres>();
-        postgres_transaction.commit().await.int_err()?;
+    async fn commit_transaction(
+        &self,
+        transaction_ref: LazyTransactionRef,
+    ) -> Result<(), InternalError> {
+        let maybe_open_postgres_transaction =
+            transaction_ref.into_maybe_transaction::<sqlx::Postgres>();
+        if let Some(postgres_transaction) = maybe_open_postgres_transaction {
+            postgres_transaction.commit().await.int_err()?;
+        }
+
         Ok(())
     }
 
-    async fn rollback_transaction(&self, transaction: TransactionRef) -> Result<(), InternalError> {
-        let postgres_transaction = transaction.into_inner::<sqlx::Postgres>();
-        postgres_transaction.rollback().await.int_err()?;
+    async fn rollback_transaction(
+        &self,
+        transaction_ref: LazyTransactionRef,
+    ) -> Result<(), InternalError> {
+        let maybe_open_postgres_transaction =
+            transaction_ref.into_maybe_transaction::<sqlx::Postgres>();
+        if let Some(postgres_transaction) = maybe_open_postgres_transaction {
+            postgres_transaction.rollback().await.int_err()?;
+        }
+
         Ok(())
     }
 }

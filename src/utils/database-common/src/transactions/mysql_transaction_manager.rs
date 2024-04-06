@@ -11,7 +11,7 @@ use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use sqlx::MySqlPool;
 
-use crate::{DatabaseTransactionManager, TransactionRef};
+use crate::{DatabaseTransactionManager, LazyTransactionRef};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,20 +29,30 @@ impl MySqlTransactionManager {
 
 #[async_trait::async_trait]
 impl DatabaseTransactionManager for MySqlTransactionManager {
-    async fn make_transaction(&self) -> Result<TransactionRef, InternalError> {
-        let mysql_transaction = self.mysql_pool.begin().await.int_err()?;
-        Ok(TransactionRef::new(mysql_transaction))
+    async fn make_lazy_transaction_ref(&self) -> Result<LazyTransactionRef, InternalError> {
+        Ok(LazyTransactionRef::new(self.mysql_pool.clone()))
     }
 
-    async fn commit_transaction(&self, transaction: TransactionRef) -> Result<(), InternalError> {
-        let mysql_transaction = transaction.into_inner::<sqlx::MySql>();
-        mysql_transaction.commit().await.int_err()?;
+    async fn commit_transaction(
+        &self,
+        transaction_ref: LazyTransactionRef,
+    ) -> Result<(), InternalError> {
+        let maybe_open_mysql_transaction = transaction_ref.into_maybe_transaction::<sqlx::MySql>();
+        if let Some(mysql_transaction) = maybe_open_mysql_transaction {
+            mysql_transaction.commit().await.int_err()?;
+        }
+
         Ok(())
     }
 
-    async fn rollback_transaction(&self, transaction: TransactionRef) -> Result<(), InternalError> {
-        let mysql_transaction = transaction.into_inner::<sqlx::MySql>();
-        mysql_transaction.rollback().await.int_err()?;
+    async fn rollback_transaction(
+        &self,
+        transaction_ref: LazyTransactionRef,
+    ) -> Result<(), InternalError> {
+        let maybe_open_mysql_transaction = transaction_ref.into_maybe_transaction::<sqlx::MySql>();
+        if let Some(mysql_transaction) = maybe_open_mysql_transaction {
+            mysql_transaction.rollback().await.int_err()?;
+        }
         Ok(())
     }
 }

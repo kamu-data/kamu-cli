@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::{LazyTransactionRef, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_task_system::*;
@@ -23,7 +23,7 @@ pub struct TaskSystemEventStorePostgres {
 #[component(pub)]
 #[interface(dyn TaskSystemEventStore)]
 impl TaskSystemEventStorePostgres {
-    pub fn new(transaction: TransactionRef) -> Self {
+    pub fn new(transaction: LazyTransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
         }
@@ -42,6 +42,10 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
         let maybe_to_id = opts.to.map(EventID::into_inner);
 
         Box::pin(async_stream::stream! {
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
             let mut query_stream = sqlx::query!(
                 r#"
                 SELECT event_id, event_payload FROM task_events
@@ -59,7 +63,7 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
                 };
                 Ok((EventID::new(event_row.event_id), event))
             })
-            .fetch(tr.connection_mut())
+            .fetch(connection_mut)
             .map_err(|e| GetEventsError::Internal(e.int_err()));
 
             while let Some((event_id, event)) = query_stream.try_next().await? {
@@ -74,6 +78,7 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
         events: Vec<TaskEvent>,
     ) -> Result<EventID, SaveEventsError> {
         let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
 
         #[derive(FromRow)]
         struct ResultRow {
@@ -99,7 +104,7 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
 
         let rows = query_builder
             .build_query_as::<ResultRow>()
-            .fetch_all(tr.connection_mut())
+            .fetch_all(connection_mut)
             .await
             .unwrap();
 
@@ -114,13 +119,14 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
 
     async fn len(&self) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
 
         let result = sqlx::query!(
             r#"
             SELECT COUNT(event_id) from task_events
             "#,
         )
-        .fetch_one(tr.connection_mut())
+        .fetch_one(connection_mut)
         .await
         .int_err()?;
 
@@ -136,13 +142,14 @@ impl TaskSystemEventStore for TaskSystemEventStorePostgres {
     /// Generates new unique task identifier
     async fn new_task_id(&self) -> Result<TaskID, InternalError> {
         let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
 
         let result = sqlx::query!(
             r#"
             SELECT nextval('task_id_seq') as new_task_id
             "#
         )
-        .fetch_one(tr.connection_mut())
+        .fetch_one(connection_mut)
         .await
         .int_err()?;
 
@@ -160,6 +167,8 @@ impl TaskSystemEventStore for TaskSystemEventStorePostgres {
         let dataset_id = dataset_id.clone();
 
         Box::pin(async_stream::stream! {
+            let connection_mut = tr.connection_mut().await?;
+
             let mut query_stream = sqlx::query!(
                 r#"
                 SELECT task_id
@@ -172,7 +181,7 @@ impl TaskSystemEventStore for TaskSystemEventStorePostgres {
                 i64::try_from(pagination.offset).unwrap(),
             )
             .try_map(|event_row| Ok(TaskID::new(event_row.task_id)))
-            .fetch(tr.connection_mut())
+            .fetch(connection_mut)
             .map_err(ErrorIntoInternal::int_err);
 
             while let Some(task_id) = query_stream.try_next().await? {
@@ -187,6 +196,7 @@ impl TaskSystemEventStore for TaskSystemEventStorePostgres {
         dataset_id: &DatasetID,
     ) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
 
         let result = sqlx::query!(
             r#"
@@ -195,7 +205,7 @@ impl TaskSystemEventStore for TaskSystemEventStorePostgres {
             "#,
             dataset_id.to_string()
         )
-        .fetch_one(tr.connection_mut())
+        .fetch_one(connection_mut)
         .await
         .int_err()?;
 
