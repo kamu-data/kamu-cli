@@ -7,13 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use database_common::{TransactionRef, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
-use sqlx::FromRow;
+use sqlx::{FromRow, QueryBuilder};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -76,56 +75,33 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
     ) -> Result<EventID, SaveEventsError> {
         let mut tr = self.transaction.lock().await;
 
-        #[derive(Default)]
-        struct BulkInsertEvents {
-            task_ids: Vec<i64>,
-            dataset_ids: Vec<Option<String>>,
-            event_times: Vec<DateTime<Utc>>,
-            event_types: Vec<&'static str>,
-            event_payloads: Vec<sqlx::types::JsonValue>,
-        }
-
-        let mut insert_events = BulkInsertEvents::default();
-        for event in events {
-            let event_task_id: i64 = (event.task_id()).into();
-
-            insert_events.task_ids.push(event_task_id);
-            insert_events
-                .dataset_ids
-                .push(event.dataset_id().map(ToString::to_string));
-            insert_events.event_times.push(event.event_time());
-            insert_events.event_types.push(event.typename());
-            insert_events
-                .event_payloads
-                .push(serde_json::to_value(event).unwrap());
-        }
-
         #[derive(FromRow)]
         struct ResultRow {
             event_id: i64,
         }
 
-        let rows = sqlx::query_as!(
-            ResultRow,
+        let mut query_builder = QueryBuilder::<sqlx::Postgres>::new(
             r#"
             INSERT INTO task_events (task_id, dataset_id, event_time, event_type, event_payload)
-                SELECT * FROM UNNEST(
-                    $1::INT8[],
-                    $2::TEXT[],
-                    $3::timestamptz[],
-                    $4::TEXT[],
-                    $5::JSONB[]
-                ) RETURNING event_id
             "#,
-            &insert_events.task_ids,
-            &insert_events.dataset_ids as _,
-            &insert_events.event_times,
-            &insert_events.event_types as _,
-            &insert_events.event_payloads
-        )
-        .fetch_all(tr.connection_mut())
-        .await
-        .unwrap();
+        );
+
+        query_builder.push_values(events, |mut b, event| {
+            let event_task_id: i64 = (event.task_id()).into();
+            b.push_bind(event_task_id);
+            b.push_bind(event.dataset_id().map(ToString::to_string));
+            b.push_bind(event.event_time());
+            b.push_bind(event.typename());
+            b.push_bind(serde_json::to_value(event).unwrap());
+        });
+
+        query_builder.push("RETURNING event_id");
+
+        let rows = query_builder
+            .build_query_as::<ResultRow>()
+            .fetch_all(tr.connection_mut())
+            .await
+            .unwrap();
 
         if let Some(last_row) = rows.last() {
             Ok(EventID::new(last_row.event_id))
