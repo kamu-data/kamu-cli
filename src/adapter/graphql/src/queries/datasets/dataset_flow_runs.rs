@@ -120,16 +120,6 @@ impl GetFlowSuccess {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct FlowMissingDatasetPollingSource;
-
-#[Object]
-impl FlowMissingDatasetPollingSource {
-    pub async fn message(&self) -> String {
-        "Polling source is required".to_string()
-    }
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject)]

@@ -153,27 +153,7 @@ impl DatasetMetadata {
             .await
             .int_err()?;
 
-        Ok(source.map_or(
-            Some(SetPollingSource {
-                fetch: FetchStep::Url(FetchStepUrl {
-                    url: String::new(),
-                    event_time: None,
-                    cache: None,
-                    headers: None,
-                }),
-                prepare: None,
-                read: ReadStep::Json(ReadStepJson {
-                    sub_path: None,
-                    schema: None,
-                    date_format: None,
-                    encoding: None,
-                    timestamp_format: None,
-                }),
-                preprocess: None,
-                merge: MergeStrategy::Append(MergeStrategyAppend { _dummy: None }),
-            }),
-            |(_hash, block)| Some(block.event.into()),
-        ))
+        Ok(source.map(|(_hash, block)| block.event.into()))
     }
 
     /// Current push sources used by the root dataset
@@ -202,18 +182,7 @@ impl DatasetMetadata {
             .await
             .int_err()?;
 
-        Ok(source.map_or(
-            Some(SetTransform {
-                inputs: vec![],
-                transform: Transform::Sql(TransformSql {
-                    engine: String::new(),
-                    version: None,
-                    queries: vec![],
-                    temporal_tables: None,
-                }),
-            }),
-            |(_hash, block)| Some(block.event.into()),
-        ))
+        Ok(source.map(|(_hash, block)| block.event.into()))
     }
 
     /// Current descriptive information about the dataset
