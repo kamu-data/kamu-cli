@@ -46,7 +46,7 @@ async fn test_insert_and_locate_account(mysql_pool: MySqlPool) {
 
     run_transactional(&harness.catalog, |catalog: Catalog| async move {
         let account_model = AccountModel {
-            id: Uuid::new_v4(),
+            id: Uuid::new_v4().to_string(),
             email: String::from("test@example.com"),
             account_name: String::from("wasya"),
             display_name: String::from("Wasya Pupkin"),

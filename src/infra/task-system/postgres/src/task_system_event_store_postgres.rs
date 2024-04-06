@@ -45,10 +45,10 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
         Box::pin(async_stream::stream! {
             let mut query_stream = sqlx::query!(
                 r#"
-                SELECT task_event_id, event_payload FROM task_events
+                SELECT event_id, event_payload FROM task_events
                     WHERE task_id = $1
-                         AND (cast($2 as INT8) IS NULL or task_event_id > $2)
-                         AND (cast($3 as INT8) IS NULL or task_event_id <= $3)
+                         AND (cast($2 as INT8) IS NULL or event_id > $2)
+                         AND (cast($3 as INT8) IS NULL or event_id <= $3)
                 "#,
                 task_id,
                 maybe_from_id,
@@ -58,7 +58,7 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
                     Ok(event) => event,
                     Err(e) => return Err(sqlx::Error::Decode(Box::new(e))),
                 };
-                Ok((EventID::new(event_row.task_event_id), event))
+                Ok((EventID::new(event_row.event_id), event))
             })
             .fetch(tr.connection_mut())
             .map_err(|e| GetEventsError::Internal(e.int_err()));
@@ -102,7 +102,7 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
 
         #[derive(FromRow)]
         struct ResultRow {
-            task_event_id: i64,
+            event_id: i64,
         }
 
         let rows = sqlx::query_as!(
@@ -115,7 +115,7 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
                     $3::timestamptz[],
                     $4::TEXT[],
                     $5::JSONB[]
-                ) RETURNING task_event_id
+                ) RETURNING event_id
             "#,
             &insert_events.task_ids,
             &insert_events.dataset_ids as _,
@@ -128,7 +128,7 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
         .unwrap();
 
         if let Some(last_row) = rows.last() {
-            Ok(EventID::new(last_row.task_event_id))
+            Ok(EventID::new(last_row.event_id))
         } else {
             Ok(EventID::new(
                 i64::try_from(self.len().await.unwrap()).unwrap(),
@@ -141,7 +141,7 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
 
         let result = sqlx::query!(
             r#"
-            SELECT COUNT(task_event_id) from task_events
+            SELECT COUNT(event_id) from task_events
             "#,
         )
         .fetch_one(tr.connection_mut())
@@ -219,7 +219,7 @@ impl TaskSystemEventStore for TaskSystemEventStorePostgres {
 
         let result = sqlx::query!(
             r#"
-            SELECT COUNT(task_event_id) FROM task_events
+            SELECT COUNT(event_id) FROM task_events
               WHERE dataset_id = $1
             "#,
             dataset_id.to_string()

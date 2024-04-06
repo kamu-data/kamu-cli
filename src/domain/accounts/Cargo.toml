@@ -23,6 +23,7 @@ doctest = false
 
 [dependencies]
 internal-error = { workspace = true }
+opendatafabric = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }

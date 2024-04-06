@@ -24,6 +24,7 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 kamu-accounts = { workspace = true }
+opendatafabric = { workspace = true }
 internal-error = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
@@ -33,7 +34,6 @@ sqlx = { version = "0.7", default-features = false, features = [
     "runtime-tokio-rustls",
     "macros",
     "mysql",
-    "uuid",
     "chrono"
 ]}
 thiserror = { version = "1", default-features = false }

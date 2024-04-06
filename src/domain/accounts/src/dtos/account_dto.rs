@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use opendatafabric::AccountID;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +23,7 @@ pub enum AccountOrigin {
 #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
 #[allow(dead_code)]
 pub struct AccountModel {
-    pub id: Uuid,
+    pub id: AccountID,
     pub email: String,
     pub account_name: String,
     pub display_name: String,

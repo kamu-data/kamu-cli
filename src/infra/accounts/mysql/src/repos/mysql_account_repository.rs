@@ -10,6 +10,7 @@
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
+use opendatafabric::AccountID;
 
 use crate::domain::{AccountModel, AccountOrigin, AccountRepository, AccountRepositoryError};
 
@@ -67,7 +68,7 @@ impl AccountRepository for MySqlAccountRepository {
         let account_data = sqlx::query_as!(
             AccountModel,
             r#"
-            SELECT id as "id: uuid::fmt::Hyphenated", email, account_name, display_name, origin as "origin: AccountOrigin", registered_at
+            SELECT id as "id: AccountID", email, account_name, display_name, origin as "origin: AccountOrigin", registered_at
               FROM accounts
               WHERE email = ?
             "#,

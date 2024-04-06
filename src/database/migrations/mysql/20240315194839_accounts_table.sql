@@ -1,9 +1,9 @@
 CREATE TABLE accounts(
-    id uuid NOT NULL,
+    id VARCHAR(100) NOT NULL,
     PRIMARY KEY (id),
-    email TEXT NOT NULL UNIQUE,
-    account_name TEXT NOT NULL,
-    display_name TEXT NOT NULL,
+    email VARCHAR(320) NOT NULL UNIQUE,
+    account_name VARCHAR(100) NOT NULL,
+    display_name VARCHAR(200) NOT NULL,
     origin ENUM('cli', 'github') NOT NULL,
     registered_at TIMESTAMP(6) NOT NULL
 );

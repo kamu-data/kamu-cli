@@ -5,10 +5,10 @@
     "columns": [],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Text",
-        "Text",
-        "Text",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
         "Text",
         "Timestamptz"
       ]

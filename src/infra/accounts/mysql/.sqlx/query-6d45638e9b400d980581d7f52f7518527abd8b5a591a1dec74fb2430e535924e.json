@@ -1,46 +1,46 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT id as \"id: uuid::fmt::Hyphenated\", email, account_name, display_name, origin as \"origin: AccountOrigin\", registered_at\n              FROM accounts\n              WHERE email = ?\n            ",
+  "query": "\n            SELECT id as \"id: AccountID\", email, account_name, display_name, origin as \"origin: AccountOrigin\", registered_at\n              FROM accounts\n              WHERE email = ?\n            ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id: uuid::fmt::Hyphenated",
+        "name": "id: AccountID",
         "type_info": {
-          "type": "String",
-          "flags": "NOT_NULL | PRIMARY_KEY | UNSIGNED | BINARY | NO_DEFAULT_VALUE",
+          "type": "VarString",
+          "flags": "NOT_NULL | PRIMARY_KEY | NO_DEFAULT_VALUE",
           "char_set": 224,
-          "max_size": 144
+          "max_size": 400
         }
       },
       {
         "ordinal": 1,
         "name": "email",
         "type_info": {
-          "type": "Blob",
-          "flags": "NOT_NULL | UNIQUE_KEY | BLOB | NO_DEFAULT_VALUE",
+          "type": "VarString",
+          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
           "char_set": 224,
-          "max_size": 262140
+          "max_size": 1280
         }
       },
       {
         "ordinal": 2,
         "name": "account_name",
         "type_info": {
-          "type": "Blob",
-          "flags": "NOT_NULL | MULTIPLE_KEY | BLOB | NO_DEFAULT_VALUE",
+          "type": "VarString",
+          "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
           "char_set": 224,
-          "max_size": 262140
+          "max_size": 400
         }
       },
       {
         "ordinal": 3,
         "name": "display_name",
         "type_info": {
-          "type": "Blob",
-          "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "type": "VarString",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
           "char_set": 224,
-          "max_size": 262140
+          "max_size": 800
         }
       },
       {
@@ -76,5 +76,5 @@
       false
     ]
   },
-  "hash": "91dca920b2e8c1a707484864e6ed705bbf2fd22b31016457d9213abd6317d4ee"
+  "hash": "6d45638e9b400d980581d7f52f7518527abd8b5a591a1dec74fb2430e535924e"
 }
