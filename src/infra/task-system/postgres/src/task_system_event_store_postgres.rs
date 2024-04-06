@@ -162,15 +162,10 @@ impl TaskSystemEventStore for TaskSystemEventStorePostgres {
         Box::pin(async_stream::stream! {
             let mut query_stream = sqlx::query!(
                 r#"
-                SELECT task_id FROM
-                (
-                    SELECT DISTINCT ON (task_id) task_id, event_time
-                        FROM task_events
-                        WHERE dataset_id = $1
-                        ORDER  BY task_id, event_time ASC
-                )
-                ORDER BY task_id DESC
-                LIMIT $2 OFFSET $3
+                SELECT task_id
+                    FROM task_events
+                    WHERE dataset_id = $1 AND event_type = 'TaskEventCreated'
+                    ORDER  BY task_id DESC LIMIT $2 OFFSET $3
                 "#,
                 dataset_id.to_string(),
                 i64::try_from(pagination.limit).unwrap(),
