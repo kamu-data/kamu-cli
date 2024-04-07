@@ -147,6 +147,13 @@ jobs:
         if: matrix.container-runtime != ''
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::setup::)' --no-capture
 
+        # Note: SQLite does not require a container and may run on any platform
+      - name: SQLite database tests
+        env:
+          SQLX_OFFLINE: false
+          DATABASE_URL: sqlite://sqlite.db
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::sqlite::)'
+
       - name: Postgres database tests
         if: matrix.database
         env:

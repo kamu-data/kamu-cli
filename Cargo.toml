@@ -23,15 +23,18 @@ members = [
     # Domain service layer
     "src/domain/task-system/services",
     # Infra
-    "src/infra/accounts/mysql",
-    "src/infra/accounts/postgres",
     "src/infra/core",
     "src/infra/ingest-datafusion",
     "src/infra/flow-system-inmem",
-    ##   Task System
+    ## Accounts
+    "src/infra/accounts/mysql",
+    "src/infra/accounts/postgres",
+    "src/infra/accounts/sqlite",
+    ## Task System
     "src/infra/task-system/repo-tests",
     "src/infra/task-system/inmem",
     "src/infra/task-system/postgres",
+    "src/infra/task-system/sqlite",
     # Adapters
     "src/adapter/auth-oso",
     "src/adapter/flight-sql",
@@ -73,13 +76,16 @@ kamu-task-system-services = { version = "0.171.0", path = "src/domain/task-syste
 
 # Infra
 kamu = { version = "0.171.0", path = "src/infra/core", default-features = false }
-kamu-accounts-mysql = { version = "0.171.0", path = "src/infra/accounts/mysql", default-features = false }
-kamu-accounts-postgres = { version = "0.171.0", path = "src/infra/accounts/postgres", default-features = false }
 kamu-ingest-datafusion = { version = "0.171.0", path = "src/infra/ingest-datafusion", default-features = false }
 kamu-flow-system-inmem = { version = "0.171.0", path = "src/infra/flow-system-inmem", default-features = false }
+## Accounts
+kamu-accounts-mysql = { version = "0.171.0", path = "src/infra/accounts/mysql", default-features = false }
+kamu-accounts-postgres = { version = "0.171.0", path = "src/infra/accounts/postgres", default-features = false }
+kamu-accounts-sqlite = { version = "0.171.0", path = "src/infra/accounts/sqlite", default-features = false }
 ##   Task System
 kamu-task-system-inmem = { version = "0.171.0", path = "src/infra/task-system/inmem", default-features = false }
 kamu-task-system-postgres = { version = "0.171.0", path = "src/infra/task-system/postgres", default-features = false }
+kamu-task-system-sqlite = { version = "0.171.0", path = "src/infra/task-system/sqlite", default-features = false }
 kamu-task-system-repo-tests = { version = "0.171.0", path = "src/infra/task-system/repo-tests", default-features = false }
 
 # Adapters

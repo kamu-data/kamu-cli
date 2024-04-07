@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod db_transaction_manager;
-mod mysql_transaction_manager;
-mod postgres_transaction_manager;
-mod sqlite_transaction_manager;
+#![feature(error_generic_member_access)]
+#![feature(hash_set_entry)]
+#![feature(let_chains)]
 
-pub use db_transaction_manager::*;
-pub use mysql_transaction_manager::*;
-pub use postgres_transaction_manager::*;
-pub use sqlite_transaction_manager::*;
+// Re-exports
+pub use kamu_task_system as domain;
+
+mod task_system_event_store_sqlite;
+
+pub use task_system_event_store_sqlite::*;

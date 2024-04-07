@@ -1,8 +1,10 @@
-CREATE SEQUENCE task_id_seq AS BIGINT;
+CREATE TABLE tasks (
+    task_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    created_time timestamptz NOT NULL
+);
 
 CREATE TABLE task_events (
-    event_id BIGSERIAL NOT NULL,
-    PRIMARY KEY (event_id),
+    event_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     task_id BIGINT NOT NULL,
     dataset_id VARCHAR(100),
     event_time timestamptz NOT NULL,

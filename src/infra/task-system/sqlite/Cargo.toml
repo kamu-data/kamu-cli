@@ -1,6 +1,6 @@
 [package]
-name = "kamu-task-system-postgres"
-description = "Postgres-specific implementation of the compute node's task system for testing purposes"
+name = "kamu-task-system-sqlite"
+description = "SQLite-specific implementation of the compute node's task system for testing purposes"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -36,7 +36,7 @@ sqlx = { version = "0.7", default-features = false, features = [
     "runtime-tokio-rustls",
     "json",
     "macros",
-    "postgres",
+    "sqlite",
     "chrono"
 ]}
 tokio-stream = { version = "0.1", default-features = false }

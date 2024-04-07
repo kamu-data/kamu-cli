@@ -3584,6 +3584,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-accounts-sqlite"
+version = "0.171.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "internal-error",
+ "kamu-accounts",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "thiserror",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "kamu-adapter-auth-oso"
 version = "0.171.0"
 dependencies = [
@@ -4104,6 +4122,27 @@ dependencies = [
  "test-log",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "kamu-task-system-sqlite"
+version = "0.171.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "futures",
+ "kamu-task-system",
+ "kamu-task-system-repo-tests",
+ "opendatafabric",
+ "serde_json",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]
