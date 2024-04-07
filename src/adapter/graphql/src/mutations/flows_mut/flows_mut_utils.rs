@@ -109,7 +109,7 @@ pub(crate) async fn ensure_flow_preconditions(
                 .int_err()?;
             if source_res.is_none() {
                 return Ok(Some(FlowPreconditionsNotMet {
-                    preconditions: "polling source does not exist".to_string(),
+                    preconditions: "No SetPollingSource event defined".to_string(),
                 }));
             }
         }
@@ -123,7 +123,7 @@ pub(crate) async fn ensure_flow_preconditions(
 
             if source_res.is_none() {
                 return Ok(Some(FlowPreconditionsNotMet {
-                    preconditions: "set transform does not exist".to_string(),
+                    preconditions: "No SetTransform event defined".to_string(),
                 }));
             };
         }
