@@ -92,8 +92,6 @@ pin-project = "1"
 petgraph = { version = "0.6.4", default-features = false }
 rand = "0.8"
 regex = "1"
-strum = "0.25"  # Enum from string
-strum_macros = "0.25"
 tempfile = "3"
 thiserror = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false, features = ["fs", "process"] }
