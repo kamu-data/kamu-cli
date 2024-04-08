@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::io::Write;
+use std::io::{ErrorKind, Write};
 
+use arrow::error::ArrowError;
 pub use datafusion::arrow::csv::{Writer as CsvWriter, WriterBuilder as CsvWriterBuilder};
 pub use datafusion::arrow::json::{
     ArrayWriter as JsonArrayWriter,
@@ -41,7 +42,15 @@ pub trait RecordsWriter {
 
 impl<W: Write> RecordsWriter for CsvWriter<W> {
     fn write_batch(&mut self, records: &RecordBatch) -> Result<(), Error> {
-        CsvWriter::write(self, records).unwrap();
+        if let Err(err) = CsvWriter::write(self, records) {
+            match err {
+                ArrowError::IoError(err_str, io_err) => match io_err.kind() {
+                    ErrorKind::BrokenPipe => (),
+                    _ => panic!("Cannot write output, io error occurred : {}", err_str),
+                },
+                err => panic!("Cannot write output, arrow writer error occurred: {}", err),
+            };
+        }
         Ok(())
     }
 }
@@ -52,7 +61,15 @@ impl<W: Write> RecordsWriter for CsvWriter<W> {
 
 impl<W: Write> RecordsWriter for JsonArrayWriter<W> {
     fn write_batch(&mut self, records: &RecordBatch) -> Result<(), Error> {
-        JsonArrayWriter::write(self, records).unwrap();
+        if let Err(err) = JsonArrayWriter::write(self, records) {
+            match err {
+                ArrowError::IoError(err_str, io_err) => match io_err.kind() {
+                    ErrorKind::BrokenPipe => (),
+                    _ => panic!("Cannot write output, io error occurred : {}", err_str),
+                },
+                err => panic!("Cannot write output, arrow writer error occurred: {}", err),
+            };
+        }
         Ok(())
     }
 
@@ -68,7 +85,15 @@ impl<W: Write> RecordsWriter for JsonArrayWriter<W> {
 
 impl<W: Write> RecordsWriter for JsonLineDelimitedWriter<W> {
     fn write_batch(&mut self, records: &RecordBatch) -> Result<(), Error> {
-        JsonLineDelimitedWriter::write(self, records).unwrap();
+        if let Err(err) = JsonLineDelimitedWriter::write(self, records) {
+            match err {
+                ArrowError::IoError(err_str, io_err) => match io_err.kind() {
+                    ErrorKind::BrokenPipe => (),
+                    _ => panic!("Cannot write output, io error occurred : {}", err_str),
+                },
+                err => panic!("Cannot write output, arrow writer error occurred: {}", err),
+            };
+        }
         Ok(())
     }
 
