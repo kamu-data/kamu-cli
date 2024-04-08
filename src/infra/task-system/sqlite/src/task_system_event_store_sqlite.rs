@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use database_common::{LazyTransactionRef, TransactionRefT};
+use database_common::{TransactionRef, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_task_system::*;
@@ -24,7 +24,7 @@ pub struct TaskSystemEventStoreSqlite {
 #[component(pub)]
 #[interface(dyn TaskSystemEventStore)]
 impl TaskSystemEventStoreSqlite {
-    pub fn new(transaction: LazyTransactionRef) -> Self {
+    pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
         }

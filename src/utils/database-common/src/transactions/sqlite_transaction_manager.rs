@@ -11,7 +11,7 @@ use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use sqlx::SqlitePool;
 
-use crate::{DatabaseTransactionManager, LazyTransactionRef};
+use crate::{DatabaseTransactionManager, TransactionRef};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,13 +29,13 @@ impl SqliteTransactionManager {
 
 #[async_trait::async_trait]
 impl DatabaseTransactionManager for SqliteTransactionManager {
-    async fn make_lazy_transaction_ref(&self) -> Result<LazyTransactionRef, InternalError> {
-        Ok(LazyTransactionRef::new(self.sqlite_pool.clone()))
+    async fn make_transaction_ref(&self) -> Result<TransactionRef, InternalError> {
+        Ok(TransactionRef::new(self.sqlite_pool.clone()))
     }
 
     async fn commit_transaction(
         &self,
-        transaction_ref: LazyTransactionRef,
+        transaction_ref: TransactionRef,
     ) -> Result<(), InternalError> {
         let maybe_open_sqlite_transaction =
             transaction_ref.into_maybe_transaction::<sqlx::Sqlite>();
@@ -48,7 +48,7 @@ impl DatabaseTransactionManager for SqliteTransactionManager {
 
     async fn rollback_transaction(
         &self,
-        transaction_ref: LazyTransactionRef,
+        transaction_ref: TransactionRef,
     ) -> Result<(), InternalError> {
         let maybe_open_sqlite_transaction =
             transaction_ref.into_maybe_transaction::<sqlx::Sqlite>();

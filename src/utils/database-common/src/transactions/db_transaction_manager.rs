@@ -19,16 +19,16 @@ use tokio::sync::Mutex;
 
 #[async_trait::async_trait]
 pub trait DatabaseTransactionManager: Send + Sync {
-    async fn make_lazy_transaction_ref(&self) -> Result<LazyTransactionRef, InternalError>;
+    async fn make_transaction_ref(&self) -> Result<TransactionRef, InternalError>;
 
     async fn commit_transaction(
         &self,
-        transaction_ref: LazyTransactionRef,
+        transaction_ref: TransactionRef,
     ) -> Result<(), InternalError>;
 
     async fn rollback_transaction(
         &self,
-        transaction_ref: LazyTransactionRef,
+        transaction_ref: TransactionRef,
     ) -> Result<(), InternalError>;
 }
 
@@ -48,7 +48,7 @@ where
         .unwrap();
 
     // Start transaction
-    let transaction_ref = db_transaction_manager.make_lazy_transaction_ref().await?;
+    let transaction_ref = db_transaction_manager.make_transaction_ref().await?;
 
     // Create a chained catalog for transaction-aware components,
     // but keep a local copy of transaction pointer
@@ -88,14 +88,14 @@ where
 /// lock must be held only for the duration of the DB query and released when
 /// passing control into other components.
 #[derive(Clone)]
-pub struct LazyTransactionRef {
-    inner: Arc<Mutex<LazyTransactionRefInner>>,
+pub struct TransactionRef {
+    inner: Arc<Mutex<TransactionRefInner>>,
 }
 
-impl LazyTransactionRef {
+impl TransactionRef {
     pub fn new<DB: sqlx::Database>(connection_pool: sqlx::pool::Pool<DB>) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(LazyTransactionRefInner::new(connection_pool))),
+            inner: Arc::new(Mutex::new(TransactionRefInner::new(connection_pool))),
         }
     }
 
@@ -109,12 +109,12 @@ impl LazyTransactionRef {
 }
 
 #[derive(Debug)]
-pub struct LazyTransactionRefInner {
+pub struct TransactionRefInner {
     connection_pool: Box<dyn Any + Send>,
     maybe_transaction: Option<Box<dyn Any + Send>>,
 }
 
-impl LazyTransactionRefInner {
+impl TransactionRefInner {
     fn new<DB: sqlx::Database>(connection_pool: sqlx::pool::Pool<DB>) -> Self {
         Self {
             connection_pool: Box::new(connection_pool),
@@ -127,12 +127,12 @@ impl LazyTransactionRefInner {
 /// information to [`TransactionGuard`] to safely access typed
 /// [`sqlx::Transaction`] object.
 pub struct TransactionRefT<DB: sqlx::Database> {
-    tr: LazyTransactionRef,
+    tr: TransactionRef,
     _phantom: PhantomData<DB>,
 }
 
 impl<DB: sqlx::Database> TransactionRefT<DB> {
-    pub fn new(tr: LazyTransactionRef) -> Self {
+    pub fn new(tr: TransactionRef) -> Self {
         Self {
             tr,
             _phantom: PhantomData,
@@ -144,8 +144,8 @@ impl<DB: sqlx::Database> TransactionRefT<DB> {
     }
 }
 
-impl<DB: sqlx::Database> From<LazyTransactionRef> for TransactionRefT<DB> {
-    fn from(value: LazyTransactionRef) -> Self {
+impl<DB: sqlx::Database> From<TransactionRef> for TransactionRefT<DB> {
+    fn from(value: TransactionRef) -> Self {
         Self::new(value)
     }
 }
@@ -155,12 +155,12 @@ impl<DB: sqlx::Database> From<LazyTransactionRef> for TransactionRefT<DB> {
 /// lock must be held only for the duration of the DB query and released when
 /// passing control into other components.
 pub struct TransactionGuard<'a, DB: sqlx::Database> {
-    guard: tokio::sync::MutexGuard<'a, LazyTransactionRefInner>,
+    guard: tokio::sync::MutexGuard<'a, TransactionRefInner>,
     _phantom: PhantomData<DB>,
 }
 
 impl<'a, DB: sqlx::Database> TransactionGuard<'a, DB> {
-    pub fn new(guard: tokio::sync::MutexGuard<'a, LazyTransactionRefInner>) -> Self {
+    pub fn new(guard: tokio::sync::MutexGuard<'a, TransactionRefInner>) -> Self {
         Self {
             guard,
             _phantom: PhantomData,

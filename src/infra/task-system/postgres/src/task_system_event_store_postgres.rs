@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{LazyTransactionRef, TransactionRefT};
+use database_common::{TransactionRef, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_task_system::*;
@@ -23,7 +23,7 @@ pub struct TaskSystemEventStorePostgres {
 #[component(pub)]
 #[interface(dyn TaskSystemEventStore)]
 impl TaskSystemEventStorePostgres {
-    pub fn new(transaction: LazyTransactionRef) -> Self {
+    pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
         }

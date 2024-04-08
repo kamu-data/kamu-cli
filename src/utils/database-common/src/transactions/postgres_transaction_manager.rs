@@ -11,7 +11,7 @@ use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use sqlx::PgPool;
 
-use crate::{DatabaseTransactionManager, LazyTransactionRef};
+use crate::{DatabaseTransactionManager, TransactionRef};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,13 +29,13 @@ impl PostgresTransactionManager {
 
 #[async_trait::async_trait]
 impl DatabaseTransactionManager for PostgresTransactionManager {
-    async fn make_lazy_transaction_ref(&self) -> Result<LazyTransactionRef, InternalError> {
-        Ok(LazyTransactionRef::new(self.pg_pool.clone()))
+    async fn make_transaction_ref(&self) -> Result<TransactionRef, InternalError> {
+        Ok(TransactionRef::new(self.pg_pool.clone()))
     }
 
     async fn commit_transaction(
         &self,
-        transaction_ref: LazyTransactionRef,
+        transaction_ref: TransactionRef,
     ) -> Result<(), InternalError> {
         let maybe_open_postgres_transaction =
             transaction_ref.into_maybe_transaction::<sqlx::Postgres>();
@@ -48,7 +48,7 @@ impl DatabaseTransactionManager for PostgresTransactionManager {
 
     async fn rollback_transaction(
         &self,
-        transaction_ref: LazyTransactionRef,
+        transaction_ref: TransactionRef,
     ) -> Result<(), InternalError> {
         let maybe_open_postgres_transaction =
             transaction_ref.into_maybe_transaction::<sqlx::Postgres>();

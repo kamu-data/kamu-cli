@@ -11,7 +11,7 @@ use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use sqlx::MySqlPool;
 
-use crate::{DatabaseTransactionManager, LazyTransactionRef};
+use crate::{DatabaseTransactionManager, TransactionRef};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,13 +29,13 @@ impl MySqlTransactionManager {
 
 #[async_trait::async_trait]
 impl DatabaseTransactionManager for MySqlTransactionManager {
-    async fn make_lazy_transaction_ref(&self) -> Result<LazyTransactionRef, InternalError> {
-        Ok(LazyTransactionRef::new(self.mysql_pool.clone()))
+    async fn make_transaction_ref(&self) -> Result<TransactionRef, InternalError> {
+        Ok(TransactionRef::new(self.mysql_pool.clone()))
     }
 
     async fn commit_transaction(
         &self,
-        transaction_ref: LazyTransactionRef,
+        transaction_ref: TransactionRef,
     ) -> Result<(), InternalError> {
         let maybe_open_mysql_transaction = transaction_ref.into_maybe_transaction::<sqlx::MySql>();
         if let Some(mysql_transaction) = maybe_open_mysql_transaction {
@@ -47,7 +47,7 @@ impl DatabaseTransactionManager for MySqlTransactionManager {
 
     async fn rollback_transaction(
         &self,
-        transaction_ref: LazyTransactionRef,
+        transaction_ref: TransactionRef,
     ) -> Result<(), InternalError> {
         let maybe_open_mysql_transaction = transaction_ref.into_maybe_transaction::<sqlx::MySql>();
         if let Some(mysql_transaction) = maybe_open_mysql_transaction {

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{LazyTransactionRef, TransactionRefT};
+use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use opendatafabric::AccountID;
@@ -23,7 +23,7 @@ pub struct MySqlAccountRepository {
 #[component(pub)]
 #[interface(dyn AccountRepository)]
 impl MySqlAccountRepository {
-    pub fn new(transaction: LazyTransactionRef) -> Self {
+    pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
         }
