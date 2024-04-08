@@ -14,13 +14,12 @@ use container_runtime::ContainerRuntime;
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
-use kamu::testing::MetadataFactory;
+use kamu::testing::{MetadataFactory, MockObjectStoreRegistry};
 use kamu::{
     DataFormatRegistryImpl,
     DatasetRepositoryLocalFs,
     DependencyGraphServiceInMemory,
     EngineProvisionerNull,
-    ObjectStoreRegistryImpl,
     PollingIngestServiceImpl,
     TransformServiceImpl,
 };
@@ -28,6 +27,7 @@ use kamu_core::{
     auth,
     CreateDatasetResult,
     DatasetRepository,
+    ObjectStoreRegistry,
     PollingIngestService,
     SystemTimeSourceDefault,
 };
@@ -966,7 +966,7 @@ async fn test_conditions_not_met_for_flows() {
                         "configs": {
                             "setConfigBatching": {
                                 "__typename": "FlowPreconditionsNotMet",
-                                "message": "Flow didn't met preconditions: 'polling source does not exist'",
+                                "message": "Flow didn't met preconditions: 'No SetPollingSource event defined'",
                             }
                         }
                     }
@@ -1003,7 +1003,7 @@ async fn test_conditions_not_met_for_flows() {
                         "configs": {
                             "setConfigSchedule": {
                                 "__typename": "FlowPreconditionsNotMet",
-                                "message": "Flow didn't met preconditions: 'set transform does not exist'",
+                                "message": "Flow didn't met preconditions: 'No SetTransform event defined'",
                             }
                         }
                     }
@@ -1224,7 +1224,8 @@ impl FlowConfigHarness {
             .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
             .add::<TransformServiceImpl>()
             .add::<EngineProvisionerNull>()
-            .add::<ObjectStoreRegistryImpl>()
+            .add_value(MockObjectStoreRegistry::with_datafusion_default())
+            .bind::<dyn ObjectStoreRegistry, MockObjectStoreRegistry>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
             .add::<FlowConfigurationServiceInMemory>()
