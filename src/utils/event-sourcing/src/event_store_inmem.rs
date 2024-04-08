@@ -43,7 +43,11 @@ impl<Proj: Projection, State: EventStoreState<Proj>> EventStore<Proj>
         Ok(self.state.lock().unwrap().events_count())
     }
 
-    fn get_events(&self, query: &Proj::Query, opts: GetEventsOpts) -> EventStream<Proj::Event> {
+    async fn get_events(
+        &self,
+        query: &Proj::Query,
+        opts: GetEventsOpts,
+    ) -> EventStream<Proj::Event> {
         let query = query.clone();
 
         // TODO: This should be a buffered stream so we don't lock per event
@@ -68,7 +72,7 @@ impl<Proj: Projection, State: EventStoreState<Proj>> EventStore<Proj>
                     None => break,
                     Some((i, event)) => {
                         seen = i + 1;
-                        yield (EventID::new(i as u64), event)
+                        yield (EventID::new(i64::try_from(i).unwrap()), event)
                     }
                 }
             }
@@ -86,7 +90,7 @@ impl<Proj: Projection, State: EventStoreState<Proj>> EventStore<Proj>
             g.add_event(event);
         }
 
-        Ok(EventID::new((g.events_count() - 1) as u64))
+        Ok(EventID::new(i64::try_from(g.events_count() - 1).unwrap()))
     }
 }
 

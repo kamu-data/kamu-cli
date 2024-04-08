@@ -11,10 +11,17 @@ use std::path::Path;
 use std::sync::Arc;
 
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
+use database_common::{
+    run_transactional,
+    DatabaseConfiguration,
+    DatabaseProvider,
+    DatabaseTransactionManager,
+};
 use dill::*;
 use kamu::domain::compact_service::CompactService;
 use kamu::domain::*;
 use kamu::*;
+use opendatafabric::DatasetID;
 
 use crate::error::*;
 use crate::explore::TraceServer;
@@ -74,6 +81,14 @@ pub async fn run(
 
         base_catalog_builder.add_value(ServerUrlConfig::load()?);
 
+        // TODO: read database settings from configuration, and make it optional
+        // let db_configuration = DatabaseConfiguration::local_postgres();
+        // let db_configuration = DatabaseConfiguration::local_mariadb();
+        // let db_configuration =
+        //    DatabaseConfiguration::sqlite_from(PathBuf::from("./kamu.sqlite.db").
+        // as_path());
+        // configure_database_components(&mut base_catalog_builder, &db_configuration)?;
+
         base_catalog_builder
             .add_value(dependencies_graph_repository)
             .bind::<dyn domain::DependencyGraphRepository, DependencyGraphRepositoryInMemory>();
@@ -104,6 +119,9 @@ pub async fn run(
 
         (guards, base_catalog, cli_catalog, output_config)
     };
+
+    // Temp: remove this
+    database_test(&base_catalog).await?;
 
     // Evict cache
     if workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()? {
@@ -151,6 +169,40 @@ pub async fn run(
     }
 
     result
+}
+
+async fn database_test(catalog: &Catalog) -> Result<(), InternalError> {
+    let maybe_transaction_manager = catalog.get_one::<dyn DatabaseTransactionManager>().ok();
+    if maybe_transaction_manager.is_some() {
+        run_transactional(catalog, |catalog| async move {
+            let account_repository = catalog
+                .get_one::<dyn kamu_accounts::AccountRepository>()
+                .unwrap();
+            println!(
+                "{:?}",
+                account_repository
+                    .find_account_by_email("test@example.com")
+                    .await
+                    .int_err()?
+            );
+            let account = kamu_accounts::AccountModel {
+                id: DatasetID::new_seeded_ed25519(b"hello").to_string(),
+                email: String::from("test@example.com"),
+                account_name: String::from("wasya"),
+                display_name: String::from("Wasya Pupkin"),
+                origin: kamu_accounts::AccountOrigin::Cli,
+                registered_at: chrono::Utc::now(),
+            };
+            account_repository
+                .create_account(&account)
+                .await
+                .int_err()?;
+            Ok(())
+        })
+        .await?;
+    }
+
+    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -267,9 +319,9 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
 
-    b.add::<kamu_task_system_inmem::TaskSchedulerInMemory>();
+    b.add::<kamu_task_system_services::TaskSchedulerImpl>();
 
-    b.add::<kamu_task_system_inmem::TaskExecutorInMemory>();
+    b.add::<kamu_task_system_services::TaskExecutorImpl>();
 
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
@@ -303,6 +355,48 @@ pub fn configure_base_catalog(
     b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
 
     b
+}
+
+#[allow(dead_code)]
+fn configure_database_components(
+    catalog_builder: &mut CatalogBuilder,
+    db_configuration: &DatabaseConfiguration,
+) -> Result<(), InternalError> {
+    match db_configuration.provider {
+        DatabaseProvider::Postgres => {
+            database_common::PostgresPlugin::init_database_components(
+                catalog_builder,
+                db_configuration,
+            )
+            .int_err()?;
+
+            catalog_builder.add::<kamu_accounts_postgres::PostgresAccountRepository>();
+
+            Ok(())
+        }
+        DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
+            database_common::MySqlPlugin::init_database_components(
+                catalog_builder,
+                db_configuration,
+            )
+            .int_err()?;
+
+            catalog_builder.add::<kamu_accounts_mysql::MySqlAccountRepository>();
+
+            Ok(())
+        }
+        DatabaseProvider::Sqlite => {
+            database_common::SqlitePlugin::init_database_components(
+                catalog_builder,
+                db_configuration,
+            )
+            .int_err()?;
+
+            catalog_builder.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
+
+            Ok(())
+        }
+    }
 }
 
 // Public only for tests

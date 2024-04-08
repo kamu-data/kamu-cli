@@ -1001,7 +1001,7 @@ impl<'a> DatasetFlowGenerator<'a> {
             initial_trigger,
         );
 
-        drive_flow_to_status(&mut flow, self.task_event_store.as_ref(), expected_status);
+        drive_flow_to_status(&mut flow, self.task_event_store.as_ref(), expected_status).await;
 
         flow.save(self.flow_event_store.as_ref()).await.unwrap();
 
@@ -1044,7 +1044,7 @@ impl SystemFlowGenerator {
             initial_trigger,
         );
 
-        drive_flow_to_status(&mut flow, self.task_event_store.as_ref(), expected_status);
+        drive_flow_to_status(&mut flow, self.task_event_store.as_ref(), expected_status).await;
 
         flow.save(self.flow_event_store.as_ref()).await.unwrap();
 
@@ -1054,7 +1054,7 @@ impl SystemFlowGenerator {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn drive_flow_to_status(
+async fn drive_flow_to_status(
     flow: &mut Flow,
     task_event_store: &dyn TaskSystemEventStore,
     expected_status: FlowStatus,
@@ -1070,7 +1070,7 @@ fn drive_flow_to_status(
     .unwrap();
 
     if expected_status != FlowStatus::Waiting {
-        let task_id = task_event_store.new_task_id();
+        let task_id = task_event_store.new_task_id().await.unwrap();
         flow.on_task_scheduled(start_moment + Duration::try_minutes(5).unwrap(), task_id)
             .unwrap();
         flow.on_task_running(start_moment + Duration::try_minutes(7).unwrap(), task_id)

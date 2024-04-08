@@ -19,7 +19,8 @@ use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_task_system::*;
-use kamu_task_system_inmem::{TaskSchedulerInMemory, TaskSystemEventStoreInMemory};
+use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
+use kamu_task_system_services::TaskSchedulerImpl;
 use opendatafabric::*;
 use tokio::task::yield_now;
 
@@ -3275,7 +3276,7 @@ impl FlowHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
-            .add::<TaskSchedulerInMemory>()
+            .add::<TaskSchedulerImpl>()
             .add::<TaskSystemEventStoreInMemory>()
             .add::<FlowSystemTestListener>()
             .build();

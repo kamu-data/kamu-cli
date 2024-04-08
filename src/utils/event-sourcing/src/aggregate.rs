@@ -133,13 +133,15 @@ where
     ) -> Result<Self, LoadError<Proj>> {
         use tokio_stream::StreamExt;
 
-        let mut event_stream = event_store.get_events(
-            &query,
-            GetEventsOpts {
-                from: None,
-                to: opts.as_of_event,
-            },
-        );
+        let mut event_stream = event_store
+            .get_events(
+                &query,
+                GetEventsOpts {
+                    from: None,
+                    to: opts.as_of_event,
+                },
+            )
+            .await;
 
         let (event_id, event) = match event_stream.next().await {
             Some(Ok(v)) => v,
@@ -195,13 +197,15 @@ where
 
         let prev_stored_event = self.last_stored_event;
 
-        let mut event_stream = event_store.get_events(
-            &self.query,
-            GetEventsOpts {
-                from: prev_stored_event,
-                to: opts.as_of_event,
-            },
-        );
+        let mut event_stream = event_store
+            .get_events(
+                &self.query,
+                GetEventsOpts {
+                    from: prev_stored_event,
+                    to: opts.as_of_event,
+                },
+            )
+            .await;
 
         let mut num_events = 1;
 
