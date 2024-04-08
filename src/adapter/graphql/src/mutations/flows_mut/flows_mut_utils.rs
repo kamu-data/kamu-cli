@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_core::GetSummaryOpts;
+use odf::DatasetHandle;
 use {kamu_flow_system as fs, opendatafabric as odf};
 
 use super::FlowNotFound;
@@ -92,6 +93,59 @@ pub(crate) async fn ensure_expected_dataset_kind(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn ensure_flow_preconditions(
+    ctx: &Context<'_>,
+    dataset_handle: &DatasetHandle,
+    dataset_flow_type: DatasetFlowType,
+) -> Result<Option<FlowPreconditionsNotMet>> {
+    match dataset_flow_type {
+        DatasetFlowType::Ingest => {
+            let polling_ingest_svc =
+                from_catalog::<dyn kamu_core::PollingIngestService>(ctx).unwrap();
+            let source_res = polling_ingest_svc
+                .get_active_polling_source(&dataset_handle.as_local_ref())
+                .await
+                .int_err()?;
+            if source_res.is_none() {
+                return Ok(Some(FlowPreconditionsNotMet {
+                    preconditions: "No SetPollingSource event defined".to_string(),
+                }));
+            }
+        }
+        DatasetFlowType::ExecuteTransform => {
+            let transform_svc = from_catalog::<dyn kamu_core::TransformService>(ctx).unwrap();
+
+            let source_res = transform_svc
+                .get_active_transform(&dataset_handle.as_local_ref())
+                .await
+                .int_err()?;
+
+            if source_res.is_none() {
+                return Ok(Some(FlowPreconditionsNotMet {
+                    preconditions: "No SetTransform event defined".to_string(),
+                }));
+            };
+        }
+        DatasetFlowType::Compaction => (),
+    }
+    Ok(None)
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct FlowPreconditionsNotMet {
+    pub preconditions: String,
+}
+
+#[ComplexObject]
+impl FlowPreconditionsNotMet {
+    pub async fn message(&self) -> String {
+        format!("Flow didn't met preconditions: '{}'", self.preconditions)
+    }
+}
 
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]

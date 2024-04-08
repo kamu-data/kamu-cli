@@ -13,10 +13,12 @@ use {kamu_flow_system as fs, opendatafabric as odf};
 use super::{
     check_if_flow_belongs_to_dataset,
     ensure_expected_dataset_kind,
+    ensure_flow_preconditions,
     ensure_scheduling_permission,
     FlowInDatasetError,
     FlowIncompatibleDatasetKind,
     FlowNotFound,
+    FlowPreconditionsNotMet,
 };
 use crate::prelude::*;
 use crate::queries::Flow;
@@ -48,6 +50,12 @@ impl DatasetFlowRunsMut {
         }
 
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
+
+        if let Some(e) =
+            ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type).await?
+        {
+            return Ok(TriggerFlowResult::PreconditionsNotMet(e));
+        }
 
         // TODO: for some datasets launching manually might not be an option:
         //   i.e., root datasets with push sources require input data to arrive
@@ -122,6 +130,7 @@ impl DatasetFlowRunsMut {
 enum TriggerFlowResult {
     Success(TriggerFlowSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
+    PreconditionsNotMet(FlowPreconditionsNotMet),
 }
 
 #[derive(SimpleObject)]

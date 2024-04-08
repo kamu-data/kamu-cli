@@ -44,7 +44,7 @@ impl FlowTrigger {
         if let FlowTrigger::Push(trigger_push) = self {
             trigger_push.source_name.clone()
         } else {
-            panic!("Any trigger kind except Push unexpected")
+            None
         }
     }
 
