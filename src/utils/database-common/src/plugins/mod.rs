@@ -9,6 +9,8 @@
 
 mod mysql_plugin;
 mod postgres_plugin;
+mod sqlite_plugin;
 
 pub use mysql_plugin::*;
 pub use postgres_plugin::*;
+pub use sqlite_plugin::*;

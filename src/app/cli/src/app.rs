@@ -21,6 +21,7 @@ use dill::*;
 use kamu::domain::compact_service::CompactService;
 use kamu::domain::*;
 use kamu::*;
+use opendatafabric::DatasetID;
 
 use crate::error::*;
 use crate::explore::TraceServer;
@@ -81,8 +82,12 @@ pub async fn run(
         base_catalog_builder.add_value(ServerUrlConfig::load()?);
 
         // TODO: read database settings from configuration, and make it optional
-        //let db_configuration = DatabaseConfiguration::local_postgres();
-        //configure_database_components(&mut base_catalog_builder, &db_configuration)?;
+        // let db_configuration = DatabaseConfiguration::local_postgres();
+        // let db_configuration = DatabaseConfiguration::local_mariadb();
+        // let db_configuration =
+        //    DatabaseConfiguration::sqlite_from(PathBuf::from("./kamu.sqlite.db").
+        // as_path());
+        // configure_database_components(&mut base_catalog_builder, &db_configuration)?;
 
         base_catalog_builder
             .add_value(dependencies_graph_repository)
@@ -180,6 +185,18 @@ async fn database_test(catalog: &Catalog) -> Result<(), InternalError> {
                     .await
                     .int_err()?
             );
+            let account = kamu_accounts::AccountModel {
+                id: DatasetID::new_seeded_ed25519(b"hello").to_string(),
+                email: String::from("test@example.com"),
+                account_name: String::from("wasya"),
+                display_name: String::from("Wasya Pupkin"),
+                origin: kamu_accounts::AccountOrigin::Cli,
+                registered_at: chrono::Utc::now(),
+            };
+            account_repository
+                .create_account(&account)
+                .await
+                .int_err()?;
             Ok(())
         })
         .await?;
@@ -365,6 +382,17 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_mysql::MySqlAccountRepository>();
+
+            Ok(())
+        }
+        DatabaseProvider::Sqlite => {
+            database_common::SqlitePlugin::init_database_components(
+                catalog_builder,
+                db_configuration,
+            )
+            .int_err()?;
+
+            catalog_builder.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
 
             Ok(())
         }

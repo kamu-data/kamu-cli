@@ -59,6 +59,7 @@ random-names = { workspace = true }
 database-common = { workspace = true }
 kamu-accounts-postgres = { workspace = true }
 kamu-accounts-mysql = { workspace = true }
+kamu-accounts-sqlite = { workspace = true }
 
 # CLI
 chrono-humanize = "0.2"  # Human readable durations

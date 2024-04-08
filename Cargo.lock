@@ -3813,6 +3813,7 @@ dependencies = [
  "kamu-accounts",
  "kamu-accounts-mysql",
  "kamu-accounts-postgres",
+ "kamu-accounts-sqlite",
  "kamu-adapter-auth-oso",
  "kamu-adapter-flight-sql",
  "kamu-adapter-graphql",

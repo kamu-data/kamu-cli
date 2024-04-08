@@ -14,6 +14,7 @@ pub enum DatabaseProvider {
     Postgres,
     MySql,
     MariaDB,
+    Sqlite,
 }
 
 impl DatabaseProvider {
@@ -21,6 +22,7 @@ impl DatabaseProvider {
         match self {
             DatabaseProvider::MariaDB | DatabaseProvider::MySql => 3306,
             DatabaseProvider::Postgres => 5432,
+            DatabaseProvider::Sqlite => unreachable!(),
         }
     }
 }
@@ -34,6 +36,7 @@ impl std::fmt::Display for DatabaseProvider {
                 DatabaseProvider::Postgres => "postgres",
                 DatabaseProvider::MySql => "mysql",
                 DatabaseProvider::MariaDB => "mariadb",
+                DatabaseProvider::Sqlite => "sqlite",
             }
         )
     }
