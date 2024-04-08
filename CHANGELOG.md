@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Fixed
 - Add preconditions flow checks
+- Fix URLs for Get Data panel
 
 ## [0.172.0] - 2024-04-08
 ### Added
