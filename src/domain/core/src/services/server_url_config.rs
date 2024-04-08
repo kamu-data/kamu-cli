@@ -34,9 +34,15 @@ impl ServerUrlConfig {
                 .unwrap_or_else(|_| "grpc://localhost:50050".to_string());
             Url::parse(&raw).int_err()?
         };
+        let base_url_platform = {
+            let raw = std::env::var("KAMU_BASE_URL_PLATFORM")
+                .unwrap_or_else(|_| "http://localhost:4200".to_string());
+            Url::parse(&raw).int_err()?
+        };
 
         Ok(Self {
             protocols: Protocols {
+                base_url_platform,
                 base_url_rest,
                 base_url_flightsql,
             },
@@ -51,6 +57,7 @@ impl ServerUrlConfig {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct Protocols {
+    pub base_url_platform: Url,
     pub base_url_rest: Url,
     pub base_url_flightsql: Url,
 }

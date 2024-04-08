@@ -39,8 +39,10 @@ impl<'a> DatasetEndpoints<'a> {
     #[allow(clippy::unused_async)]
     async fn web_link(&self) -> Result<LinkProtocolDesc> {
         let url = format!(
-            "{}{}",
-            self.config.protocols.base_url_rest, self.dataset_handle.alias
+            "{}{}/{}",
+            self.config.protocols.base_url_platform,
+            self.owner.account_name_internal().as_str(),
+            self.dataset_handle.alias
         );
 
         Ok(LinkProtocolDesc { url })
@@ -66,7 +68,7 @@ impl<'a> DatasetEndpoints<'a> {
     async fn rest(&self) -> Result<RestProtocolDesc> {
         let base_url = format!(
             "{}{}",
-            self.config.protocols.base_url_rest, self.dataset_handle.alias
+            self.config.protocols.base_url_platform, self.dataset_handle.alias
         );
 
         let tail_url = format!("{base_url}/tail?limit=10");
