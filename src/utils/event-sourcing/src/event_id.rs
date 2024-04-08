@@ -10,19 +10,19 @@
 /// A monotonically increasing identifier
 /// assigned by event stores to events
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct EventID(u64);
+pub struct EventID(i64);
 
 impl EventID {
-    pub fn new(v: u64) -> Self {
+    pub fn new(v: i64) -> Self {
         Self(v)
     }
 
-    pub fn into_inner(self) -> u64 {
+    pub fn into_inner(self) -> i64 {
         self.0
     }
 }
 
-impl From<EventID> for u64 {
+impl From<EventID> for i64 {
     fn from(val: EventID) -> Self {
         val.0
     }

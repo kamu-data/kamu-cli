@@ -59,34 +59,58 @@ jobs:
             runs-on: ubuntu-latest
             cargo-flags: --profile ci --features ftp
             nextest-flags: --cargo-profile ci --features ftp
+            nextest-exclusions: -E '!test(::database::)'
             container-runtime: podman
             ipfs: true
+            database: true
           # TODO: Not running docker as it takes ~7 minutes to install
           # See: https://github.com/actions/runner/issues/1456
           - name: MacOS / amd64
             runs-on: macos-13
             cargo-flags: --profile ci --features ftp
-            nextest-flags: --cargo-profile ci --features ftp -E '!test(::containerized::)'
+            nextest-flags: --cargo-profile ci --features ftp
+            nextest-exclusions: -E '!(test(::containerized::) | test(::database::))'
             container-runtime: ''
             ipfs: false
+            database: false
           # TODO: M1 cannot run docker due to lack of nested virtualization
           # See: https://github.com/marketplace/actions/setup-docker-on-macos#arm64-processors-m1-m2-m3-series-used-on-macos-14-images-are-unsupported
           - name: MacOS / arm64
             runs-on: macos-14
             cargo-flags: --profile ci
-            nextest-flags: --cargo-profile ci -E '!test(::containerized::)'
+            nextest-flags: --cargo-profile ci 
+            nextest-exclusions: -E '!(test(::containerized::) | test(::database::))'
             container-runtime: ''
             ipfs: false
+            database: false
           # TODO: DataFusion tests are temporarily disabled
           # See: https://github.com/kamu-data/kamu-cli/issues/226
           - name: Windows / amd64
             runs-on: windows-latest
             cargo-flags: --profile ci
-            nextest-flags: --cargo-profile ci -E 'not (test(::containerized::) | test(::datafusion::))'
+            nextest-flags: --cargo-profile ci 
+            nextest-exclusions: -E 'not (test(::containerized::) | test(::datafusion::) | test(::database::))'
             container-runtime: ''
             ipfs: false
+            database: false
     name: Test / ${{ matrix.name }}
     runs-on: ${{ matrix.runs-on }}
+    services:
+      postgres:
+        image: ${{ matrix.database && 'postgres:16' || '' }}
+        env:
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: kamu-test
+        ports:
+          - 5432:5432
+      mariadb:
+        image: ${{ matrix.database && 'mariadb:11' || '' }}
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: kamu-test
+        ports:
+          - 3306:3306
     steps:
       - name: Setup IPFS
         uses: ibnesayeed/setup-ipfs@master
@@ -102,10 +126,12 @@ jobs:
         with:
           cache-on-failure: true
 
+      - uses: cargo-bins/cargo-binstall@main
+
       - name: Install cargo tools
         # TODO: Restore --locked switch as soon as `cargo-nextest` releases version with `ahash>=0.8.7`
         run: |
-          cargo install cargo-nextest
+          cargo binstall cargo-nextest -y --force
 
       - name: Configure runtime
         if: matrix.container-runtime != ''
@@ -114,14 +140,36 @@ jobs:
           echo "KAMU_CONTAINER_RUNTIME_TYPE=${{ matrix.container-runtime }}" >> $GITHUB_ENV
 
       - name: Build
-        run: cargo test ${{ matrix.cargo-flags }} --no-run
+        run: |
+          cargo test ${{ matrix.cargo-flags }} --no-run
 
       - name: Pull test images
         if: matrix.container-runtime != ''
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::setup::)' --no-capture
 
-      - name: Run tests
-        run: cargo nextest run ${{ matrix.nextest-flags }}
+        # Note: SQLite does not require a container and may run on any platform
+      - name: SQLite database tests
+        env:
+          SQLX_OFFLINE: false
+          DATABASE_URL: sqlite://kamu.sqlite.db
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::sqlite::)'
+
+      - name: Postgres database tests
+        if: matrix.database
+        env:
+          SQLX_OFFLINE: false
+          DATABASE_URL: postgres://root:root@localhost:5432/kamu-test
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::)'
+
+      - name: MariaDB database tests
+        if: matrix.database
+        env:
+          SQLX_OFFLINE: false
+          DATABASE_URL: mariadb://root:root@localhost:3306/kamu-test
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::mysql::)'
+
+      - name: Run main set of tests
+        run: cargo nextest run ${{ matrix.nextest-flags }} ${{ matrix.nextest-exclusions }}
 
       # Not running on windows due to line ending differences
       - name: Check generated files

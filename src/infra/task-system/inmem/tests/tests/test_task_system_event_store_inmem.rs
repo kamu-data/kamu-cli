@@ -1,0 +1,68 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use dill::CatalogBuilder;
+use kamu_task_system_inmem::*;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_event_store_empty() {
+    let catalog = CatalogBuilder::new()
+        .add::<TaskSystemEventStoreInMemory>()
+        .build();
+
+    kamu_task_system_repo_tests::test_event_store_empty(&catalog).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_event_store_get_streams() {
+    let catalog = CatalogBuilder::new()
+        .add::<TaskSystemEventStoreInMemory>()
+        .build();
+
+    kamu_task_system_repo_tests::test_event_store_get_streams(&catalog).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_event_store_get_events_with_windowing() {
+    let catalog = CatalogBuilder::new()
+        .add::<TaskSystemEventStoreInMemory>()
+        .build();
+
+    kamu_task_system_repo_tests::test_event_store_get_events_with_windowing(&catalog).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_event_store_get_events_by_tasks() {
+    let catalog = CatalogBuilder::new()
+        .add::<TaskSystemEventStoreInMemory>()
+        .build();
+
+    kamu_task_system_repo_tests::test_event_store_get_events_by_tasks(&catalog).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_event_store_get_dataset_tasks() {
+    let catalog = CatalogBuilder::new()
+        .add::<TaskSystemEventStoreInMemory>()
+        .build();
+
+    kamu_task_system_repo_tests::test_event_store_get_dataset_tasks(&catalog).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

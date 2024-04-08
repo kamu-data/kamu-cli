@@ -51,12 +51,12 @@ impl CalcEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<CalcState> for CalcEventStore {
-    fn get_events(&self, _query: &(), _opts: GetEventsOpts) -> EventStream<CalcEvents> {
+    async fn get_events(&self, _query: &(), _opts: GetEventsOpts) -> EventStream<CalcEvents> {
         use futures::StreamExt;
         Box::pin(
             tokio_stream::iter(self.0.lock().unwrap().clone())
                 .enumerate()
-                .map(|(i, e)| Ok((EventID::new(i as u64), e))),
+                .map(|(i, e)| Ok((EventID::new(i64::try_from(i).unwrap()), e))),
         )
     }
 
@@ -67,7 +67,7 @@ impl EventStore<CalcState> for CalcEventStore {
     ) -> Result<EventID, SaveEventsError> {
         let mut s = self.0.lock().unwrap();
         s.append(&mut events);
-        Ok(EventID::new((s.len() - 1) as u64))
+        Ok(EventID::new(i64::try_from(s.len() - 1).unwrap()))
     }
 
     async fn len(&self) -> Result<usize, InternalError> {

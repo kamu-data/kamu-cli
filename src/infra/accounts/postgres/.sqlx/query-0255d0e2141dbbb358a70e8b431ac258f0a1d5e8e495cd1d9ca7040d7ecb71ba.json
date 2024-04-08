@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO accounts (id, email, account_name, display_name, origin, registered_at)\n                VALUES ($1, $2, $3, $4, ($5::text)::account_origin, $6)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0255d0e2141dbbb358a70e8b431ac258f0a1d5e8e495cd1d9ca7040d7ecb71ba"
+}

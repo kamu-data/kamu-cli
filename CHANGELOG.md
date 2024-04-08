@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.172.0] - 2024-04-08
+### Added
+- Added persistency infrastructure prototype based on `sqlx` engine:
+   - supports Postgres, MySQL/MariaDB, SQlite database targets
+   - sketched simplictic Accounts domain (not-integrated yet)
+   - converted Task System domain to use persistent repositories
+   - added test infrastructure for database-specific features
+   - automated and documented development flow procedures in database offline/online modes
+
 ## [0.171.0] - 2024-04-05
 ### Added
 - Support `ArrowJson` schema output format in QGL API and CLI commands

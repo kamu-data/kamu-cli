@@ -43,6 +43,8 @@ event-bus = { workspace = true }
 kamu-data-utils = { workspace = true }
 opendatafabric = { workspace = true }
 kamu = { workspace = true }
+kamu-accounts = { workspace = true }
+kamu-task-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-adapter-auth-oso = { workspace = true }
@@ -53,6 +55,11 @@ kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
 random-names = { workspace = true }
+
+database-common = { workspace = true }
+kamu-accounts-postgres = { workspace = true }
+kamu-accounts-mysql = { workspace = true }
+kamu-accounts-sqlite = { workspace = true }
 
 # CLI
 chrono-humanize = "0.2"  # Human readable durations
@@ -125,7 +132,7 @@ tempfile = "3"
 thiserror = { version = "1", default-features = false }
 url = "2"
 urlencoding = "2"
-whoami = "1.4"
+whoami = "1.5"
 
 
 [target.'cfg(unix)'.dependencies]

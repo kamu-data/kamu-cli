@@ -54,7 +54,8 @@ use kamu_flow_system_inmem::{
     FlowServiceInMemory,
 };
 use kamu_task_system as ts;
-use kamu_task_system_inmem::{TaskSchedulerInMemory, TaskSystemEventStoreInMemory};
+use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
+use kamu_task_system_services::TaskSchedulerImpl;
 use opendatafabric::{DatasetID, DatasetKind, Multihash, FAKE_ACCOUNT_ID};
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
@@ -1732,7 +1733,7 @@ impl FlowRunsHarness {
                 Duration::try_seconds(1).unwrap(),
                 Duration::try_minutes(1).unwrap(),
             ))
-            .add::<TaskSchedulerInMemory>()
+            .add::<TaskSchedulerImpl>()
             .add::<TaskSystemEventStoreInMemory>()
             .add::<DataFormatRegistryImpl>()
             .add_value(ContainerRuntime::default())
