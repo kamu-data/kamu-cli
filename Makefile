@@ -37,12 +37,12 @@ lint-fix:
 ###############################################################################
 
 define Setup_EnvFile
-echo "DATABASE_URL=$(1)://root:root@localhost:$(2)/kamu-api-server" > $(3)/.env;
+echo "DATABASE_URL=$(1)://root:root@localhost:$(2)/kamu" > $(3)/.env;
 echo "SQLX_OFFLINE=false" >> $(3)/.env;
 endef
 
 define Setup_EnvFile_Sqlite
-echo "DATABASE_URL=sqlite://$(1)/sqlite.db" > $(2)/.env;
+echo "DATABASE_URL=sqlite://$(1)/kamu.sqlite.db" > $(2)/.env;
 echo "SQLX_OFFLINE=false" >> $(2)/.env;
 endef
 
@@ -57,8 +57,8 @@ sqlx-local-setup-postgres:
 	$(foreach crate,$(POSTGRES_CRATES),$(call Setup_EnvFile,postgres,5432,$(crate)))
 	sleep 3  # Letting the container to start
 	until PGPASSWORD=root psql -h localhost -U root -p 5432 -d root -c '\q'; do sleep 3; done
-	sqlx database create --database-url postgres://root:root@localhost:5432/kamu-api-server
-	sqlx migrate run --source ./migrations/postgres --database-url postgres://root:root@localhost:5432/kamu-api-server
+	sqlx database create --database-url postgres://root:root@localhost:5432/kamu
+	sqlx migrate run --source ./migrations/postgres --database-url postgres://root:root@localhost:5432/kamu
 
 .PHONY: sqlx-local-setup-mariadb
 sqlx-local-setup-mariadb:
@@ -68,14 +68,14 @@ sqlx-local-setup-mariadb:
 	$(foreach crate,$(MYSQL_CRATES),$(call Setup_EnvFile,mysql,3306,$(crate)))
 	sleep 10  # Letting the container to start
 	until mariadb -h localhost -P 3306 -u root --password=root sys --protocol=tcp -e "SELECT 'Hello'" -b; do sleep 3; done	
-	sqlx database create --database-url mysql://root:root@localhost:3306/kamu-api-server
-	sqlx migrate run --source ./migrations/mysql --database-url mysql://root:root@localhost:3306/kamu-api-server
+	sqlx database create --database-url mysql://root:root@localhost:3306/kamu
+	sqlx migrate run --source ./migrations/mysql --database-url mysql://root:root@localhost:3306/kamu
 
 .PHONY: sqlx-local-setup-sqlite
 sqlx-local-setup-sqlite:
-	sqlx database drop -y --database-url sqlite://sqlite.db
-	sqlx database create --database-url sqlite://sqlite.db
-	sqlx migrate run --source migrations/sqlite --database-url sqlite://sqlite.db
+	sqlx database drop -y --database-url sqlite://kamu.sqlite.db
+	sqlx database create --database-url sqlite://kamu.sqlite.db
+	sqlx migrate run --source migrations/sqlite --database-url sqlite://kamu.sqlite.db
 	$(foreach crate,$(SQLITE_CRATES),$(call Setup_EnvFile_Sqlite,$(shell pwd),$(crate)))
 
 .PHONY: sqlx-local-clean
@@ -93,7 +93,7 @@ sqlx-local-clean-mariadb:
 
 .PHONY: sqlx-local-clean-sqlite
 sqlx-local-clean-sqlite:
-	sqlx database drop -y --database-url sqlite://sqlite.db
+	sqlx database drop -y --database-url sqlite://kamu.sqlite.db
 	$(foreach crate,$(SQLITE_CRATES),rm $(crate)/.env -f ;)	
 
 ###############################################################################

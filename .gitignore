@@ -8,4 +8,4 @@
 /images/demo/**/.kamu
 /images/demo/**/.ipynb_checkpoints
 .env
-/sqlite.db
+/kamu.sqlite.db

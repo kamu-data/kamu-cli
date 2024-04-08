@@ -52,7 +52,7 @@ impl DatabaseConfiguration {
             provider: DatabaseProvider::Postgres,
             user: String::from("root"),
             password: Secret::new(String::from("root")),
-            database_name: String::from("kamu-api-server"),
+            database_name: String::from("kamu"),
             host: String::from("localhost"),
             port: None,
         }
@@ -63,7 +63,7 @@ impl DatabaseConfiguration {
             provider: DatabaseProvider::MariaDB,
             user: String::from("root"),
             password: Secret::new(String::from("root")),
-            database_name: String::from("kamu-api-server"),
+            database_name: String::from("kamu"),
             host: String::from("localhost"),
             port: None,
         }

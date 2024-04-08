@@ -151,7 +151,7 @@ jobs:
       - name: SQLite database tests
         env:
           SQLX_OFFLINE: false
-          DATABASE_URL: sqlite://sqlite.db
+          DATABASE_URL: sqlite://kamu.sqlite.db
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::sqlite::)'
 
       - name: Postgres database tests

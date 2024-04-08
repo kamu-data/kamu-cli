@@ -56,7 +56,7 @@ Prerequisites:
     * `cargo binstall cargo-deny -y` - for linting dependencies
     * `cargo binstall cargo-udeps -y` - for linting dependencies (detecting unused)
   * To keep all these cargo tools up-to-date use `cargo install-update -a`
-* Database tools:
+* Database tools (optional, unless modifying repositories is necessary):
   * Install Postgres command line client `psql`: `sudo apt-get install -y postgresql-client`
   * Install MariaDB command line client `mariadb`: `sudo apt install -y mariadb-client`
   * Install `sqlx-cli`: `cargo binstall sqlx-cli -y`
