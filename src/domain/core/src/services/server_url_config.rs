@@ -38,7 +38,7 @@ impl ServerUrlConfig {
                 )?,
                 base_url_rest: Self::get_url_from_env(
                     "KAMU_BASE_URL_REST",
-                    "http://127.0.0.1:8080",
+                    "http://localhost:8080",
                 )?,
                 base_url_flightsql: Self::get_url_from_env(
                     "KAMU_BASE_URL_FLIGHTSQL",
