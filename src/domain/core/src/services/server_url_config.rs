@@ -17,6 +17,12 @@ pub struct ServerUrlConfig {
 }
 
 impl ServerUrlConfig {
+    fn get_url_from_env(env_var: &str, default: &str) -> Result<Url, InternalError> {
+        let raw = std::env::var(env_var).unwrap_or_else(|_| default.to_string());
+
+        Url::parse(&raw).int_err()
+    }
+
     pub fn load() -> Result<Self, InternalError> {
         // TODO: Use value from config not envvar
         //       https://github.com/kamu-data/kamu-node/issues/45
@@ -24,27 +30,20 @@ impl ServerUrlConfig {
         //       Example:
         //       https://github.com/mehcode/config-rs/blob/master/examples/hierarchical-env/settings.rs
 
-        let base_url_rest = {
-            let raw = std::env::var("KAMU_BASE_URL_REST")
-                .unwrap_or_else(|_| "http://127.0.0.1:8080".to_string());
-            Url::parse(&raw).int_err()?
-        };
-        let base_url_flightsql = {
-            let raw = std::env::var("KAMU_BASE_URL_FLIGHTSQL")
-                .unwrap_or_else(|_| "grpc://localhost:50050".to_string());
-            Url::parse(&raw).int_err()?
-        };
-        let base_url_platform = {
-            let raw = std::env::var("KAMU_BASE_URL_PLATFORM")
-                .unwrap_or_else(|_| "http://localhost:4200".to_string());
-            Url::parse(&raw).int_err()?
-        };
-
         Ok(Self {
             protocols: Protocols {
-                base_url_platform,
-                base_url_rest,
-                base_url_flightsql,
+                base_url_platform: Self::get_url_from_env(
+                    "KAMU_BASE_URL_PLATFORM",
+                    "http://localhost:4200",
+                )?,
+                base_url_rest: Self::get_url_from_env(
+                    "KAMU_BASE_URL_REST",
+                    "http://127.0.0.1:8080",
+                )?,
+                base_url_flightsql: Self::get_url_from_env(
+                    "KAMU_BASE_URL_FLIGHTSQL",
+                    "grpc://localhost:50050",
+                )?,
             },
         })
     }
