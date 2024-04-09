@@ -73,7 +73,6 @@ impl FlowState {
                 DatasetFlowType::HardCompaction => {
                     ts::LogicalPlan::CompactDataset(ts::CompactDataset {
                         dataset_id: flow_key.dataset_id.clone(),
-                        options: flow_key.options.clone(),
                     })
                 }
             },

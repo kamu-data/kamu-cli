@@ -13,7 +13,6 @@ use chrono::{DateTime, Utc};
 use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
 use futures::StreamExt;
-use kamu_core::compact_service::CompactOptions;
 use kamu_core::events::DatasetEventDeleted;
 use kamu_core::SystemTimeSource;
 use kamu_flow_system::*;
@@ -68,7 +67,6 @@ impl FlowConfigurationServiceInMemory {
             vec![FlowKey::Dataset(FlowKeyDataset {
                 dataset_id: dataset_id.clone(),
                 flow_type: dataset_flow_type,
-                options: CompactOptions::default(),
             })]
         } else {
             DatasetFlowType::all()
@@ -77,7 +75,6 @@ impl FlowConfigurationServiceInMemory {
                     FlowKey::Dataset(FlowKeyDataset {
                         dataset_id: dataset_id.clone(),
                         flow_type: *dft,
-                        options: CompactOptions::default(),
                     })
                 })
                 .collect()
@@ -165,8 +162,7 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
             let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().collect().await;
             for dataset_id in dataset_ids {
                 for dataset_flow_type in DatasetFlowType::all() {
-                    let maybe_flow_configuration = FlowConfiguration::try_load(FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type, None,
-                    None).into(), self.event_store.as_ref()).await.int_err()?;
+                    let maybe_flow_configuration = FlowConfiguration::try_load(FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into(), self.event_store.as_ref()).await.int_err()?;
                     if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
                         yield flow_configuration.into();
                     }
@@ -309,7 +305,7 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceInMemory
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
         for flow_type in DatasetFlowType::all() {
             let maybe_flow_configuration = FlowConfiguration::try_load(
-                FlowKeyDataset::new(event.dataset_id.clone(), *flow_type, None, None).into(),
+                FlowKeyDataset::new(event.dataset_id.clone(), *flow_type).into(),
                 self.event_store.as_ref(),
             )
             .await

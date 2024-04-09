@@ -248,10 +248,8 @@ async fn test_manual_trigger() {
         .await;
     harness.eager_dependencies_graph_init().await;
 
-    let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest, None, None).into();
-    let bar_flow_key: FlowKey =
-        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest, None, None).into();
+    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
+    let bar_flow_key: FlowKey = FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -435,9 +433,9 @@ async fn test_manual_trigger_compaction() {
     harness.eager_dependencies_graph_init().await;
 
     let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction, None, None).into();
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
     let bar_flow_key: FlowKey =
-        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompaction, None, None).into();
+        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompaction).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -544,11 +542,12 @@ async fn test_manual_trigger_compaction() {
 
             #3: +20ms:
               "foo" HardCompaction:
+                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=110ms)
                 Flow ID = 0 Finished Success
 
             #4: +40ms:
               "foo" HardCompaction:
-                Flow ID = 1 Waiting Manual Executor(task=1, since=40ms)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=40ms)
                 Flow ID = 0 Finished Success
 
             #5: +60ms:
@@ -558,27 +557,39 @@ async fn test_manual_trigger_compaction() {
 
             #6: +70ms:
               "foo" HardCompaction:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
             #7: +80ms:
               "bar" HardCompaction:
-                Flow ID = 2 Waiting Manual Executor(task=2, since=80ms)
+                Flow ID = 3 Waiting Manual Executor(task=2, since=80ms)
               "foo" HardCompaction:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
             #8: +100ms:
               "bar" HardCompaction:
-                Flow ID = 2 Running(task=2)
+                Flow ID = 3 Running(task=2)
               "foo" HardCompaction:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
             #9: +110ms:
               "bar" HardCompaction:
-                Flow ID = 2 Finished Success
+                Flow ID = 3 Finished Success
               "foo" HardCompaction:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #10: +160ms:
+              "bar" HardCompaction:
+                Flow ID = 3 Finished Success
+              "foo" HardCompaction:
+                Flow ID = 2 Waiting AutoPolling Executor(task=3, since=160ms)
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -1566,8 +1577,7 @@ async fn test_throttling_manual_triggers() {
 
     // Foo Flow
     let foo_id = harness.create_root_dataset("foo").await;
-    let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest, None, None).into();
+    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
 
     // Enforce dependency graph initialization
     harness.eager_dependencies_graph_init().await;
@@ -3545,7 +3555,7 @@ impl FlowHarness {
         self.flow_configuration_service
             .set_configuration(
                 request_time,
-                FlowKeyDataset::new(dataset_id, dataset_flow_type, None, None).into(),
+                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
                 FlowConfigurationRule::Schedule(schedule),
             )
@@ -3563,7 +3573,7 @@ impl FlowHarness {
         self.flow_configuration_service
             .set_configuration(
                 request_time,
-                FlowKeyDataset::new(dataset_id, dataset_flow_type, None, None).into(),
+                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
                 FlowConfigurationRule::BatchingRule(batching_rule),
             )
@@ -3577,8 +3587,7 @@ impl FlowHarness {
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
     ) {
-        let flow_key: FlowKey =
-            FlowKeyDataset::new(dataset_id, dataset_flow_type, None, None).into();
+        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
         let current_config = self
             .flow_configuration_service
             .find_configuration(flow_key.clone())
@@ -3598,8 +3607,7 @@ impl FlowHarness {
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
     ) {
-        let flow_key: FlowKey =
-            FlowKeyDataset::new(dataset_id, dataset_flow_type, None, None).into();
+        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
         let current_config = self
             .flow_configuration_service
             .find_configuration(flow_key.clone())

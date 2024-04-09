@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use chrono::{Duration, Utc};
 use futures::TryStreamExt;
-use kamu_core::compact_service::CompactOptions;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::FlowEventStoreInMem;
 use kamu_task_system::{TaskOutcome, TaskResult, TaskSystemEventStore};
@@ -997,7 +996,6 @@ impl<'a> DatasetFlowGenerator<'a> {
             FlowKeyDataset {
                 dataset_id: self.dataset_id.clone(),
                 flow_type,
-                options: CompactOptions::default(),
             }
             .into(),
             initial_trigger,

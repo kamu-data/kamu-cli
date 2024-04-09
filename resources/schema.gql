@@ -391,7 +391,7 @@ type DatasetFlowRunsMut {
 enum DatasetFlowType {
 	INGEST
 	EXECUTE_TRANSFORM
-	COMPACTION
+	HARD_COMPACTION
 }
 
 type DatasetFlows {
@@ -736,17 +736,22 @@ type FlowConnection {
 	edges: [FlowEdge!]!
 }
 
-union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetCompaction | FlowDescriptionSystemGC
-
-type FlowDescriptionDatasetCompaction {
-	datasetId: DatasetID!
-	originalBlocksCount: Int!
-	resultingBlocksCount: Int
-}
+union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionSystemGC
 
 type FlowDescriptionDatasetExecuteTransform {
 	datasetId: DatasetID!
 	transformResult: FlowDescriptionUpdateResult
+}
+
+type FlowDescriptionDatasetHardCompaction {
+	datasetId: DatasetID!
+	compactResult: FlowDescriptionDatasetHardCompactionResult
+}
+
+type FlowDescriptionDatasetHardCompactionResult {
+	originalBlocksCount: Int!
+	resultingBlocksCount: Int!
+	newHead: Multihash!
 }
 
 type FlowDescriptionDatasetPollingIngest {
@@ -903,6 +908,10 @@ type FlowTriggerManual {
 
 type FlowTriggerPush {
 	dummy: Boolean!
+}
+
+type FlowTypeIsNotSupported implements SetFlowConfigResult {
+	message: String!
 }
 
 interface GetFlowResult {

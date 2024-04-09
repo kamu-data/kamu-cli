@@ -500,7 +500,7 @@ impl FlowConfigurationHarness {
         self.flow_configuration_service
             .set_configuration(
                 Utc::now(),
-                FlowKeyDataset::new(dataset_id, dataset_flow_type, None, None).into(),
+                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
                 FlowConfigurationRule::Schedule(schedule),
             )
@@ -532,7 +532,7 @@ impl FlowConfigurationHarness {
         expected_schedule: &Schedule,
     ) {
         assert_matches!(
-            enabled_configurations.get(&(FlowKeyDataset::new(dataset_id, dataset_flow_type, None, None).into())),
+            enabled_configurations.get(&(FlowKeyDataset::new(dataset_id, dataset_flow_type).into())),
             Some(FlowConfigurationState {
                 status: FlowConfigurationStatus::Active,
                 rule: FlowConfigurationRule::Schedule(actual_schedule),
@@ -588,8 +588,7 @@ impl FlowConfigurationHarness {
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
     ) -> FlowConfigurationState {
-        let flow_key: FlowKey =
-            FlowKeyDataset::new(dataset_id, dataset_flow_type, None, None).into();
+        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
         let flow_configuration =
             FlowConfiguration::load(flow_key, self.flow_configuration_event_store.as_ref())
                 .await

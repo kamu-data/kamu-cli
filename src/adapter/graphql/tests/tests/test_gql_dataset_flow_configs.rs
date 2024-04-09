@@ -718,22 +718,6 @@ async fn test_pause_resume_dataset_flows() {
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    let mutation_set_compacting = FlowConfigHarness::set_config_time_delta_mutation(
-        &create_root_result.dataset_handle.id,
-        "COMPACTION",
-        false,
-        1,
-        "WEEKS",
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_set_compacting)
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-    assert!(res.is_ok(), "{res:?}");
-
     let mutation_set_transform = FlowConfigHarness::set_config_batching_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
@@ -752,7 +736,6 @@ async fn test_pause_resume_dataset_flows() {
 
     let flow_cases = [
         (&create_root_result.dataset_handle.id, "INGEST"),
-        (&create_root_result.dataset_handle.id, "COMPACTION"),
         (
             &create_derived_result.dataset_handle.id,
             "EXECUTE_TRANSFORM",
@@ -766,7 +749,7 @@ async fn test_pause_resume_dataset_flows() {
 
     // Ensure all flow configs are not paused
     for ((dataset_id, dataset_flow_type), expect_paused) in
-        flow_cases.iter().zip(vec![false, false, false])
+        flow_cases.iter().zip(vec![false, false])
     {
         check_flow_config_status(
             &harness,
@@ -784,8 +767,8 @@ async fn test_pause_resume_dataset_flows() {
     // Pause compaction of root
 
     let mutation_pause_root_compacting = FlowConfigHarness::pause_flows_of_type_mutation(
-        &create_root_result.dataset_handle.id,
-        "COMPACTION",
+        &create_derived_result.dataset_handle.id,
+        "EXECUTE_TRANSFORM",
     );
 
     let res = schema
@@ -795,10 +778,8 @@ async fn test_pause_resume_dataset_flows() {
         )
         .await;
     assert!(res.is_ok(), "{res:?}");
-
     // Compaction should be paused
-    for ((dataset_id, dataset_flow_type), expect_paused) in
-        flow_cases.iter().zip(vec![false, true, false])
+    for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![false, true])
     {
         check_flow_config_status(
             &harness,
@@ -809,7 +790,7 @@ async fn test_pause_resume_dataset_flows() {
         )
         .await;
     }
-    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, false]) {
+    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, true]) {
         check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 
@@ -826,8 +807,7 @@ async fn test_pause_resume_dataset_flows() {
     assert!(res.is_ok(), "{res:?}");
 
     // Root flows should be paused
-    for ((dataset_id, dataset_flow_type), expect_paused) in
-        flow_cases.iter().zip(vec![true, true, false])
+    for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![true, true])
     {
         check_flow_config_status(
             &harness,
@@ -838,7 +818,7 @@ async fn test_pause_resume_dataset_flows() {
         )
         .await;
     }
-    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![true, false]) {
+    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![true, true]) {
         check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 
@@ -856,9 +836,8 @@ async fn test_pause_resume_dataset_flows() {
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    // Only compacting of root should be paused
-    for ((dataset_id, dataset_flow_type), expect_paused) in
-        flow_cases.iter().zip(vec![false, true, false])
+    // Only transform of derive should be paused
+    for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![false, true])
     {
         check_flow_config_status(
             &harness,
@@ -869,7 +848,7 @@ async fn test_pause_resume_dataset_flows() {
         )
         .await;
     }
-    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, false]) {
+    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, true]) {
         check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 
@@ -888,8 +867,7 @@ async fn test_pause_resume_dataset_flows() {
     assert!(res.is_ok(), "{res:?}");
 
     // Observe status change
-    for ((dataset_id, dataset_flow_type), expect_paused) in
-        flow_cases.iter().zip(vec![false, true, true])
+    for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![false, true])
     {
         check_flow_config_status(
             &harness,
@@ -918,7 +896,7 @@ async fn test_pause_resume_dataset_flows() {
 
     // Observe status change
     for ((dataset_id, dataset_flow_type), expect_paused) in
-        flow_cases.iter().zip(vec![false, true, false])
+        flow_cases.iter().zip(vec![false, false])
     {
         check_flow_config_status(
             &harness,

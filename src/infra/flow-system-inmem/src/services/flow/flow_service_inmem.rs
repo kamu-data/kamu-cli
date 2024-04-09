@@ -297,8 +297,6 @@ impl FlowServiceInMemory {
                     let dependent_flow_key = FlowKeyDataset::new(
                         dependent_dataset_id.clone(),
                         DatasetFlowType::ExecuteTransform,
-                        None,
-                        None,
                     )
                     .into();
 

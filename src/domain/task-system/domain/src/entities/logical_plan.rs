@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use enum_variants::*;
-use kamu_core::compact_service::CompactOptions;
 use opendatafabric::DatasetID;
 use serde::{Deserialize, Serialize};
 
@@ -66,7 +65,6 @@ pub struct Probe {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompactDataset {
     pub dataset_id: DatasetID,
-    pub options: CompactOptions,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
