@@ -13,6 +13,7 @@ use std::path::PathBuf;
 
 use kamu::domain::engine::normalize_logs;
 use kamu::domain::*;
+use kamu_data_utils::data::format::WriterError;
 use opendatafabric::DatasetRefPattern;
 use thiserror::Error;
 
@@ -145,6 +146,12 @@ impl From<CommandInterpretationFailed> for CLIError {
 impl From<MultiTenantRefUnexpectedError> for CLIError {
     fn from(e: MultiTenantRefUnexpectedError) -> Self {
         Self::usage_error_from(e)
+    }
+}
+
+impl From<WriterError> for CLIError {
+    fn from(e: WriterError) -> Self {
+        Self::failure(e)
     }
 }
 

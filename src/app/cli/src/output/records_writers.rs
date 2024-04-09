@@ -14,6 +14,7 @@ use datafusion::arrow::array::ArrayRef;
 use datafusion::arrow::datatypes::DataType;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::util::display::array_value_to_string;
+use kamu_data_utils::data::format::WriterError;
 pub use kamu_data_utils::data::format::{
     CsvWriter,
     CsvWriterBuilder,
@@ -324,7 +325,7 @@ impl<W> RecordsWriter for TableWriter<W>
 where
     W: std::io::Write,
 {
-    fn write_batch(&mut self, records: &RecordBatch) -> Result<(), std::io::Error> {
+    fn write_batch(&mut self, records: &RecordBatch) -> Result<(), WriterError> {
         if !self.header_written {
             let mut header = Vec::new();
             for field in records.schema().fields() {
@@ -351,7 +352,7 @@ where
         Ok(())
     }
 
-    fn finish(&mut self) -> Result<(), std::io::Error> {
+    fn finish(&mut self) -> Result<(), WriterError> {
         // BUG: Header doesn't render when there are no data rows in the table,
         // so we add an empty row
         if self.rows_written == 0 {
@@ -361,7 +362,9 @@ where
             }
         }
 
-        self.table.print(&mut self.out)?;
+        self.table
+            .print(&mut self.out)
+            .map_err(WriterError::IoError)?;
         Ok(())
     }
 }
