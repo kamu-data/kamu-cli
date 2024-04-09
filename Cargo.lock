@@ -2127,9 +2127,9 @@ dependencies = [
 
 [[package]]
 name = "datafusion-odata"
-version = "0.4.0"
+version = "36.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "219ef6bdabe34456107b96c8ddb5c0cb3241c969ef6205c254478d42fefbeaf7"
+checksum = "92c90ff32165cfc70311db58b18b45f70e276876cd25363c1a021479c6c32137"
 dependencies = [
  "async-trait",
  "axum",
@@ -2137,6 +2137,7 @@ dependencies = [
  "datafusion",
  "http",
  "quick-xml",
+ "regex",
  "serde",
  "thiserror",
  "tracing",

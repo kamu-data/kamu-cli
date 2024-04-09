@@ -28,7 +28,7 @@ kamu-core = { workspace = true }
 axum = { version = "0.6", features = ["headers"] }
 chrono = { version = "0.4", default-features = false }
 datafusion = { version = "36", default-features = false }
-datafusion-odata = { version = "0.4", default-features = false }
+datafusion-odata = { version = "36", default-features = false }
 dill = { version = "0.8" }
 futures = { version = "0.3", default-features = false }
 http = "0.2"

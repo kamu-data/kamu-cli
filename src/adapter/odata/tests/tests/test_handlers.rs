@@ -229,6 +229,86 @@ async fn test_collection_handler() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_collection_handler_by_id() {
+    let harness = TestHarness::new();
+
+    harness.create_simple_dataset().await;
+
+    let collection_url = format!(
+        "http://{}/odata/foo.bar(2)",
+        harness.api_server.local_addr()
+    );
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+        let res = cl.get(&collection_url).send().await.unwrap();
+        assert_eq!(res.status(), http::StatusCode::OK);
+        assert_eq!(
+            res.headers()["content-type"],
+            "application/atom+xml;type=feed;charset=utf-8"
+        );
+
+        let body = res.text().await.unwrap();
+        assert_eq!(
+            body,
+            indoc!(
+                r#"
+                <?xml version="1.0" encoding="utf-8"?>
+                <entry xml:base="http://example.com/odata/"
+                 xmlns="http://www.w3.org/2005/Atom"
+                 xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices"
+                 xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
+                <id>http://example.com/odata/foo.bar(2)</id>
+                <category scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme" term="default.foo.bar"/>
+                <link rel="edit" title="foo.bar" href="foo.bar(2)"/>
+                <title/>
+                <updated>2050-01-01T12:00:00.000Z</updated>
+                <author><name/></author>
+                <content type="application/xml">
+                <m:properties>
+                <d:offset m:type="Edm.Int64">2</d:offset>
+                <d:op m:type="Edm.Int32">0</d:op><d:system_time m:type="Edm.DateTime">2050-01-01T12:00:00.000Z</d:system_time>
+                <d:date m:type="Edm.DateTime">2020-01-01T00:00:00.000Z</d:date>
+                <d:city m:type="Edm.String">C</d:city><d:population m:type="Edm.Int64">3000</d:population>
+                </m:properties>
+                </content>
+                </entry>
+                "#
+            )
+            .replace('\n', "")
+        );
+    };
+
+    await_client_server_flow!(harness.api_server.run(), client);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_collection_handler_by_id_not_found() {
+    let harness = TestHarness::new();
+
+    harness.create_simple_dataset().await;
+
+    let collection_url = format!(
+        "http://{}/odata/foo.bar(99999)",
+        harness.api_server.local_addr()
+    );
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+        let res = cl.get(&collection_url).send().await.unwrap();
+        assert_eq!(res.status(), http::StatusCode::NOT_FOUND);
+    };
+
+    await_client_server_flow!(harness.api_server.run(), client);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 struct TestHarness {
     temp_dir: tempfile::TempDir,
     dataset_repo: Arc<dyn DatasetRepository>,
