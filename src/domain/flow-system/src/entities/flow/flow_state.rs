@@ -70,7 +70,12 @@ impl FlowState {
                         dataset_id: flow_key.dataset_id.clone(),
                     })
                 }
-                DatasetFlowType::Compaction => unimplemented!(),
+                DatasetFlowType::HardCompaction => {
+                    ts::LogicalPlan::CompactDataset(ts::CompactDataset {
+                        dataset_id: flow_key.dataset_id.clone(),
+                        options: flow_key.options.clone(),
+                    })
+                }
             },
             FlowKey::System(flow_key) => {
                 match flow_key.flow_type {

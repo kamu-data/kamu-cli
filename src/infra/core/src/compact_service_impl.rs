@@ -17,12 +17,15 @@ use datafusion::prelude::*;
 use dill::{component, interface};
 use domain::compact_service::{
     CompactError,
+    CompactOptions,
     CompactResult,
     CompactionListener,
     CompactionMultiListener,
     CompactionPhase,
     InvalidDatasetKindError,
     NullCompactionListener,
+    DEFAULT_MAX_SLICE_RECORDS,
+    DEFAULT_MAX_SLICE_SIZE,
 };
 use futures::stream::TryStreamExt;
 use kamu_core::compact_service::CompactService;
@@ -440,8 +443,7 @@ impl CompactService for CompactServiceImpl {
     async fn compact_dataset(
         &self,
         dataset_handle: &DatasetHandle,
-        max_slice_size: u64,
-        max_slice_records: u64,
+        options: &CompactOptions,
         multi_listener: Option<Arc<dyn CompactionMultiListener>>,
     ) -> Result<CompactResult, CompactError> {
         self.dataset_authorizer
@@ -468,6 +470,11 @@ impl CompactService for CompactServiceImpl {
         let listener = multi_listener
             .and_then(|l| l.begin_compact(dataset_handle))
             .unwrap_or(Arc::new(NullCompactionListener {}));
+
+        let max_slice_size = options.max_slice_size.unwrap_or(DEFAULT_MAX_SLICE_SIZE);
+        let max_slice_records = options
+            .max_slice_records
+            .unwrap_or(DEFAULT_MAX_SLICE_RECORDS);
 
         match self
             .compact_dataset_impl(dataset, max_slice_size, max_slice_records, listener.clone())

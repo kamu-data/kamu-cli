@@ -50,7 +50,7 @@ async fn test_visibility() {
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
-            DatasetFlowType::Compaction,
+            DatasetFlowType::HardCompaction,
             foo_compaction_schedule.clone(),
         )
         .await;
@@ -77,7 +77,7 @@ async fn test_visibility() {
         ),
         (
             foo_id,
-            DatasetFlowType::Compaction,
+            DatasetFlowType::HardCompaction,
             &foo_compaction_schedule,
         ),
         (bar_id, DatasetFlowType::Ingest, &bar_ingest_schedule),
@@ -181,7 +181,7 @@ async fn test_pause_resume_all_dataset_flows() {
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
-            DatasetFlowType::Compaction,
+            DatasetFlowType::HardCompaction,
             foo_compacting_schedule.clone(),
         )
         .await;
@@ -198,7 +198,7 @@ async fn test_pause_resume_all_dataset_flows() {
     harness.expect_dataset_flow_schedule(
         &configs,
         foo_id.clone(),
-        DatasetFlowType::Compaction,
+        DatasetFlowType::HardCompaction,
         &foo_compacting_schedule,
     );
     assert_eq!(2, harness.configuration_events_count());
@@ -227,7 +227,7 @@ async fn test_pause_resume_all_dataset_flows() {
     );
 
     let flow_config_compaction_state = harness
-        .get_dataset_flow_config_from_store(foo_id.clone(), DatasetFlowType::Compaction)
+        .get_dataset_flow_config_from_store(foo_id.clone(), DatasetFlowType::HardCompaction)
         .await;
     assert_eq!(
         flow_config_compaction_state.status,
@@ -254,7 +254,7 @@ async fn test_pause_resume_all_dataset_flows() {
     harness.expect_dataset_flow_schedule(
         &configs,
         foo_id.clone(),
-        DatasetFlowType::Compaction,
+        DatasetFlowType::HardCompaction,
         &foo_compacting_schedule,
     );
     assert_eq!(6, harness.configuration_events_count());
@@ -500,7 +500,7 @@ impl FlowConfigurationHarness {
         self.flow_configuration_service
             .set_configuration(
                 Utc::now(),
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
+                FlowKeyDataset::new(dataset_id, dataset_flow_type, None, None).into(),
                 false,
                 FlowConfigurationRule::Schedule(schedule),
             )
@@ -532,7 +532,7 @@ impl FlowConfigurationHarness {
         expected_schedule: &Schedule,
     ) {
         assert_matches!(
-            enabled_configurations.get(&(FlowKeyDataset::new(dataset_id, dataset_flow_type).into())),
+            enabled_configurations.get(&(FlowKeyDataset::new(dataset_id, dataset_flow_type, None, None).into())),
             Some(FlowConfigurationState {
                 status: FlowConfigurationStatus::Active,
                 rule: FlowConfigurationRule::Schedule(actual_schedule),
@@ -588,7 +588,8 @@ impl FlowConfigurationHarness {
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
     ) -> FlowConfigurationState {
-        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
+        let flow_key: FlowKey =
+            FlowKeyDataset::new(dataset_id, dataset_flow_type, None, None).into();
         let flow_configuration =
             FlowConfiguration::load(flow_key, self.flow_configuration_event_store.as_ref())
                 .await

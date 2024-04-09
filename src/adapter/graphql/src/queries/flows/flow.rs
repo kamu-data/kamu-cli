@@ -103,11 +103,13 @@ impl Flow {
                     .int_err()?,
                 })
             }
-            fs::DatasetFlowType::Compaction => {
-                FlowDescriptionDataset::Compaction(FlowDescriptionDatasetCompaction {
+            fs::DatasetFlowType::HardCompaction => {
+                FlowDescriptionDataset::HardCompaction(FlowDescriptionDatasetHardCompaction {
                     dataset_id: dataset_key.dataset_id.clone().into(),
-                    original_blocks_count: 0,     // TODO
-                    resulting_blocks_count: None, // TODO
+                    compact_result:
+                        FlowDescriptionDatasetHardCompactionResult::from_maybe_flow_outcome(
+                            self.flow_state.outcome.as_ref(),
+                        ),
                 })
             }
         })
@@ -226,7 +228,7 @@ enum FlowDescriptionDataset {
     PollingIngest(FlowDescriptionDatasetPollingIngest),
     PushIngest(FlowDescriptionDatasetPushIngest),
     ExecuteTransform(FlowDescriptionDatasetExecuteTransform),
-    Compaction(FlowDescriptionDatasetCompaction),
+    HardCompaction(FlowDescriptionDatasetHardCompaction),
 }
 
 #[derive(SimpleObject)]
@@ -250,10 +252,9 @@ struct FlowDescriptionDatasetExecuteTransform {
 }
 
 #[derive(SimpleObject)]
-struct FlowDescriptionDatasetCompaction {
+struct FlowDescriptionDatasetHardCompaction {
     dataset_id: DatasetID,
-    original_blocks_count: u64,
-    resulting_blocks_count: Option<u64>,
+    compact_result: Option<FlowDescriptionDatasetHardCompactionResult>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -274,7 +275,7 @@ impl FlowDescriptionUpdateResult {
         if let Some(outcome) = maybe_outcome {
             match outcome {
                 fs::FlowOutcome::Success(result) => match result {
-                    fs::FlowResult::Empty => Ok(None),
+                    fs::FlowResult::Empty | fs::FlowResult::DatasetCompact(_) => Ok(None),
                     fs::FlowResult::DatasetUpdate(update) => {
                         let increment = dataset_changes_service
                             .get_increment_between(
@@ -296,6 +297,35 @@ impl FlowDescriptionUpdateResult {
             }
         } else {
             Ok(None)
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+struct FlowDescriptionDatasetHardCompactionResult {
+    original_blocks_count: u64,
+    resulting_blocks_count: u64,
+    new_head: Multihash,
+}
+
+impl FlowDescriptionDatasetHardCompactionResult {
+    fn from_maybe_flow_outcome(maybe_outcome: Option<&fs::FlowOutcome>) -> Option<Self> {
+        if let Some(outcome) = maybe_outcome {
+            match outcome {
+                fs::FlowOutcome::Success(result) => match result {
+                    fs::FlowResult::Empty | fs::FlowResult::DatasetUpdate(_) => None,
+                    fs::FlowResult::DatasetCompact(compact) => Some(Self {
+                        original_blocks_count: compact.old_num_blocks as u64,
+                        resulting_blocks_count: compact.new_num_blocks as u64,
+                        new_head: compact.new_head.clone().into(),
+                    }),
+                },
+                _ => None,
+            }
+        } else {
+            None
         }
     }
 }

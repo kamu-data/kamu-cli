@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use chrono::{Duration, Utc};
 use futures::TryStreamExt;
+use kamu_core::compact_service::CompactOptions;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::FlowEventStoreInMem;
 use kamu_task_system::{TaskOutcome, TaskResult, TaskSystemEventStore};
@@ -152,7 +153,7 @@ async fn test_dataset_flow_filter_by_flow_type() {
         ),
         (
             DatasetFlowFilters {
-                by_flow_type: Some(DatasetFlowType::Compaction),
+                by_flow_type: Some(DatasetFlowType::HardCompaction),
                 ..Default::default()
             },
             vec![
@@ -269,7 +270,7 @@ async fn test_dataset_flow_filter_combinations() {
         (
             DatasetFlowFilters {
                 by_flow_status: Some(FlowStatus::Waiting),
-                by_flow_type: Some(DatasetFlowType::Compaction),
+                by_flow_type: Some(DatasetFlowType::HardCompaction),
                 by_initiator: Some(InitiatorFilter::Account(AccountName::new_unchecked(
                     "petya",
                 ))),
@@ -816,7 +817,7 @@ async fn make_dataset_test_case(
         .await,
         compacting_flow_ids: make_dataset_test_flows(
             &dataset_id,
-            DatasetFlowType::Compaction,
+            DatasetFlowType::HardCompaction,
             flow_event_store,
             task_event_store,
         )
@@ -996,6 +997,7 @@ impl<'a> DatasetFlowGenerator<'a> {
             FlowKeyDataset {
                 dataset_id: self.dataset_id.clone(),
                 flow_type,
+                options: CompactOptions::default(),
             }
             .into(),
             initial_trigger,

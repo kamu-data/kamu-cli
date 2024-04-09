@@ -124,7 +124,7 @@ impl From<&kamu_flow_system::FlowOutcome> for FlowOutcome {
 pub enum DatasetFlowType {
     Ingest,
     ExecuteTransform,
-    Compaction,
+    HardCompaction,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

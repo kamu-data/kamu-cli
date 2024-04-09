@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use enum_variants::*;
+use kamu_core::compact_service::CompactOptions;
 use opendatafabric::DatasetID;
 use serde::{Deserialize, Serialize};
 
@@ -23,6 +24,8 @@ pub enum LogicalPlan {
     UpdateDataset(UpdateDataset),
     /// A task that can be used for testing the scheduling system
     Probe(Probe),
+    /// Perform dataset hard or soft compaction
+    CompactDataset(CompactDataset),
 }
 
 impl LogicalPlan {
@@ -31,6 +34,7 @@ impl LogicalPlan {
         match self {
             LogicalPlan::UpdateDataset(upd) => Some(&upd.dataset_id),
             LogicalPlan::Probe(p) => p.dataset_id.as_ref(),
+            LogicalPlan::CompactDataset(compact) => Some(&compact.dataset_id),
         }
     }
 }
@@ -54,6 +58,15 @@ pub struct Probe {
     pub dataset_id: Option<DatasetID>,
     pub busy_time: Option<std::time::Duration>,
     pub end_with_outcome: Option<TaskOutcome>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+/// A task that can be used for testing the scheduling system
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CompactDataset {
+    pub dataset_id: DatasetID,
+    pub options: CompactOptions,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

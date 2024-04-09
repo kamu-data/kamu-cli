@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu::domain::compact_service::CompactService;
+use kamu::domain::compact_service::{CompactOptions, CompactService};
 use kamu::domain::{
     DatasetRepository,
     VerificationMultiListener,
@@ -113,8 +113,10 @@ impl Command for CompactCommand {
         self.compact_svc
             .compact_dataset(
                 &dataset_handle,
-                self.max_slice_size,
-                self.max_slice_records,
+                &CompactOptions {
+                    max_slice_size: Some(self.max_slice_size),
+                    max_slice_records: Some(self.max_slice_records),
+                },
                 Some(listener.clone()),
             )
             .await

@@ -23,6 +23,7 @@ use super::{
     ensure_expected_dataset_kind,
     ensure_flow_preconditions,
     ensure_scheduling_permission,
+    ensure_set_config_flow_supported,
     FlowIncompatibleDatasetKind,
     FlowPreconditionsNotMet,
 };
@@ -50,6 +51,11 @@ impl DatasetFlowConfigsMut {
         paused: bool,
         schedule: ScheduleInput,
     ) -> Result<SetFlowConfigResult> {
+        if !ensure_set_config_flow_supported(dataset_flow_type) {
+            return Ok(SetFlowConfigResult::TypeIsNotSupported(
+                FlowTypeIsNotSupported,
+            ));
+        }
         if let Some(e) =
             ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
         {
@@ -77,8 +83,13 @@ impl DatasetFlowConfigsMut {
         let res = flow_config_service
             .set_configuration(
                 Utc::now(),
-                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
-                    .into(),
+                FlowKeyDataset::new(
+                    self.dataset_handle.id.clone(),
+                    dataset_flow_type.into(),
+                    None,
+                    None,
+                )
+                .into(),
                 paused,
                 FlowConfigurationRule::Schedule(configuration_rule),
             )
@@ -100,6 +111,11 @@ impl DatasetFlowConfigsMut {
         paused: bool,
         batching: BatchingConditionInput,
     ) -> Result<SetFlowConfigResult> {
+        if !ensure_set_config_flow_supported(dataset_flow_type) {
+            return Ok(SetFlowConfigResult::TypeIsNotSupported(
+                FlowTypeIsNotSupported,
+            ));
+        }
         let batching_rule = match BatchingRule::new_checked(
             batching.min_records_to_await,
             batching.max_batching_interval.into(),
@@ -132,8 +148,13 @@ impl DatasetFlowConfigsMut {
         let res = flow_config_service
             .set_configuration(
                 Utc::now(),
-                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
-                    .into(),
+                FlowKeyDataset::new(
+                    self.dataset_handle.id.clone(),
+                    dataset_flow_type.into(),
+                    None,
+                    None,
+                )
+                .into(),
                 paused,
                 FlowConfigurationRule::BatchingRule(batching_rule),
             )
@@ -236,6 +257,7 @@ enum SetFlowConfigResult {
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
     InvalidBatchingConfig(FlowInvalidBatchingConfig),
     PreconditionsNotMet(FlowPreconditionsNotMet),
+    TypeIsNotSupported(FlowTypeIsNotSupported),
 }
 
 #[derive(SimpleObject)]
@@ -248,6 +270,16 @@ struct SetFlowConfigSuccess {
 impl SetFlowConfigSuccess {
     pub async fn message(&self) -> String {
         "Success".to_string()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FlowTypeIsNotSupported;
+
+#[Object]
+impl FlowTypeIsNotSupported {
+    pub async fn message(&self) -> String {
+        "Flow type is not supported".to_string()
     }
 }
 

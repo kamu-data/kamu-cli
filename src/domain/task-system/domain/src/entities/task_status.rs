@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::compact_service::CompactResult;
 use kamu_core::PullResult;
 use serde::{Deserialize, Serialize};
 
@@ -48,6 +49,7 @@ impl TaskOutcome {
 pub enum TaskResult {
     Empty,
     UpdateDatasetResult(TaskUpdateDatasetResult),
+    CompactDatasetResult(TaskCompactDatasetResult),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -58,6 +60,19 @@ pub struct TaskUpdateDatasetResult {
 impl From<PullResult> for TaskUpdateDatasetResult {
     fn from(value: PullResult) -> Self {
         Self { pull_result: value }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskCompactDatasetResult {
+    pub compact_result: CompactResult,
+}
+
+impl From<CompactResult> for TaskCompactDatasetResult {
+    fn from(value: CompactResult) -> Self {
+        Self {
+            compact_result: value,
+        }
     }
 }
 

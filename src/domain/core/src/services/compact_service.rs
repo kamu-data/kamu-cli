@@ -9,18 +9,21 @@
 
 use std::sync::Arc;
 
+use ::serde::{Deserialize, Serialize};
 use opendatafabric::*;
 use thiserror::Error;
 
 use crate::*;
+
+pub const DEFAULT_MAX_SLICE_SIZE: u64 = 1_073_741_824;
+pub const DEFAULT_MAX_SLICE_RECORDS: u64 = 10000;
 
 #[async_trait::async_trait]
 pub trait CompactService: Send + Sync {
     async fn compact_dataset(
         &self,
         dataset_handle: &DatasetHandle,
-        max_slice_size: u64,
-        max_slice_records: u64,
+        options: &CompactOptions,
         listener: Option<Arc<dyn CompactionMultiListener>>,
     ) -> Result<CompactResult, CompactError>;
 }
@@ -145,7 +148,7 @@ pub enum CompactionPhase {
     CommitNewBlocks,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum CompactResult {
     NothingToDo,
     Success {
@@ -154,4 +157,12 @@ pub enum CompactResult {
         old_num_blocks: usize,
         new_num_blocks: usize,
     },
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CompactOptions {
+    pub max_slice_size: Option<u64>,
+    pub max_slice_records: Option<u64>,
 }

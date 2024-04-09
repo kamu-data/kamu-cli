@@ -1145,6 +1145,92 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_set_config_for_hard_compaction_fails() {
+    let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
+        transform_service_mock: Some(MockTransformService::without_set_transform()),
+        polling_service_mock: Some(MockPollingIngestService::without_active_polling_source()),
+    });
+    let create_root_result = harness.create_root_dataset().await;
+
+    ////
+
+    let mutation_code = FlowConfigHarness::set_config_batching_mutation(
+        &create_root_result.dataset_handle.id,
+        "HARD_COMPACTION",
+        false,
+        1,
+        (30, "MINUTES"),
+    );
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "configs": {
+                            "setConfigBatching": {
+                                "__typename": "FlowTypeIsNotSupported",
+                                "message": "Flow type is not supported",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    ////
+
+    let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
+        &create_root_result.dataset_handle.id,
+        "HARD_COMPACTION",
+        false,
+        "0 */2 * * *",
+    );
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "configs": {
+                            "setConfigSchedule": {
+                                "__typename": "FlowTypeIsNotSupported",
+                                "message": "Flow type is not supported",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_anonymous_setters_fail() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
         transform_service_mock: Some(MockTransformService::with_set_transform()),

@@ -16,6 +16,7 @@ use datafusion::execution::context::SessionContext;
 use dill::Component;
 use domain::compact_service::{
     CompactError,
+    CompactOptions,
     CompactResult,
     CompactService,
     NullCompactionMultiListener,
@@ -30,11 +31,6 @@ use kamu_core::{auth, CurrentAccountSubject};
 use opendatafabric::*;
 
 use super::test_pull_service_impl::TestTransformService;
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-const MAX_SLICE_SIZE: u64 = 1024 * 1024 * 1024;
-const MAX_SLICE_RECORDS: u64 = 10000;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -82,8 +78,7 @@ async fn test_dataset_compact() {
             .compact_svc
             .compact_dataset(
                 &dataset_handle,
-                MAX_SLICE_SIZE,
-                MAX_SLICE_RECORDS,
+                &CompactOptions::default(),
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
@@ -127,8 +122,7 @@ async fn test_dataset_compact() {
             .compact_svc
             .compact_dataset(
                 &dataset_handle,
-                MAX_SLICE_SIZE,
-                MAX_SLICE_RECORDS,
+                &CompactOptions::default(),
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
@@ -282,8 +276,7 @@ async fn test_dataset_compact_watermark_only_blocks() {
         .compact_svc
         .compact_dataset(
             &dataset_handle,
-            MAX_SLICE_SIZE,
-            MAX_SLICE_RECORDS,
+            &CompactOptions::default(),
             Some(Arc::new(NullCompactionMultiListener {})),
         )
         .await
@@ -456,8 +449,10 @@ async fn test_dataset_compact_limits() {
             .compact_svc
             .compact_dataset(
                 &dataset_handle,
-                MAX_SLICE_SIZE,
-                6,
+                &CompactOptions {
+                    max_slice_records: Some(6),
+                    max_slice_size: None,
+                },
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
@@ -620,8 +615,7 @@ async fn test_dataset_compact_keep_all_non_data_blocks() {
             .compact_svc
             .compact_dataset(
                 &dataset_handle,
-                MAX_SLICE_SIZE,
-                MAX_SLICE_RECORDS,
+                &CompactOptions::default(),
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
@@ -708,8 +702,7 @@ async fn test_dataset_compact_derive_error() {
             .compact_svc
             .compact_dataset(
                 &created.dataset_handle,
-                MAX_SLICE_SIZE,
-                MAX_SLICE_RECORDS,
+                &CompactOptions::default(),
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
@@ -774,8 +767,10 @@ async fn test_large_dataset_compact() {
             .compact_svc
             .compact_dataset(
                 &dataset_handle,
-                MAX_SLICE_SIZE,
-                10,
+                &CompactOptions {
+                    max_slice_records: Some(10),
+                    max_slice_size: None,
+                },
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,

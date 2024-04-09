@@ -297,6 +297,8 @@ impl FlowServiceInMemory {
                     let dependent_flow_key = FlowKeyDataset::new(
                         dependent_dataset_id.clone(),
                         DatasetFlowType::ExecuteTransform,
+                        None,
+                        None,
                     )
                     .into();
 
@@ -490,7 +492,7 @@ impl FlowServiceInMemory {
         for trigger in &flow.triggers {
             if let FlowTrigger::InputDatasetFlow(trigger) = trigger {
                 match &trigger.flow_result {
-                    FlowResult::Empty => {}
+                    FlowResult::Empty | FlowResult::DatasetCompact(_) => {}
                     FlowResult::DatasetUpdate(update) => {
                         // Compute increment since the first trigger by this dataset.
                         // Note: there might have been multiple updates since that time.

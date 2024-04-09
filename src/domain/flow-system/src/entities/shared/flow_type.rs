@@ -13,19 +13,20 @@
 pub enum DatasetFlowType {
     Ingest,
     ExecuteTransform,
-    Compaction,
+    HardCompaction,
 }
 
 impl DatasetFlowType {
     pub fn all() -> &'static [DatasetFlowType] {
-        &[Self::Ingest, Self::ExecuteTransform, Self::Compaction]
+        &[Self::Ingest, Self::ExecuteTransform, Self::HardCompaction]
     }
 
     pub fn dataset_kind_restriction(&self) -> Option<opendatafabric::DatasetKind> {
         match self {
-            DatasetFlowType::Ingest => Some(opendatafabric::DatasetKind::Root),
+            DatasetFlowType::Ingest | DatasetFlowType::HardCompaction => {
+                Some(opendatafabric::DatasetKind::Root)
+            }
             DatasetFlowType::ExecuteTransform => Some(opendatafabric::DatasetKind::Derivative),
-            DatasetFlowType::Compaction => None,
         }
     }
 }
@@ -55,9 +56,11 @@ impl AnyFlowType {
     /// What should be the reaction on flow success
     pub fn success_followup_method(&self) -> FlowSuccessFollowupMethod {
         match self {
-            AnyFlowType::Dataset(DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform) => {
-                FlowSuccessFollowupMethod::TriggerDependent
-            }
+            AnyFlowType::Dataset(
+                DatasetFlowType::Ingest
+                | DatasetFlowType::ExecuteTransform
+                | DatasetFlowType::HardCompaction,
+            ) => FlowSuccessFollowupMethod::TriggerDependent,
             _ => FlowSuccessFollowupMethod::Ignore,
         }
     }

@@ -11,7 +11,8 @@ use std::sync::Arc;
 
 use dill::*;
 use event_bus::EventBus;
-use kamu_core::{PullOptions, PullService, SystemTimeSource};
+use kamu_core::compact_service::CompactService;
+use kamu_core::{DatasetRepository, PullOptions, PullService, SystemTimeSource};
 use kamu_task_system::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -115,6 +116,28 @@ impl TaskExecutor for TaskExecutorImpl {
                     end_with_outcome
                         .clone()
                         .unwrap_or(TaskOutcome::Success(TaskResult::Empty))
+                }
+                LogicalPlan::CompactDataset(CompactDataset {
+                    dataset_id,
+                    options,
+                }) => {
+                    let compact_svc = self.catalog.get_one::<dyn CompactService>().int_err()?;
+                    let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().int_err()?;
+                    let dataset_handle = dataset_repo
+                        .resolve_dataset_ref(&dataset_id.as_local_ref())
+                        .await
+                        .int_err()?;
+
+                    let compact_result = compact_svc
+                        .compact_dataset(&dataset_handle, options, None)
+                        .await;
+
+                    match compact_result {
+                        Ok(result) => {
+                            TaskOutcome::Success(TaskResult::CompactDatasetResult(result.into()))
+                        }
+                        Err(_) => TaskOutcome::Failed,
+                    }
                 }
             };
 

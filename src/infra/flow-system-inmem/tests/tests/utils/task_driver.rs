@@ -97,6 +97,10 @@ impl TaskDriver {
                 assert_eq!(&ud.dataset_id, self.args.dataset_id.as_ref().unwrap());
             }
             LogicalPlan::Probe(_) => assert!(self.args.dataset_id.is_none()),
+            LogicalPlan::CompactDataset(compact) => {
+                assert!(self.args.dataset_id.is_some());
+                assert_eq!(&compact.dataset_id, self.args.dataset_id.as_ref().unwrap());
+            }
         }
     }
 }

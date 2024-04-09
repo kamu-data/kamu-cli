@@ -42,6 +42,8 @@ impl DatasetFlowRunsMut {
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
+        max_slice_size: Option<u64>,
+        max_slice_records: Option<u64>,
     ) -> Result<TriggerFlowResult> {
         if let Some(e) =
             ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
@@ -66,8 +68,13 @@ impl DatasetFlowRunsMut {
         let flow_state = flow_service
             .trigger_manual_flow(
                 Utc::now(),
-                fs::FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
-                    .into(),
+                fs::FlowKeyDataset::new(
+                    self.dataset_handle.id.clone(),
+                    dataset_flow_type.into(),
+                    max_slice_size,
+                    max_slice_records,
+                )
+                .into(),
                 odf::AccountID::from(odf::FAKE_ACCOUNT_ID),
                 logged_account.account_name,
             )

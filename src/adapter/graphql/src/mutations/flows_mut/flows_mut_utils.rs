@@ -127,9 +127,18 @@ pub(crate) async fn ensure_flow_preconditions(
                 }));
             };
         }
-        DatasetFlowType::Compaction => (),
+        DatasetFlowType::HardCompaction => (),
     }
     Ok(None)
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn ensure_set_config_flow_supported(dataset_flow_type: DatasetFlowType) -> bool {
+    match dataset_flow_type {
+        DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => true,
+        DatasetFlowType::HardCompaction => false,
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

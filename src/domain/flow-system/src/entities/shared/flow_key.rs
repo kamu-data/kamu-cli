@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::compact_service::CompactOptions;
 use opendatafabric::DatasetID;
 
 use crate::{AnyFlowType, DatasetFlowType, SystemFlowType};
@@ -34,13 +35,23 @@ impl FlowKey {
 pub struct FlowKeyDataset {
     pub dataset_id: DatasetID,
     pub flow_type: DatasetFlowType,
+    pub options: CompactOptions,
 }
 
 impl FlowKeyDataset {
-    pub fn new(dataset_id: DatasetID, flow_type: DatasetFlowType) -> Self {
+    pub fn new(
+        dataset_id: DatasetID,
+        flow_type: DatasetFlowType,
+        max_slice_size: Option<u64>,
+        max_slice_records: Option<u64>,
+    ) -> Self {
         Self {
             dataset_id,
             flow_type,
+            options: CompactOptions {
+                max_slice_size,
+                max_slice_records,
+            },
         }
     }
 }

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::compact_service::CompactResult;
 use kamu_core::PullResult;
 use kamu_task_system as ts;
 use opendatafabric::Multihash;
@@ -38,13 +39,14 @@ impl FlowOutcome {
 pub enum FlowResult {
     Empty,
     DatasetUpdate(FlowResultDatasetUpdate),
+    DatasetCompact(FlowResultDatasetCompact),
 }
 
 impl FlowResult {
     pub fn is_empty(&self) -> bool {
         match self {
             FlowResult::Empty => true,
-            FlowResult::DatasetUpdate(_) => false,
+            FlowResult::DatasetUpdate(_) | FlowResult::DatasetCompact(_) => false,
         }
     }
 }
@@ -53,6 +55,13 @@ impl FlowResult {
 pub struct FlowResultDatasetUpdate {
     pub old_head: Option<Multihash>,
     pub new_head: Multihash,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FlowResultDatasetCompact {
+    pub new_head: Multihash,
+    pub old_num_blocks: usize,
+    pub new_num_blocks: usize,
 }
 
 impl From<ts::TaskResult> for FlowResult {
@@ -65,6 +74,21 @@ impl From<ts::TaskResult> for FlowResult {
                     PullResult::Updated { old_head, new_head } => {
                         Self::DatasetUpdate(FlowResultDatasetUpdate { old_head, new_head })
                     }
+                }
+            }
+            ts::TaskResult::CompactDatasetResult(task_compact_result) => {
+                match task_compact_result.compact_result {
+                    CompactResult::NothingToDo => Self::Empty,
+                    CompactResult::Success {
+                        new_head,
+                        old_num_blocks,
+                        new_num_blocks,
+                        ..
+                    } => Self::DatasetCompact(FlowResultDatasetCompact {
+                        new_head,
+                        old_num_blocks,
+                        new_num_blocks,
+                    }),
                 }
             }
         }
