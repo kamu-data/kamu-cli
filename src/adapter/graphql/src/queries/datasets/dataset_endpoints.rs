@@ -36,13 +36,25 @@ impl<'a> DatasetEndpoints<'a> {
         }
     }
 
+    #[graphql(skip)]
+    #[inline]
+    fn account(&self) -> &str {
+        self.owner.account_name_internal().as_str()
+    }
+
+    #[graphql(skip)]
+    #[inline]
+    fn dataset(&self) -> &str {
+        self.dataset_handle.alias.dataset_name.as_str()
+    }
+
     #[allow(clippy::unused_async)]
     async fn web_link(&self) -> Result<LinkProtocolDesc> {
         let url = format!(
             "{}{}/{}",
             self.config.protocols.base_url_platform,
-            self.owner.account_name_internal().as_str(),
-            self.dataset_handle.alias
+            self.account(),
+            self.dataset()
         );
 
         Ok(LinkProtocolDesc { url })
@@ -52,14 +64,13 @@ impl<'a> DatasetEndpoints<'a> {
     async fn cli(&self) -> Result<CliProtocolDesc> {
         let url = format!(
             "{}{}",
-            self.config.protocols.base_url_rest, self.dataset_handle.alias
+            self.config.protocols.base_url_rest,
+            // to respect both kinds of workspaces: single-tenant & multi-tenant
+            self.dataset_handle.alias
         );
 
         let pull_command = format!("kamu pull {url}");
-        let push_command = format!(
-            "kamu push {} --to {url}",
-            self.dataset_handle.alias.dataset_name
-        );
+        let push_command = format!("kamu push {} --to {url}", self.dataset());
 
         Ok(CliProtocolDesc {
             pull_command,
@@ -71,7 +82,9 @@ impl<'a> DatasetEndpoints<'a> {
     async fn rest(&self) -> Result<RestProtocolDesc> {
         let base_url = format!(
             "{}{}",
-            self.config.protocols.base_url_platform, self.dataset_handle.alias
+            self.config.protocols.base_url_rest,
+            // to respect both kinds of workspaces: single-tenant & multi-tenant
+            self.dataset_handle.alias
         );
 
         let tail_url = format!("{base_url}/tail?limit=10");
@@ -130,10 +143,25 @@ impl<'a> DatasetEndpoints<'a> {
 
     #[allow(clippy::unused_async)]
     async fn odata(&self) -> Result<OdataProtocolDesc> {
-        let url = format!("{}odata", self.config.protocols.base_url_rest);
-
-        let service_url = format!("{url}/{}", self.owner.account_name_internal().as_str());
+        let mut url = format!("{}odata", self.config.protocols.base_url_rest);
+        // to respect both kinds of workspaces: single-tenant & multi-tenant
         let collection_url = format!("{url}/{}", self.dataset_handle.alias);
+
+        let service_url = {
+            // Optional for single-tenant workspaces
+            let maybe_account_url_segment = self
+                .dataset_handle
+                .alias
+                .account_name
+                .as_ref()
+                .map(odf::AccountName::as_str);
+            if let Some(account_url_segment) = maybe_account_url_segment {
+                url.push('/');
+                url.push_str(account_url_segment);
+            };
+
+            url
+        };
 
         Ok(OdataProtocolDesc {
             service_url,
