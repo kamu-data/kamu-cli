@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{BatchingRule, CompactionRule, Schedule};
+use crate::{BatchingRule, CompactingRule, Schedule};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -15,7 +15,7 @@ use crate::{BatchingRule, CompactionRule, Schedule};
 pub enum FlowConfigurationRule {
     Schedule(Schedule),
     BatchingRule(BatchingRule),
-    CompactionRule(CompactionRule),
+    CompactingRule(CompactingRule),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

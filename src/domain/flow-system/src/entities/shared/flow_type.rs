@@ -9,42 +9,38 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-use crate::FlowConfigurationRule;
+use crate::{BatchingRule, CompactingRule, Schedule};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub enum DatasetFlowType {
     Ingest,
     ExecuteTransform,
-    HardCompaction,
+    HardCompacting,
 }
 
 impl DatasetFlowType {
     pub fn all() -> &'static [DatasetFlowType] {
-        &[Self::Ingest, Self::ExecuteTransform, Self::HardCompaction]
+        &[Self::Ingest, Self::ExecuteTransform, Self::HardCompacting]
     }
 
     pub fn dataset_kind_restriction(&self) -> Option<opendatafabric::DatasetKind> {
         match self {
-            DatasetFlowType::Ingest | DatasetFlowType::HardCompaction => {
+            DatasetFlowType::Ingest | DatasetFlowType::HardCompacting => {
                 Some(opendatafabric::DatasetKind::Root)
             }
             DatasetFlowType::ExecuteTransform => Some(opendatafabric::DatasetKind::Derivative),
         }
     }
 
-    pub fn config_restriction(&self, flow_configuration_rule: &FlowConfigurationRule) -> bool {
+    pub fn config_restriction(&self, flow_configuration_type: &'static str) -> bool {
         match self {
-            DatasetFlowType::Ingest => {
-                matches!(flow_configuration_rule, FlowConfigurationRule::Schedule(_))
+            DatasetFlowType::Ingest => flow_configuration_type == std::any::type_name::<Schedule>(),
+            DatasetFlowType::ExecuteTransform => {
+                flow_configuration_type == std::any::type_name::<BatchingRule>()
             }
-            DatasetFlowType::ExecuteTransform => matches!(
-                flow_configuration_rule,
-                FlowConfigurationRule::BatchingRule(_)
-            ),
-            DatasetFlowType::HardCompaction => matches!(
-                flow_configuration_rule,
-                FlowConfigurationRule::CompactionRule(_)
-            ),
+            DatasetFlowType::HardCompacting => {
+                flow_configuration_type == std::any::type_name::<CompactingRule>()
+            }
         }
     }
 }
@@ -77,7 +73,7 @@ impl AnyFlowType {
             AnyFlowType::Dataset(
                 DatasetFlowType::Ingest
                 | DatasetFlowType::ExecuteTransform
-                | DatasetFlowType::HardCompaction,
+                | DatasetFlowType::HardCompacting,
             ) => FlowSuccessFollowupMethod::TriggerDependent,
             _ => FlowSuccessFollowupMethod::Ignore,
         }

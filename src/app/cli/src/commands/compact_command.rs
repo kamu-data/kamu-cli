@@ -18,7 +18,7 @@ use kamu::domain::{
 };
 use opendatafabric::{DatasetHandle, DatasetRef};
 
-use crate::{CLIError, Command, CompactionMultiProgress, VerificationMultiProgress};
+use crate::{CLIError, Command, CompactingMultiProgress, VerificationMultiProgress};
 
 pub struct CompactCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
@@ -103,7 +103,7 @@ impl Command for CompactCommand {
             }
         }
 
-        let progress = CompactionMultiProgress::new();
+        let progress = CompactingMultiProgress::new();
         let listener = Arc::new(progress.clone());
 
         let draw_thread = std::thread::spawn(move || {
@@ -113,7 +113,7 @@ impl Command for CompactCommand {
         self.compact_svc
             .compact_dataset(
                 &dataset_handle,
-                &CompactOptions {
+                CompactOptions {
                     max_slice_size: Some(self.max_slice_size),
                     max_slice_records: Some(self.max_slice_records),
                 },

@@ -19,11 +19,11 @@ use domain::compact_service::{
     CompactError,
     CompactOptions,
     CompactResult,
-    CompactionListener,
-    CompactionMultiListener,
-    CompactionPhase,
+    CompactingListener,
+    CompactingMultiListener,
+    CompactingPhase,
     InvalidDatasetKindError,
-    NullCompactionListener,
+    NullCompactingListener,
     DEFAULT_MAX_SLICE_RECORDS,
     DEFAULT_MAX_SLICE_SIZE,
 };
@@ -384,22 +384,22 @@ impl CompactServiceImpl {
         dataset: Arc<dyn Dataset>,
         max_slice_size: u64,
         max_slice_records: u64,
-        listener: Arc<dyn CompactionListener>,
+        listener: Arc<dyn CompactingListener>,
     ) -> Result<CompactResult, CompactError> {
         let compact_dir_path = self.create_run_compact_dir()?;
 
-        listener.begin_phase(CompactionPhase::GatherChainInfo);
+        listener.begin_phase(CompactingPhase::GatherChainInfo);
         let mut chain_files_info = self
             .gather_chain_info(dataset.clone(), max_slice_size, max_slice_records)
             .await?;
 
         // if slices amount +1(seed block) eq to amount of blocks we will not perform
-        // compaction
+        // compacting
         if chain_files_info.data_slice_batches.len() + 1 == chain_files_info.old_num_blocks {
             return Ok(CompactResult::NothingToDo);
         }
 
-        listener.begin_phase(CompactionPhase::MergeDataslices);
+        listener.begin_phase(CompactingPhase::MergeDataslices);
         self.merge_files(
             &mut chain_files_info.data_slice_batches,
             chain_files_info.offset_column.as_str(),
@@ -407,7 +407,7 @@ impl CompactServiceImpl {
         )
         .await?;
 
-        listener.begin_phase(CompactionPhase::CommitNewBlocks);
+        listener.begin_phase(CompactingPhase::CommitNewBlocks);
         let (_old_data_slices, new_head, new_num_blocks) = self
             .commit_new_blocks(dataset.clone(), &chain_files_info)
             .await?;
@@ -443,8 +443,8 @@ impl CompactService for CompactServiceImpl {
     async fn compact_dataset(
         &self,
         dataset_handle: &DatasetHandle,
-        options: &CompactOptions,
-        multi_listener: Option<Arc<dyn CompactionMultiListener>>,
+        options: CompactOptions,
+        multi_listener: Option<Arc<dyn CompactingMultiListener>>,
     ) -> Result<CompactResult, CompactError> {
         self.dataset_authorizer
             .check_action_allowed(dataset_handle, domain::auth::DatasetAction::Write)
@@ -469,7 +469,7 @@ impl CompactService for CompactServiceImpl {
 
         let listener = multi_listener
             .and_then(|l| l.begin_compact(dataset_handle))
-            .unwrap_or(Arc::new(NullCompactionListener {}));
+            .unwrap_or(Arc::new(NullCompactingListener {}));
 
         let max_slice_size = options.max_slice_size.unwrap_or(DEFAULT_MAX_SLICE_SIZE);
         let max_slice_records = options

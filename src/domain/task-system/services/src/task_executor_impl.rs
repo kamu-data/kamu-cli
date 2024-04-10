@@ -117,7 +117,7 @@ impl TaskExecutor for TaskExecutorImpl {
                         .clone()
                         .unwrap_or(TaskOutcome::Success(TaskResult::Empty))
                 }
-                LogicalPlan::CompactDataset(CompactDataset {
+                LogicalPlan::HardCompactDataset(HardCompactDataset {
                     dataset_id,
                     max_slice_size,
                     max_slice_records,
@@ -132,7 +132,7 @@ impl TaskExecutor for TaskExecutorImpl {
                     let compact_result = compact_svc
                         .compact_dataset(
                             &dataset_handle,
-                            &CompactOptions {
+                            CompactOptions {
                                 max_slice_size: *max_slice_size,
                                 max_slice_records: *max_slice_records,
                             },

@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use fs::FlowConfigurationRule;
 use kamu_core::GetSummaryOpts;
 use odf::DatasetHandle;
 use {kamu_flow_system as fs, opendatafabric as odf};
@@ -128,7 +127,7 @@ pub(crate) async fn ensure_flow_preconditions(
                 }));
             };
         }
-        DatasetFlowType::HardCompaction => (),
+        DatasetFlowType::HardCompacting => (),
     }
     Ok(None)
 }
@@ -137,10 +136,10 @@ pub(crate) async fn ensure_flow_preconditions(
 
 pub(crate) fn ensure_set_config_flow_supported(
     dataset_flow_type: DatasetFlowType,
-    flow_configuration_rule: &FlowConfigurationRule,
+    flow_configuration_type: &'static str,
 ) -> bool {
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
-    dataset_flow_type.config_restriction(flow_configuration_rule)
+    dataset_flow_type.config_restriction(flow_configuration_type)
 }
 
 ///////////////////////////////////////////////////////////////////////////////

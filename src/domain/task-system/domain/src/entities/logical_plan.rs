@@ -23,8 +23,8 @@ pub enum LogicalPlan {
     UpdateDataset(UpdateDataset),
     /// A task that can be used for testing the scheduling system
     Probe(Probe),
-    /// Perform dataset hard or soft compaction
-    CompactDataset(CompactDataset),
+    /// Perform dataset hard or soft compacting
+    HardCompactDataset(HardCompactDataset),
 }
 
 impl LogicalPlan {
@@ -33,7 +33,7 @@ impl LogicalPlan {
         match self {
             LogicalPlan::UpdateDataset(upd) => Some(&upd.dataset_id),
             LogicalPlan::Probe(p) => p.dataset_id.as_ref(),
-            LogicalPlan::CompactDataset(compact) => Some(&compact.dataset_id),
+            LogicalPlan::HardCompactDataset(hard_compact) => Some(&hard_compact.dataset_id),
         }
     }
 }
@@ -63,7 +63,7 @@ pub struct Probe {
 
 /// A task that can be used for testing the scheduling system
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CompactDataset {
+pub struct HardCompactDataset {
     pub dataset_id: DatasetID,
     pub max_slice_size: Option<u64>,
     pub max_slice_records: Option<u64>,

@@ -63,7 +63,7 @@ impl FlowState {
     }
 
     /// Creates task logical plan that corresponds to template
-    pub fn make_task_logical_plan(&self, opts: &LogicalPlanOptions) -> ts::LogicalPlan {
+    pub fn make_task_logical_plan(&self, opts: LogicalPlanOptions) -> ts::LogicalPlan {
         match &self.flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
                 DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
@@ -71,8 +71,8 @@ impl FlowState {
                         dataset_id: flow_key.dataset_id.clone(),
                     })
                 }
-                DatasetFlowType::HardCompaction => {
-                    ts::LogicalPlan::CompactDataset(ts::CompactDataset {
+                DatasetFlowType::HardCompacting => {
+                    ts::LogicalPlan::HardCompactDataset(ts::HardCompactDataset {
                         dataset_id: flow_key.dataset_id.clone(),
                         max_slice_size: opts.max_slice_size,
                         max_slice_records: opts.max_slice_records,

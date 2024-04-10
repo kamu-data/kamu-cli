@@ -103,11 +103,11 @@ impl Flow {
                     .int_err()?,
                 })
             }
-            fs::DatasetFlowType::HardCompaction => {
-                FlowDescriptionDataset::HardCompaction(FlowDescriptionDatasetHardCompaction {
+            fs::DatasetFlowType::HardCompacting => {
+                FlowDescriptionDataset::HardCompacting(FlowDescriptionDatasetHardCompacting {
                     dataset_id: dataset_key.dataset_id.clone().into(),
                     compact_result:
-                        FlowDescriptionDatasetHardCompactionResult::from_maybe_flow_outcome(
+                        FlowDescriptionDatasetHardCompactingResult::from_maybe_flow_outcome(
                             self.flow_state.outcome.as_ref(),
                         ),
                 })
@@ -228,7 +228,7 @@ enum FlowDescriptionDataset {
     PollingIngest(FlowDescriptionDatasetPollingIngest),
     PushIngest(FlowDescriptionDatasetPushIngest),
     ExecuteTransform(FlowDescriptionDatasetExecuteTransform),
-    HardCompaction(FlowDescriptionDatasetHardCompaction),
+    HardCompacting(FlowDescriptionDatasetHardCompacting),
 }
 
 #[derive(SimpleObject)]
@@ -252,9 +252,9 @@ struct FlowDescriptionDatasetExecuteTransform {
 }
 
 #[derive(SimpleObject)]
-struct FlowDescriptionDatasetHardCompaction {
+struct FlowDescriptionDatasetHardCompacting {
     dataset_id: DatasetID,
-    compact_result: Option<FlowDescriptionDatasetHardCompactionResult>,
+    compact_result: Option<FlowDescriptionDatasetHardCompactingResult>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -304,13 +304,13 @@ impl FlowDescriptionUpdateResult {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
-struct FlowDescriptionDatasetHardCompactionResult {
+struct FlowDescriptionDatasetHardCompactingResult {
     original_blocks_count: u64,
     resulting_blocks_count: u64,
     new_head: Multihash,
 }
 
-impl FlowDescriptionDatasetHardCompactionResult {
+impl FlowDescriptionDatasetHardCompactingResult {
     fn from_maybe_flow_outcome(maybe_outcome: Option<&fs::FlowOutcome>) -> Option<Self> {
         if let Some(outcome) = maybe_outcome {
             match outcome {

@@ -427,27 +427,18 @@ async fn test_manual_trigger() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_manual_trigger_compaction() {
+async fn test_manual_trigger_compacting() {
     let harness = FlowHarness::new();
 
     let foo_id = harness.create_root_dataset("foo").await;
     let bar_id = harness.create_root_dataset("bar").await;
 
-    // Note: only "foo" has auto-schedule, "bar" hasn't
-    harness
-        .set_dataset_flow_schedule(
-            harness.now_datetime(),
-            foo_id.clone(),
-            DatasetFlowType::HardCompaction,
-            Duration::try_milliseconds(90).unwrap().into(),
-        )
-        .await;
     harness.eager_dependencies_graph_init().await;
 
     let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
     let bar_flow_key: FlowKey =
-        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompaction).into();
+        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompacting).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -466,8 +457,8 @@ async fn test_manual_trigger_compaction() {
 
         // Run simulation script and task drivers
         _ = async {
-                // Task 0: "foo" start running at 10ms, finish at 20ms
-                let task0_driver = harness.task_driver(TaskDriverArgs {
+                  // Task 0: "foo" start running at 10ms, finish at 20ms
+                  let task0_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(0),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(10).unwrap(),
@@ -477,67 +468,44 @@ async fn test_manual_trigger_compaction() {
                 });
                 let task0_handle = task0_driver.run();
 
-                // Task 1: "for" start running at 60ms, finish at 70ms
-                let task1_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(1),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::try_milliseconds(60).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    max_slice_size: None,
-                    max_slice_records: None,
-                });
-                let task1_handle = task1_driver.run();
-
-                // Task 2: "bar" start running at 100ms, finish at 110ms
                 let task2_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(2),
-                    dataset_id: Some(bar_id.clone()),
-                    run_since_start: Duration::try_milliseconds(100).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    max_slice_size: None,
-                    max_slice_records: None,
+                  task_id: TaskID::new(1),
+                  dataset_id: Some(bar_id.clone()),
+                  run_since_start: Duration::try_milliseconds(60).unwrap(),
+                  finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                  max_slice_size: None,
+                  max_slice_records: None,
                 });
                 let task2_handle = task2_driver.run();
 
-                // Manual trigger for "foo" at 40ms
+                // Manual trigger for "foo" at 00ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: foo_flow_key,
-                    run_since_start: Duration::try_milliseconds(40).unwrap(),
+                    run_since_start: Duration::try_milliseconds(10).unwrap(),
                 });
                 let trigger0_handle = trigger0_driver.run();
 
-                // Manual trigger for "bar" at 80ms
+                // Manual trigger for "bar" at 40ms
                 let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: bar_flow_key,
-                    run_since_start: Duration::try_milliseconds(80).unwrap(),
+                    run_since_start: Duration::try_milliseconds(40).unwrap(),
                 });
                 let trigger1_handle = trigger1_driver.run();
 
                 // Main simulation script
                 let main_handle = async {
-                    // "foo":
-                    //  - flow 0 => task 0 gets scheduled immediately at 0ms
-                    //  - flow 0 => task 0 starts at 10ms and finishes running at 20ms
-                    //  - next flow => enqueued at 20ms to trigger in 1 period of 90ms - at 110ms
-                    // "bar": silent
+                    // Moment 10ms - manual foo trigger happens here:
+                    //  - flow 0 gets trigger and is rescheduled to 40ms (20ms finish + 20ms throttling <= 40ms now)
 
                     // Moment 40ms - manual foo trigger happens here:
-                    //  - flow 1 gets a 2nd trigger and is rescheduled to 40ms (20ms finish + 20ms throttling <= 40ms now)
+                    //  - flow 1 trigger and is rescheduled to 40ms (20ms finish + 20ms throttling <= 40ms now)
                     //  - task 1 starts at 60ms, finishes at 70ms (leave some gap to fight with random order)
-                    //  - flow 3 queued for 70 + 90 = 160ms
-                    //  - "bar": still silent
 
-                    // Moment 80ms - manual bar trigger happens here:
-                    //  - flow 2 immediately scheduled
-                    //  - task 2 gets scheduled at 80ms
-                    //  - task 2 starts at 100ms and finishes at 110ms (ensure gap to fight against task execution order)
-                    //  - no next flow enqueued
-
-                    // Stop at 180ms: "foo" flow 3 gets scheduled at 160ms
-                    harness.advance_time(Duration::try_milliseconds(180).unwrap()).await;
+                    // Stop at 100ms: "foo" flow 1 gets scheduled at 70
+                    harness.advance_time(Duration::try_milliseconds(100).unwrap()).await;
                 };
 
-                tokio::join!(task0_handle, task1_handle, task2_handle, trigger0_handle, trigger1_handle, main_handle)
+                tokio::join!(task0_handle, task2_handle, trigger0_handle, trigger1_handle, main_handle)
             } => Ok(())
     }
     .unwrap();
@@ -547,68 +515,35 @@ async fn test_manual_trigger_compaction() {
         indoc::indoc!(
             r#"
             #0: +0ms:
-              "foo" HardCompaction:
-                Flow ID = 0 Waiting AutoPolling
 
-            #1: +0ms:
-              "foo" HardCompaction:
-                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+            #1: +10ms:
+              "foo" HardCompacting:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
 
             #2: +10ms:
-              "foo" HardCompaction:
+              "foo" HardCompacting:
                 Flow ID = 0 Running(task=0)
 
             #3: +20ms:
-              "foo" HardCompaction:
-                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=110ms)
+              "foo" HardCompacting:
                 Flow ID = 0 Finished Success
 
             #4: +40ms:
-              "foo" HardCompaction:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=40ms)
+              "bar" HardCompacting:
+                Flow ID = 1 Waiting Manual Executor(task=1, since=40ms)
+              "foo" HardCompacting:
                 Flow ID = 0 Finished Success
 
             #5: +60ms:
-              "foo" HardCompaction:
+              "bar" HardCompacting:
                 Flow ID = 1 Running(task=1)
+              "foo" HardCompacting:
                 Flow ID = 0 Finished Success
 
             #6: +70ms:
-              "foo" HardCompaction:
-                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
+              "bar" HardCompacting:
                 Flow ID = 1 Finished Success
-                Flow ID = 0 Finished Success
-
-            #7: +80ms:
-              "bar" HardCompaction:
-                Flow ID = 3 Waiting Manual Executor(task=2, since=80ms)
-              "foo" HardCompaction:
-                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
-                Flow ID = 1 Finished Success
-                Flow ID = 0 Finished Success
-
-            #8: +100ms:
-              "bar" HardCompaction:
-                Flow ID = 3 Running(task=2)
-              "foo" HardCompaction:
-                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
-                Flow ID = 1 Finished Success
-                Flow ID = 0 Finished Success
-
-            #9: +110ms:
-              "bar" HardCompaction:
-                Flow ID = 3 Finished Success
-              "foo" HardCompaction:
-                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
-                Flow ID = 1 Finished Success
-                Flow ID = 0 Finished Success
-
-            #10: +160ms:
-              "bar" HardCompaction:
-                Flow ID = 3 Finished Success
-              "foo" HardCompaction:
-                Flow ID = 2 Waiting AutoPolling Executor(task=3, since=160ms)
-                Flow ID = 1 Finished Success
+              "foo" HardCompacting:
                 Flow ID = 0 Finished Success
 
             "#
@@ -619,7 +554,7 @@ async fn test_manual_trigger_compaction() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_manual_trigger_compaction_with_config() {
+async fn test_manual_trigger_compacting_with_config() {
     let max_slice_size = 1_000_000u64;
     let max_slice_records = 1000u64;
     let harness = FlowHarness::new();
@@ -628,16 +563,16 @@ async fn test_manual_trigger_compaction_with_config() {
 
     harness.eager_dependencies_graph_init().await;
     harness
-        .set_dataset_flow_compaction_rule(
+        .set_dataset_flow_compacting_rule(
             harness.now_datetime(),
             foo_id.clone(),
-            DatasetFlowType::HardCompaction,
-            CompactionRule::new_checked(max_slice_size, max_slice_records).unwrap(),
+            DatasetFlowType::HardCompacting,
+            CompactingRule::new_checked(max_slice_size, max_slice_records).unwrap(),
         )
         .await;
 
     let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -659,7 +594,7 @@ async fn test_manual_trigger_compaction_with_config() {
                 let task0_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(0),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::try_milliseconds(10).unwrap(),
+                    run_since_start: Duration::try_milliseconds(30).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                     max_slice_size: Some(max_slice_size),
                     max_slice_records: Some(max_slice_records),
@@ -669,7 +604,7 @@ async fn test_manual_trigger_compaction_with_config() {
                 // Manual trigger for "foo" at 40ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: foo_flow_key,
-                    run_since_start: Duration::try_milliseconds(40).unwrap(),
+                    run_since_start: Duration::try_milliseconds(20).unwrap(),
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -680,7 +615,7 @@ async fn test_manual_trigger_compaction_with_config() {
                     // Moment 40ms - manual foo trigger happens here:
                     //  - flow 1 gets (20ms finish + 20ms throttling <= 40ms now)
                     //  - task 1 starts at 60ms, finishes at 70ms (leave some gap to fight with random order)
-                    harness.advance_time(Duration::try_milliseconds(180).unwrap()).await;
+                    harness.advance_time(Duration::try_milliseconds(80).unwrap()).await;
                 };
 
                 tokio::join!(task0_handle, trigger0_handle, main_handle)
@@ -694,16 +629,16 @@ async fn test_manual_trigger_compaction_with_config() {
             r#"
             #0: +0ms:
 
-            #1: +40ms:
-              "foo" HardCompaction:
-                Flow ID = 0 Waiting Manual Executor(task=0, since=40ms)
+            #1: +20ms:
+              "foo" HardCompacting:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=20ms)
 
-            #2: +10ms:
-              "foo" HardCompaction:
+            #2: +30ms:
+              "foo" HardCompacting:
                 Flow ID = 0 Running(task=0)
 
-            #3: +20ms:
-              "foo" HardCompaction:
+            #3: +40ms:
+              "foo" HardCompacting:
                 Flow ID = 0 Finished Success
 
             "#
@@ -3763,19 +3698,19 @@ impl FlowHarness {
             .unwrap();
     }
 
-    async fn set_dataset_flow_compaction_rule(
+    async fn set_dataset_flow_compacting_rule(
         &self,
         request_time: DateTime<Utc>,
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
-        compaction_rule: CompactionRule,
+        compacting_rule: CompactingRule,
     ) {
         self.flow_configuration_service
             .set_configuration(
                 request_time,
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
-                FlowConfigurationRule::CompactionRule(compaction_rule),
+                FlowConfigurationRule::CompactingRule(compacting_rule),
             )
             .await
             .unwrap();

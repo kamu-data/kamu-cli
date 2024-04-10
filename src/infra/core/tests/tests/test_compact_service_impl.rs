@@ -19,7 +19,7 @@ use domain::compact_service::{
     CompactOptions,
     CompactResult,
     CompactService,
-    NullCompactionMultiListener,
+    NullCompactingMultiListener,
 };
 use event_bus::EventBus;
 use futures::TryStreamExt;
@@ -49,7 +49,7 @@ async fn test_dataset_compact() {
         .await
         .unwrap();
 
-    // Round 1: Compaction is a no-op
+    // Round 1: Compacting is a no-op
     //
     // Before/after: seed <- add_push_source <- set_vocab <- set_schema <-
     // set_data_schema <- add_data(3 records)
@@ -78,8 +78,8 @@ async fn test_dataset_compact() {
             .compact_svc
             .compact_dataset(
                 &dataset_handle,
-                &CompactOptions::default(),
-                Some(Arc::new(NullCompactionMultiListener {}))
+                CompactOptions::default(),
+                Some(Arc::new(NullCompactingMultiListener {}))
             )
             .await,
         Ok(CompactResult::NothingToDo)
@@ -122,8 +122,8 @@ async fn test_dataset_compact() {
             .compact_svc
             .compact_dataset(
                 &dataset_handle,
-                &CompactOptions::default(),
-                Some(Arc::new(NullCompactionMultiListener {}))
+                CompactOptions::default(),
+                Some(Arc::new(NullCompactingMultiListener {}))
             )
             .await,
         Ok(CompactResult::Success {
@@ -276,8 +276,8 @@ async fn test_dataset_compact_watermark_only_blocks() {
         .compact_svc
         .compact_dataset(
             &dataset_handle,
-            &CompactOptions::default(),
-            Some(Arc::new(NullCompactionMultiListener {})),
+            CompactOptions::default(),
+            Some(Arc::new(NullCompactingMultiListener {})),
         )
         .await
         .unwrap();
@@ -449,11 +449,11 @@ async fn test_dataset_compact_limits() {
             .compact_svc
             .compact_dataset(
                 &dataset_handle,
-                &CompactOptions {
+                CompactOptions {
                     max_slice_records: Some(6),
                     max_slice_size: None,
                 },
-                Some(Arc::new(NullCompactionMultiListener {}))
+                Some(Arc::new(NullCompactingMultiListener {}))
             )
             .await,
         Ok(CompactResult::Success {
@@ -615,8 +615,8 @@ async fn test_dataset_compact_keep_all_non_data_blocks() {
             .compact_svc
             .compact_dataset(
                 &dataset_handle,
-                &CompactOptions::default(),
-                Some(Arc::new(NullCompactionMultiListener {}))
+                CompactOptions::default(),
+                Some(Arc::new(NullCompactingMultiListener {}))
             )
             .await,
         Ok(CompactResult::Success {
@@ -702,8 +702,8 @@ async fn test_dataset_compact_derive_error() {
             .compact_svc
             .compact_dataset(
                 &created.dataset_handle,
-                &CompactOptions::default(),
-                Some(Arc::new(NullCompactionMultiListener {}))
+                CompactOptions::default(),
+                Some(Arc::new(NullCompactingMultiListener {}))
             )
             .await,
         Err(CompactError::InvalidDatasetKind(_)),
@@ -767,11 +767,11 @@ async fn test_large_dataset_compact() {
             .compact_svc
             .compact_dataset(
                 &dataset_handle,
-                &CompactOptions {
+                CompactOptions {
                     max_slice_records: Some(10),
                     max_slice_size: None,
                 },
-                Some(Arc::new(NullCompactionMultiListener {}))
+                Some(Arc::new(NullCompactingMultiListener {}))
             )
             .await,
         Ok(CompactResult::Success {

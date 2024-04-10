@@ -9,7 +9,7 @@
 
 use kamu_flow_system::{
     BatchingRule,
-    CompactionRule,
+    CompactingRule,
     FlowConfigurationRule,
     Schedule,
     ScheduleCron,
@@ -48,7 +48,7 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
             } else {
                 None
             },
-            compacting: if let FlowConfigurationRule::CompactionRule(args) = value.rule {
+            compacting: if let FlowConfigurationRule::CompactingRule(args) = value.rule {
                 Some(args.into())
             } else {
                 None
@@ -84,8 +84,8 @@ pub struct FlowConfigurationCompacting {
     pub max_slice_records: u64,
 }
 
-impl From<CompactionRule> for FlowConfigurationCompacting {
-    fn from(value: CompactionRule) -> Self {
+impl From<CompactingRule> for FlowConfigurationCompacting {
+    fn from(value: CompactingRule) -> Self {
         Self {
             max_slice_size: value.max_slice_size(),
             max_slice_records: value.max_slice_records(),

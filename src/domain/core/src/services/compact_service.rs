@@ -23,8 +23,8 @@ pub trait CompactService: Send + Sync {
     async fn compact_dataset(
         &self,
         dataset_handle: &DatasetHandle,
-        options: &CompactOptions,
-        listener: Option<Arc<dyn CompactionMultiListener>>,
+        options: CompactOptions,
+        listener: Option<Arc<dyn CompactingMultiListener>>,
     ) -> Result<CompactResult, CompactError>;
 }
 
@@ -118,31 +118,31 @@ pub struct InvalidDatasetKindError {
 // Progress bar
 ///////////////////////////////////////////////////////////////////////////////
 
-pub trait CompactionListener: Send + Sync {
+pub trait CompactingListener: Send + Sync {
     fn begin(&self) {}
     fn success(&self, _res: &CompactResult) {}
     fn error(&self, _err: &CompactError) {}
 
-    fn begin_phase(&self, _phase: CompactionPhase) {}
-    fn end_phase(&self, _phase: CompactionPhase) {}
+    fn begin_phase(&self, _phase: CompactingPhase) {}
+    fn end_phase(&self, _phase: CompactingPhase) {}
 }
 
-pub struct NullCompactionListener;
-impl CompactionListener for NullCompactionListener {}
+pub struct NullCompactingListener;
+impl CompactingListener for NullCompactingListener {}
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub trait CompactionMultiListener: Send + Sync {
-    fn begin_compact(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn CompactionListener>> {
+pub trait CompactingMultiListener: Send + Sync {
+    fn begin_compact(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn CompactingListener>> {
         None
     }
 }
 
-pub struct NullCompactionMultiListener;
-impl CompactionMultiListener for NullCompactionMultiListener {}
+pub struct NullCompactingMultiListener;
+impl CompactingMultiListener for NullCompactingMultiListener {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CompactionPhase {
+pub enum CompactingPhase {
     GatherChainInfo,
     MergeDataslices,
     CommitNewBlocks,
@@ -161,8 +161,17 @@ pub enum CompactResult {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CompactOptions {
     pub max_slice_size: Option<u64>,
     pub max_slice_records: Option<u64>,
+}
+
+impl Default for CompactOptions {
+    fn default() -> Self {
+        Self {
+            max_slice_size: Some(DEFAULT_MAX_SLICE_SIZE),
+            max_slice_records: Some(DEFAULT_MAX_SLICE_RECORDS),
+        }
+    }
 }

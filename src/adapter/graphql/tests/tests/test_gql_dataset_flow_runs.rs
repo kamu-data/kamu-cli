@@ -643,7 +643,7 @@ async fn test_trigger_compact_root_dataset() {
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTION");
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTING");
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -699,7 +699,7 @@ async fn test_trigger_compact_root_dataset() {
                                     {
                                         "flowId": "0",
                                         "description": {
-                                            "__typename": "FlowDescriptionDatasetHardCompaction",
+                                            "__typename": "FlowDescriptionDatasetHardCompacting",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
                                             "compactResult": null,
                                         },
@@ -764,7 +764,7 @@ async fn test_trigger_compact_root_dataset() {
                                     {
                                         "flowId": "0",
                                         "description": {
-                                            "__typename": "FlowDescriptionDatasetHardCompaction",
+                                            "__typename": "FlowDescriptionDatasetHardCompacting",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
                                             "compactResult": null,
                                         },
@@ -838,7 +838,7 @@ async fn test_trigger_compact_root_dataset() {
                                     {
                                         "flowId": "0",
                                         "description": {
-                                            "__typename": "FlowDescriptionDatasetHardCompaction",
+                                            "__typename": "FlowDescriptionDatasetHardCompacting",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
                                             "compactResult": null,
                                         },
@@ -926,7 +926,7 @@ async fn test_trigger_compact_root_dataset() {
                                     {
                                         "flowId": "0",
                                         "description": {
-                                            "__typename": "FlowDescriptionDatasetHardCompaction",
+                                            "__typename": "FlowDescriptionDatasetHardCompacting",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
                                             "compactResult": {
                                                 "originalBlocksCount": 5,
@@ -991,8 +991,8 @@ async fn test_list_flows_with_filters_and_pagination() {
 
     let ingest_mutation_code =
         FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
-    let compaction_mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTION");
+    let compacting_mutation_code =
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTING");
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -1006,7 +1006,7 @@ async fn test_list_flows_with_filters_and_pagination() {
 
     let response = schema
         .execute(
-            async_graphql::Request::new(compaction_mutation_code.clone())
+            async_graphql::Request::new(compacting_mutation_code.clone())
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
@@ -1140,7 +1140,7 @@ async fn test_list_flows_with_filters_and_pagination() {
                         runs {
                             listFlows(
                                 filters: {
-                                    byFlowType: "HARD_COMPACTION"
+                                    byFlowType: "HARD_COMPACTING"
                                 }
                             ) {
                                 nodes {
@@ -1545,7 +1545,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     let mutation_code = FlowRunsHarness::trigger_flow_mutation(
         &create_derived_result.dataset_handle.id,
-        "HARD_COMPACTION",
+        "HARD_COMPACTING",
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -1717,7 +1717,7 @@ async fn test_cancel_running_transform_derived_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_cancel_hard_compaction_root_dataset() {
+async fn test_cancel_hard_compacting_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dependency_graph_mock: None,
         dataset_changes_mock: None,
@@ -1727,7 +1727,7 @@ async fn test_cancel_hard_compaction_root_dataset() {
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTION");
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTING");
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -2488,7 +2488,7 @@ impl FlowRunsHarness {
                                         flowId
                                         description {
                                             __typename
-                                            ... on FlowDescriptionDatasetHardCompaction {
+                                            ... on FlowDescriptionDatasetHardCompacting {
                                                 datasetId
                                                 compactResult {
                                                     originalBlocksCount

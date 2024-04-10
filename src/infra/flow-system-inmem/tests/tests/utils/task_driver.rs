@@ -99,11 +99,14 @@ impl TaskDriver {
                 assert_eq!(&ud.dataset_id, self.args.dataset_id.as_ref().unwrap());
             }
             LogicalPlan::Probe(_) => assert!(self.args.dataset_id.is_none()),
-            LogicalPlan::CompactDataset(compact) => {
+            LogicalPlan::HardCompactDataset(hard_compact) => {
                 assert!(self.args.dataset_id.is_some());
-                assert_eq!(&compact.dataset_id, self.args.dataset_id.as_ref().unwrap());
-                assert_eq!(compact.max_slice_records, self.args.max_slice_records);
-                assert_eq!(compact.max_slice_size, self.args.max_slice_size);
+                assert_eq!(
+                    &hard_compact.dataset_id,
+                    self.args.dataset_id.as_ref().unwrap()
+                );
+                assert_eq!(hard_compact.max_slice_records, self.args.max_slice_records);
+                assert_eq!(hard_compact.max_slice_size, self.args.max_slice_size);
             }
         }
     }
