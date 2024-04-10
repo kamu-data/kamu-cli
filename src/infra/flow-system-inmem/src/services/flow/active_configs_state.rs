@@ -21,6 +21,7 @@ pub(crate) struct ActiveConfigsState {
     dataset_schedules: HashMap<FlowKeyDataset, Schedule>,
     system_schedules: HashMap<SystemFlowType, Schedule>,
     dataset_batching_rules: HashMap<FlowKeyDataset, BatchingRule>,
+    dataset_compaction_rules: HashMap<FlowKeyDataset, CompactionRule>,
 }
 
 impl ActiveConfigsState {
@@ -36,6 +37,9 @@ impl ActiveConfigsState {
             }
             FlowConfigurationRule::BatchingRule(batching) => {
                 self.dataset_batching_rules.insert(key, batching);
+            }
+            FlowConfigurationRule::CompactionRule(compaction) => {
+                self.dataset_compaction_rules.insert(key, compaction);
             }
         }
     }
@@ -64,6 +68,7 @@ impl ActiveConfigsState {
     fn drop_dataset_flow_config(&mut self, flow_key: BorrowedFlowKeyDataset) {
         self.dataset_schedules.remove(flow_key.as_trait());
         self.dataset_batching_rules.remove(flow_key.as_trait());
+        self.dataset_compaction_rules.remove(flow_key.as_trait());
     }
 
     pub fn try_get_flow_schedule(&self, flow_key: &FlowKey) -> Option<Schedule> {
@@ -85,6 +90,16 @@ impl ActiveConfigsState {
         flow_type: DatasetFlowType,
     ) -> Option<BatchingRule> {
         self.dataset_batching_rules
+            .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
+            .copied()
+    }
+
+    pub fn try_get_dataset_compaction_rule(
+        &self,
+        dataset_id: &DatasetID,
+        flow_type: DatasetFlowType,
+    ) -> Option<CompactionRule> {
+        self.dataset_compaction_rules
             .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
             .copied()
     }

@@ -7,7 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_flow_system::{BatchingRule, FlowConfigurationRule, Schedule, ScheduleCron};
+use kamu_flow_system::{
+    BatchingRule,
+    CompactionRule,
+    FlowConfigurationRule,
+    Schedule,
+    ScheduleCron,
+};
 
 use crate::prelude::*;
 
@@ -18,6 +24,7 @@ pub struct FlowConfiguration {
     pub paused: bool,
     pub schedule: Option<FlowConfigurationSchedule>,
     pub batching: Option<FlowConfigurationBatching>,
+    pub compacting: Option<FlowConfigurationCompacting>,
 }
 
 impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
@@ -29,13 +36,20 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
             } else {
                 None
             },
-            schedule: if let FlowConfigurationRule::Schedule(schedule) = value.rule {
+            schedule: if let FlowConfigurationRule::Schedule(schedule) = &value.rule {
                 match schedule {
                     Schedule::TimeDelta(time_delta) => Some(FlowConfigurationSchedule::TimeDelta(
                         time_delta.every.into(),
                     )),
-                    Schedule::Cron(cron) => Some(FlowConfigurationSchedule::Cron(cron.into())),
+                    Schedule::Cron(cron) => {
+                        Some(FlowConfigurationSchedule::Cron(cron.clone().into()))
+                    }
                 }
+            } else {
+                None
+            },
+            compacting: if let FlowConfigurationRule::CompactionRule(args) = value.rule {
+                Some(args.into())
             } else {
                 None
             },
@@ -60,6 +74,21 @@ impl From<BatchingRule> for FlowConfigurationBatching {
         Self {
             min_records_to_await: value.min_records_to_await(),
             max_batching_interval: (*value.max_batching_interval()).into(),
+        }
+    }
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowConfigurationCompacting {
+    pub max_slice_size: u64,
+    pub max_slice_records: u64,
+}
+
+impl From<CompactionRule> for FlowConfigurationCompacting {
+    fn from(value: CompactionRule) -> Self {
+        Self {
+            max_slice_size: value.max_slice_size(),
+            max_slice_records: value.max_slice_records(),
         }
     }
 }

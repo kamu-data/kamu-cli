@@ -65,6 +65,17 @@ pub struct Probe {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompactDataset {
     pub dataset_id: DatasetID,
+    pub max_slice_size: Option<u64>,
+    pub max_slice_records: Option<u64>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+/// A task that can be used for testing the scheduling system
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct LogicalPlanOptions {
+    pub max_slice_size: Option<u64>,
+    pub max_slice_records: Option<u64>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

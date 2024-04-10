@@ -9,6 +9,8 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+use crate::FlowConfigurationRule;
+
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub enum DatasetFlowType {
     Ingest,
@@ -27,6 +29,22 @@ impl DatasetFlowType {
                 Some(opendatafabric::DatasetKind::Root)
             }
             DatasetFlowType::ExecuteTransform => Some(opendatafabric::DatasetKind::Derivative),
+        }
+    }
+
+    pub fn config_restriction(&self, flow_configuration_rule: &FlowConfigurationRule) -> bool {
+        match self {
+            DatasetFlowType::Ingest => {
+                matches!(flow_configuration_rule, FlowConfigurationRule::Schedule(_))
+            }
+            DatasetFlowType::ExecuteTransform => matches!(
+                flow_configuration_rule,
+                FlowConfigurationRule::BatchingRule(_)
+            ),
+            DatasetFlowType::HardCompaction => matches!(
+                flow_configuration_rule,
+                FlowConfigurationRule::CompactionRule(_)
+            ),
         }
     }
 }

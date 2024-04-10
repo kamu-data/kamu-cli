@@ -59,6 +59,9 @@ async fn test_crud_time_delta_root_dataset() {
                                 batching {
                                     __typename
                                 }
+                                compacting {
+                                    __typename
+                                }
                             }
                         }
                     }
@@ -127,7 +130,8 @@ async fn test_crud_time_delta_root_dataset() {
                                         "every": 1,
                                         "unit": "DAYS"
                                     },
-                                    "batching": null
+                                    "batching": null,
+                                    "compacting": null
                                 }
                             }
                         }
@@ -171,7 +175,8 @@ async fn test_crud_time_delta_root_dataset() {
                                         "every": 2,
                                         "unit": "HOURS"
                                     },
-                                    "batching": null
+                                    "batching": null,
+                                    "compacting": null
                                 }
                             }
                         }
@@ -284,6 +289,9 @@ async fn test_crud_cron_root_dataset() {
                                 batching {
                                     __typename
                                 }
+                                compacting {
+                                    __typename
+                                }
                             }
                         }
                     }
@@ -350,7 +358,8 @@ async fn test_crud_cron_root_dataset() {
                                         "__typename": "Cron5ComponentExpression",
                                         "cron5ComponentExpression": "*/2 * * * *",
                                     },
-                                    "batching": null
+                                    "batching": null,
+                                    "compacting": null
                                 }
                             }
                         }
@@ -392,7 +401,8 @@ async fn test_crud_cron_root_dataset() {
                                         "__typename": "Cron5ComponentExpression",
                                         "cron5ComponentExpression": "0 */1 * * *",
                                     },
-                                    "batching": null
+                                    "batching": null,
+                                    "compacting": null
                                 }
                             }
                         }
@@ -477,6 +487,9 @@ async fn test_crud_batching_derived_dataset() {
                                         unit
                                     }
                                 }
+                                compacting {
+                                    __typename
+                                }
                             }
                         }
                     }
@@ -548,6 +561,118 @@ async fn test_crud_batching_derived_dataset() {
                                             "every": 30,
                                             "unit": "MINUTES"
                                         }
+                                    },
+                                    "compacting": null
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_crud_compaction_root_dataset() {
+    let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
+        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
+    });
+    let create_result = harness.create_root_dataset().await;
+
+    let request_code = indoc!(
+        r#"
+        {
+            datasets {
+                byId (datasetId: "<id>") {
+                    flows {
+                        configs {
+                            byType (datasetFlowType: "HARD_COMPACTION") {
+                                __typename
+                                paused
+                                schedule {
+                                    __typename
+                                }
+                                batching {
+                                    __typename
+                                }
+                                compacting {
+                                    __typename
+                                    maxSliceSize
+                                    maxSliceRecords
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("<id>", &create_result.dataset_handle.id.to_string());
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let res = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "configs": {
+                            "byType": null
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let mutation_code = FlowConfigHarness::set_config_compacting_mutation(
+        &create_result.dataset_handle.id,
+        "HARD_COMPACTION",
+        false,
+        1_000_000,
+        10000,
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "configs": {
+                            "setConfigCompaction": {
+                                "__typename": "SetFlowConfigSuccess",
+                                "message": "Success",
+                                "config": {
+                                    "__typename": "FlowConfiguration",
+                                    "paused": false,
+                                    "schedule": null,
+                                    "batching": null,
+                                    "compacting": {
+                                        "__typename": "FlowConfigurationCompacting",
+                                        "maxSliceSize": 1_000_000,
+                                        "maxSliceRecords": 10000
                                     }
                                 }
                             }
@@ -617,6 +742,62 @@ async fn test_batching_config_validation() {
                                     "setConfigBatching": {
                                         "__typename": "FlowInvalidBatchingConfig",
                                         "message": test_case.3,
+                                    }
+                                }
+                            }
+                        }
+                    }
+            })
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_compacting_config_validation() {
+    let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
+        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
+    });
+    harness.create_root_dataset().await;
+    let create_derived_result = harness.create_derived_dataset().await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    for test_case in [
+        (0, 1_000_000, "Maximum slice size must be a positive number"),
+        (
+            1_000_000,
+            0,
+            "Maximum slice records must be a positive number",
+        ),
+    ] {
+        let mutation_code = FlowConfigHarness::set_config_compacting_mutation(
+            &create_derived_result.dataset_handle.id,
+            "HARD_COMPACTION",
+            false,
+            test_case.0,
+            test_case.1,
+        );
+
+        let response = schema
+            .execute(
+                async_graphql::Request::new(mutation_code.clone())
+                    .data(harness.catalog_authorized.clone()),
+            )
+            .await;
+        assert!(response.is_ok(), "{response:?}");
+        assert_eq!(
+            response.data,
+            value!({
+                    "datasets": {
+                        "byId": {
+                            "flows": {
+                                "configs": {
+                                    "setConfigCompaction": {
+                                        "__typename": "FlowInvalidCompactionConfig",
+                                        "message": test_case.2,
                                     }
                                 }
                             }
@@ -926,8 +1107,8 @@ async fn test_conditions_not_met_for_flows() {
     ////
 
     let mutation_code = FlowConfigHarness::set_config_batching_mutation(
-        &create_root_result.dataset_handle.id,
-        "INGEST",
+        &create_derived_result.dataset_handle.id,
+        "EXECUTE_TRANSFORM",
         false,
         1,
         (30, "MINUTES"),
@@ -952,7 +1133,7 @@ async fn test_conditions_not_met_for_flows() {
                         "configs": {
                             "setConfigBatching": {
                                 "__typename": "FlowPreconditionsNotMet",
-                                "message": "Flow didn't met preconditions: 'No SetPollingSource event defined'",
+                                "message": "Flow didn't met preconditions: 'No SetTransform event defined'",
                             }
                         }
                     }
@@ -964,8 +1145,8 @@ async fn test_conditions_not_met_for_flows() {
     ////
 
     let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
-        &create_derived_result.dataset_handle.id,
-        "EXECUTE_TRANSFORM",
+        &create_root_result.dataset_handle.id,
+        "INGEST",
         false,
         "0 */2 * * *",
     );
@@ -989,7 +1170,7 @@ async fn test_conditions_not_met_for_flows() {
                         "configs": {
                             "setConfigSchedule": {
                                 "__typename": "FlowPreconditionsNotMet",
-                                "message": "Flow didn't met preconditions: 'No SetTransform event defined'",
+                                "message": "Flow didn't met preconditions: 'No SetPollingSource event defined'",
                             }
                         }
                     }
@@ -1109,6 +1290,42 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
                     "flows": {
                         "configs": {
                             "setConfigSchedule": {
+                                "__typename": "FlowIncompatibleDatasetKind",
+                                "message": "Expected a Root dataset, but a Derivative dataset was provided",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    ////
+
+    let mutation_code = FlowConfigHarness::set_config_compacting_mutation(
+        &create_derived_result.dataset_handle.id,
+        "HARD_COMPACTION",
+        false,
+        1000,
+        1000,
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "configs": {
+                            "setConfigCompaction": {
                                 "__typename": "FlowIncompatibleDatasetKind",
                                 "message": "Expected a Root dataset, but a Derivative dataset was provided",
                             }
@@ -1398,6 +1615,9 @@ impl FlowConfigHarness {
                                             batching {
                                                 __typename
                                             }
+                                            compacting {
+                                                __typename
+                                            }
                                         }
                                     }
                                 }
@@ -1448,6 +1668,9 @@ impl FlowConfigHarness {
                                                 }
                                             }
                                             batching {
+                                                __typename
+                                            }
+                                            compacting {
                                                 __typename
                                             }
                                         }
@@ -1508,6 +1731,9 @@ impl FlowConfigHarness {
                                                         unit
                                                     }
                                                 }
+                                                compacting {
+                                                    __typename
+                                                }
                                             }
                                         }
                                     }
@@ -1525,6 +1751,66 @@ impl FlowConfigHarness {
         .replace("<every>", &max_batching_interval.0.to_string())
         .replace("<unit>", max_batching_interval.1)
         .replace("<minRecordsToAwait>", &min_records_to_await.to_string())
+    }
+
+    fn set_config_compacting_mutation(
+        id: &DatasetID,
+        dataset_flow_type: &str,
+        paused: bool,
+        max_slice_size: u64,
+        max_slice_records: u64,
+    ) -> String {
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            configs {
+                                setConfigCompaction (
+                                    datasetFlowType: "<dataset_flow_type>",
+                                    paused: <paused>,
+                                    compactionArgs: {
+                                        maxSliceSize: <maxSliceSize>,
+                                        maxSliceRecords: <maxSliceRecords>
+                                    }
+                                ) {
+                                    __typename,
+                                    message
+                                    ... on SetFlowConfigSuccess {
+                                        __typename,
+                                        message
+                                        ... on SetFlowConfigSuccess {
+                                            config {
+                                                __typename
+                                                paused
+                                                schedule {
+                                                    __typename
+                                                }
+                                                batching {
+                                                    __typename
+                                                }
+                                                compacting {
+                                                    __typename
+                                                    maxSliceSize
+                                                    maxSliceRecords
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
+        .replace("<dataset_flow_type>", dataset_flow_type)
+        .replace("<paused>", if paused { "true" } else { "false" })
+        .replace("<maxSliceRecords>", &max_slice_records.to_string())
+        .replace("<maxSliceSize>", &max_slice_size.to_string())
     }
 
     fn quick_flow_config_query(id: &DatasetID, dataset_flow_type: &str) -> String {

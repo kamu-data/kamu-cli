@@ -140,6 +140,11 @@ type CommitResultSuccess implements CommitResult & UpdateReadmeResult {
 	message: String!
 }
 
+input CompactionConditionInput {
+	maxSliceSize: Int!
+	maxSliceRecords: Int!
+}
+
 enum CompressionFormat {
 	GZIP
 	ZIP
@@ -368,6 +373,7 @@ type DatasetFlowConfigs {
 type DatasetFlowConfigsMut {
 	setConfigSchedule(datasetFlowType: DatasetFlowType!, paused: Boolean!, schedule: ScheduleInput!): SetFlowConfigResult!
 	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, batching: BatchingConditionInput!): SetFlowConfigResult!
+	setConfigCompaction(datasetFlowType: DatasetFlowType!, paused: Boolean!, compactionArgs: CompactionConditionInput!): SetFlowConfigResult!
 	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
 	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
 }
@@ -711,11 +717,17 @@ type FlowConfiguration {
 	paused: Boolean!
 	schedule: FlowConfigurationSchedule
 	batching: FlowConfigurationBatching
+	compacting: FlowConfigurationCompacting
 }
 
 type FlowConfigurationBatching {
 	minRecordsToAwait: Int!
 	maxBatchingInterval: TimeDelta!
+}
+
+type FlowConfigurationCompacting {
+	maxSliceSize: Int!
+	maxSliceRecords: Int!
 }
 
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
@@ -825,6 +837,11 @@ type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowRes
 }
 
 type FlowInvalidBatchingConfig implements SetFlowConfigResult {
+	reason: String!
+	message: String!
+}
+
+type FlowInvalidCompactionConfig implements SetFlowConfigResult {
 	reason: String!
 	message: String!
 }

@@ -117,7 +117,11 @@ impl TaskExecutor for TaskExecutorImpl {
                         .clone()
                         .unwrap_or(TaskOutcome::Success(TaskResult::Empty))
                 }
-                LogicalPlan::CompactDataset(CompactDataset { dataset_id }) => {
+                LogicalPlan::CompactDataset(CompactDataset {
+                    dataset_id,
+                    max_slice_size,
+                    max_slice_records,
+                }) => {
                     let compact_svc = self.catalog.get_one::<dyn CompactService>().int_err()?;
                     let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().int_err()?;
                     let dataset_handle = dataset_repo
@@ -126,7 +130,14 @@ impl TaskExecutor for TaskExecutorImpl {
                         .int_err()?;
 
                     let compact_result = compact_svc
-                        .compact_dataset(&dataset_handle, &CompactOptions::default(), None)
+                        .compact_dataset(
+                            &dataset_handle,
+                            &CompactOptions {
+                                max_slice_size: *max_slice_size,
+                                max_slice_records: *max_slice_records,
+                            },
+                            None,
+                        )
                         .await;
 
                     match compact_result {

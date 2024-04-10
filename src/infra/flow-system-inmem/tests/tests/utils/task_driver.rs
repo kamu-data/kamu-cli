@@ -30,6 +30,8 @@ pub(crate) struct TaskDriverArgs {
     pub(crate) dataset_id: Option<DatasetID>,
     pub(crate) run_since_start: Duration,
     pub(crate) finish_in_with: Option<(Duration, TaskOutcome)>,
+    pub(crate) max_slice_size: Option<u64>,
+    pub(crate) max_slice_records: Option<u64>,
 }
 
 impl TaskDriver {
@@ -100,6 +102,8 @@ impl TaskDriver {
             LogicalPlan::CompactDataset(compact) => {
                 assert!(self.args.dataset_id.is_some());
                 assert_eq!(&compact.dataset_id, self.args.dataset_id.as_ref().unwrap());
+                assert_eq!(compact.max_slice_records, self.args.max_slice_records);
+                assert_eq!(compact.max_slice_size, self.args.max_slice_size);
             }
         }
     }

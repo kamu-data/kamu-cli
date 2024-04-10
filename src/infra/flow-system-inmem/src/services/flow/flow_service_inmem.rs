@@ -179,6 +179,7 @@ impl FlowServiceInMemory {
                         self.enqueue_auto_polling_flow_unconditionally(start_time, &flow_key)
                             .await?;
                     }
+                    FlowConfigurationRule::CompactionRule(_) => (),
                 }
 
                 let mut state = self.state.lock().unwrap();
@@ -662,7 +663,26 @@ impl FlowServiceInMemory {
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
-        let logical_plan = flow.make_task_logical_plan();
+        let mut logical_plan_opts = LogicalPlanOptions::default();
+        if let FlowKey::Dataset(dataset_flow) = &flow.flow_key {
+            let maybe_compaction_rule = self
+                .state
+                .lock()
+                .unwrap()
+                .active_configs
+                .try_get_dataset_compaction_rule(
+                    &dataset_flow.dataset_id,
+                    DatasetFlowType::HardCompaction,
+                );
+            if let Some(opts) = maybe_compaction_rule {
+                logical_plan_opts = LogicalPlanOptions {
+                    max_slice_size: Some(opts.max_slice_size()),
+                    max_slice_records: Some(opts.max_slice_records()),
+                };
+            };
+        }
+
+        let logical_plan = flow.make_task_logical_plan(&logical_plan_opts);
 
         let task = self
             .task_scheduler
