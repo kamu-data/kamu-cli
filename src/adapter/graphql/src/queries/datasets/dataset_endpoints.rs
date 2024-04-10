@@ -88,7 +88,7 @@ impl<'a> DatasetEndpoints<'a> {
         );
 
         let tail_url = format!("{base_url}/tail?limit=10");
-        let push_url = format!("{base_url}/push");
+        let push_url = format!("{base_url}/ingest");
 
         let query_url = format!(
             "{}graphql?query=query {{%0A%20 apiVersion%0A}}%0A",
