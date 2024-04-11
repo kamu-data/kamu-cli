@@ -26,7 +26,10 @@ pub(crate) enum FlowTrigger {
 impl FlowTrigger {
     pub async fn build(trigger: fs::FlowTrigger, ctx: &Context<'_>) -> Result<Self, InternalError> {
         Ok(match trigger {
-            fs::FlowTrigger::Manual(manual) => Self::Manual(manual.into()),
+            fs::FlowTrigger::Manual(manual) => {
+                let initiator = Account::from_account_id(ctx, manual.initiator_account_id).await?;
+                Self::Manual(FlowTriggerManual { initiator })
+            }
             fs::FlowTrigger::AutoPolling(auto_polling) => Self::AutoPolling(auto_polling.into()),
             fs::FlowTrigger::Push(push) => Self::Push(push.into()),
             fs::FlowTrigger::InputDatasetFlow(input) => {
@@ -36,7 +39,7 @@ impl FlowTrigger {
                     .await
                     .int_err()?;
                 Self::InputDatasetFlow(FlowTriggerInputDatasetFlow::new(
-                    Dataset::new(Account::from_dataset_alias(ctx, &hdl.alias), hdl),
+                    Dataset::new(Account::from_dataset_alias(ctx, &hdl.alias).await?, hdl),
                     input.flow_type.into(),
                     input.flow_id.into(),
                 ))
@@ -48,14 +51,6 @@ impl FlowTrigger {
 #[derive(SimpleObject)]
 pub(crate) struct FlowTriggerManual {
     initiator: Account,
-}
-
-impl From<fs::FlowTriggerManual> for FlowTriggerManual {
-    fn from(value: fs::FlowTriggerManual) -> Self {
-        Self {
-            initiator: Account::from_account_name(value.initiator_account_name),
-        }
-    }
 }
 
 #[derive(SimpleObject)]

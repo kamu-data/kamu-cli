@@ -18,27 +18,28 @@ use crate::prelude::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AccountID(String);
+pub struct AccountID(odf::AccountID);
 
-impl From<&str> for AccountID {
-    fn from(value: &str) -> Self {
-        Self(value.to_owned())
+impl From<odf::AccountID> for AccountID {
+    fn from(value: odf::AccountID) -> Self {
+        AccountID(value)
     }
 }
 
-impl From<String> for AccountID {
-    fn from(value: String) -> Self {
-        Self(value)
+impl From<AccountID> for odf::AccountID {
+    fn from(val: AccountID) -> Self {
+        val.0
     }
 }
 
 impl From<AccountID> for String {
     fn from(val: AccountID) -> Self {
-        val.0
+        val.0.as_did_str().to_string()
     }
 }
+
 impl Deref for AccountID {
-    type Target = String;
+    type Target = odf::AccountID;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -48,7 +49,8 @@ impl Deref for AccountID {
 impl ScalarType for AccountID {
     fn parse(value: Value) -> InputValueResult<Self> {
         if let Value::String(value) = &value {
-            Ok(Self::from(value.as_str()))
+            let val = odf::AccountID::from_did_str(value.as_str())?;
+            Ok(val.into())
         } else {
             Err(InputValueError::expected_type(value))
         }
@@ -106,22 +108,22 @@ impl ScalarType for AccountName {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AccountDisplayName(kamu_core::auth::AccountDisplayName);
+pub struct AccountDisplayName(kamu_accounts::AccountDisplayName);
 
-impl From<kamu_core::auth::AccountDisplayName> for AccountDisplayName {
-    fn from(value: kamu_core::auth::AccountDisplayName) -> Self {
+impl From<kamu_accounts::AccountDisplayName> for AccountDisplayName {
+    fn from(value: kamu_accounts::AccountDisplayName) -> Self {
         Self(value)
     }
 }
 
-impl From<AccountDisplayName> for kamu_core::auth::AccountDisplayName {
+impl From<AccountDisplayName> for kamu_accounts::AccountDisplayName {
     fn from(val: AccountDisplayName) -> Self {
         val.0
     }
 }
 
 impl Deref for AccountDisplayName {
-    type Target = kamu_core::auth::AccountDisplayName;
+    type Target = kamu_accounts::AccountDisplayName;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -131,7 +133,7 @@ impl Deref for AccountDisplayName {
 impl ScalarType for AccountDisplayName {
     fn parse(value: Value) -> InputValueResult<Self> {
         if let Value::String(value) = &value {
-            let val = kamu_core::auth::AccountDisplayName::from(value.as_str());
+            let val = kamu_accounts::AccountDisplayName::from(value.as_str());
             Ok(val.into())
         } else {
             Err(InputValueError::expected_type(value))

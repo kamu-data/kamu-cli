@@ -45,17 +45,11 @@ impl Search {
         datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
         let total_count = datasets.len();
 
-        let nodes: Vec<_> = datasets
-            .into_iter()
-            .skip(page * per_page)
-            .take(per_page)
-            .map(|hdl| {
-                SearchResult::Dataset(Dataset::new(
-                    Account::from_dataset_alias(ctx, &hdl.alias),
-                    hdl,
-                ))
-            })
-            .collect();
+        let mut nodes: Vec<SearchResult> = Vec::new();
+        for hdl in datasets.into_iter().skip(page * per_page).take(per_page) {
+            let account = Account::from_dataset_alias(ctx, &hdl.alias).await?;
+            nodes.push(SearchResult::Dataset(Dataset::new(account, hdl)));
+        }
 
         Ok(SearchResultConnection::new(
             nodes,

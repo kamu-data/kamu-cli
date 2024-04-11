@@ -68,8 +68,7 @@ impl DatasetFlowRunsMut {
                 Utc::now(),
                 fs::FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
-                odf::AccountID::from(odf::FAKE_ACCOUNT_ID),
-                logged_account.account_name,
+                logged_account.account_id,
             )
             .await
             .map_err(|e| match e {

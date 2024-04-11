@@ -7,12 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::CurrentAccountSubject;
+use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use url::Url;
 
 use crate::commands::*;
-use crate::config::UsersConfig;
 use crate::{accounts, odf_server, CommandInterpretationFailed, WorkspaceService};
 
 pub fn get_command(
@@ -175,7 +174,7 @@ pub fn get_command(
         },
         Some(("list", submatches)) => {
             let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
-            let user_config = cli_catalog.get_one::<UsersConfig>()?;
+            let user_config = cli_catalog.get_one::<kamu_accounts::PredefinedAccountsConfig>()?;
 
             Box::new(ListCommand::new(
                 cli_catalog.get_one()?,
@@ -202,19 +201,50 @@ pub fn get_command(
             *(submatches.get_one("limit").unwrap()),
             cli_catalog.get_one()?,
         )),
-        Some(("login", submatches)) => Box::new(LoginCommand::new(
-            cli_catalog.get_one()?,
-            cli_catalog.get_one()?,
-            cli_catalog.get_one()?,
-            if submatches.get_flag("user") {
-                odf_server::AccessTokenStoreScope::User
-            } else {
-                odf_server::AccessTokenStoreScope::Workspace
-            },
-            submatches.get_one::<Url>("server").cloned(),
-            submatches.get_one("access-token").cloned(),
-            submatches.get_flag("check"),
-        )),
+        Some(("login", submatches)) => match submatches.subcommand() {
+            Some(("oauth", submatches)) => Box::new(LoginSilentCommand::new(
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                if submatches.get_flag("user") {
+                    odf_server::AccessTokenStoreScope::User
+                } else {
+                    odf_server::AccessTokenStoreScope::Workspace
+                },
+                submatches.get_one::<Url>("server").cloned(),
+                LoginSilentMode::OAuth(LoginSilentModeOAuth {
+                    provider: submatches.get_one("provider").cloned().unwrap(),
+                    access_token: submatches.get_one("access-token").cloned().unwrap(),
+                }),
+            )),
+            Some(("password", submatches)) => Box::new(LoginSilentCommand::new(
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                if submatches.get_flag("user") {
+                    odf_server::AccessTokenStoreScope::User
+                } else {
+                    odf_server::AccessTokenStoreScope::Workspace
+                },
+                submatches.get_one::<Url>("server").cloned(),
+                LoginSilentMode::Password(LoginSilentModePassword {
+                    login: submatches.get_one("login").cloned().unwrap(),
+                    password: submatches.get_one("password").cloned().unwrap(),
+                }),
+            )),
+            Some(_) => return Err(CommandInterpretationFailed.into()),
+            None => Box::new(LoginCommand::new(
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                if submatches.get_flag("user") {
+                    odf_server::AccessTokenStoreScope::User
+                } else {
+                    odf_server::AccessTokenStoreScope::Workspace
+                },
+                submatches.get_one::<Url>("server").cloned(),
+                submatches.get_one("access-token").cloned(),
+                submatches.get_flag("check"),
+            )),
+        },
         Some(("logout", submatches)) => Box::new(LogoutCommand::new(
             cli_catalog.get_one()?,
             if submatches.get_flag("user") {
@@ -432,6 +462,7 @@ pub fn get_command(
                         server_matches.get_one("http-port").copied(),
                         server_matches.get_flag("get-token"),
                         cli_catalog.get_one()?,
+                        cli_catalog.get_one()?,
                     ))
                 }
                 Some(("gql-query", query_matches)) => Box::new(APIServerGqlQueryCommand::new(
@@ -461,7 +492,6 @@ pub fn get_command(
             Some(("generate-token", gen_matches)) => Box::new(GenerateTokenCommand::new(
                 cli_catalog.get_one()?,
                 gen_matches.get_one("login").cloned().unwrap(),
-                gen_matches.get_one("gh-access-token").cloned(),
                 *gen_matches.get_one::<usize>("expiration-time-sec").unwrap(),
             )),
             Some(("ipfs", ipfs_matches)) => match ipfs_matches.subcommand() {
@@ -515,6 +545,7 @@ pub fn get_command(
                 base_catalog.clone(),
                 workspace_svc.is_multi_tenant_workspace(),
                 current_account_name,
+                cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 submatches.get_one("address").copied(),
                 submatches.get_one("http-port").copied(),

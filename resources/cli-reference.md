@@ -20,7 +20,7 @@ To regenerate this schema from existing code, use the following command:
 * `inspect` — Group of commands for exploring dataset metadata
 * `list` — List all datasets in the workspace
 * `log` — Shows dataset metadata history
-* `login` — Logs in to a remote Kamu server
+* `login` — Logs in to a remote Kamu server interactively
 * `logout` — Logs out from a remote Kamu server
 * `new` — Creates a new dataset manifest from a template
 * `notebook` — Starts the notebook server for exploring the data in the workspace
@@ -500,9 +500,14 @@ Using a filter to inspect blocks containing query changes of a derivative datase
 
 ## `kamu login`
 
-Logs in to a remote Kamu server
+Logs in to a remote Kamu server interactively
 
-**Usage:** `kamu login [OPTIONS] [server]`
+**Usage:** `kamu login [OPTIONS] [server] [COMMAND]`
+
+**Subcommands:**
+
+* `oauth` — Performs non-interactive login to a remote Kamu server via OAuth provider token
+* `password` — Performs non-interactive login to a remote Kamu server via login and password
 
 **Arguments:**
 
@@ -513,6 +518,42 @@ Logs in to a remote Kamu server
 * `--user` — Store access token in the user home folder rather than in the workspace
 * `--check` — Check whether existing authorization is still valid without triggering a login flow
 * `--access-token <ACCESS-TOKEN>` — Provide an existing access token
+
+
+
+## `kamu login oauth`
+
+Performs non-interactive login to a remote Kamu server via OAuth provider token
+
+**Usage:** `kamu login oauth [OPTIONS] <provider> <access-token> [server]`
+
+**Arguments:**
+
+* `<PROVIDER>` — Name of the OAuth provider, i.e. 'github'
+* `<ACCESS-TOKEN>` — OAuth provider access token
+* `<SERVER>` — ODF backend server URL (defaults to kamu.dev)
+
+**Options:**
+
+* `--user` — Store access token in the user home folder rather than in the workspace
+
+
+
+## `kamu login password`
+
+Performs non-interactive login to a remote Kamu server via login and password
+
+**Usage:** `kamu login password [OPTIONS] <login> <password> [server]`
+
+**Arguments:**
+
+* `<LOGIN>` — Specify user name
+* `<PASSWORD>` — Specify password
+* `<SERVER>` — ODF backend server URL (defaults to kamu.dev)
+
+**Options:**
+
+* `--user` — Store access token in the user home folder rather than in the workspace
 
 
 
@@ -1173,7 +1214,6 @@ Generate a platform token from a known secret for debugging
 **Options:**
 
 * `--login <LOGIN>` — Account name
-* `--gh-access-token <GH-ACCESS-TOKEN>` — An existing GitHub access token
 * `--expiration-time-sec <EXPIRATION-TIME-SEC>` — Token expiration time in seconds
 
   Default value: `3600`

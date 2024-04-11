@@ -23,6 +23,7 @@ doctest = false
 
 [dependencies]
 opendatafabric = { workspace = true }
+kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 
 axum = { version = "0.6", features = ["headers"] }

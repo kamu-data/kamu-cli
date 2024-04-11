@@ -17,6 +17,7 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
+use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use url::Url;
 

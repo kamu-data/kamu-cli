@@ -17,31 +17,59 @@ use dill::Component;
 use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
+use kamu_accounts::{
+    set_random_jwt_secret,
+    AccountConfig,
+    CurrentAccountSubject,
+    PredefinedAccountsConfig,
+};
+use kamu_accounts_inmem::AccountRepositoryInMemory;
+use kamu_accounts_services::AuthenticationServiceImpl;
 use kamu_core::*;
 use opendatafabric::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 fn create_catalog_with_local_workspace(tempdir: &Path, is_multitenant: bool) -> dill::Catalog {
+    set_random_jwt_secret();
+
     let datasets_dir = tempdir.join("datasets");
     std::fs::create_dir(&datasets_dir).unwrap();
 
-    dill::CatalogBuilder::new()
-        .add::<SystemTimeSourceDefault>()
+    let current_account_subject = CurrentAccountSubject::new_test();
+    let mut predefined_accounts_config = PredefinedAccountsConfig::new();
+
+    if let CurrentAccountSubject::Logged(logged_account) = &current_account_subject {
+        predefined_accounts_config
+            .predefined
+            .push(AccountConfig::from_name(
+                logged_account.account_name.clone(),
+            ));
+    } else {
+        panic!()
+    }
+
+    let catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add::<DependencyGraphServiceInMemory>()
+        .add_value(current_account_subject)
+        .add_value(predefined_accounts_config)
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(datasets_dir)
-                .with_current_account_subject(Arc::new(CurrentAccountSubject::new_test()))
                 .with_multi_tenant(is_multitenant),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add::<SystemTimeSourceDefault>()
         .add::<QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
         .add::<ObjectStoreBuilderLocalFs>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .build()
+        .add::<AuthenticationServiceImpl>()
+        .add::<AccountRepositoryInMemory>()
+        .build();
+
+    catalog
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

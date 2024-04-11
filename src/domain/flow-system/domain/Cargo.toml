@@ -26,6 +26,7 @@ enum-variants = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
 opendatafabric = { workspace = true }
+kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
 

@@ -12,8 +12,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dill::*;
-use domain::auth::{DatasetAction, DatasetActionAuthorizer, DEFAULT_ACCOUNT_NAME};
+use domain::auth::{DatasetAction, DatasetActionAuthorizer};
 use event_bus::EventBus;
+use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_core::*;
 use opendatafabric::*;
 use url::Url;
@@ -585,7 +586,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
     }
 
     fn get_datasets_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_> {
-        if *account_name == DEFAULT_ACCOUNT_NAME {
+        if *account_name == DEFAULT_ACCOUNT_NAME_STR {
             self.get_all_datasets()
         } else {
             Box::pin(futures::stream::empty())
@@ -598,7 +599,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
     ) -> Result<DatasetHandle, ResolveDatasetError> {
         assert!(
             !dataset_alias.is_multi_tenant()
-                || dataset_alias.account_name.as_ref().unwrap() == DEFAULT_ACCOUNT_NAME,
+                || dataset_alias.account_name.as_ref().unwrap() == DEFAULT_ACCOUNT_NAME_STR,
             "Multi-tenant refs shouldn't have reached down to here with earlier validations"
         );
 

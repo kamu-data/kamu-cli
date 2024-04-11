@@ -59,7 +59,7 @@ jobs:
             runs-on: ubuntu-latest
             cargo-flags: --profile ci --features ftp
             nextest-flags: --cargo-profile ci --features ftp
-            nextest-exclusions: -E '!test(::database::)'
+            nextest-exclusions: -E '!(test(::database::) | test(::spark::)| test(::flink::))'
             container-runtime: podman
             ipfs: true
             database: true

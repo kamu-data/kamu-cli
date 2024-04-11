@@ -12,7 +12,10 @@ use std::sync::Arc;
 
 use dill::component;
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_accounts::PROVIDER_PASSWORD;
+use kamu_adapter_http::LoginRequestBody;
 use serde::Deserialize;
+use serde_json::json;
 use thiserror::Error;
 use tokio::sync::Notify;
 use url::Url;
@@ -22,6 +25,7 @@ use crate::odf_server;
 ////////////////////////////////////////////////////////////////////////////////////////
 
 pub const DEFAULT_ODF_FRONTEND_URL: &str = "https://platform.demo.kamu.dev";
+pub const DEFAULT_ODF_BACKEND_URL: &str = "https://api.demo.kamu.dev";
 
 type WebServer =
     axum::Server<hyper::server::conn::AddrIncoming, axum::routing::IntoMakeService<axum::Router>>;
@@ -128,7 +132,7 @@ impl LoginService {
         }
     }
 
-    pub async fn login(
+    pub async fn login_interactive(
         &self,
         odf_server_frontend_url: &Url,
         web_server_started_callback: impl Fn(&String),
@@ -144,10 +148,85 @@ impl LoginService {
 
         let maybe_callback_response =
             Self::obtain_callback_response(cli_web_server, response_rx).await?;
-        maybe_callback_response.ok_or_else(|| LoginError::AccessFailed)
+        maybe_callback_response.ok_or_else(|| {
+            LoginError::AccessFailed(LoginErrorAccessFailed {
+                reason: String::from("No response"),
+            })
+        })
     }
 
-    #[allow(dead_code)]
+    pub async fn login_oauth(
+        &self,
+        odf_server_backend_url: &Url,
+        oauth_login_method: &str,
+        access_token: &str,
+    ) -> Result<BackendLoginResponse, LoginError> {
+        let login_credentials_json = json!({
+            "accessToken": access_token,
+        })
+        .to_string();
+
+        self.invoke_login_method(
+            odf_server_backend_url,
+            oauth_login_method,
+            login_credentials_json,
+        )
+        .await
+    }
+
+    pub async fn login_password(
+        &self,
+        odf_server_backend_url: &Url,
+        login: &str,
+        password: &str,
+    ) -> Result<BackendLoginResponse, LoginError> {
+        let login_credentials_json = json!({
+            "login": login,
+            "password": password
+        })
+        .to_string();
+
+        self.invoke_login_method(
+            odf_server_backend_url,
+            PROVIDER_PASSWORD,
+            login_credentials_json,
+        )
+        .await
+    }
+
+    async fn invoke_login_method(
+        &self,
+        odf_server_backend_url: &Url,
+        login_method: &str,
+        login_credentials_json: String,
+    ) -> Result<BackendLoginResponse, LoginError> {
+        let client = reqwest::Client::new();
+
+        let login_url = odf_server_backend_url.join("platform/login").unwrap();
+        tracing::info!(?login_url, "Login request");
+
+        let response = client
+            .post(login_url)
+            .json(&LoginRequestBody {
+                login_method: String::from(login_method),
+                login_credentials_json,
+            })
+            .send()
+            .await
+            .int_err()?;
+
+        match response.status() {
+            http::StatusCode::OK => Ok(response.json::<BackendLoginResponse>().await.int_err()?),
+            _ => Err(LoginError::AccessFailed(LoginErrorAccessFailed {
+                reason: format!(
+                    "Status {} {}",
+                    response.status().as_str(),
+                    response.text().await.unwrap()
+                ),
+            })),
+        }
+    }
+
     pub async fn validate_access_token(
         &self,
         odf_server_backend_url: &Url,
@@ -200,13 +279,27 @@ pub struct FrontendLoginCallbackResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackendLoginResponse {
+    pub access_token: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Error)]
 pub enum LoginError {
-    #[error("Did not obtain access token")]
-    AccessFailed,
+    #[error(transparent)]
+    AccessFailed(LoginErrorAccessFailed),
 
     #[error(transparent)]
     Internal(InternalError),
+}
+
+#[derive(Debug, Error)]
+#[error("Did not obtain access token. Reason: {reason}")]
+pub struct LoginErrorAccessFailed {
+    reason: String,
 }
 
 impl From<InternalError> for LoginError {

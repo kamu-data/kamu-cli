@@ -7,9 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::CurrentAccountSubject;
-use opendatafabric::AccountName;
-use serde::{Deserialize, Serialize};
+use kamu_accounts::CurrentAccountSubject;
+use opendatafabric::{AccountID, AccountName};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -69,16 +68,12 @@ impl CurrentAccountIndication {
     }
 
     pub fn to_current_account_subject(&self) -> CurrentAccountSubject {
-        CurrentAccountSubject::logged(self.account_name.clone(), self.is_admin)
+        CurrentAccountSubject::logged(
+            AccountID::new_seeded_ed25519(self.account_name.as_bytes()),
+            self.account_name.clone(),
+            self.is_admin,
+        )
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PasswordLoginCredentials {
-    pub login: String,
-    pub password: String,
-}
-
-///////////////////////////////////////////////////////////////////////////////

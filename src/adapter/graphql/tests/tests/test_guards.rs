@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::{value, EmptySubscription, Object};
+use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
 use kamu_adapter_graphql::{LoggedInGuard, ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE};
-use kamu_core::{AnonymousAccountReason, CurrentAccountSubject};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

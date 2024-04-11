@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
-use kamu::domain::CurrentAccountSubject;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_cli::{self, OutputConfig, WorkspaceLayout};
 
 #[test_log::test(tokio::test)]
@@ -16,6 +16,7 @@ async fn test_di_graph_validates() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = WorkspaceLayout::new(tempdir.path());
     let mut base_catalog_builder = kamu_cli::configure_base_catalog(&workspace_layout, false, None);
+    kamu_cli::configure_in_memory_components(&mut base_catalog_builder);
     base_catalog_builder.add_value(OutputConfig::default());
 
     kamu_cli::register_config_in_catalog(

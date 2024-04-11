@@ -12,17 +12,13 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
-use database_common::{
-    run_transactional,
-    DatabaseConfiguration,
-    DatabaseProvider,
-    DatabaseTransactionManager,
-};
+use database_common::{DatabaseConfiguration, DatabaseProvider};
 use dill::*;
 use kamu::domain::*;
 use kamu::*;
-use opendatafabric::DatasetID;
+use kamu_accounts::{AccountConfig, CurrentAccountSubject, PredefinedAccountsConfig};
 
+use crate::accounts::AccountService;
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
@@ -98,6 +94,7 @@ pub async fn run(
         //    DatabaseConfiguration::sqlite_from(PathBuf::from("./kamu.sqlite.db").
         // as_path());
         // configure_database_components(&mut base_catalog_builder, &db_configuration)?;
+        configure_in_memory_components(&mut base_catalog_builder);
 
         base_catalog_builder
             .add_value(dependencies_graph_repository)
@@ -129,9 +126,6 @@ pub async fn run(
 
         (guards, base_catalog, cli_catalog, output_config)
     };
-
-    // Temp: remove this
-    database_test(&base_catalog).await?;
 
     // Evict cache
     if workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()? {
@@ -179,40 +173,6 @@ pub async fn run(
     }
 
     result
-}
-
-async fn database_test(catalog: &Catalog) -> Result<(), InternalError> {
-    let maybe_transaction_manager = catalog.get_one::<dyn DatabaseTransactionManager>().ok();
-    if maybe_transaction_manager.is_some() {
-        run_transactional(catalog, |catalog| async move {
-            let account_repository = catalog
-                .get_one::<dyn kamu_accounts::AccountRepository>()
-                .unwrap();
-            println!(
-                "{:?}",
-                account_repository
-                    .find_account_by_email("test@example.com")
-                    .await
-                    .int_err()?
-            );
-            let account = kamu_accounts::AccountModel {
-                id: DatasetID::new_seeded_ed25519(b"hello").to_string(),
-                email: String::from("test@example.com"),
-                account_name: String::from("wasya"),
-                display_name: String::from("Wasya Pupkin"),
-                origin: kamu_accounts::AccountOrigin::Cli,
-                registered_at: chrono::Utc::now(),
-            };
-            account_repository
-                .create_account(&account)
-                .await
-                .int_err()?;
-            Ok(())
-        })
-        .await?;
-    }
-
-    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -340,8 +300,6 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_task_system_services::TaskExecutorImpl>();
 
-    b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
-
     // TODO: initialize graph dependencies when starting API server
     b.add::<DependencyGraphServiceInMemory>();
 
@@ -352,17 +310,14 @@ pub fn configure_base_catalog(
         chrono::Duration::try_minutes(1).unwrap(),
     ));
 
-    b.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
-    b.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
-
-    b.add::<accounts::AccountService>();
+    b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 
     // No GitHub login possible for single-tenant workspace
     if multi_tenant_workspace {
         b.add::<kamu_adapter_oauth::OAuthGithub>();
     }
 
-    b.add::<AuthenticationServiceImpl>();
+    b.add::<kamu_accounts_services::AuthenticationServiceImpl>();
 
     // Give both CLI and server access to stored repo access tokens
     b.add::<odf_server::AccessTokenRegistryService>();
@@ -389,6 +344,7 @@ fn configure_database_components(
 
             catalog_builder.add::<kamu_accounts_postgres::PostgresAccountRepository>();
             catalog_builder.add::<kamu_flow_system_postgres::FlowSystemEventStorePostgres>();
+            catalog_builder.add::<kamu_task_system_postgres::TaskSystemEventStorePostgres>();
 
             Ok(())
         }
@@ -400,6 +356,7 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_mysql::MySqlAccountRepository>();
+            // TODO: Task System MySQL version
 
             Ok(())
         }
@@ -412,10 +369,19 @@ fn configure_database_components(
 
             catalog_builder.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
             catalog_builder.add::<kamu_flow_system_sqlite::FlowSystemEventStoreSqlite>();
+            catalog_builder.add::<kamu_task_system_sqlite::TaskSystemEventStoreSqlite>();
 
             Ok(())
         }
     }
+}
+
+// Public only for tests
+pub fn configure_in_memory_components(catalog_builder: &mut CatalogBuilder) {
+    catalog_builder.add::<kamu_accounts_inmem::AccountRepositoryInMemory>();
+    catalog_builder.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
+    catalog_builder.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
+    catalog_builder.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 }
 
 // Public only for tests
@@ -524,7 +490,18 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
 
     if multi_tenant_workspace {
-        catalog_builder.add_value(config.users.clone().unwrap());
+        let mut implicit_user_config = PredefinedAccountsConfig::new();
+        implicit_user_config.predefined.push(
+            AccountConfig::from_name(opendatafabric::AccountName::new_unchecked(
+                AccountService::default_account_name(true).as_str(),
+            ))
+            .set_display_name(AccountService::default_user_name(true)),
+        );
+
+        use merge::Merge;
+        let mut user_config = config.users.clone().unwrap();
+        user_config.merge(implicit_user_config);
+        catalog_builder.add_value(user_config);
     } else {
         if let Some(users) = &config.users {
             assert!(
@@ -533,7 +510,7 @@ pub fn register_config_in_catalog(
             );
         }
 
-        catalog_builder.add_value(config::UsersConfig::single_tenant());
+        catalog_builder.add_value(kamu_accounts::PredefinedAccountsConfig::single_tenant());
     }
 }
 

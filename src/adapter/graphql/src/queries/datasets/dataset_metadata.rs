@@ -106,7 +106,7 @@ impl DatasetMetadata {
                 .await
                 .int_err()?;
             upstream.push(Dataset::new(
-                Account::from_dataset_alias(ctx, &hdl.alias),
+                Account::from_dataset_alias(ctx, &hdl.alias).await?,
                 hdl,
             ));
         }
@@ -136,7 +136,7 @@ impl DatasetMetadata {
                 .await
                 .int_err()?;
             downstream.push(Dataset::new(
-                Account::from_dataset_alias(ctx, &hdl.alias),
+                Account::from_dataset_alias(ctx, &hdl.alias).await?,
                 hdl,
             ));
         }

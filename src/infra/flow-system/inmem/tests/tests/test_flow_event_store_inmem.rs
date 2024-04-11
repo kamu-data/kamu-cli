@@ -15,7 +15,7 @@ use kamu_flow_system::*;
 use kamu_flow_system_inmem::FlowEventStoreInMem;
 use kamu_task_system::{TaskOutcome, TaskResult, TaskSystemEventStore};
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
-use opendatafabric::{AccountName, DatasetID, FAKE_ACCOUNT_ID};
+use opendatafabric::{AccountID, DatasetID};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -198,8 +198,8 @@ async fn test_dataset_flow_filter_by_initiator() {
     let cases = vec![
         (
             DatasetFlowFilters {
-                by_initiator: Some(InitiatorFilter::Account(AccountName::new_unchecked(
-                    "wasya",
+                by_initiator: Some(InitiatorFilter::Account(AccountID::new_seeded_ed25519(
+                    b"wasya",
                 ))),
                 ..Default::default()
             },
@@ -210,8 +210,8 @@ async fn test_dataset_flow_filter_by_initiator() {
         ),
         (
             DatasetFlowFilters {
-                by_initiator: Some(InitiatorFilter::Account(AccountName::new_unchecked(
-                    "petya",
+                by_initiator: Some(InitiatorFilter::Account(AccountID::new_seeded_ed25519(
+                    b"petya",
                 ))),
                 ..Default::default()
             },
@@ -270,8 +270,8 @@ async fn test_dataset_flow_filter_combinations() {
             DatasetFlowFilters {
                 by_flow_status: Some(FlowStatus::Waiting),
                 by_flow_type: Some(DatasetFlowType::HardCompacting),
-                by_initiator: Some(InitiatorFilter::Account(AccountName::new_unchecked(
-                    "petya",
+                by_initiator: Some(InitiatorFilter::Account(AccountID::new_seeded_ed25519(
+                    b"petya",
                 ))),
             },
             vec![foo_cases.compacting_flow_ids.flow_id_waiting],
@@ -565,8 +565,8 @@ async fn test_system_flows_filtered_by_initiator() {
         ),
         (
             SystemFlowFilters {
-                by_initiator: Some(InitiatorFilter::Account(AccountName::new_unchecked(
-                    "wasya",
+                by_initiator: Some(InitiatorFilter::Account(AccountID::new_seeded_ed25519(
+                    b"wasya",
                 ))),
                 ..Default::default()
             },
@@ -574,8 +574,8 @@ async fn test_system_flows_filtered_by_initiator() {
         ),
         (
             SystemFlowFilters {
-                by_initiator: Some(InitiatorFilter::Account(AccountName::new_unchecked(
-                    "unrelated-user",
+                by_initiator: Some(InitiatorFilter::Account(AccountID::new_seeded_ed25519(
+                    b"unrelated-user",
                 ))),
                 ..Default::default()
             },
@@ -618,8 +618,8 @@ async fn test_system_flows_complex_filter() {
         ),
         (
             SystemFlowFilters {
-                by_initiator: Some(InitiatorFilter::Account(AccountName::new_unchecked(
-                    "petya",
+                by_initiator: Some(InitiatorFilter::Account(AccountID::new_seeded_ed25519(
+                    b"petya",
                 ))),
                 by_flow_status: Some(FlowStatus::Waiting),
                 by_flow_type: None,
@@ -845,14 +845,12 @@ async fn make_dataset_test_flows(
 
     let wasya_manual_trigger = FlowTrigger::Manual(FlowTriggerManual {
         trigger_time: Utc::now(),
-        initiator_account_id: FAKE_ACCOUNT_ID.to_string(),
-        initiator_account_name: AccountName::new_unchecked("wasya"),
+        initiator_account_id: AccountID::new_seeded_ed25519(b"wasya"),
     });
 
     let petya_manual_trigger = FlowTrigger::Manual(FlowTriggerManual {
         trigger_time: Utc::now(),
-        initiator_account_id: FAKE_ACCOUNT_ID.to_string(),
-        initiator_account_name: AccountName::new_unchecked("petya"),
+        initiator_account_id: AccountID::new_seeded_ed25519(b"petya"),
     });
 
     let automatic_trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
@@ -885,14 +883,12 @@ async fn make_system_test_flows(
 
     let wasya_manual_trigger = FlowTrigger::Manual(FlowTriggerManual {
         trigger_time: Utc::now(),
-        initiator_account_id: FAKE_ACCOUNT_ID.to_string(),
-        initiator_account_name: AccountName::new_unchecked("wasya"),
+        initiator_account_id: AccountID::new_seeded_ed25519(b"wasya"),
     });
 
     let petya_manual_trigger = FlowTrigger::Manual(FlowTriggerManual {
         trigger_time: Utc::now(),
-        initiator_account_id: FAKE_ACCOUNT_ID.to_string(),
-        initiator_account_name: AccountName::new_unchecked("petya"),
+        initiator_account_id: AccountID::new_seeded_ed25519(b"petya"),
     });
 
     let automatic_trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {

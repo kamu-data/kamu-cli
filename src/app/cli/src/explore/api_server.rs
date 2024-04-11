@@ -55,6 +55,10 @@ impl APIServer {
                 axum::routing::get(graphql_playground).post(graphql_handler),
             )
             .route(
+                "/platform/login",
+                axum::routing::post(kamu_adapter_http::platform_login_handler),
+            )
+            .route(
                 "/platform/token/validate",
                 axum::routing::get(kamu_adapter_http::platform_token_validate_handler),
             )

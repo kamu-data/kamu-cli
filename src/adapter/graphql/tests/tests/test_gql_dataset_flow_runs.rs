@@ -24,7 +24,14 @@ use kamu::testing::{
     MockTransformService,
 };
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
-use kamu_core::auth::DEFAULT_ACCOUNT_NAME;
+use kamu_accounts::{
+    set_random_jwt_secret,
+    CurrentAccountSubject,
+    LoggedAccount,
+    DEFAULT_ACCOUNT_NAME_STR,
+};
+use kamu_accounts_inmem::AccountRepositoryInMemory;
+use kamu_accounts_services::AuthenticationServiceImpl;
 use kamu_core::{
     auth,
     CompactingResult,
@@ -52,7 +59,7 @@ use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceImpl};
 use kamu_task_system as ts;
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
-use opendatafabric::{DatasetID, DatasetKind, Multihash, FAKE_ACCOUNT_ID};
+use opendatafabric::{AccountID, DatasetID, DatasetKind, Multihash};
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
@@ -72,6 +79,7 @@ async fn test_trigger_ingest_root_dataset() {
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     });
+
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -144,14 +152,14 @@ async fn test_trigger_ingest_root_dataset() {
                                         },
                                         "tasks": [],
                                         "initiator": {
-                                            "id": FAKE_ACCOUNT_ID,
-                                            "accountName": DEFAULT_ACCOUNT_NAME,
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
-                                                "id": FAKE_ACCOUNT_ID,
-                                                "accountName": DEFAULT_ACCOUNT_NAME,
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                             }
                                         },
                                         "startCondition": null,
@@ -215,14 +223,14 @@ async fn test_trigger_ingest_root_dataset() {
                                             }
                                         ],
                                         "initiator": {
-                                            "id": FAKE_ACCOUNT_ID,
-                                            "accountName": DEFAULT_ACCOUNT_NAME,
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
-                                                "id": FAKE_ACCOUNT_ID,
-                                                "accountName": DEFAULT_ACCOUNT_NAME,
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                             }
                                         },
                                         "startCondition": {
@@ -289,14 +297,14 @@ async fn test_trigger_ingest_root_dataset() {
                                             }
                                         ],
                                         "initiator": {
-                                            "id": FAKE_ACCOUNT_ID,
-                                            "accountName": DEFAULT_ACCOUNT_NAME,
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
-                                                "id": FAKE_ACCOUNT_ID,
-                                                "accountName": DEFAULT_ACCOUNT_NAME,
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                             }
                                         },
                                         "startCondition": null,
@@ -378,14 +386,14 @@ async fn test_trigger_ingest_root_dataset() {
                                             }
                                         ],
                                         "initiator": {
-                                            "id": FAKE_ACCOUNT_ID,
-                                            "accountName": DEFAULT_ACCOUNT_NAME,
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
-                                                "id": FAKE_ACCOUNT_ID,
-                                                "accountName": DEFAULT_ACCOUNT_NAME,
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                             }
                                         },
                                         "startCondition": null,
@@ -422,6 +430,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     });
+
     harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
 
@@ -497,14 +506,14 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                         },
                                         "tasks": [],
                                         "initiator": {
-                                            "id": FAKE_ACCOUNT_ID,
-                                            "accountName": DEFAULT_ACCOUNT_NAME,
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
-                                                "id": FAKE_ACCOUNT_ID,
-                                                "accountName": DEFAULT_ACCOUNT_NAME,
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                             }
                                         },
                                         "startCondition": null,
@@ -596,14 +605,14 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             }
                                         ],
                                         "initiator": {
-                                            "id": FAKE_ACCOUNT_ID,
-                                            "accountName": DEFAULT_ACCOUNT_NAME,
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
-                                                "id": FAKE_ACCOUNT_ID,
-                                                "accountName": DEFAULT_ACCOUNT_NAME,
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                             }
                                         },
                                         "startCondition": null,
@@ -640,6 +649,7 @@ async fn test_trigger_compacting_root_dataset() {
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     });
+
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -712,14 +722,14 @@ async fn test_trigger_compacting_root_dataset() {
                                         },
                                         "tasks": [],
                                         "initiator": {
-                                            "id": FAKE_ACCOUNT_ID,
-                                            "accountName": DEFAULT_ACCOUNT_NAME,
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
-                                                "id": FAKE_ACCOUNT_ID,
-                                                "accountName": DEFAULT_ACCOUNT_NAME,
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                             }
                                         },
                                         "startCondition": null,
@@ -783,14 +793,14 @@ async fn test_trigger_compacting_root_dataset() {
                                             }
                                         ],
                                         "initiator": {
-                                            "id": FAKE_ACCOUNT_ID,
-                                            "accountName": DEFAULT_ACCOUNT_NAME,
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
-                                                "id": FAKE_ACCOUNT_ID,
-                                                "accountName": DEFAULT_ACCOUNT_NAME,
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                             }
                                         },
                                         "startCondition": {
@@ -857,14 +867,14 @@ async fn test_trigger_compacting_root_dataset() {
                                             }
                                         ],
                                         "initiator": {
-                                            "id": FAKE_ACCOUNT_ID,
-                                            "accountName": DEFAULT_ACCOUNT_NAME,
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
-                                                "id": FAKE_ACCOUNT_ID,
-                                                "accountName": DEFAULT_ACCOUNT_NAME,
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                             }
                                         },
                                         "startCondition": null,
@@ -951,14 +961,14 @@ async fn test_trigger_compacting_root_dataset() {
                                             }
                                         ],
                                         "initiator": {
-                                            "id": FAKE_ACCOUNT_ID,
-                                            "accountName": DEFAULT_ACCOUNT_NAME,
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
-                                                "id": FAKE_ACCOUNT_ID,
-                                                "accountName": DEFAULT_ACCOUNT_NAME,
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                             }
                                         },
                                         "startCondition": null,
@@ -1289,7 +1299,7 @@ async fn test_list_flows_with_filters_and_pagination() {
     "#
     )
     .replace("<id>", &create_result.dataset_handle.id.to_string())
-    .replace("<account_name>", DEFAULT_ACCOUNT_NAME);
+    .replace("<account_name>", DEFAULT_ACCOUNT_NAME_STR);
 
     let response = schema
         .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
@@ -1333,7 +1343,7 @@ async fn test_list_flows_with_filters_and_pagination() {
                     runs {
                         listFlows(
                             filters: {
-                                byInitiator: { system: true}
+                                byInitiator: { system: true }
                             }
                         ) {
                             nodes {
@@ -1351,8 +1361,7 @@ async fn test_list_flows_with_filters_and_pagination() {
     }
     "#
     )
-    .replace("<id>", &create_result.dataset_handle.id.to_string())
-    .replace("<account_name>", DEFAULT_ACCOUNT_NAME);
+    .replace("<id>", &create_result.dataset_handle.id.to_string());
 
     let response = schema
         .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
@@ -2126,6 +2135,7 @@ async fn test_history_of_completed_flow() {
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     });
+
     let create_result: CreateDatasetResult = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -2300,6 +2310,8 @@ struct FlowRunsHarnessOverrides {
 
 impl FlowRunsHarness {
     fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
+        set_random_jwt_secret();
+
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -2338,6 +2350,8 @@ impl FlowRunsHarness {
             .bind::<dyn TransformService, MockTransformService>()
             .add_value(polling_service_mock)
             .bind::<dyn PollingIngestService, MockPollingIngestService>()
+            .add::<AuthenticationServiceImpl>()
+            .add::<AccountRepositoryInMemory>()
             .build();
 
         // Init dataset with no sources
@@ -2353,6 +2367,19 @@ impl FlowRunsHarness {
             catalog_anonymous,
             catalog_authorized,
             dataset_repo,
+        }
+    }
+
+    fn logged_account_id(&self) -> AccountID {
+        Self::logged_account_from_catalog(&self.catalog_authorized).account_id
+    }
+
+    fn logged_account_from_catalog(catalog: &dill::Catalog) -> LoggedAccount {
+        let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
+        if let CurrentAccountSubject::Logged(logged) = current_account_subject.as_ref() {
+            logged.clone()
+        } else {
+            panic!("Expected logged current user");
         }
     }
 

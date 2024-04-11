@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use opendatafabric::{AccountID, AccountName, DatasetID};
+use opendatafabric::{AccountID, DatasetID};
 
 use crate::*;
 
@@ -32,9 +32,9 @@ impl FlowTrigger {
         }
     }
 
-    pub fn initiator_account_name(&self) -> Option<&AccountName> {
+    pub fn initiator_account_id(&self) -> Option<&AccountID> {
         if let FlowTrigger::Manual(manual) = self {
-            Some(&manual.initiator_account_name)
+            Some(&manual.initiator_account_id)
         } else {
             None
         }
@@ -82,7 +82,6 @@ impl FlowTrigger {
 pub struct FlowTriggerManual {
     pub trigger_time: DateTime<Utc>,
     pub initiator_account_id: AccountID,
-    pub initiator_account_name: AccountName,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -122,9 +121,9 @@ impl FlowTriggerInputDatasetFlow {
 
 #[cfg(test)]
 mod tests {
-    use kamu_core::auth::DEFAULT_ACCOUNT_NAME;
+    use kamu_accounts::DEFAULT_ACCOUNT_ID;
     use lazy_static::lazy_static;
-    use opendatafabric::{Multihash, FAKE_ACCOUNT_ID};
+    use opendatafabric::Multihash;
 
     use super::*;
 
@@ -136,8 +135,7 @@ mod tests {
             });
         static ref MANUAL_TRIGGER: FlowTrigger = FlowTrigger::Manual(FlowTriggerManual {
             trigger_time: Utc::now(),
-            initiator_account_id: String::from(FAKE_ACCOUNT_ID),
-            initiator_account_name: AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
+            initiator_account_id: DEFAULT_ACCOUNT_ID.clone(),
         });
         static ref PUSH_SOURCE_TRIGGER: FlowTrigger = FlowTrigger::Push(FlowTriggerPush {
             trigger_time: Utc::now(),
@@ -177,11 +175,11 @@ mod tests {
             INPUT_DATASET_TRIGGER.clone()
         ]));
 
+        let initiator_account_id = AccountID::new_seeded_ed25519(b"different");
         assert!(
             MANUAL_TRIGGER.is_unique_vs(&[FlowTrigger::Manual(FlowTriggerManual {
                 trigger_time: Utc::now(),
-                initiator_account_id: String::from("23456"),
-                initiator_account_name: AccountName::new_unchecked("different"),
+                initiator_account_id,
             })])
         );
 

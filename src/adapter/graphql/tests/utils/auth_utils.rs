@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_accounts::*;
 use kamu_adapter_graphql::ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE;
-use kamu_core::{AnonymousAccountReason, CurrentAccountSubject};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,8 +19,22 @@ pub fn authentication_catalogs(base_catalog: &dill::Catalog) -> (dill::Catalog, 
         ))
         .build();
 
+    let current_account_subject = CurrentAccountSubject::new_test();
+    let mut predefined_accounts_config = PredefinedAccountsConfig::new();
+
+    if let CurrentAccountSubject::Logged(logged_account) = &current_account_subject {
+        predefined_accounts_config
+            .predefined
+            .push(AccountConfig::from_name(
+                logged_account.account_name.clone(),
+            ));
+    } else {
+        panic!()
+    }
+
     let catalog_authorized = dill::CatalogBuilder::new_chained(base_catalog)
-        .add_value(CurrentAccountSubject::new_test())
+        .add_value(current_account_subject)
+        .add_value(predefined_accounts_config)
         .build();
 
     (catalog_anonymous, catalog_authorized)

@@ -60,7 +60,7 @@ impl LoginCommand {
     ) -> Result<(), CLIError> {
         self.access_token_registry_service.save_access_token(
             self.scope,
-            odf_server_frontend_url,
+            Some(odf_server_frontend_url),
             odf_server_frontend_url,
             access_token.to_string(),
         )?;
@@ -70,18 +70,18 @@ impl LoginCommand {
     async fn new_login(&self, odf_server_frontend_url: Url) -> Result<(), CLIError> {
         let login_callback_response = self
             .login_service
-            .login(&odf_server_frontend_url, |u| {
+            .login_interactive(&odf_server_frontend_url, |u| {
                 self.report_web_server_started(u);
             })
             .await
             .map_err(|e| match e {
-                odf_server::LoginError::AccessFailed => CLIError::usage_error(e.to_string()),
+                odf_server::LoginError::AccessFailed(e) => CLIError::usage_error(e.to_string()),
                 odf_server::LoginError::Internal(e) => CLIError::failure(e),
             })?;
 
         self.access_token_registry_service.save_access_token(
             self.scope,
-            &odf_server_frontend_url,
+            Some(&odf_server_frontend_url),
             &login_callback_response.backend_url,
             login_callback_response.access_token,
         )?;

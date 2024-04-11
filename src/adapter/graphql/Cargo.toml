@@ -25,6 +25,7 @@ doctest = false
 internal-error = { workspace = true }
 opendatafabric = { workspace = true, features = ["arrow"] }
 
+kamu-accounts = { workspace = true }
 kamu-data-utils = { workspace = true }
 kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
@@ -54,6 +55,8 @@ url = { version = "2", default-features = false }
 container-runtime = { workspace = true }
 event-bus = { workspace = true }
 kamu = { workspace = true }
+kamu-accounts-inmem = { workspace = true }
+kamu-accounts-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }

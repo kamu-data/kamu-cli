@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
+use kamu_accounts::DUMMY_ACCESS_TOKEN;
 use url::Url;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -27,8 +28,6 @@ impl DummyOdfServerAccessTokenResolver {
         Self {}
     }
 }
-
-pub const DUMMY_ACCESS_TOKEN: &str = "some-token";
 
 #[async_trait::async_trait]
 impl OdfServerAccessTokenResolver for DummyOdfServerAccessTokenResolver {
