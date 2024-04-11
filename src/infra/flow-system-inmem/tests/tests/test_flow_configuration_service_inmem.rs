@@ -46,12 +46,12 @@ async fn test_visibility() {
         )
         .await;
 
-    let foo_compaction_schedule: Schedule = Duration::try_weeks(1).unwrap().into();
+    let foo_compacting_schedule: Schedule = Duration::try_weeks(1).unwrap().into();
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
-            DatasetFlowType::Compaction,
-            foo_compaction_schedule.clone(),
+            DatasetFlowType::HardCompacting,
+            foo_compacting_schedule.clone(),
         )
         .await;
 
@@ -77,8 +77,8 @@ async fn test_visibility() {
         ),
         (
             foo_id,
-            DatasetFlowType::Compaction,
-            &foo_compaction_schedule,
+            DatasetFlowType::HardCompacting,
+            &foo_compacting_schedule,
         ),
         (bar_id, DatasetFlowType::Ingest, &bar_ingest_schedule),
     ] {
@@ -181,7 +181,7 @@ async fn test_pause_resume_all_dataset_flows() {
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
-            DatasetFlowType::Compaction,
+            DatasetFlowType::HardCompacting,
             foo_compacting_schedule.clone(),
         )
         .await;
@@ -198,7 +198,7 @@ async fn test_pause_resume_all_dataset_flows() {
     harness.expect_dataset_flow_schedule(
         &configs,
         foo_id.clone(),
-        DatasetFlowType::Compaction,
+        DatasetFlowType::HardCompacting,
         &foo_compacting_schedule,
     );
     assert_eq!(2, harness.configuration_events_count());
@@ -226,15 +226,15 @@ async fn test_pause_resume_all_dataset_flows() {
         FlowConfigurationRule::Schedule(foo_ingest_schedule.clone())
     );
 
-    let flow_config_compaction_state = harness
-        .get_dataset_flow_config_from_store(foo_id.clone(), DatasetFlowType::Compaction)
+    let flow_config_compacting_state = harness
+        .get_dataset_flow_config_from_store(foo_id.clone(), DatasetFlowType::HardCompacting)
         .await;
     assert_eq!(
-        flow_config_compaction_state.status,
+        flow_config_compacting_state.status,
         FlowConfigurationStatus::PausedTemporarily
     );
     assert_eq!(
-        flow_config_compaction_state.rule,
+        flow_config_compacting_state.rule,
         FlowConfigurationRule::Schedule(foo_compacting_schedule.clone())
     );
 
@@ -254,7 +254,7 @@ async fn test_pause_resume_all_dataset_flows() {
     harness.expect_dataset_flow_schedule(
         &configs,
         foo_id.clone(),
-        DatasetFlowType::Compaction,
+        DatasetFlowType::HardCompacting,
         &foo_compacting_schedule,
     );
     assert_eq!(6, harness.configuration_events_count());

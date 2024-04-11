@@ -179,6 +179,9 @@ impl FlowServiceInMemory {
                         self.enqueue_auto_polling_flow_unconditionally(start_time, &flow_key)
                             .await?;
                     }
+                    // Sucn as compacting is very dangerous operation we
+                    // skip running it during activation flow configurations
+                    FlowConfigurationRule::CompactingRule(_) => (),
                 }
 
                 let mut state = self.state.lock().unwrap();
@@ -485,12 +488,16 @@ impl FlowServiceInMemory {
         // for now count overall number
         let mut accumulated_records_count = 0;
         let mut watermark_modified = false;
+        let mut is_compacted = false;
 
         // Scan each accumulated trigger to decide
         for trigger in &flow.triggers {
             if let FlowTrigger::InputDatasetFlow(trigger) = trigger {
                 match &trigger.flow_result {
                     FlowResult::Empty => {}
+                    FlowResult::DatasetCompact(_) => {
+                        is_compacted = true;
+                    }
                     FlowResult::DatasetUpdate(update) => {
                         // Compute increment since the first trigger by this dataset.
                         // Note: there might have been multiple updates since that time.
@@ -541,7 +548,7 @@ impl FlowServiceInMemory {
 
         //  If we accumulated at least something (records or watermarks),
         //   the upper bound of potential finish time for batching is known
-        if accumulated_something {
+        if accumulated_something || is_compacted {
             // Finish immediately if satisfied, or not later than the deadline
             let batching_finish_time = if satisfied {
                 evaluation_time
@@ -662,7 +669,7 @@ impl FlowServiceInMemory {
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
-        let logical_plan = flow.make_task_logical_plan();
+        let logical_plan = self.make_task_logical_plan(&flow.flow_key);
 
         let task = self
             .task_scheduler
@@ -716,6 +723,72 @@ impl FlowServiceInMemory {
         }
 
         Ok(())
+    }
+
+    /// Creates task logical plan that corresponds to template
+    pub fn make_task_logical_plan(&self, flow_key: &FlowKey) -> LogicalPlan {
+        match flow_key {
+            FlowKey::Dataset(flow_key) => match flow_key.flow_type {
+                DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
+                    LogicalPlan::UpdateDataset(UpdateDataset {
+                        dataset_id: flow_key.dataset_id.clone(),
+                    })
+                }
+                DatasetFlowType::HardCompacting => {
+                    let mut max_slice_size: Option<u64> = None;
+                    let mut max_slice_records: Option<u64> = None;
+
+                    let maybe_compacting_rule = self
+                        .state
+                        .lock()
+                        .unwrap()
+                        .active_configs
+                        .try_get_dataset_compacting_rule(
+                            &flow_key.dataset_id,
+                            DatasetFlowType::HardCompacting,
+                        );
+                    if let Some(opts) = maybe_compacting_rule {
+                        max_slice_size = Some(opts.max_slice_size());
+                        max_slice_records = Some(opts.max_slice_records());
+                    };
+
+                    LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                        dataset_id: flow_key.dataset_id.clone(),
+                        max_slice_size,
+                        max_slice_records,
+                    })
+                }
+            },
+            FlowKey::System(flow_key) => {
+                match flow_key.flow_type {
+                    // TODO: replace on correct logical plan
+                    SystemFlowType::GC => LogicalPlan::Probe(Probe {
+                        dataset_id: None,
+                        busy_time: Some(std::time::Duration::from_secs(20)),
+                        end_with_outcome: Some(TaskOutcome::Success(TaskResult::Empty)),
+                    }),
+                }
+            }
+        }
+    }
+
+    fn get_task_outcome(&self, flow: &Flow, task_outcome: TaskOutcome) -> TaskOutcome {
+        if let TaskOutcome::Failed(task_error) = &task_outcome {
+            if task_error == &TaskError::Empty {
+                for trigger in &flow.triggers {
+                    if let FlowTrigger::InputDatasetFlow(trigger) = trigger {
+                        if let FlowResult::DatasetCompact(_) = &trigger.flow_result {
+                            return TaskOutcome::Failed(TaskError::RootDatasetCompacted(
+                                RootDatasetCompactedError {
+                                    dataset_id: trigger.dataset_id.clone(),
+                                },
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        task_outcome
     }
 }
 
@@ -1043,7 +1116,8 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
             let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
                 .await
                 .int_err()?;
-            flow.on_task_finished(event.event_time, event.task_id, event.outcome.clone())
+            let event_outcome = self.get_task_outcome(&flow, event.outcome.clone());
+            flow.on_task_finished(event.event_time, event.task_id, event_outcome.clone())
                 .int_err()?;
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
@@ -1074,7 +1148,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
 
             // In case of success:
             //  - enqueue next auto-polling flow cycle
-            if event.outcome.is_success() {
+            if event_outcome.is_success() {
                 self.try_enqueue_scheduled_auto_polling_flow_if_enabled(
                     finish_time,
                     &flow.flow_key,

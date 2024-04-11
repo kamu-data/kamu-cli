@@ -51,7 +51,7 @@ impl From<&ts::TaskOutcome> for TaskOutcome {
     fn from(value: &ts::TaskOutcome) -> Self {
         match value {
             ts::TaskOutcome::Success(_) => Self::Success,
-            ts::TaskOutcome::Failed => Self::Failed,
+            ts::TaskOutcome::Failed(_) => Self::Failed,
             ts::TaskOutcome::Cancelled => Self::Cancelled,
         }
     }

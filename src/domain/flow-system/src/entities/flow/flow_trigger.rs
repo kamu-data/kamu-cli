@@ -222,7 +222,7 @@ mod tests {
                 FlowTriggerInputDatasetFlow {
                     trigger_time: Utc::now(),
                     dataset_id: TEST_DATASET_ID.clone(),
-                    flow_type: DatasetFlowType::Compaction, // unrelated
+                    flow_type: DatasetFlowType::HardCompacting, // unrelated
                     flow_id: FlowID::new(7),
                     flow_result: FlowResult::Empty
                 }

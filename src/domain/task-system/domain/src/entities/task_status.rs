@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::PullResult;
+use kamu_core::{CompactingResult, PullResult};
+use opendatafabric::DatasetID;
 use serde::{Deserialize, Serialize};
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -29,7 +30,7 @@ pub enum TaskOutcome {
     /// Task succeeded
     Success(TaskResult),
     /// Task failed to complete
-    Failed,
+    Failed(TaskError),
     /// Task was cancelled by a user
     Cancelled,
     // /// Task was dropped in favor of another task
@@ -48,6 +49,7 @@ impl TaskOutcome {
 pub enum TaskResult {
     Empty,
     UpdateDatasetResult(TaskUpdateDatasetResult),
+    CompactingDatasetResult(TaskCompactingDatasetResult),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -59,6 +61,32 @@ impl From<PullResult> for TaskUpdateDatasetResult {
     fn from(value: PullResult) -> Self {
         Self { pull_result: value }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskCompactingDatasetResult {
+    pub compacting_result: CompactingResult,
+}
+
+impl From<CompactingResult> for TaskCompactingDatasetResult {
+    fn from(value: CompactingResult) -> Self {
+        Self {
+            compacting_result: value,
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TaskError {
+    Empty,
+    RootDatasetCompacted(RootDatasetCompactedError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RootDatasetCompactedError {
+    pub dataset_id: DatasetID,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

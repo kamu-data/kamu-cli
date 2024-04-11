@@ -284,7 +284,7 @@ async fn test_task_create_probe() {
     let expected_logical_plan = LogicalPlan::Probe(Probe {
         dataset_id: Some(dataset_id.clone()),
         busy_time: Some(std::time::Duration::from_millis(500)),
-        end_with_outcome: Some(TaskOutcome::Failed),
+        end_with_outcome: Some(TaskOutcome::Failed(TaskError::Empty)),
     });
     let returned_task = TaskState {
         task_id: TaskID::new(123),

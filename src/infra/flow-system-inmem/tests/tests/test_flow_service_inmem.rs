@@ -69,6 +69,9 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(10).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                      dataset_id: foo_id.clone()
+                    }),
                 });
                 let foo_task0_handle = foo_task0_driver.run();
 
@@ -78,6 +81,9 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(90).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                      dataset_id: foo_id.clone()
+                    }),
                 });
                 let foo_task1_handle = foo_task1_driver.run();
 
@@ -184,6 +190,9 @@ async fn test_cron_config() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_seconds(6).unwrap(),
                     finish_in_with: Some((Duration::try_seconds(1).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                      dataset_id: foo_id.clone()
+                    }),
                 });
                 let foo_task0_handle = foo_task0_driver.run();
 
@@ -274,6 +283,9 @@ async fn test_manual_trigger() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(10).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                      dataset_id: foo_id.clone()
+                    }),
                 });
                 let task0_handle = task0_driver.run();
 
@@ -283,6 +295,9 @@ async fn test_manual_trigger() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(60).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                      dataset_id: foo_id.clone()
+                    }),
                 });
                 let task1_handle = task1_driver.run();
 
@@ -292,6 +307,9 @@ async fn test_manual_trigger() {
                     dataset_id: Some(bar_id.clone()),
                     run_since_start: Duration::try_milliseconds(100).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                      dataset_id: bar_id.clone()
+                    }),
                 });
                 let task2_handle = task2_driver.run();
 
@@ -415,6 +433,234 @@ async fn test_manual_trigger() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_manual_trigger_compacting() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness.create_root_dataset("foo").await;
+    let bar_id = harness.create_root_dataset("bar").await;
+
+    harness.eager_dependencies_graph_init().await;
+
+    let foo_flow_key: FlowKey =
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
+    let bar_flow_key: FlowKey =
+        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompacting).into();
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+        // Run API service
+        res = harness.flow_service.run(start_time) => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+                  // Task 0: "foo" start running at 10ms, finish at 20ms
+                  let task0_driver = harness.task_driver(TaskDriverArgs {
+                    task_id: TaskID::new(0),
+                    dataset_id: Some(foo_id.clone()),
+                    run_since_start: Duration::try_milliseconds(10).unwrap(),
+                    finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                      dataset_id: foo_id.clone(),
+                      max_slice_size: None,
+                      max_slice_records: None,
+                    }),
+                });
+                let task0_handle = task0_driver.run();
+
+                let task1_driver = harness.task_driver(TaskDriverArgs {
+                  task_id: TaskID::new(1),
+                  dataset_id: Some(bar_id.clone()),
+                  run_since_start: Duration::try_milliseconds(60).unwrap(),
+                  finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                  expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                    dataset_id: bar_id.clone(),
+                    max_slice_size: None,
+                    max_slice_records: None,
+                  }),
+                });
+                let task1_handle = task1_driver.run();
+
+                // Manual trigger for "foo" at 10ms
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                    flow_key: foo_flow_key,
+                    run_since_start: Duration::try_milliseconds(10).unwrap(),
+                });
+                let trigger0_handle = trigger0_driver.run();
+
+                // Manual trigger for "bar" at 50ms
+                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                    flow_key: bar_flow_key,
+                    run_since_start: Duration::try_milliseconds(50).unwrap(),
+                });
+                let trigger1_handle = trigger1_driver.run();
+
+                // Main simulation script
+                let main_handle = async {
+                    // Moment 10ms - manual foo trigger happens here:
+                    //  - flow 0 gets trigger and finishes at 30ms
+
+                    // Moment 50ms - manual foo trigger happens here:
+                    //  - flow 1 trigger and finishes
+                    //  - task 1 starts at 60ms, finishes at 70ms (leave some gap to fight with random order)
+
+                    harness.advance_time(Duration::try_milliseconds(100).unwrap()).await;
+                };
+
+                tokio::join!(task0_handle, task1_handle, trigger0_handle, trigger1_handle, main_handle)
+            } => Ok(())
+    }
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+
+            #1: +10ms:
+              "foo" HardCompacting:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
+
+            #2: +10ms:
+              "foo" HardCompacting:
+                Flow ID = 0 Running(task=0)
+
+            #3: +30ms:
+              "bar" HardCompacting:
+                Flow ID = 1 Waiting Manual
+              "foo" HardCompacting:
+                Flow ID = 0 Finished Success
+
+            #4: +50ms:
+              "bar" HardCompacting:
+                Flow ID = 1 Waiting Manual Executor(task=1, since=50ms)
+              "foo" HardCompacting:
+                Flow ID = 0 Finished Success
+
+            #5: +60ms:
+              "bar" HardCompacting:
+                Flow ID = 1 Running(task=1)
+              "foo" HardCompacting:
+                Flow ID = 0 Finished Success
+
+            #6: +70ms:
+              "bar" HardCompacting:
+                Flow ID = 1 Finished Success
+              "foo" HardCompacting:
+                Flow ID = 0 Finished Success
+
+            "#
+        )
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_manual_trigger_compacting_with_config() {
+    let max_slice_size = 1_000_000u64;
+    let max_slice_records = 1000u64;
+    let harness = FlowHarness::new();
+
+    let foo_id = harness.create_root_dataset("foo").await;
+
+    harness.eager_dependencies_graph_init().await;
+    harness
+        .set_dataset_flow_compacting_rule(
+            harness.now_datetime(),
+            foo_id.clone(),
+            DatasetFlowType::HardCompacting,
+            CompactingRule::new_checked(max_slice_size, max_slice_records).unwrap(),
+        )
+        .await;
+
+    let foo_flow_key: FlowKey =
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+        // Run API service
+        res = harness.flow_service.run(start_time) => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+                // Task 0: "foo" start running at 30ms, finish at 40ms
+                let task0_driver = harness.task_driver(TaskDriverArgs {
+                    task_id: TaskID::new(0),
+                    dataset_id: Some(foo_id.clone()),
+                    run_since_start: Duration::try_milliseconds(30).unwrap(),
+                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                      dataset_id: foo_id.clone(),
+                      max_slice_size: Some(max_slice_size),
+                      max_slice_records: Some(max_slice_records),
+                    }),
+                });
+                let task0_handle = task0_driver.run();
+
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                    flow_key: foo_flow_key,
+                    run_since_start: Duration::try_milliseconds(20).unwrap(),
+                });
+                let trigger0_handle = trigger0_driver.run();
+
+                // Main simulation script
+                let main_handle = async {
+                    // Moment 30ms - manual foo trigger happens here:
+                    //  - flow 0 trigger and finishes at 40ms
+                    harness.advance_time(Duration::try_milliseconds(80).unwrap()).await;
+                };
+
+                tokio::join!(task0_handle, trigger0_handle, main_handle)
+            } => Ok(())
+    }
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+
+            #1: +20ms:
+              "foo" HardCompacting:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=20ms)
+
+            #2: +30ms:
+              "foo" HardCompacting:
+                Flow ID = 0 Running(task=0)
+
+            #3: +40ms:
+              "foo" HardCompacting:
+                Flow ID = 0 Finished Success
+
+            "#
+        )
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_dataset_flow_configuration_paused_resumed_modified() {
     let harness = FlowHarness::new();
 
@@ -461,6 +707,9 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: foo_id.clone()
+                }),
             });
             let task0_handle = task0_driver.run();
 
@@ -470,6 +719,9 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::try_milliseconds(20).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: bar_id.clone()
+                }),
             });
             let task1_handle = task1_driver.run();
 
@@ -652,19 +904,25 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
       _ = async {
           // Task 0: "foo" start running at 10ms, finish at 20ms
           let task0_driver = harness.task_driver(TaskDriverArgs {
-              task_id: TaskID::new(0),
-              dataset_id: Some(foo_id.clone()),
-              run_since_start: Duration::try_milliseconds(10).unwrap(),
-              finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                task_id: TaskID::new(0),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::try_milliseconds(10).unwrap(),
+                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: foo_id.clone()
+                }),
           });
           let task0_handle = task0_driver.run();
 
           // Task 1: "bar" start running at 20ms, finish at 30ms
           let task1_driver = harness.task_driver(TaskDriverArgs {
-              task_id: TaskID::new(1),
-              dataset_id: Some(bar_id.clone()),
-              run_since_start: Duration::try_milliseconds(20).unwrap(),
-              finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                task_id: TaskID::new(1),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::try_milliseconds(20).unwrap(),
+                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: bar_id.clone()
+                }),
           });
           let task1_handle = task1_driver.run();
 
@@ -849,6 +1107,9 @@ async fn test_dataset_deleted() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: foo_id.clone()
+                }),
             });
             let task0_handle = task0_driver.run();
 
@@ -858,6 +1119,9 @@ async fn test_dataset_deleted() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::try_milliseconds(20).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: bar_id.clone()
+                }),
             });
             let task1_handle = task1_driver.run();
 
@@ -1017,6 +1281,9 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: foo_id.clone()
+                }),
             });
             let task0_handle = task0_driver.run();
 
@@ -1025,7 +1292,10 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 task_id: TaskID::new(1),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::try_milliseconds(20).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Failed)),
+                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Failed(TaskError::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: bar_id.clone()
+                }),
             });
             let task1_handle = task1_driver.run();
 
@@ -1035,6 +1305,9 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 dataset_id: Some(baz_id.clone()),
                 run_since_start: Duration::try_milliseconds(30).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Cancelled)),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: baz_id.clone()
+                }),
             });
             let task2_handle = task2_driver.run();
 
@@ -1216,6 +1489,9 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: foo_id.clone()
+                }),
             });
             let task0_handle = task0_driver.run();
 
@@ -1231,6 +1507,9 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                     new_head: Multihash::from_digest_sha3_256(b"new-slice"),
                   },
                 })))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: bar_id.clone()
+                }),
             });
             let task1_handle = task1_driver.run();
 
@@ -1246,6 +1525,9 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                     new_head: Multihash::from_digest_sha3_256(b"newest-slice"),
                   },
                 })))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: foo_id.clone()
+                }),
             });
             let task2_handle = task2_driver.run();
 
@@ -1255,6 +1537,9 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::try_milliseconds(130).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: bar_id.clone()
+                }),
             });
             let task3_handle = task3_driver.run();
 
@@ -1436,10 +1721,13 @@ async fn test_throttling_manual_triggers() {
 
         // Task 0: "foo" start running at 40ms, finish at 50ms
         let task0_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(0),
-          dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::try_milliseconds(40).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+            task_id: TaskID::new(0),
+            dataset_id: Some(foo_id.clone()),
+            run_since_start: Duration::try_milliseconds(40).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task0_handle = task0_driver.run();
 
@@ -1565,76 +1853,93 @@ async fn test_throttling_derived_dataset_with_2_parents() {
       _ = async {
         // Task 0: "foo" start running at 10ms, finish at 20ms
         let task0_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(0),
-          dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::try_milliseconds(10).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
-            },
-          })))),
+            task_id: TaskID::new(0),
+            dataset_id: Some(foo_id.clone()),
+            run_since_start: Duration::try_milliseconds(10).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task0_handle = task0_driver.run();
 
         // Task 1: "bar" start running at 20ms, finish at 30ms
         let task1_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(1),
-          dataset_id: Some(bar_id.clone()),
-          run_since_start: Duration::try_milliseconds(20).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"fbar-new-slice"),
-            },
-         })))),
+            task_id: TaskID::new(1),
+            dataset_id: Some(bar_id.clone()),
+            run_since_start: Duration::try_milliseconds(20).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"fbar-new-slice"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task1_handle = task1_driver.run();
 
         // Task 2: "baz" start running at 30ms, finish at 50ms (simulate longer run)
         let task2_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(2),
-          dataset_id: Some(baz_id.clone()),
-          run_since_start: Duration::try_milliseconds(30).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+            task_id: TaskID::new(2),
+            dataset_id: Some(baz_id.clone()),
+            run_since_start: Duration::try_milliseconds(30).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: baz_id.clone()
+            }),
         });
         let task2_handle = task2_driver.run();
 
         // Task 3: "foo" start running at 130ms, finish at 140ms
         let task3_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(3),
-          dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::try_milliseconds(130).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"foo-newest-slice"),
-            },
-
-          })))),
+            task_id: TaskID::new(3),
+            dataset_id: Some(foo_id.clone()),
+            run_since_start: Duration::try_milliseconds(130).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+                pull_result: PullResult::Updated {
+                    old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                    new_head: Multihash::from_digest_sha3_256(b"foo-newest-slice"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task3_handle = task3_driver.run();
 
         // Task 4: "baz" start running at 160ms, finish at 170ms
         let task4_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(4),
-          dataset_id: Some(baz_id.clone()),
-          run_since_start: Duration::try_milliseconds(160).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+            task_id: TaskID::new(4),
+            dataset_id: Some(baz_id.clone()),
+            run_since_start: Duration::try_milliseconds(160).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: baz_id.clone()
+            }),
         });
         let task4_handle = task4_driver.run();
 
         // Task 5: "bar" start running at 190ms, finish at 200ms
         let task5_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(5),
-          dataset_id: Some(bar_id.clone()),
-          run_since_start: Duration::try_milliseconds(190).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"bar-newest-slice"),
-            },
-          })))),
+            task_id: TaskID::new(5),
+            dataset_id: Some(bar_id.clone()),
+            run_since_start: Duration::try_milliseconds(190).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"bar-newest-slice"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task5_handle = task5_driver.run();
 
@@ -1992,74 +2297,86 @@ async fn test_batching_condition_records_reached() {
       _ = async {
         // Task 0: "foo" start running at 10ms, finish at 20ms
         let task0_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(0),
-          dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::try_milliseconds(10).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
-            },
-          })))),
+            task_id: TaskID::new(0),
+            dataset_id: Some(foo_id.clone()),
+            run_since_start: Duration::try_milliseconds(10).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task0_handle = task0_driver.run();
 
         // Task 1: "bar" start running at 20ms, finish at 30ms
         let task1_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(1),
-          dataset_id: Some(bar_id.clone()),
-          run_since_start: Duration::try_milliseconds(20).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
-            },
-         })))),
+            task_id: TaskID::new(1),
+            dataset_id: Some(bar_id.clone()),
+            run_since_start: Duration::try_milliseconds(20).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task1_handle = task1_driver.run();
 
         // Task 2: "foo" start running at 80ms, finish at 90ms
         let task2_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(2),
-          dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::try_milliseconds(80).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-            },
-
-          })))),
+            task_id: TaskID::new(2),
+            dataset_id: Some(foo_id.clone()),
+            run_since_start: Duration::try_milliseconds(80).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task2_handle = task2_driver.run();
 
         // Task 3: "foo" start running at 150ms, finish at 160ms
         let task3_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(3),
-          dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::try_milliseconds(150).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice-2")),
-              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
-            },
-
-          })))),
+            task_id: TaskID::new(3),
+            dataset_id: Some(foo_id.clone()),
+            run_since_start: Duration::try_milliseconds(150).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice-2")),
+                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task3_handle = task3_driver.run();
 
         // Task 4: "bar" start running at 170ms, finish at 180ms
         let task4_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(4),
-          dataset_id: Some(bar_id.clone()),
-          run_since_start: Duration::try_milliseconds(170).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-            },
-
-          })))),
+            task_id: TaskID::new(4),
+            dataset_id: Some(bar_id.clone()),
+            run_since_start: Duration::try_milliseconds(170).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task4_handle = task4_driver.run();
 
@@ -2282,44 +2599,52 @@ async fn test_batching_condition_timeout() {
       _ = async {
         // Task 0: "foo" start running at 10ms, finish at 20ms
         let task0_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(0),
-          dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::try_milliseconds(10).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
-            },
-          })))),
+            task_id: TaskID::new(0),
+            dataset_id: Some(foo_id.clone()),
+            run_since_start: Duration::try_milliseconds(10).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task0_handle = task0_driver.run();
 
         // Task 1: "bar" start running at 20ms, finish at 30ms
         let task1_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(1),
-          dataset_id: Some(bar_id.clone()),
-          run_since_start: Duration::try_milliseconds(20).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
-            },
-         })))),
+            task_id: TaskID::new(1),
+            dataset_id: Some(bar_id.clone()),
+            run_since_start: Duration::try_milliseconds(20).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task1_handle = task1_driver.run();
 
         // Task 2: "foo" start running at 80ms, finish at 90ms
         let task2_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(2),
-          dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::try_milliseconds(80).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-            },
-
-          })))),
+            task_id: TaskID::new(2),
+            dataset_id: Some(foo_id.clone()),
+            run_since_start: Duration::try_milliseconds(80).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task2_handle = task2_driver.run();
 
@@ -2327,16 +2652,18 @@ async fn test_batching_condition_timeout() {
 
         // Task 4: "bar" start running at 250ms, finish at 2560ms
         let task4_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(4),
-          dataset_id: Some(bar_id.clone()),
-          run_since_start: Duration::try_milliseconds(250).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-            },
-
-          })))),
+            task_id: TaskID::new(4),
+            dataset_id: Some(bar_id.clone()),
+            run_since_start: Duration::try_milliseconds(250).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task4_handle = task4_driver.run();
 
@@ -2527,44 +2854,52 @@ async fn test_batching_condition_watermark() {
       _ = async {
         // Task 0: "foo" start running at 10ms, finish at 20ms
         let task0_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(0),
-          dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::try_milliseconds(10).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
-            },
-          })))),
+            task_id: TaskID::new(0),
+            dataset_id: Some(foo_id.clone()),
+            run_since_start: Duration::try_milliseconds(10).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task0_handle = task0_driver.run();
 
         // Task 1: "bar" start running at 20ms, finish at 30ms
         let task1_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(1),
-          dataset_id: Some(bar_id.clone()),
-          run_since_start: Duration::try_milliseconds(20).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
-            },
-         })))),
+            task_id: TaskID::new(1),
+            dataset_id: Some(bar_id.clone()),
+            run_since_start: Duration::try_milliseconds(20).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task1_handle = task1_driver.run();
 
         // Task 2: "foo" start running at 70ms, finish at 80ms
         let task2_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(2),
-          dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::try_milliseconds(70).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-            },
-
-          })))),
+            task_id: TaskID::new(2),
+            dataset_id: Some(foo_id.clone()),
+            run_since_start: Duration::try_milliseconds(70).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task2_handle = task2_driver.run();
 
@@ -2572,16 +2907,18 @@ async fn test_batching_condition_watermark() {
 
         // Task 4: "bar" start running at 290ms, finish at 300ms
         let task4_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(4),
-          dataset_id: Some(bar_id.clone()),
-          run_since_start: Duration::try_milliseconds(290).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-            },
-
-          })))),
+            task_id: TaskID::new(4),
+            dataset_id: Some(bar_id.clone()),
+            run_since_start: Duration::try_milliseconds(290).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task4_handle = task4_driver.run();
 
@@ -2832,102 +3169,120 @@ async fn test_batching_condition_with_2_inputs() {
       _ = async {
         // Task 0: "foo" start running at 10ms, finish at 20ms
         let task0_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(0),
-          dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::try_milliseconds(10).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
-            },
-          })))),
+            task_id: TaskID::new(0),
+            dataset_id: Some(foo_id.clone()),
+            run_since_start: Duration::try_milliseconds(10).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task0_handle = task0_driver.run();
 
         // Task 1: "bar" start running at 20ms, finish at 30ms
         let task1_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(1),
-          dataset_id: Some(bar_id.clone()),
-          run_since_start: Duration::try_milliseconds(20).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
-            },
-         })))),
+            task_id: TaskID::new(1),
+            dataset_id: Some(bar_id.clone()),
+            run_since_start: Duration::try_milliseconds(20).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task1_handle = task1_driver.run();
 
         // Task 2: "baz" start running at 30ms, finish at 40ms
         let task2_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(2),
-          dataset_id: Some(baz_id.clone()),
-          run_since_start: Duration::try_milliseconds(30).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"baz-old-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"baz-new-slice"),
-            },
-
-          })))),
+            task_id: TaskID::new(2),
+            dataset_id: Some(baz_id.clone()),
+            run_since_start: Duration::try_milliseconds(30).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"baz-old-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"baz-new-slice"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: baz_id.clone()
+            }),
         });
         let task2_handle = task2_driver.run();
 
         // Task 3: "foo" start running at 110ms, finish at 120ms
         let task3_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(3),
-          dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::try_milliseconds(110).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-            },
-          })))),
+            task_id: TaskID::new(3),
+            dataset_id: Some(foo_id.clone()),
+            run_since_start: Duration::try_milliseconds(110).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task3_handle = task3_driver.run();
 
         // Task 4: "bar" start running at 160ms, finish at 170ms
         let task4_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(4),
-          dataset_id: Some(bar_id.clone()),
-          run_since_start: Duration::try_milliseconds(160).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-            },
-
-          })))),
+            task_id: TaskID::new(4),
+            dataset_id: Some(bar_id.clone()),
+            run_since_start: Duration::try_milliseconds(160).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task4_handle = task4_driver.run();
 
         // Task 5: "foo" start running at 210ms, finish at 220ms
         let task5_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(5),
-          dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::try_milliseconds(210).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-            },
-          })))),
+            task_id: TaskID::new(5),
+            dataset_id: Some(foo_id.clone()),
+            run_since_start: Duration::try_milliseconds(210).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task5_handle = task5_driver.run();
 
         // Task 6: "baz" start running at 230ms, finish at 240ms
         let task6_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(6),
-          dataset_id: Some(baz_id.clone()),
-          run_since_start: Duration::try_milliseconds(230).unwrap(),
-          finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-            pull_result: PullResult::Updated {
-              old_head: Some(Multihash::from_digest_sha3_256(b"baz-new-slice")),
-              new_head: Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
-            },
-
-          })))),
+            task_id: TaskID::new(6),
+            dataset_id: Some(baz_id.clone()),
+            run_since_start: Duration::try_milliseconds(230).unwrap(),
+            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+                pull_result: PullResult::Updated {
+                old_head: Some(Multihash::from_digest_sha3_256(b"baz-new-slice")),
+                new_head: Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
+                },
+            })))),
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: baz_id.clone()
+            }),
         });
         let task6_handle = task6_driver.run();
 
@@ -3390,6 +3745,24 @@ impl FlowHarness {
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
                 FlowConfigurationRule::BatchingRule(batching_rule),
+            )
+            .await
+            .unwrap();
+    }
+
+    async fn set_dataset_flow_compacting_rule(
+        &self,
+        request_time: DateTime<Utc>,
+        dataset_id: DatasetID,
+        dataset_flow_type: DatasetFlowType,
+        compacting_rule: CompactingRule,
+    ) {
+        self.flow_configuration_service
+            .set_configuration(
+                request_time,
+                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
+                false,
+                FlowConfigurationRule::CompactingRule(compacting_rule),
             )
             .await
             .unwrap();

@@ -61,30 +61,6 @@ impl FlowState {
         }
     }
 
-    /// Creates task logical plan that corresponds to template
-    pub fn make_task_logical_plan(&self) -> ts::LogicalPlan {
-        match &self.flow_key {
-            FlowKey::Dataset(flow_key) => match flow_key.flow_type {
-                DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
-                    ts::LogicalPlan::UpdateDataset(ts::UpdateDataset {
-                        dataset_id: flow_key.dataset_id.clone(),
-                    })
-                }
-                DatasetFlowType::Compaction => unimplemented!(),
-            },
-            FlowKey::System(flow_key) => {
-                match flow_key.flow_type {
-                    // TODO: replace on correct logical plan
-                    SystemFlowType::GC => ts::LogicalPlan::Probe(ts::Probe {
-                        dataset_id: None,
-                        busy_time: Some(std::time::Duration::from_secs(20)),
-                        end_with_outcome: Some(ts::TaskOutcome::Success(ts::TaskResult::Empty)),
-                    }),
-                }
-            }
-        }
-    }
-
     pub fn try_result_as_ref(&self) -> Option<&FlowResult> {
         self.outcome
             .as_ref()
@@ -222,8 +198,8 @@ impl Projection for FlowState {
                                     ..s
                                 }),
                                 // TODO: support retries
-                                ts::TaskOutcome::Failed => Ok(FlowState {
-                                    outcome: Some(FlowOutcome::Failed),
+                                ts::TaskOutcome::Failed(task_error) => Ok(FlowState {
+                                    outcome: Some(FlowOutcome::Failed(task_error.into())),
                                     ..s
                                 }),
                             }

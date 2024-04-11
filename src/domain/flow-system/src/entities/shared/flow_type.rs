@@ -9,23 +9,38 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+use crate::{BatchingRule, CompactingRule, Schedule};
+
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub enum DatasetFlowType {
     Ingest,
     ExecuteTransform,
-    Compaction,
+    HardCompacting,
 }
 
 impl DatasetFlowType {
     pub fn all() -> &'static [DatasetFlowType] {
-        &[Self::Ingest, Self::ExecuteTransform, Self::Compaction]
+        &[Self::Ingest, Self::ExecuteTransform, Self::HardCompacting]
     }
 
     pub fn dataset_kind_restriction(&self) -> Option<opendatafabric::DatasetKind> {
         match self {
-            DatasetFlowType::Ingest => Some(opendatafabric::DatasetKind::Root),
+            DatasetFlowType::Ingest | DatasetFlowType::HardCompacting => {
+                Some(opendatafabric::DatasetKind::Root)
+            }
             DatasetFlowType::ExecuteTransform => Some(opendatafabric::DatasetKind::Derivative),
-            DatasetFlowType::Compaction => None,
+        }
+    }
+
+    pub fn config_restriction(&self, flow_configuration_type: &'static str) -> bool {
+        match self {
+            DatasetFlowType::Ingest => flow_configuration_type == std::any::type_name::<Schedule>(),
+            DatasetFlowType::ExecuteTransform => {
+                flow_configuration_type == std::any::type_name::<BatchingRule>()
+            }
+            DatasetFlowType::HardCompacting => {
+                flow_configuration_type == std::any::type_name::<CompactingRule>()
+            }
         }
     }
 }
@@ -55,9 +70,11 @@ impl AnyFlowType {
     /// What should be the reaction on flow success
     pub fn success_followup_method(&self) -> FlowSuccessFollowupMethod {
         match self {
-            AnyFlowType::Dataset(DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform) => {
-                FlowSuccessFollowupMethod::TriggerDependent
-            }
+            AnyFlowType::Dataset(
+                DatasetFlowType::Ingest
+                | DatasetFlowType::ExecuteTransform
+                | DatasetFlowType::HardCompacting,
+            ) => FlowSuccessFollowupMethod::TriggerDependent,
             _ => FlowSuccessFollowupMethod::Ignore,
         }
     }

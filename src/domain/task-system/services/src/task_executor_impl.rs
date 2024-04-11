@@ -11,7 +11,14 @@ use std::sync::Arc;
 
 use dill::*;
 use event_bus::EventBus;
-use kamu_core::{PullOptions, PullService, SystemTimeSource};
+use kamu_core::{
+    CompactingOptions,
+    CompactingService,
+    DatasetRepository,
+    PullOptions,
+    PullService,
+    SystemTimeSource,
+};
 use kamu_task_system::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -101,7 +108,7 @@ impl TaskExecutor for TaskExecutorImpl {
                         Ok(pull_result) => TaskOutcome::Success(TaskResult::UpdateDatasetResult(
                             pull_result.into(),
                         )),
-                        Err(_) => TaskOutcome::Failed,
+                        Err(_) => TaskOutcome::Failed(TaskError::Empty),
                     }
                 }
                 LogicalPlan::Probe(Probe {
@@ -115,6 +122,37 @@ impl TaskExecutor for TaskExecutorImpl {
                     end_with_outcome
                         .clone()
                         .unwrap_or(TaskOutcome::Success(TaskResult::Empty))
+                }
+                LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                    dataset_id,
+                    max_slice_size,
+                    max_slice_records,
+                }) => {
+                    let compacting_svc =
+                        self.catalog.get_one::<dyn CompactingService>().int_err()?;
+                    let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().int_err()?;
+                    let dataset_handle = dataset_repo
+                        .resolve_dataset_ref(&dataset_id.as_local_ref())
+                        .await
+                        .int_err()?;
+
+                    let compacting_result = compacting_svc
+                        .compact_dataset(
+                            &dataset_handle,
+                            CompactingOptions {
+                                max_slice_size: *max_slice_size,
+                                max_slice_records: *max_slice_records,
+                            },
+                            None,
+                        )
+                        .await;
+
+                    match compacting_result {
+                        Ok(result) => {
+                            TaskOutcome::Success(TaskResult::CompactingDatasetResult(result.into()))
+                        }
+                        Err(_) => TaskOutcome::Failed(TaskError::Empty),
+                    }
                 }
             };
 

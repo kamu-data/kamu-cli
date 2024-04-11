@@ -152,7 +152,7 @@ async fn test_dataset_flow_filter_by_flow_type() {
         ),
         (
             DatasetFlowFilters {
-                by_flow_type: Some(DatasetFlowType::Compaction),
+                by_flow_type: Some(DatasetFlowType::HardCompacting),
                 ..Default::default()
             },
             vec![
@@ -269,7 +269,7 @@ async fn test_dataset_flow_filter_combinations() {
         (
             DatasetFlowFilters {
                 by_flow_status: Some(FlowStatus::Waiting),
-                by_flow_type: Some(DatasetFlowType::Compaction),
+                by_flow_type: Some(DatasetFlowType::HardCompacting),
                 by_initiator: Some(InitiatorFilter::Account(AccountName::new_unchecked(
                     "petya",
                 ))),
@@ -816,7 +816,7 @@ async fn make_dataset_test_case(
         .await,
         compacting_flow_ids: make_dataset_test_flows(
             &dataset_id,
-            DatasetFlowType::Compaction,
+            DatasetFlowType::HardCompacting,
             flow_event_store,
             task_event_store,
         )

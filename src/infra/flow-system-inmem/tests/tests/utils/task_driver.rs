@@ -30,6 +30,7 @@ pub(crate) struct TaskDriverArgs {
     pub(crate) dataset_id: Option<DatasetID>,
     pub(crate) run_since_start: Duration,
     pub(crate) finish_in_with: Option<(Duration, TaskOutcome)>,
+    pub(crate) expected_logical_plan: LogicalPlan,
 }
 
 impl TaskDriver {
@@ -55,7 +56,7 @@ impl TaskDriver {
             yield_now().await;
         }
 
-        self.ensure_task_matches_dataset().await;
+        self.ensure_task_matches_logical_plan().await;
 
         self.event_bus
             .dispatch_event(TaskEventRunning {
@@ -86,17 +87,19 @@ impl TaskDriver {
             .is_some()
     }
 
-    async fn ensure_task_matches_dataset(&self) {
+    async fn ensure_task_matches_logical_plan(&self) {
         let task = Task::load(self.args.task_id, self.task_event_store.as_ref())
             .await
             .expect("Task does not exist yet");
 
+        assert_eq!(self.args.expected_logical_plan, task.logical_plan);
         match &task.logical_plan {
             LogicalPlan::UpdateDataset(ud) => {
                 assert!(self.args.dataset_id.is_some());
                 assert_eq!(&ud.dataset_id, self.args.dataset_id.as_ref().unwrap());
             }
             LogicalPlan::Probe(_) => assert!(self.args.dataset_id.is_none()),
+            LogicalPlan::HardCompactingDataset(_) => (),
         }
     }
 }

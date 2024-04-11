@@ -65,7 +65,7 @@ impl TasksMut {
                 busy_time: busy_time_ms.map(std::time::Duration::from_millis),
                 end_with_outcome: end_with_outcome.map(|o| match o {
                     TaskOutcome::Success => ts::TaskOutcome::Success(ts::TaskResult::Empty),
-                    TaskOutcome::Failed => ts::TaskOutcome::Failed,
+                    TaskOutcome::Failed => ts::TaskOutcome::Failed(ts::TaskError::Empty),
                     TaskOutcome::Cancelled => ts::TaskOutcome::Cancelled,
                 }),
             }))

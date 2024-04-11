@@ -11,21 +11,21 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use kamu::domain::compact_service::{
-    CompactResult,
-    CompactionListener,
-    CompactionMultiListener,
-    CompactionPhase,
+use kamu::domain::{
+    CompactingListener,
+    CompactingMultiListener,
+    CompactingPhase,
+    CompactingResult,
 };
 use opendatafabric::DatasetHandle;
 
 #[derive(Clone)]
-pub struct CompactionMultiProgress {
+pub struct CompactingMultiProgress {
     pub multi_progress: Arc<indicatif::MultiProgress>,
     pub finished: Arc<AtomicBool>,
 }
 
-impl CompactionMultiProgress {
+impl CompactingMultiProgress {
     pub fn new() -> Self {
         Self {
             multi_progress: Arc::new(indicatif::MultiProgress::new()),
@@ -47,23 +47,23 @@ impl CompactionMultiProgress {
     }
 }
 
-impl CompactionMultiListener for CompactionMultiProgress {
-    fn begin_compact(&self, dataset_handle: &DatasetHandle) -> Option<Arc<dyn CompactionListener>> {
-        Some(Arc::new(CompactionProgress::new(
+impl CompactingMultiListener for CompactingMultiProgress {
+    fn begin_compact(&self, dataset_handle: &DatasetHandle) -> Option<Arc<dyn CompactingListener>> {
+        Some(Arc::new(CompactingProgress::new(
             dataset_handle,
             &self.multi_progress,
         )))
     }
 }
 
-pub struct CompactionProgress {
+pub struct CompactingProgress {
     dataset_handle: DatasetHandle,
     curr_progress: indicatif::ProgressBar,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-impl CompactionProgress {
+impl CompactingProgress {
     pub fn new(
         dataset_handle: &DatasetHandle,
         multi_progress: &Arc<indicatif::MultiProgress>,
@@ -96,20 +96,20 @@ impl CompactionProgress {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-impl CompactionListener for CompactionProgress {
+impl CompactingListener for CompactingProgress {
     fn begin(&self) {
         self.curr_progress
             .set_message(self.spinner_message("Compacting dataset"));
     }
 
-    fn success(&self, res: &CompactResult) {
+    fn success(&self, res: &CompactingResult) {
         match res {
-            CompactResult::NothingToDo => {
+            CompactingResult::NothingToDo => {
                 self.curr_progress.finish_with_message(
                     self.spinner_message(console::style("Dataset was left intact").green()),
                 );
             }
-            CompactResult::Success {
+            CompactingResult::Success {
                 old_head: _,
                 new_head: _,
                 old_num_blocks,
@@ -128,14 +128,14 @@ impl CompactionListener for CompactionProgress {
         }
     }
 
-    fn begin_phase(&self, phase: CompactionPhase) {
+    fn begin_phase(&self, phase: CompactingPhase) {
         let message = match phase {
-            CompactionPhase::GatherChainInfo => "Gathering chain information",
-            CompactionPhase::MergeDataslices => "Merging dataslices",
-            CompactionPhase::CommitNewBlocks => "Committing new blocks",
+            CompactingPhase::GatherChainInfo => "Gathering chain information",
+            CompactingPhase::MergeDataslices => "Merging dataslices",
+            CompactingPhase::CommitNewBlocks => "Committing new blocks",
         };
         self.curr_progress.set_message(message);
     }
 
-    fn end_phase(&self, _phase: CompactionPhase) {}
+    fn end_phase(&self, _phase: CompactingPhase) {}
 }

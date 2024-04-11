@@ -10,6 +10,7 @@
 use chrono::Utc;
 use kamu_flow_system::{
     BatchingRule,
+    CompactingRule,
     FlowConfigurationRule,
     FlowConfigurationService,
     FlowKeyDataset,
@@ -23,6 +24,7 @@ use super::{
     ensure_expected_dataset_kind,
     ensure_flow_preconditions,
     ensure_scheduling_permission,
+    ensure_set_config_flow_supported,
     FlowIncompatibleDatasetKind,
     FlowPreconditionsNotMet,
 };
@@ -50,6 +52,11 @@ impl DatasetFlowConfigsMut {
         paused: bool,
         schedule: ScheduleInput,
     ) -> Result<SetFlowConfigResult> {
+        if !ensure_set_config_flow_supported(dataset_flow_type, std::any::type_name::<Schedule>()) {
+            return Ok(SetFlowConfigResult::TypeIsNotSupported(
+                FlowTypeIsNotSupported,
+            ));
+        }
         if let Some(e) =
             ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
         {
@@ -100,6 +107,14 @@ impl DatasetFlowConfigsMut {
         paused: bool,
         batching: BatchingConditionInput,
     ) -> Result<SetFlowConfigResult> {
+        if !ensure_set_config_flow_supported(
+            dataset_flow_type,
+            std::any::type_name::<BatchingRule>(),
+        ) {
+            return Ok(SetFlowConfigResult::TypeIsNotSupported(
+                FlowTypeIsNotSupported,
+            ));
+        }
         let batching_rule = match BatchingRule::new_checked(
             batching.min_records_to_await,
             batching.max_batching_interval.into(),
@@ -136,6 +151,63 @@ impl DatasetFlowConfigsMut {
                     .into(),
                 paused,
                 FlowConfigurationRule::BatchingRule(batching_rule),
+            )
+            .await
+            .map_err(|e| match e {
+                SetFlowConfigurationError::Internal(e) => GqlError::Internal(e),
+            })?;
+
+        Ok(SetFlowConfigResult::Success(SetFlowConfigSuccess {
+            config: res.into(),
+        }))
+    }
+
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn set_config_compacting(
+        &self,
+        ctx: &Context<'_>,
+        dataset_flow_type: DatasetFlowType,
+        paused: bool,
+        compacting_args: CompactingConditionInput,
+    ) -> Result<SetFlowConfigResult> {
+        if !ensure_set_config_flow_supported(
+            dataset_flow_type,
+            std::any::type_name::<CompactingRule>(),
+        ) {
+            return Ok(SetFlowConfigResult::TypeIsNotSupported(
+                FlowTypeIsNotSupported,
+            ));
+        }
+        let compacting_rule = match CompactingRule::new_checked(
+            compacting_args.max_slice_size,
+            compacting_args.max_slice_records,
+        ) {
+            Ok(rule) => rule,
+            Err(e) => {
+                return Ok(SetFlowConfigResult::InvalidCompactingConfig(
+                    FlowInvalidCompactingConfig {
+                        reason: e.to_string(),
+                    },
+                ))
+            }
+        };
+
+        if let Some(e) =
+            ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
+        {
+            return Ok(SetFlowConfigResult::IncompatibleDatasetKind(e));
+        }
+        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
+
+        let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+
+        let res = flow_config_service
+            .set_configuration(
+                Utc::now(),
+                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
+                    .into(),
+                paused,
+                FlowConfigurationRule::CompactingRule(compacting_rule),
             )
             .await
             .map_err(|e| match e {
@@ -229,13 +301,23 @@ struct BatchingConditionInput {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[derive(InputObject)]
+struct CompactingConditionInput {
+    pub max_slice_size: u64,
+    pub max_slice_records: u64,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
 enum SetFlowConfigResult {
     Success(SetFlowConfigSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
     InvalidBatchingConfig(FlowInvalidBatchingConfig),
+    InvalidCompactingConfig(FlowInvalidCompactingConfig),
     PreconditionsNotMet(FlowPreconditionsNotMet),
+    TypeIsNotSupported(FlowTypeIsNotSupported),
 }
 
 #[derive(SimpleObject)]
@@ -251,6 +333,16 @@ impl SetFlowConfigSuccess {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct FlowTypeIsNotSupported;
+
+#[Object]
+impl FlowTypeIsNotSupported {
+    pub async fn message(&self) -> String {
+        "Flow type is not supported".to_string()
+    }
+}
+
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
 pub(crate) struct FlowInvalidBatchingConfig {
@@ -259,6 +351,19 @@ pub(crate) struct FlowInvalidBatchingConfig {
 
 #[ComplexObject]
 impl FlowInvalidBatchingConfig {
+    pub async fn message(&self) -> String {
+        self.reason.clone()
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub(crate) struct FlowInvalidCompactingConfig {
+    reason: String,
+}
+
+#[ComplexObject]
+impl FlowInvalidCompactingConfig {
     pub async fn message(&self) -> String {
         self.reason.clone()
     }

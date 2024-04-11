@@ -9,8 +9,9 @@
 
 use std::sync::Arc;
 
-use kamu::domain::compact_service::CompactService;
 use kamu::domain::{
+    CompactingOptions,
+    CompactingService,
     DatasetRepository,
     VerificationMultiListener,
     VerificationOptions,
@@ -18,12 +19,12 @@ use kamu::domain::{
 };
 use opendatafabric::{DatasetHandle, DatasetRef};
 
-use crate::{CLIError, Command, CompactionMultiProgress, VerificationMultiProgress};
+use crate::{CLIError, Command, CompactingMultiProgress, VerificationMultiProgress};
 
 pub struct CompactCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
-    compact_svc: Arc<dyn CompactService>,
+    compacting_svc: Arc<dyn CompactingService>,
     dataset_ref: DatasetRef,
     max_slice_size: u64,
     max_slice_records: u64,
@@ -35,7 +36,7 @@ impl CompactCommand {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
-        compact_svc: Arc<dyn CompactService>,
+        compacting_svc: Arc<dyn CompactingService>,
         dataset_ref: DatasetRef,
         max_slice_size: u64,
         max_slice_records: u64,
@@ -45,7 +46,7 @@ impl CompactCommand {
         Self {
             dataset_repo,
             verification_svc,
-            compact_svc,
+            compacting_svc,
             dataset_ref,
             max_slice_size,
             max_slice_records,
@@ -103,18 +104,20 @@ impl Command for CompactCommand {
             }
         }
 
-        let progress = CompactionMultiProgress::new();
+        let progress = CompactingMultiProgress::new();
         let listener = Arc::new(progress.clone());
 
         let draw_thread = std::thread::spawn(move || {
             progress.draw();
         });
 
-        self.compact_svc
+        self.compacting_svc
             .compact_dataset(
                 &dataset_handle,
-                self.max_slice_size,
-                self.max_slice_records,
+                CompactingOptions {
+                    max_slice_size: Some(self.max_slice_size),
+                    max_slice_records: Some(self.max_slice_records),
+                },
                 Some(listener.clone()),
             )
             .await
