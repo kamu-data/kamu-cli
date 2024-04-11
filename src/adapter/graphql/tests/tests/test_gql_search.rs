@@ -16,12 +16,13 @@ use kamu_core::*;
 use opendatafabric::*;
 
 #[tokio::test]
-async fn query() {
+async fn test_search_query() {
     let tempdir = tempfile::tempdir().unwrap();
     let datasets_dir = tempdir.path().join("datasets");
     std::fs::create_dir(&datasets_dir).unwrap();
 
     let cat = dill::CatalogBuilder::new()
+        .add::<SystemTimeSourceDefault>()
         .add::<EventBus>()
         .add::<DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())

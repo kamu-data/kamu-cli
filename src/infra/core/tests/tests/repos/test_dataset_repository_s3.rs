@@ -20,7 +20,7 @@ use kamu::{
     DependencyGraphServiceInMemory,
     S3RegistryCache,
 };
-use kamu_core::{DatasetRepository, DependencyGraphService};
+use kamu_core::{DatasetRepository, DependencyGraphService, SystemTimeSourceDefault};
 use opendatafabric::AccountName;
 
 use super::test_dataset_repository_shared;
@@ -44,6 +44,7 @@ impl S3RepoHarness {
         let mut catalog = dill::CatalogBuilder::new();
 
         catalog
+            .add::<SystemTimeSourceDefault>()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())

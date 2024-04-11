@@ -195,6 +195,8 @@ where
         block: MetadataBlock,
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError> {
+        tracing::trace!(?block, "Trying to append block");
+
         if opts.validation == AppendValidation::Full {
             let mut validators = [
                 &mut ValidateAddDataVisitor::new(&block)
@@ -269,7 +271,10 @@ where
                 InsertBlockError::Internal(e) => AppendError::Internal(e),
             })?;
 
+        tracing::debug!(?block, "Sucessfully appended block");
+
         if let Some(r) = opts.update_ref {
+            tracing::debug!(?r, new_hash = %res.hash, "Updating reference");
             self.ref_repo.set(r, &res.hash).await?;
         }
 

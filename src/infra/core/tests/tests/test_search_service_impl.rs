@@ -26,6 +26,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     std::fs::create_dir(&datasets_dir).unwrap();
 
     let catalog = dill::CatalogBuilder::new()
+        .add::<SystemTimeSourceDefault>()
         .add::<EventBus>()
         .add::<DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())

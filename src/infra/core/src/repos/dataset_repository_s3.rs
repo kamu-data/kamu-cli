@@ -34,6 +34,7 @@ pub struct DatasetRepositoryS3 {
     multi_tenant: bool,
     registry_cache: Option<Arc<S3RegistryCache>>,
     metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
+    system_time_source: Arc<dyn SystemTimeSource>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -58,6 +59,7 @@ impl DatasetRepositoryS3 {
         multi_tenant: bool,
         registry_cache: Option<Arc<S3RegistryCache>>,
         metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
+        system_time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
             s3_context,
@@ -68,6 +70,7 @@ impl DatasetRepositoryS3 {
             multi_tenant,
             registry_cache,
             metadata_cache_local_fs_path,
+            system_time_source,
         }
     }
 
@@ -240,7 +243,7 @@ impl DatasetRepositoryS3 {
             if cache.last_updated == DateTime::UNIX_EPOCH {
                 tracing::debug!("Initializing dataset registry cache");
                 cache.datasets = self.list_datasets_in_s3().await?;
-                cache.last_updated = Utc::now();
+                cache.last_updated = self.system_time_source.now();
             }
 
             Ok(cache.datasets.clone())
@@ -483,7 +486,13 @@ impl DatasetRepository for DatasetRepositoryS3 {
         &self,
         snapshot: DatasetSnapshot,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
-        create_dataset_from_snapshot_impl(self, self.event_bus.as_ref(), snapshot).await
+        create_dataset_from_snapshot_impl(
+            self,
+            self.event_bus.as_ref(),
+            snapshot,
+            self.system_time_source.now(),
+        )
+        .await
     }
 
     async fn rename_dataset(

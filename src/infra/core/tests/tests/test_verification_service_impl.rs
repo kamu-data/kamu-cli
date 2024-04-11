@@ -31,6 +31,7 @@ async fn test_verify_data_consistency() {
     let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
 
     let catalog = dill::CatalogBuilder::new()
+        .add::<SystemTimeSourceDefault>()
         .add::<EventBus>()
         .add::<DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())

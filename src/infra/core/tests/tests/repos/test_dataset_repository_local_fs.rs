@@ -10,7 +10,13 @@
 use std::sync::Arc;
 
 use dill::Component;
-use domain::{auth, CurrentAccountSubject, DatasetRepository, DependencyGraphService};
+use domain::{
+    auth,
+    CurrentAccountSubject,
+    DatasetRepository,
+    DependencyGraphService,
+    SystemTimeSourceDefault,
+};
 use event_bus::EventBus;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
@@ -36,6 +42,7 @@ impl LocalFsRepoHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add::<SystemTimeSourceDefault>()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())

@@ -21,6 +21,7 @@ use kamu::domain::{
     DatasetRepository,
     InternalError,
     ResultIntoInternal,
+    SystemTimeSourceDefault,
 };
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
@@ -215,6 +216,7 @@ impl ServerHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let mut catalog_builder = dill::CatalogBuilder::new();
+        catalog_builder.add::<SystemTimeSourceDefault>();
         catalog_builder.add::<EventBus>();
         catalog_builder.add::<DependencyGraphServiceInMemory>();
         catalog_builder.add_value(

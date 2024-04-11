@@ -9,7 +9,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use event_bus::EventBus;
 use internal_error::*;
 use kamu_core::events::DatasetEventDependenciesUpdated;
@@ -30,6 +30,7 @@ pub async fn create_dataset_from_snapshot_impl(
     dataset_repo: &dyn DatasetRepositoryExt,
     event_bus: &EventBus,
     mut snapshot: DatasetSnapshot,
+    system_time: DateTime<Utc>,
 ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
     // Validate / resolve events
     for event in &mut snapshot.metadata {
@@ -102,8 +103,6 @@ pub async fn create_dataset_from_snapshot_impl(
     // The key pair is discarded for now, but in future can be used for
     // proof of control over dataset and metadata signing.
     let (_keypair, dataset_id) = DatasetID::new_generated_ed25519();
-
-    let system_time = Utc::now();
 
     let create_result = dataset_repo
         .create_dataset(

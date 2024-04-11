@@ -15,7 +15,7 @@ use kamu_cli::{self, OutputConfig, WorkspaceLayout};
 async fn test_di_graph_validates() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = WorkspaceLayout::new(tempdir.path());
-    let mut base_catalog_builder = kamu_cli::configure_base_catalog(&workspace_layout, false);
+    let mut base_catalog_builder = kamu_cli::configure_base_catalog(&workspace_layout, false, None);
     base_catalog_builder.add_value(OutputConfig::default());
 
     kamu_cli::register_config_in_catalog(

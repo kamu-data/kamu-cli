@@ -22,6 +22,7 @@ use kamu_core::{
     DatasetChangesService,
     DatasetIntervalIncrement,
     DatasetRepository,
+    SystemTimeSourceDefault,
 };
 use opendatafabric::{
     Checkpoint,
@@ -809,6 +810,7 @@ impl DatasetChangesHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add::<SystemTimeSourceDefault>()
             .add::<EventBus>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()

@@ -58,6 +58,7 @@ async fn test_internal_error() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let cat = dill::CatalogBuilder::new()
+        .add::<SystemTimeSourceDefault>()
         .add::<EventBus>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()

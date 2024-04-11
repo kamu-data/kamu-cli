@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use opendatafabric::*;
 use thiserror::Error;
 use tokio::io::AsyncRead;
@@ -36,7 +37,7 @@ pub trait PushIngestService: Send + Sync {
         dataset_ref: &DatasetRef,
         source_name: Option<&str>,
         url: url::Url,
-        media_type: Option<MediaType>,
+        opts: PushIngestOpts,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError>;
 
@@ -49,10 +50,20 @@ pub trait PushIngestService: Send + Sync {
         dataset_ref: &DatasetRef,
         source_name: Option<&str>,
         data: Box<dyn AsyncRead + Send + Unpin>,
-        media_type: Option<MediaType>,
+        opts: PushIngestOpts,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError>;
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default)]
+pub struct PushIngestOpts {
+    pub media_type: Option<MediaType>,
+    pub source_event_time: Option<DateTime<Utc>>,
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub enum PushIngestResult {

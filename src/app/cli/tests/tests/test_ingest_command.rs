@@ -9,17 +9,18 @@
 
 use std::path::Path;
 
-use datafusion::parquet::record::RowAccessor;
+use chrono::{TimeZone, Utc};
 use indoc::indoc;
-use itertools::Itertools;
 use opendatafabric::*;
 
 use crate::utils::Kamu;
 
 #[test_group::group(containerized, engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_push_ingest_from_file() {
-    let kamu = Kamu::new_workspace_tmp().await;
+async fn test_push_ingest_from_file_ledger() {
+    let mut kamu = Kamu::new_workspace_tmp().await;
+
+    kamu.set_system_time(Some(Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap()));
 
     kamu.add_dataset(DatasetSnapshot {
         name: "population".try_into().unwrap(),
@@ -36,9 +37,10 @@ async fn test_push_ingest_from_file() {
             }
             .into(),
             preprocess: None,
-            merge: MergeStrategy::Ledger(MergeStrategyLedger {
+            merge: MergeStrategyLedger {
                 primary_key: vec!["event_time".to_owned(), "city".to_owned()],
-            }),
+            }
+            .into(),
         }
         .into()],
     })
@@ -68,33 +70,120 @@ async fn test_push_ingest_from_file() {
     .await
     .unwrap();
 
-    let parquet = kamu
-        .get_last_data_slice(&DatasetName::new_unchecked("population"))
-        .await;
-    assert_eq!(
-        parquet.get_column_names(),
-        [
-            "offset",
-            "op",
-            "system_time",
-            "event_time",
-            "city",
-            "population"
-        ]
-    );
-    assert_eq!(
-        parquet
-            .get_row_iter()
-            .map(Result::unwrap)
-            .map(|r| (r.get_string(4).unwrap().clone(), r.get_long(5).unwrap()))
-            .sorted()
-            .collect::<Vec<_>>(),
-        [
-            ("A".to_owned(), 1000),
-            ("B".to_owned(), 2000),
-            ("C".to_owned(), 3000)
-        ]
-    );
+    kamu.assert_last_data_slice(
+        &DatasetName::new_unchecked("population"),
+        indoc!(
+            r#"
+            message arrow_schema {
+              OPTIONAL INT64 offset;
+              REQUIRED INT32 op;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 0      | 0  | 2000-01-01T00:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
+            | 1      | 0  | 2000-01-01T00:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
+            | 2      | 0  | 2000-01-01T00:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+#[test_group::group(containerized, engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_push_ingest_from_file_snapshot_with_event_time() {
+    let mut kamu = Kamu::new_workspace_tmp().await;
+
+    kamu.set_system_time(Some(Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap()));
+
+    kamu.add_dataset(DatasetSnapshot {
+        name: "population".try_into().unwrap(),
+        kind: DatasetKind::Root,
+        metadata: vec![AddPushSource {
+            source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
+            read: ReadStepNdJson {
+                schema: Some(vec![
+                    "city STRING".to_owned(),
+                    "population BIGINT".to_owned(),
+                ]),
+                ..Default::default()
+            }
+            .into(),
+            preprocess: None,
+            merge: MergeStrategySnapshot {
+                primary_key: vec!["city".to_owned()],
+                compare_columns: None,
+            }
+            .into(),
+        }
+        .into()],
+    })
+    .await
+    .unwrap();
+
+    let data_path = kamu.workspace_path().join("data.csv");
+    std::fs::write(
+        &data_path,
+        indoc!(
+            "
+            A,1000
+            B,2000
+            C,3000
+            "
+        )
+        .trim(),
+    )
+    .unwrap();
+
+    kamu.execute([
+        "ingest",
+        "population",
+        "--input-format",
+        "csv",
+        "--event-time",
+        "2050-01-01T00:00:00Z",
+        path(&data_path),
+    ])
+    .await
+    .unwrap();
+
+    kamu.assert_last_data_slice(
+        &DatasetName::new_unchecked("population"),
+        indoc!(
+            r#"
+            message arrow_schema {
+              OPTIONAL INT64 offset;
+              REQUIRED INT32 op;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 0      | 0  | 2000-01-01T00:00:00Z | 2050-01-01T00:00:00Z | A    | 1000       |
+            | 1      | 0  | 2000-01-01T00:00:00Z | 2050-01-01T00:00:00Z | B    | 2000       |
+            | 2      | 0  | 2000-01-01T00:00:00Z | 2050-01-01T00:00:00Z | C    | 3000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
 }
 
 fn path(p: &Path) -> &str {

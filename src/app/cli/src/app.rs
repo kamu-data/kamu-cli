@@ -10,6 +10,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use database_common::{
     run_transactional,
@@ -65,6 +66,13 @@ pub async fn run(
         config.users.as_ref().unwrap(),
     );
 
+    let system_time: Option<DateTime<Utc>> = matches
+        .get_one::<String>("system-time")
+        .map(|s| DateTime::parse_from_rfc3339(s))
+        .transpose()
+        .map_err(CLIError::usage_error_from)?
+        .map(Into::into);
+
     prepare_run_dir(&workspace_layout.run_info_dir);
 
     // Configure application
@@ -75,8 +83,11 @@ pub async fn run(
             current_account.to_current_account_subject(),
         );
 
-        let mut base_catalog_builder =
-            configure_base_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
+        let mut base_catalog_builder = configure_base_catalog(
+            &workspace_layout,
+            workspace_svc.is_multi_tenant_workspace(),
+            system_time,
+        );
 
         base_catalog_builder.add_value(ServerUrlConfig::load()?);
 
@@ -218,6 +229,7 @@ pub fn prepare_dependencies_graph_repository(
 
     let special_catalog_for_graph = CatalogBuilder::new()
         .add::<event_bus::EventBus>()
+        .add::<SystemTimeSourceDefault>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(workspace_layout.datasets_dir.clone())
@@ -239,6 +251,7 @@ pub fn prepare_dependencies_graph_repository(
 pub fn configure_base_catalog(
     workspace_layout: &WorkspaceLayout,
     multi_tenant_workspace: bool,
+    system_time: Option<DateTime<Utc>>,
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
@@ -246,7 +259,12 @@ pub fn configure_base_catalog(
 
     b.add::<ContainerRuntime>();
 
-    b.add::<SystemTimeSourceDefault>();
+    if let Some(system_time) = system_time {
+        b.add_value(SystemTimeSourceStub::new_set(system_time));
+        b.bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
+    } else {
+        b.add::<SystemTimeSourceDefault>();
+    }
 
     b.add::<event_bus::EventBus>();
 

@@ -27,6 +27,7 @@ fn create_catalog_with_local_workspace(tempdir: &Path, is_multitenant: bool) -> 
     std::fs::create_dir(&datasets_dir).unwrap();
 
     dill::CatalogBuilder::new()
+        .add::<SystemTimeSourceDefault>()
         .add::<EventBus>()
         .add::<DependencyGraphServiceInMemory>()
         .add_builder(

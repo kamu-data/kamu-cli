@@ -63,7 +63,7 @@ impl PushIngestServiceImpl {
         dataset_ref: &DatasetRef,
         source_name: Option<&str>,
         source: DataSource,
-        media_type: Option<MediaType>,
+        opts: PushIngestOpts,
         listener: Arc<dyn PushIngestListener>,
     ) -> Result<PushIngestResult, PushIngestError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
@@ -106,7 +106,7 @@ impl PushIngestServiceImpl {
             operation_id,
             operation_dir,
             system_time: self.time_source.now(),
-            media_type,
+            opts,
             listener,
             ctx,
             data_writer,
@@ -182,7 +182,7 @@ impl PushIngestServiceImpl {
                 df,
                 WriteDataOpts {
                     system_time: args.system_time,
-                    source_event_time: args.system_time,
+                    source_event_time: args.opts.source_event_time.unwrap_or(args.system_time),
                     new_watermark: None,
                     new_source_state: None, // TODO: Support storing ingest source state
                     data_staging_path,
@@ -278,7 +278,7 @@ impl PushIngestServiceImpl {
             return Ok(None);
         }
 
-        let conf = if let Some(media_type) = &args.media_type {
+        let conf = if let Some(media_type) = &args.opts.media_type {
             let conf = self
                 .data_format_registry
                 .get_compatible_read_config(args.push_source.read.clone(), media_type)?;
@@ -352,13 +352,13 @@ impl PushIngestService for PushIngestServiceImpl {
         Ok(stream.try_collect().await.int_err()?)
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, %url, ?media_type))]
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, %url, ?opts))]
     async fn ingest_from_url(
         &self,
         dataset_ref: &DatasetRef,
         source_name: Option<&str>,
         url: url::Url,
-        media_type: Option<MediaType>,
+        opts: PushIngestOpts,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError> {
         let listener = listener.unwrap_or_else(|| Arc::new(NullPushIngestListener));
@@ -367,19 +367,19 @@ impl PushIngestService for PushIngestServiceImpl {
             dataset_ref,
             source_name,
             DataSource::Url(url),
-            media_type,
+            opts,
             listener,
         )
         .await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, ?media_type))]
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, ?opts))]
     async fn ingest_from_file_stream(
         &self,
         dataset_ref: &DatasetRef,
         source_name: Option<&str>,
         data: Box<dyn AsyncRead + Send + Unpin>,
-        media_type: Option<MediaType>,
+        opts: PushIngestOpts,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError> {
         let listener = listener.unwrap_or_else(|| Arc::new(NullPushIngestListener));
@@ -388,7 +388,7 @@ impl PushIngestService for PushIngestServiceImpl {
             dataset_ref,
             source_name,
             DataSource::Stream(data),
-            media_type,
+            opts,
             listener,
         )
         .await
@@ -399,7 +399,7 @@ struct PushIngestArgs {
     operation_id: String,
     operation_dir: PathBuf,
     system_time: DateTime<Utc>,
-    media_type: Option<MediaType>,
+    opts: PushIngestOpts,
     listener: Arc<dyn PushIngestListener>,
     ctx: SessionContext,
     data_writer: DataWriterDataFusion,

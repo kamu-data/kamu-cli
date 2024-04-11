@@ -80,7 +80,7 @@ async fn test_ingest_push_url_stream() {
             &dataset_ref,
             None,
             url::Url::from_file_path(&src_path).unwrap(),
-            None,
+            PushIngestOpts::default(),
             None,
         )
         .await
@@ -136,7 +136,13 @@ async fn test_ingest_push_url_stream() {
 
     harness
         .push_ingest_svc
-        .ingest_from_file_stream(&dataset_ref, None, Box::new(data), None, None)
+        .ingest_from_file_stream(
+            &dataset_ref,
+            None,
+            Box::new(data),
+            PushIngestOpts::default(),
+            None,
+        )
         .await
         .unwrap();
 
@@ -219,7 +225,10 @@ async fn test_ingest_push_media_type_override() {
             &dataset_ref,
             None,
             url::Url::from_file_path(&src_path).unwrap(),
-            Some(MediaType::CSV.to_owned()),
+            PushIngestOpts {
+                media_type: Some(MediaType::CSV.to_owned()),
+                ..Default::default()
+            },
             None,
         )
         .await
@@ -269,7 +278,10 @@ async fn test_ingest_push_media_type_override() {
             &dataset_ref,
             None,
             url::Url::from_file_path(&src_path).unwrap(),
-            Some(MediaType::NDJSON.to_owned()),
+            PushIngestOpts {
+                media_type: Some(MediaType::NDJSON.to_owned()),
+                ..Default::default()
+            },
             None,
         )
         .await
@@ -321,7 +333,10 @@ async fn test_ingest_push_media_type_override() {
             &dataset_ref,
             None,
             url::Url::from_file_path(&src_path).unwrap(),
-            Some(MediaType::JSON.to_owned()),
+            PushIngestOpts {
+                media_type: Some(MediaType::JSON.to_owned()),
+                ..Default::default()
+            },
             None,
         )
         .await
@@ -408,7 +423,7 @@ async fn test_ingest_push_schema_stability() {
             &dataset_ref,
             None,
             url::Url::from_file_path(&src_path).unwrap(),
-            None,
+            PushIngestOpts::default(),
             None,
         )
         .await

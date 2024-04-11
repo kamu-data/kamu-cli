@@ -154,6 +154,7 @@ async fn create_graph_remote(
         Arc::new(DependencyGraphServiceInMemory::new(None)),
         Arc::new(EventBus::new(Arc::new(CatalogBuilder::new().build()))),
         false,
+        Arc::new(SystemTimeSourceDefault),
     );
 
     create_graph(&remote_dataset_repo, datasets).await;

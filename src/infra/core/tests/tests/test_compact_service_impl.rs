@@ -989,7 +989,13 @@ impl CompactTestHarness {
         let data = std::io::Cursor::new(data_str);
 
         self.push_ingest_svc
-            .ingest_from_file_stream(dataset_ref, None, Box::new(data), None, None)
+            .ingest_from_file_stream(
+                dataset_ref,
+                None,
+                Box::new(data),
+                PushIngestOpts::default(),
+                None,
+            )
             .await
             .unwrap();
     }

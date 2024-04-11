@@ -28,6 +28,7 @@ pub struct DatasetRepositoryLocalFs {
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     event_bus: Arc<EventBus>,
     thrash_lock: tokio::sync::Mutex<()>,
+    system_time_source: Arc<dyn SystemTimeSource>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -41,6 +42,7 @@ impl DatasetRepositoryLocalFs {
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         event_bus: Arc<EventBus>,
         multi_tenant: bool,
+        system_time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
             storage_strategy: if multi_tenant {
@@ -59,6 +61,7 @@ impl DatasetRepositoryLocalFs {
             dependency_graph_service,
             event_bus,
             thrash_lock: tokio::sync::Mutex::new(()),
+            system_time_source,
         }
     }
 
@@ -69,6 +72,7 @@ impl DatasetRepositoryLocalFs {
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         event_bus: Arc<EventBus>,
         multi_tenant: bool,
+        system_time_source: Arc<dyn SystemTimeSource>,
     ) -> Result<Self, std::io::Error> {
         let root = root.into();
         std::fs::create_dir_all(&root)?;
@@ -79,6 +83,7 @@ impl DatasetRepositoryLocalFs {
             dependency_graph_service,
             event_bus,
             multi_tenant,
+            system_time_source,
         ))
     }
 
@@ -314,7 +319,13 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         &self,
         snapshot: DatasetSnapshot,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
-        create_dataset_from_snapshot_impl(self, self.event_bus.as_ref(), snapshot).await
+        create_dataset_from_snapshot_impl(
+            self,
+            self.event_bus.as_ref(),
+            snapshot,
+            self.system_time_source.now(),
+        )
+        .await
     }
 
     async fn rename_dataset(

@@ -511,6 +511,7 @@ impl GraphQLMetadataChainHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let base_catalog = dill::CatalogBuilder::new()
+            .add::<SystemTimeSourceDefault>()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_builder(

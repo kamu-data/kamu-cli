@@ -16,7 +16,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use axum::extract::{Extension, Query, TypedHeader};
+use axum::extract::{Extension, Query};
+use chrono::{DateTime, Utc};
+use http::HeaderMap;
 use kamu::domain::*;
 use opendatafabric::DatasetRef;
 
@@ -43,18 +45,29 @@ pub async fn dataset_ingest_handler(
     Extension(catalog): Extension<dill::Catalog>,
     Extension(dataset_ref): Extension<DatasetRef>,
     Query(params): Query<IngestParams>,
-    TypedHeader(content_type): TypedHeader<axum::headers::ContentType>,
+    headers: HeaderMap,
     body_stream: axum::extract::BodyStream,
 ) -> Result<(), ApiError> {
     let data = Box::new(crate::axum_utils::body_into_async_read(body_stream));
     let ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
+
+    let media_type = headers
+        .get(http::header::CONTENT_TYPE)
+        .map(|h| MediaType(h.to_str().unwrap().to_string()));
+
+    // TODO: Settle on the header name and document it
+    let source_event_time: Option<DateTime<Utc>> =
+        get_header(&headers, "odf-event-time", DateTime::parse_from_rfc3339)?.map(Into::into);
 
     match ingest_svc
         .ingest_from_file_stream(
             &dataset_ref,
             params.source_name.as_deref(),
             data,
-            Some(MediaType(content_type.to_string())),
+            PushIngestOpts {
+                media_type,
+                source_event_time,
+            },
             None,
         )
         .await
@@ -72,3 +85,17 @@ pub async fn dataset_ingest_handler(
 }
 
 /////////////////////////////////////////////////////////////////////////////////
+
+fn get_header<T, E: std::error::Error + Send + Sync + 'static>(
+    headers: &HeaderMap,
+    key: &str,
+    parse: impl FnOnce(&str) -> Result<T, E>,
+) -> Result<Option<T>, ApiError> {
+    let Some(v) = headers.get(key) else {
+        return Ok(None);
+    };
+
+    let v = v.to_str().map_err(ApiError::bad_request)?;
+
+    parse(v).map(Some).map_err(ApiError::bad_request)
+}

@@ -94,6 +94,11 @@ pub fn cli() -> Command {
                 .long("trace")
                 .action(ArgAction::SetTrue)
                 .help("Record and visualize the command execution as perfetto.dev trace"),
+            Arg::new("system-time")
+                .long("system-time")
+                .value_name("T")
+                .help("Overrides system time clock with provided value")
+                .hide(true),
             Arg::new("account")
                 .long("account")
                 .short('a')
@@ -347,6 +352,10 @@ pub fn cli() -> Command {
                             .long("source-name")
                             .value_name("SRC")
                             .help("Name of the push source to use for ingestion"),
+                        Arg::new("event-time")
+                            .long("event-time")
+                            .value_name("T")
+                            .help("Event time to be used if data does not contain one"),
                         Arg::new("stdin")
                             .long("stdin")
                             .action(ArgAction::SetTrue)
@@ -384,6 +393,10 @@ pub fn cli() -> Command {
                         Ingest data with format conversion:
 
                             echo '[{"key": "value1"}, {"key": "value2"}]' | kamu ingest org.example.data --stdin --input-format json
+
+                        Ingest data with event time hint:
+
+                            kamu ingest org.example.data data.json --event-time 2050-01-02T12:00:00Z
                         "#
                     )),
                 Command::new("init")

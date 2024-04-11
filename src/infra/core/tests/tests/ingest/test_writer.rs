@@ -939,6 +939,7 @@ impl Harness {
         let system_time = Utc.with_ymd_and_hms(2010, 1, 1, 12, 0, 0).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add::<SystemTimeSourceDefault>()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()

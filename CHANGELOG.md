@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Added
+- The `kamu ingest` command can now accept `--event-time` hint which is useful for snapshot-style data that doesn't have an event time column
+- The `/ingest` REST API endpoint also supports event time hints via `odf-event-time` header
+- New `--system-time` root parameter allows overriding time for all CLI commands
 ### Fixed
 - CLI show errors not only under TTY
 - Removed `paused` from `setConfigCompacting` mutation

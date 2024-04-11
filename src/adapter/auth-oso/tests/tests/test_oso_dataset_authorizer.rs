@@ -17,7 +17,7 @@ use kamu::testing::MetadataFactory;
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_adapter_auth_oso::{KamuAuthOso, OsoDatasetAuthorizer};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::{AccessError, CurrentAccountSubject, DatasetRepository};
+use kamu_core::{AccessError, CurrentAccountSubject, DatasetRepository, SystemTimeSourceDefault};
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle, DatasetKind};
 use tempfile::TempDir;
 
@@ -105,6 +105,7 @@ impl DatasetAuthorizerHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add::<SystemTimeSourceDefault>()
             .add::<EventBus>()
             .add_value(CurrentAccountSubject::logged(
                 AccountName::new_unchecked(current_account_name),

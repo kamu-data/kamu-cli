@@ -112,6 +112,7 @@ pub fn get_command(
                 .unwrap_or_default()
                 .map(String::as_str),
             submatches.get_one("source-name").map(String::as_str),
+            submatches.get_one("event-time").map(String::as_str),
             submatches.get_flag("stdin"),
             submatches.get_flag("recursive"),
             submatches.get_one("input-format").map(String::as_str),

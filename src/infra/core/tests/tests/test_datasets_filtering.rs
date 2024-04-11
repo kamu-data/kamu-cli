@@ -21,7 +21,7 @@ use kamu::utils::datasets_filtering::{
 };
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_core::auth::DEFAULT_ACCOUNT_NAME;
-use kamu_core::{auth, CurrentAccountSubject, DatasetRepository};
+use kamu_core::{auth, CurrentAccountSubject, DatasetRepository, SystemTimeSourceDefault};
 use opendatafabric::{
     AccountName,
     DatasetAlias,
@@ -274,6 +274,7 @@ impl DatasetFilteringHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add::<SystemTimeSourceDefault>()
             .add::<EventBus>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()

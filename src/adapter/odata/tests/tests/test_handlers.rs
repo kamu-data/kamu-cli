@@ -431,7 +431,7 @@ impl TestHarness {
                 &ds.dataset_handle.as_local_ref(),
                 None,
                 url::Url::from_file_path(&src_path).unwrap(),
-                None,
+                PushIngestOpts::default(),
                 None,
             )
             .await

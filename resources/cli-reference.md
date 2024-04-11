@@ -42,6 +42,7 @@ To regenerate this schema from existing code, use the following command:
 * `-v` — Sets the level of verbosity (repeat for more)
 * `-q`, `--quiet` — Suppress all non-essential output
 * `--trace` — Record and visualize the command execution as perfetto.dev trace
+* `--system-time <T>` — Overrides system time clock with provided value
 * `-a`, `--account <ACCOUNT>`
 
 To get help for individual commands use:
@@ -266,6 +267,7 @@ Adds data to the root dataset according to its push source configuration
 **Options:**
 
 * `--source-name <SRC>` — Name of the push source to use for ingestion
+* `--event-time <T>` — Event time to be used if data does not contain one
 * `--stdin` — Read data from the standard input
 * `-r`, `--recursive` — Recursively propagate the updates into all downstream datasets
 * `--input-format <FMT>` — Overrides the media type of the data expected by the push source
@@ -286,6 +288,10 @@ Ingest data from standard input (assumes source is defined to use NDJSON):
 Ingest data with format conversion:
 
     echo '[{"key": "value1"}, {"key": "value2"}]' | kamu ingest org.example.data --stdin --input-format json
+
+Ingest data with event time hint:
+
+    kamu ingest org.example.data data.json --event-time 2050-01-02T12:00:00Z
 
 
 

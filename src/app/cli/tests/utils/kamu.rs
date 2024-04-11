@@ -7,15 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsString;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
+use datafusion::prelude::*;
 use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::*;
-use kamu::testing::ParquetReaderHelper;
 use kamu::*;
 use kamu_cli::*;
 use opendatafabric::serde::yaml::*;
@@ -27,6 +28,7 @@ pub struct Kamu {
     workspace_layout: WorkspaceLayout,
     current_account: accounts::CurrentAccountIndication,
     workspace_path: PathBuf,
+    system_time: Option<DateTime<Utc>>,
     _temp_dir: Option<tempfile::TempDir>,
 }
 
@@ -42,8 +44,13 @@ impl Kamu {
             workspace_layout,
             current_account,
             workspace_path,
+            system_time: None,
             _temp_dir: None,
         }
+    }
+
+    pub fn set_system_time(&mut self, t: Option<DateTime<Utc>>) {
+        self.system_time = t;
     }
 
     pub async fn new_workspace_tmp() -> Self {
@@ -68,8 +75,14 @@ impl Kamu {
         &self.workspace_path
     }
 
-    pub async fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
+    pub async fn assert_last_data_slice(
+        &self,
+        dataset_name: &DatasetName,
+        expected_schema: &str,
+        expected_data: &str,
+    ) {
         let catalog = dill::CatalogBuilder::new()
+            .add::<SystemTimeSourceDefault>()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(self.current_account.to_current_account_subject())
@@ -88,6 +101,7 @@ impl Kamu {
             .get_dataset(&dataset_name.as_local_ref())
             .await
             .unwrap();
+
         let slice = dataset
             .as_metadata_chain()
             .iter_blocks()
@@ -106,7 +120,24 @@ impl Kamu {
         )
         .unwrap();
 
-        ParquetReaderHelper::open(&part_file)
+        let ctx = SessionContext::new();
+        let df = ctx
+            .read_parquet(
+                vec![part_file.to_string_lossy().to_string()],
+                ParquetReadOptions {
+                    file_extension: "",
+                    table_partition_cols: Vec::new(),
+                    parquet_pruning: None,
+                    skip_metadata: None,
+                    schema: None,
+                    file_sort_order: Vec::new(),
+                },
+            )
+            .await
+            .unwrap();
+
+        kamu_data_utils::testing::assert_data_eq(df.clone(), expected_data).await;
+        kamu_data_utils::testing::assert_schema_eq(df.schema(), expected_schema);
     }
 
     pub async fn execute<I, S>(&self, cmd: I) -> Result<(), CommandError>
@@ -114,7 +145,17 @@ impl Kamu {
         I: IntoIterator<Item = S>,
         S: Into<OsString>,
     {
-        let mut full_cmd = vec![OsStr::new("kamu").to_owned(), OsStr::new("-q").to_owned()];
+        let mut full_cmd: Vec<OsString> = vec!["kamu".into(), "-q".into()];
+
+        if let Some(system_time) = &self.system_time {
+            full_cmd.push("--system-time".into());
+            full_cmd.push(
+                system_time
+                    .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+                    .into(),
+            );
+        }
+
         full_cmd.extend(cmd.into_iter().map(Into::into));
 
         let app = kamu_cli::cli();
@@ -136,6 +177,7 @@ impl Kamu {
         let cli = kamu_cli::cli();
 
         let catalog = dill::CatalogBuilder::new()
+            .add::<SystemTimeSourceDefault>()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(self.current_account.to_current_account_subject())
@@ -185,7 +227,9 @@ impl Kamu {
     }
 
     pub fn catalog(&self) -> dill::Catalog {
-        let base_catalog = kamu_cli::configure_base_catalog(&self.workspace_layout, false).build();
+        let base_catalog =
+            kamu_cli::configure_base_catalog(&self.workspace_layout, false, self.system_time)
+                .build();
 
         let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(&base_catalog);
         cli_catalog_builder.add_value(self.current_account.to_current_account_subject());

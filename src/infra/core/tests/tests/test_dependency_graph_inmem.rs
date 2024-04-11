@@ -27,6 +27,7 @@ use kamu_core::{
     DatasetRepository,
     DependencyGraphRepository,
     DependencyGraphService,
+    SystemTimeSourceDefault,
 };
 use opendatafabric::{
     AccountName,
@@ -587,6 +588,7 @@ impl DependencyGraphHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add::<SystemTimeSourceDefault>()
             .add::<EventBus>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()

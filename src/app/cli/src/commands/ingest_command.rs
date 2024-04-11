@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use chrono::{DateTime, Utc};
 use kamu::domain::*;
 use opendatafabric::*;
 
@@ -30,13 +31,14 @@ pub struct IngestCommand {
     dataset_ref: DatasetRef,
     files_refs: Vec<String>,
     source_name: Option<String>,
+    event_time: Option<String>,
     stdin: bool,
     recursive: bool,
     input_format: Option<String>,
 }
 
 impl IngestCommand {
-    pub fn new<'s, I, S1, S2>(
+    pub fn new<'s, I, S1, S2, S3>(
         data_format_reg: Arc<dyn DataFormatRegistry>,
         dataset_repo: Arc<dyn DatasetRepository>,
         push_ingest_svc: Arc<dyn PushIngestService>,
@@ -45,14 +47,16 @@ impl IngestCommand {
         dataset_ref: DatasetRef,
         files_refs: I,
         source_name: Option<S1>,
+        event_time: Option<S2>,
         stdin: bool,
         recursive: bool,
-        input_format: Option<S2>,
+        input_format: Option<S3>,
     ) -> Self
     where
         I: Iterator<Item = &'s str>,
         S1: Into<String>,
         S2: Into<String>,
+        S3: Into<String>,
     {
         Self {
             data_format_reg,
@@ -63,6 +67,7 @@ impl IngestCommand {
             dataset_ref,
             files_refs: files_refs.map(ToString::to_string).collect(),
             source_name: source_name.map(Into::into),
+            event_time: event_time.map(Into::into),
             stdin,
             recursive,
             input_format: input_format.map(Into::into),
@@ -163,6 +168,14 @@ impl Command for IngestCommand {
             )) as Arc<dyn PushIngestListener>)
         };
 
+        let source_event_time: Option<DateTime<Utc>> = self
+            .event_time
+            .as_ref()
+            .map(|s| DateTime::parse_from_rfc3339(s))
+            .transpose()
+            .map_err(CLIError::usage_error_from)?
+            .map(Into::into);
+
         let mut updated = 0;
         for url in urls {
             let result = self
@@ -171,7 +184,10 @@ impl Command for IngestCommand {
                     &self.dataset_ref,
                     self.source_name.as_deref(),
                     url,
-                    self.get_media_type()?,
+                    PushIngestOpts {
+                        media_type: self.get_media_type()?,
+                        source_event_time,
+                    },
                     listener.clone(),
                 )
                 .await
