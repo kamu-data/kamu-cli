@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::compact_service::CompactResult;
-use kamu_core::PullResult;
+use kamu_core::{CompactingResult, PullResult};
 use opendatafabric::DatasetID;
 use serde::{Deserialize, Serialize};
 
@@ -50,7 +49,7 @@ impl TaskOutcome {
 pub enum TaskResult {
     Empty,
     UpdateDatasetResult(TaskUpdateDatasetResult),
-    CompactDatasetResult(TaskCompactDatasetResult),
+    CompactingDatasetResult(TaskCompactingDatasetResult),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -65,14 +64,14 @@ impl From<PullResult> for TaskUpdateDatasetResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TaskCompactDatasetResult {
-    pub compact_result: CompactResult,
+pub struct TaskCompactingDatasetResult {
+    pub compacting_result: CompactingResult,
 }
 
-impl From<CompactResult> for TaskCompactDatasetResult {
-    fn from(value: CompactResult) -> Self {
+impl From<CompactingResult> for TaskCompactingDatasetResult {
+    fn from(value: CompactingResult) -> Self {
         Self {
-            compact_result: value,
+            compacting_result: value,
         }
     }
 }
@@ -82,11 +81,11 @@ impl From<CompactResult> for TaskCompactDatasetResult {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskError {
     Empty,
-    RootDatasetWasCompacted(RootDatasetWasCompactedError),
+    RootDatasetCompacted(RootDatasetCompactedError),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RootDatasetWasCompactedError {
+pub struct RootDatasetCompactedError {
     pub dataset_id: DatasetID,
 }
 

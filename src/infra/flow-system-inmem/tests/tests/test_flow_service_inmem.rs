@@ -468,8 +468,8 @@ async fn test_manual_trigger_compacting() {
                     task_id: TaskID::new(0),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(10).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::HardCompactDataset(HardCompactDataset {
+                    finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
                       dataset_id: foo_id.clone(),
                       max_slice_size: None,
                       max_slice_records: None,
@@ -477,47 +477,46 @@ async fn test_manual_trigger_compacting() {
                 });
                 let task0_handle = task0_driver.run();
 
-                let task2_driver = harness.task_driver(TaskDriverArgs {
+                let task1_driver = harness.task_driver(TaskDriverArgs {
                   task_id: TaskID::new(1),
                   dataset_id: Some(bar_id.clone()),
                   run_since_start: Duration::try_milliseconds(60).unwrap(),
                   finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                  expected_logical_plan: LogicalPlan::HardCompactDataset(HardCompactDataset {
+                  expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
                     max_slice_records: None,
                   }),
                 });
-                let task2_handle = task2_driver.run();
+                let task1_handle = task1_driver.run();
 
-                // Manual trigger for "foo" at 00ms
+                // Manual trigger for "foo" at 10ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: foo_flow_key,
                     run_since_start: Duration::try_milliseconds(10).unwrap(),
                 });
                 let trigger0_handle = trigger0_driver.run();
 
-                // Manual trigger for "bar" at 40ms
+                // Manual trigger for "bar" at 50ms
                 let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: bar_flow_key,
-                    run_since_start: Duration::try_milliseconds(40).unwrap(),
+                    run_since_start: Duration::try_milliseconds(50).unwrap(),
                 });
                 let trigger1_handle = trigger1_driver.run();
 
                 // Main simulation script
                 let main_handle = async {
                     // Moment 10ms - manual foo trigger happens here:
-                    //  - flow 0 gets trigger and is rescheduled to 40ms (20ms finish + 20ms throttling <= 40ms now)
+                    //  - flow 0 gets trigger and finishes at 30ms
 
-                    // Moment 40ms - manual foo trigger happens here:
-                    //  - flow 1 trigger and is rescheduled to 40ms (20ms finish + 20ms throttling <= 40ms now)
+                    // Moment 50ms - manual foo trigger happens here:
+                    //  - flow 1 trigger and finishes
                     //  - task 1 starts at 60ms, finishes at 70ms (leave some gap to fight with random order)
 
-                    // Stop at 100ms: "foo" flow 1 gets scheduled at 70
                     harness.advance_time(Duration::try_milliseconds(100).unwrap()).await;
                 };
 
-                tokio::join!(task0_handle, task2_handle, trigger0_handle, trigger1_handle, main_handle)
+                tokio::join!(task0_handle, task1_handle, trigger0_handle, trigger1_handle, main_handle)
             } => Ok(())
     }
     .unwrap();
@@ -536,13 +535,15 @@ async fn test_manual_trigger_compacting() {
               "foo" HardCompacting:
                 Flow ID = 0 Running(task=0)
 
-            #3: +20ms:
+            #3: +30ms:
+              "bar" HardCompacting:
+                Flow ID = 1 Waiting Manual
               "foo" HardCompacting:
                 Flow ID = 0 Finished Success
 
-            #4: +40ms:
+            #4: +50ms:
               "bar" HardCompacting:
-                Flow ID = 1 Waiting Manual Executor(task=1, since=40ms)
+                Flow ID = 1 Waiting Manual Executor(task=1, since=50ms)
               "foo" HardCompacting:
                 Flow ID = 0 Finished Success
 
@@ -602,13 +603,13 @@ async fn test_manual_trigger_compacting_with_config() {
 
         // Run simulation script and task drivers
         _ = async {
-                // Task 0: "foo" start running at 10ms, finish at 20ms
+                // Task 0: "foo" start running at 30ms, finish at 40ms
                 let task0_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(0),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(30).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::HardCompactDataset(HardCompactDataset {
+                    expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
                       dataset_id: foo_id.clone(),
                       max_slice_size: Some(max_slice_size),
                       max_slice_records: Some(max_slice_records),
@@ -616,7 +617,6 @@ async fn test_manual_trigger_compacting_with_config() {
                 });
                 let task0_handle = task0_driver.run();
 
-                // Manual trigger for "foo" at 40ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: foo_flow_key,
                     run_since_start: Duration::try_milliseconds(20).unwrap(),
@@ -625,11 +625,8 @@ async fn test_manual_trigger_compacting_with_config() {
 
                 // Main simulation script
                 let main_handle = async {
-                    // "foo":
-
-                    // Moment 40ms - manual foo trigger happens here:
-                    //  - flow 1 gets (20ms finish + 20ms throttling <= 40ms now)
-                    //  - task 1 starts at 60ms, finishes at 70ms (leave some gap to fight with random order)
+                    // Moment 30ms - manual foo trigger happens here:
+                    //  - flow 0 trigger and finishes at 40ms
                     harness.advance_time(Duration::try_milliseconds(80).unwrap()).await;
                 };
 

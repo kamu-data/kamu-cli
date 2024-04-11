@@ -48,7 +48,6 @@ pub enum TaskOutcome {
 }
 
 impl From<&ts::TaskOutcome> for TaskOutcome {
-    // ToDo Roman
     fn from(value: &ts::TaskOutcome) -> Self {
         match value {
             ts::TaskOutcome::Success(_) => Self::Success,

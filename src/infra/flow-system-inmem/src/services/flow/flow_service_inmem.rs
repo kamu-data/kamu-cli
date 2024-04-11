@@ -179,6 +179,8 @@ impl FlowServiceInMemory {
                         self.enqueue_auto_polling_flow_unconditionally(start_time, &flow_key)
                             .await?;
                     }
+                    // Sucn as compacting is very dangerous operation we
+                    // skip running it during activation flow configurations
                     FlowConfigurationRule::CompactingRule(_) => (),
                 }
 
@@ -667,8 +669,7 @@ impl FlowServiceInMemory {
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
-        let logical_plan_opts = self.get_logical_plan_options(&flow.flow_key);
-        let logical_plan = flow.make_task_logical_plan(&logical_plan_opts);
+        let logical_plan = self.make_task_logical_plan(&flow.flow_key);
 
         let task = self
             .task_scheduler
@@ -724,26 +725,51 @@ impl FlowServiceInMemory {
         Ok(())
     }
 
-    fn get_logical_plan_options(&self, flow_key: &FlowKey) -> LogicalPlanOptions {
-        let mut logical_plan_opts = LogicalPlanOptions::default();
-        if let FlowKey::Dataset(dataset_flow) = flow_key {
-            let maybe_compacting_rule = self
-                .state
-                .lock()
-                .unwrap()
-                .active_configs
-                .try_get_dataset_compacting_rule(
-                    &dataset_flow.dataset_id,
-                    DatasetFlowType::HardCompacting,
-                );
-            if let Some(opts) = maybe_compacting_rule {
-                logical_plan_opts = LogicalPlanOptions {
-                    max_slice_size: Some(opts.max_slice_size()),
-                    max_slice_records: Some(opts.max_slice_records()),
-                };
-            };
+    /// Creates task logical plan that corresponds to template
+    pub fn make_task_logical_plan(&self, flow_key: &FlowKey) -> LogicalPlan {
+        match flow_key {
+            FlowKey::Dataset(flow_key) => match flow_key.flow_type {
+                DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
+                    LogicalPlan::UpdateDataset(UpdateDataset {
+                        dataset_id: flow_key.dataset_id.clone(),
+                    })
+                }
+                DatasetFlowType::HardCompacting => {
+                    let mut max_slice_size: Option<u64> = None;
+                    let mut max_slice_records: Option<u64> = None;
+
+                    let maybe_compacting_rule = self
+                        .state
+                        .lock()
+                        .unwrap()
+                        .active_configs
+                        .try_get_dataset_compacting_rule(
+                            &flow_key.dataset_id,
+                            DatasetFlowType::HardCompacting,
+                        );
+                    if let Some(opts) = maybe_compacting_rule {
+                        max_slice_size = Some(opts.max_slice_size());
+                        max_slice_records = Some(opts.max_slice_records());
+                    };
+
+                    LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                        dataset_id: flow_key.dataset_id.clone(),
+                        max_slice_size,
+                        max_slice_records,
+                    })
+                }
+            },
+            FlowKey::System(flow_key) => {
+                match flow_key.flow_type {
+                    // TODO: replace on correct logical plan
+                    SystemFlowType::GC => LogicalPlan::Probe(Probe {
+                        dataset_id: None,
+                        busy_time: Some(std::time::Duration::from_secs(20)),
+                        end_with_outcome: Some(TaskOutcome::Success(TaskResult::Empty)),
+                    }),
+                }
+            }
         }
-        logical_plan_opts
     }
 
     fn get_task_outcome(&self, flow: &Flow, task_outcome: TaskOutcome) -> TaskOutcome {
@@ -752,8 +778,8 @@ impl FlowServiceInMemory {
                 for trigger in &flow.triggers {
                     if let FlowTrigger::InputDatasetFlow(trigger) = trigger {
                         if let FlowResult::DatasetCompact(_) = &trigger.flow_result {
-                            return TaskOutcome::Failed(TaskError::RootDatasetWasCompacted(
-                                RootDatasetWasCompactedError {
+                            return TaskOutcome::Failed(TaskError::RootDatasetCompacted(
+                                RootDatasetCompactedError {
                                     dataset_id: trigger.dataset_id.clone(),
                                 },
                             ));

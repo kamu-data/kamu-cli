@@ -9,8 +9,9 @@
 
 use std::sync::Arc;
 
-use kamu::domain::compact_service::{CompactOptions, CompactService};
 use kamu::domain::{
+    CompactingOptions,
+    CompactingService,
     DatasetRepository,
     VerificationMultiListener,
     VerificationOptions,
@@ -23,7 +24,7 @@ use crate::{CLIError, Command, CompactingMultiProgress, VerificationMultiProgres
 pub struct CompactCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
-    compact_svc: Arc<dyn CompactService>,
+    compacting_svc: Arc<dyn CompactingService>,
     dataset_ref: DatasetRef,
     max_slice_size: u64,
     max_slice_records: u64,
@@ -35,7 +36,7 @@ impl CompactCommand {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
-        compact_svc: Arc<dyn CompactService>,
+        compacting_svc: Arc<dyn CompactingService>,
         dataset_ref: DatasetRef,
         max_slice_size: u64,
         max_slice_records: u64,
@@ -45,7 +46,7 @@ impl CompactCommand {
         Self {
             dataset_repo,
             verification_svc,
-            compact_svc,
+            compacting_svc,
             dataset_ref,
             max_slice_size,
             max_slice_records,
@@ -110,10 +111,10 @@ impl Command for CompactCommand {
             progress.draw();
         });
 
-        self.compact_svc
+        self.compacting_svc
             .compact_dataset(
                 &dataset_handle,
-                CompactOptions {
+                CompactingOptions {
                     max_slice_size: Some(self.max_slice_size),
                     max_slice_records: Some(self.max_slice_records),
                 },

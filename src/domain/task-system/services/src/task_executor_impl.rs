@@ -11,8 +11,14 @@ use std::sync::Arc;
 
 use dill::*;
 use event_bus::EventBus;
-use kamu_core::compact_service::{CompactOptions, CompactService};
-use kamu_core::{DatasetRepository, PullOptions, PullService, SystemTimeSource};
+use kamu_core::{
+    CompactingOptions,
+    CompactingService,
+    DatasetRepository,
+    PullOptions,
+    PullService,
+    SystemTimeSource,
+};
 use kamu_task_system::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -117,22 +123,23 @@ impl TaskExecutor for TaskExecutorImpl {
                         .clone()
                         .unwrap_or(TaskOutcome::Success(TaskResult::Empty))
                 }
-                LogicalPlan::HardCompactDataset(HardCompactDataset {
+                LogicalPlan::HardCompactingDataset(HardCompactingDataset {
                     dataset_id,
                     max_slice_size,
                     max_slice_records,
                 }) => {
-                    let compact_svc = self.catalog.get_one::<dyn CompactService>().int_err()?;
+                    let compacting_svc =
+                        self.catalog.get_one::<dyn CompactingService>().int_err()?;
                     let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().int_err()?;
                     let dataset_handle = dataset_repo
                         .resolve_dataset_ref(&dataset_id.as_local_ref())
                         .await
                         .int_err()?;
 
-                    let compact_result = compact_svc
+                    let compacting_result = compacting_svc
                         .compact_dataset(
                             &dataset_handle,
-                            CompactOptions {
+                            CompactingOptions {
                                 max_slice_size: *max_slice_size,
                                 max_slice_records: *max_slice_records,
                             },
@@ -140,9 +147,9 @@ impl TaskExecutor for TaskExecutorImpl {
                         )
                         .await;
 
-                    match compact_result {
+                    match compacting_result {
                         Ok(result) => {
-                            TaskOutcome::Success(TaskResult::CompactDatasetResult(result.into()))
+                            TaskOutcome::Success(TaskResult::CompactingDatasetResult(result.into()))
                         }
                         Err(_) => TaskOutcome::Failed(TaskError::Empty),
                     }

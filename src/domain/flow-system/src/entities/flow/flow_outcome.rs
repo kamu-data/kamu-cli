@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::compact_service::CompactResult;
-use kamu_core::PullResult;
+use kamu_core::{CompactingResult, PullResult};
 use kamu_task_system as ts;
 use opendatafabric::{DatasetID, Multihash};
 use ts::TaskError;
@@ -55,11 +54,11 @@ impl FlowResult {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowError {
     Failed,
-    RootDatasetWasCompacted(FlowRootDatasetWasCompactedError),
+    RootDatasetCompacted(FlowRootDatasetCompactedError),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowRootDatasetWasCompactedError {
+pub struct FlowRootDatasetCompactedError {
     pub dataset_id: DatasetID,
 }
 
@@ -67,8 +66,8 @@ impl From<&TaskError> for FlowError {
     fn from(value: &TaskError) -> Self {
         match value {
             TaskError::Empty => Self::Failed,
-            TaskError::RootDatasetWasCompacted(err) => {
-                Self::RootDatasetWasCompacted(FlowRootDatasetWasCompactedError {
+            TaskError::RootDatasetCompacted(err) => {
+                Self::RootDatasetCompacted(FlowRootDatasetCompactedError {
                     dataset_id: err.dataset_id.clone(),
                 })
             }
@@ -101,10 +100,10 @@ impl From<ts::TaskResult> for FlowResult {
                     }
                 }
             }
-            ts::TaskResult::CompactDatasetResult(task_compact_result) => {
-                match task_compact_result.compact_result {
-                    CompactResult::NothingToDo => Self::Empty,
-                    CompactResult::Success {
+            ts::TaskResult::CompactingDatasetResult(task_compacting_result) => {
+                match task_compacting_result.compacting_result {
+                    CompactingResult::NothingToDo => Self::Empty,
+                    CompactingResult::Success {
                         new_head,
                         old_num_blocks,
                         new_num_blocks,

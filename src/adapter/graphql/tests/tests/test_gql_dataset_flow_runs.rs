@@ -25,9 +25,9 @@ use kamu::testing::{
 };
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_core::auth::DEFAULT_ACCOUNT_NAME;
-use kamu_core::compact_service::CompactResult;
 use kamu_core::{
     auth,
+    CompactingResult,
     CreateDatasetResult,
     DatasetChangesService,
     DatasetIntervalIncrement,
@@ -631,7 +631,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_trigger_compact_root_dataset() {
+async fn test_trigger_compacting_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
         dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
@@ -705,7 +705,7 @@ async fn test_trigger_compact_root_dataset() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetHardCompacting",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
-                                            "compactResult": null,
+                                            "compactingResult": null,
                                         },
                                         "status": "WAITING",
                                         "outcome": null,
@@ -770,7 +770,7 @@ async fn test_trigger_compact_root_dataset() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetHardCompacting",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
-                                            "compactResult": null,
+                                            "compactingResult": null,
                                         },
                                         "status": "WAITING",
                                         "outcome": null,
@@ -844,7 +844,7 @@ async fn test_trigger_compact_root_dataset() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetHardCompacting",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
-                                            "compactResult": null,
+                                            "compactingResult": null,
                                         },
                                         "status": "RUNNING",
                                         "outcome": null,
@@ -897,9 +897,9 @@ async fn test_trigger_compact_root_dataset() {
         .mimic_task_completed(
             flow_task_id,
             complete_time,
-            ts::TaskOutcome::Success(ts::TaskResult::CompactDatasetResult(
-                ts::TaskCompactDatasetResult {
-                    compact_result: CompactResult::Success {
+            ts::TaskOutcome::Success(ts::TaskResult::CompactingDatasetResult(
+                ts::TaskCompactingDatasetResult {
+                    compacting_result: CompactingResult::Success {
                         old_head: Multihash::from_digest_sha3_256(b"old-slice"),
                         new_head: new_head.clone(),
                         old_num_blocks: 5,
@@ -932,7 +932,7 @@ async fn test_trigger_compact_root_dataset() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetHardCompacting",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
-                                            "compactResult": {
+                                            "compactingResult": {
                                                 "originalBlocksCount": 5,
                                                 "resultingBlocksCount": 4,
                                                 "newHead": new_head
@@ -2508,7 +2508,7 @@ impl FlowRunsHarness {
                                             __typename
                                             ... on FlowDescriptionDatasetHardCompacting {
                                                 datasetId
-                                                compactResult {
+                                                compactingResult {
                                                     originalBlocksCount
                                                     resultingBlocksCount,
                                                     newHead

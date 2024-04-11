@@ -10,7 +10,6 @@
 use chrono::{DateTime, Utc};
 use event_sourcing::*;
 use kamu_task_system as ts;
-use ts::LogicalPlanOptions;
 
 use crate::*;
 
@@ -59,36 +58,6 @@ impl FlowState {
             FlowStatus::Running
         } else {
             FlowStatus::Waiting
-        }
-    }
-
-    /// Creates task logical plan that corresponds to template
-    pub fn make_task_logical_plan(&self, opts: &LogicalPlanOptions) -> ts::LogicalPlan {
-        match &self.flow_key {
-            FlowKey::Dataset(flow_key) => match flow_key.flow_type {
-                DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
-                    ts::LogicalPlan::UpdateDataset(ts::UpdateDataset {
-                        dataset_id: flow_key.dataset_id.clone(),
-                    })
-                }
-                DatasetFlowType::HardCompacting => {
-                    ts::LogicalPlan::HardCompactDataset(ts::HardCompactDataset {
-                        dataset_id: flow_key.dataset_id.clone(),
-                        max_slice_size: opts.max_slice_size,
-                        max_slice_records: opts.max_slice_records,
-                    })
-                }
-            },
-            FlowKey::System(flow_key) => {
-                match flow_key.flow_type {
-                    // TODO: replace on correct logical plan
-                    SystemFlowType::GC => ts::LogicalPlan::Probe(ts::Probe {
-                        dataset_id: None,
-                        busy_time: Some(std::time::Duration::from_secs(20)),
-                        end_with_outcome: Some(ts::TaskOutcome::Success(ts::TaskResult::Empty)),
-                    }),
-                }
-            }
         }
     }
 

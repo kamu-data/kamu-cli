@@ -19,13 +19,13 @@ pub const DEFAULT_MAX_SLICE_SIZE: u64 = 1_073_741_824;
 pub const DEFAULT_MAX_SLICE_RECORDS: u64 = 10000;
 
 #[async_trait::async_trait]
-pub trait CompactService: Send + Sync {
+pub trait CompactingService: Send + Sync {
     async fn compact_dataset(
         &self,
         dataset_handle: &DatasetHandle,
-        options: CompactOptions,
+        options: CompactingOptions,
         listener: Option<Arc<dyn CompactingMultiListener>>,
-    ) -> Result<CompactResult, CompactError>;
+    ) -> Result<CompactingResult, CompactingError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -33,7 +33,7 @@ pub trait CompactService: Send + Sync {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum CompactError {
+pub enum CompactingError {
     #[error(transparent)]
     DatasetNotFound(
         #[from]
@@ -60,7 +60,7 @@ pub enum CompactError {
     ),
 }
 
-impl From<GetDatasetError> for CompactError {
+impl From<GetDatasetError> for CompactingError {
     fn from(v: GetDatasetError) -> Self {
         match v {
             GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
@@ -69,7 +69,7 @@ impl From<GetDatasetError> for CompactError {
     }
 }
 
-impl From<auth::DatasetActionUnauthorizedError> for CompactError {
+impl From<auth::DatasetActionUnauthorizedError> for CompactingError {
     fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
         match v {
             auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
@@ -78,7 +78,7 @@ impl From<auth::DatasetActionUnauthorizedError> for CompactError {
     }
 }
 
-impl From<GetRefError> for CompactError {
+impl From<GetRefError> for CompactingError {
     fn from(v: GetRefError) -> Self {
         match v {
             GetRefError::NotFound(e) => Self::Internal(e.int_err()),
@@ -88,22 +88,22 @@ impl From<GetRefError> for CompactError {
     }
 }
 
-impl From<IterBlocksError> for CompactError {
+impl From<IterBlocksError> for CompactingError {
     fn from(v: IterBlocksError) -> Self {
         match v {
-            IterBlocksError::Access(e) => CompactError::Access(e),
-            IterBlocksError::Internal(e) => CompactError::Internal(e),
-            _ => CompactError::Internal(v.int_err()),
+            IterBlocksError::Access(e) => CompactingError::Access(e),
+            IterBlocksError::Internal(e) => CompactingError::Internal(e),
+            _ => CompactingError::Internal(v.int_err()),
         }
     }
 }
 
-impl From<SetRefError> for CompactError {
+impl From<SetRefError> for CompactingError {
     fn from(v: SetRefError) -> Self {
         match v {
-            SetRefError::Access(e) => CompactError::Access(e),
-            SetRefError::Internal(e) => CompactError::Internal(e),
-            _ => CompactError::Internal(v.int_err()),
+            SetRefError::Access(e) => CompactingError::Access(e),
+            SetRefError::Internal(e) => CompactingError::Internal(e),
+            _ => CompactingError::Internal(v.int_err()),
         }
     }
 }
@@ -120,8 +120,8 @@ pub struct InvalidDatasetKindError {
 
 pub trait CompactingListener: Send + Sync {
     fn begin(&self) {}
-    fn success(&self, _res: &CompactResult) {}
-    fn error(&self, _err: &CompactError) {}
+    fn success(&self, _res: &CompactingResult) {}
+    fn error(&self, _err: &CompactingError) {}
 
     fn begin_phase(&self, _phase: CompactingPhase) {}
     fn end_phase(&self, _phase: CompactingPhase) {}
@@ -149,7 +149,7 @@ pub enum CompactingPhase {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum CompactResult {
+pub enum CompactingResult {
     NothingToDo,
     Success {
         old_head: Multihash,
@@ -162,12 +162,12 @@ pub enum CompactResult {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct CompactOptions {
+pub struct CompactingOptions {
     pub max_slice_size: Option<u64>,
     pub max_slice_records: Option<u64>,
 }
 
-impl Default for CompactOptions {
+impl Default for CompactingOptions {
     fn default() -> Self {
         Self {
             max_slice_size: Some(DEFAULT_MAX_SLICE_SIZE),

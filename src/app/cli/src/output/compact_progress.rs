@@ -11,11 +11,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use kamu::domain::compact_service::{
-    CompactResult,
+use kamu::domain::{
     CompactingListener,
     CompactingMultiListener,
     CompactingPhase,
+    CompactingResult,
 };
 use opendatafabric::DatasetHandle;
 
@@ -102,14 +102,14 @@ impl CompactingListener for CompactingProgress {
             .set_message(self.spinner_message("Compacting dataset"));
     }
 
-    fn success(&self, res: &CompactResult) {
+    fn success(&self, res: &CompactingResult) {
         match res {
-            CompactResult::NothingToDo => {
+            CompactingResult::NothingToDo => {
                 self.curr_progress.finish_with_message(
                     self.spinner_message(console::style("Dataset was left intact").green()),
                 );
             }
-            CompactResult::Success {
+            CompactingResult::Success {
                 old_head: _,
                 new_head: _,
                 old_num_blocks,

@@ -106,7 +106,7 @@ impl Flow {
             fs::DatasetFlowType::HardCompacting => {
                 FlowDescriptionDataset::HardCompacting(FlowDescriptionDatasetHardCompacting {
                     dataset_id: dataset_key.dataset_id.clone().into(),
-                    compact_result:
+                    compacting_result:
                         FlowDescriptionDatasetHardCompactingResult::from_maybe_flow_outcome(
                             self.flow_state.outcome.as_ref(),
                         ),
@@ -254,7 +254,7 @@ struct FlowDescriptionDatasetExecuteTransform {
 #[derive(SimpleObject)]
 struct FlowDescriptionDatasetHardCompacting {
     dataset_id: DatasetID,
-    compact_result: Option<FlowDescriptionDatasetHardCompactingResult>,
+    compacting_result: Option<FlowDescriptionDatasetHardCompactingResult>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

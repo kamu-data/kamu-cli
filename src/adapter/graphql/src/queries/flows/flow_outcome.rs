@@ -45,7 +45,7 @@ impl From<&kamu_flow_system::FlowOutcome> for FlowOutcome {
                 FlowError::Failed => Self::Failed(FlowFailedError {
                     reason: "FAILED".to_owned(),
                 }),
-                FlowError::RootDatasetWasCompacted(err) => Self::Failed(FlowFailedError {
+                FlowError::RootDatasetCompacted(err) => Self::Failed(FlowFailedError {
                     reason: format!("Root dataset {} was compacted", err.dataset_id),
                 }),
             },

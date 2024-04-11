@@ -100,25 +100,6 @@ pub enum FlowStatus {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// #[derive(Enum, Copy, Clone, Eq, PartialEq)]
-// pub enum FlowOutcome {
-//     Success,
-//     Failed(FlowFailedError),
-//     Aborted,
-// }
-
-// impl From<&kamu_flow_system::FlowOutcome> for FlowOutcome {
-//     fn from(value: &kamu_flow_system::FlowOutcome) -> Self {
-//         match value {
-//             kamu_flow_system::FlowOutcome::Success(_) => Self::Success,
-//             kamu_flow_system::FlowOutcome::Failed(err) => Self::Failed(err),
-//             kamu_flow_system::FlowOutcome::Aborted => Self::Aborted,
-//         }
-//     }
-// }
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
 #[graphql(remote = "kamu_flow_system::DatasetFlowType")]
 pub enum DatasetFlowType {
@@ -134,13 +115,5 @@ pub enum DatasetFlowType {
 pub enum SystemFlowType {
     GC,
 }
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// #[graphql(remote = "kamu_flow_system::FlowFailedError")]
-// pub struct FlowFailedError {
-//     pub reason: String,
-// }
 
 /////////////////////////////////////////////////////////////////////////////////////////
