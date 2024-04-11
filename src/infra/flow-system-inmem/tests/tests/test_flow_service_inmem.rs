@@ -69,8 +69,9 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(10).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    max_slice_size: None,
-                    max_slice_records: None,
+                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                      dataset_id: foo_id.clone()
+                    }),
                 });
                 let foo_task0_handle = foo_task0_driver.run();
 
@@ -80,8 +81,9 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(90).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    max_slice_size: None,
-                    max_slice_records: None,
+                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                      dataset_id: foo_id.clone()
+                    }),
                 });
                 let foo_task1_handle = foo_task1_driver.run();
 
@@ -188,8 +190,9 @@ async fn test_cron_config() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_seconds(6).unwrap(),
                     finish_in_with: Some((Duration::try_seconds(1).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    max_slice_size: None,
-                    max_slice_records: None,
+                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                      dataset_id: foo_id.clone()
+                    }),
                 });
                 let foo_task0_handle = foo_task0_driver.run();
 
@@ -280,8 +283,9 @@ async fn test_manual_trigger() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(10).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    max_slice_size: None,
-                    max_slice_records: None,
+                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                      dataset_id: foo_id.clone()
+                    }),
                 });
                 let task0_handle = task0_driver.run();
 
@@ -291,8 +295,9 @@ async fn test_manual_trigger() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(60).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    max_slice_size: None,
-                    max_slice_records: None,
+                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                      dataset_id: foo_id.clone()
+                    }),
                 });
                 let task1_handle = task1_driver.run();
 
@@ -302,8 +307,9 @@ async fn test_manual_trigger() {
                     dataset_id: Some(bar_id.clone()),
                     run_since_start: Duration::try_milliseconds(100).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    max_slice_size: None,
-                    max_slice_records: None,
+                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                      dataset_id: bar_id.clone()
+                    }),
                 });
                 let task2_handle = task2_driver.run();
 
@@ -463,8 +469,11 @@ async fn test_manual_trigger_compacting() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(10).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    max_slice_size: None,
-                    max_slice_records: None,
+                    expected_logical_plan: LogicalPlan::HardCompactDataset(HardCompactDataset {
+                      dataset_id: foo_id.clone(),
+                      max_slice_size: None,
+                      max_slice_records: None,
+                    }),
                 });
                 let task0_handle = task0_driver.run();
 
@@ -473,8 +482,11 @@ async fn test_manual_trigger_compacting() {
                   dataset_id: Some(bar_id.clone()),
                   run_since_start: Duration::try_milliseconds(60).unwrap(),
                   finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                  max_slice_size: None,
-                  max_slice_records: None,
+                  expected_logical_plan: LogicalPlan::HardCompactDataset(HardCompactDataset {
+                    dataset_id: bar_id.clone(),
+                    max_slice_size: None,
+                    max_slice_records: None,
+                  }),
                 });
                 let task2_handle = task2_driver.run();
 
@@ -596,8 +608,11 @@ async fn test_manual_trigger_compacting_with_config() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(30).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    max_slice_size: Some(max_slice_size),
-                    max_slice_records: Some(max_slice_records),
+                    expected_logical_plan: LogicalPlan::HardCompactDataset(HardCompactDataset {
+                      dataset_id: foo_id.clone(),
+                      max_slice_size: Some(max_slice_size),
+                      max_slice_records: Some(max_slice_records),
+                    }),
                 });
                 let task0_handle = task0_driver.run();
 
@@ -695,8 +710,9 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                max_slice_size: None,
-                max_slice_records: None,
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: foo_id.clone()
+                }),
             });
             let task0_handle = task0_driver.run();
 
@@ -706,8 +722,9 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::try_milliseconds(20).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                max_slice_size: None,
-                max_slice_records: None,
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: bar_id.clone()
+                }),
             });
             let task1_handle = task1_driver.run();
 
@@ -894,8 +911,9 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                max_slice_size: None,
-                max_slice_records: None,
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: foo_id.clone()
+                }),
           });
           let task0_handle = task0_driver.run();
 
@@ -905,8 +923,9 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::try_milliseconds(20).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                max_slice_size: None,
-                max_slice_records: None,
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: bar_id.clone()
+                }),
           });
           let task1_handle = task1_driver.run();
 
@@ -1091,8 +1110,9 @@ async fn test_dataset_deleted() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                max_slice_size: None,
-                max_slice_records: None,
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: foo_id.clone()
+                }),
             });
             let task0_handle = task0_driver.run();
 
@@ -1102,8 +1122,9 @@ async fn test_dataset_deleted() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::try_milliseconds(20).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                max_slice_size: None,
-                max_slice_records: None,
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: bar_id.clone()
+                }),
             });
             let task1_handle = task1_driver.run();
 
@@ -1263,8 +1284,9 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                max_slice_size: None,
-                max_slice_records: None,
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: foo_id.clone()
+                }),
             });
             let task0_handle = task0_driver.run();
 
@@ -1273,9 +1295,10 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 task_id: TaskID::new(1),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::try_milliseconds(20).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Failed)),
-                max_slice_size: None,
-                max_slice_records: None,
+                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Failed(TaskError::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: bar_id.clone()
+                }),
             });
             let task1_handle = task1_driver.run();
 
@@ -1285,8 +1308,9 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 dataset_id: Some(baz_id.clone()),
                 run_since_start: Duration::try_milliseconds(30).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Cancelled)),
-                max_slice_size: None,
-                max_slice_records: None,
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: baz_id.clone()
+                }),
             });
             let task2_handle = task2_driver.run();
 
@@ -1468,8 +1492,9 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                max_slice_size: None,
-                max_slice_records: None,
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: foo_id.clone()
+                }),
             });
             let task0_handle = task0_driver.run();
 
@@ -1485,8 +1510,9 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                     new_head: Multihash::from_digest_sha3_256(b"new-slice"),
                   },
                 })))),
-                max_slice_size: None,
-                max_slice_records: None,
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: bar_id.clone()
+                }),
             });
             let task1_handle = task1_driver.run();
 
@@ -1502,8 +1528,9 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                     new_head: Multihash::from_digest_sha3_256(b"newest-slice"),
                   },
                 })))),
-                max_slice_size: None,
-                max_slice_records: None,
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: foo_id.clone()
+                }),
             });
             let task2_handle = task2_driver.run();
 
@@ -1513,8 +1540,9 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::try_milliseconds(130).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                max_slice_size: None,
-                max_slice_records: None,
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                  dataset_id: bar_id.clone()
+                }),
             });
             let task3_handle = task3_driver.run();
 
@@ -1700,8 +1728,9 @@ async fn test_throttling_manual_triggers() {
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::try_milliseconds(40).unwrap(),
             finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task0_handle = task0_driver.run();
 
@@ -1836,8 +1865,9 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task0_handle = task0_driver.run();
 
@@ -1852,8 +1882,9 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 new_head: Multihash::from_digest_sha3_256(b"fbar-new-slice"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task1_handle = task1_driver.run();
 
@@ -1863,8 +1894,9 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             dataset_id: Some(baz_id.clone()),
             run_since_start: Duration::try_milliseconds(30).unwrap(),
             finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: baz_id.clone()
+            }),
         });
         let task2_handle = task2_driver.run();
 
@@ -1879,8 +1911,9 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                     new_head: Multihash::from_digest_sha3_256(b"foo-newest-slice"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task3_handle = task3_driver.run();
 
@@ -1890,8 +1923,9 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             dataset_id: Some(baz_id.clone()),
             run_since_start: Duration::try_milliseconds(160).unwrap(),
             finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: baz_id.clone()
+            }),
         });
         let task4_handle = task4_driver.run();
 
@@ -1906,8 +1940,9 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-newest-slice"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task5_handle = task5_driver.run();
 
@@ -2274,8 +2309,9 @@ async fn test_batching_condition_records_reached() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task0_handle = task0_driver.run();
 
@@ -2290,8 +2326,9 @@ async fn test_batching_condition_records_reached() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task1_handle = task1_driver.run();
 
@@ -2306,8 +2343,9 @@ async fn test_batching_condition_records_reached() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task2_handle = task2_driver.run();
 
@@ -2322,8 +2360,9 @@ async fn test_batching_condition_records_reached() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task3_handle = task3_driver.run();
 
@@ -2338,8 +2377,9 @@ async fn test_batching_condition_records_reached() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task4_handle = task4_driver.run();
 
@@ -2571,8 +2611,9 @@ async fn test_batching_condition_timeout() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task0_handle = task0_driver.run();
 
@@ -2587,8 +2628,9 @@ async fn test_batching_condition_timeout() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task1_handle = task1_driver.run();
 
@@ -2603,8 +2645,9 @@ async fn test_batching_condition_timeout() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task2_handle = task2_driver.run();
 
@@ -2621,8 +2664,9 @@ async fn test_batching_condition_timeout() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task4_handle = task4_driver.run();
 
@@ -2822,8 +2866,9 @@ async fn test_batching_condition_watermark() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task0_handle = task0_driver.run();
 
@@ -2838,8 +2883,9 @@ async fn test_batching_condition_watermark() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task1_handle = task1_driver.run();
 
@@ -2854,8 +2900,9 @@ async fn test_batching_condition_watermark() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task2_handle = task2_driver.run();
 
@@ -2872,8 +2919,9 @@ async fn test_batching_condition_watermark() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task4_handle = task4_driver.run();
 
@@ -3133,8 +3181,9 @@ async fn test_batching_condition_with_2_inputs() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task0_handle = task0_driver.run();
 
@@ -3149,8 +3198,9 @@ async fn test_batching_condition_with_2_inputs() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task1_handle = task1_driver.run();
 
@@ -3165,8 +3215,9 @@ async fn test_batching_condition_with_2_inputs() {
                 new_head: Multihash::from_digest_sha3_256(b"baz-new-slice"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: baz_id.clone()
+            }),
         });
         let task2_handle = task2_driver.run();
 
@@ -3181,8 +3232,9 @@ async fn test_batching_condition_with_2_inputs() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task3_handle = task3_driver.run();
 
@@ -3197,8 +3249,9 @@ async fn test_batching_condition_with_2_inputs() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: bar_id.clone()
+            }),
         });
         let task4_handle = task4_driver.run();
 
@@ -3213,8 +3266,9 @@ async fn test_batching_condition_with_2_inputs() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: foo_id.clone()
+            }),
         });
         let task5_handle = task5_driver.run();
 
@@ -3229,8 +3283,9 @@ async fn test_batching_condition_with_2_inputs() {
                 new_head: Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
                 },
             })))),
-            max_slice_size: None,
-            max_slice_records: None,
+            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+              dataset_id: baz_id.clone()
+            }),
         });
         let task6_handle = task6_driver.run();
 

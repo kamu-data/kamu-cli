@@ -486,12 +486,16 @@ impl FlowServiceInMemory {
         // for now count overall number
         let mut accumulated_records_count = 0;
         let mut watermark_modified = false;
+        let mut is_compacted = false;
 
         // Scan each accumulated trigger to decide
         for trigger in &flow.triggers {
             if let FlowTrigger::InputDatasetFlow(trigger) = trigger {
                 match &trigger.flow_result {
-                    FlowResult::Empty | FlowResult::DatasetCompact(_) => {}
+                    FlowResult::Empty => {}
+                    FlowResult::DatasetCompact(_) => {
+                        is_compacted = true;
+                    }
                     FlowResult::DatasetUpdate(update) => {
                         // Compute increment since the first trigger by this dataset.
                         // Note: there might have been multiple updates since that time.
@@ -542,7 +546,7 @@ impl FlowServiceInMemory {
 
         //  If we accumulated at least something (records or watermarks),
         //   the upper bound of potential finish time for batching is known
-        if accumulated_something {
+        if accumulated_something || is_compacted {
             // Finish immediately if satisfied, or not later than the deadline
             let batching_finish_time = if satisfied {
                 evaluation_time
@@ -663,8 +667,8 @@ impl FlowServiceInMemory {
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
-        let logical_plan_opts = self.get_logical_plan_options(&flow.flow_key).await;
-        let logical_plan = flow.make_task_logical_plan(logical_plan_opts);
+        let logical_plan_opts = self.get_logical_plan_options(&flow.flow_key);
+        let logical_plan = flow.make_task_logical_plan(&logical_plan_opts);
 
         let task = self
             .task_scheduler
@@ -720,7 +724,7 @@ impl FlowServiceInMemory {
         Ok(())
     }
 
-    async fn get_logical_plan_options(&self, flow_key: &FlowKey) -> LogicalPlanOptions {
+    fn get_logical_plan_options(&self, flow_key: &FlowKey) -> LogicalPlanOptions {
         let mut logical_plan_opts = LogicalPlanOptions::default();
         if let FlowKey::Dataset(dataset_flow) = flow_key {
             let maybe_compacting_rule = self
@@ -740,6 +744,25 @@ impl FlowServiceInMemory {
             };
         }
         logical_plan_opts
+    }
+
+    fn get_task_outcome(&self, flow: &Flow, task_outcome: TaskOutcome) -> TaskOutcome {
+        if let TaskOutcome::Failed(task_error) = &task_outcome {
+            if task_error == &TaskError::Empty {
+                for trigger in &flow.triggers {
+                    if let FlowTrigger::InputDatasetFlow(trigger) = trigger {
+                        if let FlowResult::DatasetCompact(_) = &trigger.flow_result {
+                            return TaskOutcome::Failed(TaskError::RootDatasetWasCompacted(
+                                RootDatasetWasCompactedError {
+                                    dataset_id: trigger.dataset_id.clone(),
+                                },
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        task_outcome
     }
 }
 
@@ -1067,7 +1090,8 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
             let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
                 .await
                 .int_err()?;
-            flow.on_task_finished(event.event_time, event.task_id, event.outcome.clone())
+            let event_outcome = self.get_task_outcome(&flow, event.outcome.clone());
+            flow.on_task_finished(event.event_time, event.task_id, event_outcome.clone())
                 .int_err()?;
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
@@ -1098,7 +1122,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
 
             // In case of success:
             //  - enqueue next auto-polling flow cycle
-            if event.outcome.is_success() {
+            if event_outcome.is_success() {
                 self.try_enqueue_scheduled_auto_polling_flow_if_enabled(
                     finish_time,
                     &flow.flow_key,

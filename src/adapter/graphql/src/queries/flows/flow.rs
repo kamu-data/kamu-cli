@@ -12,7 +12,7 @@ use futures::TryStreamExt;
 use kamu_core::{DatasetChangesService, PollingIngestService};
 use {kamu_flow_system as fs, kamu_task_system as ts, opendatafabric as odf};
 
-use super::{FlowEvent, FlowStartCondition, FlowTrigger};
+use super::{FlowEvent, FlowOutcome, FlowStartCondition, FlowTrigger};
 use crate::prelude::*;
 use crate::queries::{Account, Task};
 

@@ -9,6 +9,7 @@
 
 use kamu_core::compact_service::CompactResult;
 use kamu_core::PullResult;
+use opendatafabric::DatasetID;
 use serde::{Deserialize, Serialize};
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -30,7 +31,7 @@ pub enum TaskOutcome {
     /// Task succeeded
     Success(TaskResult),
     /// Task failed to complete
-    Failed,
+    Failed(TaskError),
     /// Task was cancelled by a user
     Cancelled,
     // /// Task was dropped in favor of another task
@@ -74,6 +75,19 @@ impl From<CompactResult> for TaskCompactDatasetResult {
             compact_result: value,
         }
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TaskError {
+    Empty,
+    RootDatasetWasCompacted(RootDatasetWasCompactedError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RootDatasetWasCompactedError {
+    pub dataset_id: DatasetID,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -366,7 +366,9 @@ async fn test_trigger_ingest_root_dataset() {
                                             },
                                         },
                                         "status": "FINISHED",
-                                        "outcome": "SUCCESS",
+                                        "outcome": {
+                                            "message": "SUCCESS",
+                                        },
                                         "timing": {
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -376,7 +378,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             {
                                                 "taskId": "0",
                                                 "status": "FINISHED",
-                                                "outcome": "SUCCESS",
+                                                "outcome": "SUCCESS"
                                             }
                                         ],
                                         "initiator": {
@@ -582,7 +584,9 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             },
                                         },
                                         "status": "FINISHED",
-                                        "outcome": "SUCCESS",
+                                        "outcome": {
+                                            "message": "SUCCESS"
+                                        },
                                         "timing": {
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -935,7 +939,9 @@ async fn test_trigger_compact_root_dataset() {
                                             },
                                         },
                                         "status": "FINISHED",
-                                        "outcome": "SUCCESS",
+                                        "outcome": {
+                                            "message": "SUCCESS"
+                                        },
                                         "timing": {
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -1632,7 +1638,9 @@ async fn test_cancel_ingest_root_dataset() {
                                     "__typename": "Flow",
                                     "flowId": flow_id,
                                     "status": "FINISHED",
-                                    "outcome": "ABORTED"
+                                    "outcome": {
+                                        "message": "ABORTED"
+                                    },
                                 }
                             }
                         }
@@ -1703,7 +1711,9 @@ async fn test_cancel_running_transform_derived_dataset() {
                                     "__typename": "Flow",
                                     "flowId": flow_id,
                                     "status": "FINISHED",
-                                    "outcome": "ABORTED"
+                                    "outcome": {
+                                        "message": "ABORTED"
+                                    },
                                 }
                             }
                         }
@@ -1769,7 +1779,9 @@ async fn test_cancel_hard_compacting_root_dataset() {
                                     "__typename": "Flow",
                                     "flowId": flow_id,
                                     "status": "FINISHED",
-                                    "outcome": "ABORTED"
+                                    "outcome": {
+                                        "message": "ABORTED"
+                                    },
                                 }
                             }
                         }
@@ -1939,7 +1951,9 @@ async fn test_cancel_waiting_flow() {
                                     "__typename": "Flow",
                                     "flowId": flow_id,
                                     "status": "FINISHED",
-                                    "outcome": "ABORTED"
+                                    "outcome": {
+                                        "message": "ABORTED"
+                                    },
                                 }
                             }
                         }
@@ -2018,7 +2032,9 @@ async fn test_cancel_already_aborted_flow() {
                                     "__typename": "Flow",
                                     "flowId": flow_id,
                                     "status": "FINISHED",
-                                    "outcome": "ABORTED"
+                                    "outcome": {
+                                        "message": "ABORTED"
+                                    },
                                 }
                             }
                         }
@@ -2091,7 +2107,9 @@ async fn test_cancel_already_succeeded_flow() {
                                     "__typename": "Flow",
                                     "flowId": flow_id,
                                     "status": "FINISHED",
-                                    "outcome": "SUCCESS"
+                                    "outcome": {
+                                        "message": "SUCCESS"
+                                    },
                                 }
                             }
                         }
@@ -2521,7 +2539,17 @@ impl FlowRunsHarness {
                                             }
                                         }
                                         status
-                                        outcome
+                                        outcome {
+                                            ...on FlowSuccessResult {
+                                                message
+                                            }
+                                            ...on FlowAbortedResult {
+                                                message
+                                            }
+                                            ...on FlowFailedError {
+                                                reason
+                                            }
+                                        }
                                         timing {
                                             awaitingExecutorSince
                                             runningSince
@@ -2666,7 +2694,17 @@ impl FlowRunsHarness {
                                             __typename
                                             flowId
                                             status
-                                            outcome
+                                            outcome {
+                                                ...on FlowSuccessResult {
+                                                    message
+                                                }
+                                                ...on FlowAbortedResult {
+                                                    message
+                                                }
+                                                ...on FlowFailedError {
+                                                    reason
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -2699,7 +2737,17 @@ impl FlowRunsHarness {
                                             __typename
                                             flowId
                                             status
-                                            outcome
+                                            outcome {
+                                                ...on FlowSuccessResult {
+                                                    message
+                                                }
+                                                ...on FlowAbortedResult {
+                                                    message
+                                                }
+                                                ...on FlowFailedError {
+                                                    reason
+                                                }
+                                            }
                                         }
                                     }
                                 }

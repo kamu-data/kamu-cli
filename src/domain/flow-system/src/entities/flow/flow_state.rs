@@ -63,7 +63,7 @@ impl FlowState {
     }
 
     /// Creates task logical plan that corresponds to template
-    pub fn make_task_logical_plan(&self, opts: LogicalPlanOptions) -> ts::LogicalPlan {
+    pub fn make_task_logical_plan(&self, opts: &LogicalPlanOptions) -> ts::LogicalPlan {
         match &self.flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
                 DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
@@ -229,8 +229,8 @@ impl Projection for FlowState {
                                     ..s
                                 }),
                                 // TODO: support retries
-                                ts::TaskOutcome::Failed => Ok(FlowState {
-                                    outcome: Some(FlowOutcome::Failed),
+                                ts::TaskOutcome::Failed(task_error) => Ok(FlowState {
+                                    outcome: Some(FlowOutcome::Failed(task_error.into())),
                                     ..s
                                 }),
                             }

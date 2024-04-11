@@ -140,7 +140,7 @@ type CommitResultSuccess implements CommitResult & UpdateReadmeResult {
 	message: String!
 }
 
-input CompactionConditionInput {
+input CompactingConditionInput {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
 }
@@ -373,7 +373,7 @@ type DatasetFlowConfigs {
 type DatasetFlowConfigsMut {
 	setConfigSchedule(datasetFlowType: DatasetFlowType!, paused: Boolean!, schedule: ScheduleInput!): SetFlowConfigResult!
 	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, batching: BatchingConditionInput!): SetFlowConfigResult!
-	setConfigCompaction(datasetFlowType: DatasetFlowType!, paused: Boolean!, compactionArgs: CompactionConditionInput!): SetFlowConfigResult!
+	setConfigCompacting(datasetFlowType: DatasetFlowType!, paused: Boolean!, compactingArgs: CompactingConditionInput!): SetFlowConfigResult!
 	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
 	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
 }
@@ -397,7 +397,7 @@ type DatasetFlowRunsMut {
 enum DatasetFlowType {
 	INGEST
 	EXECUTE_TRANSFORM
-	HARD_COMPACTION
+	HARD_COMPACTING
 }
 
 type DatasetFlows {
@@ -713,6 +713,10 @@ type Flow {
 	startCondition: FlowStartCondition
 }
 
+type FlowAbortedResult {
+	message: String!
+}
+
 type FlowConfiguration {
 	paused: Boolean!
 	schedule: FlowConfigurationSchedule
@@ -748,19 +752,19 @@ type FlowConnection {
 	edges: [FlowEdge!]!
 }
 
-union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionSystemGC
+union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompacting | FlowDescriptionSystemGC
 
 type FlowDescriptionDatasetExecuteTransform {
 	datasetId: DatasetID!
 	transformResult: FlowDescriptionUpdateResult
 }
 
-type FlowDescriptionDatasetHardCompaction {
+type FlowDescriptionDatasetHardCompacting {
 	datasetId: DatasetID!
-	compactResult: FlowDescriptionDatasetHardCompactionResult
+	compactResult: FlowDescriptionDatasetHardCompactingResult
 }
 
-type FlowDescriptionDatasetHardCompactionResult {
+type FlowDescriptionDatasetHardCompactingResult {
 	originalBlocksCount: Int!
 	resultingBlocksCount: Int!
 	newHead: Multihash!
@@ -828,6 +832,10 @@ type FlowEventTriggerAdded implements FlowEvent {
 	trigger: FlowTrigger!
 }
 
+type FlowFailedError {
+	reason: String!
+}
+
 scalar FlowID
 
 type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowResult {
@@ -841,7 +849,7 @@ type FlowInvalidBatchingConfig implements SetFlowConfigResult {
 	message: String!
 }
 
-type FlowInvalidCompactionConfig implements SetFlowConfigResult {
+type FlowInvalidCompactingConfig implements SetFlowConfigResult {
 	reason: String!
 	message: String!
 }
@@ -851,11 +859,7 @@ type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
 	message: String!
 }
 
-enum FlowOutcome {
-	SUCCESS
-	FAILED
-	ABORTED
-}
+union FlowOutcome = FlowSuccessResult | FlowFailedError | FlowAbortedResult
 
 type FlowPreconditionsNotMet implements SetFlowConfigResult & TriggerFlowResult {
 	preconditions: String!
@@ -889,6 +893,10 @@ enum FlowStatus {
 	WAITING
 	RUNNING
 	FINISHED
+}
+
+type FlowSuccessResult {
+	message: String!
 }
 
 type FlowTimingRecords {

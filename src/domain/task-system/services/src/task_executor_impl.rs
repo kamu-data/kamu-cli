@@ -102,7 +102,7 @@ impl TaskExecutor for TaskExecutorImpl {
                         Ok(pull_result) => TaskOutcome::Success(TaskResult::UpdateDatasetResult(
                             pull_result.into(),
                         )),
-                        Err(_) => TaskOutcome::Failed,
+                        Err(_) => TaskOutcome::Failed(TaskError::Empty),
                     }
                 }
                 LogicalPlan::Probe(Probe {
@@ -144,7 +144,7 @@ impl TaskExecutor for TaskExecutorImpl {
                         Ok(result) => {
                             TaskOutcome::Success(TaskResult::CompactDatasetResult(result.into()))
                         }
-                        Err(_) => TaskOutcome::Failed,
+                        Err(_) => TaskOutcome::Failed(TaskError::Empty),
                     }
                 }
             };
