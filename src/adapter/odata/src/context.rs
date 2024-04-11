@@ -22,7 +22,7 @@ use axum::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::dataframe::DataFrame;
-use datafusion_odata::collection::QueryParams;
+use datafusion_odata::collection::{CollectionAddr, QueryParams};
 use datafusion_odata::context::{CollectionContext, OnUnsupported, ServiceContext};
 use dill::Catalog;
 use kamu_core::*;
@@ -33,6 +33,7 @@ use opendatafabric::*;
 // TODO: Externalize config
 const DEFAULT_RECORDS_PER_PAGE: usize = 100;
 const MAX_RECORDS_PER_PAGE: usize = usize::MAX;
+const KEY_COLUMN_ALIAS: &str = "__id__";
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -84,6 +85,10 @@ impl ServiceContext for ODataServiceContext {
 
             collections.push(Arc::new(ODataCollectionContext {
                 catalog: self.catalog.clone(),
+                addr: CollectionAddr {
+                    name: dataset_handle.alias.dataset_name.to_string(),
+                    key: None,
+                },
                 dataset_handle,
                 dataset,
                 service_base_url: self.service_base_url.clone(),
@@ -102,6 +107,7 @@ impl ServiceContext for ODataServiceContext {
 
 pub(crate) struct ODataCollectionContext {
     catalog: Catalog,
+    addr: CollectionAddr,
     dataset_handle: DatasetHandle,
     dataset: Arc<dyn Dataset>,
     service_base_url: String,
@@ -110,6 +116,7 @@ pub(crate) struct ODataCollectionContext {
 impl ODataCollectionContext {
     pub(crate) fn new(
         catalog: Catalog,
+        addr: CollectionAddr,
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
     ) -> Self {
@@ -118,6 +125,7 @@ impl ODataCollectionContext {
 
         Self {
             catalog,
+            addr,
             dataset_handle,
             dataset,
             service_base_url,
@@ -127,6 +135,10 @@ impl ODataCollectionContext {
 
 #[async_trait]
 impl CollectionContext for ODataCollectionContext {
+    fn addr(&self) -> &CollectionAddr {
+        &self.addr
+    }
+
     fn service_base_url(&self) -> String {
         self.service_base_url.clone()
     }
@@ -141,21 +153,6 @@ impl CollectionContext for ODataCollectionContext {
 
     fn collection_name(&self) -> String {
         self.dataset_handle.alias.dataset_name.to_string()
-    }
-
-    async fn collection_key(&self) -> String {
-        let vocab = self
-            .dataset
-            .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(_, b)| b.event.into_variant::<SetVocab>())
-            .try_first()
-            .await
-            .int_err()
-            .unwrap();
-
-        let vocab: DatasetVocabulary = vocab.unwrap_or_default().into();
-        vocab.offset_column
     }
 
     async fn last_updated_time(&self) -> DateTime<Utc> {
@@ -199,6 +196,22 @@ impl CollectionContext for ODataCollectionContext {
     }
 
     async fn query(&self, query: QueryParams) -> datafusion::error::Result<DataFrame> {
+        // TODO: Convert into config value
+        let default_records_per_page: usize = std::env::var("KAMU_ODATA_DEFAULT_RECORDS_PER_PAGE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(DEFAULT_RECORDS_PER_PAGE);
+
+        let vocab: DatasetVocabulary = self
+            .dataset
+            .as_metadata_chain()
+            .accept_one(SearchSetVocabVisitor::new())
+            .await
+            .map_err(|e| datafusion::error::DataFusionError::External(e.into()))?
+            .into_event()
+            .map(Into::into)
+            .unwrap_or_default();
+
         let query_svc: Arc<dyn QueryService> = self.catalog.get_one().unwrap();
 
         let df = query_svc
@@ -206,7 +219,14 @@ impl CollectionContext for ODataCollectionContext {
             .await
             .unwrap();
 
-        query.apply(df, DEFAULT_RECORDS_PER_PAGE, MAX_RECORDS_PER_PAGE)
+        query.apply(
+            df,
+            &self.addr,
+            &vocab.offset_column,
+            KEY_COLUMN_ALIAS,
+            default_records_per_page,
+            MAX_RECORDS_PER_PAGE,
+        )
     }
 
     fn on_unsupported_feature(&self) -> OnUnsupported {

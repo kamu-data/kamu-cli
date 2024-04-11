@@ -18,7 +18,7 @@
 
 use std::sync::Arc;
 
-use datafusion_odata::collection::QueryParamsRaw;
+use datafusion_odata::collection::{CollectionAddr, QueryParamsRaw};
 use dill::Catalog;
 use kamu_core::*;
 use opendatafabric::*;
@@ -62,23 +62,24 @@ pub async fn odata_metadata_handler_mt(
 
 pub async fn odata_collection_handler_st(
     catalog: axum::extract::Extension<Catalog>,
-    axum::extract::Path(dataset_name): axum::extract::Path<DatasetName>,
+    axum::extract::Path(collection_addr): axum::extract::Path<String>,
     headers: axum::http::HeaderMap,
     query: axum::extract::Query<QueryParamsRaw>,
 ) -> axum::response::Response<String> {
-    odata_collection_handler_common(catalog, None, dataset_name, headers, query).await
+    odata_collection_handler_common(catalog, None, collection_addr, headers, query).await
 }
 
 pub async fn odata_collection_handler_mt(
     catalog: axum::extract::Extension<Catalog>,
-    axum::extract::Path((account_name, dataset_name)): axum::extract::Path<(
+    axum::extract::Path((account_name, collection_addr)): axum::extract::Path<(
         AccountName,
-        DatasetName,
+        String,
     )>,
     headers: axum::http::HeaderMap,
     query: axum::extract::Query<QueryParamsRaw>,
 ) -> axum::response::Response<String> {
-    odata_collection_handler_common(catalog, Some(account_name), dataset_name, headers, query).await
+    odata_collection_handler_common(catalog, Some(account_name), collection_addr, headers, query)
+        .await
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -108,10 +109,24 @@ pub async fn odata_metadata_handler_common(
 pub async fn odata_collection_handler_common(
     axum::extract::Extension(catalog): axum::extract::Extension<Catalog>,
     account_name: Option<AccountName>,
-    dataset_name: DatasetName,
+    collection_addr: String,
     headers: axum::http::HeaderMap,
     query: axum::extract::Query<QueryParamsRaw>,
 ) -> axum::response::Response<String> {
+    let Some(addr) = CollectionAddr::decode(&collection_addr) else {
+        return axum::response::Response::builder()
+            .status(http::StatusCode::NOT_FOUND)
+            .body(Default::default())
+            .unwrap();
+    };
+
+    let Ok(dataset_name) = DatasetName::try_from(&addr.name) else {
+        return axum::response::Response::builder()
+            .status(http::StatusCode::NOT_FOUND)
+            .body(Default::default())
+            .unwrap();
+    };
+
     let repo: Arc<dyn DatasetRepository> = catalog.get_one().unwrap();
 
     let dataset_handle = match repo
@@ -134,7 +149,7 @@ pub async fn odata_collection_handler_common(
         .await
         .unwrap();
 
-    let ctx = ODataCollectionContext::new(catalog, dataset_handle, dataset);
+    let ctx = ODataCollectionContext::new(catalog, addr, dataset_handle, dataset);
     datafusion_odata::handlers::odata_collection_handler(
         axum::Extension(Arc::new(ctx)),
         query,

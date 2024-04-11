@@ -4,9 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.173.0] - 2024-04-09
+### Added
+- OData API now supports querying by collection ID/key (e.g. `account/covid.cases(123)`)
 ### Fixed
-- Handle broken pipe panic
+- Handle broken pipe panic when process piping data into `kamu` exits with an error
+- GraphQL Dataset Endpoints object: tenant-insensitive paths & updated REST API push endpoint
 
 ## [0.172.1] - 2024-04-08
 ### Fixed
@@ -15,9 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.172.0] - 2024-04-08
 ### Added
-- Added persistency infrastructure prototype based on `sqlx` engine:
-   - supports Postgres, MySQL/MariaDB, SQlite database targets
-   - sketched simplictic Accounts domain (not-integrated yet)
+- Added persistence infrastructure prototype based on `sqlx` engine:
+   - supports Postgres, MySQL/MariaDB, SQLite database targets
+   - sketched simplistic Accounts domain (not-integrated yet)
    - converted Task System domain to use persistent repositories
    - added test infrastructure for database-specific features
    - automated and documented development flow procedures in database offline/online modes
