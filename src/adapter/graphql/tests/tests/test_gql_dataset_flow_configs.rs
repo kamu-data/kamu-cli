@@ -641,7 +641,6 @@ async fn test_crud_compacting_root_dataset() {
     let mutation_code = FlowConfigHarness::set_config_compacting_mutation(
         &create_result.dataset_handle.id,
         "HARD_COMPACTING",
-        false,
         1_000_000,
         10000,
     );
@@ -666,7 +665,7 @@ async fn test_crud_compacting_root_dataset() {
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
-                                    "paused": false,
+                                    "paused": true,
                                     "schedule": null,
                                     "batching": null,
                                     "compacting": {
@@ -776,7 +775,6 @@ async fn test_compacting_config_validation() {
         let mutation_code = FlowConfigHarness::set_config_compacting_mutation(
             &create_derived_result.dataset_handle.id,
             "HARD_COMPACTING",
-            false,
             test_case.0,
             test_case.1,
         );
@@ -1305,7 +1303,6 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
     let mutation_code = FlowConfigHarness::set_config_compacting_mutation(
         &create_derived_result.dataset_handle.id,
         "HARD_COMPACTING",
-        false,
         1000,
         1000,
     );
@@ -1756,7 +1753,6 @@ impl FlowConfigHarness {
     fn set_config_compacting_mutation(
         id: &DatasetID,
         dataset_flow_type: &str,
-        paused: bool,
         max_slice_size: u64,
         max_slice_records: u64,
     ) -> String {
@@ -1769,7 +1765,6 @@ impl FlowConfigHarness {
                             configs {
                                 setConfigCompacting (
                                     datasetFlowType: "<dataset_flow_type>",
-                                    paused: <paused>,
                                     compactingArgs: {
                                         maxSliceSize: <maxSliceSize>,
                                         maxSliceRecords: <maxSliceRecords>
@@ -1808,7 +1803,6 @@ impl FlowConfigHarness {
         )
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
-        .replace("<paused>", if paused { "true" } else { "false" })
         .replace("<maxSliceRecords>", &max_slice_records.to_string())
         .replace("<maxSliceSize>", &max_slice_size.to_string())
     }
