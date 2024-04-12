@@ -47,7 +47,7 @@ thiserror = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false, features = [] }
 tokio-stream = "0.1"
 tokio-util = { version = "0.7", default-features = false, features = ["codec", "compat", "io"] }
-tokio-tungstenite = "0.20"
+tokio-tungstenite = { version = "0.20", features = ["rustls-tls-native-roots"] }
 tower = "0.4"
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
