@@ -457,6 +457,15 @@ impl WsSmartTransferProtocolClient {
                 PushClientError::ReadFailed(PushReadError::new(e, PushPhase::CompleteRequest))
             })
     }
+
+    fn generate_ws_url(http_base_url: &Url, additional_path_segment: &str) -> Url {
+        let mut url = http_base_url.join(additional_path_segment).unwrap();
+        let new_scheme = if url.scheme() == "https" { "wss" } else { "ws" };
+
+        assert!(url.set_scheme(new_scheme).is_ok());
+
+        url
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -476,10 +485,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         let maybe_access_token = self
             .dataset_credential_resolver
             .resolve_odf_dataset_access_token(http_src_url);
-
-        let mut pull_url = http_src_url.join("pull").unwrap();
-        let pull_url_res = pull_url.set_scheme("ws");
-        assert!(pull_url_res.is_ok());
+        let pull_url = Self::generate_ws_url(http_src_url, "pull");
 
         tracing::debug!(
             %pull_url, access_token = ?maybe_access_token,
@@ -677,10 +683,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         let maybe_access_token = self
             .dataset_credential_resolver
             .resolve_odf_dataset_access_token(http_dst_url);
-
-        let mut push_url = http_dst_url.join("push").unwrap();
-        let push_url_res = push_url.set_scheme("ws");
-        assert!(push_url_res.is_ok());
+        let push_url = Self::generate_ws_url(http_dst_url, "push");
 
         tracing::debug!(
             %push_url, access_token = ?maybe_access_token,
