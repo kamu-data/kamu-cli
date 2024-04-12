@@ -167,7 +167,6 @@ impl DatasetFlowConfigsMut {
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
-        paused: bool,
         compacting_args: CompactingConditionInput,
     ) -> Result<SetFlowConfigResult> {
         if !ensure_set_config_flow_supported(
@@ -206,7 +205,7 @@ impl DatasetFlowConfigsMut {
                 Utc::now(),
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
-                paused,
+                true,
                 FlowConfigurationRule::CompactingRule(compacting_rule),
             )
             .await

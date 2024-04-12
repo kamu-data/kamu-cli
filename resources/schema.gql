@@ -373,7 +373,7 @@ type DatasetFlowConfigs {
 type DatasetFlowConfigsMut {
 	setConfigSchedule(datasetFlowType: DatasetFlowType!, paused: Boolean!, schedule: ScheduleInput!): SetFlowConfigResult!
 	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, batching: BatchingConditionInput!): SetFlowConfigResult!
-	setConfigCompacting(datasetFlowType: DatasetFlowType!, paused: Boolean!, compactingArgs: CompactingConditionInput!): SetFlowConfigResult!
+	setConfigCompacting(datasetFlowType: DatasetFlowType!, compactingArgs: CompactingConditionInput!): SetFlowConfigResult!
 	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
 	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
 }
