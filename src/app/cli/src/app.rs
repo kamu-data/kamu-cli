@@ -153,7 +153,7 @@ pub async fn run(
                 "Command failed",
             );
 
-            if output_config.is_tty && output_config.verbosity_level == 0 {
+            if output_config.verbosity_level == 0 {
                 eprintln!("{}", err.pretty(false));
             }
         }
