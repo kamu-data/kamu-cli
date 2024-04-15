@@ -28,6 +28,7 @@ pub struct EngineProvisionerLocal {
     spark_engine: Arc<dyn Engine>,
     flink_engine: Arc<dyn Engine>,
     datafusion_engine: Arc<dyn Engine>,
+    risingwave_engine: Arc<dyn Engine>,
     container_runtime: Arc<ContainerRuntime>,
     inner: Arc<Inner>,
 }
@@ -78,6 +79,13 @@ impl EngineProvisionerLocal {
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.datafusion_image,
+                run_info_dir.clone(),
+                dataset_repo.clone(),
+            )),
+            risingwave_engine: Arc::new(ODFEngine::new(
+                container_runtime.clone(),
+                engine_config.clone(),
+                &config.risingwave_image,
                 run_info_dir.clone(),
                 dataset_repo.clone(),
             )),
@@ -201,6 +209,10 @@ impl EngineProvisioner for EngineProvisionerLocal {
                 self.datafusion_engine.clone(),
                 &self.config.datafusion_image,
             )),
+            "risingwave" => Ok((
+                self.risingwave_engine.clone(),
+                &self.config.risingwave_image,
+            )),
             _ => Err(format!("Unsupported engine {engine_id}").int_err()),
         }?;
 
@@ -231,6 +243,7 @@ pub struct EngineProvisionerLocalConfig {
     pub spark_image: String,
     pub flink_image: String,
     pub datafusion_image: String,
+    pub risingwave_image: String,
 }
 
 // This is for tests only
@@ -243,6 +256,7 @@ impl Default for EngineProvisionerLocalConfig {
             spark_image: docker_images::SPARK.to_owned(),
             flink_image: docker_images::FLINK.to_owned(),
             datafusion_image: docker_images::DATAFUSION.to_owned(),
+            risingwave_image: docker_images::RISINGWAVE.to_owned(),
         }
     }
 }

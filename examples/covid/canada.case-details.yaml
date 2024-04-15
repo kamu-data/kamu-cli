@@ -15,39 +15,39 @@ content:
       # Transformation that will be applied to produce new data
       transform:
         kind: Sql
-        engine: spark
+        engine: datafusion
         query: |
-          SELECT
-            "AB" as province,
+          select
+            'AB' as province,
             id,
             reported_date,
             gender,
             location
-            FROM `covid19.alberta.case-details.hm`
-          UNION ALL
-          SELECT
-            "BC" as province,
+            from "covid19.alberta.case-details.hm"
+          union all
+          select
+            'BC' as province,
             id,
             reported_date,
             gender,
             location
-            FROM `covid19.british-columbia.case-details.hm`
-          UNION ALL
-          SELECT
-            "ON" as province,
+            from "covid19.british-columbia.case-details.hm"
+          union all
+          select
+            'ON' as province,
             id,
             reported_date,
             gender,
             location
-            FROM `covid19.ontario.case-details.hm`
-          UNION ALL
-          SELECT
-            "QC" as province,
+            from "covid19.ontario.case-details.hm"
+          union all
+          select
+            'QC' as province,
             id,
             reported_date,
             gender,
             location
-            FROM `covid19.quebec.case-details.hm`
+            from "covid19.quebec.case-details.hm"
     - kind: SetVocab
       eventTimeColumn: reported_date
     - kind: SetInfo

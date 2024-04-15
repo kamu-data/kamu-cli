@@ -49,6 +49,7 @@ impl Command for PullImagesCommand {
             self.engine_config.spark_image.as_str(),
             self.engine_config.flink_image.as_str(),
             self.engine_config.datafusion_image.as_str(),
+            self.engine_config.risingwave_image.as_str(),
             self.jupyter_config.image.as_ref().unwrap().as_str(),
             self.jupyter_config.livy_image.as_ref().unwrap().as_str(),
         ];

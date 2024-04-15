@@ -28,7 +28,7 @@ content:
         engine: datafusion
         query: |
           SELECT
-            "Row_ID" as id,
+            cast("Row_ID" as bigint) as id,
             to_timestamp(coalesce("Case_Reported_Date", "Test_Reported_Date")) as case_reported_date,
             case
               when "Test_Reported_Date" != '' then to_timestamp("Test_Reported_Date")

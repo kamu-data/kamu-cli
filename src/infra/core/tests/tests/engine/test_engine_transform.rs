@@ -207,7 +207,9 @@ impl DatasetHelper {
     }
 }
 
-async fn test_transform_common(transform: Transform) {
+// TODO: Remove `test_retractions` flag once RisingWave can handle them without
+// crashing
+async fn test_transform_common(transform: Transform, test_retractions: bool) {
     let tempdir = tempfile::tempdir().unwrap();
     let run_info_dir = tempdir.path().join("run");
     let cache_dir = tempdir.path().join("cache");
@@ -388,6 +390,10 @@ async fn test_transform_common(transform: Transform) {
     // Round 2
     ///////////////////////////////////////////////////////////////////////////
 
+    if !test_retractions {
+        return;
+    }
+
     std::fs::write(
         &src_path,
         indoc!(
@@ -503,6 +509,7 @@ async fn test_transform_with_engine_spark() {
                 FROM root",
             )
             .build(),
+        true,
     )
     .await;
 }
@@ -524,6 +531,7 @@ async fn test_transform_with_engine_flink() {
                 FROM root",
             )
             .build(),
+        true,
     )
     .await;
 }
@@ -543,6 +551,28 @@ async fn test_transform_with_engine_datafusion() {
                 FROM root",
             )
             .build(),
+        true,
+    )
+    .await;
+}
+
+// See: https://github.com/kamu-data/kamu-cli/issues/599
+#[test_group::group(containerized, engine, transform, risingwave)]
+#[ignore = "#599 Disabled for disk space issues reason"]
+#[test_log::test(tokio::test)]
+async fn test_transform_with_engine_risingwave() {
+    test_transform_common(
+        MetadataFactory::transform()
+            .engine("risingwave")
+            .query(
+                "SELECT
+                    event_time,
+                    city,
+                    cast(population * 10 as int) as population_x10
+                FROM root",
+            )
+            .build(),
+        false, // TODO: RW should does not support retractions at all
     )
     .await;
 }
@@ -573,6 +603,11 @@ fn normalize_schema(s: &DFSchema, engine: &str) -> DFSchema {
                     // - produces optional `event_time`
                     "flink" => match f.name().as_str() {
                         "event_time" => f.clone().with_nullable(false),
+                        _ => f.clone(),
+                    },
+                    // RisingWave has no control over nulability
+                    "risingwave" => match f.name().as_str() {
+                        "offset" | "event_time" => f.clone().with_nullable(false),
                         _ => f.clone(),
                     },
                     _ => unreachable!(),

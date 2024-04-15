@@ -31,16 +31,14 @@ content:
           - province STRING
           - province_abbr STRING
           - hr_uid INT
-      # Using Spark engine to convert a tricky date time string into a timestamp
-      # See: https://github.com/kamu-data/kamu-cli/issues/438
       preprocess:
         kind: Sql
-        engine: spark
+        engine: datafusion
         query: |
           select
             objectid,
             row_id,
-            to_timestamp(date_reported, "yyyy/MM/dd HH:mm:ssx") as date_reported,
+            to_timestamp(date_reported, '%Y/%m/%d %H:%M:%S%#z') as date_reported,
             health_region,
             age_group,
             gender,

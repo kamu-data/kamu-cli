@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+- New engine based on RisingWave streaming database ([repo](https://github.com/kamu-data/kamu-engine-risingwave)) that provides mature streaming alternative to Flink
+  - See `examples/leaderboard` and updated `examples/covid` for usage
+
 ## [0.175.0] - 2024-04-15
 ### Added
 - The `kamu ingest` command can now accept `--event-time` hint which is useful for snapshot-style data that doesn't have an event time column

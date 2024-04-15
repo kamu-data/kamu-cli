@@ -25,6 +25,12 @@ async fn test_setup_pull_images() {
         .ensure_image(docker_images::FLINK, None)
         .await
         .unwrap();
+    // Disabled for disk space issue
+    // See: https://github.com/kamu-data/kamu-cli/issues/599
+    // container_runtime
+    //     .ensure_image(docker_images::RISINGWAVE, None)
+    //     .await
+    //     .unwrap();
     container_runtime
         .ensure_image(docker_images::DATAFUSION, None)
         .await

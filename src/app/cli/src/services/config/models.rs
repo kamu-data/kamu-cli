@@ -140,6 +140,8 @@ pub struct EngineImagesConfig {
     pub flink: Option<String>,
     /// UNSTABLE: Datafusion engine image
     pub datafusion: Option<String>,
+    /// UNSTABLE: RisingWave engine image
+    pub risingwave: Option<String>,
 }
 
 impl EngineImagesConfig {
@@ -148,6 +150,7 @@ impl EngineImagesConfig {
             spark: None,
             flink: None,
             datafusion: None,
+            risingwave: None,
         }
     }
 
@@ -162,6 +165,7 @@ impl Default for EngineImagesConfig {
             spark: Some(docker_images::SPARK.to_owned()),
             flink: Some(docker_images::FLINK.to_owned()),
             datafusion: Some(docker_images::DATAFUSION.to_owned()),
+            risingwave: Some(docker_images::RISINGWAVE.to_owned()),
         }
     }
 }

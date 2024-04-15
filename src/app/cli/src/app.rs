@@ -501,6 +501,16 @@ pub fn register_config_in_catalog(
             .datafusion
             .clone()
             .unwrap(),
+        risingwave_image: config
+            .engine
+            .as_ref()
+            .unwrap()
+            .images
+            .as_ref()
+            .unwrap()
+            .risingwave
+            .clone()
+            .unwrap(),
     });
 
     let ipfs_conf = config.protocol.as_ref().unwrap().ipfs.as_ref().unwrap();
