@@ -2509,9 +2509,14 @@ impl FlowRunsHarness {
                                             ... on FlowDescriptionDatasetHardCompacting {
                                                 datasetId
                                                 compactingResult {
-                                                    originalBlocksCount
-                                                    resultingBlocksCount,
-                                                    newHead
+                                                    ... on FlowDescriptionHardCompactingSuccess {
+                                                        originalBlocksCount
+                                                        resultingBlocksCount
+                                                        newHead
+                                                    }
+                                                    ... on FlowDescriptionHardCompactingNothingToDo {
+                                                        message
+                                                    }
                                                 }
                                             }
                                             ... on FlowDescriptionDatasetExecuteTransform {
