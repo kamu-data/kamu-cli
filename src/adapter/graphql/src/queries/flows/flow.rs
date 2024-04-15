@@ -303,11 +303,30 @@ impl FlowDescriptionUpdateResult {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject)]
-struct FlowDescriptionDatasetHardCompactingResult {
+#[derive(Union, Debug, Clone)]
+enum FlowDescriptionDatasetHardCompactingResult {
+    NothingToDo(FlowDescriptionHardCompactingNothingToDo),
+    Success(FlowDescriptionHardCompactingSuccess),
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+struct FlowDescriptionHardCompactingSuccess {
     original_blocks_count: u64,
     resulting_blocks_count: u64,
     new_head: Multihash,
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct FlowDescriptionHardCompactingNothingToDo {
+    pub _dummy: String,
+}
+
+#[ComplexObject]
+impl FlowDescriptionHardCompactingNothingToDo {
+    async fn message(&self) -> String {
+        "Nothing to do".to_string()
+    }
 }
 
 impl FlowDescriptionDatasetHardCompactingResult {
@@ -315,12 +334,19 @@ impl FlowDescriptionDatasetHardCompactingResult {
         if let Some(outcome) = maybe_outcome {
             match outcome {
                 fs::FlowOutcome::Success(result) => match result {
-                    fs::FlowResult::Empty | fs::FlowResult::DatasetUpdate(_) => None,
-                    fs::FlowResult::DatasetCompact(compact) => Some(Self {
-                        original_blocks_count: compact.old_num_blocks as u64,
-                        resulting_blocks_count: compact.new_num_blocks as u64,
-                        new_head: compact.new_head.clone().into(),
-                    }),
+                    fs::FlowResult::DatasetUpdate(_) => None,
+                    fs::FlowResult::Empty => Some(Self::NothingToDo(
+                        FlowDescriptionHardCompactingNothingToDo {
+                            _dummy: "Nothing to do".to_string(),
+                        },
+                    )),
+                    fs::FlowResult::DatasetCompact(compact) => {
+                        Some(Self::Success(FlowDescriptionHardCompactingSuccess {
+                            original_blocks_count: compact.old_num_blocks as u64,
+                            resulting_blocks_count: compact.new_num_blocks as u64,
+                            new_head: compact.new_head.clone().into(),
+                        }))
+                    }
                 },
                 _ => None,
             }
