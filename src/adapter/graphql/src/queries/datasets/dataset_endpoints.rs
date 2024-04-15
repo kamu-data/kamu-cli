@@ -80,18 +80,17 @@ impl<'a> DatasetEndpoints<'a> {
 
     #[allow(clippy::unused_async)]
     async fn rest(&self) -> Result<RestProtocolDesc> {
-        let base_url = format!(
+        let dataset_base_url = format!(
             "{}{}",
             self.config.protocols.base_url_rest,
             // to respect both kinds of workspaces: single-tenant & multi-tenant
             self.dataset_handle.alias
         );
 
-        let tail_url = format!("{base_url}/tail?limit=10");
-        let push_url = format!("{base_url}/ingest");
-
+        let tail_url = format!("{dataset_base_url}/tail?limit=10");
+        let push_url = format!("{dataset_base_url}/ingest");
         let query_url = format!(
-            "{}graphql?query=query {{%0A%20 apiVersion%0A}}%0A",
+            "{}query?query=SELECT 42 as answer",
             self.config.protocols.base_url_rest
         );
 
