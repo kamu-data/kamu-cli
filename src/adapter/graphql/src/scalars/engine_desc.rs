@@ -44,6 +44,7 @@ pub enum QueryDialect {
     SqlSpark,
     SqlFlink,
     SqlDataFusion,
+    SqlRisingWave,
 }
 
 impl From<domain::QueryDialect> for QueryDialect {
@@ -52,6 +53,7 @@ impl From<domain::QueryDialect> for QueryDialect {
             domain::QueryDialect::SqlSpark => QueryDialect::SqlSpark,
             domain::QueryDialect::SqlFlink => QueryDialect::SqlFlink,
             domain::QueryDialect::SqlDataFusion => QueryDialect::SqlDataFusion,
+            domain::QueryDialect::SqlRisingWave => QueryDialect::SqlRisingWave,
         }
     }
 }

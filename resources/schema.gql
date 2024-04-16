@@ -1185,6 +1185,7 @@ enum QueryDialect {
 	SQL_SPARK
 	SQL_FLINK
 	SQL_DATA_FUSION
+	SQL_RISING_WAVE
 }
 
 union ReadStep = ReadStepCsv | ReadStepGeoJson | ReadStepEsriShapefile | ReadStepParquet | ReadStepJson | ReadStepNdJson | ReadStepNdGeoJson
