@@ -7,6 +7,7 @@ POSTGRES_CRATES := ./src/infra/accounts/postgres ./src/infra/task-system/postgre
 MYSQL_CRATES := ./src/infra/accounts/mysql
 SQLITE_CRATES := ./src/infra/accounts/sqlite ./src/infra/task-system/sqlite
 ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES) $(SQLITE_CRATES)
+MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite
 
 ###############################################################################
 # Lint
@@ -67,7 +68,7 @@ sqlx-local-setup-mariadb:
 	docker run --name kamu-mariadb -p 3306:3306 -e MARIADB_ROOT_PASSWORD=root -d mariadb:latest
 	$(foreach crate,$(MYSQL_CRATES),$(call Setup_EnvFile,mysql,3306,$(crate)))
 	sleep 10  # Letting the container to start
-	until mariadb -h localhost -P 3306 -u root --password=root sys --protocol=tcp -e "SELECT 'Hello'" -b; do sleep 3; done	
+	until mariadb -h localhost -P 3306 -u root --password=root sys --protocol=tcp -e "SELECT 'Hello'" -b; do sleep 3; done
 	sqlx database create --database-url mysql://root:root@localhost:3306/kamu
 	sqlx migrate run --source ./migrations/mysql --database-url mysql://root:root@localhost:3306/kamu
 
@@ -75,7 +76,7 @@ sqlx-local-setup-mariadb:
 sqlx-local-setup-sqlite:
 	sqlx database drop -y --database-url sqlite://kamu.sqlite.db
 	sqlx database create --database-url sqlite://kamu.sqlite.db
-	sqlx migrate run --source migrations/sqlite --database-url sqlite://kamu.sqlite.db
+	sqlx migrate run --source ./migrations/sqlite --database-url sqlite://kamu.sqlite.db
 	$(foreach crate,$(SQLITE_CRATES),$(call Setup_EnvFile_Sqlite,$(shell pwd),$(crate)))
 
 .PHONY: sqlx-local-clean
@@ -89,12 +90,12 @@ sqlx-local-clean-postgres:
 .PHONY: sqlx-local-clean-mariadb
 sqlx-local-clean-mariadb:
 	docker stop kamu-mariadb || true && docker rm kamu-mariadb || true
-	$(foreach crate,$(MYSQL_CRATES),rm $(crate)/.env -f ;)	
+	$(foreach crate,$(MYSQL_CRATES),rm $(crate)/.env -f ;)
 
 .PHONY: sqlx-local-clean-sqlite
 sqlx-local-clean-sqlite:
 	sqlx database drop -y --database-url sqlite://kamu.sqlite.db
-	$(foreach crate,$(SQLITE_CRATES),rm $(crate)/.env -f ;)	
+	$(foreach crate,$(SQLITE_CRATES),rm $(crate)/.env -f ;)
 
 ###############################################################################
 # Sqlx Prepare (update data for offline compilation)
@@ -103,6 +104,15 @@ sqlx-local-clean-sqlite:
 .PHONY: sqlx-prepare
 sqlx-prepare:
 	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare );)
+
+###############################################################################
+# Sqlx: add migration
+###############################################################################
+
+.PHONY: sqlx-add-migration
+sqlx-add-migration:
+	@@echo "Migration name: $${NAME:?nUsage: make sqlx-add-migration NAME=new_table}"
+	$(foreach dir,$(MIGRATION_DIRS),(sqlx migrate add -r $$NAME --source $(dir) );)
 
 ###############################################################################
 # Test
