@@ -4,9 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-- New engine based on RisingWave streaming database ([repo](https://github.com/kamu-data/kamu-engine-risingwave)) that provides mature streaming alternative to Flink
-  - See `examples/leaderboard` and updated `examples/covid` for usage
+## [0.176.0] - 2024-04-15
+- New engine based on RisingWave streaming database ([repo](https://github.com/kamu-data/kamu-engine-risingwave)) that provides mature streaming alternative to Flink. See:
+  - Updated [supported engines](https://docs.kamu.dev/cli/supported-engines/) documentation
+  - New [top-n](https://docs.kamu.dev/cli/get-started/examples/leaderboard/) dataset example highlighting retractions
+  - Updated `examples/covid` dataset where RisingWave replaced Flink in tumbling window aggregation
 
 ## [0.175.0] - 2024-04-15
 ### Added
