@@ -106,12 +106,12 @@ impl DatasetFlowConfigsMut {
         dataset_flow_type: DatasetFlowType,
         paused: bool,
         batching: BatchingConditionInput,
-    ) -> Result<SetFlowConfigResult> {
+    ) -> Result<SetFlowBatchingConfigResult> {
         if !ensure_set_config_flow_supported(
             dataset_flow_type,
             std::any::type_name::<BatchingRule>(),
         ) {
-            return Ok(SetFlowConfigResult::TypeIsNotSupported(
+            return Ok(SetFlowBatchingConfigResult::TypeIsNotSupported(
                 FlowTypeIsNotSupported,
             ));
         }
@@ -121,7 +121,7 @@ impl DatasetFlowConfigsMut {
         ) {
             Ok(rule) => rule,
             Err(e) => {
-                return Ok(SetFlowConfigResult::InvalidBatchingConfig(
+                return Ok(SetFlowBatchingConfigResult::InvalidBatchingConfig(
                     FlowInvalidBatchingConfig {
                         reason: e.to_string(),
                     },
@@ -132,14 +132,14 @@ impl DatasetFlowConfigsMut {
         if let Some(e) =
             ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
         {
-            return Ok(SetFlowConfigResult::IncompatibleDatasetKind(e));
+            return Ok(SetFlowBatchingConfigResult::IncompatibleDatasetKind(e));
         }
 
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
         if let Some(e) =
             ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type).await?
         {
-            return Ok(SetFlowConfigResult::PreconditionsNotMet(e));
+            return Ok(SetFlowBatchingConfigResult::PreconditionsNotMet(e));
         }
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
@@ -157,7 +157,7 @@ impl DatasetFlowConfigsMut {
                 SetFlowConfigurationError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        Ok(SetFlowConfigResult::Success(SetFlowConfigSuccess {
+        Ok(SetFlowBatchingConfigResult::Success(SetFlowConfigSuccess {
             config: res.into(),
         }))
     }
@@ -168,12 +168,12 @@ impl DatasetFlowConfigsMut {
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
         compacting_args: CompactingConditionInput,
-    ) -> Result<SetFlowConfigResult> {
+    ) -> Result<SetFlowCompactingConfigResult> {
         if !ensure_set_config_flow_supported(
             dataset_flow_type,
             std::any::type_name::<CompactingRule>(),
         ) {
-            return Ok(SetFlowConfigResult::TypeIsNotSupported(
+            return Ok(SetFlowCompactingConfigResult::TypeIsNotSupported(
                 FlowTypeIsNotSupported,
             ));
         }
@@ -183,7 +183,7 @@ impl DatasetFlowConfigsMut {
         ) {
             Ok(rule) => rule,
             Err(e) => {
-                return Ok(SetFlowConfigResult::InvalidCompactingConfig(
+                return Ok(SetFlowCompactingConfigResult::InvalidCompactingConfig(
                     FlowInvalidCompactingConfig {
                         reason: e.to_string(),
                     },
@@ -194,7 +194,7 @@ impl DatasetFlowConfigsMut {
         if let Some(e) =
             ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
         {
-            return Ok(SetFlowConfigResult::IncompatibleDatasetKind(e));
+            return Ok(SetFlowCompactingConfigResult::IncompatibleDatasetKind(e));
         }
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
@@ -213,9 +213,9 @@ impl DatasetFlowConfigsMut {
                 SetFlowConfigurationError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        Ok(SetFlowConfigResult::Success(SetFlowConfigSuccess {
-            config: res.into(),
-        }))
+        Ok(SetFlowCompactingConfigResult::Success(
+            SetFlowConfigSuccess { config: res.into() },
+        ))
     }
 
     #[graphql(guard = "LoggedInGuard::new()")]
@@ -313,8 +313,6 @@ struct CompactingConditionInput {
 enum SetFlowConfigResult {
     Success(SetFlowConfigSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
-    InvalidBatchingConfig(FlowInvalidBatchingConfig),
-    InvalidCompactingConfig(FlowInvalidCompactingConfig),
     PreconditionsNotMet(FlowPreconditionsNotMet),
     TypeIsNotSupported(FlowTypeIsNotSupported),
 }
@@ -366,6 +364,25 @@ impl FlowInvalidCompactingConfig {
     pub async fn message(&self) -> String {
         self.reason.clone()
     }
+}
+
+#[derive(Interface)]
+#[graphql(field(name = "message", ty = "String"))]
+enum SetFlowCompactingConfigResult {
+    Success(SetFlowConfigSuccess),
+    IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
+    InvalidCompactingConfig(FlowInvalidCompactingConfig),
+    TypeIsNotSupported(FlowTypeIsNotSupported),
+}
+
+#[derive(Interface)]
+#[graphql(field(name = "message", ty = "String"))]
+enum SetFlowBatchingConfigResult {
+    Success(SetFlowConfigSuccess),
+    IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
+    InvalidBatchingConfig(FlowInvalidBatchingConfig),
+    PreconditionsNotMet(FlowPreconditionsNotMet),
+    TypeIsNotSupported(FlowTypeIsNotSupported),
 }
 
 ///////////////////////////////////////////////////////////////////////////////
