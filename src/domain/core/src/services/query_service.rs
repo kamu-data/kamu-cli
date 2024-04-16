@@ -114,6 +114,7 @@ pub enum QueryDialect {
     SqlSpark,
     SqlFlink,
     SqlDataFusion,
+    SqlRisingWave,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

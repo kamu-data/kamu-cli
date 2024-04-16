@@ -295,6 +295,11 @@ impl QueryService for QueryServiceImpl {
                 dialect: QueryDialect::SqlDataFusion,
                 latest_image: docker_images::DATAFUSION.to_string(),
             },
+            EngineDesc {
+                name: "RisingWave".to_string(),
+                dialect: QueryDialect::SqlRisingWave,
+                latest_image: docker_images::RISINGWAVE.to_string(),
+            },
         ])
     }
 }
