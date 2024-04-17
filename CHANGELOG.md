@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `/ingest` REST API endpoint also supports event time hints via `odf-event-time` header
 - New `--system-time` root parameter allows overriding time for all CLI commands
 ### Fixed
-- CLI show errors not only under TTY
+- CLI shows errors not only under TTY
 - Removed `paused` from `setConfigCompacting` mutation
 - Extended GraphQL `FlowDescriptionDatasetHardCompacting` empty result with a resulting message
 - GraphQL Dataset Endpoints object: fixed the query endpoint
