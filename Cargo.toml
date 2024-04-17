@@ -19,7 +19,7 @@ members = [
     "src/domain/accounts",
     "src/domain/core",
     "src/domain/task-system/domain",
-    "src/domain/flow-system",
+    "src/domain/flow-system/domain",
     # Domain service layer
     "src/domain/task-system/services",
     # Infra
@@ -52,7 +52,7 @@ resolver = "2"
 
 # Utils
 container-runtime = { version = "0.176.1", path = "src/utils/container-runtime", default-features = false }
-database-common = { version = "0.176.1", path="src/utils/database-common", default-features = false }
+database-common = { version = "0.176.1", path = "src/utils/database-common", default-features = false }
 enum-variants = { version = "0.176.1", path = "src/utils/enum-variants", default-features = false }
 event-bus = { version = "0.176.1", path = "src/utils/event-bus", default-features = false }
 event-sourcing = { version = "0.176.1", path = "src/utils/event-sourcing", default-features = false }
@@ -69,7 +69,7 @@ opendatafabric = { version = "0.176.1", path = "src/domain/opendatafabric", defa
 kamu-core = { version = "0.176.1", path = "src/domain/core", default-features = false }
 kamu-accounts = { version = "0.176.1", path = "src/domain/accounts", default-features = false }
 kamu-task-system = { version = "0.176.1", path = "src/domain/task-system/domain", default-features = false }
-kamu-flow-system = { version = "0.176.1", path = "src/domain/flow-system", default-features = false }
+kamu-flow-system = { version = "0.176.1", path = "src/domain/flow-system/domain", default-features = false }
 
 # Domain service layer
 kamu-task-system-services = { version = "0.176.1", path = "src/domain/task-system/services", default-features = false }
