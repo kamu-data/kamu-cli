@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Fixed
 - Fix the instant run of `ExecuteTransform` flow after the successful finish of `HardCompacting` flow 
-- Add new error type `FlowDatasetCompactedFailedError` to indicate `ExecuteTransform` failed due to `HardCompacting` of root dataset
+- Extend `FlowFailed` error type to indicate when `ExecuteTransform` failed due to `HardCompacting` of root dataset
 
 ## [0.176.1] - 2024-04-16
 ### Fixed

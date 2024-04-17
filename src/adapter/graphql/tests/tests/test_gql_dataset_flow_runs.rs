@@ -2552,7 +2552,17 @@ impl FlowRunsHarness {
                                                 message
                                             }
                                             ...on FlowFailedError {
-                                                reason
+                                                reason {
+                                                    ...on FlowFailedMessage {
+                                                        message
+                                                    }
+                                                    ...on FlowDatasetCompactedFailedError {
+                                                        message
+                                                        rootDataset {
+                                                            id
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                         timing {
@@ -2707,7 +2717,17 @@ impl FlowRunsHarness {
                                                     message
                                                 }
                                                 ...on FlowFailedError {
-                                                    reason
+                                                    reason {
+                                                        ...on FlowFailedMessage {
+                                                            message
+                                                        }
+                                                        ...on FlowDatasetCompactedFailedError {
+                                                            message
+                                                            rootDataset {
+                                                                id
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -2750,7 +2770,17 @@ impl FlowRunsHarness {
                                                     message
                                                 }
                                                 ...on FlowFailedError {
-                                                    reason
+                                                    reason {
+                                                        ...on FlowFailedMessage {
+                                                            message
+                                                        }
+                                                        ...on FlowDatasetCompactedFailedError {
+                                                            message
+                                                            rootDataset {
+                                                                id
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }

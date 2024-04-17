@@ -19,13 +19,23 @@ use crate::queries::{Account, Dataset};
 pub(crate) enum FlowOutcome {
     Success(FlowSuccessResult),
     Failed(FlowFailedError),
-    DatasetCompacted(FlowDatasetCompactedFailedError),
-    Abotted(FlowAbortedResult),
+    Aborted(FlowAbortedResult),
 }
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowFailedError {
-    reason: String,
+    reason: FlowFailedReason,
+}
+
+#[derive(Union)]
+pub(crate) enum FlowFailedReason {
+    FlowFailed(FlowFailedMessage),
+    FlowDatasetCompactedFailed(FlowDatasetCompactedFailedError),
+}
+
+#[derive(SimpleObject)]
+pub(crate) struct FlowFailedMessage {
+    message: String,
 }
 
 #[derive(SimpleObject)]
@@ -41,7 +51,7 @@ pub(crate) struct FlowAbortedResult {
 #[derive(SimpleObject)]
 pub(crate) struct FlowDatasetCompactedFailedError {
     root_dataset: Dataset,
-    reason: String,
+    message: String,
 }
 
 impl FlowOutcome {
@@ -56,7 +66,9 @@ impl FlowOutcome {
                 }),
                 kamu_flow_system::FlowOutcome::Failed(err) => match err {
                     FlowError::Failed => Self::Failed(FlowFailedError {
-                        reason: "FAILED".to_owned(),
+                        reason: FlowFailedReason::FlowFailed(FlowFailedMessage {
+                            message: "FAILED".to_owned(),
+                        }),
                     }),
                     FlowError::RootDatasetCompacted(err) => {
                         let dataset_repository =
@@ -68,13 +80,17 @@ impl FlowOutcome {
 
                         let dataset =
                             Dataset::new(Account::from_dataset_alias(ctx, &hdl.alias), hdl);
-                        Self::DatasetCompacted(FlowDatasetCompactedFailedError {
-                            reason: "Root dataset was compacted".to_string(),
-                            root_dataset: dataset,
+                        Self::Failed(FlowFailedError {
+                            reason: FlowFailedReason::FlowDatasetCompactedFailed(
+                                FlowDatasetCompactedFailedError {
+                                    message: "Root dataset was compacted".to_owned(),
+                                    root_dataset: dataset,
+                                },
+                            ),
                         })
                     }
                 },
-                kamu_flow_system::FlowOutcome::Aborted => Self::Success(FlowSuccessResult {
+                kamu_flow_system::FlowOutcome::Aborted => Self::Aborted(FlowAbortedResult {
                     message: "ABORTED".to_owned(),
                 }),
             };
