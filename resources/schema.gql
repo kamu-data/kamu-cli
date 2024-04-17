@@ -753,7 +753,7 @@ type FlowConnection {
 }
 
 type FlowDatasetCompactedFailedError {
-	rootDatasetId: DatasetID!
+	rootDataset: Dataset!
 	reason: String!
 }
 

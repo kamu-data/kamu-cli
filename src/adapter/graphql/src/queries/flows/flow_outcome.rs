@@ -7,9 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::DatasetRepository;
 use kamu_flow_system::FlowError;
 
 use crate::prelude::*;
+use crate::queries::{Account, Dataset};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -38,31 +40,47 @@ pub(crate) struct FlowAbortedResult {
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDatasetCompactedFailedError {
-    root_dataset_id: DatasetID,
+    root_dataset: Dataset,
     reason: String,
 }
 
-impl From<&kamu_flow_system::FlowOutcome> for FlowOutcome {
-    fn from(value: &kamu_flow_system::FlowOutcome) -> Self {
-        match value {
-            kamu_flow_system::FlowOutcome::Success(_) => Self::Success(FlowSuccessResult {
-                message: "SUCCESS".to_owned(),
-            }),
-            kamu_flow_system::FlowOutcome::Failed(err) => match err {
-                FlowError::Failed => Self::Failed(FlowFailedError {
-                    reason: "FAILED".to_owned(),
+impl FlowOutcome {
+    pub async fn from_maybe_flow_outcome(
+        outcome_result: &Option<kamu_flow_system::FlowOutcome>,
+        ctx: &Context<'_>,
+    ) -> Result<Option<Self>, InternalError> {
+        if let Some(value) = outcome_result {
+            let result = match value {
+                kamu_flow_system::FlowOutcome::Success(_) => Self::Success(FlowSuccessResult {
+                    message: "SUCCESS".to_owned(),
                 }),
-                FlowError::RootDatasetCompacted(err) => {
-                    Self::DatasetCompacted(FlowDatasetCompactedFailedError {
-                        reason: "Root dataset was compacted".to_string(),
-                        root_dataset_id: err.dataset_id.clone().into(),
-                    })
-                }
-            },
-            kamu_flow_system::FlowOutcome::Aborted => Self::Success(FlowSuccessResult {
-                message: "ABORTED".to_owned(),
-            }),
+                kamu_flow_system::FlowOutcome::Failed(err) => match err {
+                    FlowError::Failed => Self::Failed(FlowFailedError {
+                        reason: "FAILED".to_owned(),
+                    }),
+                    FlowError::RootDatasetCompacted(err) => {
+                        let dataset_repository =
+                            from_catalog::<dyn DatasetRepository>(ctx).unwrap();
+                        let hdl = dataset_repository
+                            .resolve_dataset_ref(&err.dataset_id.as_local_ref())
+                            .await
+                            .int_err()?;
+
+                        let dataset =
+                            Dataset::new(Account::from_dataset_alias(ctx, &hdl.alias), hdl);
+                        Self::DatasetCompacted(FlowDatasetCompactedFailedError {
+                            reason: "Root dataset was compacted".to_string(),
+                            root_dataset: dataset,
+                        })
+                    }
+                },
+                kamu_flow_system::FlowOutcome::Aborted => Self::Success(FlowSuccessResult {
+                    message: "ABORTED".to_owned(),
+                }),
+            };
+            return Ok(Some(result));
         }
+        Ok(None)
     }
 }
 
