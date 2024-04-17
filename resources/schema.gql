@@ -752,6 +752,11 @@ type FlowConnection {
 	edges: [FlowEdge!]!
 }
 
+type FlowDatasetCompactedFailedError {
+	rootDataset: Dataset!
+	message: String!
+}
+
 union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompacting | FlowDescriptionSystemGC
 
 type FlowDescriptionDatasetExecuteTransform {
@@ -840,8 +845,14 @@ type FlowEventTriggerAdded implements FlowEvent {
 }
 
 type FlowFailedError {
-	reason: String!
+	reason: FlowFailedReason!
 }
+
+type FlowFailedMessage {
+	message: String!
+}
+
+union FlowFailedReason = FlowFailedMessage | FlowDatasetCompactedFailedError
 
 scalar FlowID
 

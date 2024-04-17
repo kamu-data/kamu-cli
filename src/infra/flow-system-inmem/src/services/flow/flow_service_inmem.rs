@@ -550,7 +550,7 @@ impl FlowServiceInMemory {
         //   the upper bound of potential finish time for batching is known
         if accumulated_something || is_compacted {
             // Finish immediately if satisfied, or not later than the deadline
-            let batching_finish_time = if satisfied {
+            let batching_finish_time = if satisfied || is_compacted {
                 evaluation_time
             } else {
                 batching_deadline
@@ -570,7 +570,7 @@ impl FlowServiceInMemory {
 
             // If batching is over, it's start condition is no longer valid.
             // However, set throttling condition, if it applies
-            if satisfied && throttling_boundary_time > batching_finish_time {
+            if (satisfied || is_compacted) && throttling_boundary_time > batching_finish_time {
                 self.indicate_throttling_activity(
                     flow,
                     throttling_boundary_time,

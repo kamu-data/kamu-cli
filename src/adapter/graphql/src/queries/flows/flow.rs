@@ -130,8 +130,12 @@ impl Flow {
     }
 
     /// Outcome of the flow (Finished state only)
-    async fn outcome(&self) -> Option<FlowOutcome> {
-        self.flow_state.outcome.as_ref().map(Into::into)
+    async fn outcome(&self, ctx: &Context<'_>) -> Result<Option<FlowOutcome>> {
+        Ok(
+            FlowOutcome::from_maybe_flow_outcome(&self.flow_state.outcome, ctx)
+                .await
+                .int_err()?,
+        )
     }
 
     /// Timing records associated with the flow lifecycle
