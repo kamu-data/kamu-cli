@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Fixed
+- Fix the instant run of `ExecuteTransform` flow after the successful finish of `HardCompacting` flow 
+- Add new error type `FlowDatasetCompactedFailedError` to indicate `ExecuteTransform` failed due to `HardCompacting` of root dataset
+
 ## [0.176.1] - 2024-04-16
 ### Fixed
 - Split result for different(`setFlowConfigResult`, `setFlowBatchingConfigResult`, `setFlowCompactingConfigResult`) flow configuration mutations

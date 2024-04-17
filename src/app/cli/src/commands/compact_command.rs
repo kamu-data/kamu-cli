@@ -84,7 +84,7 @@ impl Command for CompactCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         if !self.is_hard {
             return Err(CLIError::usage_error(
-                "Soft compactions are not yet supported",
+                "Soft compactings are not yet supported",
             ));
         }
         let dataset_handle = self

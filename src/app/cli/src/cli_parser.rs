@@ -1290,25 +1290,25 @@ pub fn cli() -> Command {
                                 Arg::new("hard")
                                     .long("hard")
                                     .action(ArgAction::SetTrue)
-                                    .help("Perform 'hard' compaction that rewrites the history of a dataset"),
+                                    .help("Perform 'hard' compacting that rewrites the history of a dataset"),
                                 Arg::new("verify")
                                     .long("verify")
                                     .action(ArgAction::SetTrue)
-                                    .help("Perform verification of the dataset before running a compaction"),
+                                    .help("Perform verification of the dataset before running a compacting"),
                             ])
                             .after_help(indoc::indoc!(
                                 r#"
                                 For datasets that get frequent small appends the number of data slices can grow over time and affect the performance of querying. This command allows to merge multiple small data slices into a few large files, which can be beneficial in terms of size from more compact encoding, and in query performance, as data engines will have to scan through far fewer file headers.
 
-                                There are two types of compactions: soft and hard.
+                                There are two types of compactings: soft and hard.
 
-                                Soft compactions produce new files while leaving the old blocks intact. This allows for faster queries, while still preserving the accurate history of how dataset evolved over time.
+                                Soft compactings produce new files while leaving the old blocks intact. This allows for faster queries, while still preserving the accurate history of how dataset evolved over time.
 
-                                Hard compactions rewrite the history of the dataset as if data was originally written in big batches. They allow to shrink the history of a dataset to just a few blocks, reclaim the space used by old data files, but at the expense of history loss. Hard compactions will rewrite the metadata chain, changing block hashes. Therefore, they will **break all downstream datasets** that depend on them.
+                                Hard compactings rewrite the history of the dataset as if data was originally written in big batches. They allow to shrink the history of a dataset to just a few blocks, reclaim the space used by old data files, but at the expense of history loss. Hard compactings will rewrite the metadata chain, changing block hashes. Therefore, they will **break all downstream datasets** that depend on them.
 
                                 **Examples:**
 
-                                Perform a history-altering hard compaction:
+                                Perform a history-altering hard compacting:
 
                                     kamu system compact --hard my.dataset
                                 "#

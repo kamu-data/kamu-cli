@@ -752,6 +752,11 @@ type FlowConnection {
 	edges: [FlowEdge!]!
 }
 
+type FlowDatasetCompactedFailedError {
+	rootDatasetId: DatasetID!
+	reason: String!
+}
+
 union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompacting | FlowDescriptionSystemGC
 
 type FlowDescriptionDatasetExecuteTransform {
@@ -866,7 +871,7 @@ type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
 	message: String!
 }
 
-union FlowOutcome = FlowSuccessResult | FlowFailedError | FlowAbortedResult
+union FlowOutcome = FlowSuccessResult | FlowFailedError | FlowDatasetCompactedFailedError | FlowAbortedResult
 
 type FlowPreconditionsNotMet implements SetFlowConfigResult & SetFlowBatchingConfigResult & TriggerFlowResult {
 	preconditions: String!

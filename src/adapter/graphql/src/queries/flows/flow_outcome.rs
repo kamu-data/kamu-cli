@@ -17,6 +17,7 @@ use crate::prelude::*;
 pub(crate) enum FlowOutcome {
     Success(FlowSuccessResult),
     Failed(FlowFailedError),
+    DatasetCompacted(FlowDatasetCompactedFailedError),
     Abotted(FlowAbortedResult),
 }
 
@@ -35,6 +36,12 @@ pub(crate) struct FlowAbortedResult {
     message: String,
 }
 
+#[derive(SimpleObject)]
+pub(crate) struct FlowDatasetCompactedFailedError {
+    root_dataset_id: DatasetID,
+    reason: String,
+}
+
 impl From<&kamu_flow_system::FlowOutcome> for FlowOutcome {
     fn from(value: &kamu_flow_system::FlowOutcome) -> Self {
         match value {
@@ -45,9 +52,12 @@ impl From<&kamu_flow_system::FlowOutcome> for FlowOutcome {
                 FlowError::Failed => Self::Failed(FlowFailedError {
                     reason: "FAILED".to_owned(),
                 }),
-                FlowError::RootDatasetCompacted(err) => Self::Failed(FlowFailedError {
-                    reason: format!("Root dataset {} was compacted", err.dataset_id),
-                }),
+                FlowError::RootDatasetCompacted(err) => {
+                    Self::DatasetCompacted(FlowDatasetCompactedFailedError {
+                        reason: "Root dataset was compacted".to_string(),
+                        root_dataset_id: err.dataset_id.clone().into(),
+                    })
+                }
             },
             kamu_flow_system::FlowOutcome::Aborted => Self::Success(FlowSuccessResult {
                 message: "ABORTED".to_owned(),
