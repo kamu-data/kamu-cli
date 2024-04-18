@@ -129,7 +129,7 @@ async fn test_pause_resume_individual_dataset_flows() {
     assert_eq!(0, configs.len());
     assert_eq!(2, harness.configuration_events_count());
 
-    // Still we should see it's state as paused in the repository directly
+    // Still, we should see it's state as paused in the repository directly
     let flow_config_state = harness
         .get_dataset_flow_config_from_store(foo_id.clone(), DatasetFlowType::Ingest)
         .await;
@@ -147,8 +147,8 @@ async fn test_pause_resume_individual_dataset_flows() {
         .resume_dataset_flow(foo_id.clone(), DatasetFlowType::Ingest)
         .await;
 
-    // It should be visible in the list of active configs again, and produce yet
-    // another event
+    // It should be visible in the list of active configs again, and produce
+    // another event yet
     let configs = harness.list_enabled_configurations().await;
     assert_eq!(1, configs.len());
     harness.expect_dataset_flow_schedule(
@@ -213,7 +213,7 @@ async fn test_pause_resume_all_dataset_flows() {
     assert_eq!(0, configs.len());
     assert_eq!(4, harness.configuration_events_count());
 
-    // Still we should see their state as paused in the repository directly
+    // Still, we should see their state as paused in the repository directly
 
     let flow_config_ingest_state = harness
         .get_dataset_flow_config_from_store(foo_id.clone(), DatasetFlowType::Ingest)
@@ -289,7 +289,7 @@ async fn test_pause_resume_individual_system_flows() {
     assert_eq!(0, configs.len());
     assert_eq!(2, harness.configuration_events_count());
 
-    // Still we should see it's state as paused in the repository directly
+    // Still, we should see it's state as paused in the repository directly
     let flow_config_state = harness
         .get_system_flow_config_from_store(SystemFlowType::GC)
         .await;
@@ -305,8 +305,8 @@ async fn test_pause_resume_individual_system_flows() {
     // Now, resume the configuration
     harness.resume_system_flow(SystemFlowType::GC).await;
 
-    // It should be visible in the list of active configs again, and create yet
-    // another event
+    // It should be visible in the list of active configs again, and create
+    // another event yet
     let configs = harness.list_enabled_configurations().await;
     assert_eq!(1, configs.len());
     harness.expect_system_flow_schedule(&configs, SystemFlowType::GC, &gc_schedule);
@@ -400,7 +400,7 @@ async fn test_dataset_deleted() {
     let configs = harness.list_enabled_configurations().await;
     assert_eq!(0, configs.len());
 
-    // Still we should see it's state as permanently stopped in the repository
+    // Still, we should see it's state as permanently stopped in the repository
     let flow_config_state = harness
         .get_dataset_flow_config_from_store(foo_id, DatasetFlowType::Ingest)
         .await;
@@ -418,7 +418,7 @@ async fn test_dataset_deleted() {
 
 struct FlowConfigurationHarness {
     _tmp_dir: tempfile::TempDir,
-    catalog: dill::Catalog,
+    catalog: Catalog,
     dataset_repo: Arc<dyn DatasetRepository>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_configuration_event_store: Arc<dyn FlowConfigurationEventStore>,
@@ -433,7 +433,7 @@ impl FlowConfigurationHarness {
 
         let catalog = CatalogBuilder::new()
             .add::<EventBus>()
-            .add::<FlowConfigurationServiceInMemory>()
+            .add::<FlowConfigurationServiceImpl>()
             .add::<FlowConfigurationEventStoreInMem>()
             .add::<SystemTimeSourceDefault>()
             .add_builder(
