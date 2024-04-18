@@ -18,12 +18,12 @@ use kamu::*;
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
+use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceInMemory};
 use kamu_task_system::*;
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
 use opendatafabric::*;
 use tokio::task::yield_now;
-use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceInMemory};
 
 use super::{
     FlowSystemTestListener,
