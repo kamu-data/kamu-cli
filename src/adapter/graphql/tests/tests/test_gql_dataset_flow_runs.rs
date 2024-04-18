@@ -47,12 +47,8 @@ use kamu_flow_system::{
     FlowTrigger,
     FlowTriggerAutoPolling,
 };
-use kamu_flow_system_inmem::{
-    FlowConfigurationEventStoreInMem,
-    FlowConfigurationServiceInMemory,
-    FlowEventStoreInMem,
-    FlowServiceInMemory,
-};
+use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
+use kamu_flow_system_services::{FlowConfigurationServiceInMemory, FlowServiceInMemory};
 use kamu_task_system as ts;
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;

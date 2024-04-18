@@ -23,7 +23,8 @@ use kamu_core::{
     SystemTimeSourceDefault,
     TransformService,
 };
-use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowConfigurationServiceInMemory};
+use kamu_flow_system_inmem::FlowConfigurationEventStoreInMem;
+use kamu_flow_system_services::FlowConfigurationServiceInMemory;
 use opendatafabric::*;
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};

@@ -1,6 +1,6 @@
 [package]
-name = "kamu-flow-system-inmem"
-description = "In-memory implementation of the flows management for scheduled dataset and system activities"
+name = "kamu-flow-system-services"
+description = "Service model of the flows management for scheduled dataset and system activities"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -27,7 +27,6 @@ kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-task-system-services = { workspace = true }
 kamu-flow-system = { workspace = true }
-kamu-flow-system-services = { workspace = true }
 event-bus = { workspace = true }
 
 async-stream = "0.3"

@@ -20,6 +20,7 @@ use kamu::*;
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
+use kamu_flow_system_services::*;
 use opendatafabric::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -430,7 +431,7 @@ impl FlowConfigurationHarness {
         let datasets_dir = tmp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
+        let catalog = CatalogBuilder::new()
             .add::<EventBus>()
             .add::<FlowConfigurationServiceInMemory>()
             .add::<FlowConfigurationEventStoreInMem>()

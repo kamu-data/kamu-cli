@@ -14,11 +14,13 @@
 pub use event_sourcing::*;
 
 pub mod aggregates;
+pub mod dataset_flow_key;
 pub mod entities;
 pub mod repos;
 pub mod services;
 
 pub use aggregates::*;
+pub use dataset_flow_key::*;
 pub use entities::*;
 pub use repos::*;
 pub use services::*;

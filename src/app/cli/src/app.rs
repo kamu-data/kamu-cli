@@ -345,8 +345,8 @@ pub fn configure_base_catalog(
     // TODO: initialize graph dependencies when starting API server
     b.add::<DependencyGraphServiceInMemory>();
 
-    b.add::<kamu_flow_system_inmem::FlowConfigurationServiceInMemory>();
-    b.add::<kamu_flow_system_inmem::FlowServiceInMemory>();
+    b.add::<kamu_flow_system_services::FlowConfigurationServiceInMemory>();
+    b.add::<kamu_flow_system_services::FlowServiceInMemory>();
     b.add_value(kamu_flow_system_inmem::domain::FlowServiceRunConfig::new(
         chrono::Duration::try_seconds(1).unwrap(),
         chrono::Duration::try_minutes(1).unwrap(),

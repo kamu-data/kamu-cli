@@ -29,6 +29,7 @@ kamu-data-utils = { workspace = true }
 kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-flow-system = { workspace = true }
+kamu-flow-system-services = { workspace = true }
 event-sourcing = { workspace = true }
 
 
@@ -39,7 +40,7 @@ chrono = "0.4"
 datafusion = { version = "36", default-features = false, features = ["serde"] } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 dill = "0.8"
 futures = "0.3"
-serde = {version = "1", default-features = false }
+serde = { version = "1", default-features = false }
 serde_json = "1"
 tokio = { version = "1", default-features = false, features = [] }
 tokio-stream = { version = "0.1", default-features = false }

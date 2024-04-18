@@ -23,6 +23,7 @@ use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
 use opendatafabric::*;
 use tokio::task::yield_now;
+use kamu_flow_system_services::{FlowConfigurationServiceInMemory, FlowServiceInMemory};
 
 use super::{
     FlowSystemTestListener,
@@ -3608,7 +3609,7 @@ impl FlowHarness {
 
         let mock_dataset_changes = overrides.mock_dataset_changes.unwrap_or_default();
 
-        let catalog = dill::CatalogBuilder::new()
+        let catalog = CatalogBuilder::new()
             .add::<EventBus>()
             .add_value(FlowServiceRunConfig::new(
                 awaiting_step,

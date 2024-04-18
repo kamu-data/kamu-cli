@@ -22,6 +22,7 @@ members = [
     "src/domain/flow-system/domain",
     # Domain service layer
     "src/domain/task-system/services",
+    "src/domain/flow-system/services",
     # Infra
     "src/infra/core",
     "src/infra/ingest-datafusion",
@@ -74,6 +75,7 @@ kamu-flow-system = { version = "0.176.3", path = "src/domain/flow-system/domain"
 
 # Domain service layer
 kamu-task-system-services = { version = "0.176.3", path = "src/domain/task-system/services", default-features = false }
+kamu-flow-system-services = { version = "0.176.3", path = "src/domain/flow-system/services", default-features = false }
 
 # Infra
 kamu = { version = "0.176.3", path = "src/infra/core", default-features = false }

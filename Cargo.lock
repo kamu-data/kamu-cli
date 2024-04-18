@@ -3690,6 +3690,7 @@ dependencies = [
  "kamu-data-utils",
  "kamu-flow-system",
  "kamu-flow-system-inmem",
+ "kamu-flow-system-services",
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
@@ -3849,6 +3850,7 @@ dependencies = [
  "kamu-data-utils",
  "kamu-datafusion-cli",
  "kamu-flow-system-inmem",
+ "kamu-flow-system-services",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
  "libc",
@@ -3990,6 +3992,40 @@ dependencies = [
 [[package]]
 name = "kamu-flow-system-inmem"
 version = "0.176.3"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "cron",
+ "dill",
+ "event-bus",
+ "futures",
+ "indoc 2.0.5",
+ "kamu",
+ "kamu-core",
+ "kamu-flow-system",
+ "kamu-flow-system-services",
+ "kamu-task-system",
+ "kamu-task-system-inmem",
+ "kamu-task-system-services",
+ "mockall",
+ "opendatafabric",
+ "pretty_assertions",
+ "serde",
+ "serde_with",
+ "tempfile",
+ "test-log",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "kamu-flow-system-services"
+version = "0.176.1"
 dependencies = [
  "async-stream",
  "async-trait",

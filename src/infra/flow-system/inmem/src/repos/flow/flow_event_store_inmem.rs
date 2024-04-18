@@ -11,10 +11,8 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
 use dill::*;
-use kamu_flow_system::*;
+use kamu_flow_system::{BorrowedFlowKeyDataset, *};
 use opendatafabric::{AccountName, DatasetID};
-
-use crate::dataset_flow_key::BorrowedFlowKeyDataset;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
