@@ -10,6 +10,8 @@
 // Re-exports
 pub use kamu_flow_system as domain;
 
-mod repos;
+mod flow;
+mod flow_configuration;
 
-pub use repos::*;
+pub use flow::*;
+pub use flow_configuration::*;
