@@ -25,7 +25,6 @@ doctest = false
 opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
-kamu-task-system-services = { workspace = true }
 kamu-flow-system = { workspace = true }
 event-bus = { workspace = true }
 
@@ -46,14 +45,6 @@ serde_with = { version = "3", default-features = false }
 
 
 [dev-dependencies]
-kamu = { workspace = true }
-kamu-task-system-inmem = { workspace = true }
-
 cron = { version = "0.12", default-features = false }
-indoc = "2"
-mockall = "0.11"
-pretty_assertions = "1"
 tempfile = "3"
-test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
