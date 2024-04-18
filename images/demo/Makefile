@@ -1,7 +1,7 @@
 IMAGE_PLATFORMS = linux/amd64,linux/arm64
 IMAGE_REPO = ghcr.io/kamu-data
 KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "kamu") | .version')
-DEMO_VERSION = 0.12.2
+DEMO_VERSION = 0.13.0
 
 #########################################################################################
 
@@ -62,10 +62,10 @@ minio-data:
 		kamu repo list && \
 		kamu add -r "../../user-home/01 - Kamu Basics (COVID-19 example)/datasets/" && \
 		kamu pull --all && \
-		kamu push british-columbia.case-details --to kamu-hub/covid19.british-columbia.case-details && \
-		kamu push canada.case-details --to kamu-hub/covid19.canada.case-details && \
-		kamu push canada.daily-cases --to kamu-hub/covid19.canada.daily-cases && \
-		kamu push ontario.case-details --to kamu-hub/covid19.ontario.case-details && \
+		kamu push covid19.british-columbia.case-details --to kamu-hub/covid19.british-columbia.case-details && \
+		kamu push covid19.canada.case-details --to kamu-hub/covid19.canada.case-details && \
+		kamu push covid19.canada.daily-cases --to kamu-hub/covid19.canada.daily-cases && \
+		kamu push covid19.ontario.case-details --to kamu-hub/covid19.ontario.case-details && \
 		kamu search && \
 		cd .. && \
 		rm -rf tmp

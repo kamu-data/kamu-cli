@@ -13,10 +13,10 @@ content:
       # Transformation that will be applied to produce new data
       transform:
         kind: Sql
-        engine: spark
+        engine: datafusion
         query: |
-          SELECT
-            "BC" as province,
+          select
+            'BC' as province,
             id,
             reported_date,
             sex as gender,
@@ -32,10 +32,10 @@ content:
                  when age_group = '90+' then '90+'
                  else 'UNKNOWN' end as age_group,
             ha as location
-            FROM `covid19.british-columbia.case-details`
-          UNION ALL
-          SELECT
-            "ON" as province,
+          from "covid19.british-columbia.case-details"
+          union all
+          select
+            'ON' as province,
             id,
             case_reported_date as reported_date,
             case when lower(gender) = 'male' then 'M' 
@@ -43,6 +43,6 @@ content:
                  else 'U' end as gender,
             age_group,
             city as location
-            FROM `covid19.ontario.case-details`
+          from "covid19.ontario.case-details"
     - kind: SetVocab
       eventTimeColumn: reported_date

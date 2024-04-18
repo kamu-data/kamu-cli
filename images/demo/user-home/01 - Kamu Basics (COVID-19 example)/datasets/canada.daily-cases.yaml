@@ -9,13 +9,27 @@ content:
         - datasetRef: covid19.canada.case-details
       transform:
         kind: Sql
-        engine: flink
+        engine: risingwave
         query: |
-          SELECT
-            TUMBLE_START(`reported_date`, INTERVAL '1' DAY) as `reported_date`,
-            `province`,
-            COUNT(*) as `total_daily`
-          FROM `covid19.canada.case-details`
-          GROUP BY TUMBLE(`reported_date`, INTERVAL '1' DAY), `province`
+          select
+            window_end - interval '1' second as reported_date,
+            province,
+            count(1) as total_daily
+          from tumble(
+            "covid19.canada.case-details",
+            reported_date,
+            interval '1' day
+          )
+          group by 1, 2
+          emit on window close
+        # # Alternatively we could use Flink
+        # engine: flink
+        # query: |
+        #   SELECT
+        #     TUMBLE_START(`reported_date`, INTERVAL '1' DAY) as `reported_date`,
+        #     `province`,
+        #     COUNT(*) as `total_daily`
+        #   FROM `covid19.canada.case-details`
+        #   GROUP BY TUMBLE(`reported_date`, INTERVAL '1' DAY), `province`
     - kind: SetVocab
       eventTimeColumn: reported_date

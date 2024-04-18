@@ -4,7 +4,9 @@ FROM minio/minio:RELEASE.2024-02-09T21-25-16Z
 # See: https://stackoverflow.com/questions/72904999/create-minio-docker-image-with-content
 COPY minio-data /data.tmp
 
+# Random sleep is needed when building multi-arch images as they will race for the same port
 RUN mkdir /data; \
+    sleep $(($RANDOM % 10)); \
     minio server /data & \
     server_pid=$!; \
     until mc alias set local http://localhost:9000 minioadmin minioadmin; do \
