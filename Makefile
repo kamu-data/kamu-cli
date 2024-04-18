@@ -111,7 +111,7 @@ sqlx-prepare:
 
 .PHONY: sqlx-add-migration
 sqlx-add-migration:
-	@@echo "Migration name: $${NAME:?nUsage: make sqlx-add-migration NAME=new_table}"
+	@@echo "Migration name: $${NAME:?Usage: make sqlx-add-migration NAME=new_table}"
 	$(foreach dir,$(MIGRATION_DIRS),(sqlx migrate add -r $$NAME --source $(dir) );)
 
 ###############################################################################
