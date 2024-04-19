@@ -27,7 +27,6 @@ kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-task-system-services = { workspace = true }
 kamu-flow-system = { workspace = true }
-kamu-flow-system-services = { workspace = true }
 event-bus = { workspace = true }
 
 async-stream = "0.3"
@@ -49,6 +48,7 @@ serde_with = { version = "3", default-features = false }
 [dev-dependencies]
 kamu = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
+kamu-flow-system-services = { workspace = true }
 
 cron = { version = "0.12", default-features = false }
 indoc = "2"
