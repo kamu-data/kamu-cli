@@ -4,7 +4,7 @@ set -eo pipefail
 
 # Generate Kamu Node auth token if GitHub access token is provided
 if [ -n "${GITHUB_TOKEN}" ] && [ -n "${GITHUB_LOGIN}" ] && [ -n "${KAMU_JWT_SECRET}" ] && [ -n "${KAMU_NODE_URL}" ]; then
-    kamu_token=$(kamu system generate-token --gh-login "${GITHUB_LOGIN}" --gh-access-token "${GITHUB_TOKEN}")
+    kamu_token=$(kamu system generate-token --login "${GITHUB_LOGIN}" --gh-access-token "${GITHUB_TOKEN}" --expiration-time-sec 18000)
     kamu login --user --access-token "${kamu_token}" "${KAMU_NODE_URL#odf+}"
 fi
 
