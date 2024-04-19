@@ -216,14 +216,26 @@ main() {
 
 #########################################################################################
 
+# ╦╔═ ╔═╗ ╔╦╗ ╦ ╦
+# ╠╩╗ ╠═╣ ║║║ ║ ║
+# ╩ ╩ ╩ ╩ ╩ ╩ ╚═╝
+
 print_header() {
     logoclr="${cyanbr}"
     printf \
-"${logoclr}${green}${bold}Kamu: Planet-scale data pipeline${reset}
+"${logoclr}${cyan}${bold}
+  ██╗  ██╗ █████╗ ███╗   ███╗██╗   ██╗
+  ██║ ██╔╝██╔══██╗████╗ ████║██║   ██║
+  █████╔╝ ███████║██╔████╔██║██║   ██║
+  ██╔═██╗ ██╔══██║██║╚██╔╝██║██║   ██║
+  ██║  ██╗██║  ██║██║ ╚═╝ ██║╚██████╔╝
+  ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝ ╚═════╝
+      Planet-scale data pipeline
 ${logoclr}${reset}
-${logoclr}${magenta}Website: https://kamu.dev${reset}
-${logoclr}${magenta}Docs: https://docs.kamu.dev/cli/${reset}
-${logoclr}${magenta}Discord: https://discord.gg/nU6TXRQNXC${reset}
+${logoclr}  ${cyan}${bold}Website:${reset}${cyan} https://kamu.dev${reset}
+${logoclr}  ${cyan}${bold}Docs:${reset}${cyan} https://docs.kamu.dev/cli/${reset}
+${logoclr}  ${cyan}${bold}Discord:${reset}${cyan} https://discord.gg/nU6TXRQNXC${reset}
+${logoclr}  ${cyan}${bold}Repo:${reset}${cyan} https://github.com/kamu-data/kamu-cli${reset}
 
 " 1>&2
 }
