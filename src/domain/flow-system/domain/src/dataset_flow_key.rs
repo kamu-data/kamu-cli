@@ -10,13 +10,14 @@
 use std::borrow::Borrow;
 use std::hash::{Hash, Hasher};
 
-use kamu_flow_system::{DatasetFlowType, FlowKeyDataset};
 use opendatafabric::DatasetID;
+
+use crate::{DatasetFlowType, FlowKeyDataset};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
-pub(crate) struct BorrowedFlowKeyDataset<'a> {
+pub struct BorrowedFlowKeyDataset<'a> {
     dataset_id: &'a DatasetID,
     flow_type: DatasetFlowType,
 }
@@ -36,7 +37,7 @@ impl<'a> BorrowedFlowKeyDataset<'a> {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) trait BorrowedFlowKeyDatasetHelper {
+pub trait BorrowedFlowKeyDatasetHelper {
     fn borrowed_key(&self) -> BorrowedFlowKeyDataset;
 }
 

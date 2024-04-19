@@ -47,12 +47,8 @@ use kamu_flow_system::{
     FlowTrigger,
     FlowTriggerAutoPolling,
 };
-use kamu_flow_system_inmem::{
-    FlowConfigurationEventStoreInMem,
-    FlowConfigurationServiceInMemory,
-    FlowEventStoreInMem,
-    FlowServiceInMemory,
-};
+use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
+use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceImpl};
 use kamu_task_system as ts;
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
@@ -149,13 +145,13 @@ async fn test_trigger_ingest_root_dataset() {
                                         "tasks": [],
                                         "initiator": {
                                             "id": FAKE_ACCOUNT_ID,
-                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            "accountName": DEFAULT_ACCOUNT_NAME,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
                                                 "id": FAKE_ACCOUNT_ID,
-                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                                "accountName": DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
                                         "startCondition": null,
@@ -220,13 +216,13 @@ async fn test_trigger_ingest_root_dataset() {
                                         ],
                                         "initiator": {
                                             "id": FAKE_ACCOUNT_ID,
-                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            "accountName": DEFAULT_ACCOUNT_NAME,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
                                                 "id": FAKE_ACCOUNT_ID,
-                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                                "accountName": DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
                                         "startCondition": {
@@ -294,13 +290,13 @@ async fn test_trigger_ingest_root_dataset() {
                                         ],
                                         "initiator": {
                                             "id": FAKE_ACCOUNT_ID,
-                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            "accountName": DEFAULT_ACCOUNT_NAME,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
                                                 "id": FAKE_ACCOUNT_ID,
-                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                                "accountName": DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
                                         "startCondition": null,
@@ -383,13 +379,13 @@ async fn test_trigger_ingest_root_dataset() {
                                         ],
                                         "initiator": {
                                             "id": FAKE_ACCOUNT_ID,
-                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            "accountName": DEFAULT_ACCOUNT_NAME,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
                                                 "id": FAKE_ACCOUNT_ID,
-                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                                "accountName": DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
                                         "startCondition": null,
@@ -502,13 +498,13 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                         "tasks": [],
                                         "initiator": {
                                             "id": FAKE_ACCOUNT_ID,
-                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            "accountName": DEFAULT_ACCOUNT_NAME,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
                                                 "id": FAKE_ACCOUNT_ID,
-                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                                "accountName": DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
                                         "startCondition": null,
@@ -601,13 +597,13 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                         ],
                                         "initiator": {
                                             "id": FAKE_ACCOUNT_ID,
-                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            "accountName": DEFAULT_ACCOUNT_NAME,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
                                                 "id": FAKE_ACCOUNT_ID,
-                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                                "accountName": DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
                                         "startCondition": null,
@@ -717,13 +713,13 @@ async fn test_trigger_compacting_root_dataset() {
                                         "tasks": [],
                                         "initiator": {
                                             "id": FAKE_ACCOUNT_ID,
-                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            "accountName": DEFAULT_ACCOUNT_NAME,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
                                                 "id": FAKE_ACCOUNT_ID,
-                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                                "accountName": DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
                                         "startCondition": null,
@@ -788,13 +784,13 @@ async fn test_trigger_compacting_root_dataset() {
                                         ],
                                         "initiator": {
                                             "id": FAKE_ACCOUNT_ID,
-                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            "accountName": DEFAULT_ACCOUNT_NAME,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
                                                 "id": FAKE_ACCOUNT_ID,
-                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                                "accountName": DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
                                         "startCondition": {
@@ -862,13 +858,13 @@ async fn test_trigger_compacting_root_dataset() {
                                         ],
                                         "initiator": {
                                             "id": FAKE_ACCOUNT_ID,
-                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            "accountName": DEFAULT_ACCOUNT_NAME,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
                                                 "id": FAKE_ACCOUNT_ID,
-                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                                "accountName": DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
                                         "startCondition": null,
@@ -956,13 +952,13 @@ async fn test_trigger_compacting_root_dataset() {
                                         ],
                                         "initiator": {
                                             "id": FAKE_ACCOUNT_ID,
-                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            "accountName": DEFAULT_ACCOUNT_NAME,
                                         },
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                             "initiator": {
                                                 "id": FAKE_ACCOUNT_ID,
-                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                                "accountName": DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
                                         "startCondition": null,
@@ -2328,9 +2324,9 @@ impl FlowRunsHarness {
             .add::<DependencyGraphServiceInMemory>()
             .add_value(dependency_graph_mock)
             .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
-            .add::<FlowConfigurationServiceInMemory>()
+            .add::<FlowConfigurationServiceImpl>()
             .add::<FlowConfigurationEventStoreInMem>()
-            .add::<FlowServiceInMemory>()
+            .add::<FlowServiceImpl>()
             .add::<FlowEventStoreInMem>()
             .add_value(FlowServiceRunConfig::new(
                 Duration::try_seconds(1).unwrap(),

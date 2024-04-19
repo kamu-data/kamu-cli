@@ -12,9 +12,8 @@
 // Re-exports
 pub use kamu_flow_system as domain;
 
-mod dataset_flow_key;
-mod repos;
-mod services;
+mod flow;
+mod flow_configuration;
 
-pub use repos::*;
-pub use services::*;
+pub use flow::*;
+pub use flow_configuration::*;

@@ -18,6 +18,7 @@ use kamu::*;
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
+use kamu_flow_system_services::*;
 use kamu_task_system::*;
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
@@ -92,7 +93,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                 //  - "task 0" will take action and complete, this will enqueue the next flow
                 //    run for "foo" after full scheduling period
                 //  - when that period is over, "task 1" should be scheduled
-                //  - "task 1" will take action and complete, enqueing another flow
+                //  - "task 1" will take action and complete, enqueuing another flow
                 let sim_handle = harness.advance_time(Duration::try_milliseconds(120).unwrap());
                 tokio::join!(foo_task0_handle, foo_task1_handle, sim_handle)
             } => Ok(())
@@ -727,7 +728,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
 
             // Main simulation script
             let main_handle = async {
-                // Initially both "foo" and "bar" are scheduled without waiting.
+                // Initially, both "foo" and "bar" are scheduled without waiting.
                 // "bar":
                 //  - flow 0: task 1 starts at 20ms, finishes at 30sms
                 //  - next flow 2 queued for 110ms (30+80)
@@ -735,7 +736,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 //  - flow 1: task 0 starts at 10ms, finishes at 20ms
                 //  - next flow 3 queued for 70ms (20+50)
 
-                // 50ms: Pause both flow configs in between completion 2 first tasks and queing
+                // 50ms: Pause both flow configs in between completion 2 first tasks and queuing
                 harness.advance_time(Duration::try_milliseconds(50).unwrap()).await;
                 harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), foo_id.clone(), DatasetFlowType::Ingest).await;
                 harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), bar_id.clone(), DatasetFlowType::Ingest).await;
@@ -3608,15 +3609,15 @@ impl FlowHarness {
 
         let mock_dataset_changes = overrides.mock_dataset_changes.unwrap_or_default();
 
-        let catalog = dill::CatalogBuilder::new()
+        let catalog = CatalogBuilder::new()
             .add::<EventBus>()
             .add_value(FlowServiceRunConfig::new(
                 awaiting_step,
                 mandatory_throttling_period,
             ))
-            .add::<FlowServiceInMemory>()
+            .add::<FlowServiceImpl>()
             .add::<FlowEventStoreInMem>()
-            .add::<FlowConfigurationServiceInMemory>()
+            .add::<FlowConfigurationServiceImpl>()
             .add::<FlowConfigurationEventStoreInMem>()
             .add_value(fake_system_time_source.clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()

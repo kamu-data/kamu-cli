@@ -46,6 +46,7 @@ kamu = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-task-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
+kamu-flow-system-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-adapter-auth-oso = { workspace = true }
 kamu-adapter-flight-sql = { workspace = true }

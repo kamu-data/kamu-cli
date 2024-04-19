@@ -20,7 +20,7 @@ use opendatafabric::DatasetID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct FlowConfigurationServiceInMemory {
+pub struct FlowConfigurationServiceImpl {
     event_store: Arc<dyn FlowConfigurationEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
     event_bus: Arc<EventBus>,
@@ -32,7 +32,7 @@ pub struct FlowConfigurationServiceInMemory {
 #[interface(dyn FlowConfigurationService)]
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
 #[scope(Singleton)]
-impl FlowConfigurationServiceInMemory {
+impl FlowConfigurationServiceImpl {
     pub fn new(
         event_store: Arc<dyn FlowConfigurationEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
@@ -98,9 +98,9 @@ impl FlowConfigurationServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowConfigurationService for FlowConfigurationServiceInMemory {
-    /// Find current schedule, which may or may not be associated with the given
-    /// dataset
+impl FlowConfigurationService for FlowConfigurationServiceImpl {
+    /// Find the current schedule, which may or may not be associated with the
+    /// given dataset
     #[tracing::instrument(level = "info", skip_all, fields(?flow_key))]
     async fn find_configuration(
         &self,
@@ -221,8 +221,8 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
         Ok(())
     }
 
-    /// Pauses dataset flows of given type for given dataset.
-    /// If type is omitted, all possible dataset flow types are paused
+    /// Pauses dataset flows of a given type for given dataset.
+    /// If the type is omitted, all possible dataset flow types are paused
     async fn pause_dataset_flows(
         &self,
         request_time: DateTime<Utc>,
@@ -240,8 +240,8 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
         Ok(())
     }
 
-    /// Pauses system flows of given type.
-    /// If type is omitted, all possible system flow types are paused
+    /// Pauses system flows of a given type.
+    /// If the type is omitted, all possible system flow types are paused
     async fn pause_system_flows(
         &self,
         request_time: DateTime<Utc>,
@@ -258,8 +258,9 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
         Ok(())
     }
 
-    /// Resumes dataset flows of given type for given dataset.
-    /// If type is omitted, all possible types are resumed (where configured)
+    /// Resumes dataset flows of a given type for given dataset.
+    /// If the type is omitted, all possible types are resumed (where
+    /// configured)
     async fn resume_dataset_flows(
         &self,
         request_time: DateTime<Utc>,
@@ -277,9 +278,9 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
         Ok(())
     }
 
-    /// Resumes system flows of given type.
-    /// If type is omitted, all possible system flow types are resumed (where
-    /// configured)
+    /// Resumes system flows of a given type.
+    /// If the type is omitted, all possible system flow types are resumed
+    /// (where configured)
     async fn resume_system_flows(
         &self,
         request_time: DateTime<Utc>,
@@ -300,7 +301,7 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceInMemory {
+impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
         for flow_type in DatasetFlowType::all() {

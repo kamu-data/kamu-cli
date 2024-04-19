@@ -101,7 +101,7 @@ pub async fn run(
 
         base_catalog_builder
             .add_value(dependencies_graph_repository)
-            .bind::<dyn domain::DependencyGraphRepository, DependencyGraphRepositoryInMemory>();
+            .bind::<dyn DependencyGraphRepository, DependencyGraphRepositoryInMemory>();
 
         let output_config = configure_output_format(&matches, &workspace_svc);
         base_catalog_builder.add_value(output_config.clone());
@@ -174,7 +174,7 @@ pub async fn run(
     drop(guards);
 
     if let Some(trace_file) = &output_config.trace_file {
-        // Run a web server and open the trace in the browser if environment allows
+        // Run a web server and open the trace in the browser if the environment allows
         let _ = TraceServer::maybe_serve_in_browser(trace_file).await;
     }
 
@@ -237,8 +237,8 @@ pub fn prepare_dependencies_graph_repository(
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add_value(current_account_subject)
-        .add::<kamu::domain::auth::AlwaysHappyDatasetActionAuthorizer>()
-        .add::<kamu::DependencyGraphServiceInMemory>()
+        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<DependencyGraphServiceInMemory>()
         // Don't add its own initializer, leave optional dependency uninitialized
         .build();
 
@@ -345,8 +345,8 @@ pub fn configure_base_catalog(
     // TODO: initialize graph dependencies when starting API server
     b.add::<DependencyGraphServiceInMemory>();
 
-    b.add::<kamu_flow_system_inmem::FlowConfigurationServiceInMemory>();
-    b.add::<kamu_flow_system_inmem::FlowServiceInMemory>();
+    b.add::<kamu_flow_system_services::FlowConfigurationServiceImpl>();
+    b.add::<kamu_flow_system_services::FlowServiceImpl>();
     b.add_value(kamu_flow_system_inmem::domain::FlowServiceRunConfig::new(
         chrono::Duration::try_seconds(1).unwrap(),
         chrono::Duration::try_minutes(1).unwrap(),
@@ -608,7 +608,7 @@ fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceL
     }
 
     if !workspace_layout.run_info_dir.exists() {
-        // Running outside of workspace - discard logs
+        // Running outside workspace - discard logs
         return Guards::default();
     }
 

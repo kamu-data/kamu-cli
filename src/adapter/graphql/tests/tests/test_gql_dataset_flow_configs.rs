@@ -23,7 +23,8 @@ use kamu_core::{
     SystemTimeSourceDefault,
     TransformService,
 };
-use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowConfigurationServiceInMemory};
+use kamu_flow_system_inmem::FlowConfigurationEventStoreInMem;
+use kamu_flow_system_services::FlowConfigurationServiceImpl;
 use opendatafabric::*;
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
@@ -956,7 +957,7 @@ async fn test_pause_resume_dataset_flows() {
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    // execute transfrom should be paused
+    // execute transform should be paused
 
     for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![false, true])
     {
@@ -973,7 +974,7 @@ async fn test_pause_resume_dataset_flows() {
         check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 
-    // Pause all of root
+    // Pause all the root
     let mutation_pause_all_root =
         FlowConfigHarness::pause_all_flows_mutation(&create_root_result.dataset_handle.id);
 
@@ -1015,7 +1016,7 @@ async fn test_pause_resume_dataset_flows() {
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    // Only transform of derive should be paused
+    // Only transform of deriving should be paused
     for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![false, true])
     {
         check_flow_config_status(
@@ -1515,7 +1516,7 @@ impl FlowConfigHarness {
             .bind::<dyn TransformService, MockTransformService>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
-            .add::<FlowConfigurationServiceInMemory>()
+            .add::<FlowConfigurationServiceImpl>()
             .add::<FlowConfigurationEventStoreInMem>()
             .build();
 
