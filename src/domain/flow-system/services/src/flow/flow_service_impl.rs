@@ -27,7 +27,7 @@ use super::pending_flows_state::PendingFlowsState;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct FlowServiceInMemory {
+pub struct FlowServiceImpl {
     state: Arc<Mutex<State>>,
     run_config: Arc<FlowServiceRunConfig>,
     event_bus: Arc<EventBus>,
@@ -59,7 +59,7 @@ struct State {
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
 #[interface(dyn AsyncEventHandler<FlowConfigurationEventModified>)]
 #[scope(Singleton)]
-impl FlowServiceInMemory {
+impl FlowServiceImpl {
     pub fn new(
         run_config: Arc<FlowServiceRunConfig>,
         event_bus: Arc<EventBus>,
@@ -795,7 +795,7 @@ impl FlowServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowService for FlowServiceInMemory {
+impl FlowService for FlowServiceImpl {
     /// Runs the update main loop
     #[tracing::instrument(level = "info", skip_all)]
     async fn run(&self, planned_start_time: DateTime<Utc>) -> Result<(), InternalError> {
@@ -1027,7 +1027,7 @@ impl FlowService for FlowServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowServiceTestDriver for FlowServiceInMemory {
+impl FlowServiceTestDriver for FlowServiceImpl {
     /// Pretends running started
     fn mimic_running_started(&self) {
         let mut state = self.state.lock().unwrap();
@@ -1060,7 +1060,7 @@ impl FlowServiceTestDriver for FlowServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<TaskEventRunning> for FlowServiceInMemory {
+impl AsyncEventHandler<TaskEventRunning> for FlowServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &TaskEventRunning) -> Result<(), InternalError> {
         // Is this a task associated with flows?
@@ -1097,7 +1097,7 @@ impl AsyncEventHandler<TaskEventRunning> for FlowServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
+impl AsyncEventHandler<TaskEventFinished> for FlowServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &TaskEventFinished) -> Result<(), InternalError> {
         // Is this a task associated with flows?
@@ -1176,7 +1176,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceInMemory {
+impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &FlowConfigurationEventModified) -> Result<(), InternalError> {
         if event.paused {
@@ -1227,7 +1227,7 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceInMemory {
+impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
         let flow_ids_2_abort = {

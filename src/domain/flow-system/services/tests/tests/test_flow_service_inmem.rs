@@ -3615,7 +3615,7 @@ impl FlowHarness {
                 awaiting_step,
                 mandatory_throttling_period,
             ))
-            .add::<FlowServiceInMemory>()
+            .add::<FlowServiceImpl>()
             .add::<FlowEventStoreInMem>()
             .add::<FlowConfigurationServiceImpl>()
             .add::<FlowConfigurationEventStoreInMem>()

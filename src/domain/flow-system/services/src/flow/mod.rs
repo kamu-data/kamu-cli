@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 mod active_configs_state;
-mod flow_service_inmem;
+mod flow_service_impl;
 mod flow_time_wheel;
 mod pending_flows_state;
 
-pub use flow_service_inmem::*;
+pub use flow_service_impl::*;

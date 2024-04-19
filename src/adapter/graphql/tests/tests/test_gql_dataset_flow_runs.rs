@@ -48,7 +48,7 @@ use kamu_flow_system::{
     FlowTriggerAutoPolling,
 };
 use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
-use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceInMemory};
+use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceImpl};
 use kamu_task_system as ts;
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
@@ -2326,7 +2326,7 @@ impl FlowRunsHarness {
             .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
             .add::<FlowConfigurationServiceImpl>()
             .add::<FlowConfigurationEventStoreInMem>()
-            .add::<FlowServiceInMemory>()
+            .add::<FlowServiceImpl>()
             .add::<FlowEventStoreInMem>()
             .add_value(FlowServiceRunConfig::new(
                 Duration::try_seconds(1).unwrap(),
