@@ -666,7 +666,7 @@ async fn test_crud_compacting_root_dataset() {
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
-                                    "paused": true,
+                                    "paused": false,
                                     "schedule": null,
                                     "batching": null,
                                     "compacting": {

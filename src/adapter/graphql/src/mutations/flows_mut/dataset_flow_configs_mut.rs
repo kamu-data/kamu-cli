@@ -205,7 +205,7 @@ impl DatasetFlowConfigsMut {
                 Utc::now(),
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
-                true,
+                false,
                 FlowConfigurationRule::CompactingRule(compacting_rule),
             )
             .await
