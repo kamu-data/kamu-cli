@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Changed
+- Upgraded to `datafusion` `v37.1.0`
 - Split the Flow system crates
 
 ## [0.176.3] - 2024-04-18
