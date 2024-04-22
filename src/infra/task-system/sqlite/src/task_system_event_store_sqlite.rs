@@ -76,7 +76,7 @@ impl EventStore<TaskState> for TaskSystemEventStoreSqlite {
             .map_err(|e| GetEventsError::Internal(e.int_err()));
 
             while let Some((event_id, event)) = query_stream.try_next().await? {
-                yield(Ok((event_id, event)));
+                yield Ok((event_id, event));
             }
         })
     }
