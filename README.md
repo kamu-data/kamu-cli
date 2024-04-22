@@ -18,11 +18,9 @@ Using the installer script _(Linux / MacOSX / WSL2)_:
 curl -s "https://get.kamu.dev" | sh
 ```
 
-## Get Started
-
 * Watch [this introductory video](https://www.youtube.com/watch?v=oUTiWW6W78A&list=PLV91cS45lwVG20Hicztbv7hsjN6x69MJk) to see `kamu` in action.
-* Learn how to use `kamu` with this [self-serve demo](https://docs.kamu.dev/cli/get-started/self-serve-demo/) without needing to install anything.
-* Then follow the "Getting Started" section of our [documentation] to install the tool and try a bunch of examples.
+* Learn how to use `kamu` with this [self-serve demo](https://demo.kamu.dev/) without needing to install anything.
+* Then follow the ["Getting Started"](https://docs.kamu.dev/cli/get-started/) section of our documentation to install the tool and try a bunch of examples.
 
 ## About
 
@@ -39,7 +37,7 @@ Using `kamu`, any person or smallest organization can easily **share structured 
 * Reproducible - i.e. you can ask the publisher *"Give me the same exact data you gave me a year ago"*
 * Verifiable - i.e. you can ask the publisher *"Is this the exact data you had a year ago?"*
 
-Teams and data communities can then **collaborate** on cleaning, enriching, and aggregating data by building arbitrarily complex **decentralized data pipelines**. Following the **"data as code"** philosophy `kamu` doesn't let you touch data manually - instead, you transform it using **Streaming SQL** (we support [multiple frameworks](https://docs.kamu.dev/cli/transform/supported-engines/)). This ensures that data supply chains are:
+Teams and data communities can then **collaborate** on cleaning, enriching, and aggregating data by building arbitrarily complex **decentralized data pipelines**. Following the **"data as code"** philosophy `kamu` doesn't let you touch data manually - instead, you transform it using **Streaming SQL** (we support [multiple frameworks](https://docs.kamu.dev/cli/supported-engines/)). This ensures that data supply chains are:
 * Autonomous - write query once and run it forever, no more babysitting fragile batch workflows
 * Low latency - get accurate results immediately, as new data arrives
 * Transparent - see where every single piece of data came from, who transformed it, and how
@@ -52,7 +50,7 @@ Data scientists, analysts, ML/AI researchers, and engineers can then:
 
 The reuse is achieved by maintaining **unbreakable lineage and provenance trail** in **tamper-proof** metadata, which lets you assess the trustworthiness of data, no matter how many hands and transformation steps it went through.
 
-In a larger context, `kamu` is a reference implementation of [Open Data Fabric](https://github.com/kamu-data/open-data-fabric) - a Web 3.0 protocol for providing timely, high-quality, and verifiable data for data science, smart contracts, web and applications.
+In a larger context, `kamu` is a reference implementation of [Open Data Fabric](https://github.com/open-data-fabric/open-data-fabric) - a Web 3.0 protocol for providing timely, high-quality, and verifiable data for data science, smart contracts, web and applications.
 
 <div align="center">
 <img src="./docs/readme_files/dataset_graph.png" alt="Open Data Fabric">
