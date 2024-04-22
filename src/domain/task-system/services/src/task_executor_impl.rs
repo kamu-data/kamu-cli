@@ -151,7 +151,15 @@ impl TaskExecutor for TaskExecutorImpl {
                         Ok(result) => {
                             TaskOutcome::Success(TaskResult::CompactingDatasetResult(result.into()))
                         }
-                        Err(_) => TaskOutcome::Failed(TaskError::Empty),
+                        Err(err) => {
+                            tracing::info!(
+                                %task_id,
+                                logical_plan = ?task.logical_plan,
+                                err = ?err,
+                                "Task failed",
+                            );
+                            TaskOutcome::Failed(TaskError::Empty)
+                        }
                     }
                 }
             };

@@ -380,6 +380,7 @@ impl CompactingServiceImpl {
         Ok((old_data_slices, current_head, new_num_blocks))
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn compact_dataset_impl(
         &self,
         dataset: Arc<dyn Dataset>,
