@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
-use futures::StreamExt;
+use futures::TryStreamExt;
 use kamu_core::events::DatasetEventDeleted;
 use kamu_core::SystemTimeSource;
 use kamu_flow_system::*;
@@ -154,12 +154,14 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
             for system_flow_type in SystemFlowType::all() {
                 let flow_key = (*system_flow_type).into();
                 let maybe_flow_configuration = FlowConfiguration::try_load(flow_key, self.event_store.as_ref()).await.int_err()?;
+
                 if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
                     yield flow_configuration.into();
                 }
             }
 
-            let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().collect().await;
+            let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().await.try_collect().await?;
+
             for dataset_id in dataset_ids {
                 for dataset_flow_type in DatasetFlowType::all() {
                     let maybe_flow_configuration = FlowConfiguration::try_load(FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into(), self.event_store.as_ref()).await.int_err()?;

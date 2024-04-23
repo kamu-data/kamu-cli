@@ -54,8 +54,7 @@ pub trait DependencyGraphService: Sync + Send {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type DatasetIDStream<'a> =
-    std::pin::Pin<Box<dyn Stream<Item = Result<DatasetID, InternalError>> + Send + 'a>>;
+pub type DatasetIDStream<'a> = std::pin::Pin<Box<dyn Stream<Item = DatasetID> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

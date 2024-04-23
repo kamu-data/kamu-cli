@@ -190,7 +190,7 @@ impl TaskSystemEventStore for TaskSystemEventStorePostgres {
         })
     }
 
-    /// Returns total number of tasks associated  with the specified dataset
+    /// Returns total number of tasks associated with the specified dataset
     async fn get_count_tasks_by_dataset(
         &self,
         dataset_id: &DatasetID,

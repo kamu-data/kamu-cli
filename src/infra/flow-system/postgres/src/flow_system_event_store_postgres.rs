@@ -10,7 +10,6 @@
 use database_common::{TransactionRef, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
-use kamu_core::DatasetIDStream;
 use kamu_flow_system::*;
 use opendatafabric::DatasetID;
 use sqlx::{FromRow, Postgres, QueryBuilder};
@@ -225,7 +224,7 @@ FROM flow_configuration_event_id_seq;
 
 #[async_trait::async_trait]
 impl FlowConfigurationEventStore for FlowSystemEventStorePostgres {
-    async fn list_all_dataset_ids(&self) -> DatasetIDStream<'_> {
+    async fn list_all_dataset_ids(&self) -> FailableDatasetIDStream<'_> {
         let mut tr = self.transaction.lock().await;
 
         Box::pin(async_stream::stream! {

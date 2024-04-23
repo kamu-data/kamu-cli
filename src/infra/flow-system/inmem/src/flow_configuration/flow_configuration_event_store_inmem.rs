@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
-use kamu_core::DatasetIDStream;
 use kamu_flow_system::*;
 use opendatafabric::DatasetID;
 
@@ -89,13 +88,16 @@ impl EventStore<FlowConfigurationState> for FlowConfigurationEventStoreInMem {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait]
 impl FlowConfigurationEventStore for FlowConfigurationEventStoreInMem {
     #[tracing::instrument(level = "debug", skip_all)]
-    fn list_all_dataset_ids(&self) -> DatasetIDStream {
+    async fn list_all_dataset_ids(&self) -> FailableDatasetIDStream {
+        use futures::StreamExt;
+
+        let dataset_ids = self.inner.as_state().lock().unwrap().dataset_ids.clone();
+
         // TODO: re-consider performance impact
-        Box::pin(tokio_stream::iter(
-            self.inner.as_state().lock().unwrap().dataset_ids.clone(),
-        ))
+        Box::pin(tokio_stream::iter(dataset_ids).map(Ok))
     }
 }
 

@@ -23,7 +23,6 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-kamu-core = { workspace = true }
 kamu-flow-system = { workspace = true }
 opendatafabric = { workspace = true }
 

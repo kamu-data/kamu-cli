@@ -273,7 +273,7 @@ impl FlowServiceImpl {
         flow_result: &FlowResult,
     ) -> Result<(), InternalError> {
         if let FlowKey::Dataset(fk_dataset) = flow_key {
-            // Extract list of downstream 1 level datasets
+            // Extract a list of downstream 1 level datasets
             let dependent_dataset_ids: Vec<_> = self
                 .dependency_graph_service
                 .get_downstream_dependencies(&fk_dataset.dataset_id)

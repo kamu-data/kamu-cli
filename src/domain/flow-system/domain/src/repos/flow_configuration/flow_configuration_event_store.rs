@@ -7,10 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::pin::Pin;
+
 use event_sourcing::EventStore;
-use kamu_core::DatasetIDStream;
+use opendatafabric::DatasetID;
+use tokio_stream::Stream;
 
 use crate::*;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub type FailableDatasetIDStream<'a> =
+    Pin<Box<dyn Stream<Item = Result<DatasetID, InternalError>> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,7 +26,7 @@ use crate::*;
 pub trait FlowConfigurationEventStore: EventStore<FlowConfigurationState> {
     /// Returns all unique values of dataset IDs associated with update configs
     // TODO: re-consider performance impact
-    async fn list_all_dataset_ids(&self) -> DatasetIDStream<'_>;
+    async fn list_all_dataset_ids(&self) -> FailableDatasetIDStream<'_>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

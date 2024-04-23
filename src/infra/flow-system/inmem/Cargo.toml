@@ -23,7 +23,6 @@ doctest = false
 
 [dependencies]
 opendatafabric = { workspace = true }
-kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-flow-system = { workspace = true }
 
