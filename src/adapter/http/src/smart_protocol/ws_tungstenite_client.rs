@@ -531,7 +531,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             }
         };
 
-        let sync_result = if dataset_pull_result.transfer_plan.num_blocks > 0 {
+        let transfer_plan_num_blocks = dataset_pull_result.transfer_plan.num_blocks;
+        let sync_result = if transfer_plan_num_blocks > 0 {
             let dataset_pull_metadata_response =
                 match self.pull_send_metadata_request(&mut ws_stream).await {
                     Ok(dataset_pull_metadata_response) => Ok(dataset_pull_metadata_response),
@@ -606,12 +607,17 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     .await?;
             }
 
-            let response = dataset_append_metadata(dst.as_ref(), new_blocks)
-                .await
-                .map_err(|e| {
-                    tracing::debug!("Appending dataset metadata failed with error: {}", e);
-                    SyncError::Internal(e.int_err())
-                })?;
+            let response = dataset_append_metadata(
+                dst.as_ref(),
+                new_blocks,
+                Some(listener),
+                Some(u64::from(transfer_plan_num_blocks)),
+            )
+            .await
+            .map_err(|e| {
+                tracing::debug!("Appending dataset metadata failed with error: {}", e);
+                SyncError::Internal(e.int_err())
+            })?;
 
             // TODO: encapsulate this inside dataset/chain
             if !response.new_upstream_ids.is_empty() {
@@ -635,7 +641,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             SyncResult::Updated {
                 old_head: dst_head,
                 new_head: new_dst_head,
-                num_blocks: u64::from(dataset_pull_result.transfer_plan.num_blocks),
+                num_blocks: u64::from(transfer_plan_num_blocks),
             }
         } else {
             SyncResult::UpToDate

@@ -10,6 +10,7 @@
 use std::collections::VecDeque;
 use std::io::Read;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use bytes::Bytes;
 use flate2::Compression;
@@ -208,7 +209,16 @@ pub struct AppendMetadataResponse {
 pub async fn dataset_append_metadata(
     dataset: &dyn Dataset,
     metadata: VecDeque<HashedMetadataBlock>,
+    listener: Option<Arc<dyn SyncListener>>,
+    num_blocks: Option<u64>,
 ) -> Result<AppendMetadataResponse, AppendError> {
+    let mut stats = SyncStats::default();
+    if let Some(num_blocks) = num_blocks {
+        stats.src_estimated.metadata_blocks_read += num_blocks;
+    }
+
+    let ls = listener.clone();
+
     let old_head = metadata.front().unwrap().1.prev_block_hash.clone();
     let new_head = metadata.back().unwrap().0.clone();
 
@@ -218,6 +228,11 @@ pub async fn dataset_append_metadata(
 
     for (hash, block) in metadata {
         tracing::debug!(sequence_numer = %block.sequence_number, hash = %hash, "Appending block");
+
+        stats.src.metadata_blocks_read += 1;
+        if let Some(ls) = &ls {
+            ls.on_status(SyncStage::ReadMetadata, &stats);
+        }
 
         if let opendatafabric::MetadataEvent::SetTransform(transform) = &block.event {
             // Collect only the latest upstream dataset IDs
