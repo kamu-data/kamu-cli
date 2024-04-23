@@ -4056,6 +4056,7 @@ dependencies = [
  "opendatafabric",
  "serde",
  "serde_with",
+ "sqlx",
  "thiserror",
  "tokio-stream",
  "tracing",
@@ -4087,6 +4088,28 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+]
+
+[[package]]
+name = "kamu-flow-system-postgres"
+version = "0.176.3"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "futures",
+ "kamu-core",
+ "kamu-flow-system",
+ "opendatafabric",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

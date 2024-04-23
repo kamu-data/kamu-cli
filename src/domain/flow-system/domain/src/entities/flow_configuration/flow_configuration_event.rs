@@ -9,12 +9,13 @@
 
 use chrono::{DateTime, Utc};
 use enum_variants::*;
+use serde::{Deserialize, Serialize};
 
 use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowConfigurationEvent {
     Created(FlowConfigurationEventCreated),
     Modified(FlowConfigurationEventModified),
@@ -23,7 +24,7 @@ pub enum FlowConfigurationEvent {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowConfigurationEventCreated {
     pub event_time: DateTime<Utc>,
     pub flow_key: FlowKey,
@@ -33,7 +34,7 @@ pub struct FlowConfigurationEventCreated {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowConfigurationEventModified {
     pub event_time: DateTime<Utc>,
     pub flow_key: FlowKey,
@@ -43,7 +44,7 @@ pub struct FlowConfigurationEventModified {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowConfigurationEventDatasetRemoved {
     pub event_time: DateTime<Utc>,
     pub flow_key: FlowKey,
@@ -52,6 +53,14 @@ pub struct FlowConfigurationEventDatasetRemoved {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl FlowConfigurationEvent {
+    pub fn typename(&self) -> &'static str {
+        match self {
+            FlowConfigurationEvent::Created(_) => "FlowConfigurationEventCreated",
+            FlowConfigurationEvent::Modified(_) => "FlowConfigurationEventModified",
+            FlowConfigurationEvent::DatasetRemoved(_) => "FlowConfigurationEventDatasetRemoved",
+        }
+    }
+
     pub fn flow_key(&self) -> &FlowKey {
         match self {
             FlowConfigurationEvent::Created(e) => &e.flow_key,
@@ -60,11 +69,11 @@ impl FlowConfigurationEvent {
         }
     }
 
-    pub fn event_time(&self) -> &DateTime<Utc> {
+    pub fn event_time(&self) -> DateTime<Utc> {
         match self {
-            FlowConfigurationEvent::Created(e) => &e.event_time,
-            FlowConfigurationEvent::Modified(e) => &e.event_time,
-            FlowConfigurationEvent::DatasetRemoved(e) => &e.event_time,
+            FlowConfigurationEvent::Created(e) => e.event_time,
+            FlowConfigurationEvent::Modified(e) => e.event_time,
+            FlowConfigurationEvent::DatasetRemoved(e) => e.event_time,
         }
     }
 }

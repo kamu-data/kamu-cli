@@ -30,9 +30,10 @@ kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
-cron = { version = "0.12", default-features = false }
 chrono = { version = "0.4", default-features = false }
+cron = { version = "0.12", default-features = false }
 lazy_static = { version = "1" }
+sqlx = { version = "0.7", default_features = false }
 thiserror = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
@@ -40,7 +41,7 @@ url = { version = "2", default-features = false }
 
 # TODO: Make serde optional
 serde = { version = "1", default-features = false, features = ["derive"] }
-serde_with = { version = "3", default-features = false }
+serde_with = { version = "3", default-features = false, features = ["chrono_0_4"] }
 
 [dev-dependencies]
 datafusion = { version = "37", default-features = false }

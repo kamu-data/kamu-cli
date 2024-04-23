@@ -8,12 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use opendatafabric::DatasetID;
+use serde::{Deserialize, Serialize};
 
 use crate::{AnyFlowType, DatasetFlowType, SystemFlowType};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FlowKey {
     Dataset(FlowKeyDataset),
     System(FlowKeySystem),
@@ -30,7 +32,7 @@ impl FlowKey {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct FlowKeyDataset {
     pub dataset_id: DatasetID,
     pub flow_type: DatasetFlowType,
@@ -47,7 +49,7 @@ impl FlowKeyDataset {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct FlowKeySystem {
     pub flow_type: SystemFlowType,
 }

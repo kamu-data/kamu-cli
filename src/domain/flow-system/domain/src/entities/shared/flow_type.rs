@@ -9,9 +9,12 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+use serde::{Deserialize, Serialize};
+
 use crate::{BatchingRule, CompactingRule, Schedule};
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "dataset_flow_type", rename_all = "snake_case")]
 pub enum DatasetFlowType {
     Ingest,
     ExecuteTransform,
@@ -47,7 +50,8 @@ impl DatasetFlowType {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "system_flow_type", rename_all = "snake_case")]
 pub enum SystemFlowType {
     GC,
 }
@@ -84,7 +88,7 @@ impl AnyFlowType {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum FlowSuccessFollowupMethod {
-    /// Nothing should happen if flow succeeds,
+    /// Nothing should happen if flow succeeds
     Ignore,
 
     /// If flow succeeds, it's dependent flows should trigger

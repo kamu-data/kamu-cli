@@ -3,7 +3,7 @@ ODF_CRATE_DIR=./src/domain/opendatafabric
 LICENSE_HEADER=docs/license_header.txt
 TEST_LOG_PARAMS=RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug
 
-POSTGRES_CRATES := ./src/infra/accounts/postgres ./src/infra/task-system/postgres
+POSTGRES_CRATES := ./src/infra/accounts/postgres ./src/infra/task-system/postgres ./src/infra/flow-system/postgres
 MYSQL_CRATES := ./src/infra/accounts/mysql
 SQLITE_CRATES := ./src/infra/accounts/sqlite ./src/infra/task-system/sqlite
 ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES) $(SQLITE_CRATES)

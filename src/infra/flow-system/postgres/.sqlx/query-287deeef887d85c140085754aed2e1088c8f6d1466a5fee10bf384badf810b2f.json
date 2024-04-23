@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nSELECT DISTINCT dataset_id\nFROM dataset_flow_configuration_events;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "dataset_id",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "287deeef887d85c140085754aed2e1088c8f6d1466a5fee10bf384badf810b2f"
+}

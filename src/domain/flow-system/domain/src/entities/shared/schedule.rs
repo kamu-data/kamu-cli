@@ -11,12 +11,14 @@ use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError};
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use thiserror::Error;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents dataset update settings
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Schedule {
     /// Time-delta based schedule
     TimeDelta(ScheduleTimeDelta),
@@ -26,14 +28,18 @@ pub enum Schedule {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScheduleTimeDelta {
+    #[serde_as(as = "serde_with::DurationMicroSeconds<i64>")]
     pub every: chrono::Duration,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScheduleCron {
     pub source_5component_cron_expression: String,
+    #[serde_as(as = "DisplayFromStr")]
     pub cron_schedule: cron::Schedule,
 }
 
@@ -113,8 +119,9 @@ impl Schedule {
         maybe_last_success_time: Option<DateTime<Utc>>,
     ) -> DateTime<Utc> {
         match self {
-            // For TimeDelta, take last activation time into account, if any recorded.
-            // If we know the last run was long time ago or even never happened - no need to wait.
+            // For TimeDelta, take the last activation time into account, if any recorded.
+            // If we know, the last run was a long time ago or even never happened - no need to
+            // wait.
             Schedule::TimeDelta(td) => {
                 if let Some(last_success_time) = maybe_last_success_time {
                     let planned_activation_time = last_success_time + td.every;
