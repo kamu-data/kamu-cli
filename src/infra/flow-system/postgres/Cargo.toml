@@ -41,8 +41,8 @@ sqlx = { version = "0.7", default-features = false, features = [
 ] }
 tokio-stream = { version = "0.1", default-features = false }
 
-#[dev-dependencies]
-#kamu-flow-system-repo-tests = { workspace = true }
+[dev-dependencies]
+kamu-flow-system-repo-tests = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

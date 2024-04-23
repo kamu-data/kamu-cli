@@ -43,6 +43,7 @@ serde_with = { version = "3", default-features = false }
 
 
 [dev-dependencies]
+kamu-flow-system-repo-tests = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 
 cron = { version = "0.12", default-features = false }
