@@ -22,6 +22,10 @@ pub enum FlowKey {
 }
 
 impl FlowKey {
+    pub fn dataset(dataset_id: DatasetID, flow_type: DatasetFlowType) -> Self {
+        Self::Dataset(FlowKeyDataset::new(dataset_id, flow_type))
+    }
+
     pub fn get_type(&self) -> AnyFlowType {
         match self {
             Self::Dataset(fk_dataset) => AnyFlowType::Dataset(fk_dataset.flow_type),

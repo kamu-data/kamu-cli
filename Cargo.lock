@@ -4074,6 +4074,7 @@ dependencies = [
  "dill",
  "futures",
  "kamu-flow-system",
+ "kamu-flow-system-repo-tests",
  "kamu-task-system",
  "kamu-task-system-inmem",
  "opendatafabric",
@@ -4100,6 +4101,7 @@ dependencies = [
  "dill",
  "futures",
  "kamu-flow-system",
+ "kamu-flow-system-repo-tests",
  "opendatafabric",
  "serde",
  "serde_json",
@@ -4108,6 +4110,17 @@ dependencies = [
  "test-log",
  "tokio",
  "tokio-stream",
+]
+
+[[package]]
+name = "kamu-flow-system-repo-tests"
+version = "0.176.3"
+dependencies = [
+ "chrono",
+ "dill",
+ "futures",
+ "kamu-flow-system",
+ "opendatafabric",
 ]
 
 [[package]]
