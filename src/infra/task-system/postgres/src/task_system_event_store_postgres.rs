@@ -106,13 +106,13 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
             .build_query_as::<ResultRow>()
             .fetch_all(connection_mut)
             .await
-            .unwrap();
+            .int_err()?;
 
         if let Some(last_row) = rows.last() {
             Ok(EventID::new(last_row.event_id))
         } else {
             Ok(EventID::new(
-                i64::try_from(self.len().await.unwrap()).unwrap(),
+                i64::try_from(self.len().await.int_err()?).int_err()?,
             ))
         }
     }
