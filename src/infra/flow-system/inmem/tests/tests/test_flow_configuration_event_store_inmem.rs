@@ -22,3 +22,25 @@ async fn test_event_store_empty() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_event_store_get_streams() {
+    let catalog = CatalogBuilder::new()
+        .add::<FlowConfigurationEventStoreInMem>()
+        .build();
+
+    kamu_flow_system_repo_tests::test_event_store_get_streams(&catalog).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_event_store_get_events_with_windowing() {
+    let catalog = CatalogBuilder::new()
+        .add::<FlowConfigurationEventStoreInMem>()
+        .build();
+
+    kamu_flow_system_repo_tests::test_event_store_get_events_with_windowing(&catalog).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
