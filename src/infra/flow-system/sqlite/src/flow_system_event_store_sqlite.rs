@@ -240,7 +240,7 @@ INSERT INTO system_flow_configuration_events (event_id, system_flow_type, event_
         if let Some(last_row) = rows.last() {
             Ok(EventID::new(last_row.event_id))
         } else {
-            let event_id = i64::try_from(self.len().await.unwrap()).unwrap();
+            let event_id = i64::try_from(self.len().await.int_err()?).int_err()?;
 
             Ok(EventID::new(event_id))
         }

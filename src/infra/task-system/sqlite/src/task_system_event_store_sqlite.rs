@@ -101,7 +101,7 @@ impl EventStore<TaskState> for TaskSystemEventStoreSqlite {
         );
 
         query_builder.push_values(events, |mut b, event| {
-            let event_task_id: i64 = (event.task_id()).into();
+            let event_task_id: i64 = event.task_id().into();
             b.push_bind(event_task_id);
             b.push_bind(event.dataset_id().map(ToString::to_string));
             b.push_bind(event.event_time());
@@ -115,13 +115,13 @@ impl EventStore<TaskState> for TaskSystemEventStoreSqlite {
             .build_query_as::<ResultRow>()
             .fetch_all(connection_mut)
             .await
-            .unwrap();
+            .int_err()?;
 
         if let Some(last_row) = rows.last() {
             Ok(EventID::new(last_row.event_id))
         } else {
             Ok(EventID::new(
-                i64::try_from(self.len().await.unwrap()).unwrap(),
+                i64::try_from(self.len().await.int_err()?).int_err()?,
             ))
         }
     }
@@ -183,14 +183,13 @@ impl TaskSystemEventStore for TaskSystemEventStoreSqlite {
         pagination: TaskPaginationOpts,
     ) -> TaskIDStream {
         let mut tr = self.transaction.lock().await;
-        let dataset_id = dataset_id.clone();
+        let dataset_id = dataset_id.to_string();
 
         Box::pin(async_stream::stream! {
             let connection_mut = tr.connection_mut().await?;
 
-            let dataset_id_str = dataset_id.to_string();
-            let limit = i64::try_from(pagination.limit).unwrap();
-            let offset = i64::try_from(pagination.offset).unwrap();
+            let limit = i64::try_from(pagination.limit).int_err()?;
+            let offset = i64::try_from(pagination.offset).int_err()?;
 
             let mut query_stream = sqlx::query!(
                 r#"
@@ -199,7 +198,7 @@ impl TaskSystemEventStore for TaskSystemEventStoreSqlite {
                     WHERE dataset_id = $1 AND event_type = 'TaskEventCreated'
                     ORDER  BY task_id DESC LIMIT $2 OFFSET $3
                 "#,
-                dataset_id_str,
+                dataset_id,
                 limit,
                 offset,
             )

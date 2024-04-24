@@ -164,10 +164,13 @@ impl TaskSystemEventStore for TaskSystemEventStorePostgres {
         pagination: TaskPaginationOpts,
     ) -> TaskIDStream {
         let mut tr = self.transaction.lock().await;
-        let dataset_id = dataset_id.clone();
+        let dataset_id = dataset_id.to_string();
 
         Box::pin(async_stream::stream! {
             let connection_mut = tr.connection_mut().await?;
+
+            let limit = i64::try_from(pagination.limit).int_err()?;
+            let offset = i64::try_from(pagination.offset).int_err()?;
 
             let mut query_stream = sqlx::query!(
                 r#"
@@ -176,9 +179,9 @@ impl TaskSystemEventStore for TaskSystemEventStorePostgres {
                     WHERE dataset_id = $1 AND event_type = 'TaskEventCreated'
                     ORDER  BY task_id DESC LIMIT $2 OFFSET $3
                 "#,
-                dataset_id.to_string(),
-                i64::try_from(pagination.limit).unwrap(),
-                i64::try_from(pagination.offset).unwrap(),
+                dataset_id,
+                limit,
+                offset,
             )
             .try_map(|event_row| Ok(TaskID::new(event_row.task_id)))
             .fetch(connection_mut)
