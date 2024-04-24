@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT DISTINCT dataset_id\nFROM dataset_flow_configuration_events\nORDER BY event_id\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "dataset_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "34737ee9aa2d2526b0ed0f440ab1dbd874b9362ed7c65e6a1b0805a9199e6564"
+}
