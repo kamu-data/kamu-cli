@@ -15,7 +15,6 @@ use crate::{AnyFlowType, DatasetFlowType, SystemFlowType};
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub enum FlowKey {
     Dataset(FlowKeyDataset),
     System(FlowKeySystem),
