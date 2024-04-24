@@ -189,12 +189,12 @@ INSERT INTO system_flow_configuration_events (system_flow_type, event_type, even
             .build_query_as::<ResultRow>()
             .fetch_all(connection_mut)
             .await
-            .unwrap();
+            .int_err()?;
 
         if let Some(last_row) = rows.last() {
             Ok(EventID::new(last_row.event_id))
         } else {
-            let event_id = i64::try_from(self.len().await.unwrap()).unwrap();
+            let event_id = i64::try_from(self.len().await.int_err()?).int_err()?;
 
             Ok(EventID::new(event_id))
         }
