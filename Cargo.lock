@@ -2317,9 +2317,9 @@ dependencies = [
 
 [[package]]
 name = "dbase"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86bc97a72d9aca92b9a8095b3bfe8f691c54bb15eefaacec53882604062428bf"
+checksum = "847c0b5d4f3a3d80f9c64db3cb60eb00304b3ea1262c7299dd6274a83e714d24"
 dependencies = [
  "byteorder",
  "time",
@@ -6531,9 +6531,9 @@ dependencies = [
 
 [[package]]
 name = "shapefile"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96e5f3746704e7b520956ef4906aa15e24e80b351c41bdfbf11bb086b12c48af"
+checksum = "79d5472e932503059d02779ad2c1b96258980940c6923e49f427fbe80eb3053c"
 dependencies = [
  "byteorder",
  "dbase",
