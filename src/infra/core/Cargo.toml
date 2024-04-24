@@ -55,7 +55,7 @@ curl-sys = { optional = true, version = "0.4" }
 flate2 = "1"  # GZip decoder
 reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "stream", "gzip", "brotli", "deflate"] }
 ringbuf = "0.3"
-zip = "0.6"
+zip = "1"
 
 # Data
 datafusion = { version = "37", default-features = false }
