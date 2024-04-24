@@ -181,7 +181,7 @@ INSERT INTO flow_configuration_event(created_time)
                 .build_query_as::<ReturningEventModel>()
                 .fetch_all(connection_mut)
                 .await
-                .unwrap()
+                .int_err()?
         };
 
         let connection_mut = tr.connection_mut().await?;
@@ -235,7 +235,7 @@ INSERT INTO system_flow_configuration_events (event_id, system_flow_type, event_
             .build_query_as::<ReturningEventModel>()
             .fetch_all(connection_mut)
             .await
-            .unwrap();
+            .int_err()?;
 
         if let Some(last_row) = rows.last() {
             Ok(EventID::new(last_row.event_id))
