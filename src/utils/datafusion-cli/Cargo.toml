@@ -32,8 +32,8 @@ publish = { workspace = true }
 [dependencies]
 arrow = "51.0.0"
 async-trait = "0.1"
-aws-config = "0.57"
-aws-credential-types = "0.57"
+aws-config = "1"
+aws-credential-types = "1"
 clap = { version = "4", features = ["derive"] }
 datafusion = { version = "37", features = [
     "crypto_expressions",

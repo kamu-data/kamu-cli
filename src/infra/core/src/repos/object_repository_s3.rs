@@ -100,7 +100,9 @@ where
         tracing::debug!(?key, "Checking for object");
 
         match self.s3_context.head_object(key).await {
-            Ok(output) => u64::try_from(output.content_length).map_err(|err| err.int_err().into()),
+            Ok(output) => {
+                u64::try_from(output.content_length.unwrap()).map_err(|err| err.int_err().into())
+            }
             Err(err) => match err.into_service_error() {
                 // TODO: Detect credentials error
                 HeadObjectError::NotFound(_) => Err(GetError::NotFound(ObjectNotFoundError {

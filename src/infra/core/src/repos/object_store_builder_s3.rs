@@ -7,13 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use aws_credential_types::provider::SharedCredentialsProvider;
 use dill::*;
 use kamu_core::*;
-use object_store::aws::{AmazonS3Builder, AwsCredential};
-use object_store::CredentialProvider;
+use object_store::aws::AmazonS3Builder;
 use url::Url;
 
 use crate::utils::s3_context::S3Context;
@@ -57,14 +55,14 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
     )]
     fn build_object_store(&self) -> Result<Arc<dyn object_store::ObjectStore>, InternalError> {
         let mut s3_builder = AmazonS3Builder::from_env()
-            .with_credentials(Arc::new(AwsSdkCredentialProvider::new(
+            /*.with_credentials(Arc::new(AwsSdkCredentialProvider::new(
                 self.s3_context
                     .client
                     .config()
                     .credentials_provider()
                     .unwrap()
                     .clone(),
-            )))
+            )))*/
             .with_bucket_name(self.s3_context.bucket.clone())
             .with_allow_http(self.allow_http);
 
@@ -91,6 +89,8 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
 /////////////////////////////////////////////////////////////////////////////////////////
 // AwsSdkCredentialProvider
 /////////////////////////////////////////////////////////////////////////////////////////
+
+/*
 
 /// The [`object_store`] crate doesn't use the official AWS SDK and has its
 /// own credential resolution mechanisms. We want to avoid using two paths to
@@ -157,5 +157,5 @@ impl CredentialProvider for AwsSdkCredentialProvider {
         Ok(converted_creds)
     }
 }
-
+*/
 /////////////////////////////////////////////////////////////////////////////////////////

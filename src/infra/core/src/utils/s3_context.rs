@@ -9,7 +9,7 @@
 
 use std::convert::TryFrom;
 
-use aws_credential_types::Credentials;
+use aws_config::BehaviorVersion;
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::delete_object::{DeleteObjectError, DeleteObjectOutput};
 use aws_sdk_s3::operation::get_object::{GetObjectError, GetObjectOutput};
@@ -76,7 +76,10 @@ impl S3Context {
         // not set even if using custom endpoint
         let region_provider = aws_config::meta::region::RegionProviderChain::default_provider()
             .or_else("unspecified");
-        let sdk_config = aws_config::from_env().region(region_provider).load().await;
+        let sdk_config = aws_config::defaults(BehaviorVersion::latest())
+            .region(region_provider)
+            .load()
+            .await;
         let s3_config = if let Some(endpoint) = endpoint.clone() {
             aws_sdk_s3::config::Builder::from(&sdk_config)
                 .endpoint_url(endpoint)
@@ -148,12 +151,6 @@ impl S3Context {
             }
         };
         Url::parse(context_url_str.as_str()).unwrap()
-    }
-
-    pub async fn credentials(&self) -> Credentials {
-        use aws_credential_types::provider::ProvideCredentials;
-        let credentials_cache = self.client.config().credentials_provider().unwrap();
-        credentials_cache.provide_credentials().await.unwrap()
     }
 
     pub fn region(&self) -> Option<&str> {
@@ -272,10 +269,10 @@ impl S3Context {
             .int_err()?;
 
         // TODO: Support iteration
-        assert!(
-            !list_objects_resp.is_truncated,
-            "Cannot handle truncated response"
-        );
+        let is_truncated = list_objects_resp
+            .is_truncated
+            .is_some_and(|is_truncated| is_truncated);
+        assert!(!is_truncated, "Cannot handle truncated response");
 
         Ok(list_objects_resp.common_prefixes.unwrap_or_default())
     }
@@ -301,7 +298,9 @@ impl S3Context {
                     .collect::<Result<Vec<_>, _>>()
                     .int_err()?;
 
-                has_next_page = list_response.is_truncated;
+                has_next_page = list_response
+                    .is_truncated
+                    .is_some_and(|is_truncated| is_truncated);
                 self.client
                     .delete_objects()
                     .bucket(&self.bucket)
@@ -346,7 +345,9 @@ impl S3Context {
             // same bucket. Consider optimistic locking (comparing old head with
             // expected before final commit).
 
-            has_next_page = list_response.is_truncated();
+            has_next_page = list_response
+                .is_truncated()
+                .is_some_and(|is_truncated| is_truncated);
             if let Some(contents) = list_response.contents {
                 for obj in &contents {
                     let copy_source =
