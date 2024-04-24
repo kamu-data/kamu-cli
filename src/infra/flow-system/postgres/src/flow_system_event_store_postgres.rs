@@ -206,7 +206,11 @@ INSERT INTO system_flow_configuration_events (system_flow_type, event_type, even
 
         let result = sqlx::query!(
             r#"
-SELECT last_value - 1 as count
+SELECT
+    CASE
+        WHEN is_called THEN last_value
+        ELSE 0
+    END AS count
 FROM flow_configuration_event_id_seq;
 "#,
         )
