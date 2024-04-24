@@ -83,7 +83,7 @@ minus = { version = "5", features = ["static_output", "search"] }
 num-format = "0.4"  # Human-readable number formatting
 prettytable-rs = "0.10"  # ASCII table formatting
 read_input = "0.8"  # Basic user input
-webbrowser = "0.8"  # For opening URLs in default system browser
+webbrowser = "1"  # For opening URLs in default system browser
 
 # APIs
 arrow-flight = { version = "51", features = ["flight-sql-experimental"] }
