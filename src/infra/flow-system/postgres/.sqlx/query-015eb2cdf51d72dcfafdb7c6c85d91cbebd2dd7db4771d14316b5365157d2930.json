@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\nSELECT\n    CASE\n        WHEN is_called THEN last_value\n        ELSE 0\n    END AS count\nFROM flow_configuration_event_id_seq;\n",
+  "query": "\nSELECT\n    CASE\n        WHEN is_called THEN last_value\n        ELSE 0\n    END AS count\nFROM flow_configuration_event_id_seq\n",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       null
     ]
   },
-  "hash": "20dc6e2ed68085b272628a0c3166f3d6ad5b4fdf78a1fa83d6ee1ce42cb6bcf2"
+  "hash": "015eb2cdf51d72dcfafdb7c6c85d91cbebd2dd7db4771d14316b5365157d2930"
 }

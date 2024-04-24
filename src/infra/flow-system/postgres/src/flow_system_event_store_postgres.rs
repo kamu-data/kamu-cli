@@ -211,7 +211,7 @@ SELECT
         WHEN is_called THEN last_value
         ELSE 0
     END AS count
-FROM flow_configuration_event_id_seq;
+FROM flow_configuration_event_id_seq
 "#,
         )
         .fetch_one(connection_mut)
@@ -237,7 +237,7 @@ impl FlowConfigurationEventStore for FlowSystemEventStorePostgres {
             let mut query_stream = sqlx::query!(
                 r#"
 SELECT DISTINCT dataset_id
-FROM dataset_flow_configuration_events;
+FROM dataset_flow_configuration_events
 "#,
             )
             .try_map(|event_row| {

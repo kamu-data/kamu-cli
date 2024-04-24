@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\nSELECT DISTINCT dataset_id\nFROM dataset_flow_configuration_events;\n",
+  "query": "\nSELECT DISTINCT dataset_id\nFROM dataset_flow_configuration_events\n",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "287deeef887d85c140085754aed2e1088c8f6d1466a5fee10bf384badf810b2f"
+  "hash": "132a0077e3401aa57877bf649132168fee49f52d0b186dcc3e8321e8ad251399"
 }
