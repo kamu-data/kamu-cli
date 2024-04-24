@@ -388,6 +388,7 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_postgres::PostgresAccountRepository>();
+            catalog_builder.add::<kamu_flow_system_postgres::FlowSystemEventStorePostgres>();
 
             Ok(())
         }
@@ -410,6 +411,7 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
+            catalog_builder.add::<kamu_flow_system_sqlite::FlowSystemEventStoreSqlite>();
 
             Ok(())
         }

@@ -86,7 +86,7 @@ kamu-ingest-datafusion = { version = "0.177.0", path = "src/infra/ingest-datafus
 ## Flow System
 kamu-flow-system-repo-tests = { version = "0.177.0", path = "src/infra/flow-system/repo-tests", default-features = false }
 kamu-flow-system-inmem = { version = "0.177.0", path = "src/infra/flow-system/inmem", default-features = false }
-kamu-flow-system-postgres = { version = "0.177.0", path = "src/infra/flow-system/inmem", default-features = false }
+kamu-flow-system-postgres = { version = "0.177.0", path = "src/infra/flow-system/postgres", default-features = false }
 kamu-flow-system-sqlite = { version = "0.177.0", path = "src/infra/flow-system/sqlite", default-features = false }
 ## Accounts
 kamu-accounts-mysql = { version = "0.177.0", path = "src/infra/accounts/mysql", default-features = false }
