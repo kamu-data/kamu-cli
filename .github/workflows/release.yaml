@@ -65,11 +65,13 @@ jobs:
           target: ${{ matrix.target }}
           override: true
 
+      - uses: cargo-bins/cargo-binstall@main
+
       - name: Install cross
         if: matrix.use-cross
         shell: bash
         run: |
-          cargo install cross --locked
+          cargo binstall cross -y
           echo "CARGO=cross" >> $GITHUB_ENV
 
       - name: Fetch web UI artifacts
@@ -101,11 +103,11 @@ jobs:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}${{ matrix.binary-ext }}
           if-no-files-found: error
-  
+
   create_release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [ build ]
     steps:
       - uses: actions/checkout@v4
 
@@ -128,7 +130,7 @@ jobs:
           body_path: RELEASE.md
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
-  
+
   upload_assets:
     strategy:
       fail-fast: false
@@ -157,7 +159,7 @@ jobs:
             media-type: application/zip
     name: Upload Assets (${{ matrix.target }})
     runs-on: ubuntu-latest
-    needs: [create_release]
+    needs: [ create_release ]
     steps:
       - name: Download Artifact
         uses: actions/download-artifact@v4
