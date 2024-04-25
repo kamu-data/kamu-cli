@@ -31,7 +31,7 @@ pub enum Schedule {
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScheduleTimeDelta {
-    #[serde_as(as = "serde_with::DurationMicroSeconds<i64>")]
+    #[serde_as(as = "serde_with::DurationSeconds<i64>")]
     pub every: chrono::Duration,
 }
 
