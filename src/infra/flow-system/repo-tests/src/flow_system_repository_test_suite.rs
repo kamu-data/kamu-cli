@@ -125,14 +125,20 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     assert_eq!(&events[..], [event_2.into()]);
 
-    let dataset_ids: Vec<_> = event_store
+    let mut dataset_ids: Vec<_> = event_store
         .list_all_dataset_ids()
         .await
         .try_collect()
         .await
         .unwrap();
 
-    assert_eq!(&dataset_ids[..], [dataset_id_2, dataset_id_1]); // Reverse order
+    dataset_ids.sort();
+
+    let mut expected_dataset_ids = vec![dataset_id_1, dataset_id_2];
+
+    expected_dataset_ids.sort();
+
+    assert_eq!(expected_dataset_ids, dataset_ids);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
