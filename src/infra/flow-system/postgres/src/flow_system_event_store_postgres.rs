@@ -205,12 +205,12 @@ INSERT INTO system_flow_configuration_events (system_flow_type, event_type, even
 
         let result = sqlx::query!(
             r#"
-SELECT
-    CASE
-        WHEN is_called THEN last_value
-        ELSE 0
-    END AS count
-FROM flow_configuration_event_id_seq
+SELECT MAX(event_count) as count
+FROM (SELECT COUNT(event_id) as event_count
+      FROM dataset_flow_configuration_events
+      UNION ALL
+      SELECT COUNT(event_id) as event_count
+      FROM dataset_flow_configuration_events) as counts;
 "#,
         )
         .fetch_one(connection_mut)
