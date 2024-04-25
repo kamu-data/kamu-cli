@@ -10,7 +10,7 @@ on:
       - "!**.ipynb"
       - "resources/**"
   # manual trigger
-  workflow_dispatch: {}
+  workflow_dispatch: { }
 env:
   RUST_LOG: "debug"
   RUST_LOG_SPAN_EVENTS: "new,close"
@@ -78,7 +78,7 @@ jobs:
           - name: MacOS / arm64
             runs-on: macos-14
             cargo-flags: --profile ci
-            nextest-flags: --cargo-profile ci 
+            nextest-flags: --cargo-profile ci
             nextest-exclusions: -E '!(test(::containerized::) | test(::database::))'
             container-runtime: ''
             ipfs: false
@@ -88,7 +88,7 @@ jobs:
           - name: Windows / amd64
             runs-on: windows-latest
             cargo-flags: --profile ci
-            nextest-flags: --cargo-profile ci 
+            nextest-flags: --cargo-profile ci
             nextest-exclusions: -E 'not (test(::containerized::) | test(::datafusion::) | test(::database::))'
             container-runtime: ''
             ipfs: false
@@ -129,9 +129,8 @@ jobs:
       - uses: cargo-bins/cargo-binstall@main
 
       - name: Install cargo tools
-        # TODO: Restore --locked switch as soon as `cargo-nextest` releases version with `ahash>=0.8.7`
         run: |
-          cargo binstall cargo-nextest -y --force
+          cargo binstall cargo-nextest -y
 
       - name: Configure runtime
         if: matrix.container-runtime != ''
