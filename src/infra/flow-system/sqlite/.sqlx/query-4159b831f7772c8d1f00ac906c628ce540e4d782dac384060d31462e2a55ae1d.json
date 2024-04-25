@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT DISTINCT dataset_id\nFROM dataset_flow_configuration_events\nORDER BY event_id\n",
+  "query": "\nSELECT DISTINCT dataset_id\nFROM dataset_flow_configuration_events\nWHERE event_type = 'FlowConfigurationEventCreated'\n",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "34737ee9aa2d2526b0ed0f440ab1dbd874b9362ed7c65e6a1b0805a9199e6564"
+  "hash": "4159b831f7772c8d1f00ac906c628ce540e4d782dac384060d31462e2a55ae1d"
 }

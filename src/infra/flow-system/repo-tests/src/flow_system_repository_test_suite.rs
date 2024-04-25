@@ -132,7 +132,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .await
         .unwrap();
 
-    assert_eq!(&dataset_ids[..], [dataset_id_1, dataset_id_2]);
+    assert_eq!(&dataset_ids[..], [dataset_id_2, dataset_id_1]); // Reverse order
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

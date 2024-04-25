@@ -280,7 +280,7 @@ impl FlowConfigurationEventStore for FlowSystemEventStoreSqlite {
                 r#"
 SELECT DISTINCT dataset_id
 FROM dataset_flow_configuration_events
-ORDER BY event_id
+WHERE event_type = 'FlowConfigurationEventCreated'
 "#,
             )
             .try_map(|event_row| {

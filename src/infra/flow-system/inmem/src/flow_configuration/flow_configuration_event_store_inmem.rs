@@ -94,7 +94,16 @@ impl FlowConfigurationEventStore for FlowConfigurationEventStoreInMem {
     async fn list_all_dataset_ids(&self) -> FailableDatasetIDStream {
         use futures::StreamExt;
 
-        let dataset_ids = self.inner.as_state().lock().unwrap().dataset_ids.clone();
+        let dataset_ids: Vec<_> = self
+            .inner
+            .as_state()
+            .lock()
+            .unwrap()
+            .dataset_ids
+            .iter()
+            .rev()
+            .cloned()
+            .collect();
 
         // TODO: re-consider performance impact
         Box::pin(tokio_stream::iter(dataset_ids).map(Ok))

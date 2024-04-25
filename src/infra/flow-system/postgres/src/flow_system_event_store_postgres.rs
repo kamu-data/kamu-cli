@@ -237,6 +237,7 @@ impl FlowConfigurationEventStore for FlowSystemEventStorePostgres {
                 r#"
 SELECT DISTINCT dataset_id
 FROM dataset_flow_configuration_events
+WHERE event_type = 'FlowConfigurationEventCreated'
 "#,
             )
             .try_map(|event_row| {
