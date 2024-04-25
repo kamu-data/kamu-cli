@@ -159,6 +159,10 @@ impl EventStore<FlowConfigurationState> for FlowSystemEventStoreSqlite {
         flow_key: &FlowKey,
         events: Vec<FlowConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
+        if events.is_empty() {
+            return Err(SaveEventsError::NothingToSave);
+        }
+
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -237,13 +241,9 @@ INSERT INTO system_flow_configuration_events (event_id, system_flow_type, event_
             .await
             .int_err()?;
 
-        if let Some(last_row) = rows.last() {
-            Ok(EventID::new(last_row.event_id))
-        } else {
-            let event_id = i64::try_from(self.len().await.int_err()?).int_err()?;
+        let last_event_id = rows.last().unwrap().event_id;
 
-            Ok(EventID::new(event_id))
-        }
+        Ok(EventID::new(last_event_id))
     }
 
     async fn len(&self) -> Result<usize, InternalError> {

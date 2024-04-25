@@ -67,6 +67,9 @@ pub enum GetEventsError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum SaveEventsError {
+    #[error("No events for saves")]
+    NothingToSave,
+
     // TODO: Concurrency control
     #[error(transparent)]
     Internal(#[from] InternalError),

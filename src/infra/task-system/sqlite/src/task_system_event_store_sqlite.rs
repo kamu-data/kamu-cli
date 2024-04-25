@@ -86,6 +86,10 @@ impl EventStore<TaskState> for TaskSystemEventStoreSqlite {
         _task_id: &TaskID,
         events: Vec<TaskEvent>,
     ) -> Result<EventID, SaveEventsError> {
+        if events.is_empty() {
+            return Err(SaveEventsError::NothingToSave);
+        }
+
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -116,14 +120,9 @@ impl EventStore<TaskState> for TaskSystemEventStoreSqlite {
             .fetch_all(connection_mut)
             .await
             .int_err()?;
+        let last_event_id = rows.last().unwrap().event_id;
 
-        if let Some(last_row) = rows.last() {
-            Ok(EventID::new(last_row.event_id))
-        } else {
-            Ok(EventID::new(
-                i64::try_from(self.len().await.int_err()?).int_err()?,
-            ))
-        }
+        Ok(EventID::new(last_event_id))
     }
 
     async fn len(&self) -> Result<usize, InternalError> {
