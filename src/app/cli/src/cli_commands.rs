@@ -448,16 +448,12 @@ pub fn get_command(
                 cli_catalog.get_one()?,
                 info_matches.get_one("output-format").map(String::as_str),
             )),
-            Some(("diagnose", _)) => {
-                let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
-                Box::new(SystemDiagnoseCommand::new(
-                    cli_catalog.get_one()?,
-                    cli_catalog.get_one()?,
-                    cli_catalog.get_one()?,
-                    workspace_svc.is_in_workspace(),
-                    workspace_svc.layout().unwrap().run_info_dir.clone(),
-                ))
-            }
+            Some(("diagnose", _)) => Box::new(SystemDiagnoseCommand::new(
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+            )),
             Some(("check-token", matches)) => Box::new(CheckTokenCommand::new(
                 cli_catalog.get_one()?,
                 matches.get_one("token").cloned().unwrap(),
