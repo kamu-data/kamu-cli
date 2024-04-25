@@ -9,7 +9,7 @@
 
 use std::fs::File;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Output;
 use std::sync::Arc;
 
@@ -30,7 +30,7 @@ use random_names::get_random_name;
 use thiserror::Error;
 
 use super::{CLIError, Command};
-use crate::VerificationMultiProgress;
+use crate::{VerificationMultiProgress, WorkspaceService};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -43,8 +43,7 @@ pub struct SystemDiagnoseCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
     container_runtime: Arc<ContainerRuntime>,
-    is_in_workspace: bool,
-    run_info_dir: PathBuf,
+    workspace_svc: Arc<WorkspaceService>,
 }
 
 impl SystemDiagnoseCommand {
@@ -52,16 +51,21 @@ impl SystemDiagnoseCommand {
         dataset_repo: Arc<dyn DatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
         container_runtime: Arc<ContainerRuntime>,
-        is_in_workspace: bool,
-        run_info_dir: PathBuf,
+        workspace_svc: Arc<WorkspaceService>,
     ) -> Self {
         Self {
             dataset_repo,
             verification_svc,
             container_runtime,
-            is_in_workspace,
-            run_info_dir,
+            workspace_svc,
         }
+    }
+
+    fn run_info_dir(&self) -> Option<PathBuf> {
+        if !self.workspace_svc.is_in_workspace() {
+            return None;
+        }
+        Some(self.workspace_svc.layout().unwrap().run_info_dir.clone())
     }
 }
 
@@ -77,22 +81,22 @@ impl Command for SystemDiagnoseCommand {
         let mut diagnostic_checks: Vec<Box<dyn DiagnosticCheck>> = vec![
             Box::new(CheckContainerRuntimeIsInstalled {
                 container_runtime: self.container_runtime.clone(),
-                run_info_dir: self.run_info_dir.clone(),
+                run_info_dir: self.run_info_dir(),
             }),
             Box::new(CheckContainerRuntimeImagePull {
                 container_runtime: self.container_runtime.clone(),
             }),
             Box::new(CheckContainerRuntimeRootlessRun {
                 container_runtime: self.container_runtime.clone(),
-                run_info_dir: self.run_info_dir.clone(),
+                run_info_dir: self.run_info_dir(),
             }),
             Box::new(CheckContainerRuntimeVolumeMount {
                 container_runtime: self.container_runtime.clone(),
-                run_info_dir: self.run_info_dir.clone(),
+                run_info_dir: self.run_info_dir(),
             }),
         ];
         // Add checks which required workspace initialization
-        if self.is_in_workspace {
+        if self.workspace_svc.is_in_workspace() {
             diagnostic_checks.push(Box::new(CheckWorkspaceConsistent {
                 dataset_repo: self.dataset_repo.clone(),
                 verification_svc: self.verification_svc.clone(),
@@ -110,7 +114,7 @@ impl Command for SystemDiagnoseCommand {
             }
         }
 
-        if !self.is_in_workspace {
+        if !self.workspace_svc.is_in_workspace() {
             writeln!(out, "{}", style("Directory is not kamu workspace").yellow())?;
         }
         Ok(())
@@ -185,14 +189,14 @@ trait DiagnosticCheck {
 
     async fn run(&self) -> Result<(), DiagnosticCheckError>;
 
-    fn stderr_file_path(&self) -> PathBuf;
+    fn stderr_file_path(&self, run_info_dir: &Path) -> PathBuf;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 struct CheckContainerRuntimeIsInstalled {
     container_runtime: Arc<ContainerRuntime>,
-    run_info_dir: PathBuf,
+    run_info_dir: Option<PathBuf>,
 }
 
 #[async_trait::async_trait]
@@ -201,19 +205,19 @@ impl DiagnosticCheck for CheckContainerRuntimeIsInstalled {
         format!("{} installed", self.container_runtime.config.runtime)
     }
 
-    fn stderr_file_path(&self) -> PathBuf {
-        self.run_info_dir.join("kamu.diagnose-stderr-installed.log")
+    fn stderr_file_path(&self, run_info_dir: &Path) -> PathBuf {
+        run_info_dir.join("kamu.diagnose-stderr-installed.log")
     }
 
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
-        let command_res = self
-            .container_runtime
-            .info()
-            .stderr(File::create(&self.stderr_file_path())?)
-            .output()
-            .await
-            .int_err()?;
-        handle_output_result(command_res, vec![self.stderr_file_path()])
+        let mut command = self.container_runtime.info();
+        let mut err_output = vec![];
+        if let Some(run_info_dir) = self.run_info_dir.as_ref() {
+            command.stderr(File::create(self.stderr_file_path(run_info_dir))?);
+            err_output.push(self.stderr_file_path(run_info_dir));
+        }
+        let command_res = command.output().await.int_err()?;
+        handle_output_result(command_res, err_output)
     }
 }
 
@@ -229,7 +233,7 @@ impl DiagnosticCheck for CheckContainerRuntimeImagePull {
         format!("{} can pull images", self.container_runtime.config.runtime)
     }
 
-    fn stderr_file_path(&self) -> PathBuf {
+    fn stderr_file_path(&self, _: &Path) -> PathBuf {
         unimplemented!()
     }
 
@@ -247,7 +251,7 @@ impl DiagnosticCheck for CheckContainerRuntimeImagePull {
 
 struct CheckContainerRuntimeRootlessRun {
     container_runtime: Arc<ContainerRuntime>,
-    run_info_dir: PathBuf,
+    run_info_dir: Option<PathBuf>,
 }
 
 #[async_trait::async_trait]
@@ -259,8 +263,8 @@ impl DiagnosticCheck for CheckContainerRuntimeRootlessRun {
         )
     }
 
-    fn stderr_file_path(&self) -> PathBuf {
-        self.run_info_dir.join("kamu.diagnose-stderr-rootless.log")
+    fn stderr_file_path(&self, run_info_dir: &Path) -> PathBuf {
+        run_info_dir.join("kamu.diagnose-stderr-rootless.log")
     }
 
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
@@ -270,15 +274,14 @@ impl DiagnosticCheck for CheckContainerRuntimeRootlessRun {
             ..RunArgs::default()
         };
 
-        let command_res = self
-            .container_runtime
-            .run_cmd(run_args)
-            .stderr(File::create(&self.stderr_file_path())?)
-            .output()
-            .await
-            .int_err()?;
-
-        handle_output_result(command_res, vec![self.stderr_file_path()])
+        let mut command = self.container_runtime.run_cmd(run_args);
+        let mut err_output = vec![];
+        if let Some(run_info_dir) = self.run_info_dir.as_ref() {
+            command.stderr(File::create(self.stderr_file_path(run_info_dir))?);
+            err_output.push(self.stderr_file_path(run_info_dir));
+        }
+        let command_res = command.output().await.int_err()?;
+        handle_output_result(command_res, err_output)
     }
 }
 
@@ -286,7 +289,7 @@ impl DiagnosticCheck for CheckContainerRuntimeRootlessRun {
 
 struct CheckContainerRuntimeVolumeMount {
     container_runtime: Arc<ContainerRuntime>,
-    run_info_dir: PathBuf,
+    run_info_dir: Option<PathBuf>,
 }
 
 #[async_trait::async_trait]
@@ -298,8 +301,8 @@ impl DiagnosticCheck for CheckContainerRuntimeVolumeMount {
         )
     }
 
-    fn stderr_file_path(&self) -> PathBuf {
-        self.run_info_dir.join("kamu.diagnose-stderr-volume.log")
+    fn stderr_file_path(&self, run_info_dir: &Path) -> PathBuf {
+        run_info_dir.join("kamu.diagnose-stderr-volume.log")
     }
 
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
@@ -313,15 +316,14 @@ impl DiagnosticCheck for CheckContainerRuntimeVolumeMount {
             ..RunArgs::default()
         };
 
-        let command_res = self
-            .container_runtime
-            .run_cmd(run_args)
-            .stderr(File::create(self.stderr_file_path())?)
-            .output()
-            .await
-            .int_err()?;
-
-        handle_output_result(command_res, vec![self.stderr_file_path()])
+        let mut command = self.container_runtime.run_cmd(run_args);
+        let mut err_output = vec![];
+        if let Some(run_info_dir) = self.run_info_dir.as_ref() {
+            command.stderr(File::create(self.stderr_file_path(run_info_dir))?);
+            err_output.push(self.stderr_file_path(run_info_dir));
+        }
+        let command_res = command.output().await.int_err()?;
+        handle_output_result(command_res, err_output)
     }
 }
 
@@ -338,7 +340,7 @@ impl DiagnosticCheck for CheckWorkspaceConsistent {
         "workspace consistent".to_string()
     }
 
-    fn stderr_file_path(&self) -> PathBuf {
+    fn stderr_file_path(&self, _: &Path) -> PathBuf {
         unimplemented!()
     }
 
