@@ -4094,7 +4094,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-postgres"
-version = "0.176.3"
+version = "0.177.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -4116,7 +4116,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-repo-tests"
-version = "0.176.3"
+version = "0.177.0"
 dependencies = [
  "chrono",
  "dill",
@@ -4161,7 +4161,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-sqlite"
-version = "0.176.3"
+version = "0.177.0"
 dependencies = [
  "async-stream",
  "async-trait",
