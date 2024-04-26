@@ -2,6 +2,9 @@ CREATE SEQUENCE flow_configuration_event_id_seq AS BIGINT;
 
 -- Add a value to enum:
 -- ALTER TYPE system_flow_type ADD VALUE 'new_value';
+--
+-- Rename an enum value:
+-- ALTER TYPE system_flow_type RENAME VALUE 'existing_value' TO 'new_value';
 CREATE TYPE system_flow_type AS ENUM ('gc');
 
 CREATE TABLE system_flow_configuration_events
@@ -15,6 +18,9 @@ CREATE TABLE system_flow_configuration_events
 
 -- Add a value to enum:
 -- ALTER TYPE dataset_flow_type ADD VALUE 'new_value';
+--
+-- Rename an enum value:
+-- ALTER TYPE dataset_flow_type RENAME VALUE 'existing_value' TO 'new_value';
 CREATE TYPE dataset_flow_type AS ENUM ('ingest', 'execute_transform', 'hard_compacting');
 
 CREATE TABLE dataset_flow_configuration_events
