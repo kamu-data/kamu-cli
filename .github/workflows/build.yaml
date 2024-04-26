@@ -130,7 +130,7 @@ jobs:
 
       - name: Install cargo tools
         run: |
-          cargo binstall cargo-nextest -y
+          cargo binstall cargo-nextest -y --force
 
       - name: Configure runtime
         if: matrix.container-runtime != ''
