@@ -76,6 +76,10 @@ impl EventStore<FlowConfigurationState> for FlowConfigurationEventStoreInMem {
         query: &FlowKey,
         events: Vec<FlowConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
+        if events.is_empty() {
+            return Err(SaveEventsError::NothingToSave);
+        }
+
         if let FlowKey::Dataset(flow_key) = query {
             let state = self.inner.as_state();
             let mut g = state.lock().unwrap();
