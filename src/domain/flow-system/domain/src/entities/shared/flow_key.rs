@@ -25,6 +25,10 @@ impl FlowKey {
         Self::Dataset(FlowKeyDataset::new(dataset_id, flow_type))
     }
 
+    pub fn system(flow_type: SystemFlowType) -> Self {
+        Self::System(FlowKeySystem::new(flow_type))
+    }
+
     pub fn get_type(&self) -> AnyFlowType {
         match self {
             Self::Dataset(fk_dataset) => AnyFlowType::Dataset(fk_dataset.flow_type),

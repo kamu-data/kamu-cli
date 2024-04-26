@@ -203,14 +203,16 @@ INSERT INTO system_flow_configuration_events (system_flow_type, event_type, even
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
+        // Without type cast, PostgreSQL, for some unknown reason, returned type
+        // `bignumeric`, which is not suitable for us
         let result = sqlx::query!(
             r#"
-SELECT MAX(event_count) as count
+SELECT SUM(event_count)::BIGINT as count
 FROM (SELECT COUNT(event_id) as event_count
       FROM dataset_flow_configuration_events
       UNION ALL
       SELECT COUNT(event_id) as event_count
-      FROM dataset_flow_configuration_events) as counts;
+      FROM system_flow_configuration_events) as counts;
 "#,
         )
         .fetch_one(connection_mut)

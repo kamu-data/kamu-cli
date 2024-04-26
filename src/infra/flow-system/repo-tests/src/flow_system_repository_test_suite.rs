@@ -56,8 +56,6 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     let dataset_id_1 = DatasetID::new_seeded_ed25519(b"foo");
     let flow_key_1 = FlowKey::dataset(dataset_id_1.clone(), DatasetFlowType::Ingest);
-    let dataset_id_2 = DatasetID::new_seeded_ed25519(b"bar");
-    let flow_key_2 = FlowKey::dataset(dataset_id_2.clone(), DatasetFlowType::Ingest);
 
     let event_1_1 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
@@ -75,14 +73,6 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
             every: Duration::seconds(5),
         })),
     };
-    let event_2 = FlowConfigurationEventCreated {
-        event_time: Utc::now(),
-        flow_key: flow_key_2.clone(),
-        paused: false,
-        rule: FlowConfigurationRule::Schedule(
-            Schedule::try_from_5component_cron_expression("0 * * * *").unwrap(),
-        ),
-    };
 
     event_store
         .save_events(
@@ -96,6 +86,18 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     assert_eq!(2, num_events);
 
+    let dataset_id_2 = DatasetID::new_seeded_ed25519(b"bar");
+    let flow_key_2 = FlowKey::dataset(dataset_id_2.clone(), DatasetFlowType::Ingest);
+
+    let event_2 = FlowConfigurationEventCreated {
+        event_time: Utc::now(),
+        flow_key: flow_key_2.clone(),
+        paused: false,
+        rule: FlowConfigurationRule::Schedule(
+            Schedule::try_from_5component_cron_expression("0 * * * *").unwrap(),
+        ),
+    };
+
     event_store
         .save_events(&flow_key_2, vec![event_2.clone().into()])
         .await
@@ -104,6 +106,25 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     let num_events = event_store.len().await.unwrap();
 
     assert_eq!(3, num_events);
+
+    let flow_key_3 = FlowKey::system(SystemFlowType::GC);
+    let event_3 = FlowConfigurationEventCreated {
+        event_time: Utc::now(),
+        flow_key: flow_key_3.clone(),
+        paused: false,
+        rule: FlowConfigurationRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
+            every: Duration::seconds(5),
+        })),
+    };
+
+    event_store
+        .save_events(&flow_key_3, vec![event_3.clone().into()])
+        .await
+        .unwrap();
+
+    let num_events = event_store.len().await.unwrap();
+
+    assert_eq!(4, num_events);
 
     let events: Vec<_> = event_store
         .get_events(&flow_key_1, GetEventsOpts::default())
@@ -124,6 +145,16 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .unwrap();
 
     assert_eq!(&events[..], [event_2.into()]);
+
+    let events: Vec<_> = event_store
+        .get_events(&flow_key_3, GetEventsOpts::default())
+        .await
+        .map_ok(|(_, event)| event)
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert_eq!(&events[..], [event_3.into()]);
 
     let mut dataset_ids: Vec<_> = event_store
         .list_all_dataset_ids()
