@@ -9,13 +9,26 @@
 
 use crate::prelude::*;
 
-#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+/////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Externalize
+const MAX_SOA_BUFFER_SIZE: usize = 100_000_000;
+
+/////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataBatchFormat {
+    #[default]
     Json,
-    JsonLD,
     JsonSOA,
+    JsonAOA,
+    NdJson,
     Csv,
+    /// Deprecated: Use ND_JSON instead
+    JsonLD,
 }
+
+/////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
 pub struct DataBatch {
@@ -29,10 +42,11 @@ impl DataBatch {
         DataBatch {
             format,
             content: match format {
-                DataBatchFormat::Csv => String::new(),
-                DataBatchFormat::Json | DataBatchFormat::JsonLD | DataBatchFormat::JsonSOA => {
-                    String::from("{}")
+                DataBatchFormat::Csv | DataBatchFormat::JsonLD | DataBatchFormat::NdJson => {
+                    String::new()
                 }
+                DataBatchFormat::Json | DataBatchFormat::JsonAOA => String::from("[]"),
+                DataBatchFormat::JsonSOA => String::from("{}"),
             },
             num_records: 0,
         }
@@ -49,27 +63,23 @@ impl DataBatch {
             .map(datafusion::arrow::array::RecordBatch::num_rows)
             .sum();
 
+        if num_records == 0 {
+            return Ok(Self::empty(format));
+        }
+
         let mut buf = Vec::new();
         {
             let mut writer: Box<dyn RecordsWriter> = match format {
                 DataBatchFormat::Csv => {
                     Box::new(CsvWriterBuilder::new().with_header(true).build(&mut buf))
                 }
-                DataBatchFormat::Json => {
-                    // HACK: JsonArrayWriter should be producing [] when there are no rows
-                    if num_records != 0 {
-                        Box::new(JsonArrayWriter::new(&mut buf))
-                    } else {
-                        return Ok(DataBatch {
-                            format,
-                            content: "[]".to_string(),
-                            num_records: num_records as u64,
-                        });
-                    }
-                }
-                DataBatchFormat::JsonLD => Box::new(JsonLineDelimitedWriter::new(&mut buf)),
+                DataBatchFormat::Json => Box::new(JsonArrayOfStructsWriter::new(&mut buf)),
                 DataBatchFormat::JsonSOA => {
-                    unimplemented!("SoA Json format is not yet implemented")
+                    Box::new(JsonStructOfArraysWriter::new(&mut buf, MAX_SOA_BUFFER_SIZE))
+                }
+                DataBatchFormat::JsonAOA => Box::new(JsonArrayOfArraysWriter::new(&mut buf)),
+                DataBatchFormat::JsonLD | DataBatchFormat::NdJson => {
+                    Box::new(JsonLineDelimitedWriter::new(&mut buf))
                 }
             };
 

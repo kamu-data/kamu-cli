@@ -679,6 +679,7 @@ fn configure_output_format(
         Some("json") => OutputFormat::Json,
         Some("ndjson") => OutputFormat::NdJson,
         Some("json-soa") => OutputFormat::JsonSoA,
+        Some("json-aoa") => OutputFormat::JsonAoA,
         Some("table") => OutputFormat::Table,
         None | Some(_) => {
             if is_tty {

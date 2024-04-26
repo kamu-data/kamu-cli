@@ -190,9 +190,14 @@ type DataBatch {
 
 enum DataBatchFormat {
 	JSON
-	JSON_LD
 	JSON_SOA
+	JSON_AOA
+	ND_JSON
 	CSV
+	"""
+	Deprecated: Use ND_JSON instead
+	"""
+	JSON_LD
 }
 
 type DataQueries {

@@ -21,6 +21,7 @@ use axum::response::Json;
 use kamu::domain::*;
 use opendatafabric::DatasetRef;
 
+use super::query_handler::SubFormat;
 use crate::api_error::*;
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -29,12 +30,24 @@ use crate::api_error::*;
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TailParams {
-    skip: Option<u64>,
-    limit: Option<u64>,
+    #[serde(default)]
+    skip: u64,
+    #[serde(default = "TailParams::default_limit")]
+    limit: u64,
+    #[serde(default)]
+    format: SubFormat,
+    #[serde(default = "TailParams::default_schema")]
+    schema: bool,
 }
 
 impl TailParams {
-    const DEFAULT_LIMIT: u64 = 100;
+    fn default_limit() -> u64 {
+        100
+    }
+
+    fn default_schema() -> bool {
+        true
+    }
 }
 
 // TODO: This endpoint is temporary to enable some demo integrations
@@ -45,21 +58,15 @@ pub async fn dataset_tail_handler(
     Extension(dataset_ref): Extension<DatasetRef>,
     Query(params): Query<TailParams>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // TODO: Default to JsonSoA format once implemented
-    // let data_format = data_format.unwrap_or(DataBatchFormat::Json);
-    // let schema_format = schema_format.unwrap_or(DataSchemaFormat::Parquet);
-    let skip = params.skip.unwrap_or(0);
-    let limit = params.limit.unwrap_or(TailParams::DEFAULT_LIMIT);
-
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
 
     let df = query_svc
-        .tail(&dataset_ref, skip, limit)
+        .tail(&dataset_ref, params.skip, params.limit)
         .await
         .int_err()
         .api_err()?;
 
-    super::query_handler::records_to_json(df).await
+    super::query_handler::records_to_json(df, params.format, params.schema).await
 }
 
 /////////////////////////////////////////////////////////////////////////////////

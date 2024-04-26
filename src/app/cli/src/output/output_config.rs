@@ -9,8 +9,6 @@
 
 use std::path::PathBuf;
 
-use kamu_data_utils::data::format::RecordsWriter;
-
 use super::records_writers::*;
 pub use super::records_writers::{ColumnFormat, RecordsFormat};
 
@@ -34,9 +32,12 @@ impl OutputConfig {
                     .with_header(true)
                     .build(std::io::stdout()),
             ),
-            OutputFormat::Json => Box::new(JsonArrayWriter::new(std::io::stdout())),
+            OutputFormat::Json => Box::new(JsonArrayOfStructsWriter::new(std::io::stdout())),
+            OutputFormat::JsonSoA => {
+                Box::new(JsonStructOfArraysWriter::new(std::io::stdout(), usize::MAX))
+            }
+            OutputFormat::JsonAoA => Box::new(JsonArrayOfArraysWriter::new(std::io::stdout())),
             OutputFormat::NdJson => Box::new(JsonLineDelimitedWriter::new(std::io::stdout())),
-            OutputFormat::JsonSoA => unimplemented!("SoA Json format is not yet implemented"),
             OutputFormat::Table => Box::new(TableWriter::new(fmt, std::io::stdout())),
         }
     }
@@ -54,6 +55,8 @@ pub enum OutputFormat {
     /// Structure of arrays - more compact and efficient format for encoding
     /// entire dataframe
     JsonSoA,
+    /// Array of arrays - compact and efficient and preserves column order
+    JsonAoA,
     /// A pretty human-readable table
     Table,
 }

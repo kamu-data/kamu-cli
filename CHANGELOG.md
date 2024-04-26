@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Added
+- REST data APIs and CLI commands now support different variations of JSON representation, including:
+  - `Array-of-Structures` e.g. `[{"c1": 1, "c2": 2}, {"c1": 3, "c2": 4}]` (default)
+  - `Structure-of-Arrays` e.g. `{"c1": [1, 3], "c2": [2, 4]}`
+  - `Array-of-Arrays` e.g. `[[1, 2], [3, 4]]`
+- REST data APIs now also return schema of the result (pass `?schema=false` to switch it off)
 ### Changed
 - Upgraded to `datafusion` `v37.1.0`
 - Split the Flow system crates

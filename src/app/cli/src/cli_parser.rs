@@ -20,8 +20,8 @@ fn tabular_output_params(app: Command) -> Command {
             .short('o')
             .value_name("FMT")
             .value_parser([
-                "table", "csv", "json", "ndjson",
-                "json-soa",
+                "table", "csv", "json", "ndjson", "json-soa",
+                "json-aoa",
                 // "vertical",
                 // "tsv",
                 // "xmlattrs",

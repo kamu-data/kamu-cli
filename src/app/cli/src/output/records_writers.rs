@@ -18,8 +18,10 @@ use kamu_data_utils::data::format::WriterError;
 pub use kamu_data_utils::data::format::{
     CsvWriter,
     CsvWriterBuilder,
-    JsonArrayWriter,
+    JsonArrayOfArraysWriter,
+    JsonArrayOfStructsWriter,
     JsonLineDelimitedWriter,
+    JsonStructOfArraysWriter,
     RecordsWriter,
 };
 use prettytable::{Cell, Row, Table};
