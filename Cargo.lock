@@ -3922,7 +3922,9 @@ dependencies = [
  "kamu-data-utils",
  "kamu-datafusion-cli",
  "kamu-flow-system-inmem",
+ "kamu-flow-system-postgres",
  "kamu-flow-system-services",
+ "kamu-flow-system-sqlite",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
  "libc",
@@ -4056,6 +4058,7 @@ dependencies = [
  "opendatafabric",
  "serde",
  "serde_with",
+ "sqlx",
  "thiserror",
  "tokio-stream",
  "tracing",
@@ -4072,8 +4075,8 @@ dependencies = [
  "cron",
  "dill",
  "futures",
- "kamu-core",
  "kamu-flow-system",
+ "kamu-flow-system-repo-tests",
  "kamu-task-system",
  "kamu-task-system-inmem",
  "opendatafabric",
@@ -4087,6 +4090,39 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+]
+
+[[package]]
+name = "kamu-flow-system-postgres"
+version = "0.177.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "futures",
+ "kamu-flow-system",
+ "kamu-flow-system-repo-tests",
+ "opendatafabric",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
+name = "kamu-flow-system-repo-tests"
+version = "0.177.0"
+dependencies = [
+ "chrono",
+ "dill",
+ "futures",
+ "kamu-flow-system",
+ "opendatafabric",
 ]
 
 [[package]]
@@ -4121,6 +4157,28 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+]
+
+[[package]]
+name = "kamu-flow-system-sqlite"
+version = "0.177.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "futures",
+ "kamu-flow-system",
+ "kamu-flow-system-repo-tests",
+ "opendatafabric",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

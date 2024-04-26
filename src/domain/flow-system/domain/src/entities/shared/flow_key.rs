@@ -8,18 +8,27 @@
 // by the Apache License, Version 2.0.
 
 use opendatafabric::DatasetID;
+use serde::{Deserialize, Serialize};
 
 use crate::{AnyFlowType, DatasetFlowType, SystemFlowType};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum FlowKey {
     Dataset(FlowKeyDataset),
     System(FlowKeySystem),
 }
 
 impl FlowKey {
+    pub fn dataset(dataset_id: DatasetID, flow_type: DatasetFlowType) -> Self {
+        Self::Dataset(FlowKeyDataset::new(dataset_id, flow_type))
+    }
+
+    pub fn system(flow_type: SystemFlowType) -> Self {
+        Self::System(FlowKeySystem::new(flow_type))
+    }
+
     pub fn get_type(&self) -> AnyFlowType {
         match self {
             Self::Dataset(fk_dataset) => AnyFlowType::Dataset(fk_dataset.flow_type),
@@ -30,7 +39,7 @@ impl FlowKey {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct FlowKeyDataset {
     pub dataset_id: DatasetID,
     pub flow_type: DatasetFlowType,
@@ -47,7 +56,7 @@ impl FlowKeyDataset {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct FlowKeySystem {
     pub flow_type: SystemFlowType,
 }

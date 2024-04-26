@@ -423,6 +423,7 @@ pub enum SaveError {
 impl From<SaveEventsError> for SaveError {
     fn from(value: SaveEventsError) -> Self {
         match value {
+            e @ SaveEventsError::NothingToSave => SaveError::Internal(e.int_err()),
             SaveEventsError::Internal(err) => Self::Internal(err),
         }
     }

@@ -27,7 +27,10 @@ members = [
     "src/infra/core",
     "src/infra/ingest-datafusion",
     ## Flow System
+    "src/infra/flow-system/repo-tests",
     "src/infra/flow-system/inmem",
+    "src/infra/flow-system/postgres",
+    "src/infra/flow-system/sqlite",
     ## Accounts
     "src/infra/accounts/mysql",
     "src/infra/accounts/postgres",
@@ -81,7 +84,10 @@ kamu-flow-system-services = { version = "0.177.0", path = "src/domain/flow-syste
 kamu = { version = "0.177.0", path = "src/infra/core", default-features = false }
 kamu-ingest-datafusion = { version = "0.177.0", path = "src/infra/ingest-datafusion", default-features = false }
 ## Flow System
+kamu-flow-system-repo-tests = { version = "0.177.0", path = "src/infra/flow-system/repo-tests", default-features = false }
 kamu-flow-system-inmem = { version = "0.177.0", path = "src/infra/flow-system/inmem", default-features = false }
+kamu-flow-system-postgres = { version = "0.177.0", path = "src/infra/flow-system/postgres", default-features = false }
+kamu-flow-system-sqlite = { version = "0.177.0", path = "src/infra/flow-system/sqlite", default-features = false }
 ## Accounts
 kamu-accounts-mysql = { version = "0.177.0", path = "src/infra/accounts/mysql", default-features = false }
 kamu-accounts-postgres = { version = "0.177.0", path = "src/infra/accounts/postgres", default-features = false }

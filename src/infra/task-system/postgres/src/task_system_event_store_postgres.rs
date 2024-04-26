@@ -67,7 +67,7 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
             .map_err(|e| GetEventsError::Internal(e.int_err()));
 
             while let Some((event_id, event)) = query_stream.try_next().await? {
-                yield(Ok((event_id, event)));
+                yield Ok((event_id, event));
             }
         })
     }
@@ -77,6 +77,10 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
         _task_id: &TaskID,
         events: Vec<TaskEvent>,
     ) -> Result<EventID, SaveEventsError> {
+        if events.is_empty() {
+            return Err(SaveEventsError::NothingToSave);
+        }
+
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -106,15 +110,10 @@ impl EventStore<TaskState> for TaskSystemEventStorePostgres {
             .build_query_as::<ResultRow>()
             .fetch_all(connection_mut)
             .await
-            .unwrap();
+            .int_err()?;
+        let last_event_id = rows.last().unwrap().event_id;
 
-        if let Some(last_row) = rows.last() {
-            Ok(EventID::new(last_row.event_id))
-        } else {
-            Ok(EventID::new(
-                i64::try_from(self.len().await.unwrap()).unwrap(),
-            ))
-        }
+        Ok(EventID::new(last_event_id))
     }
 
     async fn len(&self) -> Result<usize, InternalError> {
@@ -164,10 +163,13 @@ impl TaskSystemEventStore for TaskSystemEventStorePostgres {
         pagination: TaskPaginationOpts,
     ) -> TaskIDStream {
         let mut tr = self.transaction.lock().await;
-        let dataset_id = dataset_id.clone();
+        let dataset_id = dataset_id.to_string();
 
         Box::pin(async_stream::stream! {
             let connection_mut = tr.connection_mut().await?;
+
+            let limit = i64::try_from(pagination.limit).int_err()?;
+            let offset = i64::try_from(pagination.offset).int_err()?;
 
             let mut query_stream = sqlx::query!(
                 r#"
@@ -176,9 +178,9 @@ impl TaskSystemEventStore for TaskSystemEventStorePostgres {
                     WHERE dataset_id = $1 AND event_type = 'TaskEventCreated'
                     ORDER  BY task_id DESC LIMIT $2 OFFSET $3
                 "#,
-                dataset_id.to_string(),
-                i64::try_from(pagination.limit).unwrap(),
-                i64::try_from(pagination.offset).unwrap(),
+                dataset_id,
+                limit,
+                offset,
             )
             .try_map(|event_row| Ok(TaskID::new(event_row.task_id)))
             .fetch(connection_mut)
@@ -190,7 +192,7 @@ impl TaskSystemEventStore for TaskSystemEventStorePostgres {
         })
     }
 
-    /// Returns total number of tasks associated  with the specified dataset
+    /// Returns total number of tasks associated with the specified dataset
     async fn get_count_tasks_by_dataset(
         &self,
         dataset_id: &DatasetID,

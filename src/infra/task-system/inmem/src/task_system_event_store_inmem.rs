@@ -100,6 +100,10 @@ impl EventStore<TaskState> for TaskSystemEventStoreInMemory {
         task_id: &TaskID,
         events: Vec<TaskEvent>,
     ) -> Result<EventID, SaveEventsError> {
+        if events.is_empty() {
+            return Err(SaveEventsError::NothingToSave);
+        }
+
         {
             let state = self.inner.as_state();
             let mut g = state.lock().unwrap();

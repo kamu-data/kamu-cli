@@ -8,13 +8,16 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Duration;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[serde_with::serde_as]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BatchingRule {
     min_records_to_await: u64,
+    #[serde_as(as = "serde_with::DurationSeconds<i64>")]
     max_batching_interval: Duration,
 }
 

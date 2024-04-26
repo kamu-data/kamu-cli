@@ -51,7 +51,7 @@ where
     let transaction_ref = db_transaction_manager.make_transaction_ref().await?;
 
     // Create a chained catalog for transaction-aware components,
-    // but keep a local copy of transaction pointer
+    // but keep a local copy of a transaction pointer
     let chained_catalog = CatalogBuilder::new_chained(base_catalog)
         .add_value(transaction_ref.clone())
         .build();
