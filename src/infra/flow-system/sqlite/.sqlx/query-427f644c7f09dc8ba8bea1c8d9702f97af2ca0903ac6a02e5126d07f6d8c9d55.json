@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT COUNT(event_id) as count\nFROM flow_configuration_event\n            ",
+  "query": "\n            SELECT COUNT(event_id) as count\n            FROM flow_configuration_event\n            ",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "cc8e973be0ffb0c958a40a953b82dd6d964682a7ca458718bb8c6a6f303245d5"
+  "hash": "427f644c7f09dc8ba8bea1c8d9702f97af2ca0903ac6a02e5126d07f6d8c9d55"
 }

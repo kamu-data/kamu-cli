@@ -43,24 +43,24 @@ impl FlowSystemEventStorePostgres {
                 .await?;
 
             let mut query_stream = sqlx::query!(
-r#"
-SELECT event_id, event_payload
-FROM system_flow_configuration_events
-WHERE system_flow_type = ($1::text)::system_flow_type
-    AND (cast($2 as INT8) IS NULL or event_id > $2)
-    AND (cast($3 as INT8) IS NULL or event_id <= $3)
-"#,
-                    fk_system.flow_type as SystemFlowType,
-                    maybe_from_id,
-                    maybe_to_id,
-                ).try_map(|event_row| {
-                    let event = serde_json::from_value::<FlowConfigurationEvent>(event_row.event_payload)
-                        .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+                r#"
+                SELECT event_id, event_payload
+                FROM system_flow_configuration_events
+                WHERE system_flow_type = ($1::text)::system_flow_type
+                    AND (cast($2 as INT8) IS NULL or event_id > $2)
+                    AND (cast($3 as INT8) IS NULL or event_id <= $3)
+                "#,
+                fk_system.flow_type as SystemFlowType,
+                maybe_from_id,
+                maybe_to_id,
+            ).try_map(|event_row| {
+                let event = serde_json::from_value::<FlowConfigurationEvent>(event_row.event_payload)
+                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
 
-                    Ok((EventID::new(event_row.event_id), event))
-                })
-                .fetch(connection_mut)
-                .map_err(|e| GetEventsError::Internal(e.int_err()));
+                Ok((EventID::new(event_row.event_id), event))
+            })
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
 
             while let Some((event_id, event)) = query_stream.try_next().await? {
                 yield Ok((event_id, event));
@@ -83,25 +83,25 @@ WHERE system_flow_type = ($1::text)::system_flow_type
 
             let mut query_stream = sqlx::query!(
                 r#"
-SELECT event_id, event_payload
-FROM dataset_flow_configuration_events
-WHERE dataset_id = $1
-    AND dataset_flow_type = ($2::text)::dataset_flow_type
-    AND (cast($3 as INT8) IS NULL or event_id > $3)
-    AND (cast($4 as INT8) IS NULL or event_id <= $4)
-"#,
-                    fk_dataset.dataset_id.to_string(),
-                    fk_dataset.flow_type as DatasetFlowType,
-                    maybe_from_id,
-                    maybe_to_id,
-                ).try_map(|event_row| {
-                    let event = serde_json::from_value::<FlowConfigurationEvent>(event_row.event_payload)
-                        .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+                SELECT event_id, event_payload
+                FROM dataset_flow_configuration_events
+                WHERE dataset_id = $1
+                    AND dataset_flow_type = ($2::text)::dataset_flow_type
+                    AND (cast($3 as INT8) IS NULL or event_id > $3)
+                    AND (cast($4 as INT8) IS NULL or event_id <= $4)
+                "#,
+                fk_dataset.dataset_id.to_string(),
+                fk_dataset.flow_type as DatasetFlowType,
+                maybe_from_id,
+                maybe_to_id,
+            ).try_map(|event_row| {
+                let event = serde_json::from_value::<FlowConfigurationEvent>(event_row.event_payload)
+                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
 
-                    Ok((EventID::new(event_row.event_id), event))
-                })
-                .fetch(connection_mut)
-                .map_err(|e| GetEventsError::Internal(e.int_err()));
+                Ok((EventID::new(event_row.event_id), event))
+            })
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
 
             while let Some((event_id, event)) = query_stream.try_next().await? {
                 yield Ok((event_id, event));
@@ -150,8 +150,8 @@ impl EventStore<FlowConfigurationState> for FlowSystemEventStorePostgres {
             FlowKey::Dataset(fk_dataset) => {
                 let mut query_builder = QueryBuilder::<Postgres>::new(
                     r#"
-INSERT INTO dataset_flow_configuration_events (dataset_id, dataset_flow_type, event_type, event_time, event_payload)
-"#,
+                    INSERT INTO dataset_flow_configuration_events (dataset_id, dataset_flow_type, event_type, event_time, event_payload)
+                    "#,
                 );
 
                 query_builder.push_values(events, |mut b, event| {
@@ -167,8 +167,8 @@ INSERT INTO dataset_flow_configuration_events (dataset_id, dataset_flow_type, ev
             FlowKey::System(fk_system) => {
                 let mut query_builder = QueryBuilder::<Postgres>::new(
                     r#"
-INSERT INTO system_flow_configuration_events (system_flow_type, event_type, event_time, event_payload)
-"#,
+                    INSERT INTO system_flow_configuration_events (system_flow_type, event_type, event_time, event_payload)
+                    "#,
                 );
 
                 query_builder.push_values(events, |mut b, event| {
@@ -207,13 +207,13 @@ INSERT INTO system_flow_configuration_events (system_flow_type, event_type, even
         // `bignumeric`, which is not suitable for us
         let result = sqlx::query!(
             r#"
-SELECT SUM(event_count)::BIGINT as count
-FROM (SELECT COUNT(event_id) as event_count
-      FROM dataset_flow_configuration_events
-      UNION ALL
-      SELECT COUNT(event_id) as event_count
-      FROM system_flow_configuration_events) as counts;
-"#,
+            SELECT SUM(event_count)::BIGINT as count
+            FROM (SELECT COUNT(event_id) as event_count
+                  FROM dataset_flow_configuration_events
+                  UNION ALL
+                  SELECT COUNT(event_id) as event_count
+                  FROM system_flow_configuration_events) as counts;
+            "#,
         )
         .fetch_one(connection_mut)
         .await
@@ -237,10 +237,10 @@ impl FlowConfigurationEventStore for FlowSystemEventStorePostgres {
 
             let mut query_stream = sqlx::query!(
                 r#"
-SELECT DISTINCT dataset_id
-FROM dataset_flow_configuration_events
-WHERE event_type = 'FlowConfigurationEventCreated'
-"#,
+                SELECT DISTINCT dataset_id
+                FROM dataset_flow_configuration_events
+                WHERE event_type = 'FlowConfigurationEventCreated'
+                "#,
             )
             .try_map(|event_row| {
                 DatasetID::from_did_str(event_row.dataset_id.as_str())

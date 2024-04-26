@@ -58,13 +58,13 @@ impl FlowSystemEventStoreSqlite {
 
             let mut query_stream = sqlx::query_as!(
                 EventModel,
-r#"
-SELECT event_id, event_payload as "event_payload: _"
-FROM system_flow_configuration_events
-WHERE system_flow_type = $1
-    AND (cast($2 as INT8) IS NULL or event_id > $2)
-    AND (cast($3 as INT8) IS NULL or event_id <= $3)
-"#,
+                r#"
+                SELECT event_id, event_payload as "event_payload: _"
+                FROM system_flow_configuration_events
+                WHERE system_flow_type = $1
+                    AND (cast($2 as INT8) IS NULL or event_id > $2)
+                    AND (cast($3 as INT8) IS NULL or event_id <= $3)
+                "#,
                 fk_system.flow_type,
                 maybe_from_id,
                 maybe_to_id,
@@ -102,13 +102,13 @@ WHERE system_flow_type = $1
             let mut query_stream = sqlx::query_as!(
                 EventModel,
                 r#"
-SELECT event_id, event_payload as "event_payload: _"
-FROM dataset_flow_configuration_events
-WHERE dataset_id = $1
-    AND dataset_flow_type = $2
-    AND (cast($3 as INT8) IS NULL or event_id > $3)
-    AND (cast($4 as INT8) IS NULL or event_id <= $4)
-"#,
+                SELECT event_id, event_payload as "event_payload: _"
+                FROM dataset_flow_configuration_events
+                WHERE dataset_id = $1
+                    AND dataset_flow_type = $2
+                    AND (cast($3 as INT8) IS NULL or event_id > $3)
+                    AND (cast($4 as INT8) IS NULL or event_id <= $4)
+                "#,
                 dataset_id,
                 fk_dataset.flow_type,
                 maybe_from_id,
@@ -169,8 +169,8 @@ impl EventStore<FlowConfigurationState> for FlowSystemEventStoreSqlite {
         let flow_configuration_events = {
             let mut query_builder = QueryBuilder::<Sqlite>::new(
                 r#"
-INSERT INTO flow_configuration_event(created_time)
-"#,
+                INSERT INTO flow_configuration_event(created_time)
+                "#,
             );
 
             let created_times = vec![Utc::now(); events.len()];
@@ -193,8 +193,8 @@ INSERT INTO flow_configuration_event(created_time)
             FlowKey::Dataset(fk_dataset) => {
                 let mut query_builder = QueryBuilder::<Sqlite>::new(
                     r#"
-INSERT INTO dataset_flow_configuration_events (event_id, dataset_id, dataset_flow_type, event_type, event_time, event_payload)
-"#,
+                    INSERT INTO dataset_flow_configuration_events (event_id, dataset_id, dataset_flow_type, event_type, event_time, event_payload)
+                    "#,
                 );
 
                 query_builder.push_values(
@@ -214,8 +214,8 @@ INSERT INTO dataset_flow_configuration_events (event_id, dataset_id, dataset_flo
             FlowKey::System(fk_system) => {
                 let mut query_builder = QueryBuilder::<Sqlite>::new(
                     r#"
-INSERT INTO system_flow_configuration_events (event_id, system_flow_type, event_type, event_time, event_payload)
-"#,
+                    INSERT INTO system_flow_configuration_events (event_id, system_flow_type, event_type, event_time, event_payload)
+                    "#,
                 );
 
                 query_builder.push_values(
@@ -252,8 +252,8 @@ INSERT INTO system_flow_configuration_events (event_id, system_flow_type, event_
 
         let result = sqlx::query!(
             r#"
-SELECT COUNT(event_id) as count
-FROM flow_configuration_event
+            SELECT COUNT(event_id) as count
+            FROM flow_configuration_event
             "#,
         )
         .fetch_one(connection_mut)
@@ -278,10 +278,10 @@ impl FlowConfigurationEventStore for FlowSystemEventStoreSqlite {
 
             let mut query_stream = sqlx::query!(
                 r#"
-SELECT DISTINCT dataset_id
-FROM dataset_flow_configuration_events
-WHERE event_type = 'FlowConfigurationEventCreated'
-"#,
+                SELECT DISTINCT dataset_id
+                FROM dataset_flow_configuration_events
+                WHERE event_type = 'FlowConfigurationEventCreated'
+                "#,
             )
             .try_map(|event_row| {
                 DatasetID::from_did_str(event_row.dataset_id.as_str())
