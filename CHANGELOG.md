@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Added
 - Flow system: implemented persistent repositories (PostgreSQL, SQLite) for flow configuration events
+### Fixed
+- Compacting datasets stored in an S3 bucket
 
 ## [0.177.0] - 2024-04-25
 ### Added

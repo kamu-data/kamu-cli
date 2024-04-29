@@ -25,7 +25,8 @@ use event_bus::EventBus;
 use futures::TryStreamExt;
 use indoc::{formatdoc, indoc};
 use kamu::domain::*;
-use kamu::testing::{DatasetDataHelper, MetadataFactory};
+use kamu::testing::{DatasetDataHelper, LocalS3Server, MetadataFactory};
+use kamu::utils::s3_context::S3Context;
 use kamu::*;
 use kamu_core::{auth, CurrentAccountSubject};
 use opendatafabric::*;
@@ -166,6 +167,123 @@ async fn test_dataset_compact() {
             ),
         )
         .await;
+
+    let new_blocks = harness.get_dataset_blocks(&dataset_ref).await;
+
+    let last_old_block = old_blocks.first().unwrap();
+    let last_new_block = new_blocks.first().unwrap();
+    CompactTestHarness::assert_end_state_equivalent(&last_old_block.event, &last_new_block.event);
+
+    let new_add_data = last_new_block.event.as_variant::<AddData>().unwrap();
+    CompactTestHarness::assert_offset_interval_eq(
+        new_add_data,
+        &OffsetInterval { start: 0, end: 5 },
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized, ingest, datafusion, compact)]
+#[tokio::test]
+async fn test_dataset_compact_s3() {
+    let s3 = LocalS3Server::new().await;
+    let harness = CompactTestHarness::new_s3(&s3).await;
+
+    let created = harness.create_test_dataset().await;
+    let dataset_ref = created.dataset_handle.as_local_ref();
+
+    let dataset_handle = harness
+        .dataset_repo
+        .resolve_dataset_ref(&created.dataset_handle.as_local_ref())
+        .await
+        .unwrap();
+
+    // Round 1: Compacting is a no-op
+    //
+    // Before/after: seed <- add_push_source <- set_vocab <- set_schema <-
+    // set_data_schema <- add_data(3 records)
+    let data_str = indoc!(
+        "
+        date,city,population
+        2020-01-01,A,1000
+        2020-01-02,B,2000
+        2020-01-03,C,3000
+        "
+    );
+
+    harness
+        .ingest_data(data_str.to_string(), &dataset_ref)
+        .await;
+
+    let prev_head = created
+        .dataset
+        .as_metadata_chain()
+        .resolve_ref(&BlockRef::Head)
+        .await
+        .unwrap();
+
+    assert_matches!(
+        harness
+            .compacting_svc
+            .compact_dataset(
+                &dataset_handle,
+                CompactingOptions::default(),
+                Some(Arc::new(NullCompactingMultiListener {}))
+            )
+            .await,
+        Ok(CompactingResult::NothingToDo)
+    );
+
+    assert_eq!(
+        prev_head,
+        created
+            .dataset
+            .as_metadata_chain()
+            .resolve_ref(&BlockRef::Head)
+            .await
+            .unwrap()
+    );
+
+    // Round 2: Last blocks are compacted
+    //
+    // Before: seed <- add_push_source <- set_vocab <- set_schema <- set_data_schema
+    // <- add_data(3 records) <- add_data(3 records)
+    //
+    // After: seed <- add_push_source <- set_vocab <- set_schema <- add_data(6
+    // records)
+    let data_str = indoc!(
+        "
+        date,city,population
+        2020-01-04,A,4000
+        2020-01-05,B,5000
+        2020-01-06,C,6000
+        "
+    );
+
+    harness
+        .ingest_data(data_str.to_string(), &dataset_ref)
+        .await;
+
+    let old_blocks = harness.get_dataset_blocks(&dataset_ref).await;
+
+    assert_matches!(
+        harness
+            .compacting_svc
+            .compact_dataset(
+                &dataset_handle,
+                CompactingOptions::default(),
+                Some(Arc::new(NullCompactingMultiListener {}))
+            )
+            .await,
+        Ok(CompactingResult::Success {
+            new_head,
+            old_head,
+            new_num_blocks: 5,
+            old_num_blocks: 6
+        }) if new_head != old_head,
+    );
+
+    assert!(harness.verify_dataset(&dataset_ref).await);
 
     let new_blocks = harness.get_dataset_blocks(&dataset_ref).await;
 
@@ -832,8 +950,8 @@ async fn test_large_dataset_compact() {
 struct CompactTestHarness {
     _temp_dir: tempfile::TempDir,
     dataset_repo: Arc<dyn DatasetRepository>,
-    compacting_svc: Arc<dyn CompactingService>,
-    push_ingest_svc: Arc<dyn PushIngestService>,
+    compacting_svc: Arc<CompactingServiceImpl>,
+    push_ingest_svc: Arc<PushIngestServiceImpl>,
     verification_svc: Arc<dyn VerificationService>,
     current_date_time: DateTime<Utc>,
     ctx: SessionContext,
@@ -866,6 +984,8 @@ impl CompactTestHarness {
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<EngineProvisionerNull>()
+            .add::<ObjectStoreRegistryImpl>()
+            .add::<ObjectStoreBuilderLocalFs>()
             .add_builder(CompactingServiceImpl::builder().with_run_info_dir(run_info_dir.clone()))
             .bind::<dyn CompactingService, CompactingServiceImpl>()
             .add_builder(
@@ -883,8 +1003,8 @@ impl CompactTestHarness {
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-        let compacting_svc = catalog.get_one::<dyn CompactingService>().unwrap();
-        let push_ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
+        let compacting_svc = catalog.get_one::<CompactingServiceImpl>().unwrap();
+        let push_ingest_svc = catalog.get_one::<PushIngestServiceImpl>().unwrap();
         let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
 
         Self {
@@ -895,6 +1015,68 @@ impl CompactTestHarness {
             verification_svc,
             current_date_time,
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
+        }
+    }
+
+    async fn new_s3(s3: &LocalS3Server) -> Self {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let run_info_dir = temp_dir.path().join("run");
+        let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
+        let s3_context = S3Context::from_items(endpoint.clone(), bucket, key_prefix).await;
+        let current_date_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
+
+        let catalog = dill::CatalogBuilder::new()
+            .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add_builder(
+                DatasetRepositoryS3::builder()
+                    .with_s3_context(s3_context.clone())
+                    .with_multi_tenant(false),
+            )
+            .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add_value(SystemTimeSourceStub::new_set(current_date_time))
+            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+            .add::<EngineProvisionerNull>()
+            .add::<ObjectStoreRegistryImpl>()
+            .add::<ObjectStoreBuilderLocalFs>()
+            .add_value(ObjectStoreBuilderS3::new(s3_context.clone(), true))
+            .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
+            .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
+            .bind::<dyn TransformService, TestTransformService>()
+            .add::<VerificationServiceImpl>()
+            .add_value(CurrentAccountSubject::new_test())
+            .build();
+
+        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let object_store_registry = catalog.get_one::<dyn ObjectStoreRegistry>().unwrap();
+        let compacting_svc = CompactingServiceImpl::new(
+            catalog.get_one().unwrap(),
+            dataset_repo.clone(),
+            object_store_registry.clone(),
+            catalog.get_one().unwrap(),
+            run_info_dir.clone(),
+        );
+        let push_ingest_svc = PushIngestServiceImpl::new(
+            dataset_repo.clone(),
+            catalog.get_one().unwrap(),
+            object_store_registry.clone(),
+            Arc::new(DataFormatRegistryImpl::new()),
+            run_info_dir,
+            catalog.get_one().unwrap(),
+            catalog.get_one().unwrap(),
+        );
+        let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
+        let ctx = new_session_context(object_store_registry);
+
+        Self {
+            _temp_dir: temp_dir,
+            dataset_repo,
+            compacting_svc: Arc::new(compacting_svc),
+            push_ingest_svc: Arc::new(push_ingest_svc),
+            verification_svc,
+            current_date_time,
+            ctx,
         }
     }
 

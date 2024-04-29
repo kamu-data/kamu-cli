@@ -49,6 +49,7 @@ use crate::*;
 pub struct CompactingServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_authorizer: Arc<dyn domain::auth::DatasetActionAuthorizer>,
+    object_store_registry: Arc<dyn ObjectStoreRegistry>,
     time_source: Arc<dyn SystemTimeSource>,
     run_info_dir: PathBuf,
 }
@@ -99,12 +100,14 @@ impl CompactingServiceImpl {
     pub fn new(
         dataset_authorizer: Arc<dyn domain::auth::DatasetActionAuthorizer>,
         dataset_repo: Arc<dyn DatasetRepository>,
+        object_store_registry: Arc<dyn ObjectStoreRegistry>,
         time_source: Arc<dyn SystemTimeSource>,
         run_info_dir: PathBuf,
     ) -> Self {
         Self {
             dataset_repo,
             dataset_authorizer,
+            object_store_registry,
             time_source,
             run_info_dir,
         }
@@ -253,7 +256,7 @@ impl CompactingServiceImpl {
         offset_column: &str,
         compacting_dir_path: &Path,
     ) -> Result<(), CompactingError> {
-        let ctx = SessionContext::new();
+        let ctx = new_session_context(self.object_store_registry.clone());
 
         for (index, data_slice_batch) in data_slice_batches.iter_mut().enumerate() {
             if let DataSliceBatch::CompactedBatch(data_slice_batch_info) = data_slice_batch {
