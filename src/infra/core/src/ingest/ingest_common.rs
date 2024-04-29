@@ -49,9 +49,7 @@ pub(crate) async fn preprocess(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn new_session_context(
-    object_store_registry: Arc<dyn ObjectStoreRegistry>,
-) -> SessionContext {
+pub fn new_session_context(object_store_registry: Arc<dyn ObjectStoreRegistry>) -> SessionContext {
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::prelude::*;
 
