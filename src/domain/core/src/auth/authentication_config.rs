@@ -13,9 +13,9 @@ use random_names::get_random_name;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID: &str = "KAMU_AUTH_GITHUB_CLIENT_ID";
-pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET: &str = "KAMU_AUTH_GITHUB_CLIENT_SECRET";
-pub const ENV_VAR_KAMU_JWT_SECRET: &str = "KAMU_JWT_SECRET";
+const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID: &str = "KAMU_AUTH_GITHUB_CLIENT_ID";
+const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET: &str = "KAMU_AUTH_GITHUB_CLIENT_SECRET";
+const ENV_VAR_KAMU_JWT_SECRET: &str = "KAMU_JWT_SECRET";
 
 ///////////////////////////////////////////////////////////////////////////////
 
