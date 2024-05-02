@@ -14,6 +14,7 @@ use chrono::{DateTime, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use database_common::{DatabaseConfiguration, DatabaseProvider};
 use dill::*;
+use kamu::domain::auth::AuthenticationConfig;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::{AccountConfig, CurrentAccountSubject, PredefinedAccountsConfig};
@@ -84,6 +85,8 @@ pub async fn run(
             workspace_svc.is_multi_tenant_workspace(),
             system_time,
         );
+
+        base_catalog_builder.add_value(AuthenticationConfig::load_from_env());
 
         base_catalog_builder.add_value(ServerUrlConfig::load()?);
 
