@@ -19,6 +19,7 @@ const ENV_VAR_KAMU_JWT_SECRET: &str = "KAMU_JWT_SECRET";
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[derive(Default)]
 pub struct JwtAuthenticationConfig {
     jwt_secret: Option<String>,
 }
@@ -43,6 +44,7 @@ impl JwtAuthenticationConfig {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[derive(Default)]
 pub struct GithubAuthenticationConfig {
     pub client_id: String,
     pub client_secret: String,

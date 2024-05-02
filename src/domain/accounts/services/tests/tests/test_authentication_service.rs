@@ -102,6 +102,7 @@ fn make_catalog() -> dill::Catalog {
         .add_value(PredefinedAccountsConfig::single_tenant())
         .add_value(SystemTimeSourceStub::new())
         .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+        .add_value(JwtAuthenticationConfig::default())
         .build()
 }
 
