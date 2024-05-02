@@ -23,7 +23,7 @@ impl ServerUrlConfig {
         Url::parse(&raw).int_err()
     }
 
-    pub fn load() -> Result<Self, InternalError> {
+    pub fn load_from_env() -> Result<Self, InternalError> {
         // TODO: Use value from config not envvar
         //       https://github.com/kamu-data/kamu-node/issues/45
         //

@@ -91,7 +91,7 @@ pub async fn run(
             GithubAuthenticationConfig::load_from_env().map_err(CLIError::missed_env_var)?,
         );
 
-        base_catalog_builder.add_value(ServerUrlConfig::load()?);
+        base_catalog_builder.add_value(ServerUrlConfig::load_from_env()?);
 
         // TODO: read database settings from configuration, and make it optional
         // let db_configuration = DatabaseConfiguration::local_postgres();
