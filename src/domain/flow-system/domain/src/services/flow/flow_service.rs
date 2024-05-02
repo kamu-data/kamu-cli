@@ -48,6 +48,16 @@ pub trait FlowService: Sync + Send {
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
 
+    /// Returns states of flows associated with a given account
+    /// ordered by creation time from newest to oldest.
+    /// Applies specified filters/pagination
+    async fn list_all_flows_by_account(
+        &self,
+        account_id: &AccountName,
+        filters: DatasetFlowFilters,
+        pagination: FlowPaginationOpts,
+    ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
+
     /// Returns states of system flows associated with a given dataset
     /// ordered by creation time from newest to oldest.
     /// Applies specified filters/pagination

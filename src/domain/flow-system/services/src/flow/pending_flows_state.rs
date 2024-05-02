@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use kamu_flow_system::*;
 use kamu_task_system::*;
-use opendatafabric::DatasetID;
+use opendatafabric::{AccountName, DatasetID};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,9 +41,11 @@ impl PendingFlowsState {
 
     pub fn drop_pending_flow(&mut self, flow_key: &FlowKey) -> Option<FlowID> {
         match flow_key {
-            FlowKey::Dataset(flow_key) => {
-                self.drop_dataset_pending_flow(&flow_key.dataset_id, flow_key.flow_type)
-            }
+            FlowKey::Dataset(flow_key) => self.drop_dataset_pending_flow(
+                &flow_key.dataset_id,
+                flow_key.flow_type,
+                &flow_key.account_id,
+            ),
             FlowKey::System(flow_key) => self.pending_system_flows.remove(&flow_key.flow_type),
         }
     }
@@ -52,9 +54,10 @@ impl PendingFlowsState {
         &mut self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
+        account_id: &Option<AccountName>,
     ) -> Option<FlowID> {
         self.pending_dataset_flows
-            .remove(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
+            .remove(BorrowedFlowKeyDataset::new(dataset_id, flow_type, account_id).as_trait())
     }
 
     pub fn untrack_flow_by_task(&mut self, task_id: TaskID) {
@@ -66,8 +69,12 @@ impl PendingFlowsState {
             FlowKey::Dataset(flow_key) => self
                 .pending_dataset_flows
                 .get(
-                    BorrowedFlowKeyDataset::new(&flow_key.dataset_id, flow_key.flow_type)
-                        .as_trait(),
+                    BorrowedFlowKeyDataset::new(
+                        &flow_key.dataset_id,
+                        flow_key.flow_type,
+                        &flow_key.account_id,
+                    )
+                    .as_trait(),
                 )
                 .copied(),
             FlowKey::System(flow_key) => {

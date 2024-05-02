@@ -804,11 +804,13 @@ async fn make_dataset_test_case(
     task_event_store: Arc<dyn TaskSystemEventStore>,
 ) -> DatasetTestCase {
     let (_, dataset_id) = DatasetID::new_generated_ed25519();
+    let account_id = AccountName::new_unchecked("kamu");
 
     DatasetTestCase {
         dataset_id: dataset_id.clone(),
         ingest_flow_ids: make_dataset_test_flows(
             &dataset_id,
+            Some(account_id.clone()),
             DatasetFlowType::Ingest,
             flow_event_store.clone(),
             task_event_store.clone(),
@@ -816,6 +818,7 @@ async fn make_dataset_test_case(
         .await,
         compacting_flow_ids: make_dataset_test_flows(
             &dataset_id,
+            Some(account_id),
             DatasetFlowType::HardCompacting,
             flow_event_store,
             task_event_store,
@@ -836,12 +839,17 @@ async fn make_system_test_case(
 
 async fn make_dataset_test_flows(
     dataset_id: &DatasetID,
+    account_id: Option<AccountName>,
     dataset_flow_type: DatasetFlowType,
     flow_event_store: Arc<dyn FlowEventStore>,
     task_event_store: Arc<dyn TaskSystemEventStore>,
 ) -> TestFlowIDs {
-    let flow_generator =
-        DatasetFlowGenerator::new(dataset_id, flow_event_store.clone(), task_event_store);
+    let flow_generator = DatasetFlowGenerator::new(
+        dataset_id,
+        account_id,
+        flow_event_store.clone(),
+        task_event_store,
+    );
 
     let wasya_manual_trigger = FlowTrigger::Manual(FlowTriggerManual {
         trigger_time: Utc::now(),
@@ -963,6 +971,7 @@ async fn assert_system_flow_expectaitons(
 
 struct DatasetFlowGenerator<'a> {
     dataset_id: &'a DatasetID,
+    account_id: Option<AccountName>,
     flow_event_store: Arc<dyn FlowEventStore>,
     task_event_store: Arc<dyn TaskSystemEventStore>,
 }
@@ -970,11 +979,13 @@ struct DatasetFlowGenerator<'a> {
 impl<'a> DatasetFlowGenerator<'a> {
     fn new(
         dataset_id: &'a DatasetID,
+        account_id: Option<AccountName>,
         flow_event_store: Arc<dyn FlowEventStore>,
         task_event_store: Arc<dyn TaskSystemEventStore>,
     ) -> Self {
         Self {
             dataset_id,
+            account_id,
             flow_event_store,
             task_event_store,
         }
@@ -996,6 +1007,7 @@ impl<'a> DatasetFlowGenerator<'a> {
             FlowKeyDataset {
                 dataset_id: self.dataset_id.clone(),
                 flow_type,
+                account_id: self.account_id.clone(),
             }
             .into(),
             initial_trigger,

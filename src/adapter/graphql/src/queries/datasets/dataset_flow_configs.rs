@@ -37,8 +37,12 @@ impl DatasetFlowConfigs {
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
         let maybe_flow_config = flow_config_service
             .find_configuration(
-                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
-                    .into(),
+                FlowKeyDataset::new(
+                    self.dataset_handle.id.clone(),
+                    dataset_flow_type.into(),
+                    self.dataset_handle.alias.account_name.clone(),
+                )
+                .into(),
             )
             .await
             .int_err()?;
@@ -54,7 +58,12 @@ impl DatasetFlowConfigs {
         for dataset_flow_type in kamu_flow_system::DatasetFlowType::all() {
             let maybe_flow_config = flow_config_service
                 .find_configuration(
-                    FlowKeyDataset::new(self.dataset_handle.id.clone(), *dataset_flow_type).into(),
+                    FlowKeyDataset::new(
+                        self.dataset_handle.id.clone(),
+                        *dataset_flow_type,
+                        self.dataset_handle.alias.account_name.clone(),
+                    )
+                    .into(),
                 )
                 .await
                 .int_err()?;

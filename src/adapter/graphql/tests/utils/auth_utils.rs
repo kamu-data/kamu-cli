@@ -9,6 +9,7 @@
 
 use kamu_adapter_graphql::ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE;
 use kamu_core::{AnonymousAccountReason, CurrentAccountSubject};
+use opendatafabric::AccountName;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,6 +25,17 @@ pub fn authentication_catalogs(base_catalog: &dill::Catalog) -> (dill::Catalog, 
         .build();
 
     (catalog_anonymous, catalog_authorized)
+}
+
+pub fn add_custom_logged_in_account(
+    base_catalog: &dill::Catalog,
+    account_name: AccountName,
+    is_admin: bool,
+) -> dill::Catalog {
+    let new_account = CurrentAccountSubject::logged(account_name, is_admin);
+    dill::CatalogBuilder::new_chained(base_catalog)
+        .add_value(new_account)
+        .build()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 
 use kamu_flow_system::*;
-use opendatafabric::DatasetID;
+use opendatafabric::{AccountName, DatasetID};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,9 +46,15 @@ impl ActiveConfigsState {
         self.system_schedules.insert(flow_type, schedule);
     }
 
-    pub fn drop_dataset_configs(&mut self, dataset_id: &DatasetID) {
+    pub fn drop_dataset_configs(
+        &mut self,
+        dataset_id: &DatasetID,
+        account_id: &Option<AccountName>,
+    ) {
         for flow_type in DatasetFlowType::all() {
-            self.drop_dataset_flow_config(BorrowedFlowKeyDataset::new(dataset_id, *flow_type));
+            self.drop_dataset_flow_config(BorrowedFlowKeyDataset::new(
+                dataset_id, *flow_type, account_id,
+            ));
         }
     }
 
@@ -74,8 +80,12 @@ impl ActiveConfigsState {
             FlowKey::Dataset(flow_key) => self
                 .dataset_schedules
                 .get(
-                    BorrowedFlowKeyDataset::new(&flow_key.dataset_id, flow_key.flow_type)
-                        .as_trait(),
+                    BorrowedFlowKeyDataset::new(
+                        &flow_key.dataset_id,
+                        flow_key.flow_type,
+                        &flow_key.account_id,
+                    )
+                    .as_trait(),
                 )
                 .cloned(),
             FlowKey::System(flow_key) => self.system_schedules.get(&flow_key.flow_type).cloned(),
@@ -85,20 +95,22 @@ impl ActiveConfigsState {
     pub fn try_get_dataset_batching_rule(
         &self,
         dataset_id: &DatasetID,
+        account_id: &Option<AccountName>,
         flow_type: DatasetFlowType,
     ) -> Option<BatchingRule> {
         self.dataset_batching_rules
-            .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
+            .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type, account_id).as_trait())
             .copied()
     }
 
     pub fn try_get_dataset_compacting_rule(
         &self,
         dataset_id: &DatasetID,
+        account_id: &Option<AccountName>,
         flow_type: DatasetFlowType,
     ) -> Option<CompactingRule> {
         self.dataset_compacting_rules
-            .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
+            .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type, account_id).as_trait())
             .copied()
     }
 }

@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use event_sourcing::TryLoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
-use opendatafabric::DatasetID;
+use opendatafabric::{AccountName, DatasetID};
 use tokio_stream::Stream;
 
 use crate::{
@@ -63,6 +63,7 @@ pub trait FlowConfigurationService: Sync + Send {
         &self,
         request_time: DateTime<Utc>,
         dataset_id: &DatasetID,
+        account_id: &Option<AccountName>,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<(), InternalError>;
 
@@ -80,6 +81,7 @@ pub trait FlowConfigurationService: Sync + Send {
         &self,
         request_time: DateTime<Utc>,
         dataset_id: &DatasetID,
+        account_id: &Option<AccountName>,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<(), InternalError>;
 

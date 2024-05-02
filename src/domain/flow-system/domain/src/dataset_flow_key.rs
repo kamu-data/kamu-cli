@@ -10,7 +10,7 @@
 use std::borrow::Borrow;
 use std::hash::{Hash, Hasher};
 
-use opendatafabric::DatasetID;
+use opendatafabric::{AccountName, DatasetID};
 
 use crate::{DatasetFlowType, FlowKeyDataset};
 
@@ -20,13 +20,19 @@ use crate::{DatasetFlowType, FlowKeyDataset};
 pub struct BorrowedFlowKeyDataset<'a> {
     dataset_id: &'a DatasetID,
     flow_type: DatasetFlowType,
+    account_id: &'a Option<AccountName>,
 }
 
 impl<'a> BorrowedFlowKeyDataset<'a> {
-    pub fn new(dataset_id: &'a DatasetID, flow_type: DatasetFlowType) -> Self {
+    pub fn new(
+        dataset_id: &'a DatasetID,
+        flow_type: DatasetFlowType,
+        account_id: &'a Option<AccountName>,
+    ) -> Self {
         Self {
             dataset_id,
             flow_type,
+            account_id,
         }
     }
 
@@ -46,6 +52,7 @@ impl BorrowedFlowKeyDatasetHelper for FlowKeyDataset {
         BorrowedFlowKeyDataset {
             dataset_id: &self.dataset_id,
             flow_type: self.flow_type,
+            account_id: &self.account_id,
         }
     }
 }

@@ -42,6 +42,7 @@ async fn test_visibility() {
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
+            None,
             DatasetFlowType::Ingest,
             foo_ingest_schedule.clone(),
         )
@@ -51,6 +52,7 @@ async fn test_visibility() {
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
+            None,
             DatasetFlowType::HardCompacting,
             foo_compacting_schedule.clone(),
         )
@@ -60,6 +62,7 @@ async fn test_visibility() {
     harness
         .set_dataset_flow_schedule(
             bar_id.clone(),
+            None,
             DatasetFlowType::Ingest,
             bar_ingest_schedule.clone(),
         )
@@ -101,6 +104,7 @@ async fn test_pause_resume_individual_dataset_flows() {
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
+            None,
             DatasetFlowType::Ingest,
             foo_ingest_schedule.clone(),
         )
@@ -174,6 +178,7 @@ async fn test_pause_resume_all_dataset_flows() {
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
+            None,
             DatasetFlowType::Ingest,
             foo_ingest_schedule.clone(),
         )
@@ -182,6 +187,7 @@ async fn test_pause_resume_all_dataset_flows() {
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
+            None,
             DatasetFlowType::HardCompacting,
             foo_compacting_schedule.clone(),
         )
@@ -327,6 +333,7 @@ async fn test_modify() {
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
+            None,
             DatasetFlowType::Ingest,
             foo_ingest_schedule.clone(),
         )
@@ -348,6 +355,7 @@ async fn test_modify() {
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
+            None,
             DatasetFlowType::Ingest,
             foo_ingest_schedule_2.clone(),
         )
@@ -378,6 +386,7 @@ async fn test_dataset_deleted() {
     harness
         .set_dataset_flow_schedule(
             foo_id.clone(),
+            None,
             DatasetFlowType::Ingest,
             foo_ingest_schedule.clone(),
         )
@@ -495,13 +504,14 @@ impl FlowConfigurationHarness {
     async fn set_dataset_flow_schedule(
         &self,
         dataset_id: DatasetID,
+        account_id: Option<AccountName>,
         dataset_flow_type: DatasetFlowType,
         schedule: Schedule,
     ) {
         self.flow_configuration_service
             .set_configuration(
                 Utc::now(),
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
+                FlowKeyDataset::new(dataset_id, dataset_flow_type, account_id).into(),
                 false,
                 FlowConfigurationRule::Schedule(schedule),
             )
@@ -533,7 +543,7 @@ impl FlowConfigurationHarness {
         expected_schedule: &Schedule,
     ) {
         assert_matches!(
-            enabled_configurations.get(&(FlowKeyDataset::new(dataset_id, dataset_flow_type).into())),
+            enabled_configurations.get(&(FlowKeyDataset::new(dataset_id, dataset_flow_type, None).into())),
             Some(FlowConfigurationState {
                 status: FlowConfigurationStatus::Active,
                 rule: FlowConfigurationRule::Schedule(actual_schedule),
@@ -544,14 +554,14 @@ impl FlowConfigurationHarness {
 
     async fn pause_dataset_flow(&self, dataset_id: DatasetID, dataset_flow_type: DatasetFlowType) {
         self.flow_configuration_service
-            .pause_dataset_flows(Utc::now(), &dataset_id, Some(dataset_flow_type))
+            .pause_dataset_flows(Utc::now(), &dataset_id, &None, Some(dataset_flow_type))
             .await
             .unwrap();
     }
 
     async fn pause_all_dataset_flows(&self, dataset_id: DatasetID) {
         self.flow_configuration_service
-            .pause_dataset_flows(Utc::now(), &dataset_id, None)
+            .pause_dataset_flows(Utc::now(), &dataset_id, &None, None)
             .await
             .unwrap();
     }
@@ -565,14 +575,14 @@ impl FlowConfigurationHarness {
 
     async fn resume_dataset_flow(&self, dataset_id: DatasetID, dataset_flow_type: DatasetFlowType) {
         self.flow_configuration_service
-            .resume_dataset_flows(Utc::now(), &dataset_id, Some(dataset_flow_type))
+            .resume_dataset_flows(Utc::now(), &dataset_id, &None, Some(dataset_flow_type))
             .await
             .unwrap();
     }
 
     async fn resume_all_dataset_flows(&self, dataset_id: DatasetID) {
         self.flow_configuration_service
-            .resume_dataset_flows(Utc::now(), &dataset_id, None)
+            .resume_dataset_flows(Utc::now(), &dataset_id, &None, None)
             .await
             .unwrap();
     }
@@ -589,7 +599,7 @@ impl FlowConfigurationHarness {
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
     ) -> FlowConfigurationState {
-        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
+        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type, None).into();
         let flow_configuration =
             FlowConfiguration::load(flow_key, self.flow_configuration_event_store.as_ref())
                 .await

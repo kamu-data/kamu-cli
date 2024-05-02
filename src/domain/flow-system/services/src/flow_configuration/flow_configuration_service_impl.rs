@@ -16,7 +16,7 @@ use futures::TryStreamExt;
 use kamu_core::events::DatasetEventDeleted;
 use kamu_core::SystemTimeSource;
 use kamu_flow_system::*;
-use opendatafabric::DatasetID;
+use opendatafabric::{AccountName, DatasetID};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -62,11 +62,13 @@ impl FlowConfigurationServiceImpl {
     fn get_dataset_flow_keys(
         dataset_id: &DatasetID,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
+        account_id: &Option<AccountName>,
     ) -> Vec<FlowKey> {
         if let Some(dataset_flow_type) = maybe_dataset_flow_type {
             vec![FlowKey::Dataset(FlowKeyDataset {
                 dataset_id: dataset_id.clone(),
                 flow_type: dataset_flow_type,
+                account_id: account_id.clone(),
             })]
         } else {
             DatasetFlowType::all()
@@ -75,6 +77,7 @@ impl FlowConfigurationServiceImpl {
                     FlowKey::Dataset(FlowKeyDataset {
                         dataset_id: dataset_id.clone(),
                         flow_type: *dft,
+                        account_id: account_id.clone(),
                     })
                 })
                 .collect()
@@ -164,7 +167,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 
             for dataset_id in dataset_ids {
                 for dataset_flow_type in DatasetFlowType::all() {
-                    let maybe_flow_configuration = FlowConfiguration::try_load(FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into(), self.event_store.as_ref()).await.int_err()?;
+                    let maybe_flow_configuration = FlowConfiguration::try_load(FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type, None).into(), self.event_store.as_ref()).await.int_err()?;
                     if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
                         yield flow_configuration.into();
                     }
@@ -229,9 +232,11 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         &self,
         request_time: DateTime<Utc>,
         dataset_id: &DatasetID,
+        account_id: &Option<AccountName>,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<(), InternalError> {
-        let flow_keys = Self::get_dataset_flow_keys(dataset_id, maybe_dataset_flow_type);
+        let flow_keys =
+            Self::get_dataset_flow_keys(dataset_id, maybe_dataset_flow_type, account_id);
 
         for flow_key in flow_keys {
             self.pause_flow_configuration(request_time, flow_key)
@@ -267,9 +272,11 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         &self,
         request_time: DateTime<Utc>,
         dataset_id: &DatasetID,
+        account_id: &Option<AccountName>,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<(), InternalError> {
-        let flow_keys = Self::get_dataset_flow_keys(dataset_id, maybe_dataset_flow_type);
+        let flow_keys =
+            Self::get_dataset_flow_keys(dataset_id, maybe_dataset_flow_type, account_id);
 
         for flow_key in flow_keys {
             self.resume_flow_configuration(request_time, flow_key)
@@ -308,7 +315,12 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceImpl {
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
         for flow_type in DatasetFlowType::all() {
             let maybe_flow_configuration = FlowConfiguration::try_load(
-                FlowKeyDataset::new(event.dataset_id.clone(), *flow_type).into(),
+                FlowKeyDataset::new(
+                    event.dataset_id.clone(),
+                    *flow_type,
+                    event.account_id.clone(),
+                )
+                .into(),
                 self.event_store.as_ref(),
             )
             .await

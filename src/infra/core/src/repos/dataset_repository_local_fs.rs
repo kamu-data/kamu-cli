@@ -305,6 +305,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         self.event_bus
             .dispatch_event(events::DatasetEventCreated {
                 dataset_id: dataset_handle.id.clone(),
+                account_id: dataset_handle.alias.account_name.clone(),
             })
             .await?;
 
@@ -418,6 +419,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         self.event_bus
             .dispatch_event(events::DatasetEventDeleted {
                 dataset_id: dataset_handle.id,
+                account_id: dataset_handle.alias.account_name.clone(),
             })
             .await?;
 

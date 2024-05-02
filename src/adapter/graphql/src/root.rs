@@ -92,6 +92,14 @@ impl Mutation {
         DatasetsMut
     }
 
+    /// Account-related functionality group.
+    ///
+    /// Accounts can be individual users or organizations registered in the
+    /// system. This groups deals with their identities and permissions.
+    async fn accounts(&self) -> AccountsMut {
+        AccountsMut
+    }
+
     /// Tasks-related functionality group.
     ///
     /// Tasks are units of work scheduled and executed by the system to query

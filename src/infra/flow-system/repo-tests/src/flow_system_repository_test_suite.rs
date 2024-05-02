@@ -27,6 +27,7 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
     let flow_key = FlowKey::dataset(
         DatasetID::new_seeded_ed25519(b"foo"),
         DatasetFlowType::Ingest,
+        None,
     );
     let events: Vec<_> = event_store
         .get_events(&flow_key, GetEventsOpts::default())
@@ -55,7 +56,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .unwrap();
 
     let dataset_id_1 = DatasetID::new_seeded_ed25519(b"foo");
-    let flow_key_1 = FlowKey::dataset(dataset_id_1.clone(), DatasetFlowType::Ingest);
+    let flow_key_1 = FlowKey::dataset(dataset_id_1.clone(), DatasetFlowType::Ingest, None);
 
     let event_1_1 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
@@ -87,7 +88,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     assert_eq!(2, num_events);
 
     let dataset_id_2 = DatasetID::new_seeded_ed25519(b"bar");
-    let flow_key_2 = FlowKey::dataset(dataset_id_2.clone(), DatasetFlowType::Ingest);
+    let flow_key_2 = FlowKey::dataset(dataset_id_2.clone(), DatasetFlowType::Ingest, None);
 
     let event_2 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
@@ -182,6 +183,7 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     let flow_key = FlowKey::dataset(
         DatasetID::new_seeded_ed25519(b"foo"),
         DatasetFlowType::Ingest,
+        None,
     );
 
     let event_1 = FlowConfigurationEventCreated {

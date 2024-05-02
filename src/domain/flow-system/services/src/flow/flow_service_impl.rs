@@ -292,6 +292,7 @@ impl FlowServiceImpl {
                     .active_configs
                     .try_get_dataset_batching_rule(
                         &dependent_dataset_id,
+                        &fk_dataset.account_id,
                         DatasetFlowType::ExecuteTransform,
                     );
 
@@ -300,6 +301,7 @@ impl FlowServiceImpl {
                     let dependent_flow_key = FlowKeyDataset::new(
                         dependent_dataset_id.clone(),
                         DatasetFlowType::ExecuteTransform,
+                        fk_dataset.account_id.clone(),
                     )
                     .into();
 
@@ -638,7 +640,11 @@ impl FlowServiceImpl {
         match flow_key {
             FlowKey::Dataset(fk_dataset) => {
                 self.flow_event_store
-                    .get_dataset_flow_run_stats(&fk_dataset.dataset_id, fk_dataset.flow_type)
+                    .get_dataset_flow_run_stats(
+                        &fk_dataset.dataset_id,
+                        fk_dataset.flow_type,
+                        &fk_dataset.account_id,
+                    )
                     .await
             }
             FlowKey::System(fk_system) => {
@@ -745,6 +751,7 @@ impl FlowServiceImpl {
                         .active_configs
                         .try_get_dataset_compacting_rule(
                             &flow_key.dataset_id,
+                            &flow_key.account_id,
                             DatasetFlowType::HardCompacting,
                         );
                     if let Some(opts) = maybe_compacting_rule {
@@ -904,6 +911,44 @@ impl FlowService for FlowServiceImpl {
             let relevant_flow_ids: Vec<_> = self
                 .flow_event_store
                 .get_all_flow_ids_by_dataset(&dataset_id, filters, pagination)
+                .try_collect()
+                .await
+                .int_err()?;
+
+            // TODO: implement batch loading
+            for flow_id in relevant_flow_ids {
+                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
+                yield flow.into();
+            }
+        });
+
+        Ok(FlowStateListing {
+            matched_stream,
+            total_count,
+        })
+    }
+
+    /// Returns states of flows associated with a given account
+    /// ordered by creation time from newest to oldest
+    /// Applies specified filters
+    #[tracing::instrument(level = "debug", skip_all, fields(%account_id, ?filters, ?pagination))]
+    async fn list_all_flows_by_account(
+        &self,
+        account_id: &AccountName,
+        filters: DatasetFlowFilters,
+        pagination: FlowPaginationOpts,
+    ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
+        let total_count = self
+            .flow_event_store
+            .get_count_flows_by_account(account_id, &filters)
+            .await
+            .int_err()?;
+        let account_id = account_id.clone();
+
+        let matched_stream = Box::pin(async_stream::try_stream! {
+            let relevant_flow_ids: Vec<_> = self
+                .flow_event_store
+                .get_all_flow_ids_by_account(&account_id, filters, pagination)
                 .try_collect()
                 .await
                 .int_err()?;
@@ -1237,7 +1282,9 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceImpl {
                 return Ok(());
             };
 
-            state.active_configs.drop_dataset_configs(&event.dataset_id);
+            state
+                .active_configs
+                .drop_dataset_configs(&event.dataset_id, &event.account_id);
 
             // For every possible dataset flow:
             //  - drop it from pending state
@@ -1245,10 +1292,11 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceImpl {
             //  - collect ID of aborted flow
             let mut flow_ids_2_abort: Vec<_> = Vec::new();
             for flow_type in DatasetFlowType::all() {
-                if let Some(flow_id) = state
-                    .pending_flows
-                    .drop_dataset_pending_flow(&event.dataset_id, *flow_type)
-                {
+                if let Some(flow_id) = state.pending_flows.drop_dataset_pending_flow(
+                    &event.dataset_id,
+                    *flow_type,
+                    &event.account_id,
+                ) {
                     flow_ids_2_abort.push(flow_id);
                     state.time_wheel.cancel_flow_activation(flow_id).int_err()?;
                 }

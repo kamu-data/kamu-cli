@@ -12,6 +12,7 @@ use kamu_core::CurrentAccountSubject;
 use opendatafabric as odf;
 use tokio::sync::OnceCell;
 
+use super::AccountFlows;
 use crate::prelude::*;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -155,6 +156,11 @@ impl Account {
         let full_account_info = self.get_full_account_info(ctx).await?;
 
         Ok(full_account_info.is_admin)
+    }
+
+    /// Access to the flow configurations of this account
+    async fn flows(&self) -> AccountFlows {
+        AccountFlows::new(self.account_name.clone().into())
     }
 }
 

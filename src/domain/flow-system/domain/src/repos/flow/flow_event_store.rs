@@ -25,6 +25,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
+        account_id: &Option<AccountName>,
     ) -> Result<FlowRunStats, InternalError>;
 
     /// Returns last run statistics for the system flow of certain type
@@ -43,11 +44,29 @@ pub trait FlowEventStore: EventStore<FlowState> {
         pagination: FlowPaginationOpts,
     ) -> FlowIDStream;
 
+    /// Returns IDs of the flows associated with the specified
+    /// account in reverse chronological order based on creation time.
+    /// Applies filters/pagination, if specified
+    fn get_all_flow_ids_by_account(
+        &self,
+        account_id: &AccountName,
+        filters: DatasetFlowFilters,
+        pagination: FlowPaginationOpts,
+    ) -> FlowIDStream;
+
     /// Returns number of flows associated with the specified dataset and
     /// matching filters, if specified
     async fn get_count_flows_by_dataset(
         &self,
         dataset_id: &DatasetID,
+        filters: &DatasetFlowFilters,
+    ) -> Result<usize, InternalError>;
+
+    /// Returns number of flows associated with the specified account and
+    /// matching filters, if specified
+    async fn get_count_flows_by_account(
+        &self,
+        account_id: &AccountName,
         filters: &DatasetFlowFilters,
     ) -> Result<usize, InternalError>;
 

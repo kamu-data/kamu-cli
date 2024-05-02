@@ -66,8 +66,12 @@ impl DatasetFlowRunsMut {
         let flow_state = flow_service
             .trigger_manual_flow(
                 Utc::now(),
-                fs::FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
-                    .into(),
+                fs::FlowKeyDataset::new(
+                    self.dataset_handle.id.clone(),
+                    dataset_flow_type.into(),
+                    self.dataset_handle.alias.account_name.clone(),
+                )
+                .into(),
                 odf::AccountID::from(odf::FAKE_ACCOUNT_ID),
                 logged_account.account_name,
             )
