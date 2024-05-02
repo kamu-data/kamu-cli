@@ -33,17 +33,6 @@ impl OAuthGithub {
         Self {}
     }
 
-    fn get_client_id() -> String {
-        std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)
-            .unwrap_or_else(|_| panic!("{ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID} env var is not set"))
-    }
-
-    fn get_client_secret() -> String {
-        std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET).unwrap_or_else(|_| {
-            panic!("{ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET} env var is not set")
-        })
-    }
-
     fn get_client(&self) -> Result<reqwest::Client, reqwest::Error> {
         reqwest::Client::builder()
             .user_agent(concat!(
@@ -60,9 +49,9 @@ impl OAuthGithub {
         code: String,
     ) -> Result<GithubAccountInfo, ProviderLoginError> {
         let params = [
-            ("client_id", OAuthGithub::get_client_id()),
-            ("client_secret", OAuthGithub::get_client_secret()),
-            ("code", code),
+            ("client_id", self.config.client_id.as_str()),
+            ("client_secret", self.config.client_secret.as_str()),
+            ("code", code.as_str()),
         ];
 
         let body = client

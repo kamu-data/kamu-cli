@@ -103,6 +103,15 @@ impl CLIError {
         })
     }
 
+    pub fn missed_env_var<T>(var_name: T) -> Self
+    where
+        T: Into<String>,
+    {
+        Self::usage_error_from(RequiredEnvVarNotSet {
+            var_name: var_name.into(),
+        })
+    }
+
     pub fn failure(e: impl std::error::Error + Send + Sync + 'static) -> Self {
         Self::Failure {
             source: e.into(),

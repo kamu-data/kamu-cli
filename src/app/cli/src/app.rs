@@ -14,7 +14,7 @@ use chrono::{DateTime, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use database_common::{DatabaseConfiguration, DatabaseProvider};
 use dill::*;
-use kamu::domain::auth::AuthenticationConfig;
+use kamu::domain::auth::*;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::{AccountConfig, CurrentAccountSubject, PredefinedAccountsConfig};
@@ -86,7 +86,10 @@ pub async fn run(
             system_time,
         );
 
-        base_catalog_builder.add_value(AuthenticationConfig::load_from_env());
+        base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
+        base_catalog_builder.add_value(
+            GithubAuthenticationConfig::load_from_env().map_err(CLIError::missed_env_var)?,
+        );
 
         base_catalog_builder.add_value(ServerUrlConfig::load()?);
 

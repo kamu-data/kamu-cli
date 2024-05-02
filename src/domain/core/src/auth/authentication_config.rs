@@ -19,18 +19,14 @@ pub const ENV_VAR_KAMU_JWT_SECRET: &str = "KAMU_JWT_SECRET";
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct AuthenticationConfig {
+pub struct JwtAuthenticationConfig {
     jwt_secret: Option<String>,
-    pub github_client_id: Option<String>,
-    pub github_client_secret: Option<String>,
 }
 
-impl AuthenticationConfig {
+impl JwtAuthenticationConfig {
     pub fn load_from_env() -> Self {
         Self {
             jwt_secret: std::env::var(ENV_VAR_KAMU_JWT_SECRET).ok(),
-            github_client_id: std::env::var(ENV_VAR_KAMU_JWT_SECRET).ok(),
-            github_client_secret: std::env::var(ENV_VAR_KAMU_JWT_SECRET).ok(),
         }
     }
 
@@ -44,3 +40,26 @@ impl AuthenticationConfig {
         }
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct GithubAuthenticationConfig {
+    pub client_id: String,
+    pub client_secret: String,
+}
+
+impl GithubAuthenticationConfig {
+    pub fn load_from_env() -> Result<Self, &'static str> {
+        let config = Self {
+            client_id: std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)
+                .map_err(|_| ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)?,
+
+            client_secret: std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET)
+                .map_err(|_| ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET)?,
+        };
+
+        Ok(config)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
