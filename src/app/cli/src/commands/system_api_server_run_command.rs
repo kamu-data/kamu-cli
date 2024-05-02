@@ -40,6 +40,7 @@ pub struct APIServerRunCommand {
     get_token: bool,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     account_subject: Arc<CurrentAccountSubject>,
+    github_auth_config: Arc<GithubAuthenticationConfig>,
 }
 
 impl APIServerRunCommand {
@@ -53,6 +54,7 @@ impl APIServerRunCommand {
         get_token: bool,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         account_subject: Arc<CurrentAccountSubject>,
+        github_auth_config: Arc<GithubAuthenticationConfig>,
     ) -> Self {
         Self {
             base_catalog,
@@ -64,7 +66,24 @@ impl APIServerRunCommand {
             get_token,
             predefined_accounts_config,
             account_subject,
+            github_auth_config,
         }
+    }
+
+    fn check_required_env_vars(&self) -> Result<(), CLIError> {
+        if self.multi_tenant_workspace {
+            if self.github_auth_config.client_id.is_empty() {
+                return Err(CLIError::missed_env_var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID));
+            }
+
+            if self.github_auth_config.client_secret.is_empty() {
+                return Err(CLIError::missed_env_var(
+                    ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET,
+                ));
+            }
+        }
+
+        Ok(())
     }
 
     async fn get_access_token(&self) -> Result<String, CLIError> {
@@ -106,6 +125,8 @@ impl APIServerRunCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for APIServerRunCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
+        self.check_required_env_vars()?;
+
         let access_token = self.get_access_token().await?;
 
         // TODO: Cloning catalog is too expensive currently

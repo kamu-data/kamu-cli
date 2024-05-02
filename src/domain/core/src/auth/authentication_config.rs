@@ -13,8 +13,8 @@ use random_names::get_random_name;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID: &str = "KAMU_AUTH_GITHUB_CLIENT_ID";
-const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET: &str = "KAMU_AUTH_GITHUB_CLIENT_SECRET";
+pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID: &str = "KAMU_AUTH_GITHUB_CLIENT_ID";
+pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET: &str = "KAMU_AUTH_GITHUB_CLIENT_SECRET";
 const ENV_VAR_KAMU_JWT_SECRET: &str = "KAMU_JWT_SECRET";
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -51,16 +51,16 @@ pub struct GithubAuthenticationConfig {
 }
 
 impl GithubAuthenticationConfig {
-    pub fn load_from_env() -> Result<Self, &'static str> {
-        let config = Self {
+    pub fn load_from_env() -> Self {
+        Self {
             client_id: std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)
-                .map_err(|_| ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)?,
+                .ok()
+                .unwrap_or_default(),
 
             client_secret: std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET)
-                .map_err(|_| ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET)?,
-        };
-
-        Ok(config)
+                .ok()
+                .unwrap_or_default(),
+        }
     }
 }
 

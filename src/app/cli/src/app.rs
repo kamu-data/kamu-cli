@@ -86,12 +86,7 @@ pub async fn run(
             configure_base_catalog(&workspace_layout, multi_tenant_workspace, system_time);
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
-
-        if multi_tenant_workspace {
-            base_catalog_builder.add_value(
-                GithubAuthenticationConfig::load_from_env().map_err(CLIError::missed_env_var)?,
-            );
-        }
+        base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
 
         base_catalog_builder.add_value(ServerUrlConfig::load_from_env()?);
 
