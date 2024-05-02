@@ -20,7 +20,7 @@ use kamu_accounts::{set_random_jwt_secret, PredefinedAccountsConfig, ENV_VAR_KAM
 use opendatafabric::AccountName;
 
 use super::{CLIError, Command};
-use crate::{check_env_var_set, OutputConfig};
+use crate::OutputConfig;
 
 pub struct UICommand {
     base_catalog: Catalog,
@@ -55,22 +55,12 @@ impl UICommand {
             get_token,
         }
     }
-
-    fn ensure_required_env_vars(&self) {
-        match check_env_var_set(ENV_VAR_KAMU_JWT_SECRET) {
-            Ok(_) => {}
-            Err(_) => set_random_jwt_secret(),
-        }
-    }
 }
 
 #[cfg(feature = "web-ui")]
 #[async_trait::async_trait(?Send)]
 impl Command for UICommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        // Ensure required env variables are present before starting UI server
-        self.ensure_required_env_vars();
-
         let web_server = crate::explore::WebUIServer::new(
             self.base_catalog.clone(),
             self.multi_tenant_workspace,

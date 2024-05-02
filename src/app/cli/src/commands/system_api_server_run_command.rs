@@ -67,20 +67,6 @@ impl APIServerRunCommand {
         }
     }
 
-    fn check_required_env_vars(&self) -> Result<(), CLIError> {
-        match check_env_var_set(ENV_VAR_KAMU_JWT_SECRET) {
-            Ok(_) => {}
-            Err(_) => set_random_jwt_secret(),
-        };
-
-        if self.multi_tenant_workspace {
-            check_env_var_set(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)?;
-            check_env_var_set(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET)?;
-        }
-
-        Ok(())
-    }
-
     async fn get_access_token(&self) -> Result<String, CLIError> {
         let current_account_name = match self.account_subject.as_ref() {
             CurrentAccountSubject::Logged(l) => l.account_name.clone(),
@@ -120,8 +106,6 @@ impl APIServerRunCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for APIServerRunCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        // Check required env variables are present before starting API server
-        self.check_required_env_vars()?;
         let access_token = self.get_access_token().await?;
 
         // TODO: Cloning catalog is too expensive currently

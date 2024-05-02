@@ -18,9 +18,6 @@ use thiserror::Error;
 
 pub const PROVIDER_GITHUB: &str = "oauth_github";
 
-pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID: &str = "KAMU_AUTH_GITHUB_CLIENT_ID";
-pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET: &str = "KAMU_AUTH_GITHUB_CLIENT_SECRET";
-
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct OAuthGithub {}
