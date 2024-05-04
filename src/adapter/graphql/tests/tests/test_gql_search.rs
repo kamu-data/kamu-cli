@@ -12,6 +12,7 @@ use dill::Component;
 use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
 use kamu::*;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use opendatafabric::*;
 

@@ -13,7 +13,8 @@ use std::task::{Context, Poll};
 use axum::body::Body;
 use axum::response::Response;
 use futures::Future;
-use kamu::domain::{CurrentAccountSubject, GetDatasetError};
+use kamu::domain::GetDatasetError;
+use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::DatasetRef;
 use tower::{Layer, Service};
 

@@ -15,8 +15,16 @@ use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::*;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_http::SmartTransferProtocolClientWs;
-use opendatafabric::{AccountName, DatasetID, DatasetRef, DatasetRefAny, DatasetRefRemote};
+use opendatafabric::{
+    AccountID,
+    AccountName,
+    DatasetID,
+    DatasetRef,
+    DatasetRefAny,
+    DatasetRefRemote,
+};
 use tempfile::TempDir;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -58,6 +66,7 @@ impl ClientSideHarness {
         b.add::<DependencyGraphServiceInMemory>();
 
         b.add_value(CurrentAccountSubject::logged(
+            AccountID::new_seeded_ed25519(CLIENT_ACCOUNT_NAME.as_bytes()),
             AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
             false,
         ));

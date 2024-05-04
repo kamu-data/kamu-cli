@@ -28,7 +28,8 @@ use kamu::domain::*;
 use kamu::testing::{DatasetDataHelper, LocalS3Server, MetadataFactory};
 use kamu::utils::s3_context::S3Context;
 use kamu::*;
-use kamu_core::{auth, CurrentAccountSubject};
+use kamu_accounts::CurrentAccountSubject;
+use kamu_core::auth;
 use opendatafabric::*;
 
 use super::test_pull_service_impl::TestTransformService;

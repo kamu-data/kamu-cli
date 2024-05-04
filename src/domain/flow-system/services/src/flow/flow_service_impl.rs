@@ -19,7 +19,7 @@ use kamu_core::events::DatasetEventDeleted;
 use kamu_core::{DatasetChangesService, DependencyGraphService, InternalError, SystemTimeSource};
 use kamu_flow_system::*;
 use kamu_task_system::*;
-use opendatafabric::{AccountID, AccountName, DatasetID};
+use opendatafabric::{AccountID, DatasetID};
 
 use super::active_configs_state::ActiveConfigsState;
 use super::flow_time_wheel::FlowTimeWheel;
@@ -858,14 +858,13 @@ impl FlowService for FlowServiceImpl {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        fields(?flow_key, %initiator_account_id, %initiator_account_name)
+        fields(?flow_key, %initiator_account_id)
     )]
     async fn trigger_manual_flow(
         &self,
         trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
         initiator_account_id: AccountID,
-        initiator_account_name: AccountName,
     ) -> Result<FlowState, RequestFlowError> {
         let activation_time = self.round_time(trigger_time).int_err()?;
 
@@ -874,7 +873,6 @@ impl FlowService for FlowServiceImpl {
             FlowTrigger::Manual(FlowTriggerManual {
                 trigger_time: activation_time,
                 initiator_account_id,
-                initiator_account_name,
             }),
             FlowTriggerContext::Unconditional,
         )

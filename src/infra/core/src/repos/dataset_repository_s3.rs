@@ -14,7 +14,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use dill::*;
 use event_bus::EventBus;
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DEFAULT_ACCOUNT_NAME};
+use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
 use opendatafabric::*;
 use tokio::sync::Mutex;
@@ -347,7 +348,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
     }
 
     fn get_datasets_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_> {
-        if !self.is_multi_tenant() && *account_name != DEFAULT_ACCOUNT_NAME {
+        if !self.is_multi_tenant() && *account_name != DEFAULT_ACCOUNT_NAME_STR {
             return Box::pin(futures::stream::empty());
         }
 

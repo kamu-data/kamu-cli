@@ -13,7 +13,10 @@ use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
+use kamu_accounts::*;
+use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_core::*;
+use mockall::predicate::eq;
 use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
 use opendatafabric::serde::DatasetSnapshotSerializer;
 use opendatafabric::*;
@@ -93,13 +96,21 @@ async fn dataset_by_id() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn dataset_by_account_and_name_case_insensetive() {
-    let harness = GraphQLDatasetsHarness::new(true);
+async fn dataset_by_account_and_name_case_insensitive() {
+    let account_name = AccountName::new_unchecked("KaMu");
 
-    let account_name_str = "KaMu";
+    let mut mock_authentication_service = MockAuthenticationService::new();
+    mock_authentication_service
+        .expect_account_by_name()
+        .with(eq(account_name.clone()))
+        .returning(|_| Ok(Some(Account::dummy())));
+
+    let harness =
+        GraphQLDatasetsHarness::new_custom_authentication(mock_authentication_service, true);
+
     harness
         .create_root_dataset(
-            Some(AccountName::new_unchecked(account_name_str)),
+            Some(account_name.clone()),
             DatasetName::new_unchecked("Foo"),
         )
         .await;
@@ -129,8 +140,64 @@ async fn dataset_by_account_and_name_case_insensetive() {
                 "byOwnerAndName": {
                     "name": "Foo",
                     "owner": {
-                       "accountName": account_name_str,
+                       "accountName": DEFAULT_ACCOUNT_NAME_STR,
                     }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn dataset_by_account_id() {
+    let mut mock_authentication_service = MockAuthenticationService::new();
+    mock_authentication_service
+        .expect_find_account_name_by_id()
+        .with(eq(DEFAULT_ACCOUNT_ID.clone()))
+        .returning(|_| Ok(Some(DEFAULT_ACCOUNT_NAME.clone())));
+
+    let harness =
+        GraphQLDatasetsHarness::new_custom_authentication(mock_authentication_service, false);
+    harness
+        .create_root_dataset(None, DatasetName::new_unchecked("Foo"))
+        .await;
+
+    let res = harness
+        .execute_anonymous_query(
+            indoc!(
+                r#"
+                {
+                    datasets {
+                        byAccountId(accountId: "<accountId>") {
+                            nodes {
+                                name,
+                                owner { accountName }
+                            }
+                        }
+                    }
+                }
+                "#
+            )
+            .replace("<accountId>", DEFAULT_ACCOUNT_ID.to_string().as_str()),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byAccountId": {
+                    "nodes": [
+                        {
+                            "name": "Foo",
+                            "owner": {
+                               "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                            }
+                        }
+                    ]
+
                 }
             }
         })
@@ -592,6 +659,13 @@ struct GraphQLDatasetsHarness {
 
 impl GraphQLDatasetsHarness {
     pub fn new(is_multi_tenant: bool) -> Self {
+        Self::new_custom_authentication(MockAuthenticationService::built_in(), is_multi_tenant)
+    }
+
+    pub fn new_custom_authentication(
+        mock_authentication_service: MockAuthenticationService,
+        is_multi_tenant: bool,
+    ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -606,9 +680,10 @@ impl GraphQLDatasetsHarness {
                     .with_multi_tenant(is_multi_tenant),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_value(kamu::testing::MockAuthenticationService::built_in())
-            .bind::<dyn auth::AuthenticationService, kamu::testing::MockAuthenticationService>()
+            .add_value(mock_authentication_service)
+            .bind::<dyn AuthenticationService, MockAuthenticationService>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AccountRepositoryInMemory>()
             .build();
 
         let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog);

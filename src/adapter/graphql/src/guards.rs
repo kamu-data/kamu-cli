@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::{Context, Guard, Result};
-use kamu_core::{AnonymousAccountReason, CurrentAccountSubject};
+use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
 
 use crate::prelude::from_catalog;
 

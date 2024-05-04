@@ -25,6 +25,7 @@ use kamu::testing::{
 };
 use kamu::utils::s3_context::S3Context;
 use kamu::*;
+use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use tempfile::TempDir;
 

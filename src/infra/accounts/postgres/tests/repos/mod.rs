@@ -8,3 +8,4 @@
 // by the Apache License, Version 2.0.
 
 mod test_postgres_account_repository;
+mod test_postgres_password_hash_repository;

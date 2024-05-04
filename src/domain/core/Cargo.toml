@@ -22,6 +22,7 @@ doctest = false
 
 
 [dependencies]
+kamu-accounts = { workspace = true }
 internal-error = { workspace = true }
 container-runtime = { workspace = true }
 opendatafabric = { workspace = true }

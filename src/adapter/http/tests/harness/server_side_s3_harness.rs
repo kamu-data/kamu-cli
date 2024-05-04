@@ -15,16 +15,16 @@ use std::sync::Arc;
 use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::{
-    auth,
     DatasetRepository,
     InternalError,
     ResultIntoInternal,
     SystemTimeSource,
     SystemTimeSourceStub,
 };
-use kamu::testing::{LocalS3Server, MockAuthenticationService};
+use kamu::testing::LocalS3Server;
 use kamu::utils::s3_context::S3Context;
 use kamu::{DatasetLayout, DatasetRepositoryS3, DependencyGraphServiceInMemory};
+use kamu_accounts::{AuthenticationService, MockAuthenticationService};
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use url::Url;
 
@@ -69,7 +69,7 @@ impl ServerSideS3Harness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
             .add_value(server_authentication_mock())
-            .bind::<dyn auth::AuthenticationService, MockAuthenticationService>();
+            .bind::<dyn AuthenticationService, MockAuthenticationService>();
 
         let base_catalog = base_catalog_builder.build();
 

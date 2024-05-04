@@ -16,11 +16,12 @@ members = [
     "src/utils/tracing-perfetto",
     # Domain
     "src/domain/opendatafabric",
-    "src/domain/accounts",
+    "src/domain/accounts/domain",
     "src/domain/core",
     "src/domain/task-system/domain",
     "src/domain/flow-system/domain",
     # Domain service layer
+    "src/domain/accounts/services",
     "src/domain/task-system/services",
     "src/domain/flow-system/services",
     # Infra
@@ -32,6 +33,8 @@ members = [
     "src/infra/flow-system/postgres",
     "src/infra/flow-system/sqlite",
     ## Accounts
+    "src/infra/accounts/repo-tests",
+    "src/infra/accounts/inmem",
     "src/infra/accounts/mysql",
     "src/infra/accounts/postgres",
     "src/infra/accounts/sqlite",
@@ -72,11 +75,12 @@ tracing-perfetto = { version = "0.177.0", path = "src/utils/tracing-perfetto", d
 # Domain
 opendatafabric = { version = "0.177.0", path = "src/domain/opendatafabric", default-features = false }
 kamu-core = { version = "0.177.0", path = "src/domain/core", default-features = false }
-kamu-accounts = { version = "0.177.0", path = "src/domain/accounts", default-features = false }
+kamu-accounts = { version = "0.177.0", path = "src/domain/accounts/domain", default-features = false }
 kamu-task-system = { version = "0.177.0", path = "src/domain/task-system/domain", default-features = false }
 kamu-flow-system = { version = "0.177.0", path = "src/domain/flow-system/domain", default-features = false }
 
 # Domain service layer
+kamu-accounts-services = { version = "0.177.0", path = "src/domain/accounts/services", default-features = false }
 kamu-task-system-services = { version = "0.177.0", path = "src/domain/task-system/services", default-features = false }
 kamu-flow-system-services = { version = "0.177.0", path = "src/domain/flow-system/services", default-features = false }
 
@@ -89,9 +93,11 @@ kamu-flow-system-inmem = { version = "0.177.0", path = "src/infra/flow-system/in
 kamu-flow-system-postgres = { version = "0.177.0", path = "src/infra/flow-system/postgres", default-features = false }
 kamu-flow-system-sqlite = { version = "0.177.0", path = "src/infra/flow-system/sqlite", default-features = false }
 ## Accounts
+kamu-accounts-inmem = { version = "0.177.0", path = "src/infra/accounts/inmem", default-features = false }
 kamu-accounts-mysql = { version = "0.177.0", path = "src/infra/accounts/mysql", default-features = false }
 kamu-accounts-postgres = { version = "0.177.0", path = "src/infra/accounts/postgres", default-features = false }
 kamu-accounts-sqlite = { version = "0.177.0", path = "src/infra/accounts/sqlite", default-features = false }
+kamu-accounts-repo-tests = { version = "0.177.0", path = "src/infra/accounts/repo-tests", default-features = false }
 ## Task System
 kamu-task-system-inmem = { version = "0.177.0", path = "src/infra/task-system/inmem", default-features = false }
 kamu-task-system-postgres = { version = "0.177.0", path = "src/infra/task-system/postgres", default-features = false }

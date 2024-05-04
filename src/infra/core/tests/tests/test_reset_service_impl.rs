@@ -15,6 +15,7 @@ use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
+use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use tempfile::TempDir;
 

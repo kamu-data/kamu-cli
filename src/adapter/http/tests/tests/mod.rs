@@ -11,6 +11,7 @@ mod test_authentication_layer;
 mod test_data_ingest;
 mod test_data_query;
 mod test_dataset_authorization_layer;
+mod test_platform_login_validate;
 mod test_protocol_dataset_helpers;
 mod test_routing;
 mod tests_pull;

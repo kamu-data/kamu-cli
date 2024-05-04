@@ -13,7 +13,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use kamu::domain::auth::OdfServerAccessTokenResolver;
-use kamu::domain::CurrentAccountSubject;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_cli::odf_server::*;
 use url::Url;
 
@@ -53,7 +53,7 @@ async fn test_valid_logins() {
 
     svc.save_access_token(
         AccessTokenStoreScope::User,
-        &Url::parse(TEST_FRONTEND_URL).unwrap(),
+        Some(&Url::parse(TEST_FRONTEND_URL).unwrap()),
         &Url::parse(TEST_BACKEND_URL).unwrap(),
         "random-token-user".to_string(),
     )
@@ -61,7 +61,7 @@ async fn test_valid_logins() {
 
     svc.save_access_token(
         AccessTokenStoreScope::Workspace,
-        &Url::parse(TEST_FRONTEND_URL_2).unwrap(),
+        Some(&Url::parse(TEST_FRONTEND_URL_2).unwrap()),
         &Url::parse(TEST_BACKEND_URL_2).unwrap(),
         "random-token-workspace".to_string(),
     )
@@ -81,6 +81,130 @@ async fn test_valid_logins() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_no_frontend_urls() {
+    let svc = AccessTokenRegistryService::new(
+        Arc::new(DummyAccessTokenStore::new()),
+        Arc::new(CurrentAccountSubject::new_test()),
+    );
+
+    svc.save_access_token(
+        AccessTokenStoreScope::User,
+        None,
+        &Url::parse(TEST_BACKEND_URL).unwrap(),
+        "random-token-user".to_string(),
+    )
+    .unwrap();
+
+    svc.save_access_token(
+        AccessTokenStoreScope::Workspace,
+        None,
+        &Url::parse(TEST_BACKEND_URL_2).unwrap(),
+        "random-token-workspace".to_string(),
+    )
+    .unwrap();
+
+    let dataset_url = Url::parse(TEST_DATASET_URL).unwrap();
+    let maybe_token = svc.resolve_odf_dataset_access_token(&dataset_url);
+
+    assert_matches!(maybe_token, Some(token) if token.as_str() == "random-token-user");
+
+    let dataset_url = Url::parse(TEST_DATASET_URL_2).unwrap();
+    let maybe_token = svc.resolve_odf_dataset_access_token(&dataset_url);
+
+    assert_matches!(maybe_token, Some(token) if token.as_str() == "random-token-workspace");
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_find_token() {
+    let svc = AccessTokenRegistryService::new(
+        Arc::new(DummyAccessTokenStore::new()),
+        Arc::new(CurrentAccountSubject::new_test()),
+    );
+
+    let frontend_url = Url::parse(TEST_FRONTEND_URL).unwrap();
+    let backend_url = Url::parse(TEST_BACKEND_URL).unwrap();
+
+    svc.save_access_token(
+        AccessTokenStoreScope::User,
+        Some(&frontend_url),
+        &backend_url,
+        "random-token-user".to_string(),
+    )
+    .unwrap();
+
+    let report = svc
+        .find_by_frontend_url(AccessTokenStoreScope::User, &frontend_url)
+        .unwrap();
+    assert_eq!(report.frontend_url.as_ref(), Some(&frontend_url));
+    assert_eq!(report.backend_url, backend_url);
+    assert_eq!(&report.access_token.access_token, "random-token-user");
+
+    let report = svc
+        .find_by_backend_url(AccessTokenStoreScope::User, &backend_url)
+        .unwrap();
+    assert_eq!(report.frontend_url.as_ref(), Some(&frontend_url));
+    assert_eq!(report.backend_url, backend_url);
+    assert_eq!(&report.access_token.access_token, "random-token-user");
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_drop_token() {
+    let svc = AccessTokenRegistryService::new(
+        Arc::new(DummyAccessTokenStore::new()),
+        Arc::new(CurrentAccountSubject::new_test()),
+    );
+
+    let frontend_url = Url::parse(TEST_FRONTEND_URL).unwrap();
+    let backend_url = Url::parse(TEST_BACKEND_URL).unwrap();
+
+    svc.save_access_token(
+        AccessTokenStoreScope::User,
+        Some(&frontend_url),
+        &backend_url,
+        "random-token-user".to_string(),
+    )
+    .unwrap();
+
+    svc.save_access_token(
+        AccessTokenStoreScope::Workspace,
+        Some(&frontend_url),
+        &backend_url,
+        "random-token-user-workspace".to_string(),
+    )
+    .unwrap();
+
+    let res = svc
+        .drop_access_token(AccessTokenStoreScope::User, &frontend_url)
+        .unwrap();
+    assert!(res);
+
+    let res = svc
+        .drop_access_token(AccessTokenStoreScope::Workspace, &backend_url)
+        .unwrap();
+    assert!(res);
+
+    assert!(svc
+        .find_by_frontend_url(AccessTokenStoreScope::User, &frontend_url)
+        .is_none());
+    assert!(svc
+        .find_by_frontend_url(AccessTokenStoreScope::Workspace, &frontend_url)
+        .is_none());
+
+    assert!(svc
+        .find_by_backend_url(AccessTokenStoreScope::User, &backend_url)
+        .is_none());
+    assert!(svc
+        .find_by_backend_url(AccessTokenStoreScope::Workspace, &backend_url)
+        .is_none());
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_workspace_token_dominates() {
     let svc = AccessTokenRegistryService::new(
         Arc::new(DummyAccessTokenStore::new()),
@@ -89,7 +213,7 @@ async fn test_workspace_token_dominates() {
 
     svc.save_access_token(
         AccessTokenStoreScope::Workspace,
-        &Url::parse(TEST_FRONTEND_URL).unwrap(),
+        Some(&Url::parse(TEST_FRONTEND_URL).unwrap()),
         &Url::parse(TEST_BACKEND_URL).unwrap(),
         "random-token-workspace".to_string(),
     )
@@ -97,7 +221,7 @@ async fn test_workspace_token_dominates() {
 
     svc.save_access_token(
         AccessTokenStoreScope::User,
-        &Url::parse(TEST_FRONTEND_URL).unwrap(),
+        Some(&Url::parse(TEST_FRONTEND_URL).unwrap()),
         &Url::parse(TEST_BACKEND_URL).unwrap(),
         "random-token-user".to_string(),
     )
@@ -120,7 +244,7 @@ async fn test_no_token_after_logout() {
 
     svc.save_access_token(
         AccessTokenStoreScope::Workspace,
-        &Url::parse(TEST_FRONTEND_URL).unwrap(),
+        Some(&Url::parse(TEST_FRONTEND_URL).unwrap()),
         &Url::parse(TEST_BACKEND_URL).unwrap(),
         "random-token-workspace".to_string(),
     )

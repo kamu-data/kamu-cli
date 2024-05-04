@@ -14,11 +14,11 @@ use dill::Component;
 use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
 use kamu::{DatasetChangesServiceImpl, DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
     auth,
     CommitOpts,
     CreateDatasetResult,
-    CurrentAccountSubject,
     DatasetChangesService,
     DatasetIntervalIncrement,
     DatasetRepository,

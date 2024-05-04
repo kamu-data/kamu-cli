@@ -13,16 +13,22 @@ use std::sync::Arc;
 use console::style as s;
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
-use kamu::domain::auth::AuthenticationService;
-use kamu::domain::CurrentAccountSubject;
-use kamu::{set_random_jwt_secret, ENV_VAR_KAMU_JWT_SECRET};
+use kamu_accounts::{
+    set_random_jwt_secret,
+    AccountConfig,
+    AuthenticationService,
+    CurrentAccountSubject,
+    PredefinedAccountsConfig,
+    ENV_VAR_KAMU_JWT_SECRET,
+};
+use kamu_accounts_services::PasswordLoginCredentials;
 use kamu_adapter_oauth::{
     ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID,
     ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET,
 };
 
 use super::{CLIError, Command};
-use crate::{accounts, check_env_var_set, OutputConfig};
+use crate::{check_env_var_set, OutputConfig};
 
 pub struct APIServerRunCommand {
     base_catalog: Catalog,
@@ -32,6 +38,7 @@ pub struct APIServerRunCommand {
     address: Option<IpAddr>,
     port: Option<u16>,
     get_token: bool,
+    predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     account_subject: Arc<CurrentAccountSubject>,
 }
 
@@ -44,6 +51,7 @@ impl APIServerRunCommand {
         address: Option<IpAddr>,
         port: Option<u16>,
         get_token: bool,
+        predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         account_subject: Arc<CurrentAccountSubject>,
     ) -> Self {
         Self {
@@ -54,6 +62,7 @@ impl APIServerRunCommand {
             address,
             port,
             get_token,
+            predefined_accounts_config,
             account_subject,
         }
     }
@@ -79,10 +88,16 @@ impl APIServerRunCommand {
                 unreachable!("Cannot launch API server with anonymous account")
             }
         };
-        let login_credentials = accounts::PasswordLoginCredentials {
+
+        let account_config = self
+            .predefined_accounts_config
+            .find_account_config_by_name(&current_account_name)
+            .or_else(|| Some(AccountConfig::from_name(current_account_name.clone())))
+            .unwrap();
+
+        let login_credentials = PasswordLoginCredentials {
             login: current_account_name.to_string(),
-            // Note: note a mistake, use identical login and password, equal to account name
-            password: current_account_name.to_string(),
+            password: account_config.get_password(),
         };
 
         let auth_svc = self
@@ -91,9 +106,8 @@ impl APIServerRunCommand {
             .unwrap();
         let access_token = auth_svc
             .login(
-                accounts::LOGIN_METHOD_PASSWORD,
-                serde_json::to_string::<accounts::PasswordLoginCredentials>(&login_credentials)
-                    .int_err()?,
+                kamu_accounts::PROVIDER_PASSWORD,
+                serde_json::to_string::<PasswordLoginCredentials>(&login_credentials).int_err()?,
             )
             .await
             .int_err()?

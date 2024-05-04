@@ -24,6 +24,7 @@ doctest = false
 [features]
 default = ["arrow"]
 arrow = ["dep:arrow"]
+sqlx = ["dep:sqlx"]
 
 
 [dependencies]
@@ -60,6 +61,7 @@ tonic = "0.11"
 
 # Optional
 arrow = { optional = true, version = "51", default-features = false, features = ["ipc"] }
+sqlx = { optional = true, version = "0.7", default_features = false}
 
 [dev-dependencies]
 indoc = "2"

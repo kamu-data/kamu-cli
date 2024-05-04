@@ -7,12 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod account_id;
 mod dataset_handles;
 mod dataset_id;
 mod dataset_identity;
 mod dataset_refs;
 mod grammar;
 
+pub use account_id::*;
 pub use dataset_handles::*;
 pub use dataset_id::*;
 pub use dataset_identity::*;

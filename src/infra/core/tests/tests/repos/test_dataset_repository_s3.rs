@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::Component;
 use event_bus::EventBus;
-use kamu::domain::{auth, CurrentAccountSubject};
+use kamu::domain::auth;
 use kamu::testing::{LocalS3Server, MockDatasetActionAuthorizer};
 use kamu::utils::s3_context::S3Context;
 use kamu::{
@@ -20,8 +20,8 @@ use kamu::{
     DependencyGraphServiceInMemory,
     S3RegistryCache,
 };
+use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
 use kamu_core::{DatasetRepository, DependencyGraphService, SystemTimeSourceDefault};
-use opendatafabric::AccountName;
 
 use super::test_dataset_repository_shared;
 
@@ -118,7 +118,7 @@ async fn test_create_dataset_multi_tenant() {
 
     test_dataset_repository_shared::test_create_dataset(
         harness.dataset_repo.as_ref(),
-        Some(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
+        Some(DEFAULT_ACCOUNT_NAME.clone()),
     )
     .await;
 }
@@ -139,7 +139,7 @@ async fn test_create_dataset_multi_tenant_with_caching() {
 
     test_dataset_repository_shared::test_create_dataset(
         harness.dataset_repo.as_ref(),
-        Some(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
+        Some(DEFAULT_ACCOUNT_NAME.clone()),
     )
     .await;
 }
@@ -202,7 +202,7 @@ async fn test_create_dataset_from_snapshot_multi_tenant() {
 
     test_dataset_repository_shared::test_create_dataset_from_snapshot(
         harness.dataset_repo.as_ref(),
-        Some(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
+        Some(DEFAULT_ACCOUNT_NAME.clone()),
     )
     .await;
 }
@@ -240,7 +240,7 @@ async fn test_rename_dataset_multi_tenant() {
 
     test_dataset_repository_shared::test_rename_dataset(
         harness.dataset_repo.as_ref(),
-        Some(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
+        Some(DEFAULT_ACCOUNT_NAME.clone()),
     )
     .await;
 }
@@ -261,7 +261,7 @@ async fn test_rename_dataset_multi_tenant_with_caching() {
 
     test_dataset_repository_shared::test_rename_dataset(
         harness.dataset_repo.as_ref(),
-        Some(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
+        Some(DEFAULT_ACCOUNT_NAME.clone()),
     )
     .await;
 }
@@ -337,7 +337,7 @@ async fn test_delete_dataset_multi_tenant() {
 
     test_dataset_repository_shared::test_delete_dataset(
         harness.dataset_repo.as_ref(),
-        Some(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
+        Some(DEFAULT_ACCOUNT_NAME.clone()),
     )
     .await;
 }
@@ -433,7 +433,7 @@ async fn test_create_and_get_case_insensetive_dataset_multi_tenant() {
 
     test_dataset_repository_shared::test_create_and_get_case_insensetive_dataset(
         harness.dataset_repo.as_ref(),
-        Some(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
+        Some(DEFAULT_ACCOUNT_NAME.clone()),
     )
     .await;
 }

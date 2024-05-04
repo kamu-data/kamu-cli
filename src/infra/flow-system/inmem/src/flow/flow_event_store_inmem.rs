@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 use dill::*;
 use kamu_flow_system::{BorrowedFlowKeyDataset, *};
-use opendatafabric::{AccountName, DatasetID};
+use opendatafabric::{AccountID, DatasetID};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -81,7 +81,7 @@ impl EventStoreState<FlowState> for State {
 struct FlowIndexEntry {
     pub flow_type: AnyFlowType,
     pub flow_status: FlowStatus,
-    pub initiator: Option<AccountName>,
+    pub initiator: Option<AccountID>,
 }
 
 impl FlowIndexEntry {
@@ -180,7 +180,7 @@ impl FlowEventStoreInMem {
                         FlowIndexEntry {
                             flow_type: AnyFlowType::Dataset(flow_key.flow_type),
                             flow_status: FlowStatus::Waiting,
-                            initiator: e.trigger.initiator_account_name().cloned(),
+                            initiator: e.trigger.initiator_account_id().cloned(),
                         },
                     );
                 }
@@ -193,7 +193,7 @@ impl FlowEventStoreInMem {
                         FlowIndexEntry {
                             flow_type: AnyFlowType::System(flow_key.flow_type),
                             flow_status: FlowStatus::Waiting,
-                            initiator: e.trigger.initiator_account_name().cloned(),
+                            initiator: e.trigger.initiator_account_id().cloned(),
                         },
                     );
                 }

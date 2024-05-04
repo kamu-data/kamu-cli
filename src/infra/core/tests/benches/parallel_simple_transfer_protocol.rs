@@ -31,6 +31,7 @@ use kamu::{
     RemoteRepositoryRegistryImpl,
     SyncServiceImpl,
 };
+use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use url::Url;
 

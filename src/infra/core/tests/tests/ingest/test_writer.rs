@@ -19,6 +19,7 @@ use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_data_utils::testing::{assert_data_eq, assert_schema_eq};
 use kamu_ingest_datafusion::*;

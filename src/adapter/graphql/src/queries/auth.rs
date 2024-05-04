@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core as domain;
-
 use crate::prelude::*;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -20,7 +18,7 @@ impl Auth {
     #[allow(clippy::unused_async)]
     async fn enabled_login_methods(&self, ctx: &Context<'_>) -> Result<Vec<&'static str>> {
         let authentication_service =
-            from_catalog::<dyn domain::auth::AuthenticationService>(ctx).unwrap();
+            from_catalog::<dyn kamu_accounts::AuthenticationService>(ctx).unwrap();
 
         Ok(authentication_service.supported_login_methods())
     }

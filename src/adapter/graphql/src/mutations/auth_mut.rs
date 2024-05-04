@@ -23,7 +23,7 @@ impl AuthMut {
         login_credentials_json: String,
     ) -> Result<LoginResponse> {
         let authentication_service =
-            from_catalog::<dyn kamu_core::auth::AuthenticationService>(ctx).unwrap();
+            from_catalog::<dyn kamu_accounts::AuthenticationService>(ctx).unwrap();
 
         let login_result = authentication_service
             .login(login_method.as_str(), login_credentials_json)
@@ -37,13 +37,10 @@ impl AuthMut {
 
     async fn account_details(&self, ctx: &Context<'_>, access_token: String) -> Result<Account> {
         let authentication_service =
-            from_catalog::<dyn kamu_core::auth::AuthenticationService>(ctx).unwrap();
+            from_catalog::<dyn kamu_accounts::AuthenticationService>(ctx).unwrap();
 
-        let get_account_info_result = authentication_service
-            .account_info_by_token(access_token)
-            .await;
-        match get_account_info_result {
-            Ok(ai) => Ok(Account::from_account_info(ai)),
+        match authentication_service.account_by_token(access_token).await {
+            Ok(a) => Ok(Account::from_account(a)),
             Err(e) => Err(e.into()),
         }
     }
@@ -51,31 +48,37 @@ impl AuthMut {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-impl From<kamu_core::auth::LoginError> for GqlError {
-    fn from(value: kamu_core::auth::LoginError) -> Self {
+impl From<kamu_accounts::LoginError> for GqlError {
+    fn from(value: kamu_accounts::LoginError) -> Self {
         match value {
-            kamu_core::auth::LoginError::UnsupportedMethod(e) => GqlError::Gql(
+            kamu_accounts::LoginError::UnsupportedMethod(e) => GqlError::Gql(
                 Error::new(e.to_string()).extend_with(|_, eev| eev.set("method", e.to_string())),
             ),
-            kamu_core::auth::LoginError::InvalidCredentials(e) => GqlError::Gql(
+            kamu_accounts::LoginError::InvalidCredentials(e) => GqlError::Gql(
                 Error::new(e.to_string()).extend_with(|_, eev| eev.set("reason", e.to_string())),
             ),
-            kamu_core::auth::LoginError::RejectedCredentials(e) => GqlError::Gql(
+            kamu_accounts::LoginError::RejectedCredentials(e) => GqlError::Gql(
                 Error::new(e.to_string()).extend_with(|_, eev| eev.set("reason", e.to_string())),
             ),
-            kamu_core::auth::LoginError::Internal(e) => GqlError::Internal(e),
+            kamu_accounts::LoginError::DuplicateCredentials => {
+                GqlError::Gql(Error::new(value.to_string()))
+            }
+            kamu_accounts::LoginError::Internal(e) => GqlError::Internal(e),
         }
     }
 }
 
-impl From<kamu_core::auth::GetAccountInfoError> for GqlError {
-    fn from(value: kamu_core::auth::GetAccountInfoError) -> Self {
+impl From<kamu_accounts::GetAccountInfoError> for GqlError {
+    fn from(value: kamu_accounts::GetAccountInfoError) -> Self {
         match value {
-            kamu_core::auth::GetAccountInfoError::AccessToken(e) => GqlError::Gql(
+            kamu_accounts::GetAccountInfoError::AccessToken(e) => GqlError::Gql(
                 Error::new("Access token error")
                     .extend_with(|_, eev| eev.set("token_error", e.to_string())),
             ),
-            kamu_core::auth::GetAccountInfoError::Internal(e) => GqlError::Internal(e),
+            kamu_accounts::GetAccountInfoError::AccountUnresolved => GqlError::Gql(Error::new(
+                "Access token error: pointed account does not exist",
+            )),
+            kamu_accounts::GetAccountInfoError::Internal(e) => GqlError::Internal(e),
         }
     }
 }
@@ -88,11 +91,11 @@ pub(crate) struct LoginResponse {
     account: Account,
 }
 
-impl From<kamu_core::auth::LoginResponse> for LoginResponse {
-    fn from(value: kamu_core::auth::LoginResponse) -> Self {
+impl From<kamu_accounts::LoginResponse> for LoginResponse {
+    fn from(value: kamu_accounts::LoginResponse) -> Self {
         Self {
             access_token: value.access_token,
-            account: Account::from_account_info(value.account_info),
+            account: Account::new(value.account_id.into(), value.account_name.into()),
         }
     }
 }

@@ -327,13 +327,6 @@ impl std::str::FromStr for DatasetAliasPattern {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// TODO: implement similarly to DatasetID
-pub type AccountID = String;
-
-pub const FAKE_ACCOUNT_ID: &str = "12345";
-
-////////////////////////////////////////////////////////////////////////////////
-
 newtype_str!(
     AccountName,
     Grammar::match_account_name,

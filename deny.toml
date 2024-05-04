@@ -13,7 +13,7 @@ wildcards = "deny"
 # We specify features explicitly to avoid bloat
 workspace-default-features = "deny"
 features = [
-    { name = "opendatafabric", allow = ["default"] },
+    { name = "opendatafabric", allow = ["default", "sqlx"] },
     { name = "kamu", allow = ["default"] },
     { name = "kamu-cli", allow = ["default"] },
 ]

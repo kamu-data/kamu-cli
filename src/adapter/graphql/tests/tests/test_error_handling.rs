@@ -11,6 +11,7 @@ use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
 use kamu::*;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 
 #[test_log::test(tokio::test)]

@@ -115,6 +115,17 @@ sqlx-add-migration:
 	$(foreach dir,$(MIGRATION_DIRS),(sqlx migrate add -r $$NAME --source $(dir) );)
 
 ###############################################################################
+# Podman cleanups (run from time to time to preserve tests performance)
+###############################################################################
+
+.PHONY: podman-clean
+podman-clean:
+	podman ps -aq | xargs --no-run-if-empty podman rm -f
+	podman images -f dangling=true -q | xargs --no-run-if-empty podman rmi
+	podman volume ls -q | xargs --no-run-if-empty podman volume rm
+	podman network prune -f
+
+###############################################################################
 # Test
 ###############################################################################
 

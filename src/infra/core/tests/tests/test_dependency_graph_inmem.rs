@@ -20,9 +20,9 @@ use kamu::{
     DependencyGraphRepositoryInMemory,
     DependencyGraphServiceInMemory,
 };
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
     auth,
-    CurrentAccountSubject,
     DatasetDependencies,
     DatasetRepository,
     DependencyGraphRepository,
