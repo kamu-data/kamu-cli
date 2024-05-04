@@ -8,16 +8,21 @@
 // by the Apache License, Version 2.0.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
 use dill::Catalog;
-use kamu_accounts::AuthenticationService;
+use kamu_accounts::{
+    AccountConfig,
+    AuthenticationService,
+    PredefinedAccountsConfig,
+    PROVIDER_PASSWORD,
+};
+use kamu_accounts_services::PasswordLoginCredentials;
 use opendatafabric::AccountName;
 use rust_embed::RustEmbed;
 use serde::Serialize;
-
-use crate::accounts;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -79,13 +84,12 @@ impl WebUIServer {
             panic!("error binding to {}: {}", addr, e);
         });
 
-        let account_config = self
-            .predefined_accounts_config
+        let account_config = predefined_accounts_config
             .find_account_config_by_name(&current_account_name)
             .or_else(|| Some(AccountConfig::from_name(current_account_name.clone())))
             .unwrap();
 
-        let login_credentials = accounts::PasswordLoginCredentials {
+        let login_credentials = PasswordLoginCredentials {
             login: current_account_name.to_string(),
             password: account_config.get_password(),
         };
@@ -93,11 +97,8 @@ impl WebUIServer {
         let gql_schema = kamu_adapter_graphql::schema();
 
         let login_instructions = WebUILoginInstructions {
-            login_method: accounts::LOGIN_METHOD_PASSWORD.to_string(),
-            login_credentials_json: serde_json::to_string::<accounts::PasswordLoginCredentials>(
-                &login_credentials,
-            )
-            .unwrap(),
+            login_method: String::from(PROVIDER_PASSWORD),
+            login_credentials_json: serde_json::to_string(&login_credentials).unwrap(),
         };
 
         let auth_svc = base_catalog.get_one::<dyn AuthenticationService>().unwrap();
