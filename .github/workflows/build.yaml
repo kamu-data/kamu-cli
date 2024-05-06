@@ -89,6 +89,7 @@ jobs:
             runs-on: windows-latest
             cargo-flags: --profile ci
             nextest-flags: --cargo-profile ci
+          # platform(target) is a workaround for Windows only issue in cargo-nextest upon proc macro crates
             nextest-exclusions: -E 'platform(target) & !(test(::containerized::) | test(::datafusion::) | test(::database::))'
             container-runtime: ''
             ipfs: false
@@ -154,7 +155,8 @@ jobs:
         env:
           SQLX_OFFLINE: false
           DATABASE_URL: sqlite://kamu.sqlite.db
-        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::sqlite::)'
+        # platform(target) is a workaround for Windows only issue in cargo-nextest upon proc macro crates
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'platform(target) & test(::sqlite::)'
 
       - name: Postgres database tests
         if: matrix.database
