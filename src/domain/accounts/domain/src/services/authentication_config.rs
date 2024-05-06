@@ -23,6 +23,10 @@ pub struct JwtAuthenticationConfig {
 }
 
 impl JwtAuthenticationConfig {
+    pub fn new(jwt_secret: Option<String>) -> Self {
+        Self { jwt_secret }
+    }
+
     pub fn load_from_env() -> Self {
         Self {
             jwt_secret: std::env::var(ENV_VAR_KAMU_JWT_SECRET).ok(),
