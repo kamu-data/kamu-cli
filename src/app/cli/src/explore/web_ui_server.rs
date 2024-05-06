@@ -13,7 +13,6 @@ use std::sync::Arc;
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
 use dill::Catalog;
-use kamu::domain::ServerUrlConfig;
 use kamu_accounts::{
     AccountConfig,
     AuthenticationService,
