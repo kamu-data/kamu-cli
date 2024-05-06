@@ -24,3 +24,6 @@ proc-macro = true
 [dependencies]
 syn = { version = "2", default-features = false }
 quote = "1"
+
+[dev-dependencies]
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
