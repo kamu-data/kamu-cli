@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.179.0] - 2024-05-06
 ### Changed
 - Refactoring of authorization configuration data: separation into configuration models and logic for loading them from environment variables
+
+## [0.178.0] - 2024-05-04
 ### Added
 - Flow system: implemented persistent repositories (PostgresSQL, SQLite) for flow configuration events
 - Support for persistent accounts:
