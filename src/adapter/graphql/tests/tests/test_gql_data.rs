@@ -17,10 +17,9 @@ use dill::Component;
 use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
-use kamu_accounts::{AccountConfig, CurrentAccountSubject, PredefinedAccountsConfig};
+use kamu_accounts::*;
 use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::AuthenticationServiceImpl;
-use kamu_core::auth::JwtAuthenticationConfig;
 use kamu_core::*;
 use opendatafabric::*;
 

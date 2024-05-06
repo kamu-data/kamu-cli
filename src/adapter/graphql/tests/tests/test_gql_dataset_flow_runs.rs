@@ -24,10 +24,14 @@ use kamu::testing::{
     MockTransformService,
 };
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
-use kamu_accounts::{CurrentAccountSubject, LoggedAccount, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_accounts::{
+    CurrentAccountSubject,
+    JwtAuthenticationConfig,
+    LoggedAccount,
+    DEFAULT_ACCOUNT_NAME_STR,
+};
 use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::AuthenticationServiceImpl;
-use kamu_core::auth::JwtAuthenticationConfig;
 use kamu_core::{
     auth,
     CompactingResult,

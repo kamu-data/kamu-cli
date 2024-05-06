@@ -14,10 +14,9 @@ use chrono::{DateTime, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use database_common::{DatabaseConfiguration, DatabaseProvider};
 use dill::*;
-use kamu::domain::auth::*;
 use kamu::domain::*;
 use kamu::*;
-use kamu_accounts::{AccountConfig, CurrentAccountSubject, PredefinedAccountsConfig};
+use kamu_accounts::*;
 
 use crate::accounts::AccountService;
 use crate::error::*;

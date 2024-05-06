@@ -26,7 +26,6 @@ use jsonwebtoken::{
     Validation,
 };
 use kamu_accounts::*;
-use kamu_core::auth::JwtAuthenticationConfig;
 use kamu_core::SystemTimeSource;
 use opendatafabric::{AccountID, AccountName};
 use serde::{Deserialize, Serialize};

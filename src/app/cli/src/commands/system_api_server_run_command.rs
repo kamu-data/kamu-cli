@@ -13,12 +13,7 @@ use std::sync::Arc;
 use console::style as s;
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
-use kamu_accounts::{
-    AccountConfig,
-    AuthenticationService,
-    CurrentAccountSubject,
-    PredefinedAccountsConfig,
-};
+use kamu_accounts::*;
 use kamu_accounts_services::PasswordLoginCredentials;
 
 use super::{CLIError, Command};

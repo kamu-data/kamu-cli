@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use dill::*;
 use kamu_accounts::*;
-use kamu_core::auth::GithubAuthenticationConfig;
 use kamu_core::ResultIntoInternal;
 use opendatafabric::{AccountID, AccountName};
 use serde::Deserialize;

@@ -11,9 +11,8 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
-use kamu::domain::auth::JwtAuthenticationConfig;
 use kamu::domain::{InternalError, ResultIntoInternal, SystemTimeSource, SystemTimeSourceStub};
-use kamu_accounts::{AccountConfig, PredefinedAccountsConfig, PROVIDER_PASSWORD};
+use kamu_accounts::*;
 use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::{AuthenticationServiceImpl, LoginPasswordAuthProvider};
 use kamu_adapter_http::{LoginRequestBody, LoginResponseBody};

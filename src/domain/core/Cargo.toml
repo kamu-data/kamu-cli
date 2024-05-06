@@ -26,7 +26,6 @@ kamu-accounts = { workspace = true }
 container-runtime = { workspace = true }
 internal-error = { workspace = true }
 opendatafabric = { workspace = true }
-random-names = { workspace = true }
 
 async-stream = { version = "0.3", default-features = false }
 async-trait = { version = "0.1", default-features = false }
