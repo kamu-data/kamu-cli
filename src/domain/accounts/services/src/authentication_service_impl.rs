@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use core::panic;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
@@ -27,6 +26,7 @@ use jsonwebtoken::{
     Validation,
 };
 use kamu_accounts::*;
+use kamu_core::auth::JwtAuthenticationConfig;
 use kamu_core::SystemTimeSource;
 use opendatafabric::{AccountID, AccountName};
 use serde::{Deserialize, Serialize};
@@ -70,10 +70,8 @@ impl AuthenticationServiceImpl {
         login_password_auth_provider: Option<Arc<LoginPasswordAuthProvider>>,
         account_repository: Arc<dyn AccountRepository>,
         time_source: Arc<dyn SystemTimeSource>,
+        config: Arc<JwtAuthenticationConfig>,
     ) -> Self {
-        let kamu_jwt_secret = std::env::var(ENV_VAR_KAMU_JWT_SECRET)
-            .unwrap_or_else(|_| panic!("{} env var is not set", ENV_VAR_KAMU_JWT_SECRET));
-
         let mut authentication_providers_by_method = HashMap::new();
 
         for authentication_provider in authentication_providers {
@@ -88,11 +86,13 @@ impl AuthenticationServiceImpl {
             );
         }
 
+        let jwt_secret = config.jwt_secret();
+
         Self {
             predefined_accounts_config,
             time_source,
-            encoding_key: EncodingKey::from_secret(kamu_jwt_secret.as_bytes()),
-            decoding_key: DecodingKey::from_secret(kamu_jwt_secret.as_bytes()),
+            encoding_key: EncodingKey::from_secret(jwt_secret.as_bytes()),
+            decoding_key: DecodingKey::from_secret(jwt_secret.as_bytes()),
             authentication_providers_by_method,
             login_password_auth_provider,
             account_repository,

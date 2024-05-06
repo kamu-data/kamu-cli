@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod authentication_config;
+pub use authentication_config::*;
+
 mod dataset_action_authorizer;
 pub use dataset_action_authorizer::*;
 

@@ -14,21 +14,15 @@ use console::style as s;
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::{
-    set_random_jwt_secret,
     AccountConfig,
     AuthenticationService,
     CurrentAccountSubject,
     PredefinedAccountsConfig,
-    ENV_VAR_KAMU_JWT_SECRET,
 };
 use kamu_accounts_services::PasswordLoginCredentials;
-use kamu_adapter_oauth::{
-    ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID,
-    ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET,
-};
 
 use super::{CLIError, Command};
-use crate::{check_env_var_set, OutputConfig};
+use crate::OutputConfig;
 
 pub struct APIServerRunCommand {
     base_catalog: Catalog,

@@ -12,6 +12,7 @@ use std::assert_matches::assert_matches;
 use kamu_accounts::*;
 use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::AuthenticationServiceImpl;
+use kamu_core::auth::JwtAuthenticationConfig;
 use kamu_core::{SystemTimeSource, SystemTimeSourceStub};
 use opendatafabric::{AccountID, AccountName};
 

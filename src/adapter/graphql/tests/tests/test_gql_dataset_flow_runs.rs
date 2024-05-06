@@ -32,6 +32,7 @@ use kamu_accounts::{
 };
 use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::AuthenticationServiceImpl;
+use kamu_core::auth::JwtAuthenticationConfig;
 use kamu_core::{
     auth,
     CompactingResult,
@@ -2352,6 +2353,7 @@ impl FlowRunsHarness {
             .bind::<dyn PollingIngestService, MockPollingIngestService>()
             .add::<AuthenticationServiceImpl>()
             .add::<AccountRepositoryInMemory>()
+            .add_value(JwtAuthenticationConfig::default())
             .build();
 
         // Init dataset with no sources

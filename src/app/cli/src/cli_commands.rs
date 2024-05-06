@@ -463,6 +463,7 @@ pub fn get_command(
                         server_matches.get_flag("get-token"),
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,
+                        cli_catalog.get_one()?,
                     ))
                 }
                 Some(("gql-query", query_matches)) => Box::new(APIServerGqlQueryCommand::new(

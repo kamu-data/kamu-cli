@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
+use kamu::domain::auth::JwtAuthenticationConfig;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_cli::{self, OutputConfig, WorkspaceLayout};
 

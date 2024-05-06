@@ -7,8 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use dill::*;
 use kamu_accounts::*;
+use kamu_core::auth::GithubAuthenticationConfig;
 use kamu_core::ResultIntoInternal;
 use opendatafabric::{AccountID, AccountName};
 use serde::Deserialize;
@@ -20,14 +23,16 @@ pub const PROVIDER_GITHUB: &str = "oauth_github";
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct OAuthGithub {}
+pub struct OAuthGithub {
+    config: Arc<GithubAuthenticationConfig>,
+}
 
 #[component(pub)]
 #[interface(dyn AuthenticationProvider)]
 #[scope(Singleton)]
 impl OAuthGithub {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(config: Arc<GithubAuthenticationConfig>) -> Self {
+        Self { config }
     }
 
     fn get_client(&self) -> Result<reqwest::Client, reqwest::Error> {

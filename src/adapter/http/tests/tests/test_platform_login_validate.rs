@@ -11,6 +11,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
+use kamu::domain::auth::JwtAuthenticationConfig;
 use kamu::domain::{InternalError, ResultIntoInternal, SystemTimeSource, SystemTimeSourceStub};
 use kamu_accounts::{
     set_random_jwt_secret,
@@ -66,6 +67,7 @@ impl Harness {
             .add_value(SystemTimeSourceStub::new())
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<LoginPasswordAuthProvider>()
+            .add_value(JwtAuthenticationConfig::default())
             .build();
 
         let system_time_source_stub = catalog.get_one::<SystemTimeSourceStub>().unwrap();
