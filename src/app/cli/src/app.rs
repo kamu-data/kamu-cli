@@ -17,6 +17,7 @@ use dill::*;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
+use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
 use crate::error::*;

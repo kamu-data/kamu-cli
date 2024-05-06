@@ -19,6 +19,8 @@ use thiserror::Error;
 ///////////////////////////////////////////////////////////////////////////////
 
 pub const PROVIDER_GITHUB: &str = "oauth_github";
+pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID: &str = "KAMU_AUTH_GITHUB_CLIENT_ID";
+pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET: &str = "KAMU_AUTH_GITHUB_CLIENT_SECRET";
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -196,5 +198,27 @@ struct GithubAccountInfo {
 #[derive(Debug, Error)]
 #[error("Invalid credentials: pass either Github code or access token")]
 struct GithubInvalidCredentialsError {}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+pub struct GithubAuthenticationConfig {
+    pub client_id: String,
+    pub client_secret: String,
+}
+
+impl GithubAuthenticationConfig {
+    pub fn load_from_env() -> Self {
+        Self {
+            client_id: std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)
+                .ok()
+                .unwrap_or_default(),
+
+            client_secret: std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET)
+                .ok()
+                .unwrap_or_default(),
+        }
+    }
+}
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -13,8 +13,6 @@ use random_names::get_random_name;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID: &str = "KAMU_AUTH_GITHUB_CLIENT_ID";
-pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET: &str = "KAMU_AUTH_GITHUB_CLIENT_SECRET";
 const ENV_VAR_KAMU_JWT_SECRET: &str = "KAMU_JWT_SECRET";
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -38,28 +36,6 @@ impl JwtAuthenticationConfig {
             let random_jwt_secret = get_random_name(None, 64);
 
             Cow::Owned(random_jwt_secret)
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Default)]
-pub struct GithubAuthenticationConfig {
-    pub client_id: String,
-    pub client_secret: String,
-}
-
-impl GithubAuthenticationConfig {
-    pub fn load_from_env() -> Self {
-        Self {
-            client_id: std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)
-                .ok()
-                .unwrap_or_default(),
-
-            client_secret: std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET)
-                .ok()
-                .unwrap_or_default(),
         }
     }
 }

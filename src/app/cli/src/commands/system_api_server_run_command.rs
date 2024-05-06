@@ -15,6 +15,7 @@ use dill::Catalog;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::*;
 use kamu_accounts_services::PasswordLoginCredentials;
+use kamu_adapter_oauth::*;
 
 use super::{CLIError, Command};
 use crate::OutputConfig;
