@@ -85,13 +85,11 @@ impl AuthenticationServiceImpl {
             );
         }
 
-        let jwt_secret = config.jwt_secret();
-
         Self {
             predefined_accounts_config,
             time_source,
-            encoding_key: EncodingKey::from_secret(jwt_secret.as_bytes()),
-            decoding_key: DecodingKey::from_secret(jwt_secret.as_bytes()),
+            encoding_key: EncodingKey::from_secret(config.jwt_secret.as_bytes()),
+            decoding_key: DecodingKey::from_secret(config.jwt_secret.as_bytes()),
             authentication_providers_by_method,
             login_password_auth_provider,
             account_repository,
