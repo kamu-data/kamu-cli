@@ -208,6 +208,13 @@ pub struct GithubAuthenticationConfig {
 }
 
 impl GithubAuthenticationConfig {
+    pub fn new(client_id: String, client_secret: String) -> Self {
+        Self {
+            client_id,
+            client_secret,
+        }
+    }
+
     pub fn load_from_env() -> Self {
         Self {
             client_id: std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)
