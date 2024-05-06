@@ -24,12 +24,6 @@ impl ServerUrlConfig {
     }
 
     pub fn load_from_env() -> Result<Self, InternalError> {
-        // TODO: Use value from config not envvar
-        //       https://github.com/kamu-data/kamu-node/issues/45
-        //
-        //       Example:
-        //       https://github.com/mehcode/config-rs/blob/master/examples/hierarchical-env/settings.rs
-
         Ok(Self {
             protocols: Protocols {
                 base_url_platform: Self::get_url_from_env(
