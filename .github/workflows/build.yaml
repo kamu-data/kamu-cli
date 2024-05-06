@@ -89,7 +89,8 @@ jobs:
             runs-on: windows-latest
             cargo-flags: --profile ci
             nextest-flags: --cargo-profile ci
-            nextest-exclusions: -E 'not (test(::containerized::) | test(::datafusion::) | test(::database::))'
+          # platform(target) is a workaround for Windows only issue in cargo-nextest upon proc macro crates
+            nextest-exclusions: -E 'platform(target) & !(test(::containerized::) | test(::datafusion::) | test(::database::))'
             container-runtime: ''
             ipfs: false
             database: false
@@ -146,12 +147,16 @@ jobs:
         if: matrix.container-runtime != ''
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::setup::)' --no-capture
 
+      - name: Run main set of tests
+        run: cargo nextest run ${{ matrix.nextest-flags }} ${{ matrix.nextest-exclusions }} -v
+
         # Note: SQLite does not require a container and may run on any platform
       - name: SQLite database tests
         env:
           SQLX_OFFLINE: false
           DATABASE_URL: sqlite://kamu.sqlite.db
-        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::sqlite::)'
+        # platform(target) is a workaround for Windows only issue in cargo-nextest upon proc macro crates
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'platform(target) & test(::sqlite::)'
 
       - name: Postgres database tests
         if: matrix.database
@@ -166,9 +171,6 @@ jobs:
           SQLX_OFFLINE: false
           DATABASE_URL: mariadb://root:root@localhost:3306/kamu-test
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::mysql::)'
-
-      - name: Run main set of tests
-        run: cargo nextest run ${{ matrix.nextest-flags }} ${{ matrix.nextest-exclusions }}
 
       # Not running on windows due to line ending differences
       - name: Check generated files

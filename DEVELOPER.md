@@ -29,7 +29,7 @@
 Prerequisites:
 * Docker or Podman (note: unit tests run with Podman by default)
   * If using `docker` - make sure it's usable without `sudo` ([guidelines](https://docs.docker.com/engine/install/linux-postinstall))
-  * If using `podman` - make sure it's setup to run root-less containers ([guidelines](https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md))
+  * If using `podman` - make sure it's setup to run rootless containers ([guidelines](https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md))
 * Rust toolset
   * Install `rustup`
   * The correct toolchain version will be automatically installed based on the `rust-toolchain` file in the repository
@@ -45,7 +45,7 @@ Prerequisites:
   * Prerequisites:
     * `cargo install cargo-update` - to easily keep your tools up-to-date
     * `cargo install cargo-binstall` - to install binaries without compiling
-    * `cargo binstall cargo-binstall --force -y` - make future updates of `binstall` to use precompiled version
+    * `cargo binstall cargo-binstall --force -y` - make future updates of `binstall` to use a precompiled version
   * Recommended:
     * `cargo binstall cargo-nextest -y` - advanced test runner
     * `cargo binstall bunyan -y` - for pretty-printing the JSON logs
@@ -76,7 +76,7 @@ To use your locally-built `kamu` executable link it as so:
 ln -s $PWD/target/debug/kamu-cli ~/.local/bin/kamu
 ```
 
-When needing to test against a specific official release you can install it under a different alias:
+When needing to test against a specific official release, you can install it under a different alias:
 
 ```shell
 curl -s "https://get.kamu.dev" | KAMU_ALIAS=kamu-release sh
@@ -160,7 +160,7 @@ This will do a number of highly useful checks:
 
 
 ### Run Tests
-Before you run tests for the first time you need to run:
+Before you run tests for the first time, you need to run:
 ```sh
 make test-setup
 ```
@@ -172,7 +172,7 @@ You can run all tests except database-specific as:
 make test
 ```
 
-In most cases you can skip tests involving very heavy Spark and Flink engines and databases by running:
+In most cases, you can skip tests involving very heavy Spark and Flink engines and databases by running:
 ```sh
 make test-fast
 ```
@@ -249,7 +249,7 @@ Note: we assume that `kamu-web-ui` repository directory will be at the same leve
     └── kamu-web-ui
 ```
 
-Note: in debug mode the directory content is not actually being embedded into the executable but accessed from the specified directory.
+Note: in debug mode, the directory content is not actually being embedded into the executable but accessed from the specified directory.
 
 
 ### Code Generation

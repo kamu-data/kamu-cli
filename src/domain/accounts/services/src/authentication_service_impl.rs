@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use core::panic;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
@@ -70,10 +69,8 @@ impl AuthenticationServiceImpl {
         login_password_auth_provider: Option<Arc<LoginPasswordAuthProvider>>,
         account_repository: Arc<dyn AccountRepository>,
         time_source: Arc<dyn SystemTimeSource>,
+        config: Arc<JwtAuthenticationConfig>,
     ) -> Self {
-        let kamu_jwt_secret = std::env::var(ENV_VAR_KAMU_JWT_SECRET)
-            .unwrap_or_else(|_| panic!("{} env var is not set", ENV_VAR_KAMU_JWT_SECRET));
-
         let mut authentication_providers_by_method = HashMap::new();
 
         for authentication_provider in authentication_providers {
@@ -91,8 +88,8 @@ impl AuthenticationServiceImpl {
         Self {
             predefined_accounts_config,
             time_source,
-            encoding_key: EncodingKey::from_secret(kamu_jwt_secret.as_bytes()),
-            decoding_key: DecodingKey::from_secret(kamu_jwt_secret.as_bytes()),
+            encoding_key: EncodingKey::from_secret(config.jwt_secret.as_bytes()),
+            decoding_key: DecodingKey::from_secret(config.jwt_secret.as_bytes()),
             authentication_providers_by_method,
             login_password_auth_provider,
             account_repository,
@@ -140,7 +137,7 @@ impl AuthenticationServiceImpl {
         access_token: &str,
     ) -> Result<TokenData<KamuAccessTokenClaims>, AccessTokenError> {
         let mut validation = Validation::new(KAMU_JWT_ALGORITHM);
-        validation.set_issuer(vec![KAMU_JWT_ISSUER].as_slice());
+        validation.set_issuer(&[KAMU_JWT_ISSUER]);
 
         decode::<KamuAccessTokenClaims>(access_token, &self.decoding_key, &validation).map_err(
             |e| match *e.kind() {

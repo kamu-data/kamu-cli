@@ -94,8 +94,6 @@ async fn test_use_bad_access_token() {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn make_catalog() -> dill::Catalog {
-    set_random_jwt_secret();
-
     dill::CatalogBuilder::new()
         .add::<DummyAuthenticationProviderA>()
         .add::<DummyAuthenticationProviderB>()
@@ -104,6 +102,7 @@ fn make_catalog() -> dill::Catalog {
         .add_value(PredefinedAccountsConfig::single_tenant())
         .add_value(SystemTimeSourceStub::new())
         .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+        .add_value(JwtAuthenticationConfig::default())
         .build()
 }
 

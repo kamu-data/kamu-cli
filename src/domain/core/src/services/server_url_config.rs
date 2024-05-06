@@ -23,13 +23,7 @@ impl ServerUrlConfig {
         Url::parse(&raw).int_err()
     }
 
-    pub fn load() -> Result<Self, InternalError> {
-        // TODO: Use value from config not envvar
-        //       https://github.com/kamu-data/kamu-node/issues/45
-        //
-        //       Example:
-        //       https://github.com/mehcode/config-rs/blob/master/examples/hierarchical-env/settings.rs
-
+    pub fn load_from_env() -> Result<Self, InternalError> {
         Ok(Self {
             protocols: Protocols {
                 base_url_platform: Self::get_url_from_env(
@@ -50,6 +44,16 @@ impl ServerUrlConfig {
 
     pub fn new(protocols: Protocols) -> Self {
         Self { protocols }
+    }
+
+    pub fn new_test(base_url_rest: Option<&str>) -> Self {
+        Self {
+            protocols: Protocols {
+                base_url_platform: Url::parse("http://platform.example.com").unwrap(),
+                base_url_rest: Url::parse(base_url_rest.unwrap_or("http://example.com")).unwrap(),
+                base_url_flightsql: Url::parse("grpc://example.com:50050").unwrap(),
+            },
+        }
     }
 }
 
