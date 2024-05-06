@@ -2697,7 +2697,6 @@ version = "0.179.0"
 dependencies = [
  "quote",
  "syn 2.0.60",
- "tokio",
 ]
 
 [[package]]
