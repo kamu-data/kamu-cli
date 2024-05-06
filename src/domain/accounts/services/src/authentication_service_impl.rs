@@ -139,7 +139,7 @@ impl AuthenticationServiceImpl {
         access_token: &str,
     ) -> Result<TokenData<KamuAccessTokenClaims>, AccessTokenError> {
         let mut validation = Validation::new(KAMU_JWT_ALGORITHM);
-        validation.set_issuer(vec![KAMU_JWT_ISSUER].as_slice());
+        validation.set_issuer(&[KAMU_JWT_ISSUER]);
 
         decode::<KamuAccessTokenClaims>(access_token, &self.decoding_key, &validation).map_err(
             |e| match *e.kind() {
