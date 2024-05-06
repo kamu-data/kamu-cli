@@ -216,6 +216,8 @@ impl GithubAuthenticationConfig {
     }
 
     pub fn load_from_env() -> Self {
+        // Check for empty values only when the server API is running -- for this
+        // reason, it is acceptable to use default values for other cases
         Self {
             client_id: std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)
                 .ok()
