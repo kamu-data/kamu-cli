@@ -11,6 +11,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use http::StatusCode;
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
+use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -22,15 +23,15 @@ use crate::{DatasetAuthorizationLayer, DatasetResolverLayer};
 // Extractor of dataset identity for single-tenant smart transfer protocol
 #[derive(serde::Deserialize)]
 struct DatasetByName {
-    dataset_name: opendatafabric::DatasetName,
+    dataset_name: odf::DatasetName,
 }
 
 // Extractor of account + dataset identity for multi-tenant smart transfer
 // protocol
 #[derive(serde::Deserialize)]
 struct DatasetByAccountAndName {
-    account_name: opendatafabric::AccountName,
-    dataset_name: opendatafabric::DatasetName,
+    account_name: odf::AccountName,
+    dataset_name: odf::DatasetName,
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -69,8 +70,7 @@ pub fn add_dataset_resolver_layer(
     if multi_tenant {
         dataset_router.layer(DatasetResolverLayer::new(
             |Path(p): Path<DatasetByAccountAndName>| {
-                opendatafabric::DatasetAlias::new(Some(p.account_name), p.dataset_name)
-                    .into_local_ref()
+                odf::DatasetAlias::new(Some(p.account_name), p.dataset_name).into_local_ref()
             },
             is_dataset_optional_for_request,
         ))

@@ -196,7 +196,6 @@ pub async fn dataset_push_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
     axum::extract::Extension(dataset_ref): axum::extract::Extension<DatasetRef>,
     axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
-    host: axum::extract::Host,
     uri: axum::extract::OriginalUri,
     maybe_bearer_header: Option<BearerHeader>,
 ) -> Result<axum::response::Response, ApiError> {
@@ -206,7 +205,8 @@ pub async fn dataset_push_ws_upgrade_handler(
         CurrentAccountSubject::Anonymous(_) => Err(ApiError::new_unauthorized()),
     }?;
 
-    let dataset_url = get_base_dataset_url(host, uri, 1);
+    let server_url_config = catalog.get_one::<ServerUrlConfig>().unwrap();
+    let dataset_url = get_base_dataset_url(uri, &server_url_config.protocols.base_url_rest, 1);
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
@@ -248,11 +248,12 @@ pub async fn dataset_push_ws_upgrade_handler(
 pub async fn dataset_pull_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
-    host: axum::extract::Host,
+    axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     uri: axum::extract::OriginalUri,
     maybe_bearer_header: Option<BearerHeader>,
 ) -> axum::response::Response {
-    let dataset_url = get_base_dataset_url(host, uri, 1);
+    let server_url_config = catalog.get_one::<ServerUrlConfig>().unwrap();
+    let dataset_url = get_base_dataset_url(uri, &server_url_config.protocols.base_url_rest, 1);
 
     ws.on_upgrade(move |socket| {
         AxumServerPullProtocolInstance::new(socket, dataset, dataset_url, maybe_bearer_header)
@@ -263,29 +264,16 @@ pub async fn dataset_pull_ws_upgrade_handler(
 /////////////////////////////////////////////////////////////////////////////////
 
 fn get_base_dataset_url(
-    axum::extract::Host(host): axum::extract::Host,
     axum::extract::OriginalUri(uri): axum::extract::OriginalUri,
+    base_url_rest: &Url,
     depth: usize,
 ) -> Url {
-    let api_server_url = get_api_server_url(&host);
-
     let mut path: Vec<_> = uri.path().split('/').collect();
     for _ in 0..depth {
         path.pop();
     }
     let path_string = format!("{}/", path.join("/"));
-    api_server_url.join(path_string.as_str()).unwrap()
-}
-
-/////////////////////////////////////////////////////////////////////////////////
-
-fn get_api_server_url(host: &str) -> Url {
-    // TODO: Use value from config not envvar
-    //       https://github.com/kamu-data/kamu-node/issues/45
-    let raw_base_url =
-        std::env::var("KAMU_BASE_URL_REST").unwrap_or_else(|_| format!("http://{host}"));
-
-    Url::parse(&raw_base_url).unwrap()
+    base_url_rest.join(path_string.as_str()).unwrap()
 }
 
 /////////////////////////////////////////////////////////////////////////////////
