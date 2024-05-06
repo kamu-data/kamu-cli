@@ -146,6 +146,9 @@ jobs:
         if: matrix.container-runtime != ''
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::setup::)' --no-capture
 
+      - name: Run main set of tests
+        run: cargo nextest run ${{ matrix.nextest-flags }} ${{ matrix.nextest-exclusions }}
+
         # Note: SQLite does not require a container and may run on any platform
       - name: SQLite database tests
         env:
@@ -166,9 +169,6 @@ jobs:
           SQLX_OFFLINE: false
           DATABASE_URL: mariadb://root:root@localhost:3306/kamu-test
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::mysql::)'
-
-      - name: Run main set of tests
-        run: cargo nextest run ${{ matrix.nextest-flags }} ${{ matrix.nextest-exclusions }}
 
       # Not running on windows due to line ending differences
       - name: Check generated files
