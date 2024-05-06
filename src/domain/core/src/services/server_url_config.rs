@@ -45,6 +45,16 @@ impl ServerUrlConfig {
     pub fn new(protocols: Protocols) -> Self {
         Self { protocols }
     }
+
+    pub fn new_test(base_url_rest: Option<&str>) -> Self {
+        Self {
+            protocols: Protocols {
+                base_url_platform: Url::parse("http://platform.example.com").unwrap(),
+                base_url_rest: Url::parse(base_url_rest.unwrap_or("http://example.com")).unwrap(),
+                base_url_flightsql: Url::parse("grpc://example.com:50050").unwrap(),
+            },
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

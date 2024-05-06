@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{SocketAddr, TcpListener};
 
 use dill::Catalog;
 
@@ -21,12 +21,7 @@ pub struct TestAPIServer {
 }
 
 impl TestAPIServer {
-    pub fn new(
-        catalog: Catalog,
-        address: Option<IpAddr>,
-        port: Option<u16>,
-        multi_tenant: bool,
-    ) -> Self {
+    pub fn new(catalog: Catalog, bind_socket: TcpListener, multi_tenant: bool) -> Self {
         let app = axum::Router::new()
             .route(
                 "/platform/login",
@@ -62,12 +57,9 @@ impl TestAPIServer {
                     .layer(kamu_adapter_http::AuthenticationLayer::new()),
             );
 
-        let addr = SocketAddr::from((
-            address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
-            port.unwrap_or(0),
-        ));
-
-        let server = axum::Server::bind(&addr).serve(app.into_make_service());
+        let server = axum::Server::from_tcp(bind_socket)
+            .unwrap()
+            .serve(app.into_make_service());
 
         Self { server }
     }
