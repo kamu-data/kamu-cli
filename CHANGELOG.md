@@ -8,14 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Refactoring of authorization configuration data: separation into configuration models and logic for loading them from environment variables
 ### Added
-- Flow system: implemented persistent repositories (PostgreSQL, SQLite) for flow configuration events
+- Flow system: implemented persistent repositories (PostgresSQL, SQLite) for flow configuration events
 - Support for persistent accounts:
   - supports Postgres, MySQL/MariaDB, SQLite database targets
-  - accounts have a fullly functional DID-identifier:
+  - accounts have a fully functional DID-identifier:
     - based on account name for CLI mode
     - auto-registered randomly on first GitHub login
   - account ID resolutions are no longer mocked
-- REST API to login remotely using password and Github methods  
+- REST API to login remotely using password and GitHub methods  
 ### Fixed
 - Compacting datasets stored in an S3 bucket
 
