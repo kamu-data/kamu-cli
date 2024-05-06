@@ -16,6 +16,7 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
+use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use url::Url;
 

@@ -15,16 +15,10 @@ use std::str::FromStr;
 use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::auth::DatasetAction;
-use kamu::domain::{
-    AnonymousAccountReason,
-    CurrentAccountSubject,
-    DatasetRepository,
-    InternalError,
-    ResultIntoInternal,
-    SystemTimeSourceDefault,
-};
+use kamu::domain::{DatasetRepository, InternalError, ResultIntoInternal, SystemTimeSourceDefault};
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu_accounts::*;
 use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetHandle, DatasetKind, DatasetName, DatasetRef};
 use url::Url;
@@ -219,10 +213,12 @@ impl ServerHarness {
         catalog_builder.add::<SystemTimeSourceDefault>();
         catalog_builder.add::<EventBus>();
         catalog_builder.add::<DependencyGraphServiceInMemory>();
-        catalog_builder.add_value(
-            kamu::testing::MockAuthenticationService::resolving_token(kamu::domain::auth::DUMMY_ACCESS_TOKEN, kamu::domain::auth::AccountInfo::dummy())
-        )
-            .bind::<dyn kamu::domain::auth::AuthenticationService, kamu::testing::MockAuthenticationService>();
+        catalog_builder
+            .add_value(MockAuthenticationService::resolving_token(
+                DUMMY_ACCESS_TOKEN,
+                Account::dummy(),
+            ))
+            .bind::<dyn AuthenticationService, MockAuthenticationService>();
         catalog_builder
             .add_value(dataset_action_authorizer)
             .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>();

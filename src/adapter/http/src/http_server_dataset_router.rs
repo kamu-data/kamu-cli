@@ -7,7 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::{AnonymousAccountReason, CurrentAccountSubject};
+use axum::response::{IntoResponse, Response};
+use axum::Json;
+use http::StatusCode;
+use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 use crate::simple_protocol::*;
 use crate::{DatasetAuthorizationLayer, DatasetResolverLayer};
@@ -79,6 +84,63 @@ pub fn add_dataset_resolver_layer(
 
 /////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginRequestBody {
+    pub login_method: String,
+    pub login_credentials_json: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginResponseBody {
+    pub access_token: String,
+}
+
+pub async fn platform_login_handler(
+    catalog: axum::extract::Extension<dill::Catalog>,
+    Json(payload): Json<LoginRequestBody>,
+) -> Response {
+    let authentication_service = catalog
+        .get_one::<dyn kamu_accounts::AuthenticationService>()
+        .unwrap();
+
+    let login_result = authentication_service
+        .login(
+            payload.login_method.as_str(),
+            payload.login_credentials_json,
+        )
+        .await;
+
+    match login_result {
+        Ok(login_response) => {
+            let response_body = LoginResponseBody {
+                access_token: login_response.access_token,
+            };
+            Json(json!(response_body)).into_response()
+        }
+        Err(e) => match e {
+            kamu_accounts::LoginError::UnsupportedMethod(e) => {
+                (StatusCode::BAD_REQUEST, e.to_string()).into_response()
+            }
+            kamu_accounts::LoginError::InvalidCredentials(e) => {
+                (StatusCode::UNAUTHORIZED, e.to_string()).into_response()
+            }
+            kamu_accounts::LoginError::RejectedCredentials(e) => {
+                (StatusCode::UNAUTHORIZED, e.to_string()).into_response()
+            }
+            kamu_accounts::LoginError::DuplicateCredentials => {
+                (StatusCode::BAD_REQUEST, e.to_string()).into_response()
+            }
+            kamu_accounts::LoginError::Internal(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "").into_response()
+            }
+        },
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
 #[allow(clippy::unused_async)]
 pub async fn platform_token_validate_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
@@ -90,14 +152,17 @@ pub async fn platform_token_validate_handler(
             .status(http::StatusCode::OK)
             .body(Default::default())
             .unwrap(),
-        CurrentAccountSubject::Anonymous(reason) => axum::response::Response::builder()
-            .status(match reason {
-                AnonymousAccountReason::AuthenticationExpired => http::StatusCode::UNAUTHORIZED,
-                AnonymousAccountReason::AuthenticationInvalid
-                | AnonymousAccountReason::NoAuthenticationProvided => http::StatusCode::BAD_REQUEST,
-            })
-            .body(Default::default())
-            .unwrap(),
+        CurrentAccountSubject::Anonymous(reason) => match reason {
+            AnonymousAccountReason::AuthenticationExpired => {
+                (StatusCode::UNAUTHORIZED, "Authentication token expired").into_response()
+            }
+            AnonymousAccountReason::AuthenticationInvalid => {
+                (StatusCode::BAD_REQUEST, "Authentication token invalid").into_response()
+            }
+            AnonymousAccountReason::NoAuthenticationProvided => {
+                (StatusCode::BAD_REQUEST, "No authentication token provided").into_response()
+            }
+        },
     }
 }
 

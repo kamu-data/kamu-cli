@@ -25,6 +25,7 @@ doctest = false
 database-common = { workspace = true }
 kamu-accounts = { workspace = true }
 internal-error = { workspace = true }
+opendatafabric = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
@@ -37,9 +38,10 @@ sqlx = { version = "0.7", default-features = false, features = [
 ]}
 thiserror = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }
-uuid = { version = "1", features = ["v4"] }
 
 
 [dev-dependencies]
+kamu-accounts-repo-tests = { workspace = true }
+
 test-log = { version = "0.2", features = ["trace"] }
 test-group = { version = "1" }

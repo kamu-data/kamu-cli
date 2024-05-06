@@ -14,7 +14,13 @@ use axum::body::Body;
 use axum::response::Response;
 use axum::RequestExt;
 use futures::Future;
-use kamu::domain::{auth, AnonymousAccountReason, CurrentAccountSubject};
+use kamu_accounts::{
+    AccessTokenError,
+    AnonymousAccountReason,
+    AuthenticationService,
+    CurrentAccountSubject,
+    GetAccountInfoError,
+};
 use tower::{Layer, Service};
 
 use crate::access_token::AccessToken;
@@ -53,34 +59,38 @@ impl<Svc> AuthenticationMiddleware<Svc> {
         maybe_access_token: Option<AccessToken>,
     ) -> Result<CurrentAccountSubject, Response> {
         if let Some(access_token) = maybe_access_token {
-            let authentication_service = base_catalog
-                .get_one::<dyn auth::AuthenticationService>()
-                .unwrap();
+            let authentication_service =
+                base_catalog.get_one::<dyn AuthenticationService>().unwrap();
 
             // TODO: Getting the full account info here is expensive while all we need is
             // the caller identity
             match authentication_service
-                .account_info_by_token(access_token.token)
+                .account_by_token(access_token.token)
                 .await
             {
-                Ok(account_info) => Ok(CurrentAccountSubject::logged(
-                    account_info.account_name,
-                    account_info.is_admin,
+                Ok(account) => Ok(CurrentAccountSubject::logged(
+                    account.id,
+                    account.account_name,
+                    account.is_admin,
                 )),
-                Err(auth::GetAccountInfoError::AccessToken(e)) => match e {
-                    auth::AccessTokenError::Expired => Ok(CurrentAccountSubject::anonymous(
+                Err(GetAccountInfoError::AccessToken(e)) => match e {
+                    AccessTokenError::Expired => Ok(CurrentAccountSubject::anonymous(
                         AnonymousAccountReason::AuthenticationExpired,
                     )),
-                    auth::AccessTokenError::Invalid(err) => {
+                    AccessTokenError::Invalid(err) => {
                         tracing::warn!(error = err, "Ignoring invalid auth token",);
                         Ok(CurrentAccountSubject::anonymous(
                             AnonymousAccountReason::AuthenticationInvalid,
                         ))
                     }
                 },
-                Err(auth::GetAccountInfoError::Internal(_)) => {
-                    Err(internal_server_error_response())
+                Err(GetAccountInfoError::AccountUnresolved) => {
+                    tracing::warn!("Ignoring auth token pointing to non-existing account");
+                    Ok(CurrentAccountSubject::anonymous(
+                        AnonymousAccountReason::AuthenticationInvalid,
+                    ))
                 }
+                Err(GetAccountInfoError::Internal(_)) => Err(internal_server_error_response()),
             }
         } else {
             Ok(CurrentAccountSubject::anonymous(

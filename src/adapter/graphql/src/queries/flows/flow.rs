@@ -174,11 +174,13 @@ impl Flow {
     }
 
     /// A user, who initiated the flow run. None for system-initiated flows
-    async fn initiator(&self) -> Option<Account> {
-        self.flow_state
-            .primary_trigger()
-            .initiator_account_name()
-            .map(|initiator| Account::from_account_name(initiator.clone()))
+    async fn initiator(&self, ctx: &Context<'_>) -> Result<Option<Account>> {
+        let maybe_initiator = self.flow_state.primary_trigger().initiator_account_id();
+        Ok(if let Some(initiator) = maybe_initiator {
+            Some(Account::from_account_id(ctx, initiator.clone()).await?)
+        } else {
+            None
+        })
     }
 
     /// Primary flow trigger

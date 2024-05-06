@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use console::style as s;
 use dill::Catalog;
-use kamu::{set_random_jwt_secret, ENV_VAR_KAMU_JWT_SECRET};
+use kamu_accounts::{set_random_jwt_secret, PredefinedAccountsConfig, ENV_VAR_KAMU_JWT_SECRET};
 use opendatafabric::AccountName;
 
 use super::{CLIError, Command};
@@ -26,6 +26,7 @@ pub struct UICommand {
     base_catalog: Catalog,
     multi_tenant_workspace: bool,
     current_account_name: AccountName,
+    predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     output_config: Arc<OutputConfig>,
     address: Option<IpAddr>,
     port: Option<u16>,
@@ -37,6 +38,7 @@ impl UICommand {
         base_catalog: Catalog,
         multi_tenant_workspace: bool,
         current_account_name: AccountName,
+        predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         output_config: Arc<OutputConfig>,
         address: Option<IpAddr>,
         port: Option<u16>,
@@ -46,6 +48,7 @@ impl UICommand {
             base_catalog,
             multi_tenant_workspace,
             current_account_name,
+            predefined_accounts_config,
             output_config,
             address,
             port,
@@ -72,6 +75,7 @@ impl Command for UICommand {
             self.base_catalog.clone(),
             self.multi_tenant_workspace,
             self.current_account_name.clone(),
+            self.predefined_accounts_config.clone(),
             self.address,
             self.port,
         )

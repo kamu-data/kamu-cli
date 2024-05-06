@@ -10,9 +10,9 @@
 use std::sync::Arc;
 
 use chrono::Duration;
-use kamu_core::{auth, SystemTimeSource};
+use kamu_accounts::DEFAULT_ACCOUNT_ID;
+use kamu_core::SystemTimeSource;
 use kamu_flow_system::{FlowKey, FlowService};
-use opendatafabric::{AccountName, FAKE_ACCOUNT_ID};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,8 +49,7 @@ impl ManualFlowTriggerDriver {
             .trigger_manual_flow(
                 start_time + self.args.run_since_start,
                 self.args.flow_key,
-                FAKE_ACCOUNT_ID.to_string(),
-                AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME),
+                DEFAULT_ACCOUNT_ID.clone(),
             )
             .await
             .unwrap();

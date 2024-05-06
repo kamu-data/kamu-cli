@@ -611,7 +611,43 @@ pub fn cli() -> Command {
                         "#
                     )),
                 Command::new("login")
-                    .about("Logs in to a remote Kamu server")
+                    .about("Logs in to a remote Kamu server interactively")
+                    .subcommands([
+                        Command::new("oauth")
+                            .about("Performs non-interactive login to a remote Kamu server via OAuth provider token")
+                            .args([
+                                Arg::new("provider")
+                                    .required(true)
+                                    .help("Name of the OAuth provider, i.e. 'github'"),
+                                Arg::new("access-token")
+                                    .required(true)
+                                    .help("OAuth provider access token"),
+                                Arg::new("server")
+                                    .value_parser(value_parse_url)
+                                    .help("ODF backend server URL (defaults to kamu.dev)"),
+                                Arg::new("user")
+                                    .long("user")
+                                    .action(ArgAction::SetTrue)
+                                    .help("Store access token in the user home folder rather than in the workspace"),
+                            ]),
+                        Command::new("password")
+                            .about("Performs non-interactive login to a remote Kamu server via login and password")
+                            .args([
+                                Arg::new("login")
+                                    .required(true)
+                                    .help("Specify user name"),
+                                Arg::new("password")
+                                    .required(true)
+                                    .help("Specify password"),
+                                Arg::new("server")
+                                    .value_parser(value_parse_url)
+                                    .help("ODF backend server URL (defaults to kamu.dev)"),
+                                Arg::new("user")
+                                    .long("user")
+                                    .action(ArgAction::SetTrue)
+                                    .help("Store access token in the user home folder rather than in the workspace"),
+                            ]),
+                    ])
                     .args([
                         Arg::new("user")
                             .long("user")
@@ -1256,10 +1292,6 @@ pub fn cli() -> Command {
                                     .long("login")
                                     .required(true)
                                     .help("Account name"),
-                                Arg::new("gh-access-token")
-                                    .long("gh-access-token")
-                                    .required(false)
-                                    .help("An existing GitHub access token"),
                                 Arg::new("expiration-time-sec")
                                     .long("expiration-time-sec")
                                     .value_parser(value_parser!(usize))

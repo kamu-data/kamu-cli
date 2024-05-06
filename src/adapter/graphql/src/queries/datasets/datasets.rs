@@ -28,7 +28,13 @@ impl Datasets {
         let hdl = dataset_repo
             .try_resolve_dataset_ref(&dataset_id.as_local_ref())
             .await?;
-        Ok(hdl.map(|h| Dataset::new(Account::from_dataset_alias(ctx, &h.alias), h)))
+        Ok(match hdl {
+            Some(h) => Some(Dataset::new(
+                Account::from_dataset_alias(ctx, &h.alias).await?,
+                h,
+            )),
+            None => None,
+        })
     }
 
     /// Returns dataset by its owner and name
@@ -46,7 +52,13 @@ impl Datasets {
             .try_resolve_dataset_ref(&dataset_alias.into_local_ref())
             .await?;
 
-        Ok(hdl.map(|h| Dataset::new(Account::from_dataset_alias(ctx, &h.alias), h)))
+        Ok(match hdl {
+            Some(h) => Some(Dataset::new(
+                Account::from_dataset_alias(ctx, &h.alias).await?,
+                h,
+            )),
+            None => None,
+        })
     }
 
     #[graphql(skip)]
@@ -91,7 +103,31 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        panic!("Resolving accounts by ID is not supported yet");
+        let authentication_service =
+            from_catalog::<dyn kamu_accounts::AuthenticationService>(ctx).unwrap();
+
+        let account_id: odf::AccountID = account_id.into();
+        let maybe_account_name = authentication_service
+            .find_account_name_by_id(&account_id)
+            .await?;
+
+        match maybe_account_name {
+            Some(account_name) => {
+                self.by_account_impl(
+                    ctx,
+                    Account::new(account_id.into(), account_name.into()),
+                    page,
+                    per_page,
+                )
+                .await
+            }
+            None => {
+                let page = page.unwrap_or(0);
+                let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+
+                Ok(DatasetConnection::new(vec![], page, per_page, 0))
+            }
+        }
     }
 
     /// Returns datasets belonging to the specified account
@@ -103,7 +139,7 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let account_ref = Account::from_account_name(account_name.into());
+        let account_ref = Account::from_account_name(ctx, account_name.into()).await?;
         self.by_account_impl(ctx, account_ref, page, per_page).await
     }
 }

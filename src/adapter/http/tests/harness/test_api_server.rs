@@ -28,6 +28,14 @@ impl TestAPIServer {
         multi_tenant: bool,
     ) -> Self {
         let app = axum::Router::new()
+            .route(
+                "/platform/login",
+                axum::routing::post(kamu_adapter_http::platform_login_handler),
+            )
+            .route(
+                "/platform/token/validate",
+                axum::routing::get(kamu_adapter_http::platform_token_validate_handler),
+            )
             .nest("/", kamu_adapter_http::data::root_router())
             .nest(
                 if multi_tenant {

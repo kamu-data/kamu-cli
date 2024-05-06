@@ -79,7 +79,7 @@ impl FlowOutcome {
                             .int_err()?;
 
                         let dataset =
-                            Dataset::new(Account::from_dataset_alias(ctx, &hdl.alias), hdl);
+                            Dataset::new(Account::from_dataset_alias(ctx, &hdl.alias).await?, hdl);
                         Self::Failed(FlowFailedError {
                             reason: FlowFailedReason::FlowDatasetCompactedFailed(
                                 FlowDatasetCompactedFailedError {

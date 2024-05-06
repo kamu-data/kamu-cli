@@ -8,16 +8,21 @@
 // by the Apache License, Version 2.0.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
 use dill::Catalog;
-use kamu::domain::auth::AuthenticationService;
+use kamu_accounts::{
+    AccountConfig,
+    AuthenticationService,
+    PredefinedAccountsConfig,
+    PROVIDER_PASSWORD,
+};
+use kamu_accounts_services::PasswordLoginCredentials;
 use opendatafabric::AccountName;
 use rust_embed::RustEmbed;
 use serde::Serialize;
-
-use crate::accounts;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,6 +71,7 @@ impl WebUIServer {
         base_catalog: Catalog,
         multi_tenant_workspace: bool,
         current_account_name: AccountName,
+        predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         address: Option<IpAddr>,
         port: Option<u16>,
     ) -> Self {
@@ -78,20 +84,21 @@ impl WebUIServer {
             panic!("error binding to {}: {}", addr, e);
         });
 
-        let login_credentials = accounts::PasswordLoginCredentials {
+        let account_config = predefined_accounts_config
+            .find_account_config_by_name(&current_account_name)
+            .or_else(|| Some(AccountConfig::from_name(current_account_name.clone())))
+            .unwrap();
+
+        let login_credentials = PasswordLoginCredentials {
             login: current_account_name.to_string(),
-            // Note: note a mistake, use identical login and password, equal to account name
-            password: current_account_name.to_string(),
+            password: account_config.get_password(),
         };
 
         let gql_schema = kamu_adapter_graphql::schema();
 
         let login_instructions = WebUILoginInstructions {
-            login_method: accounts::LOGIN_METHOD_PASSWORD.to_string(),
-            login_credentials_json: serde_json::to_string::<accounts::PasswordLoginCredentials>(
-                &login_credentials,
-            )
-            .unwrap(),
+            login_method: String::from(PROVIDER_PASSWORD),
+            login_credentials_json: serde_json::to_string(&login_credentials).unwrap(),
         };
 
         let auth_svc = base_catalog.get_one::<dyn AuthenticationService>().unwrap();
@@ -123,10 +130,6 @@ impl WebUIServer {
             .route(
                 "/graphql",
                 axum::routing::get(graphql_playground_handler).post(graphql_handler),
-            )
-            .route(
-                "/platform/token/validate",
-                axum::routing::get(kamu_adapter_http::platform_token_validate_handler),
             )
             .nest("/", kamu_adapter_http::data::root_router())
             .nest(

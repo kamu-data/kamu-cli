@@ -11,17 +11,23 @@
 
 use std::sync::Arc;
 
-use kamu::domain::auth::{AccountType, DEFAULT_AVATAR_URL};
-use kamu::domain::{
-    auth,
-    CurrentAccountSubject,
-    DatasetRepository,
-    InternalError,
-    SystemTimeSourceStub,
+use chrono::Utc;
+use kamu::domain::auth::{
+    AlwaysHappyDatasetActionAuthorizer,
+    DatasetAction,
+    DatasetActionAuthorizer,
 };
-use kamu::testing::{MockAuthenticationService, MockDatasetActionAuthorizer};
+use kamu::domain::{DatasetRepository, InternalError, SystemTimeSourceStub};
+use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::DatasetLayout;
-use opendatafabric::{AccountName, DatasetAlias, DatasetHandle, FAKE_ACCOUNT_ID};
+use kamu_accounts::{
+    Account,
+    AccountType,
+    CurrentAccountSubject,
+    MockAuthenticationService,
+    PROVIDER_PASSWORD,
+};
+use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle};
 use reqwest::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -61,14 +67,18 @@ pub(crate) struct ServerSideHarnessOptions {
 
 pub(crate) fn server_authentication_mock() -> MockAuthenticationService {
     MockAuthenticationService::resolving_token(
-        kamu::domain::auth::DUMMY_ACCESS_TOKEN,
-        kamu::domain::auth::AccountInfo {
-            account_id: FAKE_ACCOUNT_ID.to_string(),
+        kamu_accounts::DUMMY_ACCESS_TOKEN,
+        Account {
+            id: AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
             account_name: AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
             account_type: AccountType::User,
             display_name: SERVER_ACCOUNT_NAME.to_string(),
-            avatar_url: Some(DEFAULT_AVATAR_URL.to_string()),
+            email: None,
+            avatar_url: None,
+            registered_at: Utc::now(),
             is_admin: false,
+            provider: String::from(PROVIDER_PASSWORD),
+            provider_identity_key: String::from(SERVER_ACCOUNT_NAME),
         },
     )
 }
@@ -80,10 +90,11 @@ pub(crate) fn create_cli_user_catalog(base_catalog: &dill::Catalog) -> dill::Cat
 
     dill::CatalogBuilder::new_chained(base_catalog)
         .add_value(CurrentAccountSubject::logged(
+            AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
             AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
             is_admin,
         ))
-        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<AlwaysHappyDatasetActionAuthorizer>()
         .build()
 }
 
@@ -95,13 +106,13 @@ pub(crate) fn create_web_user_catalog(
 ) -> dill::Catalog {
     let mut web_catalog_builder = dill::CatalogBuilder::new_chained(base_catalog);
     if options.authorized_writes {
-        web_catalog_builder.add::<auth::AlwaysHappyDatasetActionAuthorizer>();
+        web_catalog_builder.add::<AlwaysHappyDatasetActionAuthorizer>();
     } else {
         let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
         mock_dataset_action_authorizer
             .expect_check_action_allowed()
             .returning(|dataset_handle, action| {
-                if action == auth::DatasetAction::Write {
+                if action == DatasetAction::Write {
                     Err(MockDatasetActionAuthorizer::denying_error(
                         dataset_handle,
                         action,
@@ -112,7 +123,7 @@ pub(crate) fn create_web_user_catalog(
             });
         web_catalog_builder
             .add_value(mock_dataset_action_authorizer)
-            .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+            .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
     }
 
     web_catalog_builder.build()

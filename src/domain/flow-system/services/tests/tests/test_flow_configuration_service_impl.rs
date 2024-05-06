@@ -17,6 +17,7 @@ use event_bus::{AsyncEventHandler, EventBus};
 use futures::TryStreamExt;
 use kamu::testing::MetadataFactory;
 use kamu::*;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;

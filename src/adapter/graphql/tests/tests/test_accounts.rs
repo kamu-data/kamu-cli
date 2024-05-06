@@ -8,16 +8,34 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::value;
-use kamu::testing::MockAuthenticationService;
-use kamu_core::auth::{AccountInfo, DEFAULT_ACCOUNT_NAME};
+use kamu_accounts::{
+    Account,
+    AuthenticationService,
+    MockAuthenticationService,
+    DEFAULT_ACCOUNT_ID,
+    DEFAULT_ACCOUNT_NAME,
+    DEFAULT_ACCOUNT_NAME_STR,
+};
 use mockall::predicate::eq;
-use opendatafabric::AccountName;
+use opendatafabric::{AccountID, AccountName};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_account_by_name() {
-    let harness = GraphQLAccountsHarness::new();
+async fn test_account_by_id() {
+    let invalid_account_id = AccountID::new_seeded_ed25519(b"I don't exist");
+
+    let mut mock_authentication_service = MockAuthenticationService::new();
+    mock_authentication_service
+        .expect_find_account_name_by_id()
+        .with(eq(DEFAULT_ACCOUNT_ID.clone()))
+        .returning(|_| Ok(Some(DEFAULT_ACCOUNT_NAME.clone())));
+    mock_authentication_service
+        .expect_find_account_name_by_id()
+        .with(eq(invalid_account_id.clone()))
+        .returning(|_| Ok(None));
+
+    let harness = GraphQLAccountsHarness::new(mock_authentication_service);
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -26,7 +44,82 @@ async fn test_account_by_name() {
                 r#"
                 query {{
                     accounts {{
-                        byName (name: "{DEFAULT_ACCOUNT_NAME}") {{
+                        byId (accountId: "{}") {{
+                            accountName
+                        }}
+                    }}
+                }}
+                "#,
+                *DEFAULT_ACCOUNT_ID
+            ))
+            .data(harness.catalog.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "accounts": {
+                "byId": {
+                    "accountName": DEFAULT_ACCOUNT_NAME_STR
+                }
+            }
+        })
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(format!(
+                r#"
+                query {{
+                    accounts {{
+                        byId (accountId: "{invalid_account_id}") {{
+                            accountName
+                        }}
+                    }}
+                }}
+                "#,
+            ))
+            .data(harness.catalog.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "accounts": {
+                "byId": null
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_account_by_name() {
+    let mut mock_authentication_service = MockAuthenticationService::new();
+    mock_authentication_service
+        .expect_account_by_name()
+        .with(eq(DEFAULT_ACCOUNT_NAME.clone()))
+        .returning(|_| Ok(Some(Account::dummy())));
+    mock_authentication_service
+        .expect_account_by_name()
+        .with(eq(AccountName::new_unchecked("unknown")))
+        .returning(|_| Ok(None));
+
+    let harness = GraphQLAccountsHarness::new(mock_authentication_service);
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let res = schema
+        .execute(
+            async_graphql::Request::new(format!(
+                r#"
+                query {{
+                    accounts {{
+                        byName (name: "{DEFAULT_ACCOUNT_NAME_STR}") {{
                             accountName
                         }}
                     }}
@@ -43,7 +136,7 @@ async fn test_account_by_name() {
         value!({
             "accounts": {
                 "byName": {
-                    "accountName": DEFAULT_ACCOUNT_NAME
+                    "accountName": DEFAULT_ACCOUNT_NAME_STR
                 }
             }
         })
@@ -89,7 +182,7 @@ async fn test_account_by_name() {
                     }}
                 }}
                 "#,
-                DEFAULT_ACCOUNT_NAME.to_ascii_uppercase(),
+                DEFAULT_ACCOUNT_NAME_STR.to_ascii_uppercase(),
             ))
             .data(harness.catalog),
         )
@@ -101,7 +194,7 @@ async fn test_account_by_name() {
         value!({
             "accounts": {
                 "byName": {
-                    "accountName": DEFAULT_ACCOUNT_NAME
+                    "accountName": DEFAULT_ACCOUNT_NAME_STR
                 }
             }
         })
@@ -115,21 +208,14 @@ struct GraphQLAccountsHarness {
 }
 
 impl GraphQLAccountsHarness {
-    pub fn new() -> Self {
-        let mut mock_authentication_service = MockAuthenticationService::new();
-        mock_authentication_service
-            .expect_find_account_info_by_name()
-            .with(eq(AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME)))
-            .returning(|_| Ok(Some(AccountInfo::dummy())));
-        mock_authentication_service
-            .expect_find_account_info_by_name()
-            .with(eq(AccountName::new_unchecked("unknown")))
-            .returning(|_| Ok(None));
+    pub fn new(mock_authentication_service: MockAuthenticationService) -> Self {
         let catalog = dill::CatalogBuilder::new()
             .add_value(mock_authentication_service)
-            .bind::<dyn kamu_core::auth::AuthenticationService, MockAuthenticationService>()
+            .bind::<dyn AuthenticationService, MockAuthenticationService>()
             .build();
 
         Self { catalog }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////

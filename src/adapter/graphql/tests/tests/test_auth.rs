@@ -8,8 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::value;
-use kamu::testing::{MockAuthenticationService, DUMMY_LOGIN_METHOD};
-use kamu_core::auth::DEFAULT_ACCOUNT_NAME;
+use kamu_accounts::{
+    AuthenticationService,
+    MockAuthenticationService,
+    DEFAULT_ACCOUNT_NAME_STR,
+    DUMMY_LOGIN_METHOD,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,7 +47,7 @@ fn make_account_details_request() -> async_graphql::Request {
             }}
         }}
         "#,
-        kamu::domain::auth::DUMMY_ACCESS_TOKEN,
+        kamu_accounts::DUMMY_ACCESS_TOKEN,
     ))
 }
 
@@ -58,7 +62,7 @@ async fn test_enabled_login_methods() {
 
     let cat = dill::CatalogBuilder::new()
         .add_value(mock_authentication_service)
-        .bind::<dyn kamu_core::auth::AuthenticationService, MockAuthenticationService>()
+        .bind::<dyn AuthenticationService, MockAuthenticationService>()
         .build();
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -94,7 +98,7 @@ async fn test_enabled_login_methods() {
 async fn test_login() {
     let cat = dill::CatalogBuilder::new()
         .add_value(MockAuthenticationService::built_in())
-        .bind::<dyn kamu_core::auth::AuthenticationService, MockAuthenticationService>()
+        .bind::<dyn AuthenticationService, MockAuthenticationService>()
         .build();
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -106,9 +110,9 @@ async fn test_login() {
         value!({
             "auth": {
                 "login": {
-                    "accessToken": kamu::domain::auth::DUMMY_ACCESS_TOKEN,
+                    "accessToken": kamu_accounts::DUMMY_ACCESS_TOKEN,
                     "account": {
-                        "accountName": DEFAULT_ACCOUNT_NAME
+                        "accountName": DEFAULT_ACCOUNT_NAME_STR
                     }
                 },
             }
@@ -122,7 +126,7 @@ async fn test_login() {
 async fn test_login_bad_method() {
     let cat = dill::CatalogBuilder::new()
         .add_value(MockAuthenticationService::unsupported_login_method())
-        .bind::<dyn kamu_core::auth::AuthenticationService, MockAuthenticationService>()
+        .bind::<dyn AuthenticationService, MockAuthenticationService>()
         .build();
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -142,7 +146,7 @@ async fn test_login_bad_method() {
 async fn test_account_details() {
     let cat = dill::CatalogBuilder::new()
         .add_value(MockAuthenticationService::built_in())
-        .bind::<dyn kamu_core::auth::AuthenticationService, MockAuthenticationService>()
+        .bind::<dyn AuthenticationService, MockAuthenticationService>()
         .build();
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -156,7 +160,7 @@ async fn test_account_details() {
         value!({
             "auth": {
                 "accountDetails": {
-                    "accountName": DEFAULT_ACCOUNT_NAME
+                    "accountName": DEFAULT_ACCOUNT_NAME_STR
                 },
             }
         })
@@ -169,7 +173,7 @@ async fn test_account_details() {
 async fn test_account_details_expired_token() {
     let cat = dill::CatalogBuilder::new()
         .add_value(MockAuthenticationService::expired_token())
-        .bind::<dyn kamu_core::auth::AuthenticationService, MockAuthenticationService>()
+        .bind::<dyn AuthenticationService, MockAuthenticationService>()
         .build();
 
     let schema = kamu_adapter_graphql::schema_quiet();

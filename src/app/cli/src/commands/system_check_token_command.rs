@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::*;
-use kamu::AuthenticationServiceImpl;
+use kamu_accounts_services::AuthenticationServiceImpl;
 
 use crate::{CLIError, Command};
 

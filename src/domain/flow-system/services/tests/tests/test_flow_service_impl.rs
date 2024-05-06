@@ -15,6 +15,7 @@ use dill::*;
 use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, MockDatasetChangesService};
 use kamu::*;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;

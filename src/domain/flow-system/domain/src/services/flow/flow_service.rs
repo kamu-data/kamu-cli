@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
-use opendatafabric::{AccountID, AccountName, DatasetID};
+use opendatafabric::{AccountID, DatasetID};
 use tokio_stream::Stream;
 
 use crate::{
@@ -35,7 +35,6 @@ pub trait FlowService: Sync + Send {
         trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
         initiator_account_id: AccountID,
-        initiator_account_name: AccountName,
     ) -> Result<FlowState, RequestFlowError>;
 
     /// Returns states of flows associated with a given dataset

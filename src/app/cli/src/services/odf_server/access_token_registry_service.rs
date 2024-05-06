@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu::domain::CurrentAccountSubject;
+use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::AccountName;
 use url::Url;
@@ -75,10 +75,10 @@ impl AccessTokenRegistryService {
             .lock()
             .expect("Could not lock access tokens registry");
 
-        if let Some(server_record) = registry
-            .iter()
-            .find(|c| &c.frontend_url == odf_server_frontend_url)
-        {
+        if let Some(server_record) = registry.iter().find(|c| match &c.frontend_url {
+            Some(frontend_url) => frontend_url == odf_server_frontend_url,
+            _ => false,
+        }) {
             server_record
                 .token_for_account(self.account_name())
                 .map(|ac| AccessTokenFindReport {
@@ -124,7 +124,7 @@ impl AccessTokenRegistryService {
     pub fn save_access_token(
         &self,
         scope: AccessTokenStoreScope,
-        odf_server_frontend_url: &Url,
+        odf_server_frontend_url: Option<&Url>,
         odf_server_backend_url: &Url,
         access_token: String,
     ) -> Result<(), InternalError> {
@@ -141,14 +141,23 @@ impl AccessTokenRegistryService {
 
         let access_token = AccessToken::new(account_name.clone(), access_token);
 
-        if let Some(server_record) = registry
-            .iter_mut()
-            .find(|c| &c.frontend_url == odf_server_frontend_url)
-        {
+        if let Some(server_record) = registry.iter_mut().find(|c| {
+            if &c.backend_url == odf_server_backend_url {
+                true
+            } else {
+                match (&c.frontend_url, odf_server_frontend_url) {
+                    (Some(frontend_a), Some(frontend_b)) => frontend_a == frontend_b,
+                    _ => false,
+                }
+            }
+        }) {
             server_record.add_account_token(access_token);
+            if server_record.frontend_url.is_none() && odf_server_frontend_url.is_some() {
+                server_record.frontend_url = odf_server_frontend_url.cloned();
+            }
         } else {
             let mut server_record = ServerAccessTokensRecord::new(
-                odf_server_frontend_url.clone(),
+                odf_server_frontend_url.cloned(),
                 odf_server_backend_url.clone(),
             );
             server_record.add_account_token(access_token);
@@ -192,7 +201,7 @@ impl AccessTokenRegistryService {
     pub fn drop_access_token(
         &self,
         scope: AccessTokenStoreScope,
-        odf_server_frontend_url: &Url,
+        odf_server_url: &Url,
     ) -> Result<bool, InternalError> {
         let account_name = self.account_name();
 
@@ -205,10 +214,12 @@ impl AccessTokenRegistryService {
             .lock()
             .expect("Could not lock access tokens registry");
 
-        if let Some(token_map) = registry
-            .iter_mut()
-            .find(|c| &c.frontend_url == odf_server_frontend_url)
-        {
+        if let Some(token_map) = registry.iter_mut().find(|c| {
+            &c.backend_url == odf_server_url
+                || c.frontend_url
+                    .as_ref()
+                    .is_some_and(|frontend_url| frontend_url == odf_server_url)
+        }) {
             if token_map.drop_account_token(account_name).is_some() {
                 self.storage
                     .write_access_tokens_registry(scope, &registry)?;

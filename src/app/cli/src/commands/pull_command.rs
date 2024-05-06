@@ -14,6 +14,7 @@ use chrono::{DateTime, Utc};
 use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
+use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};

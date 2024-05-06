@@ -15,15 +15,14 @@ use std::sync::Arc;
 use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::{
-    auth,
     DatasetRepository,
     InternalError,
     ResultIntoInternal,
     SystemTimeSource,
     SystemTimeSourceStub,
 };
-use kamu::testing::MockAuthenticationService;
 use kamu::{DatasetLayout, DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu_accounts::{AuthenticationService, MockAuthenticationService};
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use tempfile::TempDir;
 use url::Url;
@@ -74,7 +73,7 @@ impl ServerSideLocalFsHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .add_value(server_authentication_mock())
-            .bind::<dyn auth::AuthenticationService, MockAuthenticationService>();
+            .bind::<dyn AuthenticationService, MockAuthenticationService>();
 
         let base_catalog = base_catalog_builder.build();
 

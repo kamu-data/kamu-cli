@@ -15,10 +15,11 @@ use dill::Component;
 use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_auth_oso::{KamuAuthOso, OsoDatasetAuthorizer};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::{AccessError, CurrentAccountSubject, DatasetRepository, SystemTimeSourceDefault};
-use opendatafabric::{AccountName, DatasetAlias, DatasetHandle, DatasetKind};
+use kamu_core::{AccessError, DatasetRepository, SystemTimeSourceDefault};
+use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle, DatasetKind};
 use tempfile::TempDir;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -108,6 +109,7 @@ impl DatasetAuthorizerHarness {
             .add::<SystemTimeSourceDefault>()
             .add::<EventBus>()
             .add_value(CurrentAccountSubject::logged(
+                AccountID::new_seeded_ed25519(current_account_name.as_bytes()),
                 AccountName::new_unchecked(current_account_name),
                 false,
             ))

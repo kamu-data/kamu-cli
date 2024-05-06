@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::EventStore;
-use opendatafabric::{AccountName, DatasetID};
+use opendatafabric::{AccountID, DatasetID};
 
 use crate::*;
 
@@ -119,7 +119,7 @@ pub struct SystemFlowFilters {
 #[derive(Debug, Clone)]
 pub enum InitiatorFilter {
     System,
-    Account(AccountName), // TODO: replace on AccountID
+    Account(AccountID),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

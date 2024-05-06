@@ -41,7 +41,7 @@ impl Dataset {
             .await
             .int_err()?;
         Ok(Dataset::new(
-            Account::from_dataset_alias(ctx, &hdl.alias),
+            Account::from_dataset_alias(ctx, &hdl.alias).await?,
             hdl,
         ))
     }

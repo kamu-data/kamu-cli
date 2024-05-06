@@ -75,13 +75,8 @@ impl MetadataChain {
     ) -> Result<Option<MetadataBlockExtended>> {
         let dataset = self.get_dataset(ctx).await?;
         let block = dataset.as_metadata_chain().try_get_block(&hash).await?;
-        Ok(block.map(|b| {
-            MetadataBlockExtended::new(
-                hash,
-                b,
-                Account::from_dataset_alias(ctx, &self.dataset_handle.alias),
-            )
-        }))
+        let account = Account::from_dataset_alias(ctx, &self.dataset_handle.alias).await?;
+        Ok(block.map(|b| MetadataBlockExtended::new(hash, b, account)))
     }
 
     /// Returns a metadata block corresponding to the specified hash and encoded
@@ -139,7 +134,7 @@ impl MetadataChain {
             let block = MetadataBlockExtended::new(
                 hash,
                 block,
-                Account::from_dataset_alias(ctx, &self.dataset_handle.alias),
+                Account::from_dataset_alias(ctx, &self.dataset_handle.alias).await?,
             );
             nodes.push(block);
         }

@@ -22,6 +22,7 @@ doctest = false
 
 [dependencies]
 opendatafabric = { workspace = true }
+kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 
 async-trait = "0.1"
