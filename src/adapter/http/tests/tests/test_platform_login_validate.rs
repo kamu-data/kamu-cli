@@ -13,12 +13,7 @@ use std::sync::Arc;
 use chrono::{Duration, Utc};
 use kamu::domain::auth::JwtAuthenticationConfig;
 use kamu::domain::{InternalError, ResultIntoInternal, SystemTimeSource, SystemTimeSourceStub};
-use kamu_accounts::{
-    set_random_jwt_secret,
-    AccountConfig,
-    PredefinedAccountsConfig,
-    PROVIDER_PASSWORD,
-};
+use kamu_accounts::{AccountConfig, PredefinedAccountsConfig, PROVIDER_PASSWORD};
 use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::{AuthenticationServiceImpl, LoginPasswordAuthProvider};
 use kamu_adapter_http::{LoginRequestBody, LoginResponseBody};
@@ -57,8 +52,6 @@ impl Harness {
             .push(AccountConfig::from_name(AccountName::new_unchecked(
                 USER_PETYA,
             )));
-
-        set_random_jwt_secret();
 
         let catalog = dill::CatalogBuilder::new()
             .add::<AuthenticationServiceImpl>()

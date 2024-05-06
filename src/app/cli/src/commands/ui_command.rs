@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use console::style as s;
 use dill::Catalog;
-use kamu_accounts::{set_random_jwt_secret, PredefinedAccountsConfig, ENV_VAR_KAMU_JWT_SECRET};
+use kamu_accounts::PredefinedAccountsConfig;
 use opendatafabric::AccountName;
 
 use super::{CLIError, Command};

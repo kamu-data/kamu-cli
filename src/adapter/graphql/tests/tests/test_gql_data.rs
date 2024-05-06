@@ -17,12 +17,7 @@ use dill::Component;
 use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
-use kamu_accounts::{
-    set_random_jwt_secret,
-    AccountConfig,
-    CurrentAccountSubject,
-    PredefinedAccountsConfig,
-};
+use kamu_accounts::{AccountConfig, CurrentAccountSubject, PredefinedAccountsConfig};
 use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::AuthenticationServiceImpl;
 use kamu_core::auth::JwtAuthenticationConfig;
@@ -32,8 +27,6 @@ use opendatafabric::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 fn create_catalog_with_local_workspace(tempdir: &Path, is_multitenant: bool) -> dill::Catalog {
-    set_random_jwt_secret();
-
     let datasets_dir = tempdir.join("datasets");
     std::fs::create_dir(&datasets_dir).unwrap();
 
