@@ -180,8 +180,10 @@ impl Account {
     }
 
     /// Access to the flow configurations of this account
-    async fn flows(&self) -> AccountFlows {
-        AccountFlows::new(self.account_name.clone().into())
+    async fn flows(&self, ctx: &Context<'_>) -> Result<AccountFlows> {
+        Ok(AccountFlows::new(
+            self.get_full_account_info(ctx).await?.clone(),
+        ))
     }
 }
 

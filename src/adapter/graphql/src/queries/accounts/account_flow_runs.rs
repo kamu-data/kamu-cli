@@ -8,13 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use futures::TryStreamExt;
-use {kamu_flow_system as fs, opendatafabric as odf};
+use kamu_accounts::Account;
+use kamu_flow_system as fs;
 
 use crate::prelude::*;
 use crate::queries::{Flow, FlowConnection};
 
 pub struct AccountFlowRuns {
-    account_name: odf::AccountName,
+    account: Account,
 }
 
 #[Object]
@@ -22,8 +23,8 @@ impl AccountFlowRuns {
     const DEFAULT_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
-    pub fn new(account_name: odf::AccountName) -> Self {
-        Self { account_name }
+    pub fn new(account: Account) -> Self {
+        Self { account }
     }
 
     async fn list_flows(
@@ -40,7 +41,7 @@ impl AccountFlowRuns {
 
         let flows_state_listing = flow_service
             .list_all_flows_by_account(
-                &self.account_name,
+                &self.account.account_name,
                 match filters {
                     Some(filters) => filters.into(),
                     None => Default::default(),
