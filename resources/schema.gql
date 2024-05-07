@@ -45,8 +45,12 @@ type AccountFlowConfigsMut {
 	pauseAccountDatasetFlows: Boolean!
 }
 
+input AccountFlowFilters {
+	byDatasetName: DatasetName
+}
+
 type AccountFlowRuns {
-	listFlows(page: Int, perPage: Int, filters: DatasetFlowFilters): FlowConnection!
+	listFlows(page: Int, perPage: Int, filters: AccountFlowFilters): FlowConnection!
 }
 
 type AccountFlows {
@@ -88,6 +92,10 @@ type Accounts {
 }
 
 type AccountsMut {
+	"""
+	Returns a mutable account by its id
+	"""
+	byId(accountId: AccountID!): AccountMut
 	"""
 	Returns a mutable account by its name
 	"""

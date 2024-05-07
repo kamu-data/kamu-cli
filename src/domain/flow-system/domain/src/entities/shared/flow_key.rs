@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::{AccountName, DatasetID};
+use opendatafabric::DatasetID;
 use serde::{Deserialize, Serialize};
 
 use crate::{AnyFlowType, DatasetFlowType, SystemFlowType};
@@ -21,12 +21,8 @@ pub enum FlowKey {
 }
 
 impl FlowKey {
-    pub fn dataset(
-        dataset_id: DatasetID,
-        flow_type: DatasetFlowType,
-        account_id: Option<AccountName>,
-    ) -> Self {
-        Self::Dataset(FlowKeyDataset::new(dataset_id, flow_type, account_id))
+    pub fn dataset(dataset_id: DatasetID, flow_type: DatasetFlowType) -> Self {
+        Self::Dataset(FlowKeyDataset::new(dataset_id, flow_type))
     }
 
     pub fn system(flow_type: SystemFlowType) -> Self {
@@ -47,19 +43,13 @@ impl FlowKey {
 pub struct FlowKeyDataset {
     pub dataset_id: DatasetID,
     pub flow_type: DatasetFlowType,
-    pub account_id: Option<AccountName>,
 }
 
 impl FlowKeyDataset {
-    pub fn new(
-        dataset_id: DatasetID,
-        flow_type: DatasetFlowType,
-        account_id: Option<AccountName>,
-    ) -> Self {
+    pub fn new(dataset_id: DatasetID, flow_type: DatasetFlowType) -> Self {
         Self {
             dataset_id,
             flow_type,
-            account_id,
         }
     }
 }

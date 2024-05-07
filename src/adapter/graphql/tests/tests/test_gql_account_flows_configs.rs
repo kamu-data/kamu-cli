@@ -18,46 +18,36 @@ use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::{
     MetadataFactory,
-    MockAuthenticationService,
     MockDatasetActionAuthorizer,
     MockDatasetChangesService,
     MockDependencyGraphRepository,
     MockPollingIngestService,
     MockTransformService,
 };
-use kamu::{set_random_jwt_secret, DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
-use kamu_core::auth::AccountInfo;
+use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu_accounts::{set_random_jwt_secret, AuthenticationService, MockAuthenticationService};
 use kamu_core::*;
 use kamu_flow_system::FlowServiceRunConfig;
 use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
 use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceImpl};
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
-use mockall::predicate::eq;
-use opendatafabric::{AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
+use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
 
-use crate::utils::{add_custom_logged_in_account, authentication_catalogs};
+use crate::utils::authentication_catalogs;
 
 #[test_log::test(tokio::test)]
 async fn test_list_account_flows() {
     let foo_account_name = AccountName::new_unchecked("foo");
+    let foo_account_id = AccountID::new_seeded_ed25519(b"foo");
     let foo_dataset_name = DatasetName::new_unchecked("foo");
     let foo_dataset_alias =
         DatasetAlias::new(Some(foo_account_name.clone()), foo_dataset_name.clone());
-    let mut mock_authentication_service = MockAuthenticationService::new();
-    mock_authentication_service
-        .expect_find_account_info_by_name()
-        .with(eq(foo_account_name.clone()))
-        .returning(|_| {
-            Ok(Some(AccountInfo {
-                account_id: "foo_id".to_string(),
-                account_name: AccountName::new_unchecked("foo"),
-                account_type: auth::AccountType::User,
-                display_name: "foo".to_string(),
-                avatar_url: None,
-                is_admin: false,
-            }))
-        });
+    let mock_authentication_service = MockAuthenticationService::with_custom_account(
+        foo_account_id.clone(),
+        foo_account_name.clone(),
+    );
+
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
         transform_service_mock: Some(MockTransformService::with_set_transform()),
@@ -69,14 +59,13 @@ async fn test_list_account_flows() {
 
     let create_result = harness.create_root_dataset(foo_dataset_alias).await;
     let schema = kamu_adapter_graphql::schema_quiet();
-    let foo_catalog_authorized =
-        add_custom_logged_in_account(&harness.catalog_base, foo_account_name.clone(), false);
 
     let request_code =
         FlowConfigHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
     let response = schema
         .execute(
-            async_graphql::Request::new(request_code.clone()).data(foo_catalog_authorized.clone()),
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
         )
         .await;
 
@@ -86,7 +75,8 @@ async fn test_list_account_flows() {
     let request_code = FlowConfigHarness::list_flows_query(&foo_account_name);
     let response = schema
         .execute(
-            async_graphql::Request::new(request_code.clone()).data(foo_catalog_authorized.clone()),
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
         )
         .await;
 
@@ -141,24 +131,16 @@ async fn test_pause_resume_account_flows() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
     let foo_account_name = AccountName::new_unchecked("foo");
+    let foo_account_id = AccountID::new_seeded_ed25519(b"foo");
     let foo_dataset_alias = DatasetAlias::new(
         Some(foo_account_name.clone()),
         DatasetName::new_unchecked("foo"),
     );
-    let mut mock_authentication_service = MockAuthenticationService::new();
-    mock_authentication_service
-        .expect_find_account_info_by_name()
-        .with(eq(foo_account_name.clone()))
-        .returning(|_| {
-            Ok(Some(AccountInfo {
-                account_id: "foo_id".to_string(),
-                account_name: AccountName::new_unchecked("foo"),
-                account_type: auth::AccountType::User,
-                display_name: "foo".to_string(),
-                avatar_url: None,
-                is_admin: false,
-            }))
-        });
+    let mock_authentication_service = MockAuthenticationService::with_custom_account(
+        foo_account_id.clone(),
+        foo_account_name.clone(),
+    );
+
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
         transform_service_mock: Some(MockTransformService::with_set_transform()),
@@ -168,8 +150,6 @@ async fn test_pause_resume_account_flows() {
         ..Default::default()
     });
     let foo_create_result = harness.create_root_dataset(foo_dataset_alias).await;
-    let foo_catalog_authorized =
-        add_custom_logged_in_account(&harness.catalog_base, foo_account_name.clone(), false);
 
     let bar_account_name = AccountName::new_unchecked("bar");
     let bar_dataset_alias = DatasetAlias::new(
@@ -177,14 +157,13 @@ async fn test_pause_resume_account_flows() {
         DatasetName::new_unchecked("bar"),
     );
     let bar_create_result = harness.create_root_dataset(bar_dataset_alias).await;
-    let bar_catalog_authorized =
-        add_custom_logged_in_account(&harness.catalog_base, bar_account_name.clone(), false);
 
     let request_code =
         FlowConfigHarness::trigger_flow_mutation(&foo_create_result.dataset_handle.id, "INGEST");
     let response = schema
         .execute(
-            async_graphql::Request::new(request_code.clone()).data(foo_catalog_authorized.clone()),
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
         )
         .await;
 
@@ -193,7 +172,8 @@ async fn test_pause_resume_account_flows() {
         FlowConfigHarness::trigger_flow_mutation(&bar_create_result.dataset_handle.id, "INGEST");
     let response = schema
         .execute(
-            async_graphql::Request::new(request_code.clone()).data(bar_catalog_authorized.clone()),
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
         )
         .await;
 
@@ -202,7 +182,8 @@ async fn test_pause_resume_account_flows() {
     let request_code = FlowConfigHarness::list_flows_query(&foo_account_name);
     let response = schema
         .execute(
-            async_graphql::Request::new(request_code.clone()).data(foo_catalog_authorized.clone()),
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
         )
         .await;
 
@@ -261,7 +242,8 @@ async fn test_pause_resume_account_flows() {
     );
     let response = schema
         .execute(
-            async_graphql::Request::new(mutation_code.clone()).data(foo_catalog_authorized.clone()),
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
         )
         .await;
 
@@ -270,7 +252,8 @@ async fn test_pause_resume_account_flows() {
     let mutation_code = FlowConfigHarness::pause_account_flows(&foo_account_name);
     let response = schema
         .execute(
-            async_graphql::Request::new(mutation_code.clone()).data(foo_catalog_authorized.clone()),
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
         )
         .await;
 
@@ -294,7 +277,8 @@ async fn test_pause_resume_account_flows() {
         FlowConfigHarness::all_paused_config_query(&foo_create_result.dataset_handle.id);
     let response = schema
         .execute(
-            async_graphql::Request::new(request_code.clone()).data(foo_catalog_authorized.clone()),
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
         )
         .await;
 
@@ -317,7 +301,8 @@ async fn test_pause_resume_account_flows() {
     let mutation_code = FlowConfigHarness::resume_account_flows(&foo_account_name);
     let response = schema
         .execute(
-            async_graphql::Request::new(mutation_code.clone()).data(foo_catalog_authorized.clone()),
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
         )
         .await;
 
@@ -341,7 +326,8 @@ async fn test_pause_resume_account_flows() {
         FlowConfigHarness::all_paused_config_query(&foo_create_result.dataset_handle.id);
     let response = schema
         .execute(
-            async_graphql::Request::new(request_code.clone()).data(foo_catalog_authorized.clone()),
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
         )
         .await;
 
@@ -364,9 +350,9 @@ async fn test_pause_resume_account_flows() {
 
 struct FlowConfigHarness {
     _tempdir: tempfile::TempDir,
-    catalog_base: dill::Catalog,
+    _catalog_base: dill::Catalog,
     _catalog_anonymous: dill::Catalog,
-    _catalog_authorized: dill::Catalog,
+    catalog_authorized: dill::Catalog,
     dataset_repo: Arc<dyn DatasetRepository>,
 }
 
@@ -408,7 +394,7 @@ impl FlowConfigHarness {
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
             .add::<SystemTimeSourceDefault>()
             .add_value(mock_authentication_service)
-            .bind::<dyn kamu_core::auth::AuthenticationService, MockAuthenticationService>()
+            .bind::<dyn AuthenticationService, MockAuthenticationService>()
             .add_value(mock_dataset_action_authorizer)
             .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
@@ -439,9 +425,9 @@ impl FlowConfigHarness {
 
         Self {
             _tempdir: tempdir,
-            catalog_base,
+            _catalog_base: catalog_base,
             _catalog_anonymous: catalog_anonymous,
-            _catalog_authorized: catalog_authorized,
+            catalog_authorized,
             dataset_repo,
         }
     }

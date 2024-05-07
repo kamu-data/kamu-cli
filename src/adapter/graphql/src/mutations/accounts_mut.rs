@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::auth::AuthenticationService;
+use kamu_accounts::AuthenticationService;
 
 use crate::mutations::AccountMut;
 use crate::prelude::*;
@@ -20,6 +20,14 @@ pub struct AccountsMut;
 
 #[Object]
 impl AccountsMut {
+    /// Returns a mutable account by its id
+    async fn by_id(&self, ctx: &Context<'_>, account_id: AccountID) -> Result<Option<AccountMut>> {
+        let authentication_service = from_catalog::<dyn AuthenticationService>(ctx).unwrap();
+
+        let account_maybe = authentication_service.account_by_id(&account_id).await?;
+        Ok(account_maybe.map(AccountMut::new))
+    }
+
     /// Returns a mutable account by its name
     async fn by_name(
         &self,
@@ -29,9 +37,9 @@ impl AccountsMut {
         let authentication_service = from_catalog::<dyn AuthenticationService>(ctx).unwrap();
 
         let account_maybe = authentication_service
-            .find_account_info_by_name(&account_name)
+            .account_by_name(&account_name)
             .await?;
 
-        Ok(account_maybe.map(|account| AccountMut::new(account.account_name)))
+        Ok(account_maybe.map(AccountMut::new))
     }
 }

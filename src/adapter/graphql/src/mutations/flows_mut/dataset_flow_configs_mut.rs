@@ -84,12 +84,8 @@ impl DatasetFlowConfigsMut {
         let res = flow_config_service
             .set_configuration(
                 Utc::now(),
-                FlowKeyDataset::new(
-                    self.dataset_handle.id.clone(),
-                    dataset_flow_type.into(),
-                    self.dataset_handle.alias.account_name.clone(),
-                )
-                .into(),
+                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
+                    .into(),
                 paused,
                 FlowConfigurationRule::Schedule(configuration_rule),
             )
@@ -151,12 +147,8 @@ impl DatasetFlowConfigsMut {
         let res = flow_config_service
             .set_configuration(
                 Utc::now(),
-                FlowKeyDataset::new(
-                    self.dataset_handle.id.clone(),
-                    dataset_flow_type.into(),
-                    self.dataset_handle.alias.account_name.clone(),
-                )
-                .into(),
+                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
+                    .into(),
                 paused,
                 FlowConfigurationRule::BatchingRule(batching_rule),
             )
@@ -211,12 +203,8 @@ impl DatasetFlowConfigsMut {
         let res = flow_config_service
             .set_configuration(
                 Utc::now(),
-                FlowKeyDataset::new(
-                    self.dataset_handle.id.clone(),
-                    dataset_flow_type.into(),
-                    self.dataset_handle.alias.account_name.clone(),
-                )
-                .into(),
+                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
+                    .into(),
                 false,
                 FlowConfigurationRule::CompactingRule(compacting_rule),
             )
@@ -244,7 +232,6 @@ impl DatasetFlowConfigsMut {
             .pause_dataset_flows(
                 Utc::now(),
                 &self.dataset_handle.id,
-                &self.dataset_handle.alias.account_name,
                 dataset_flow_type.map(Into::into),
             )
             .await?;
@@ -266,7 +253,6 @@ impl DatasetFlowConfigsMut {
             .resume_dataset_flows(
                 Utc::now(),
                 &self.dataset_handle.id,
-                &self.dataset_handle.alias.account_name,
                 dataset_flow_type.map(Into::into),
             )
             .await?;

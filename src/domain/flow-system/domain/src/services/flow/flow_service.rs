@@ -10,10 +10,11 @@
 use chrono::{DateTime, Utc};
 use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
-use opendatafabric::{AccountID, DatasetID};
+use opendatafabric::{AccountID, AccountName, DatasetID};
 use tokio_stream::Stream;
 
 use crate::{
+    AccountFlowFilters,
     DatasetFlowFilters,
     FlowID,
     FlowKey,
@@ -52,8 +53,8 @@ pub trait FlowService: Sync + Send {
     /// Applies specified filters/pagination
     async fn list_all_flows_by_account(
         &self,
-        account_id: &AccountName,
-        filters: DatasetFlowFilters,
+        account_name: &AccountName,
+        filters: AccountFlowFilters,
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
 

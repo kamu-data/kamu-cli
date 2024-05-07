@@ -39,7 +39,6 @@ impl From<fs::FlowKey> for FlowKey {
 pub struct FlowKeyDataset {
     pub dataset_id: DatasetID,
     pub flow_type: DatasetFlowType,
-    pub account_id: Option<AccountName>,
 }
 
 impl From<fs::FlowKeyDataset> for FlowKeyDataset {
@@ -47,7 +46,6 @@ impl From<fs::FlowKeyDataset> for FlowKeyDataset {
         Self {
             dataset_id: value.dataset_id.into(),
             flow_type: value.flow_type.into(),
-            account_id: value.account_id.map(Into::into),
         }
     }
 }

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric as odf;
+use kamu_accounts::Account;
 
 use super::AccountFlowConfigsMut;
 use crate::prelude::*;
@@ -15,18 +15,18 @@ use crate::prelude::*;
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct AccountFlowsMut {
-    account_id: odf::AccountName,
+    account: Account,
 }
 
 #[Object]
 impl AccountFlowsMut {
     #[graphql(skip)]
-    pub fn new(account_id: odf::AccountName) -> Self {
-        Self { account_id }
+    pub fn new(account: Account) -> Self {
+        Self { account }
     }
 
     async fn configs(&self) -> AccountFlowConfigsMut {
-        AccountFlowConfigsMut::new(self.account_id.clone())
+        AccountFlowConfigsMut::new(self.account.clone())
     }
 }
 

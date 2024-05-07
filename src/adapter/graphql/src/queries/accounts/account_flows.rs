@@ -15,19 +15,19 @@ use crate::prelude::*;
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct AccountFlows {
-    account_id: odf::AccountName,
+    account_name: odf::AccountName,
 }
 
 #[Object]
 impl AccountFlows {
     #[graphql(skip)]
-    pub fn new(account_id: odf::AccountName) -> Self {
-        Self { account_id }
+    pub fn new(account_name: odf::AccountName) -> Self {
+        Self { account_name }
     }
 
     /// Returns interface for flow runs queries
     async fn runs(&self) -> AccountFlowRuns {
-        AccountFlowRuns::new(self.account_id.clone())
+        AccountFlowRuns::new(self.account_name.clone())
     }
 }
 

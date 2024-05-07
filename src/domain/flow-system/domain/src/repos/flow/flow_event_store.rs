@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::EventStore;
-use opendatafabric::{AccountID, DatasetID};
+use opendatafabric::{AccountID, DatasetID, DatasetName};
 
 use crate::*;
 
@@ -25,7 +25,6 @@ pub trait FlowEventStore: EventStore<FlowState> {
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-        account_id: &Option<AccountName>,
     ) -> Result<FlowRunStats, InternalError>;
 
     /// Returns last run statistics for the system flow of certain type
@@ -44,16 +43,6 @@ pub trait FlowEventStore: EventStore<FlowState> {
         pagination: FlowPaginationOpts,
     ) -> FlowIDStream;
 
-    /// Returns IDs of the flows associated with the specified
-    /// account in reverse chronological order based on creation time.
-    /// Applies filters/pagination, if specified
-    fn get_all_flow_ids_by_account(
-        &self,
-        account_id: &AccountName,
-        filters: DatasetFlowFilters,
-        pagination: FlowPaginationOpts,
-    ) -> FlowIDStream;
-
     /// Returns number of flows associated with the specified dataset and
     /// matching filters, if specified
     async fn get_count_flows_by_dataset(
@@ -62,13 +51,14 @@ pub trait FlowEventStore: EventStore<FlowState> {
         filters: &DatasetFlowFilters,
     ) -> Result<usize, InternalError>;
 
-    /// Returns number of flows associated with the specified account and
-    /// matching filters, if specified
-    async fn get_count_flows_by_account(
+    /// Returns IDs of the flows associated with the specified
+    /// dataset in reverse chronological order based on creation time.
+    /// Applies filters/pagination, if specified
+    fn get_all_flow_ids_by_datasets(
         &self,
-        account_id: &AccountName,
-        filters: &DatasetFlowFilters,
-    ) -> Result<usize, InternalError>;
+        dataset_id: Vec<DatasetID>,
+        pagination: FlowPaginationOpts,
+    ) -> (usize, FlowIDStream);
 
     /// Returns IDs of the system flows  in reverse chronological order based on
     /// creation time
@@ -107,6 +97,11 @@ pub struct DatasetFlowFilters {
     pub by_flow_type: Option<DatasetFlowType>,
     pub by_flow_status: Option<FlowStatus>,
     pub by_initiator: Option<InitiatorFilter>,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct AccountFlowFilters {
+    pub by_dataset_name: Option<DatasetName>,
 }
 
 #[derive(Default, Debug, Clone)]

@@ -46,7 +46,6 @@ async fn test_read_initial_config_and_queue_without_waiting() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             foo_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(60).unwrap().into(),
         )
@@ -165,7 +164,6 @@ async fn test_cron_config() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             foo_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Schedule::Cron(ScheduleCron {
                 source_5component_cron_expression: String::from("<irrelevant>"),
@@ -255,17 +253,14 @@ async fn test_manual_trigger() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             foo_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(90).unwrap().into(),
         )
         .await;
     harness.eager_dependencies_graph_init().await;
 
-    let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest, None).into();
-    let bar_flow_key: FlowKey =
-        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest, None).into();
+    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
+    let bar_flow_key: FlowKey = FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -449,9 +444,9 @@ async fn test_manual_trigger_compacting() {
     harness.eager_dependencies_graph_init().await;
 
     let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting, None).into();
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
     let bar_flow_key: FlowKey =
-        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompacting, None).into();
+        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompacting).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -586,14 +581,13 @@ async fn test_manual_trigger_compacting_with_config() {
         .set_dataset_flow_compacting_rule(
             harness.now_datetime(),
             foo_id.clone(),
-            None,
             DatasetFlowType::HardCompacting,
             CompactingRule::new_checked(max_slice_size, max_slice_records).unwrap(),
         )
         .await;
 
     let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting, None).into();
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -678,7 +672,6 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             foo_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(50).unwrap().into(),
         )
@@ -687,7 +680,6 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             bar_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(80).unwrap().into(),
         )
@@ -747,8 +739,8 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
 
                 // 50ms: Pause both flow configs in between completion 2 first tasks and queuing
                 harness.advance_time(Duration::try_milliseconds(50).unwrap()).await;
-                harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), foo_id.clone(), None, DatasetFlowType::Ingest).await;
-                harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), bar_id.clone(), None, DatasetFlowType::Ingest).await;
+                harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), foo_id.clone(), DatasetFlowType::Ingest).await;
+                harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), bar_id.clone(), DatasetFlowType::Ingest).await;
                 test_flow_listener
                     .make_a_snapshot(start_time + Duration::try_milliseconds(50).unwrap())
                     .await;
@@ -761,8 +753,8 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 //    - gets a config update for period of 70ms
                 //    - get queued for 100ms (last success at 30ms + period of 70ms)
                 harness.advance_time(Duration::try_milliseconds(30).unwrap()).await;
-                harness.resume_dataset_flow(start_time + Duration::try_milliseconds(80).unwrap(), foo_id.clone(), None, DatasetFlowType::Ingest).await;
-                harness.set_dataset_flow_schedule(start_time + Duration::try_milliseconds(80).unwrap(), bar_id.clone(), None, DatasetFlowType::Ingest, Duration::try_milliseconds(70).unwrap().into()).await;
+                harness.resume_dataset_flow(start_time + Duration::try_milliseconds(80).unwrap(), foo_id.clone(), DatasetFlowType::Ingest).await;
+                harness.set_dataset_flow_schedule(start_time + Duration::try_milliseconds(80).unwrap(), bar_id.clone(), DatasetFlowType::Ingest, Duration::try_milliseconds(70).unwrap().into()).await;
                 test_flow_listener
                     .make_a_snapshot(start_time + Duration::try_milliseconds(80).unwrap())
                     .await;
@@ -877,7 +869,6 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             foo_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(100).unwrap().into(),
         )
@@ -887,7 +878,6 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             bar_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(60).unwrap().into(),
         )
@@ -950,8 +940,8 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
 
               // 50ms: Pause flow config before next flow runs
               harness.advance_time(Duration::try_milliseconds(50).unwrap()).await;
-              harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), foo_id.clone(), None, DatasetFlowType::Ingest).await;
-              harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), bar_id.clone(), None, DatasetFlowType::Ingest).await;
+              harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), foo_id.clone(), DatasetFlowType::Ingest).await;
+              harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), bar_id.clone(), DatasetFlowType::Ingest).await;
               test_flow_listener
                   .make_a_snapshot(start_time + Duration::try_milliseconds(50).unwrap())
                   .await;
@@ -966,8 +956,8 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
               //    - last success at 30ms
               //    - gets scheduled immediately (waited longer than 30ms last success + 60ms period)
               harness.advance_time(Duration::try_milliseconds(50).unwrap()).await;
-              harness.resume_dataset_flow(start_time + Duration::try_milliseconds(100).unwrap(), foo_id.clone(), None, DatasetFlowType::Ingest).await;
-              harness.resume_dataset_flow(start_time + Duration::try_milliseconds(100).unwrap(), bar_id.clone(), None, DatasetFlowType::Ingest).await;
+              harness.resume_dataset_flow(start_time + Duration::try_milliseconds(100).unwrap(), foo_id.clone(), DatasetFlowType::Ingest).await;
+              harness.resume_dataset_flow(start_time + Duration::try_milliseconds(100).unwrap(), bar_id.clone(), DatasetFlowType::Ingest).await;
               test_flow_listener
                   .make_a_snapshot(start_time + Duration::try_milliseconds(100).unwrap())
                   .await;
@@ -1082,7 +1072,6 @@ async fn test_dataset_deleted() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             foo_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(50).unwrap().into(),
         )
@@ -1091,7 +1080,6 @@ async fn test_dataset_deleted() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             bar_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(70).unwrap().into(),
         )
@@ -1261,7 +1249,6 @@ async fn test_task_completions_trigger_next_loop_on_success() {
             .set_dataset_flow_schedule(
                 harness.now_datetime(),
                 dataset_id.clone(),
-                None,
                 DatasetFlowType::Ingest,
                 Duration::try_milliseconds(40).unwrap().into(),
             )
@@ -1463,7 +1450,6 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             foo_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(80).unwrap().into(),
         )
@@ -1473,7 +1459,6 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
         .set_dataset_flow_batching_rule(
             harness.now_datetime(),
             bar_id.clone(),
-            None,
             DatasetFlowType::ExecuteTransform,
             BatchingRule::new_checked(1, Duration::try_seconds(1).unwrap()).unwrap(),
         )
@@ -1693,8 +1678,7 @@ async fn test_throttling_manual_triggers() {
 
     // Foo Flow
     let foo_id = harness.create_root_dataset("foo").await;
-    let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest, None).into();
+    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
 
     // Enforce dependency graph initialization
     harness.eager_dependencies_graph_init().await;
@@ -1824,7 +1808,6 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             foo_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(50).unwrap().into(),
         )
@@ -1834,7 +1817,6 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             bar_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(150).unwrap().into(),
         )
@@ -1844,7 +1826,6 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         .set_dataset_flow_batching_rule(
             harness.now_datetime(),
             baz_id.clone(),
-            None,
             DatasetFlowType::ExecuteTransform,
             BatchingRule::new_checked(1, Duration::try_hours(24).unwrap()).unwrap(),
         )
@@ -2281,7 +2262,6 @@ async fn test_batching_condition_records_reached() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             foo_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(50).unwrap().into(),
         )
@@ -2291,7 +2271,6 @@ async fn test_batching_condition_records_reached() {
         .set_dataset_flow_batching_rule(
             harness.now_datetime(),
             bar_id.clone(),
-            None,
             DatasetFlowType::ExecuteTransform,
             BatchingRule::new_checked(10, Duration::try_milliseconds(120).unwrap()).unwrap(),
         )
@@ -2585,7 +2564,6 @@ async fn test_batching_condition_timeout() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             foo_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(50).unwrap().into(),
         )
@@ -2595,7 +2573,6 @@ async fn test_batching_condition_timeout() {
         .set_dataset_flow_batching_rule(
             harness.now_datetime(),
             bar_id.clone(),
-            None,
             DatasetFlowType::ExecuteTransform,
             BatchingRule::new_checked(10, Duration::try_milliseconds(150).unwrap()).unwrap(),
         )
@@ -2842,7 +2819,6 @@ async fn test_batching_condition_watermark() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             foo_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(40).unwrap().into(),
         )
@@ -2852,7 +2828,6 @@ async fn test_batching_condition_watermark() {
         .set_dataset_flow_batching_rule(
             harness.now_datetime(),
             bar_id.clone(),
-            None,
             DatasetFlowType::ExecuteTransform,
             BatchingRule::new_checked(10, Duration::try_milliseconds(200).unwrap()).unwrap(),
         )
@@ -3149,7 +3124,6 @@ async fn test_batching_condition_with_2_inputs() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             foo_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(80).unwrap().into(),
         )
@@ -3159,7 +3133,6 @@ async fn test_batching_condition_with_2_inputs() {
         .set_dataset_flow_schedule(
             harness.now_datetime(),
             bar_id.clone(),
-            None,
             DatasetFlowType::Ingest,
             Duration::try_milliseconds(120).unwrap().into(),
         )
@@ -3169,7 +3142,6 @@ async fn test_batching_condition_with_2_inputs() {
         .set_dataset_flow_batching_rule(
             harness.now_datetime(),
             baz_id.clone(),
-            None,
             DatasetFlowType::ExecuteTransform,
             BatchingRule::new_checked(15, Duration::try_milliseconds(200).unwrap()).unwrap(),
         )
@@ -3748,14 +3720,13 @@ impl FlowHarness {
         &self,
         request_time: DateTime<Utc>,
         dataset_id: DatasetID,
-        account_id: Option<AccountName>,
         dataset_flow_type: DatasetFlowType,
         schedule: Schedule,
     ) {
         self.flow_configuration_service
             .set_configuration(
                 request_time,
-                FlowKeyDataset::new(dataset_id, dataset_flow_type, account_id).into(),
+                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
                 FlowConfigurationRule::Schedule(schedule),
             )
@@ -3767,14 +3738,13 @@ impl FlowHarness {
         &self,
         request_time: DateTime<Utc>,
         dataset_id: DatasetID,
-        account_id: Option<AccountName>,
         dataset_flow_type: DatasetFlowType,
         batching_rule: BatchingRule,
     ) {
         self.flow_configuration_service
             .set_configuration(
                 request_time,
-                FlowKeyDataset::new(dataset_id, dataset_flow_type, account_id).into(),
+                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
                 FlowConfigurationRule::BatchingRule(batching_rule),
             )
@@ -3786,14 +3756,13 @@ impl FlowHarness {
         &self,
         request_time: DateTime<Utc>,
         dataset_id: DatasetID,
-        account_id: Option<AccountName>,
         dataset_flow_type: DatasetFlowType,
         compacting_rule: CompactingRule,
     ) {
         self.flow_configuration_service
             .set_configuration(
                 request_time,
-                FlowKeyDataset::new(dataset_id, dataset_flow_type, account_id).into(),
+                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
                 FlowConfigurationRule::CompactingRule(compacting_rule),
             )
@@ -3805,11 +3774,9 @@ impl FlowHarness {
         &self,
         request_time: DateTime<Utc>,
         dataset_id: DatasetID,
-        account_id: Option<AccountName>,
         dataset_flow_type: DatasetFlowType,
     ) {
-        let flow_key: FlowKey =
-            FlowKeyDataset::new(dataset_id, dataset_flow_type, account_id).into();
+        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
         let current_config = self
             .flow_configuration_service
             .find_configuration(flow_key.clone())
@@ -3827,11 +3794,9 @@ impl FlowHarness {
         &self,
         request_time: DateTime<Utc>,
         dataset_id: DatasetID,
-        account_id: Option<AccountName>,
         dataset_flow_type: DatasetFlowType,
     ) {
-        let flow_key: FlowKey =
-            FlowKeyDataset::new(dataset_id, dataset_flow_type, account_id).into();
+        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
         let current_config = self
             .flow_configuration_service
             .find_configuration(flow_key.clone())

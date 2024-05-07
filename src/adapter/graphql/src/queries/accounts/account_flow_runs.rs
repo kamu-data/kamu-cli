@@ -8,12 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use futures::TryStreamExt;
-use kamu_core::DatasetRepository;
 use {kamu_flow_system as fs, opendatafabric as odf};
 
 use crate::prelude::*;
-use crate::queries::{DatasetFlowFilters, Flow, FlowConnection};
-use crate::utils;
+use crate::queries::{Flow, FlowConnection};
 
 pub struct AccountFlowRuns {
     account_name: odf::AccountName,
@@ -33,7 +31,7 @@ impl AccountFlowRuns {
         ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-        filters: Option<DatasetFlowFilters>,
+        filters: Option<AccountFlowFilters>,
     ) -> Result<FlowConnection> {
         let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
 
@@ -55,26 +53,11 @@ impl AccountFlowRuns {
             .await
             .int_err()?;
 
-        let flows: Vec<_> = flows_state_listing.matched_stream.try_collect().await?;
-        let mut matched_flows: Vec<Flow> = vec![];
-
-        for flow in &flows {
-            let dataset_repo = from_catalog::<dyn DatasetRepository>(ctx).unwrap();
-
-            if let fs::FlowKey::Dataset(dataset_flow_key) = &flow.flow_key {
-                let dataset_handle = dataset_repo
-                    .resolve_dataset_ref(&dataset_flow_key.dataset_id.as_local_ref())
-                    .await
-                    .int_err()?;
-                // ToDo improve to check more general permissions
-                if utils::check_dataset_read_access(ctx, &dataset_handle)
-                    .await
-                    .is_ok()
-                {
-                    matched_flows.push(Flow::new(flow.clone()));
-                }
-            }
-        }
+        let matched_flows: Vec<_> = flows_state_listing
+            .matched_stream
+            .map_ok(Flow::new)
+            .try_collect()
+            .await?;
         let total_count = flows_state_listing.total_count;
 
         Ok(FlowConnection::new(
@@ -83,5 +66,18 @@ impl AccountFlowRuns {
             per_page,
             total_count,
         ))
+    }
+}
+
+#[derive(InputObject)]
+pub struct AccountFlowFilters {
+    by_dataset_name: Option<DatasetName>,
+}
+
+impl From<AccountFlowFilters> for fs::AccountFlowFilters {
+    fn from(value: AccountFlowFilters) -> Self {
+        Self {
+            by_dataset_name: value.by_dataset_name.map(Into::into),
+        }
     }
 }

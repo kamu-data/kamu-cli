@@ -27,7 +27,6 @@ struct State {
     events: Vec<FlowEvent>,
     last_flow_id: Option<FlowID>,
     all_flows_by_dataset: HashMap<DatasetID, Vec<FlowID>>,
-    all_flows_by_account: HashMap<AccountName, Vec<FlowID>>,
     all_system_flows: Vec<FlowID>,
     all_flows: Vec<FlowID>,
     flow_search_index: HashMap<FlowID, FlowIndexEntry>,
@@ -175,14 +174,6 @@ impl FlowEventStoreInMem {
                         Entry::Vacant(v) => v.insert(Vec::default()),
                     };
                     all_dataset_entries.push(event.flow_id());
-                    if let Some(account_id) = &flow_key.account_id {
-                        let all_account_entries =
-                            match state.all_flows_by_account.entry(account_id.clone()) {
-                                Entry::Occupied(v) => v.into_mut(),
-                                Entry::Vacant(v) => v.insert(Vec::default()),
-                            };
-                        all_account_entries.push(event.flow_id());
-                    }
 
                     state.flow_search_index.insert(
                         event.flow_id(),
@@ -302,12 +293,11 @@ impl FlowEventStore for FlowEventStoreInMem {
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-        account_id: &Option<AccountName>,
     ) -> Result<FlowRunStats, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
         Ok(g.dataset_flow_last_run_stats
-            .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type, account_id).as_trait())
+            .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
             .copied()
             .unwrap_or_default())
     }
@@ -353,32 +343,32 @@ impl FlowEventStore for FlowEventStoreInMem {
         Box::pin(futures::stream::iter(flow_ids_page))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%account_id, ?filters, ?pagination))]
-    fn get_all_flow_ids_by_account(
+    #[tracing::instrument(level = "debug", skip_all)]
+    fn get_all_flow_ids_by_datasets(
         &self,
-        account_id: &AccountName,
-        filters: DatasetFlowFilters,
+        dataset_ids: Vec<DatasetID>,
         pagination: FlowPaginationOpts,
-    ) -> FlowIDStream {
+    ) -> (usize, FlowIDStream) {
+        let mut total_count = 0;
         let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
-            g.all_flows_by_account
-                .get(account_id)
-                .map(|account_flow_ids| {
-                    account_flow_ids
-                        .iter()
-                        .rev()
-                        .filter(|flow_id| g.matches_dataset_flow(**flow_id, &filters))
-                        .skip(pagination.offset)
-                        .take(pagination.limit)
-                        .map(|flow_id| Ok(*flow_id))
-                        .collect()
-                })
-                .unwrap_or_default()
+            let mut result: Vec<Result<FlowID, _>> = vec![];
+            g.all_flows.iter().rev().for_each(|flow_id| {
+                let flow_key = g.flow_key_by_flow_id.get(flow_id).unwrap();
+                if let FlowKey::Dataset(flow_key_dataset) = flow_key {
+                    if dataset_ids.contains(&flow_key_dataset.dataset_id) {
+                        if total_count >= pagination.offset && result.len() <= pagination.limit {
+                            result.push(Ok(*flow_id));
+                        }
+                        total_count += 1;
+                    }
+                };
+            });
+            result
         };
 
-        Box::pin(futures::stream::iter(flow_ids_page))
+        (total_count, Box::pin(futures::stream::iter(flow_ids_page)))
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters))]
@@ -392,26 +382,6 @@ impl FlowEventStore for FlowEventStoreInMem {
         Ok(
             if let Some(dataset_flow_ids) = g.all_flows_by_dataset.get(dataset_id) {
                 dataset_flow_ids
-                    .iter()
-                    .filter(|flow_id| g.matches_dataset_flow(**flow_id, filters))
-                    .count()
-            } else {
-                0
-            },
-        )
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(%account_id, ?filters))]
-    async fn get_count_flows_by_account(
-        &self,
-        account_id: &AccountName,
-        filters: &DatasetFlowFilters,
-    ) -> Result<usize, InternalError> {
-        let state = self.inner.as_state();
-        let g = state.lock().unwrap();
-        Ok(
-            if let Some(account_flow_ids) = g.all_flows_by_account.get(account_id) {
-                account_flow_ids
                     .iter()
                     .filter(|flow_id| g.matches_dataset_flow(**flow_id, filters))
                     .count()
