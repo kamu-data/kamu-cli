@@ -73,7 +73,7 @@ impl PredefinedAccountsConfig {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct AccountConfig {
     // 'id' is auto-derived from `account_name` if omitted
