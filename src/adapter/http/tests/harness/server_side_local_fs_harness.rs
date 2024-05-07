@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{SocketAddr, TcpListener};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -18,6 +18,7 @@ use kamu::domain::{
     DatasetRepository,
     InternalError,
     ResultIntoInternal,
+    ServerUrlConfig,
     SystemTimeSource,
     SystemTimeSourceStub,
 };
@@ -61,6 +62,10 @@ impl ServerSideLocalFsHarness {
 
         let time_source = SystemTimeSourceStub::new();
 
+        let addr = SocketAddr::from(([127, 0, 0, 1], 0));
+        let bind_socket = TcpListener::bind(addr).unwrap();
+        let base_url_rest = format!("http://{}", bind_socket.local_addr().unwrap());
+
         base_catalog_builder
             .add::<EventBus>()
             .add_value(time_source.clone())
@@ -73,14 +78,14 @@ impl ServerSideLocalFsHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .add_value(server_authentication_mock())
-            .bind::<dyn AuthenticationService, MockAuthenticationService>();
+            .bind::<dyn AuthenticationService, MockAuthenticationService>()
+            .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)));
 
         let base_catalog = base_catalog_builder.build();
 
         let api_server = TestAPIServer::new(
             create_web_user_catalog(&base_catalog, &options),
-            Some(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
-            None,
+            bind_socket,
             options.multi_tenant,
         );
 

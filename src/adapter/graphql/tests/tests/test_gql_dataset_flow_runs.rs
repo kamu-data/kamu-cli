@@ -25,8 +25,8 @@ use kamu::testing::{
 };
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_accounts::{
-    set_random_jwt_secret,
     CurrentAccountSubject,
+    JwtAuthenticationConfig,
     LoggedAccount,
     DEFAULT_ACCOUNT_NAME_STR,
 };
@@ -2310,8 +2310,6 @@ struct FlowRunsHarnessOverrides {
 
 impl FlowRunsHarness {
     fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
-        set_random_jwt_secret();
-
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -2352,6 +2350,7 @@ impl FlowRunsHarness {
             .bind::<dyn PollingIngestService, MockPollingIngestService>()
             .add::<AuthenticationServiceImpl>()
             .add::<AccountRepositoryInMemory>()
+            .add_value(JwtAuthenticationConfig::default())
             .build();
 
         // Init dataset with no sources

@@ -9,23 +9,10 @@
 
 use internal_error::{BoxedError, InternalError};
 use opendatafabric::{AccountID, AccountName};
-use random_names::get_random_name;
 use thiserror::Error;
 
 use super::{InvalidCredentialsError, RejectedCredentialsError};
 use crate::Account;
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub const ENV_VAR_KAMU_JWT_SECRET: &str = "KAMU_JWT_SECRET";
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub fn set_random_jwt_secret() {
-    let random_jwt_secret = get_random_name(None, 64);
-
-    std::env::set_var(ENV_VAR_KAMU_JWT_SECRET, random_jwt_secret);
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 

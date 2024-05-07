@@ -130,7 +130,7 @@ podman-clean:
 ###############################################################################
 
 # Executes the setup actions for tests (e.g. pulling images)
-.PHONY: test-fast
+.PHONY: test-setup
 test-setup:
 	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::setup::)' --no-capture
 

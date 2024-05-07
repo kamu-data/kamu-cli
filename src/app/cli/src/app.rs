@@ -16,7 +16,8 @@ use database_common::{DatabaseConfiguration, DatabaseProvider};
 use dill::*;
 use kamu::domain::*;
 use kamu::*;
-use kamu_accounts::{AccountConfig, CurrentAccountSubject, PredefinedAccountsConfig};
+use kamu_accounts::*;
+use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
 use crate::error::*;
@@ -73,19 +74,21 @@ pub async fn run(
 
     // Configure application
     let (guards, base_catalog, cli_catalog, output_config) = {
+        let multi_tenant_workspace = workspace_svc.is_multi_tenant_workspace();
+
         let dependencies_graph_repository = prepare_dependencies_graph_repository(
             &workspace_layout,
-            workspace_svc.is_multi_tenant_workspace(),
+            multi_tenant_workspace,
             current_account.to_current_account_subject(),
         );
 
-        let mut base_catalog_builder = configure_base_catalog(
-            &workspace_layout,
-            workspace_svc.is_multi_tenant_workspace(),
-            system_time,
-        );
+        let mut base_catalog_builder =
+            configure_base_catalog(&workspace_layout, multi_tenant_workspace, system_time);
 
-        base_catalog_builder.add_value(ServerUrlConfig::load()?);
+        base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
+        base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
+
+        base_catalog_builder.add_value(ServerUrlConfig::load_from_env()?);
 
         // TODO: read database settings from configuration, and make it optional
         // let db_configuration = DatabaseConfiguration::local_postgres();

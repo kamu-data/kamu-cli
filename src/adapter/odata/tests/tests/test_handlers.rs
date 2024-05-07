@@ -18,7 +18,6 @@ use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
-use url::Url;
 
 use super::test_api_server::TestAPIServer;
 
@@ -362,11 +361,7 @@ impl TestHarness {
             )
             .bind::<dyn PushIngestService, PushIngestServiceImpl>()
             .add::<QueryServiceImpl>()
-            .add_value(ServerUrlConfig::new(Protocols {
-                base_url_platform: Url::parse("http://platform.example.com").unwrap(),
-                base_url_rest: Url::parse("http://example.com").unwrap(),
-                base_url_flightsql: Url::parse("grpc://example.com:50050").unwrap(),
-            }))
+            .add_value(ServerUrlConfig::new_test(None))
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();

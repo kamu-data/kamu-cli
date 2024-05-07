@@ -13,22 +13,12 @@ use std::sync::Arc;
 use console::style as s;
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
-use kamu_accounts::{
-    set_random_jwt_secret,
-    AccountConfig,
-    AuthenticationService,
-    CurrentAccountSubject,
-    PredefinedAccountsConfig,
-    ENV_VAR_KAMU_JWT_SECRET,
-};
+use kamu_accounts::*;
 use kamu_accounts_services::PasswordLoginCredentials;
-use kamu_adapter_oauth::{
-    ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID,
-    ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET,
-};
+use kamu_adapter_oauth::*;
 
 use super::{CLIError, Command};
-use crate::{check_env_var_set, OutputConfig};
+use crate::OutputConfig;
 
 pub struct APIServerRunCommand {
     base_catalog: Catalog,
@@ -40,6 +30,7 @@ pub struct APIServerRunCommand {
     get_token: bool,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     account_subject: Arc<CurrentAccountSubject>,
+    github_auth_config: Arc<GithubAuthenticationConfig>,
 }
 
 impl APIServerRunCommand {
@@ -53,6 +44,7 @@ impl APIServerRunCommand {
         get_token: bool,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         account_subject: Arc<CurrentAccountSubject>,
+        github_auth_config: Arc<GithubAuthenticationConfig>,
     ) -> Self {
         Self {
             base_catalog,
@@ -64,18 +56,21 @@ impl APIServerRunCommand {
             get_token,
             predefined_accounts_config,
             account_subject,
+            github_auth_config,
         }
     }
 
     fn check_required_env_vars(&self) -> Result<(), CLIError> {
-        match check_env_var_set(ENV_VAR_KAMU_JWT_SECRET) {
-            Ok(_) => {}
-            Err(_) => set_random_jwt_secret(),
-        };
-
         if self.multi_tenant_workspace {
-            check_env_var_set(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)?;
-            check_env_var_set(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET)?;
+            if self.github_auth_config.client_id.is_empty() {
+                return Err(CLIError::missed_env_var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID));
+            }
+
+            if self.github_auth_config.client_secret.is_empty() {
+                return Err(CLIError::missed_env_var(
+                    ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET,
+                ));
+            }
         }
 
         Ok(())
@@ -120,8 +115,8 @@ impl APIServerRunCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for APIServerRunCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        // Check required env variables are present before starting API server
         self.check_required_env_vars()?;
+
         let access_token = self.get_access_token().await?;
 
         // TODO: Cloning catalog is too expensive currently

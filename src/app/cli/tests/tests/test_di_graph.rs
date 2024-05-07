@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, JwtAuthenticationConfig};
 use kamu_cli::{self, OutputConfig, WorkspaceLayout};
 
 #[test_log::test(tokio::test)]
@@ -28,6 +28,7 @@ async fn test_di_graph_validates() {
 
     let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(&base_catalog);
     cli_catalog_builder.add_value(CurrentAccountSubject::new_test());
+    cli_catalog_builder.add_value(JwtAuthenticationConfig::default());
 
     // TODO: We should ensure this test covers parameters requested by commands and
     // types needed for GQL/HTTP adapter that are currently being constructed

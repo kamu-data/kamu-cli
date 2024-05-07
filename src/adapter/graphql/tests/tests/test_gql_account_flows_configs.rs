@@ -26,7 +26,6 @@ use kamu::testing::{
 };
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_accounts::{
-    set_random_jwt_secret,
     AuthenticationService,
     MockAuthenticationService,
     DEFAULT_ACCOUNT_ID,
@@ -357,8 +356,6 @@ struct FlowRunsHarnessOverrides {
 
 impl FlowConfigHarness {
     fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
-        set_random_jwt_secret();
-
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();

@@ -7,17 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{SocketAddr, TcpListener};
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
 use kamu::domain::{InternalError, ResultIntoInternal, SystemTimeSource, SystemTimeSourceStub};
-use kamu_accounts::{
-    set_random_jwt_secret,
-    AccountConfig,
-    PredefinedAccountsConfig,
-    PROVIDER_PASSWORD,
-};
+use kamu_accounts::*;
 use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::{AuthenticationServiceImpl, LoginPasswordAuthProvider};
 use kamu_adapter_http::{LoginRequestBody, LoginResponseBody};
@@ -57,8 +52,6 @@ impl Harness {
                 USER_PETYA,
             )));
 
-        set_random_jwt_secret();
-
         let catalog = dill::CatalogBuilder::new()
             .add::<AuthenticationServiceImpl>()
             .add_value(predefined_accounts_config)
@@ -66,16 +59,14 @@ impl Harness {
             .add_value(SystemTimeSourceStub::new())
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<LoginPasswordAuthProvider>()
+            .add_value(JwtAuthenticationConfig::default())
             .build();
 
         let system_time_source_stub = catalog.get_one::<SystemTimeSourceStub>().unwrap();
 
-        let api_server = TestAPIServer::new(
-            catalog,
-            Some(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
-            None,
-            true,
-        );
+        let addr = SocketAddr::from(([127, 0, 0, 1], 0));
+        let bind_socket = TcpListener::bind(addr).unwrap();
+        let api_server = TestAPIServer::new(catalog, bind_socket, true);
 
         Self {
             run_info_dir,

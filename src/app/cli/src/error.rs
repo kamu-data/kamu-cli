@@ -103,6 +103,15 @@ impl CLIError {
         })
     }
 
+    pub fn missed_env_var<T>(var_name: T) -> Self
+    where
+        T: Into<String>,
+    {
+        Self::usage_error_from(RequiredEnvVarNotSet {
+            var_name: var_name.into(),
+        })
+    }
+
     pub fn failure(e: impl std::error::Error + Send + Sync + 'static) -> Self {
         Self::Failure {
             source: e.into(),
@@ -270,16 +279,6 @@ pub struct WorkspaceUpgradeRequired;
 #[error("Environment variable {var_name} is not set")]
 pub struct RequiredEnvVarNotSet {
     pub var_name: String,
-}
-
-pub fn check_env_var_set(var_name: &str) -> Result<(), CLIError> {
-    std::env::var(var_name).map_err(|_| {
-        CLIError::usage_error_from(RequiredEnvVarNotSet {
-            var_name: var_name.to_string(),
-        })
-    })?;
-
-    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

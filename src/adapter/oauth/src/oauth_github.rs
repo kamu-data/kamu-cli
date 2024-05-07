@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use dill::*;
 use kamu_accounts::*;
 use kamu_core::ResultIntoInternal;
@@ -17,31 +19,21 @@ use thiserror::Error;
 ///////////////////////////////////////////////////////////////////////////////
 
 pub const PROVIDER_GITHUB: &str = "oauth_github";
-
 pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID: &str = "KAMU_AUTH_GITHUB_CLIENT_ID";
 pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET: &str = "KAMU_AUTH_GITHUB_CLIENT_SECRET";
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct OAuthGithub {}
+pub struct OAuthGithub {
+    config: Arc<GithubAuthenticationConfig>,
+}
 
 #[component(pub)]
 #[interface(dyn AuthenticationProvider)]
 #[scope(Singleton)]
 impl OAuthGithub {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    fn get_client_id() -> String {
-        std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)
-            .unwrap_or_else(|_| panic!("{ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID} env var is not set"))
-    }
-
-    fn get_client_secret() -> String {
-        std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET).unwrap_or_else(|_| {
-            panic!("{ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET} env var is not set")
-        })
+    pub fn new(config: Arc<GithubAuthenticationConfig>) -> Self {
+        Self { config }
     }
 
     fn get_client(&self) -> Result<reqwest::Client, reqwest::Error> {
@@ -60,9 +52,9 @@ impl OAuthGithub {
         code: String,
     ) -> Result<GithubAccountInfo, ProviderLoginError> {
         let params = [
-            ("client_id", OAuthGithub::get_client_id()),
-            ("client_secret", OAuthGithub::get_client_secret()),
-            ("code", code),
+            ("client_id", self.config.client_id.as_str()),
+            ("client_secret", self.config.client_secret.as_str()),
+            ("code", code.as_str()),
         ];
 
         let body = client
@@ -206,5 +198,36 @@ struct GithubAccountInfo {
 #[derive(Debug, Error)]
 #[error("Invalid credentials: pass either Github code or access token")]
 struct GithubInvalidCredentialsError {}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+pub struct GithubAuthenticationConfig {
+    pub client_id: String,
+    pub client_secret: String,
+}
+
+impl GithubAuthenticationConfig {
+    pub fn new(client_id: String, client_secret: String) -> Self {
+        Self {
+            client_id,
+            client_secret,
+        }
+    }
+
+    pub fn load_from_env() -> Self {
+        // Check for empty values only when the server API is running -- for this
+        // reason, it is acceptable to use default values for other cases
+        Self {
+            client_id: std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)
+                .ok()
+                .unwrap_or_default(),
+
+            client_secret: std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET)
+                .ok()
+                .unwrap_or_default(),
+        }
+    }
+}
 
 ///////////////////////////////////////////////////////////////////////////////

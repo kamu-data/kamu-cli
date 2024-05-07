@@ -59,8 +59,7 @@ impl Account {
         ctx: &Context<'_>,
         account_id: odf::AccountID,
     ) -> Result<Self, InternalError> {
-        let authentication_service =
-            from_catalog::<dyn kamu_accounts::AuthenticationService>(ctx).unwrap();
+        let authentication_service = from_catalog::<dyn AuthenticationService>(ctx).unwrap();
 
         let account_name = authentication_service
             .find_account_name_by_id(&account_id)
