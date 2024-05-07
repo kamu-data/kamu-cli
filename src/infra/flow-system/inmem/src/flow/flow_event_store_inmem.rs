@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use dill::*;
 use kamu_flow_system::{BorrowedFlowKeyDataset, *};
@@ -338,6 +338,40 @@ impl FlowEventStore for FlowEventStoreInMem {
                         .collect()
                 })
                 .unwrap_or_default()
+        };
+
+        Box::pin(futures::stream::iter(flow_ids_page))
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, ?pagination))]
+    fn get_all_flow_ids_by_datasets(
+        &self,
+        dataset_ids: HashSet<DatasetID>,
+        filters: &DatasetFlowFilters,
+        pagination: FlowPaginationOpts,
+    ) -> FlowIDStream {
+        let flow_ids_page: Vec<_> = {
+            let state = self.inner.as_state();
+            let g = state.lock().unwrap();
+            let mut result: Vec<Result<FlowID, _>> = vec![];
+            let mut total_count = 0;
+            for flow_id in g.all_flows.iter().rev() {
+                let flow_key = g.flow_key_by_flow_id.get(flow_id).unwrap();
+                if let FlowKey::Dataset(flow_key_dataset) = flow_key {
+                    if dataset_ids.contains(&flow_key_dataset.dataset_id)
+                        && g.matches_dataset_flow(*flow_id, filters)
+                    {
+                        if result.len() >= pagination.limit {
+                            break;
+                        }
+                        if total_count >= pagination.offset {
+                            result.push(Ok(*flow_id));
+                        }
+                        total_count += 1;
+                    }
+                };
+            }
+            result
         };
 
         Box::pin(futures::stream::iter(flow_ids_page))

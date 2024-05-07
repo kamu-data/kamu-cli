@@ -15,7 +15,9 @@ use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{Dataset, DatasetRepository};
 use kamu_task_system as ts;
-use opendatafabric::DatasetHandle;
+use opendatafabric::{AccountName as OdfAccountName, DatasetHandle};
+
+use crate::prelude::{AccountID, AccountName};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -106,6 +108,44 @@ pub(crate) async fn get_task(
 ) -> Result<ts::TaskState, InternalError> {
     let task_scheduler = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
     task_scheduler.get_task(task_id).await.int_err()
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn check_logged_account_id_match(
+    ctx: &Context<'_>,
+    account_id: &AccountID,
+) -> Result<(), GqlError> {
+    let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
+
+    if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
+        if logged_account.account_id == account_id.clone().into() {
+            return Ok(());
+        }
+    };
+    Err(GqlError::Gql(
+        async_graphql::Error::new("Account datasets access error")
+            .extend_with(|_, eev| eev.set("account_id", account_id.to_string())),
+    ))
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn check_logged_account_name_match(
+    ctx: &Context<'_>,
+    account_name: &AccountName,
+) -> Result<(), GqlError> {
+    let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
+
+    if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
+        if logged_account.account_name == OdfAccountName::from(account_name.clone()) {
+            return Ok(());
+        }
+    };
+    Err(GqlError::Gql(
+        async_graphql::Error::new("Account datasets access error")
+            .extend_with(|_, eev| eev.set("account_name", account_name.to_string())),
+    ))
 }
 
 ///////////////////////////////////////////////////////////////////////////////

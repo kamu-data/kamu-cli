@@ -8,46 +8,23 @@
 // by the Apache License, Version 2.0.
 
 use futures::TryStreamExt;
-use kamu_accounts::AuthenticationService;
-use {kamu_flow_system as fs, opendatafabric as odf};
+use kamu_accounts::{Account, AuthenticationService};
+use kamu_flow_system as fs;
 
-use crate::mutations::{check_if_flow_belongs_to_dataset, FlowInDatasetError, FlowNotFound};
 use crate::prelude::*;
-use crate::queries::Flow;
-use crate::utils;
+use crate::queries::{Flow, FlowConnection, InitiatorFilterInput};
 
-///////////////////////////////////////////////////////////////////////////////
-
-pub struct DatasetFlowRuns {
-    dataset_handle: odf::DatasetHandle,
+pub struct AccountFlowRuns {
+    account: Account,
 }
 
 #[Object]
-impl DatasetFlowRuns {
+impl AccountFlowRuns {
     const DEFAULT_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
-    }
-
-    async fn get_flow(&self, ctx: &Context<'_>, flow_id: FlowID) -> Result<GetFlowResult> {
-        utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
-
-        if let Some(error) =
-            check_if_flow_belongs_to_dataset(ctx, flow_id, &self.dataset_handle).await?
-        {
-            return Ok(match error {
-                FlowInDatasetError::NotFound(e) => GetFlowResult::NotFound(e),
-            });
-        }
-
-        let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
-        let flow_state = flow_service.get_flow(flow_id.into()).await.int_err()?;
-
-        Ok(GetFlowResult::Success(GetFlowSuccess {
-            flow: Flow::new(flow_state),
-        }))
+    pub fn new(account: Account) -> Self {
+        Self { account }
     }
 
     async fn list_flows(
@@ -55,19 +32,18 @@ impl DatasetFlowRuns {
         ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-        filters: Option<DatasetFlowFilters>,
+        filters: Option<AccountFlowFilters>,
     ) -> Result<FlowConnection> {
-        utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
-
         let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
         let filters = match filters {
-            Some(filters) => Some(kamu_flow_system::DatasetFlowFilters {
+            Some(filters) => Some(kamu_flow_system::AccountFlowFilters {
                 by_flow_type: filters.by_flow_type.map(Into::into),
                 by_flow_status: filters.by_status.map(Into::into),
+                by_dataset_name: filters.by_dataset_name.map(Into::into),
                 by_initiator: match filters.by_initiator {
                     Some(initiator_filter) => match initiator_filter {
                         InitiatorFilterInput::System(_) => {
@@ -94,15 +70,13 @@ impl DatasetFlowRuns {
             None => None,
         };
 
-        let filters = match filters {
-            Some(filters) => filters,
-            None => Default::default(),
-        };
-
         let flows_state_listing = flow_service
-            .list_all_flows_by_dataset(
-                &self.dataset_handle.id,
-                filters,
+            .list_all_flows_by_account(
+                &self.account.account_name,
+                match filters {
+                    Some(filters) => filters,
+                    None => Default::default(),
+                },
                 fs::FlowPaginationOpts {
                     offset: page * per_page,
                     limit: per_page,
@@ -127,45 +101,10 @@ impl DatasetFlowRuns {
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////
-
-page_based_connection!(Flow, FlowConnection, FlowEdge);
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
-enum GetFlowResult {
-    Success(GetFlowSuccess),
-    NotFound(FlowNotFound),
-}
-
-#[derive(SimpleObject)]
-#[graphql(complex)]
-struct GetFlowSuccess {
-    pub flow: Flow,
-}
-
-#[ComplexObject]
-impl GetFlowSuccess {
-    pub async fn message(&self) -> String {
-        "Success".to_string()
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 #[derive(InputObject)]
-pub struct DatasetFlowFilters {
+pub struct AccountFlowFilters {
     by_flow_type: Option<DatasetFlowType>,
     by_status: Option<FlowStatus>,
     by_initiator: Option<InitiatorFilterInput>,
+    by_dataset_name: Option<DatasetName>,
 }
-
-#[derive(OneofObject)]
-pub enum InitiatorFilterInput {
-    System(bool),
-    Account(AccountName),
-}
-
-///////////////////////////////////////////////////////////////////////////////

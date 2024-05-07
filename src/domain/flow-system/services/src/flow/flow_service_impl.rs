@@ -9,6 +9,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, DurationRound, Utc};
@@ -16,10 +17,17 @@ use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
 use futures::{StreamExt, TryStreamExt};
 use kamu_core::events::DatasetEventDeleted;
-use kamu_core::{DatasetChangesService, DependencyGraphService, InternalError, SystemTimeSource};
+use kamu_core::{
+    DatasetChangesService,
+    DatasetRepository,
+    DependencyGraphService,
+    InternalError,
+    SystemTimeSource,
+    TryStreamExtExt,
+};
 use kamu_flow_system::*;
 use kamu_task_system::*;
-use opendatafabric::{AccountID, DatasetID};
+use opendatafabric::{AccountID, AccountName, DatasetID};
 
 use super::active_configs_state::ActiveConfigsState;
 use super::flow_time_wheel::FlowTimeWheel;
@@ -37,6 +45,7 @@ pub struct FlowServiceImpl {
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
+    dataset_repo: Arc<dyn DatasetRepository>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -69,6 +78,7 @@ impl FlowServiceImpl {
         flow_configuration_service: Arc<dyn FlowConfigurationService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_changes_service: Arc<dyn DatasetChangesService>,
+        dataset_repo: Arc<dyn DatasetRepository>,
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
@@ -80,6 +90,7 @@ impl FlowServiceImpl {
             flow_configuration_service,
             dependency_graph_service,
             dataset_changes_service,
+            dataset_repo,
         }
     }
 
@@ -902,6 +913,73 @@ impl FlowService for FlowServiceImpl {
             let relevant_flow_ids: Vec<_> = self
                 .flow_event_store
                 .get_all_flow_ids_by_dataset(&dataset_id, filters, pagination)
+                .try_collect()
+                .await
+                .int_err()?;
+
+            // TODO: implement batch loading
+            for flow_id in relevant_flow_ids {
+                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
+                yield flow.into();
+            }
+        });
+
+        Ok(FlowStateListing {
+            matched_stream,
+            total_count,
+        })
+    }
+
+    /// Returns states of flows associated with a given account
+    /// ordered by creation time from newest to oldest
+    /// Applies specified filters
+    #[tracing::instrument(level = "debug", skip_all, fields(%account_name, ?filters, ?pagination))]
+    async fn list_all_flows_by_account(
+        &self,
+        account_name: &AccountName,
+        filters: AccountFlowFilters,
+        pagination: FlowPaginationOpts,
+    ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
+        let datasets_stream = self.dataset_repo.get_datasets_by_owner(account_name);
+
+        let account_dataset_ids_list: Vec<_> =
+            if let Some(dataset_name_filter) = &filters.by_dataset_name {
+                datasets_stream
+                    .filter_map_ok(|dataset_handle| {
+                        if dataset_name_filter == &dataset_handle.alias.dataset_name {
+                            return Some(dataset_handle.id);
+                        }
+                        None
+                    })
+                    .try_collect()
+                    .await?
+            } else {
+                datasets_stream
+                    .map_ok(|dataset_handle| dataset_handle.id)
+                    .try_collect()
+                    .await?
+            };
+        let mut total_count = 0;
+        let dataset_flow_filters = DatasetFlowFilters {
+            by_flow_status: filters.by_flow_status,
+            by_flow_type: filters.by_flow_type,
+            by_initiator: filters.by_initiator,
+        };
+
+        for dataset_id in &account_dataset_ids_list {
+            total_count += self
+                .flow_event_store
+                .get_count_flows_by_dataset(dataset_id, &dataset_flow_filters)
+                .await
+                .int_err()?;
+        }
+
+        let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(account_dataset_ids_list);
+
+        let matched_stream = Box::pin(async_stream::try_stream! {
+            let relevant_flow_ids: Vec<_> = self
+                .flow_event_store
+                .get_all_flow_ids_by_datasets(account_dataset_ids, &dataset_flow_filters, pagination)
                 .try_collect()
                 .await
                 .int_err()?;

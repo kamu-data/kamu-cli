@@ -32,11 +32,49 @@ type Account {
 	Indicates the administrator status
 	"""
 	isAdmin: Boolean!
+	"""
+	Access to the flow configurations of this account
+	"""
+	flows: AccountFlows
 }
 
 scalar AccountDisplayName
 
+type AccountFlowConfigsMut {
+	resumeAccountDatasetFlows: Boolean!
+	pauseAccountDatasetFlows: Boolean!
+}
+
+input AccountFlowFilters {
+	byFlowType: DatasetFlowType
+	byStatus: FlowStatus
+	byInitiator: InitiatorFilterInput
+	byDatasetName: DatasetName
+}
+
+type AccountFlowRuns {
+	listFlows(page: Int, perPage: Int, filters: AccountFlowFilters): FlowConnection!
+}
+
+type AccountFlows {
+	"""
+	Returns interface for flow runs queries
+	"""
+	runs: AccountFlowRuns!
+}
+
+type AccountFlowsMut {
+	configs: AccountFlowConfigsMut!
+}
+
 scalar AccountID
+
+type AccountMut {
+	"""
+	Access to the mutable flow configurations of this account
+	"""
+	flows: AccountFlowsMut!
+}
 
 scalar AccountName
 
@@ -54,6 +92,17 @@ type Accounts {
 	Returns account by its name
 	"""
 	byName(name: AccountName!): Account
+}
+
+type AccountsMut {
+	"""
+	Returns a mutable account by its id
+	"""
+	byId(accountId: AccountID!): AccountMut
+	"""
+	Returns a mutable account by its name
+	"""
+	byName(accountName: AccountName!): AccountMut
 }
 
 type AddData {
@@ -1094,6 +1143,13 @@ type Mutation {
 	schema.
 	"""
 	datasets: DatasetsMut!
+	"""
+	Account-related functionality group.
+	
+	Accounts can be individual users or organizations registered in the
+	system. This groups deals with their identities and permissions.
+	"""
+	accounts: AccountsMut!
 	"""
 	Tasks-related functionality group.
 	

@@ -76,6 +76,25 @@ mockall::mock! {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl MockAuthenticationService {
+    pub fn with_custom_account(account_id: AccountID, account_name: AccountName) -> Self {
+        let account_name_clone = account_name.clone();
+        let mut mock_authentication_service = MockAuthenticationService::new();
+        mock_authentication_service
+            .expect_find_account_name_by_id()
+            .returning(move |_| Ok(Some(account_name.clone())));
+        mock_authentication_service
+            .expect_account_by_name()
+            .with(eq(account_name_clone.clone()))
+            .returning(move |_| {
+                Ok(Some(Account {
+                    id: account_id.clone(),
+                    account_name: account_name_clone.clone(),
+                    ..Account::dummy()
+                }))
+            });
+        mock_authentication_service
+    }
+
     pub fn built_in() -> Self {
         let mut mock_authentication_service = MockAuthenticationService::new();
         mock_authentication_service

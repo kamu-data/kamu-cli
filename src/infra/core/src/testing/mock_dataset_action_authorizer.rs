@@ -59,6 +59,14 @@ impl MockDatasetActionAuthorizer {
         mock_dataset_action_authorizer
     }
 
+    pub fn allowing() -> Self {
+        let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
+        mock_dataset_action_authorizer
+            .expect_check_action_allowed()
+            .returning(|_, _| Ok(()));
+        mock_dataset_action_authorizer
+    }
+
     pub fn expect_check_read_dataset(self, dataset_alias: DatasetAlias, times: usize) -> Self {
         self.expect_check_action_allowed_internal(
             function(move |dh: &DatasetHandle| dh.alias == dataset_alias),

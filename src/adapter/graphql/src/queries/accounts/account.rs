@@ -16,7 +16,9 @@ use kamu_accounts::{
 use opendatafabric as odf;
 use tokio::sync::OnceCell;
 
+use super::AccountFlows;
 use crate::prelude::*;
+use crate::utils::check_logged_account_id_match;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -175,6 +177,15 @@ impl Account {
         let full_account_info = self.get_full_account_info(ctx).await?;
 
         Ok(full_account_info.is_admin)
+    }
+
+    /// Access to the flow configurations of this account
+    async fn flows(&self, ctx: &Context<'_>) -> Result<Option<AccountFlows>> {
+        check_logged_account_id_match(ctx, &self.account_id)?;
+
+        Ok(Some(AccountFlows::new(
+            self.get_full_account_info(ctx).await?.clone(),
+        )))
     }
 }
 
