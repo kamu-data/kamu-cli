@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::{AccountName, DatasetID};
+use opendatafabric::DatasetID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,7 +22,6 @@ pub enum DatasetEvent {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatasetEventCreated {
-    pub account_id: Option<AccountName>,
     pub dataset_id: DatasetID,
 }
 
@@ -30,7 +29,6 @@ pub struct DatasetEventCreated {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatasetEventDeleted {
-    pub account_id: Option<AccountName>,
     pub dataset_id: DatasetID,
 }
 
