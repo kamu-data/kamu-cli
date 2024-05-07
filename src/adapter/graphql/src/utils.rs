@@ -15,7 +15,9 @@ use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{Dataset, DatasetRepository};
 use kamu_task_system as ts;
-use opendatafabric::DatasetHandle;
+use opendatafabric::{AccountName as OdfAccountName, DatasetHandle};
+
+use crate::prelude::{AccountID, AccountName};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -110,6 +112,40 @@ pub(crate) async fn get_task(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+pub(crate) fn check_logged_account_match(
+    ctx: &Context<'_>,
+    account_identifier: AccountIdentifier,
+) -> Result<(), GqlError> {
+    let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
+
+    if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
+        match &account_identifier {
+            AccountIdentifier::Id(account_id) => {
+                if logged_account.account_id == account_id.clone().into() {
+                    return Ok(());
+                }
+            }
+            AccountIdentifier::Name(account_name) => {
+                if logged_account.account_name == OdfAccountName::from(account_name.clone()) {
+                    return Ok(());
+                }
+            }
+        };
+    }
+    match account_identifier {
+        AccountIdentifier::Id(account_id) => Err(GqlError::Gql(
+            async_graphql::Error::new("Account datasets access error")
+                .extend_with(|_, eev| eev.set("account_id", account_id.to_string())),
+        )),
+        AccountIdentifier::Name(account_name) => Err(GqlError::Gql(
+            async_graphql::Error::new("Account datasets access error")
+                .extend_with(|_, eev| eev.set("account_name", account_name.to_string())),
+        )),
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 /// This wrapper is unfortunately necessary because of poor error handling
 /// strategy of async-graphql that:
 ///
@@ -146,4 +182,10 @@ impl From<GqlError> for async_graphql::Error {
             GqlError::Gql(err) => err,
         }
     }
+}
+
+#[derive(Debug)]
+pub enum AccountIdentifier {
+    Id(AccountID),
+    Name(AccountName),
 }

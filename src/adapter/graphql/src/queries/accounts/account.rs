@@ -18,6 +18,7 @@ use tokio::sync::OnceCell;
 
 use super::AccountFlows;
 use crate::prelude::*;
+use crate::utils::{check_logged_account_match, AccountIdentifier};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -180,20 +181,11 @@ impl Account {
 
     /// Access to the flow configurations of this account
     async fn flows(&self, ctx: &Context<'_>) -> Result<Option<AccountFlows>> {
-        let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
+        check_logged_account_match(ctx, AccountIdentifier::Id(self.account_id.clone()))?;
 
-        if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
-            if logged_account.account_id == self.account_id.clone().into() {
-                return Ok(Some(AccountFlows::new(
-                    self.get_full_account_info(ctx).await?.clone(),
-                )));
-            }
-            return Err(GqlError::Gql(
-                async_graphql::Error::new("Account datasets access error")
-                    .extend_with(|_, eev| eev.set("account_name", self.account_name.to_string())),
-            ));
-        }
-        Ok(None)
+        Ok(Some(AccountFlows::new(
+            self.get_full_account_info(ctx).await?.clone(),
+        )))
     }
 }
 
