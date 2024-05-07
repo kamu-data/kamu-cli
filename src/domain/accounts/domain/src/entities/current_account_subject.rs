@@ -13,7 +13,7 @@ use crate::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum CurrentAccountSubject {
     Logged(LoggedAccount),
     Anonymous(AnonymousAccountReason),
@@ -26,7 +26,7 @@ pub struct LoggedAccount {
     pub is_admin: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AnonymousAccountReason {
     NoAuthenticationProvided,
     AuthenticationInvalid,
