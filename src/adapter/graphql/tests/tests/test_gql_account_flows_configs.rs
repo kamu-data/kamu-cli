@@ -25,21 +25,27 @@ use kamu::testing::{
     MockTransformService,
 };
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
-use kamu_accounts::{set_random_jwt_secret, AuthenticationService, MockAuthenticationService};
+use kamu_accounts::{
+    set_random_jwt_secret,
+    AuthenticationService,
+    MockAuthenticationService,
+    DEFAULT_ACCOUNT_ID,
+    DEFAULT_ACCOUNT_NAME,
+};
 use kamu_core::*;
 use kamu_flow_system::FlowServiceRunConfig;
 use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
 use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceImpl};
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
-use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
+use opendatafabric::{AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
 
 use crate::utils::authentication_catalogs;
 
 #[test_log::test(tokio::test)]
 async fn test_list_account_flows() {
-    let foo_account_name = AccountName::new_unchecked("foo");
-    let foo_account_id = AccountID::new_seeded_ed25519(b"foo");
+    let foo_account_name = DEFAULT_ACCOUNT_NAME.clone();
+    let foo_account_id = DEFAULT_ACCOUNT_ID.clone();
     let foo_dataset_name = DatasetName::new_unchecked("foo");
     let foo_dataset_alias =
         DatasetAlias::new(Some(foo_account_name.clone()), foo_dataset_name.clone());
@@ -130,8 +136,8 @@ async fn test_list_account_flows() {
 async fn test_pause_resume_account_flows() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let foo_account_name = AccountName::new_unchecked("foo");
-    let foo_account_id = AccountID::new_seeded_ed25519(b"foo");
+    let foo_account_name = DEFAULT_ACCOUNT_NAME.clone();
+    let foo_account_id = DEFAULT_ACCOUNT_ID.clone();
     let foo_dataset_alias = DatasetAlias::new(
         Some(foo_account_name.clone()),
         DatasetName::new_unchecked("foo"),
@@ -151,25 +157,8 @@ async fn test_pause_resume_account_flows() {
     });
     let foo_create_result = harness.create_root_dataset(foo_dataset_alias).await;
 
-    let bar_account_name = AccountName::new_unchecked("bar");
-    let bar_dataset_alias = DatasetAlias::new(
-        Some(bar_account_name.clone()),
-        DatasetName::new_unchecked("bar"),
-    );
-    let bar_create_result = harness.create_root_dataset(bar_dataset_alias).await;
-
     let request_code =
         FlowConfigHarness::trigger_flow_mutation(&foo_create_result.dataset_handle.id, "INGEST");
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    let request_code =
-        FlowConfigHarness::trigger_flow_mutation(&bar_create_result.dataset_handle.id, "INGEST");
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())

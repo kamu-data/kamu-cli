@@ -35,7 +35,7 @@ type Account {
 	"""
 	Access to the flow configurations of this account
 	"""
-	flows: AccountFlows!
+	flows: AccountFlows
 }
 
 scalar AccountDisplayName
@@ -46,6 +46,9 @@ type AccountFlowConfigsMut {
 }
 
 input AccountFlowFilters {
+	byFlowType: DatasetFlowType
+	byStatus: FlowStatus
+	byInitiator: InitiatorFilterInput
 	byDatasetName: DatasetName
 }
 

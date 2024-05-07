@@ -163,7 +163,7 @@ pub struct DatasetFlowFilters {
 }
 
 #[derive(OneofObject)]
-enum InitiatorFilterInput {
+pub enum InitiatorFilterInput {
     System(bool),
     Account(AccountName),
 }

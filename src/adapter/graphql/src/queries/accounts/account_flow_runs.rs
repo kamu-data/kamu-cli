@@ -8,11 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use futures::TryStreamExt;
-use kamu_accounts::Account;
+use kamu_accounts::{Account, AuthenticationService};
 use kamu_flow_system as fs;
 
 use crate::prelude::*;
-use crate::queries::{Flow, FlowConnection};
+use crate::queries::{Flow, FlowConnection, InitiatorFilterInput};
 
 pub struct AccountFlowRuns {
     account: Account,
@@ -39,11 +39,42 @@ impl AccountFlowRuns {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
+        let filters = match filters {
+            Some(filters) => Some(kamu_flow_system::AccountFlowFilters {
+                by_flow_type: filters.by_flow_type.map(Into::into),
+                by_flow_status: filters.by_status.map(Into::into),
+                by_dataset_name: filters.by_dataset_name.map(Into::into),
+                by_initiator: match filters.by_initiator {
+                    Some(initiator_filter) => match initiator_filter {
+                        InitiatorFilterInput::System(_) => {
+                            Some(kamu_flow_system::InitiatorFilter::System)
+                        }
+                        InitiatorFilterInput::Account(account_name) => {
+                            let authentication_service =
+                                from_catalog::<dyn AuthenticationService>(ctx).unwrap();
+                            let account_id = authentication_service
+                                .find_account_id_by_name(&account_name)
+                                .await?
+                                .ok_or_else(|| {
+                                    GqlError::Gql(Error::new("Account not resolved").extend_with(
+                                        |_, eev| eev.set("name", account_name.to_string()),
+                                    ))
+                                })?;
+
+                            Some(kamu_flow_system::InitiatorFilter::Account(account_id))
+                        }
+                    },
+                    None => None,
+                },
+            }),
+            None => None,
+        };
+
         let flows_state_listing = flow_service
             .list_all_flows_by_account(
                 &self.account.account_name,
                 match filters {
-                    Some(filters) => filters.into(),
+                    Some(filters) => filters,
                     None => Default::default(),
                 },
                 fs::FlowPaginationOpts {
@@ -72,13 +103,8 @@ impl AccountFlowRuns {
 
 #[derive(InputObject)]
 pub struct AccountFlowFilters {
+    by_flow_type: Option<DatasetFlowType>,
+    by_status: Option<FlowStatus>,
+    by_initiator: Option<InitiatorFilterInput>,
     by_dataset_name: Option<DatasetName>,
-}
-
-impl From<AccountFlowFilters> for fs::AccountFlowFilters {
-    fn from(value: AccountFlowFilters) -> Self {
-        Self {
-            by_dataset_name: value.by_dataset_name.map(Into::into),
-        }
-    }
 }

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use chrono::{DateTime, Utc};
 use event_sourcing::EventStore;
 use opendatafabric::{AccountID, DatasetID, DatasetName};
@@ -56,9 +58,10 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Applies filters/pagination, if specified
     fn get_all_flow_ids_by_datasets(
         &self,
-        dataset_id: Vec<DatasetID>,
+        dataset_id: HashSet<DatasetID>,
+        filters: &DatasetFlowFilters,
         pagination: FlowPaginationOpts,
-    ) -> (usize, FlowIDStream);
+    ) -> FlowIDStream;
 
     /// Returns IDs of the system flows  in reverse chronological order based on
     /// creation time
@@ -102,6 +105,9 @@ pub struct DatasetFlowFilters {
 #[derive(Default, Debug, Clone)]
 pub struct AccountFlowFilters {
     pub by_dataset_name: Option<DatasetName>,
+    pub by_flow_type: Option<DatasetFlowType>,
+    pub by_flow_status: Option<FlowStatus>,
+    pub by_initiator: Option<InitiatorFilter>,
 }
 
 #[derive(Default, Debug, Clone)]

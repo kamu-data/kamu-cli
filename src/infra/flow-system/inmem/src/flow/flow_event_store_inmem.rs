@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use dill::*;
 use kamu_flow_system::{BorrowedFlowKeyDataset, *};
@@ -343,32 +343,38 @@ impl FlowEventStore for FlowEventStoreInMem {
         Box::pin(futures::stream::iter(flow_ids_page))
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, ?pagination))]
     fn get_all_flow_ids_by_datasets(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: HashSet<DatasetID>,
+        filters: &DatasetFlowFilters,
         pagination: FlowPaginationOpts,
-    ) -> (usize, FlowIDStream) {
-        let mut total_count = 0;
+    ) -> FlowIDStream {
         let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
             let mut result: Vec<Result<FlowID, _>> = vec![];
-            g.all_flows.iter().rev().for_each(|flow_id| {
+            let mut total_count = 0;
+            for flow_id in g.all_flows.iter().rev() {
                 let flow_key = g.flow_key_by_flow_id.get(flow_id).unwrap();
                 if let FlowKey::Dataset(flow_key_dataset) = flow_key {
-                    if dataset_ids.contains(&flow_key_dataset.dataset_id) {
-                        if total_count >= pagination.offset && result.len() <= pagination.limit {
+                    if dataset_ids.contains(&flow_key_dataset.dataset_id)
+                        && g.matches_dataset_flow(*flow_id, filters)
+                    {
+                        if result.len() >= pagination.limit {
+                            break;
+                        }
+                        if total_count >= pagination.offset {
                             result.push(Ok(*flow_id));
                         }
                         total_count += 1;
                     }
                 };
-            });
+            }
             result
         };
 
-        (total_count, Box::pin(futures::stream::iter(flow_ids_page)))
+        Box::pin(futures::stream::iter(flow_ids_page))
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters))]

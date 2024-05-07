@@ -9,6 +9,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, DurationRound, Utc};
@@ -939,26 +940,46 @@ impl FlowService for FlowServiceImpl {
         filters: AccountFlowFilters,
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
-        let account_datasets_ids: Vec<_> = self
-            .dataset_repo
-            .get_datasets_by_owner(account_name)
-            .filter_map_ok(|dataset_handle| {
-                if let Some(dataset_name_filter) = &filters.by_dataset_name {
-                    if dataset_name_filter == &dataset_handle.alias.dataset_name {
-                        return Some(dataset_handle.id);
-                    }
-                    return None;
-                }
-                Some(dataset_handle.id)
-            })
-            .try_collect()
-            .await?;
-        let (total_count, flow_stream) = self
-            .flow_event_store
-            .get_all_flow_ids_by_datasets(account_datasets_ids, pagination);
+        let datasets_stream = self.dataset_repo.get_datasets_by_owner(account_name);
+
+        let account_dataset_ids_list: Vec<_> =
+            if let Some(dataset_name_filter) = &filters.by_dataset_name {
+                datasets_stream
+                    .filter_map_ok(|dataset_handle| {
+                        if dataset_name_filter == &dataset_handle.alias.dataset_name {
+                            return Some(dataset_handle.id);
+                        }
+                        None
+                    })
+                    .try_collect()
+                    .await?
+            } else {
+                datasets_stream
+                    .map_ok(|dataset_handle| dataset_handle.id)
+                    .try_collect()
+                    .await?
+            };
+        let mut total_count = 0;
+        let dataset_flow_filters = DatasetFlowFilters {
+            by_flow_status: filters.by_flow_status,
+            by_flow_type: filters.by_flow_type,
+            by_initiator: filters.by_initiator,
+        };
+
+        for dataset_id in &account_dataset_ids_list {
+            total_count += self
+                .flow_event_store
+                .get_count_flows_by_dataset(dataset_id, &dataset_flow_filters)
+                .await
+                .int_err()?;
+        }
+
+        let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(account_dataset_ids_list);
 
         let matched_stream = Box::pin(async_stream::try_stream! {
-            let relevant_flow_ids: Vec<_> = flow_stream
+            let relevant_flow_ids: Vec<_> = self
+                .flow_event_store
+                .get_all_flow_ids_by_datasets(account_dataset_ids, &dataset_flow_filters, pagination)
                 .try_collect()
                 .await
                 .int_err()?;
