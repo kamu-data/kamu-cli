@@ -18,7 +18,7 @@ use tokio::sync::OnceCell;
 
 use super::AccountFlows;
 use crate::prelude::*;
-use crate::utils::{check_logged_account_match, AccountIdentifier};
+use crate::utils::check_logged_account_id_match;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -181,7 +181,7 @@ impl Account {
 
     /// Access to the flow configurations of this account
     async fn flows(&self, ctx: &Context<'_>) -> Result<Option<AccountFlows>> {
-        check_logged_account_match(ctx, AccountIdentifier::Id(self.account_id.clone()))?;
+        check_logged_account_id_match(ctx, &self.account_id)?;
 
         Ok(Some(AccountFlows::new(
             self.get_full_account_info(ctx).await?.clone(),

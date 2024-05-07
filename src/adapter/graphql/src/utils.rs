@@ -112,36 +112,40 @@ pub(crate) async fn get_task(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn check_logged_account_match(
+pub(crate) fn check_logged_account_id_match(
     ctx: &Context<'_>,
-    account_identifier: AccountIdentifier,
+    account_id: &AccountID,
 ) -> Result<(), GqlError> {
     let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
 
     if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
-        match &account_identifier {
-            AccountIdentifier::Id(account_id) => {
-                if logged_account.account_id == account_id.clone().into() {
-                    return Ok(());
-                }
-            }
-            AccountIdentifier::Name(account_name) => {
-                if logged_account.account_name == OdfAccountName::from(account_name.clone()) {
-                    return Ok(());
-                }
-            }
-        };
-    }
-    match account_identifier {
-        AccountIdentifier::Id(account_id) => Err(GqlError::Gql(
-            async_graphql::Error::new("Account datasets access error")
-                .extend_with(|_, eev| eev.set("account_id", account_id.to_string())),
-        )),
-        AccountIdentifier::Name(account_name) => Err(GqlError::Gql(
-            async_graphql::Error::new("Account datasets access error")
-                .extend_with(|_, eev| eev.set("account_name", account_name.to_string())),
-        )),
-    }
+        if logged_account.account_id == account_id.clone().into() {
+            return Ok(());
+        }
+    };
+    Err(GqlError::Gql(
+        async_graphql::Error::new("Account datasets access error")
+            .extend_with(|_, eev| eev.set("account_id", account_id.to_string())),
+    ))
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn check_logged_account_name_match(
+    ctx: &Context<'_>,
+    account_name: &AccountName,
+) -> Result<(), GqlError> {
+    let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
+
+    if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
+        if logged_account.account_name == OdfAccountName::from(account_name.clone()) {
+            return Ok(());
+        }
+    };
+    Err(GqlError::Gql(
+        async_graphql::Error::new("Account datasets access error")
+            .extend_with(|_, eev| eev.set("account_name", account_name.to_string())),
+    ))
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -182,10 +186,4 @@ impl From<GqlError> for async_graphql::Error {
             GqlError::Gql(err) => err,
         }
     }
-}
-
-#[derive(Debug)]
-pub enum AccountIdentifier {
-    Id(AccountID),
-    Name(AccountName),
 }
