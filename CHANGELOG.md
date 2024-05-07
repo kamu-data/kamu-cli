@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - List of flows by account(including filters `byDatasetName`, `byFlowType`, `byStatus`, `byInitiator`)
   - Pause all flows by account
   - Resume all flows by account
+### Fixed
+- `kamu repo alias rm` command regression crash. Changed accepted type and cove by integration test
 
 ## [0.179.1] - 2024-05-07
 ### Changed
