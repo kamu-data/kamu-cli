@@ -1043,7 +1043,7 @@ pub fn cli() -> Command {
                                         Arg::new("dataset")
                                             .required(true)
                                             .index(1)
-                                            .value_parser(value_parse_dataset_ref_pattern_local)
+                                            .value_parser(value_parse_dataset_ref_local)
                                             .help("Local dataset reference"),
                                         Arg::new("alias")
                                             .index(2)

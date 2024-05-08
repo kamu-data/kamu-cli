@@ -235,6 +235,43 @@ impl Kamu {
         cli_catalog_builder.add_value(self.current_account.to_current_account_subject());
         cli_catalog_builder.build()
     }
+
+    pub async fn get_list_of_repo_aliases(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> (Vec<String>, Vec<String>) {
+        let catalog = dill::CatalogBuilder::new()
+            .add::<SystemTimeSourceDefault>()
+            .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add_value(self.current_account.to_current_account_subject())
+            .add::<domain::auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(self.workspace_layout.datasets_dir.clone())
+                    .with_multi_tenant(false),
+            )
+            .add::<RemoteAliasesRegistryImpl>()
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .build();
+
+        let remote_alias_reg = catalog.get_one::<dyn RemoteAliasesRegistry>().unwrap();
+
+        let repo_aliases = remote_alias_reg
+            .get_remote_aliases(dataset_ref)
+            .await
+            .unwrap();
+        let pull_aliases: Vec<_> = repo_aliases
+            .get_by_kind(RemoteAliasKind::Pull)
+            .map(ToString::to_string)
+            .collect();
+        let push_aliases: Vec<_> = repo_aliases
+            .get_by_kind(RemoteAliasKind::Push)
+            .map(ToString::to_string)
+            .collect();
+
+        (pull_aliases, push_aliases)
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
