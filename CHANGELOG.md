@@ -4,12 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.180.0] - 2024-05-08
 ### Added
 - GraphQL account flows endpoints:
   - List of flows by account(including filters `byDatasetName`, `byFlowType`, `byStatus`, `byInitiator`)
   - Pause all flows by account
   - Resume all flows by account
+### Changed
+- Correct JWT config creation for `kamu-node`
 ### Fixed
 - `kamu repo alias rm` command regression crash. Changed accepted type and covered by integration test
 
