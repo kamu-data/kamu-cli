@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pause all flows by account
   - Resume all flows by account
 ### Fixed
-- `kamu repo alias rm` command regression crash. Changed accepted type and cove by integration test
+- `kamu repo alias rm` command regression crash. Changed accepted type and covered by integration test
 
 ## [0.179.1] - 2024-05-07
 ### Changed
