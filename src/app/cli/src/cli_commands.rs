@@ -517,6 +517,7 @@ pub fn get_command(
                 *(submatches.get_one("max-slice-records").unwrap()),
                 submatches.get_flag("hard"),
                 submatches.get_flag("verify"),
+                submatches.get_flag("keep-metadata-only"),
             )),
             _ => return Err(CommandInterpretationFailed.into()),
         },

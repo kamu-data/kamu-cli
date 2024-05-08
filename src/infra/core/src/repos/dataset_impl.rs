@@ -434,7 +434,9 @@ where
         };
 
         let mut new_upstream_ids: Vec<opendatafabric::DatasetID> = vec![];
-        if let opendatafabric::MetadataEvent::SetTransform(transform) = &event {
+        if opts.update_block_ref
+            && let opendatafabric::MetadataEvent::SetTransform(transform) = &event
+        {
             for new_input in &transform.inputs {
                 if let Some(id) = new_input.dataset_ref.id() {
                     new_upstream_ids.push(id.clone());

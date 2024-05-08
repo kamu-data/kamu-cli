@@ -1323,6 +1323,10 @@ pub fn cli() -> Command {
                                     .long("hard")
                                     .action(ArgAction::SetTrue)
                                     .help("Perform 'hard' compacting that rewrites the history of a dataset"),
+                                Arg::new("keep-metadata-only")
+                                    .long("keep-metadata-only")
+                                    .action(ArgAction::SetTrue)
+                                    .help("Perform compacting without saving data blocks"),
                                 Arg::new("verify")
                                     .long("verify")
                                     .action(ArgAction::SetTrue)

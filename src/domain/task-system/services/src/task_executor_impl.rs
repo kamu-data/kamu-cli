@@ -142,6 +142,7 @@ impl TaskExecutor for TaskExecutorImpl {
                             CompactingOptions {
                                 max_slice_size: *max_slice_size,
                                 max_slice_records: *max_slice_records,
+                                ..CompactingOptions::default()
                             },
                             None,
                         )

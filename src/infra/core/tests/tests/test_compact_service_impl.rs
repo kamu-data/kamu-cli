@@ -33,6 +33,7 @@ use kamu_core::auth;
 use opendatafabric::*;
 
 use super::test_pull_service_impl::TestTransformService;
+use crate::mock_engine_provisioner;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,15 +42,10 @@ use super::test_pull_service_impl::TestTransformService;
 async fn test_dataset_compact() {
     let harness = CompactTestHarness::new();
 
-    let created = harness.create_test_dataset().await;
+    let created = harness.create_test_root_dataset().await;
     let dataset_ref = created.dataset_handle.as_local_ref();
 
     let data_helper = harness.dataset_data_helper(&dataset_ref).await;
-    let dataset_handle = harness
-        .dataset_repo
-        .resolve_dataset_ref(&created.dataset_handle.as_local_ref())
-        .await
-        .unwrap();
 
     // Round 1: Compacting is a no-op
     //
@@ -79,7 +75,7 @@ async fn test_dataset_compact() {
         harness
             .compacting_svc
             .compact_dataset(
-                &dataset_handle,
+                &created.dataset_handle,
                 CompactingOptions::default(),
                 Some(Arc::new(NullCompactingMultiListener {}))
             )
@@ -123,7 +119,7 @@ async fn test_dataset_compact() {
         harness
             .compacting_svc
             .compact_dataset(
-                &dataset_handle,
+                &created.dataset_handle,
                 CompactingOptions::default(),
                 Some(Arc::new(NullCompactingMultiListener {}))
             )
@@ -190,14 +186,8 @@ async fn test_dataset_compact_s3() {
     let s3 = LocalS3Server::new().await;
     let harness = CompactTestHarness::new_s3(&s3).await;
 
-    let created = harness.create_test_dataset().await;
+    let created = harness.create_test_root_dataset().await;
     let dataset_ref = created.dataset_handle.as_local_ref();
-
-    let dataset_handle = harness
-        .dataset_repo
-        .resolve_dataset_ref(&created.dataset_handle.as_local_ref())
-        .await
-        .unwrap();
 
     // Round 1: Compacting is a no-op
     //
@@ -227,7 +217,7 @@ async fn test_dataset_compact_s3() {
         harness
             .compacting_svc
             .compact_dataset(
-                &dataset_handle,
+                &created.dataset_handle,
                 CompactingOptions::default(),
                 Some(Arc::new(NullCompactingMultiListener {}))
             )
@@ -271,7 +261,7 @@ async fn test_dataset_compact_s3() {
         harness
             .compacting_svc
             .compact_dataset(
-                &dataset_handle,
+                &created.dataset_handle,
                 CompactingOptions::default(),
                 Some(Arc::new(NullCompactingMultiListener {}))
             )
@@ -306,15 +296,10 @@ async fn test_dataset_compact_s3() {
 async fn test_dataset_compacting_watermark_only_blocks() {
     let harness = CompactTestHarness::new();
 
-    let created = harness.create_test_dataset().await;
+    let created = harness.create_test_root_dataset().await;
     let dataset_ref = created.dataset_handle.as_local_ref();
 
     let data_helper = harness.dataset_data_helper(&dataset_ref).await;
-    let dataset_handle = harness
-        .dataset_repo
-        .resolve_dataset_ref(&created.dataset_handle.as_local_ref())
-        .await
-        .unwrap();
 
     // Before: ... <- add_data(3 records) <- add_data(wm1) <- add_data(3 records) <-
     // add_data(wm2, src2)
@@ -394,7 +379,7 @@ async fn test_dataset_compacting_watermark_only_blocks() {
     let res = harness
         .compacting_svc
         .compact_dataset(
-            &dataset_handle,
+            &created.dataset_handle,
             CompactingOptions::default(),
             Some(Arc::new(NullCompactingMultiListener {})),
         )
@@ -482,16 +467,10 @@ async fn test_dataset_compacting_watermark_only_blocks() {
 async fn test_dataset_compacting_limits() {
     let harness = CompactTestHarness::new();
 
-    let created = harness.create_test_dataset().await;
+    let created = harness.create_test_root_dataset().await;
     let dataset_ref = created.dataset_handle.as_local_ref();
 
     let data_helper = harness.dataset_data_helper(&dataset_ref).await;
-    let dataset_handle = harness
-        .dataset_repo
-        .resolve_dataset_ref(&dataset_ref)
-        .await
-        .unwrap();
-
     let data_str = indoc!(
         "
         date,city,population
@@ -567,10 +546,11 @@ async fn test_dataset_compacting_limits() {
         harness
             .compacting_svc
             .compact_dataset(
-                &dataset_handle,
+                &created.dataset_handle,
                 CompactingOptions {
                     max_slice_records: Some(6),
                     max_slice_size: None,
+                    ..CompactingOptions::default()
                 },
                 Some(Arc::new(NullCompactingMultiListener {}))
             )
@@ -656,16 +636,10 @@ async fn test_dataset_compacting_limits() {
 async fn test_dataset_compacting_keep_all_non_data_blocks() {
     let harness = CompactTestHarness::new();
 
-    let created = harness.create_test_dataset().await;
+    let created = harness.create_test_root_dataset().await;
     let dataset_ref = created.dataset_handle.as_local_ref();
 
     let data_helper = harness.dataset_data_helper(&dataset_ref).await;
-    let dataset_handle = harness
-        .dataset_repo
-        .resolve_dataset_ref(&dataset_ref)
-        .await
-        .unwrap();
-
     let data_str = indoc!(
         "
         date,city,population
@@ -693,7 +667,7 @@ async fn test_dataset_compacting_keep_all_non_data_blocks() {
         .await;
 
     let current_head = harness
-        .get_dataset_head(&dataset_handle.as_local_ref())
+        .get_dataset_head(&created.dataset_handle.as_local_ref())
         .await;
     harness
         .commit_set_licence_block(&dataset_ref, &current_head)
@@ -733,7 +707,7 @@ async fn test_dataset_compacting_keep_all_non_data_blocks() {
         harness
             .compacting_svc
             .compact_dataset(
-                &dataset_handle,
+                &created.dataset_handle,
                 CompactingOptions::default(),
                 Some(Arc::new(NullCompactingMultiListener {}))
             )
@@ -836,18 +810,12 @@ async fn test_dataset_compacting_derive_error() {
 async fn test_large_dataset_compact() {
     let harness = CompactTestHarness::new();
 
-    let created = harness.create_test_dataset().await;
+    let created = harness.create_test_root_dataset().await;
     let dataset_ref = created.dataset_handle.as_local_ref();
 
     harness.ingest_multiple_blocks(&dataset_ref, 100).await;
 
     let data_helper = harness.dataset_data_helper(&dataset_ref).await;
-
-    let dataset_handle = harness
-        .dataset_repo
-        .resolve_dataset_ref(&dataset_ref)
-        .await
-        .unwrap();
 
     let old_blocks = harness.get_dataset_blocks(&dataset_ref).await;
 
@@ -885,10 +853,11 @@ async fn test_large_dataset_compact() {
         harness
             .compacting_svc
             .compact_dataset(
-                &dataset_handle,
+                &created.dataset_handle,
                 CompactingOptions {
                     max_slice_records: Some(10),
                     max_slice_size: None,
+                    ..CompactingOptions::default()
                 },
                 Some(Arc::new(NullCompactingMultiListener {}))
             )
@@ -948,12 +917,157 @@ async fn test_large_dataset_compact() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(ingest, datafusion, compact)]
+#[tokio::test]
+async fn test_dataset_keep_metadata_only_compact() {
+    let harness = CompactTestHarness::new();
+
+    let created_root = harness.create_test_root_dataset().await;
+    let created_derived = harness.create_test_derived_dataset().await;
+    let root_dataset_ref = created_root.dataset_handle.as_local_ref();
+    let derived_dataset_ref = created_derived.dataset_handle.as_local_ref();
+
+    let data_str = indoc!(
+        "
+        date,city,population
+        2020-01-01,A,1000
+        2020-01-02,B,2000
+        2020-01-03,C,3000
+        "
+    );
+
+    harness
+        .ingest_data(data_str.to_string(), &root_dataset_ref)
+        .await;
+
+    let prev_head = created_derived
+        .dataset
+        .as_metadata_chain()
+        .resolve_ref(&BlockRef::Head)
+        .await
+        .unwrap();
+
+    assert_matches!(
+        harness
+            .compacting_svc
+            .compact_dataset(
+                &created_derived.dataset_handle,
+                CompactingOptions {
+                    is_keep_metadata_only: true,
+                    ..CompactingOptions::default()
+                },
+                Some(Arc::new(NullCompactingMultiListener {}))
+            )
+            .await,
+        Ok(CompactingResult::NothingToDo)
+    );
+
+    assert_eq!(
+        prev_head,
+        created_derived
+            .dataset
+            .as_metadata_chain()
+            .resolve_ref(&BlockRef::Head)
+            .await
+            .unwrap()
+    );
+
+    // Round 1: Compact derived dataset
+    //
+    // Before: seed <- set_transform <- execute_transform
+    //
+    // After: seed <- set_transform
+    let res = harness
+        .transform_svc
+        .transform(&derived_dataset_ref, None)
+        .await
+        .unwrap();
+    assert_matches!(res, TransformResult::Updated { .. });
+
+    assert_matches!(
+        harness
+            .compacting_svc
+            .compact_dataset(
+                &created_derived.dataset_handle,
+                CompactingOptions {
+                    is_keep_metadata_only: true,
+                    ..CompactingOptions::default()
+                },
+                Some(Arc::new(NullCompactingMultiListener {}))
+            )
+            .await,
+        Ok(CompactingResult::Success {
+            new_head,
+            old_head,
+            new_num_blocks: 2,
+            old_num_blocks: 3
+        }) if new_head != old_head,
+    );
+
+    assert!(harness.verify_dataset(&derived_dataset_ref).await);
+    assert!(
+        !harness
+            .check_is_data_slices_exist(&derived_dataset_ref)
+            .await
+    );
+
+    // Round 2: Compact root dataset
+    //
+    // Before/after: seed <- add_push_source <- set_vocab <- set_schema <-
+    // add_data(3 records) <- add_data(3 records)
+    //
+    // After: seed <- add_push_source <- set_vocab <- set_schema <-
+    // set_data_schema
+    let data_str = indoc!(
+        "
+        date,city,population
+        2020-01-04,A,4000
+        2020-01-05,B,5000
+        2020-01-06,C,6000
+        "
+    );
+
+    harness
+        .ingest_data(data_str.to_string(), &root_dataset_ref)
+        .await;
+
+    assert_matches!(
+        harness
+            .compacting_svc
+            .compact_dataset(
+                &created_root.dataset_handle,
+                CompactingOptions {
+                    is_keep_metadata_only: true,
+                    ..CompactingOptions::default()
+                },
+                Some(Arc::new(NullCompactingMultiListener {}))
+            )
+            .await,
+        Ok(CompactingResult::Success {
+            new_head,
+            old_head,
+            new_num_blocks: 4,
+            old_num_blocks: 6
+        }) if new_head != old_head,
+    );
+
+    assert!(harness.verify_dataset(&derived_dataset_ref).await);
+    assert!(
+        !harness
+            .check_is_data_slices_exist(&derived_dataset_ref)
+            .await
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 struct CompactTestHarness {
     _temp_dir: tempfile::TempDir,
     dataset_repo: Arc<dyn DatasetRepository>,
     compacting_svc: Arc<CompactingServiceImpl>,
     push_ingest_svc: Arc<PushIngestServiceImpl>,
     verification_svc: Arc<dyn VerificationService>,
+    transform_svc: Arc<dyn TransformService>,
     current_date_time: DateTime<Utc>,
     ctx: SessionContext,
 }
@@ -984,7 +1098,6 @@ impl CompactTestHarness {
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
-            .add::<EngineProvisionerNull>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add_builder(CompactingServiceImpl::builder().with_run_info_dir(run_info_dir.clone()))
@@ -998,14 +1111,18 @@ impl CompactTestHarness {
                     .with_run_info_dir(run_info_dir),
             )
             .bind::<dyn PushIngestService, PushIngestServiceImpl>()
-            .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
-            .bind::<dyn TransformService, TestTransformService>()
+            .add_value(
+                mock_engine_provisioner::MockEngineProvisioner::new().stub_provision_engine(),
+            )
+            .bind::<dyn EngineProvisioner, mock_engine_provisioner::MockEngineProvisioner>()
+            .add::<TransformServiceImpl>()
             .add::<VerificationServiceImpl>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
         let compacting_svc = catalog.get_one::<CompactingServiceImpl>().unwrap();
         let push_ingest_svc = catalog.get_one::<PushIngestServiceImpl>().unwrap();
+        let transform_svc = catalog.get_one::<TransformServiceImpl>().unwrap();
         let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
 
         Self {
@@ -1013,6 +1130,7 @@ impl CompactTestHarness {
             dataset_repo,
             compacting_svc,
             push_ingest_svc,
+            transform_svc,
             verification_svc,
             current_date_time,
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
@@ -1068,6 +1186,7 @@ impl CompactTestHarness {
             catalog.get_one().unwrap(),
         );
         let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
+        let transform_svc = catalog.get_one::<dyn TransformService>().unwrap();
         let ctx = new_session_context(object_store_registry);
 
         Self {
@@ -1076,6 +1195,7 @@ impl CompactTestHarness {
             compacting_svc: Arc::new(compacting_svc),
             push_ingest_svc: Arc::new(push_ingest_svc),
             verification_svc,
+            transform_svc,
             current_date_time,
             ctx,
         }
@@ -1111,7 +1231,7 @@ impl CompactTestHarness {
             .unwrap()
     }
 
-    async fn create_test_dataset(&self) -> CreateDatasetResult {
+    async fn create_test_root_dataset(&self) -> CreateDatasetResult {
         self.create_dataset(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
@@ -1137,6 +1257,34 @@ impl CompactTestHarness {
                     event_time_column: Some("date".to_string()),
                     ..Default::default()
                 })
+                .build(),
+        )
+        .await
+    }
+
+    async fn create_test_derived_dataset(&self) -> CreateDatasetResult {
+        self.create_dataset(
+            MetadataFactory::dataset_snapshot()
+                .name("foo-derivative")
+                .kind(DatasetKind::Derivative)
+                .push_event(
+                    MetadataFactory::set_transform()
+                        .inputs_from_refs(["foo"])
+                        .transform(
+                            MetadataFactory::transform()
+                                .engine("datafusion")
+                                .query(
+                                    "SELECT
+                                        op,
+                                        event_time,
+                                        city,
+                                        cast(population * 10 as int) as population_x10
+                                    FROM root",
+                                )
+                                .build(),
+                        )
+                        .build(),
+                )
                 .build(),
         )
         .await
@@ -1224,6 +1372,18 @@ impl CompactTestHarness {
         assert_eq!(old_event.prev_checkpoint, new_event.prev_checkpoint);
         assert_eq!(old_event.new_watermark, new_event.new_watermark);
         assert_eq!(old_event.new_source_state, new_event.new_source_state);
+    }
+
+    // Ensures that there are no AddData/Executetransform blocks
+    async fn check_is_data_slices_exist(&self, dataset_ref: &DatasetRef) -> bool {
+        let blocks = self.get_dataset_blocks(dataset_ref).await;
+        for block in &blocks {
+            match block.event {
+                MetadataEvent::AddData(_) | MetadataEvent::ExecuteTransform(_) => return true,
+                _ => (),
+            }
+        }
+        false
     }
 
     fn assert_offset_interval_eq(event: &AddData, expected: &OffsetInterval) {
