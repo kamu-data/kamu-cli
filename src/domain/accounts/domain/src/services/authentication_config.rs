@@ -21,16 +21,14 @@ pub struct JwtAuthenticationConfig {
 }
 
 impl JwtAuthenticationConfig {
-    pub fn new(jwt_secret: String) -> Self {
-        Self { jwt_secret }
+    pub fn new(maybe_jwt_secret: Option<String>) -> Self {
+        Self {
+            jwt_secret: maybe_jwt_secret.unwrap_or_else(|| get_random_name(None, 64)),
+        }
     }
 
     pub fn load_from_env() -> Self {
-        Self {
-            jwt_secret: std::env::var(ENV_VAR_KAMU_JWT_SECRET)
-                .ok()
-                .unwrap_or_else(|| get_random_name(None, 64)),
-        }
+        Self::new(std::env::var(ENV_VAR_KAMU_JWT_SECRET).ok())
     }
 }
 
