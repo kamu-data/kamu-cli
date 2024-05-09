@@ -102,6 +102,21 @@ impl IngestCommand {
                 pull_aliases.join("\n- ")
             )));
         }
+
+        let dataset = self
+            .dataset_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
+        let dataset_kind = dataset
+            .get_summary(GetSummaryOpts::default())
+            .await
+            .int_err()?
+            .kind;
+        if dataset_kind != DatasetKind::Root {
+            return Err(CLIError::usage_error(
+                "Ingesting data available for root datasets only",
+            ));
+        }
         Ok(())
     }
 
