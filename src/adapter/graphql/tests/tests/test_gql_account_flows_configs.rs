@@ -444,15 +444,15 @@ impl FlowConfigHarness {
                                       flowId
                                       description {
                                           __typename
-                                          ... on FlowDescriptionDatasetHardCompacting {
+                                          ... on FlowDescriptionDatasetHardCompaction {
                                               datasetId
-                                              compactingResult {
-                                                  ... on FlowDescriptionHardCompactingSuccess {
+                                              compactionResult {
+                                                  ... on FlowDescriptionHardCompactionSuccess {
                                                       originalBlocksCount
                                                       resultingBlocksCount
                                                       newHead
                                                   }
-                                                  ... on FlowDescriptionHardCompactingNothingToDo {
+                                                  ... on FlowDescriptionHardCompactionNothingToDo {
                                                       message
                                                   }
                                               }
@@ -715,7 +715,7 @@ impl FlowConfigHarness {
                                             batching {
                                                 __typename
                                             }
-                                            compacting {
+                                            compaction {
                                                 __typename
                                             }
                                         }

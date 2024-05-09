@@ -19,13 +19,13 @@ pub const DEFAULT_MAX_SLICE_SIZE: u64 = 1_073_741_824;
 pub const DEFAULT_MAX_SLICE_RECORDS: u64 = 10000;
 
 #[async_trait::async_trait]
-pub trait CompactingService: Send + Sync {
+pub trait CompactionService: Send + Sync {
     async fn compact_dataset(
         &self,
         dataset_handle: &DatasetHandle,
-        options: CompactingOptions,
-        listener: Option<Arc<dyn CompactingMultiListener>>,
-    ) -> Result<CompactingResult, CompactingError>;
+        options: CompactionOptions,
+        listener: Option<Arc<dyn CompactionMultiListener>>,
+    ) -> Result<CompactionResult, CompactionError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -33,7 +33,7 @@ pub trait CompactingService: Send + Sync {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum CompactingError {
+pub enum CompactionError {
     #[error(transparent)]
     DatasetNotFound(
         #[from]
@@ -60,7 +60,7 @@ pub enum CompactingError {
     ),
 }
 
-impl From<GetDatasetError> for CompactingError {
+impl From<GetDatasetError> for CompactionError {
     fn from(v: GetDatasetError) -> Self {
         match v {
             GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
@@ -69,7 +69,7 @@ impl From<GetDatasetError> for CompactingError {
     }
 }
 
-impl From<auth::DatasetActionUnauthorizedError> for CompactingError {
+impl From<auth::DatasetActionUnauthorizedError> for CompactionError {
     fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
         match v {
             auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
@@ -78,7 +78,7 @@ impl From<auth::DatasetActionUnauthorizedError> for CompactingError {
     }
 }
 
-impl From<GetRefError> for CompactingError {
+impl From<GetRefError> for CompactionError {
     fn from(v: GetRefError) -> Self {
         match v {
             GetRefError::NotFound(e) => Self::Internal(e.int_err()),
@@ -88,22 +88,22 @@ impl From<GetRefError> for CompactingError {
     }
 }
 
-impl From<IterBlocksError> for CompactingError {
+impl From<IterBlocksError> for CompactionError {
     fn from(v: IterBlocksError) -> Self {
         match v {
-            IterBlocksError::Access(e) => CompactingError::Access(e),
-            IterBlocksError::Internal(e) => CompactingError::Internal(e),
-            _ => CompactingError::Internal(v.int_err()),
+            IterBlocksError::Access(e) => CompactionError::Access(e),
+            IterBlocksError::Internal(e) => CompactionError::Internal(e),
+            _ => CompactionError::Internal(v.int_err()),
         }
     }
 }
 
-impl From<SetRefError> for CompactingError {
+impl From<SetRefError> for CompactionError {
     fn from(v: SetRefError) -> Self {
         match v {
-            SetRefError::Access(e) => CompactingError::Access(e),
-            SetRefError::Internal(e) => CompactingError::Internal(e),
-            _ => CompactingError::Internal(v.int_err()),
+            SetRefError::Access(e) => CompactionError::Access(e),
+            SetRefError::Internal(e) => CompactionError::Internal(e),
+            _ => CompactionError::Internal(v.int_err()),
         }
     }
 }
@@ -118,38 +118,38 @@ pub struct InvalidDatasetKindError {
 // Progress bar
 ///////////////////////////////////////////////////////////////////////////////
 
-pub trait CompactingListener: Send + Sync {
+pub trait CompactionListener: Send + Sync {
     fn begin(&self) {}
-    fn success(&self, _res: &CompactingResult) {}
-    fn error(&self, _err: &CompactingError) {}
+    fn success(&self, _res: &CompactionResult) {}
+    fn error(&self, _err: &CompactionError) {}
 
-    fn begin_phase(&self, _phase: CompactingPhase) {}
-    fn end_phase(&self, _phase: CompactingPhase) {}
+    fn begin_phase(&self, _phase: CompactionPhase) {}
+    fn end_phase(&self, _phase: CompactionPhase) {}
 }
 
-pub struct NullCompactingListener;
-impl CompactingListener for NullCompactingListener {}
+pub struct NullCompactionListener;
+impl CompactionListener for NullCompactionListener {}
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub trait CompactingMultiListener: Send + Sync {
-    fn begin_compact(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn CompactingListener>> {
+pub trait CompactionMultiListener: Send + Sync {
+    fn begin_compact(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn CompactionListener>> {
         None
     }
 }
 
-pub struct NullCompactingMultiListener;
-impl CompactingMultiListener for NullCompactingMultiListener {}
+pub struct NullCompactionMultiListener;
+impl CompactionMultiListener for NullCompactionMultiListener {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CompactingPhase {
+pub enum CompactionPhase {
     GatherChainInfo,
     MergeDataslices,
     CommitNewBlocks,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum CompactingResult {
+pub enum CompactionResult {
     NothingToDo,
     Success {
         old_head: Multihash,
@@ -162,12 +162,12 @@ pub enum CompactingResult {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct CompactingOptions {
+pub struct CompactionOptions {
     pub max_slice_size: Option<u64>,
     pub max_slice_records: Option<u64>,
 }
 
-impl Default for CompactingOptions {
+impl Default for CompactionOptions {
     fn default() -> Self {
         Self {
             max_slice_size: Some(DEFAULT_MAX_SLICE_SIZE),

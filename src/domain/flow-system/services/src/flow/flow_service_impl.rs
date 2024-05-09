@@ -190,9 +190,9 @@ impl FlowServiceImpl {
                         self.enqueue_auto_polling_flow_unconditionally(start_time, &flow_key)
                             .await?;
                     }
-                    // Sucn as compacting is very dangerous operation we
+                    // Sucn as compaction is very dangerous operation we
                     // skip running it during activation flow configurations
-                    FlowConfigurationRule::CompactingRule(_) => (),
+                    FlowConfigurationRule::CompactionRule(_) => (),
                 }
 
                 let mut state = self.state.lock().unwrap();
@@ -745,25 +745,25 @@ impl FlowServiceImpl {
                         dataset_id: flow_key.dataset_id.clone(),
                     })
                 }
-                DatasetFlowType::HardCompacting => {
+                DatasetFlowType::HardCompaction => {
                     let mut max_slice_size: Option<u64> = None;
                     let mut max_slice_records: Option<u64> = None;
 
-                    let maybe_compacting_rule = self
+                    let maybe_compaction_rule = self
                         .state
                         .lock()
                         .unwrap()
                         .active_configs
-                        .try_get_dataset_compacting_rule(
+                        .try_get_dataset_compaction_rule(
                             &flow_key.dataset_id,
-                            DatasetFlowType::HardCompacting,
+                            DatasetFlowType::HardCompaction,
                         );
-                    if let Some(opts) = maybe_compacting_rule {
+                    if let Some(opts) = maybe_compaction_rule {
                         max_slice_size = Some(opts.max_slice_size());
                         max_slice_records = Some(opts.max_slice_records());
                     };
 
-                    LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                    LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                         dataset_id: flow_key.dataset_id.clone(),
                         max_slice_size,
                         max_slice_records,

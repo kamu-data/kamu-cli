@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Changed
+- Rename `compacting` entities and names to `compaction`
+
 ## [0.180.0] - 2024-05-08
 ### Added
 - GraphQL account flows endpoints:
@@ -34,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - account ID resolutions are no longer mocked
 - REST API to login remotely using password and GitHub methods  
 ### Fixed
-- Compacting datasets stored in an S3 bucket
+- Compaction datasets stored in an S3 bucket
 
 ## [0.177.0] - 2024-04-25
 ### Added

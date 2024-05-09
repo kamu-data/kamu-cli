@@ -127,7 +127,7 @@ pub(crate) async fn ensure_flow_preconditions(
                 }));
             };
         }
-        DatasetFlowType::HardCompacting => (),
+        DatasetFlowType::HardCompaction => (),
     }
     Ok(None)
 }

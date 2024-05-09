@@ -34,7 +34,7 @@ use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::AuthenticationServiceImpl;
 use kamu_core::{
     auth,
-    CompactingResult,
+    CompactionResult,
     CreateDatasetResult,
     DatasetChangesService,
     DatasetIntervalIncrement,
@@ -636,7 +636,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_trigger_compacting_root_dataset() {
+async fn test_trigger_compaction_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
         dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
@@ -653,7 +653,7 @@ async fn test_trigger_compacting_root_dataset() {
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTING");
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTION");
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -709,9 +709,9 @@ async fn test_trigger_compacting_root_dataset() {
                                     {
                                         "flowId": "0",
                                         "description": {
-                                            "__typename": "FlowDescriptionDatasetHardCompacting",
+                                            "__typename": "FlowDescriptionDatasetHardCompaction",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
-                                            "compactingResult": null,
+                                            "compactionResult": null,
                                         },
                                         "status": "WAITING",
                                         "outcome": null,
@@ -774,9 +774,9 @@ async fn test_trigger_compacting_root_dataset() {
                                     {
                                         "flowId": "0",
                                         "description": {
-                                            "__typename": "FlowDescriptionDatasetHardCompacting",
+                                            "__typename": "FlowDescriptionDatasetHardCompaction",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
-                                            "compactingResult": null,
+                                            "compactionResult": null,
                                         },
                                         "status": "WAITING",
                                         "outcome": null,
@@ -848,9 +848,9 @@ async fn test_trigger_compacting_root_dataset() {
                                     {
                                         "flowId": "0",
                                         "description": {
-                                            "__typename": "FlowDescriptionDatasetHardCompacting",
+                                            "__typename": "FlowDescriptionDatasetHardCompaction",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
-                                            "compactingResult": null,
+                                            "compactionResult": null,
                                         },
                                         "status": "RUNNING",
                                         "outcome": null,
@@ -903,9 +903,9 @@ async fn test_trigger_compacting_root_dataset() {
         .mimic_task_completed(
             flow_task_id,
             complete_time,
-            ts::TaskOutcome::Success(ts::TaskResult::CompactingDatasetResult(
-                ts::TaskCompactingDatasetResult {
-                    compacting_result: CompactingResult::Success {
+            ts::TaskOutcome::Success(ts::TaskResult::CompactionDatasetResult(
+                ts::TaskCompactionDatasetResult {
+                    compaction_result: CompactionResult::Success {
                         old_head: Multihash::from_digest_sha3_256(b"old-slice"),
                         new_head: new_head.clone(),
                         old_num_blocks: 5,
@@ -936,9 +936,9 @@ async fn test_trigger_compacting_root_dataset() {
                                     {
                                         "flowId": "0",
                                         "description": {
-                                            "__typename": "FlowDescriptionDatasetHardCompacting",
+                                            "__typename": "FlowDescriptionDatasetHardCompaction",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
-                                            "compactingResult": {
+                                            "compactionResult": {
                                                 "originalBlocksCount": 5,
                                                 "resultingBlocksCount": 4,
                                                 "newHead": new_head
@@ -1003,8 +1003,8 @@ async fn test_list_flows_with_filters_and_pagination() {
 
     let ingest_mutation_code =
         FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
-    let compacting_mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTING");
+    let compaction_mutation_code =
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTION");
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -1018,7 +1018,7 @@ async fn test_list_flows_with_filters_and_pagination() {
 
     let response = schema
         .execute(
-            async_graphql::Request::new(compacting_mutation_code.clone())
+            async_graphql::Request::new(compaction_mutation_code.clone())
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
@@ -1152,7 +1152,7 @@ async fn test_list_flows_with_filters_and_pagination() {
                         runs {
                             listFlows(
                                 filters: {
-                                    byFlowType: "HARD_COMPACTING"
+                                    byFlowType: "HARD_COMPACTION"
                                 }
                             ) {
                                 nodes {
@@ -1556,7 +1556,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     let mutation_code = FlowRunsHarness::trigger_flow_mutation(
         &create_derived_result.dataset_handle.id,
-        "HARD_COMPACTING",
+        "HARD_COMPACTION",
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -1732,7 +1732,7 @@ async fn test_cancel_running_transform_derived_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_cancel_hard_compacting_root_dataset() {
+async fn test_cancel_hard_compaction_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dependency_graph_mock: None,
         dataset_changes_mock: None,
@@ -1742,7 +1742,7 @@ async fn test_cancel_hard_compacting_root_dataset() {
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTING");
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTION");
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -2528,15 +2528,15 @@ impl FlowRunsHarness {
                                         flowId
                                         description {
                                             __typename
-                                            ... on FlowDescriptionDatasetHardCompacting {
+                                            ... on FlowDescriptionDatasetHardCompaction {
                                                 datasetId
-                                                compactingResult {
-                                                    ... on FlowDescriptionHardCompactingSuccess {
+                                                compactionResult {
+                                                    ... on FlowDescriptionHardCompactionSuccess {
                                                         originalBlocksCount
                                                         resultingBlocksCount
                                                         newHead
                                                     }
-                                                    ... on FlowDescriptionHardCompactingNothingToDo {
+                                                    ... on FlowDescriptionHardCompactionNothingToDo {
                                                         message
                                                     }
                                                 }

@@ -60,7 +60,7 @@ async fn test_crud_time_delta_root_dataset() {
                                 batching {
                                     __typename
                                 }
-                                compacting {
+                                compaction {
                                     __typename
                                 }
                             }
@@ -132,7 +132,7 @@ async fn test_crud_time_delta_root_dataset() {
                                         "unit": "DAYS"
                                     },
                                     "batching": null,
-                                    "compacting": null
+                                    "compaction": null
                                 }
                             }
                         }
@@ -177,7 +177,7 @@ async fn test_crud_time_delta_root_dataset() {
                                         "unit": "HOURS"
                                     },
                                     "batching": null,
-                                    "compacting": null
+                                    "compaction": null
                                 }
                             }
                         }
@@ -290,7 +290,7 @@ async fn test_crud_cron_root_dataset() {
                                 batching {
                                     __typename
                                 }
-                                compacting {
+                                compaction {
                                     __typename
                                 }
                             }
@@ -360,7 +360,7 @@ async fn test_crud_cron_root_dataset() {
                                         "cron5ComponentExpression": "*/2 * * * *",
                                     },
                                     "batching": null,
-                                    "compacting": null
+                                    "compaction": null
                                 }
                             }
                         }
@@ -403,7 +403,7 @@ async fn test_crud_cron_root_dataset() {
                                         "cron5ComponentExpression": "0 */1 * * *",
                                     },
                                     "batching": null,
-                                    "compacting": null
+                                    "compaction": null
                                 }
                             }
                         }
@@ -488,7 +488,7 @@ async fn test_crud_batching_derived_dataset() {
                                         unit
                                     }
                                 }
-                                compacting {
+                                compaction {
                                     __typename
                                 }
                             }
@@ -563,7 +563,7 @@ async fn test_crud_batching_derived_dataset() {
                                             "unit": "MINUTES"
                                         }
                                     },
-                                    "compacting": null
+                                    "compaction": null
                                 }
                             }
                         }
@@ -577,7 +577,7 @@ async fn test_crud_batching_derived_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_crud_compacting_root_dataset() {
+async fn test_crud_compaction_root_dataset() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -591,7 +591,7 @@ async fn test_crud_compacting_root_dataset() {
                 byId (datasetId: "<id>") {
                     flows {
                         configs {
-                            byType (datasetFlowType: "HARD_COMPACTING") {
+                            byType (datasetFlowType: "HARD_COMPACTION") {
                                 __typename
                                 paused
                                 schedule {
@@ -600,7 +600,7 @@ async fn test_crud_compacting_root_dataset() {
                                 batching {
                                     __typename
                                 }
-                                compacting {
+                                compaction {
                                     __typename
                                     maxSliceSize
                                     maxSliceRecords
@@ -639,9 +639,9 @@ async fn test_crud_compacting_root_dataset() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_config_compacting_mutation(
+    let mutation_code = FlowConfigHarness::set_config_compaction_mutation(
         &create_result.dataset_handle.id,
-        "HARD_COMPACTING",
+        "HARD_COMPACTION",
         1_000_000,
         10000,
     );
@@ -661,7 +661,7 @@ async fn test_crud_compacting_root_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigCompacting": {
+                            "setConfigCompaction": {
                                 "__typename": "SetFlowConfigSuccess",
                                 "message": "Success",
                                 "config": {
@@ -669,8 +669,8 @@ async fn test_crud_compacting_root_dataset() {
                                     "paused": false,
                                     "schedule": null,
                                     "batching": null,
-                                    "compacting": {
-                                        "__typename": "FlowConfigurationCompacting",
+                                    "compaction": {
+                                        "__typename": "FlowConfigurationCompaction",
                                         "maxSliceSize": 1_000_000,
                                         "maxSliceRecords": 10000
                                     }
@@ -755,7 +755,7 @@ async fn test_batching_config_validation() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_compacting_config_validation() {
+async fn test_compaction_config_validation() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -773,9 +773,9 @@ async fn test_compacting_config_validation() {
             "Maximum slice records must be a positive number",
         ),
     ] {
-        let mutation_code = FlowConfigHarness::set_config_compacting_mutation(
+        let mutation_code = FlowConfigHarness::set_config_compaction_mutation(
             &create_derived_result.dataset_handle.id,
-            "HARD_COMPACTING",
+            "HARD_COMPACTION",
             test_case.0,
             test_case.1,
         );
@@ -794,8 +794,8 @@ async fn test_compacting_config_validation() {
                         "byId": {
                             "flows": {
                                 "configs": {
-                                    "setConfigCompacting": {
-                                        "__typename": "FlowInvalidCompactingConfig",
+                                    "setConfigCompaction": {
+                                        "__typename": "FlowInvalidCompactionConfig",
                                         "message": test_case.2,
                                     }
                                 }
@@ -944,14 +944,14 @@ async fn test_pause_resume_dataset_flows() {
         check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 
-    let mutation_pause_root_compacting = FlowConfigHarness::pause_flows_of_type_mutation(
+    let mutation_pause_root_compaction = FlowConfigHarness::pause_flows_of_type_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
     );
 
     let res = schema
         .execute(
-            async_graphql::Request::new(mutation_pause_root_compacting)
+            async_graphql::Request::new(mutation_pause_root_compaction)
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
@@ -1301,9 +1301,9 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     ////
 
-    let mutation_code = FlowConfigHarness::set_config_compacting_mutation(
+    let mutation_code = FlowConfigHarness::set_config_compaction_mutation(
         &create_derived_result.dataset_handle.id,
-        "HARD_COMPACTING",
+        "HARD_COMPACTION",
         1000,
         1000,
     );
@@ -1323,7 +1323,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigCompacting": {
+                            "setConfigCompaction": {
                                 "__typename": "FlowIncompatibleDatasetKind",
                                 "message": "Expected a Root dataset, but a Derivative dataset was provided",
                             }
@@ -1338,7 +1338,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_set_config_for_hard_compacting_fails() {
+async fn test_set_config_for_hard_compaction_fails() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
         transform_service_mock: Some(MockTransformService::without_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::without_active_polling_source()),
@@ -1349,7 +1349,7 @@ async fn test_set_config_for_hard_compacting_fails() {
 
     let mutation_code = FlowConfigHarness::set_config_batching_mutation(
         &create_root_result.dataset_handle.id,
-        "HARD_COMPACTING",
+        "HARD_COMPACTION",
         false,
         1,
         (30, "MINUTES"),
@@ -1387,7 +1387,7 @@ async fn test_set_config_for_hard_compacting_fails() {
 
     let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
         &create_root_result.dataset_handle.id,
-        "HARD_COMPACTING",
+        "HARD_COMPACTION",
         false,
         "0 */2 * * *",
     );
@@ -1613,7 +1613,7 @@ impl FlowConfigHarness {
                                             batching {
                                                 __typename
                                             }
-                                            compacting {
+                                            compaction {
                                                 __typename
                                             }
                                         }
@@ -1668,7 +1668,7 @@ impl FlowConfigHarness {
                                             batching {
                                                 __typename
                                             }
-                                            compacting {
+                                            compaction {
                                                 __typename
                                             }
                                         }
@@ -1729,7 +1729,7 @@ impl FlowConfigHarness {
                                                         unit
                                                     }
                                                 }
-                                                compacting {
+                                                compaction {
                                                     __typename
                                                 }
                                             }
@@ -1751,7 +1751,7 @@ impl FlowConfigHarness {
         .replace("<minRecordsToAwait>", &min_records_to_await.to_string())
     }
 
-    fn set_config_compacting_mutation(
+    fn set_config_compaction_mutation(
         id: &DatasetID,
         dataset_flow_type: &str,
         max_slice_size: u64,
@@ -1764,9 +1764,9 @@ impl FlowConfigHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             configs {
-                                setConfigCompacting (
+                                setConfigCompaction (
                                     datasetFlowType: "<dataset_flow_type>",
-                                    compactingArgs: {
+                                    compactionArgs: {
                                         maxSliceSize: <maxSliceSize>,
                                         maxSliceRecords: <maxSliceRecords>
                                     }
@@ -1786,7 +1786,7 @@ impl FlowConfigHarness {
                                                 batching {
                                                     __typename
                                                 }
-                                                compacting {
+                                                compaction {
                                                     __typename
                                                     maxSliceSize
                                                     maxSliceRecords

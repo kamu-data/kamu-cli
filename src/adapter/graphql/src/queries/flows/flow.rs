@@ -103,11 +103,11 @@ impl Flow {
                     .int_err()?,
                 })
             }
-            fs::DatasetFlowType::HardCompacting => {
-                FlowDescriptionDataset::HardCompacting(FlowDescriptionDatasetHardCompacting {
+            fs::DatasetFlowType::HardCompaction => {
+                FlowDescriptionDataset::HardCompaction(FlowDescriptionDatasetHardCompaction {
                     dataset_id: dataset_key.dataset_id.clone().into(),
-                    compacting_result:
-                        FlowDescriptionDatasetHardCompactingResult::from_maybe_flow_outcome(
+                    compaction_result:
+                        FlowDescriptionDatasetHardCompactionResult::from_maybe_flow_outcome(
                             self.flow_state.outcome.as_ref(),
                         ),
                 })
@@ -234,7 +234,7 @@ enum FlowDescriptionDataset {
     PollingIngest(FlowDescriptionDatasetPollingIngest),
     PushIngest(FlowDescriptionDatasetPushIngest),
     ExecuteTransform(FlowDescriptionDatasetExecuteTransform),
-    HardCompacting(FlowDescriptionDatasetHardCompacting),
+    HardCompaction(FlowDescriptionDatasetHardCompaction),
 }
 
 #[derive(SimpleObject)]
@@ -258,9 +258,9 @@ struct FlowDescriptionDatasetExecuteTransform {
 }
 
 #[derive(SimpleObject)]
-struct FlowDescriptionDatasetHardCompacting {
+struct FlowDescriptionDatasetHardCompaction {
     dataset_id: DatasetID,
-    compacting_result: Option<FlowDescriptionDatasetHardCompactingResult>,
+    compaction_result: Option<FlowDescriptionDatasetHardCompactionResult>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -310,13 +310,13 @@ impl FlowDescriptionUpdateResult {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Union, Debug, Clone)]
-enum FlowDescriptionDatasetHardCompactingResult {
-    NothingToDo(FlowDescriptionHardCompactingNothingToDo),
-    Success(FlowDescriptionHardCompactingSuccess),
+enum FlowDescriptionDatasetHardCompactionResult {
+    NothingToDo(FlowDescriptionHardCompactionNothingToDo),
+    Success(FlowDescriptionHardCompactionSuccess),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
-struct FlowDescriptionHardCompactingSuccess {
+struct FlowDescriptionHardCompactionSuccess {
     original_blocks_count: u64,
     resulting_blocks_count: u64,
     new_head: Multihash,
@@ -324,30 +324,30 @@ struct FlowDescriptionHardCompactingSuccess {
 
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
-pub struct FlowDescriptionHardCompactingNothingToDo {
+pub struct FlowDescriptionHardCompactionNothingToDo {
     pub _dummy: String,
 }
 
 #[ComplexObject]
-impl FlowDescriptionHardCompactingNothingToDo {
+impl FlowDescriptionHardCompactionNothingToDo {
     async fn message(&self) -> String {
         "Nothing to do".to_string()
     }
 }
 
-impl FlowDescriptionDatasetHardCompactingResult {
+impl FlowDescriptionDatasetHardCompactionResult {
     fn from_maybe_flow_outcome(maybe_outcome: Option<&fs::FlowOutcome>) -> Option<Self> {
         if let Some(outcome) = maybe_outcome {
             match outcome {
                 fs::FlowOutcome::Success(result) => match result {
                     fs::FlowResult::DatasetUpdate(_) => None,
                     fs::FlowResult::Empty => Some(Self::NothingToDo(
-                        FlowDescriptionHardCompactingNothingToDo {
+                        FlowDescriptionHardCompactionNothingToDo {
                             _dummy: "Nothing to do".to_string(),
                         },
                     )),
                     fs::FlowResult::DatasetCompact(compact) => {
-                        Some(Self::Success(FlowDescriptionHardCompactingSuccess {
+                        Some(Self::Success(FlowDescriptionHardCompactionSuccess {
                             original_blocks_count: compact.old_num_blocks as u64,
                             resulting_blocks_count: compact.new_num_blocks as u64,
                             new_head: compact.new_head.clone().into(),

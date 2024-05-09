@@ -12,8 +12,8 @@ use std::sync::Arc;
 use dill::*;
 use event_bus::EventBus;
 use kamu_core::{
-    CompactingOptions,
-    CompactingService,
+    CompactionOptions,
+    CompactionService,
     DatasetRepository,
     PullOptions,
     PullService,
@@ -123,23 +123,23 @@ impl TaskExecutor for TaskExecutorImpl {
                         .clone()
                         .unwrap_or(TaskOutcome::Success(TaskResult::Empty))
                 }
-                LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                     dataset_id,
                     max_slice_size,
                     max_slice_records,
                 }) => {
-                    let compacting_svc =
-                        self.catalog.get_one::<dyn CompactingService>().int_err()?;
+                    let compaction_svc =
+                        self.catalog.get_one::<dyn CompactionService>().int_err()?;
                     let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().int_err()?;
                     let dataset_handle = dataset_repo
                         .resolve_dataset_ref(&dataset_id.as_local_ref())
                         .await
                         .int_err()?;
 
-                    let compacting_result = compacting_svc
+                    let compaction_result = compaction_svc
                         .compact_dataset(
                             &dataset_handle,
-                            CompactingOptions {
+                            CompactionOptions {
                                 max_slice_size: *max_slice_size,
                                 max_slice_records: *max_slice_records,
                             },
@@ -147,9 +147,9 @@ impl TaskExecutor for TaskExecutorImpl {
                         )
                         .await;
 
-                    match compacting_result {
+                    match compaction_result {
                         Ok(result) => {
-                            TaskOutcome::Success(TaskResult::CompactingDatasetResult(result.into()))
+                            TaskOutcome::Success(TaskResult::CompactionDatasetResult(result.into()))
                         }
                         Err(err) => {
                             tracing::info!(

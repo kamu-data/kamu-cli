@@ -25,7 +25,7 @@ mod repos;
 pub mod testing; // TODO: Put under feature flag
 pub mod utils;
 
-mod compacting_service_impl;
+mod compaction_service_impl;
 mod dataset_changes_service_impl;
 mod dataset_config;
 mod dataset_layout;
@@ -44,7 +44,7 @@ mod sync_service_impl;
 mod transform_service_impl;
 mod verification_service_impl;
 
-pub use compacting_service_impl::*;
+pub use compaction_service_impl::*;
 pub use dataset_changes_service_impl::*;
 pub use dataset_config::*;
 pub use dataset_layout::*;

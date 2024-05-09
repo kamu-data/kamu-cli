@@ -40,9 +40,9 @@ async fn test_dataset_flow_empty_filters_distingush_dataset() {
         },
         6,
         vec![
-            foo_cases.compacting_flow_ids.flow_id_finished,
-            foo_cases.compacting_flow_ids.flow_id_running,
-            foo_cases.compacting_flow_ids.flow_id_waiting,
+            foo_cases.compaction_flow_ids.flow_id_finished,
+            foo_cases.compaction_flow_ids.flow_id_running,
+            foo_cases.compaction_flow_ids.flow_id_waiting,
             foo_cases.ingest_flow_ids.flow_id_finished,
             foo_cases.ingest_flow_ids.flow_id_running,
             foo_cases.ingest_flow_ids.flow_id_waiting,
@@ -60,9 +60,9 @@ async fn test_dataset_flow_empty_filters_distingush_dataset() {
         },
         6,
         vec![
-            bar_cases.compacting_flow_ids.flow_id_finished,
-            bar_cases.compacting_flow_ids.flow_id_running,
-            bar_cases.compacting_flow_ids.flow_id_waiting,
+            bar_cases.compaction_flow_ids.flow_id_finished,
+            bar_cases.compaction_flow_ids.flow_id_running,
+            bar_cases.compaction_flow_ids.flow_id_waiting,
             bar_cases.ingest_flow_ids.flow_id_finished,
             bar_cases.ingest_flow_ids.flow_id_running,
             bar_cases.ingest_flow_ids.flow_id_waiting,
@@ -87,7 +87,7 @@ async fn test_dataset_flow_filter_by_status() {
                 ..Default::default()
             },
             vec![
-                foo_cases.compacting_flow_ids.flow_id_waiting,
+                foo_cases.compaction_flow_ids.flow_id_waiting,
                 foo_cases.ingest_flow_ids.flow_id_waiting,
             ],
         ),
@@ -97,7 +97,7 @@ async fn test_dataset_flow_filter_by_status() {
                 ..Default::default()
             },
             vec![
-                foo_cases.compacting_flow_ids.flow_id_running,
+                foo_cases.compaction_flow_ids.flow_id_running,
                 foo_cases.ingest_flow_ids.flow_id_running,
             ],
         ),
@@ -107,7 +107,7 @@ async fn test_dataset_flow_filter_by_status() {
                 ..Default::default()
             },
             vec![
-                foo_cases.compacting_flow_ids.flow_id_finished,
+                foo_cases.compaction_flow_ids.flow_id_finished,
                 foo_cases.ingest_flow_ids.flow_id_finished,
             ],
         ),
@@ -152,13 +152,13 @@ async fn test_dataset_flow_filter_by_flow_type() {
         ),
         (
             DatasetFlowFilters {
-                by_flow_type: Some(DatasetFlowType::HardCompacting),
+                by_flow_type: Some(DatasetFlowType::HardCompaction),
                 ..Default::default()
             },
             vec![
-                foo_cases.compacting_flow_ids.flow_id_finished,
-                foo_cases.compacting_flow_ids.flow_id_running,
-                foo_cases.compacting_flow_ids.flow_id_waiting,
+                foo_cases.compaction_flow_ids.flow_id_finished,
+                foo_cases.compaction_flow_ids.flow_id_running,
+                foo_cases.compaction_flow_ids.flow_id_waiting,
             ],
         ),
         (
@@ -204,7 +204,7 @@ async fn test_dataset_flow_filter_by_initiator() {
                 ..Default::default()
             },
             vec![
-                foo_cases.compacting_flow_ids.flow_id_running,
+                foo_cases.compaction_flow_ids.flow_id_running,
                 foo_cases.ingest_flow_ids.flow_id_running,
             ],
         ),
@@ -216,7 +216,7 @@ async fn test_dataset_flow_filter_by_initiator() {
                 ..Default::default()
             },
             vec![
-                foo_cases.compacting_flow_ids.flow_id_waiting,
+                foo_cases.compaction_flow_ids.flow_id_waiting,
                 foo_cases.ingest_flow_ids.flow_id_waiting,
             ],
         ),
@@ -226,7 +226,7 @@ async fn test_dataset_flow_filter_by_initiator() {
                 ..Default::default()
             },
             vec![
-                foo_cases.compacting_flow_ids.flow_id_finished,
+                foo_cases.compaction_flow_ids.flow_id_finished,
                 foo_cases.ingest_flow_ids.flow_id_finished,
             ],
         ),
@@ -269,12 +269,12 @@ async fn test_dataset_flow_filter_combinations() {
         (
             DatasetFlowFilters {
                 by_flow_status: Some(FlowStatus::Waiting),
-                by_flow_type: Some(DatasetFlowType::HardCompacting),
+                by_flow_type: Some(DatasetFlowType::HardCompaction),
                 by_initiator: Some(InitiatorFilter::Account(AccountID::new_seeded_ed25519(
                     b"petya",
                 ))),
             },
-            vec![foo_cases.compacting_flow_ids.flow_id_waiting],
+            vec![foo_cases.compaction_flow_ids.flow_id_waiting],
         ),
         (
             DatasetFlowFilters {
@@ -318,8 +318,8 @@ async fn test_dataset_flow_pagination() {
                 limit: 2,
             },
             vec![
-                foo_cases.compacting_flow_ids.flow_id_finished,
-                foo_cases.compacting_flow_ids.flow_id_running,
+                foo_cases.compaction_flow_ids.flow_id_finished,
+                foo_cases.compaction_flow_ids.flow_id_running,
             ],
         ),
         (
@@ -328,7 +328,7 @@ async fn test_dataset_flow_pagination() {
                 limit: 3,
             },
             vec![
-                foo_cases.compacting_flow_ids.flow_id_waiting,
+                foo_cases.compaction_flow_ids.flow_id_waiting,
                 foo_cases.ingest_flow_ids.flow_id_finished,
                 foo_cases.ingest_flow_ids.flow_id_running,
             ],
@@ -786,7 +786,7 @@ fn make_event_stores() -> (Arc<dyn FlowEventStore>, Arc<dyn TaskSystemEventStore
 struct DatasetTestCase {
     dataset_id: DatasetID,
     ingest_flow_ids: TestFlowIDs,
-    compacting_flow_ids: TestFlowIDs,
+    compaction_flow_ids: TestFlowIDs,
 }
 
 struct SystemTestCase {
@@ -814,9 +814,9 @@ async fn make_dataset_test_case(
             task_event_store.clone(),
         )
         .await,
-        compacting_flow_ids: make_dataset_test_flows(
+        compaction_flow_ids: make_dataset_test_flows(
             &dataset_id,
-            DatasetFlowType::HardCompacting,
+            DatasetFlowType::HardCompaction,
             flow_event_store,
             task_event_store,
         )

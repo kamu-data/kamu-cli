@@ -189,7 +189,7 @@ type CommitResultSuccess implements CommitResult & UpdateReadmeResult {
 	message: String!
 }
 
-input CompactingConditionInput {
+input CompactionConditionInput {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
 }
@@ -427,7 +427,7 @@ type DatasetFlowConfigs {
 type DatasetFlowConfigsMut {
 	setConfigSchedule(datasetFlowType: DatasetFlowType!, paused: Boolean!, schedule: ScheduleInput!): SetFlowConfigResult!
 	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, batching: BatchingConditionInput!): SetFlowBatchingConfigResult!
-	setConfigCompacting(datasetFlowType: DatasetFlowType!, compactingArgs: CompactingConditionInput!): SetFlowCompactingConfigResult!
+	setConfigCompaction(datasetFlowType: DatasetFlowType!, compactionArgs: CompactionConditionInput!): SetFlowCompactionConfigResult!
 	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
 	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
 }
@@ -451,7 +451,7 @@ type DatasetFlowRunsMut {
 enum DatasetFlowType {
 	INGEST
 	EXECUTE_TRANSFORM
-	HARD_COMPACTING
+	HARD_COMPACTION
 }
 
 type DatasetFlows {
@@ -775,7 +775,7 @@ type FlowConfiguration {
 	paused: Boolean!
 	schedule: FlowConfigurationSchedule
 	batching: FlowConfigurationBatching
-	compacting: FlowConfigurationCompacting
+	compaction: FlowConfigurationCompaction
 }
 
 type FlowConfigurationBatching {
@@ -783,7 +783,7 @@ type FlowConfigurationBatching {
 	maxBatchingInterval: TimeDelta!
 }
 
-type FlowConfigurationCompacting {
+type FlowConfigurationCompaction {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
 }
@@ -811,19 +811,19 @@ type FlowDatasetCompactedFailedError {
 	message: String!
 }
 
-union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompacting | FlowDescriptionSystemGC
+union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionSystemGC
 
 type FlowDescriptionDatasetExecuteTransform {
 	datasetId: DatasetID!
 	transformResult: FlowDescriptionUpdateResult
 }
 
-type FlowDescriptionDatasetHardCompacting {
+type FlowDescriptionDatasetHardCompaction {
 	datasetId: DatasetID!
-	compactingResult: FlowDescriptionDatasetHardCompactingResult
+	compactionResult: FlowDescriptionDatasetHardCompactionResult
 }
 
-union FlowDescriptionDatasetHardCompactingResult = FlowDescriptionHardCompactingNothingToDo | FlowDescriptionHardCompactingSuccess
+union FlowDescriptionDatasetHardCompactionResult = FlowDescriptionHardCompactionNothingToDo | FlowDescriptionHardCompactionSuccess
 
 type FlowDescriptionDatasetPollingIngest {
 	datasetId: DatasetID!
@@ -837,12 +837,12 @@ type FlowDescriptionDatasetPushIngest {
 	ingestResult: FlowDescriptionUpdateResult
 }
 
-type FlowDescriptionHardCompactingNothingToDo {
+type FlowDescriptionHardCompactionNothingToDo {
 	dummy: String!
 	message: String!
 }
 
-type FlowDescriptionHardCompactingSuccess {
+type FlowDescriptionHardCompactionSuccess {
 	originalBlocksCount: Int!
 	resultingBlocksCount: Int!
 	newHead: Multihash!
@@ -910,7 +910,7 @@ union FlowFailedReason = FlowFailedMessage | FlowDatasetCompactedFailedError
 
 scalar FlowID
 
-type FlowIncompatibleDatasetKind implements SetFlowConfigResult & SetFlowBatchingConfigResult & SetFlowCompactingConfigResult & TriggerFlowResult {
+type FlowIncompatibleDatasetKind implements SetFlowConfigResult & SetFlowBatchingConfigResult & SetFlowCompactionConfigResult & TriggerFlowResult {
 	expectedDatasetKind: DatasetKind!
 	actualDatasetKind: DatasetKind!
 	message: String!
@@ -921,7 +921,7 @@ type FlowInvalidBatchingConfig implements SetFlowBatchingConfigResult {
 	message: String!
 }
 
-type FlowInvalidCompactingConfig implements SetFlowCompactingConfigResult {
+type FlowInvalidCompactionConfig implements SetFlowCompactionConfigResult {
 	reason: String!
 	message: String!
 }
@@ -1007,7 +1007,7 @@ type FlowTriggerPush {
 	dummy: Boolean!
 }
 
-type FlowTypeIsNotSupported implements SetFlowConfigResult & SetFlowBatchingConfigResult & SetFlowCompactingConfigResult {
+type FlowTypeIsNotSupported implements SetFlowConfigResult & SetFlowBatchingConfigResult & SetFlowCompactionConfigResult {
 	message: String!
 }
 
@@ -1389,7 +1389,7 @@ interface SetFlowBatchingConfigResult {
 	message: String!
 }
 
-interface SetFlowCompactingConfigResult {
+interface SetFlowCompactionConfigResult {
 	message: String!
 }
 
@@ -1397,7 +1397,7 @@ interface SetFlowConfigResult {
 	message: String!
 }
 
-type SetFlowConfigSuccess implements SetFlowConfigResult & SetFlowBatchingConfigResult & SetFlowCompactingConfigResult {
+type SetFlowConfigSuccess implements SetFlowConfigResult & SetFlowBatchingConfigResult & SetFlowCompactionConfigResult {
 	config: FlowConfiguration!
 	message: String!
 }

@@ -15,11 +15,11 @@ use datafusion::execution::config::SessionConfig;
 use datafusion::execution::context::SessionContext;
 use dill::Component;
 use domain::{
-    CompactingError,
-    CompactingOptions,
-    CompactingResult,
-    CompactingService,
-    NullCompactingMultiListener,
+    CompactionError,
+    CompactionOptions,
+    CompactionResult,
+    CompactionService,
+    NullCompactionMultiListener,
 };
 use event_bus::EventBus;
 use futures::TryStreamExt;
@@ -51,7 +51,7 @@ async fn test_dataset_compact() {
         .await
         .unwrap();
 
-    // Round 1: Compacting is a no-op
+    // Round 1: Compaction is a no-op
     //
     // Before/after: seed <- add_push_source <- set_vocab <- set_schema <-
     // set_data_schema <- add_data(3 records)
@@ -77,14 +77,14 @@ async fn test_dataset_compact() {
 
     assert_matches!(
         harness
-            .compacting_svc
+            .compaction_svc
             .compact_dataset(
                 &dataset_handle,
-                CompactingOptions::default(),
-                Some(Arc::new(NullCompactingMultiListener {}))
+                CompactionOptions::default(),
+                Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(CompactingResult::NothingToDo)
+        Ok(CompactionResult::NothingToDo)
     );
 
     assert_eq!(
@@ -121,14 +121,14 @@ async fn test_dataset_compact() {
 
     assert_matches!(
         harness
-            .compacting_svc
+            .compaction_svc
             .compact_dataset(
                 &dataset_handle,
-                CompactingOptions::default(),
-                Some(Arc::new(NullCompactingMultiListener {}))
+                CompactionOptions::default(),
+                Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(CompactingResult::Success {
+        Ok(CompactionResult::Success {
             new_head,
             old_head,
             new_num_blocks: 5,
@@ -199,7 +199,7 @@ async fn test_dataset_compact_s3() {
         .await
         .unwrap();
 
-    // Round 1: Compacting is a no-op
+    // Round 1: Compaction is a no-op
     //
     // Before/after: seed <- add_push_source <- set_vocab <- set_schema <-
     // set_data_schema <- add_data(3 records)
@@ -225,14 +225,14 @@ async fn test_dataset_compact_s3() {
 
     assert_matches!(
         harness
-            .compacting_svc
+            .compaction_svc
             .compact_dataset(
                 &dataset_handle,
-                CompactingOptions::default(),
-                Some(Arc::new(NullCompactingMultiListener {}))
+                CompactionOptions::default(),
+                Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(CompactingResult::NothingToDo)
+        Ok(CompactionResult::NothingToDo)
     );
 
     assert_eq!(
@@ -269,14 +269,14 @@ async fn test_dataset_compact_s3() {
 
     assert_matches!(
         harness
-            .compacting_svc
+            .compaction_svc
             .compact_dataset(
                 &dataset_handle,
-                CompactingOptions::default(),
-                Some(Arc::new(NullCompactingMultiListener {}))
+                CompactionOptions::default(),
+                Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(CompactingResult::Success {
+        Ok(CompactionResult::Success {
             new_head,
             old_head,
             new_num_blocks: 5,
@@ -303,7 +303,7 @@ async fn test_dataset_compact_s3() {
 
 #[test_group::group(ingest, datafusion, compact)]
 #[tokio::test]
-async fn test_dataset_compacting_watermark_only_blocks() {
+async fn test_dataset_compaction_watermark_only_blocks() {
     let harness = CompactTestHarness::new();
 
     let created = harness.create_test_dataset().await;
@@ -392,16 +392,16 @@ async fn test_dataset_compacting_watermark_only_blocks() {
 
     // After: ... <- add_data(6 records, wm2, src2)
     let res = harness
-        .compacting_svc
+        .compaction_svc
         .compact_dataset(
             &dataset_handle,
-            CompactingOptions::default(),
-            Some(Arc::new(NullCompactingMultiListener {})),
+            CompactionOptions::default(),
+            Some(Arc::new(NullCompactionMultiListener {})),
         )
         .await
         .unwrap();
 
-    let CompactingResult::Success {
+    let CompactionResult::Success {
         old_num_blocks,
         new_num_blocks,
         new_head,
@@ -479,7 +479,7 @@ async fn test_dataset_compacting_watermark_only_blocks() {
 
 #[test_group::group(ingest, datafusion, compact)]
 #[tokio::test]
-async fn test_dataset_compacting_limits() {
+async fn test_dataset_compaction_limits() {
     let harness = CompactTestHarness::new();
 
     let created = harness.create_test_dataset().await;
@@ -565,17 +565,17 @@ async fn test_dataset_compacting_limits() {
 
     assert_matches!(
         harness
-            .compacting_svc
+            .compaction_svc
             .compact_dataset(
                 &dataset_handle,
-                CompactingOptions {
+                CompactionOptions {
                     max_slice_records: Some(6),
                     max_slice_size: None,
                 },
-                Some(Arc::new(NullCompactingMultiListener {}))
+                Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(CompactingResult::Success {
+        Ok(CompactionResult::Success {
             new_head,
             old_head,
             new_num_blocks: 7,
@@ -653,7 +653,7 @@ async fn test_dataset_compacting_limits() {
 
 #[test_group::group(ingest, datafusion, compact)]
 #[tokio::test]
-async fn test_dataset_compacting_keep_all_non_data_blocks() {
+async fn test_dataset_compaction_keep_all_non_data_blocks() {
     let harness = CompactTestHarness::new();
 
     let created = harness.create_test_dataset().await;
@@ -731,14 +731,14 @@ async fn test_dataset_compacting_keep_all_non_data_blocks() {
 
     assert_matches!(
         harness
-            .compacting_svc
+            .compaction_svc
             .compact_dataset(
                 &dataset_handle,
-                CompactingOptions::default(),
-                Some(Arc::new(NullCompactingMultiListener {}))
+                CompactionOptions::default(),
+                Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(CompactingResult::Success {
+        Ok(CompactionResult::Success {
             new_head,
             old_head,
             new_num_blocks: 7,
@@ -803,7 +803,7 @@ async fn test_dataset_compacting_keep_all_non_data_blocks() {
 
 #[test_group::group(compact)]
 #[tokio::test]
-async fn test_dataset_compacting_derive_error() {
+async fn test_dataset_compaction_derive_error() {
     let harness = CompactTestHarness::new();
 
     let created = harness
@@ -818,14 +818,14 @@ async fn test_dataset_compacting_derive_error() {
 
     assert_matches!(
         harness
-            .compacting_svc
+            .compaction_svc
             .compact_dataset(
                 &created.dataset_handle,
-                CompactingOptions::default(),
-                Some(Arc::new(NullCompactingMultiListener {}))
+                CompactionOptions::default(),
+                Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Err(CompactingError::InvalidDatasetKind(_)),
+        Err(CompactionError::InvalidDatasetKind(_)),
     );
 }
 
@@ -883,17 +883,17 @@ async fn test_large_dataset_compact() {
 
     assert_matches!(
         harness
-            .compacting_svc
+            .compaction_svc
             .compact_dataset(
                 &dataset_handle,
-                CompactingOptions {
+                CompactionOptions {
                     max_slice_records: Some(10),
                     max_slice_size: None,
                 },
-                Some(Arc::new(NullCompactingMultiListener {}))
+                Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
-        Ok(CompactingResult::Success {
+        Ok(CompactionResult::Success {
             new_head,
             old_head,
             new_num_blocks: 24,
@@ -951,7 +951,7 @@ async fn test_large_dataset_compact() {
 struct CompactTestHarness {
     _temp_dir: tempfile::TempDir,
     dataset_repo: Arc<dyn DatasetRepository>,
-    compacting_svc: Arc<CompactingServiceImpl>,
+    compaction_svc: Arc<CompactionServiceImpl>,
     push_ingest_svc: Arc<PushIngestServiceImpl>,
     verification_svc: Arc<dyn VerificationService>,
     current_date_time: DateTime<Utc>,
@@ -987,8 +987,8 @@ impl CompactTestHarness {
             .add::<EngineProvisionerNull>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
-            .add_builder(CompactingServiceImpl::builder().with_run_info_dir(run_info_dir.clone()))
-            .bind::<dyn CompactingService, CompactingServiceImpl>()
+            .add_builder(CompactionServiceImpl::builder().with_run_info_dir(run_info_dir.clone()))
+            .bind::<dyn CompactionService, CompactionServiceImpl>()
             .add_builder(
                 PushIngestServiceImpl::builder()
                     .with_object_store_registry(Arc::new(ObjectStoreRegistryImpl::new(vec![
@@ -1004,14 +1004,14 @@ impl CompactTestHarness {
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-        let compacting_svc = catalog.get_one::<CompactingServiceImpl>().unwrap();
+        let compaction_svc = catalog.get_one::<CompactionServiceImpl>().unwrap();
         let push_ingest_svc = catalog.get_one::<PushIngestServiceImpl>().unwrap();
         let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
 
         Self {
             _temp_dir: temp_dir,
             dataset_repo,
-            compacting_svc,
+            compaction_svc,
             push_ingest_svc,
             verification_svc,
             current_date_time,
@@ -1051,7 +1051,7 @@ impl CompactTestHarness {
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
         let object_store_registry = catalog.get_one::<dyn ObjectStoreRegistry>().unwrap();
-        let compacting_svc = CompactingServiceImpl::new(
+        let compaction_svc = CompactionServiceImpl::new(
             catalog.get_one().unwrap(),
             dataset_repo.clone(),
             object_store_registry.clone(),
@@ -1073,7 +1073,7 @@ impl CompactTestHarness {
         Self {
             _temp_dir: temp_dir,
             dataset_repo,
-            compacting_svc: Arc::new(compacting_svc),
+            compaction_svc: Arc::new(compaction_svc),
             push_ingest_svc: Arc::new(push_ingest_svc),
             verification_svc,
             current_date_time,
