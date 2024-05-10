@@ -118,6 +118,7 @@ impl CompactingServiceImpl {
         dataset: Arc<dyn Dataset>,
         max_slice_size: u64,
         max_slice_records: u64,
+        is_keep_metadata_only: bool,
     ) -> Result<ChainFilesInfo, CompactingError> {
         // Declare mut values for result
 
@@ -140,7 +141,7 @@ impl CompactingServiceImpl {
             old_num_blocks += 1;
             match block.event {
                 MetadataEvent::AddData(add_data_event) => {
-                    if let Some(output_slice) = &add_data_event.new_data {
+                    if !is_keep_metadata_only && let Some(output_slice) = &add_data_event.new_data {
                         let data_slice_url = object_data_repo
                             .get_internal_url(&output_slice.physical_hash)
                             .await;
@@ -203,6 +204,11 @@ impl CompactingServiceImpl {
                     }
                 }
                 MetadataEvent::Seed(_) => old_head = Some(block_hash),
+                MetadataEvent::ExecuteTransform(_) => {
+                    if is_keep_metadata_only {
+                        continue;
+                    }
+                }
                 event => {
                     if let MetadataEvent::SetVocab(set_vocab_event) = event {
                         vocab_event = Some(set_vocab_event);
@@ -389,13 +395,19 @@ impl CompactingServiceImpl {
         dataset: Arc<dyn Dataset>,
         max_slice_size: u64,
         max_slice_records: u64,
+        is_keep_metadata_only: bool,
         listener: Arc<dyn CompactingListener>,
     ) -> Result<CompactingResult, CompactingError> {
         let compacting_dir_path = self.create_run_compacting_dir()?;
 
         listener.begin_phase(CompactingPhase::GatherChainInfo);
         let mut chain_files_info = self
-            .gather_chain_info(dataset.clone(), max_slice_size, max_slice_records)
+            .gather_chain_info(
+                dataset.clone(),
+                max_slice_size,
+                max_slice_records,
+                is_keep_metadata_only,
+            )
             .await?;
 
         // if slices amount +1(seed block) eq to amount of blocks we will not perform
@@ -466,7 +478,7 @@ impl CompactingService for CompactingServiceImpl {
             .int_err()?
             .kind;
 
-        if dataset_kind != DatasetKind::Root {
+        if !options.is_keep_metadata_only && dataset_kind != DatasetKind::Root {
             return Err(CompactingError::InvalidDatasetKind(
                 InvalidDatasetKindError {
                     dataset_name: dataset_handle.alias.dataset_name.clone(),
@@ -484,7 +496,13 @@ impl CompactingService for CompactingServiceImpl {
             .unwrap_or(DEFAULT_MAX_SLICE_RECORDS);
 
         match self
-            .compact_dataset_impl(dataset, max_slice_size, max_slice_records, listener.clone())
+            .compact_dataset_impl(
+                dataset,
+                max_slice_size,
+                max_slice_records,
+                options.is_keep_metadata_only,
+                listener.clone(),
+            )
             .await
         {
             Ok(res) => {

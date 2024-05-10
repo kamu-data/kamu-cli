@@ -1239,6 +1239,7 @@ Compact a dataset
 
   Default value: `10000`
 * `--hard` — Perform 'hard' compacting that rewrites the history of a dataset
+* `--keep-metadata-only` — Perform compacting without saving data blocks
 * `--verify` — Perform verification of the dataset before running a compacting
 
 For datasets that get frequent small appends the number of data slices can grow over time and affect the performance of querying. This command allows to merge multiple small data slices into a few large files, which can be beneficial in terms of size from more compact encoding, and in query performance, as data engines will have to scan through far fewer file headers.
