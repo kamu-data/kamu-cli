@@ -1,0 +1,59 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::process::Stdio;
+use std::time::Duration;
+
+use container_runtime::*;
+use kamu::utils::docker_images;
+
+pub struct MqttBroker {
+    pub container_name: String,
+    pub address: String,
+    pub host_port: u16,
+    #[allow(dead_code)]
+    container: ContainerProcess,
+}
+
+impl MqttBroker {
+    pub const IMAGE: &'static str = docker_images::RUMQTTD;
+
+    pub async fn new() -> Self {
+        let container_runtime = ContainerRuntime::default();
+        container_runtime
+            .ensure_image(Self::IMAGE, None)
+            .await
+            .unwrap();
+
+        let server_port = 1883;
+
+        let container = container_runtime
+            .run_attached(Self::IMAGE)
+            .random_container_name_with_prefix("kamu-test-mqtt-")
+            .expose_port(server_port)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+
+        let host_port = container
+            .wait_for_host_socket(server_port, Duration::from_secs(20))
+            .await
+            .unwrap();
+
+        let address = container_runtime.get_runtime_host_addr();
+
+        Self {
+            container_name: container.container_name().to_string(),
+            container,
+            address,
+            host_port,
+        }
+    }
+}

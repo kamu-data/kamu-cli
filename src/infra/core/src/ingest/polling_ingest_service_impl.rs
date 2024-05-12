@@ -141,6 +141,7 @@ impl PollingIngestServiceImpl {
 
             // TODO: Avoid excessive cloning
             let iteration_args = IngestIterationArgs {
+                dataset_handle: args.dataset_handle.clone(),
                 iteration,
                 operation_id,
                 operation_dir,
@@ -214,7 +215,8 @@ impl PollingIngestServiceImpl {
             .on_stage_progress(PollingIngestStage::CheckCache, 0, TotalSteps::Exact(1));
 
         let uncacheable = args.data_writer.prev_offset().is_some()
-            && args.data_writer.prev_source_state().is_none();
+            && args.data_writer.prev_source_state().is_none()
+            && !matches!(args.polling_source.fetch, FetchStep::Mqtt(_));
 
         if uncacheable && !args.options.fetch_uncacheable {
             tracing::info!("Skipping fetch of uncacheable source");
@@ -347,6 +349,7 @@ impl PollingIngestServiceImpl {
                     ?savepoint_path,
                     "Ignoring savepoint due to --fetch-uncacheable"
                 );
+            } else if let FetchStep::Mqtt(_) = fetch_step {
             } else {
                 tracing::info!(?savepoint_path, "Resuming from savepoint");
                 args.listener.on_cache_hit(&savepoint.created_at);
@@ -366,6 +369,7 @@ impl PollingIngestServiceImpl {
 
         let fetch_result = fetch_service
             .fetch(
+                &args.dataset_handle,
                 &args.operation_id,
                 fetch_step,
                 prev_source_state.as_ref(),
@@ -655,6 +659,7 @@ struct IngestLoopArgs {
 }
 
 struct IngestIterationArgs<'a> {
+    dataset_handle: DatasetHandle,
     iteration: usize,
     operation_id: String,
     operation_dir: PathBuf,

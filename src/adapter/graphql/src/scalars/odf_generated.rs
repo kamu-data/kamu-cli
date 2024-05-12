@@ -421,6 +421,7 @@ pub enum FetchStep {
     Url(FetchStepUrl),
     FilesGlob(FetchStepFilesGlob),
     Container(FetchStepContainer),
+    Mqtt(FetchStepMqtt),
 }
 
 impl From<odf::FetchStep> for FetchStep {
@@ -429,6 +430,7 @@ impl From<odf::FetchStep> for FetchStep {
             odf::FetchStep::Url(v) => Self::Url(v.into()),
             odf::FetchStep::FilesGlob(v) => Self::FilesGlob(v.into()),
             odf::FetchStep::Container(v) => Self::Container(v.into()),
+            odf::FetchStep::Mqtt(v) => Self::Mqtt(v.into()),
         }
     }
 }
@@ -486,6 +488,27 @@ impl From<odf::FetchStepContainer> for FetchStepContainer {
             command: v.command.map(|v| v.into_iter().map(Into::into).collect()),
             args: v.args.map(|v| v.into_iter().map(Into::into).collect()),
             env: v.env.map(|v| v.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct FetchStepMqtt {
+    pub host: String,
+    pub port: i32,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub topics: Vec<MqttTopicSubscription>,
+}
+
+impl From<odf::FetchStepMqtt> for FetchStepMqtt {
+    fn from(v: odf::FetchStepMqtt) -> Self {
+        Self {
+            host: v.host.into(),
+            port: v.port.into(),
+            username: v.username.map(Into::into),
+            password: v.password.map(Into::into),
+            topics: v.topics.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -639,6 +662,53 @@ impl From<odf::MetadataEvent> for MetadataEvent {
             odf::MetadataEvent::AddPushSource(v) => Self::AddPushSource(v.into()),
             odf::MetadataEvent::DisablePushSource(v) => Self::DisablePushSource(v.into()),
             odf::MetadataEvent::DisablePollingSource(v) => Self::DisablePollingSource(v.into()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// MqttTopicSubscription
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqtttopicsubscription-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct MqttTopicSubscription {
+    pub path: String,
+    pub qos: Option<MqttQos>,
+}
+
+impl From<odf::MqttTopicSubscription> for MqttTopicSubscription {
+    fn from(v: odf::MqttTopicSubscription) -> Self {
+        Self {
+            path: v.path.into(),
+            qos: v.qos.map(Into::into),
+        }
+    }
+}
+
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MqttQos {
+    AtMostOnce,
+    AtLeastOnce,
+    ExactlyOnce,
+}
+
+impl From<odf::MqttQos> for MqttQos {
+    fn from(v: odf::MqttQos) -> Self {
+        match v {
+            odf::MqttQos::AtMostOnce => Self::AtMostOnce,
+            odf::MqttQos::AtLeastOnce => Self::AtLeastOnce,
+            odf::MqttQos::ExactlyOnce => Self::ExactlyOnce,
+        }
+    }
+}
+
+impl Into<odf::MqttQos> for MqttQos {
+    fn into(self) -> odf::MqttQos {
+        match self {
+            Self::AtMostOnce => odf::MqttQos::AtMostOnce,
+            Self::AtLeastOnce => odf::MqttQos::AtLeastOnce,
+            Self::ExactlyOnce => odf::MqttQos::ExactlyOnce,
         }
     }
 }

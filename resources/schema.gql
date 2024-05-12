@@ -696,7 +696,7 @@ type ExecuteTransformInput {
 	newOffset: Int
 }
 
-union FetchStep = FetchStepUrl | FetchStepFilesGlob | FetchStepContainer
+union FetchStep = FetchStepUrl | FetchStepFilesGlob | FetchStepContainer | FetchStepMqtt
 
 type FetchStepContainer {
 	image: String!
@@ -710,6 +710,14 @@ type FetchStepFilesGlob {
 	eventTime: EventTimeSource
 	cache: SourceCaching
 	order: SourceOrdering
+}
+
+type FetchStepMqtt {
+	host: String!
+	port: Int!
+	username: String
+	password: String
+	topics: [MqttTopicSubscription!]!
 }
 
 type FetchStepUrl {
@@ -1127,6 +1135,17 @@ type MetadataManifestMalformed implements CommitResult & CreateDatasetFromSnapsh
 
 type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetFromSnapshotResult {
 	message: String!
+}
+
+enum MqttQos {
+	AT_MOST_ONCE
+	AT_LEAST_ONCE
+	EXACTLY_ONCE
+}
+
+type MqttTopicSubscription {
+	path: String!
+	qos: MqttQos
 }
 
 scalar Multihash

@@ -431,6 +431,8 @@ pub enum FetchStepDef {
     FilesGlob(#[serde_as(as = "FetchStepFilesGlobDef")] FetchStepFilesGlob),
     #[serde(alias = "container")]
     Container(#[serde_as(as = "FetchStepContainerDef")] FetchStepContainer),
+    #[serde(alias = "mqtt")]
+    Mqtt(#[serde_as(as = "FetchStepMqttDef")] FetchStepMqtt),
 }
 
 implement_serde_as!(FetchStep, FetchStepDef, "FetchStepDef");
@@ -445,6 +447,7 @@ implement_serde_as!(
     FetchStepContainerDef,
     "FetchStepContainerDef"
 );
+implement_serde_as!(FetchStepMqtt, FetchStepMqttDef, "FetchStepMqttDef");
 
 #[serde_as]
 #[skip_serializing_none]
@@ -494,6 +497,20 @@ pub struct FetchStepContainerDef {
     #[serde_as(as = "Option<Vec<EnvVarDef>>")]
     #[serde(default)]
     pub env: Option<Vec<EnvVar>>,
+}
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "FetchStepMqtt")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct FetchStepMqttDef {
+    pub host: String,
+    pub port: i32,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    #[serde_as(as = "Vec<MqttTopicSubscriptionDef>")]
+    pub topics: Vec<MqttTopicSubscription>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -629,6 +646,43 @@ pub enum MetadataEventDef {
 }
 
 implement_serde_as!(MetadataEvent, MetadataEventDef, "MetadataEventDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// MqttTopicSubscription
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqtttopicsubscription-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "MqttTopicSubscription")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct MqttTopicSubscriptionDef {
+    pub path: String,
+    #[serde_as(as = "Option<MqttQosDef>")]
+    #[serde(default)]
+    pub qos: Option<MqttQos>,
+}
+
+implement_serde_as!(
+    MqttTopicSubscription,
+    MqttTopicSubscriptionDef,
+    "MqttTopicSubscriptionDef"
+);
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "MqttQos")]
+#[serde(deny_unknown_fields)]
+pub enum MqttQosDef {
+    #[serde(alias = "atMostOnce", alias = "atmostonce")]
+    AtMostOnce,
+    #[serde(alias = "atLeastOnce", alias = "atleastonce")]
+    AtLeastOnce,
+    #[serde(alias = "exactlyOnce", alias = "exactlyonce")]
+    ExactlyOnce,
+}
+
+implement_serde_as!(MqttQos, MqttQosDef, "MqttQosDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // OffsetInterval

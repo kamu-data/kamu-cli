@@ -24,7 +24,10 @@ use super::*;
 ////////////////////////////////////////////////////////////////////////////////
 
 pub const ODF_BATCH_SIZE: &str = "ODF_BATCH_SIZE";
-pub const ODF_BATCH_SIZE_DEFAULT: u32 = 10_000;
+pub const ODF_BATCH_SIZE_DEFAULT: u64 = 10_000;
+
+pub const ODF_POLL_TIMEOUT_MS: &str = "ODF_POLL_TIMEOUT_MS";
+pub const ODF_POLL_TIMEOUT_MS_DEFAULT: u64 = 1000;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -49,6 +52,7 @@ impl FetchService {
 
     pub async fn fetch(
         &self,
+        dataset_handle: &DatasetHandle,
         operation_id: &str,
         fetch_step: &FetchStep,
         prev_source_state: Option<&PollingSourceState>,
@@ -109,6 +113,9 @@ impl FetchService {
                 system_time,
                 &listener,
             ),
+            FetchStep::Mqtt(fetch) => {
+                Self::fetch_mqtt(dataset_handle, fetch, target_path, &listener).await
+            }
         }
     }
 
@@ -720,6 +727,120 @@ impl FetchService {
             has_more: false,
             zero_copy_path: None,
         }))
+    }
+
+    async fn fetch_mqtt(
+        dataset_handle: &DatasetHandle,
+        fetch: &FetchStepMqtt,
+        target_path: &Path,
+        listener: &Arc<dyn FetchProgressListener>,
+    ) -> Result<FetchResult, PollingIngestError> {
+        use std::io::Write as _;
+
+        use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
+
+        // TODO: Reconsider assignment of client identity on which QoS session data
+        // rentention is based
+        let client_id = format!("kamu-ingest-{}", dataset_handle.id.as_multibase());
+
+        let mut opts = MqttOptions::new(client_id, &fetch.host, u16::try_from(fetch.port).unwrap());
+        opts.set_clean_session(false);
+
+        // TODO: Reconsider password propagation
+        if let (Some(username), Some(password)) = (&fetch.username, &fetch.password) {
+            let password = Self::template_string(password)?;
+            opts.set_credentials(username, password);
+        }
+
+        tracing::debug!("Connecting to the MQTT broker and subscribing to the topic");
+
+        let (client, mut event_loop) = AsyncClient::new(opts, 1000);
+        client
+            .subscribe_many(fetch.topics.clone().into_iter().map(|s| {
+                rumqttc::SubscribeFilter::new(
+                    s.path,
+                    match s.qos {
+                        None | Some(MqttQos::AtMostOnce) => QoS::AtMostOnce,
+                        Some(MqttQos::AtLeastOnce) => QoS::AtLeastOnce,
+                        Some(MqttQos::ExactlyOnce) => QoS::ExactlyOnce,
+                    },
+                )
+            }))
+            .await
+            .int_err()?;
+
+        let mut fetched_bytes = 0;
+        let mut fetched_records = 0;
+        let mut file = std::fs::File::create(target_path).int_err()?;
+
+        // TODO: Reading from env vars is temporary - should be replaced by vars
+        // provider
+        let max_records: u64 = std::env::var(ODF_BATCH_SIZE)
+            .ok()
+            .map(|s| s.parse())
+            .transpose()
+            .int_err()?
+            .unwrap_or(ODF_BATCH_SIZE_DEFAULT);
+
+        let poll_timeout: u64 = std::env::var(ODF_POLL_TIMEOUT_MS)
+            .ok()
+            .map(|s| s.parse())
+            .transpose()
+            .int_err()?
+            .unwrap_or(ODF_POLL_TIMEOUT_MS_DEFAULT);
+        let poll_timeout = std::time::Duration::from_millis(poll_timeout);
+
+        loop {
+            // Limit number of records read if they keep flowing faster that we timeout
+            // TODO: Manual ACKs to prevent lost records
+            if fetched_records >= max_records {
+                break;
+            }
+
+            if let Ok(poll) = tokio::time::timeout(poll_timeout, event_loop.poll()).await {
+                match poll.int_err()? {
+                    Event::Incoming(Packet::Publish(publish)) => {
+                        // TODO: Assuming that payload is JSON and formatting it as line-delimited
+                        if fetched_bytes != 0 {
+                            file.write_all(b" ").int_err()?;
+                        }
+                        let json = std::str::from_utf8(&publish.payload).int_err()?.trim();
+                        file.write_all(json.as_bytes()).int_err()?;
+
+                        fetched_bytes += publish.payload.len() as u64 + 1;
+                        fetched_records += 1;
+
+                        listener.on_progress(&FetchProgress {
+                            fetched_bytes,
+                            total_bytes: TotalBytes::Unknown,
+                        });
+                    }
+                    event => tracing::debug!(?event, "Received"),
+                }
+            } else {
+                break;
+            };
+        }
+
+        tracing::debug!(
+            fetched_bytes,
+            fetched_records,
+            "Disconnecting from the MQTT broker"
+        );
+
+        file.flush().int_err()?;
+
+        if fetched_bytes == 0 {
+            Ok(FetchResult::UpToDate)
+        } else {
+            // TODO: Store last packet ID / client ID in the source state?
+            Ok(FetchResult::Updated(FetchResultUpdated {
+                source_state: None,
+                source_event_time: None,
+                has_more: false,
+                zero_copy_path: None,
+            }))
+        }
     }
 
     fn parse_http_date_time(val: &str) -> DateTime<Utc> {

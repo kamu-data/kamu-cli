@@ -9,13 +9,14 @@
 
 #[cfg(feature = "ftp")]
 mod ftp_server;
-#[cfg(feature = "ftp")]
-pub use ftp_server::*;
-
 mod http_server;
-pub use http_server::*;
-
 mod ipfs_daemon;
-pub use ipfs_daemon::*;
+mod mqtt_broker;
 
 pub mod mock_engine_provisioner;
+
+#[cfg(feature = "ftp")]
+pub use ftp_server::*;
+pub use http_server::*;
+pub use ipfs_daemon::*;
+pub use mqtt_broker::*;

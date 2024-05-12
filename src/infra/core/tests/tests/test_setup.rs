@@ -44,6 +44,10 @@ async fn test_setup_pull_images() {
         .ensure_image(docker_images::MINIO, None)
         .await
         .unwrap();
+    container_runtime
+        .ensure_image(docker_images::RUMQTTD, None)
+        .await
+        .unwrap();
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "ftp")] {

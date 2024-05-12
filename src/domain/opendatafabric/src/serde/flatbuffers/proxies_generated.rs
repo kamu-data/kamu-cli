@@ -719,6 +719,103 @@ pub struct SourceCachingUnionTableOffset {}
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
+pub const ENUM_MIN_MQTT_QOS: i32 = 0;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+pub const ENUM_MAX_MQTT_QOS: i32 = 2;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+#[allow(non_camel_case_types)]
+pub const ENUM_VALUES_MQTT_QOS: [MqttQos; 3] = [
+    MqttQos::AtMostOnce,
+    MqttQos::AtLeastOnce,
+    MqttQos::ExactlyOnce,
+];
+
+////////////////////////////////////////////////////////////////////////////////
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(transparent)]
+pub struct MqttQos(pub i32);
+#[allow(non_upper_case_globals)]
+impl MqttQos {
+    pub const AtMostOnce: Self = Self(0);
+    pub const AtLeastOnce: Self = Self(1);
+    pub const ExactlyOnce: Self = Self(2);
+
+    pub const ENUM_MIN: i32 = 0;
+    pub const ENUM_MAX: i32 = 2;
+    pub const ENUM_VALUES: &'static [Self] =
+        &[Self::AtMostOnce, Self::AtLeastOnce, Self::ExactlyOnce];
+    /// Returns the variant's name or "" if unknown.
+    pub fn variant_name(self) -> Option<&'static str> {
+        match self {
+            Self::AtMostOnce => Some("AtMostOnce"),
+            Self::AtLeastOnce => Some("AtLeastOnce"),
+            Self::ExactlyOnce => Some("ExactlyOnce"),
+            _ => None,
+        }
+    }
+}
+impl core::fmt::Debug for MqttQos {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        if let Some(name) = self.variant_name() {
+            f.write_str(name)
+        } else {
+            f.write_fmt(format_args!("<UNKNOWN {:?}>", self.0))
+        }
+    }
+}
+impl<'a> flatbuffers::Follow<'a> for MqttQos {
+    type Inner = Self;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        let b = flatbuffers::read_scalar_at::<i32>(buf, loc);
+        Self(b)
+    }
+}
+
+impl flatbuffers::Push for MqttQos {
+    type Output = MqttQos;
+    #[inline]
+    unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
+        flatbuffers::emplace_scalar::<i32>(dst, self.0);
+    }
+}
+
+impl flatbuffers::EndianScalar for MqttQos {
+    type Scalar = i32;
+    #[inline]
+    fn to_little_endian(self) -> i32 {
+        self.0.to_le()
+    }
+    #[inline]
+    #[allow(clippy::wrong_self_convention)]
+    fn from_little_endian(v: i32) -> Self {
+        let b = i32::from_le(v);
+        Self(b)
+    }
+}
+
+impl<'a> flatbuffers::Verifiable for MqttQos {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        i32::run_verifier(v, pos)
+    }
+}
+
+impl flatbuffers::SimpleToVerifyInSlice for MqttQos {}
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
 pub const ENUM_MIN_SOURCE_ORDERING: i32 = 0;
 #[deprecated(
     since = "2.0.0",
@@ -814,17 +911,18 @@ pub const ENUM_MIN_FETCH_STEP: u8 = 0;
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MAX_FETCH_STEP: u8 = 3;
+pub const ENUM_MAX_FETCH_STEP: u8 = 4;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_FETCH_STEP: [FetchStep; 4] = [
+pub const ENUM_VALUES_FETCH_STEP: [FetchStep; 5] = [
     FetchStep::NONE,
     FetchStep::FetchStepUrl,
     FetchStep::FetchStepFilesGlob,
     FetchStep::FetchStepContainer,
+    FetchStep::FetchStepMqtt,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -836,14 +934,16 @@ impl FetchStep {
     pub const FetchStepUrl: Self = Self(1);
     pub const FetchStepFilesGlob: Self = Self(2);
     pub const FetchStepContainer: Self = Self(3);
+    pub const FetchStepMqtt: Self = Self(4);
 
     pub const ENUM_MIN: u8 = 0;
-    pub const ENUM_MAX: u8 = 3;
+    pub const ENUM_MAX: u8 = 4;
     pub const ENUM_VALUES: &'static [Self] = &[
         Self::NONE,
         Self::FetchStepUrl,
         Self::FetchStepFilesGlob,
         Self::FetchStepContainer,
+        Self::FetchStepMqtt,
     ];
     /// Returns the variant's name or "" if unknown.
     pub fn variant_name(self) -> Option<&'static str> {
@@ -852,6 +952,7 @@ impl FetchStep {
             Self::FetchStepUrl => Some("FetchStepUrl"),
             Self::FetchStepFilesGlob => Some("FetchStepFilesGlob"),
             Self::FetchStepContainer => Some("FetchStepContainer"),
+            Self::FetchStepMqtt => Some("FetchStepMqtt"),
             _ => None,
         }
     }
@@ -6737,6 +6838,136 @@ impl core::fmt::Debug for EnvVar<'_> {
         ds.finish()
     }
 }
+pub enum MqttTopicSubscriptionOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct MqttTopicSubscription<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for MqttTopicSubscription<'a> {
+    type Inner = MqttTopicSubscription<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> MqttTopicSubscription<'a> {
+    pub const VT_PATH: flatbuffers::VOffsetT = 4;
+    pub const VT_QOS: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        MqttTopicSubscription { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args MqttTopicSubscriptionArgs<'args>,
+    ) -> flatbuffers::WIPOffset<MqttTopicSubscription<'bldr>> {
+        let mut builder = MqttTopicSubscriptionBuilder::new(_fbb);
+        if let Some(x) = args.qos {
+            builder.add_qos(x);
+        }
+        if let Some(x) = args.path {
+            builder.add_path(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn path(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(MqttTopicSubscription::VT_PATH, None)
+        }
+    }
+    #[inline]
+    pub fn qos(&self) -> Option<MqttQos> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<MqttQos>(MqttTopicSubscription::VT_QOS, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for MqttTopicSubscription<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("path", Self::VT_PATH, false)?
+            .visit_field::<MqttQos>("qos", Self::VT_QOS, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct MqttTopicSubscriptionArgs<'a> {
+    pub path: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub qos: Option<MqttQos>,
+}
+impl<'a> Default for MqttTopicSubscriptionArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        MqttTopicSubscriptionArgs {
+            path: None,
+            qos: None,
+        }
+    }
+}
+
+pub struct MqttTopicSubscriptionBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> MqttTopicSubscriptionBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_path(&mut self, path: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(MqttTopicSubscription::VT_PATH, path);
+    }
+    #[inline]
+    pub fn add_qos(&mut self, qos: MqttQos) {
+        self.fbb_
+            .push_slot_always::<MqttQos>(MqttTopicSubscription::VT_QOS, qos);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> MqttTopicSubscriptionBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        MqttTopicSubscriptionBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<MqttTopicSubscription<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for MqttTopicSubscription<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("MqttTopicSubscription");
+        ds.field("path", &self.path());
+        ds.field("qos", &self.qos());
+        ds.finish()
+    }
+}
 pub enum FetchStepUrlOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -7680,6 +7911,224 @@ impl core::fmt::Debug for FetchStepContainer<'_> {
         ds.finish()
     }
 }
+pub enum FetchStepMqttOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct FetchStepMqtt<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for FetchStepMqtt<'a> {
+    type Inner = FetchStepMqtt<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> FetchStepMqtt<'a> {
+    pub const VT_HOST: flatbuffers::VOffsetT = 4;
+    pub const VT_PORT: flatbuffers::VOffsetT = 6;
+    pub const VT_USERNAME: flatbuffers::VOffsetT = 8;
+    pub const VT_PASSWORD: flatbuffers::VOffsetT = 10;
+    pub const VT_TOPICS: flatbuffers::VOffsetT = 12;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        FetchStepMqtt { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args FetchStepMqttArgs<'args>,
+    ) -> flatbuffers::WIPOffset<FetchStepMqtt<'bldr>> {
+        let mut builder = FetchStepMqttBuilder::new(_fbb);
+        if let Some(x) = args.topics {
+            builder.add_topics(x);
+        }
+        if let Some(x) = args.password {
+            builder.add_password(x);
+        }
+        if let Some(x) = args.username {
+            builder.add_username(x);
+        }
+        builder.add_port(args.port);
+        if let Some(x) = args.host {
+            builder.add_host(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn host(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(FetchStepMqtt::VT_HOST, None)
+        }
+    }
+    #[inline]
+    pub fn port(&self) -> i32 {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<i32>(FetchStepMqtt::VT_PORT, Some(0))
+                .unwrap()
+        }
+    }
+    #[inline]
+    pub fn username(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(FetchStepMqtt::VT_USERNAME, None)
+        }
+    }
+    #[inline]
+    pub fn password(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(FetchStepMqtt::VT_PASSWORD, None)
+        }
+    }
+    #[inline]
+    pub fn topics(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<MqttTopicSubscription<'a>>>>
+    {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<MqttTopicSubscription>>,
+            >>(FetchStepMqtt::VT_TOPICS, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for FetchStepMqtt<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("host", Self::VT_HOST, false)?
+            .visit_field::<i32>("port", Self::VT_PORT, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "username",
+                Self::VT_USERNAME,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "password",
+                Self::VT_PASSWORD,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<MqttTopicSubscription>>,
+            >>("topics", Self::VT_TOPICS, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct FetchStepMqttArgs<'a> {
+    pub host: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub port: i32,
+    pub username: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub password: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub topics: Option<
+        flatbuffers::WIPOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<MqttTopicSubscription<'a>>>,
+        >,
+    >,
+}
+impl<'a> Default for FetchStepMqttArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        FetchStepMqttArgs {
+            host: None,
+            port: 0,
+            username: None,
+            password: None,
+            topics: None,
+        }
+    }
+}
+
+pub struct FetchStepMqttBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> FetchStepMqttBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_host(&mut self, host: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(FetchStepMqtt::VT_HOST, host);
+    }
+    #[inline]
+    pub fn add_port(&mut self, port: i32) {
+        self.fbb_.push_slot::<i32>(FetchStepMqtt::VT_PORT, port, 0);
+    }
+    #[inline]
+    pub fn add_username(&mut self, username: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(FetchStepMqtt::VT_USERNAME, username);
+    }
+    #[inline]
+    pub fn add_password(&mut self, password: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(FetchStepMqtt::VT_PASSWORD, password);
+    }
+    #[inline]
+    pub fn add_topics(
+        &mut self,
+        topics: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<MqttTopicSubscription<'b>>>,
+        >,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(FetchStepMqtt::VT_TOPICS, topics);
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> FetchStepMqttBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        FetchStepMqttBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<FetchStepMqtt<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for FetchStepMqtt<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("FetchStepMqtt");
+        ds.field("host", &self.host());
+        ds.field("port", &self.port());
+        ds.field("username", &self.username());
+        ds.field("password", &self.password());
+        ds.field("topics", &self.topics());
+        ds.finish()
+    }
+}
 pub enum PrepStepDecompressOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -8355,6 +8804,21 @@ impl<'a> SetPollingSource<'a> {
 
     #[inline]
     #[allow(non_snake_case)]
+    pub fn fetch_as_fetch_step_mqtt(&self) -> Option<FetchStepMqtt<'a>> {
+        if self.fetch_type() == FetchStep::FetchStepMqtt {
+            self.fetch().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { FetchStepMqtt::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
     pub fn read_as_read_step_csv(&self) -> Option<ReadStepCsv<'a>> {
         if self.read_type() == ReadStep::ReadStepCsv {
             self.read().map(|t| {
@@ -8532,6 +8996,7 @@ impl flatbuffers::Verifiable for SetPollingSource<'_> {
           FetchStep::FetchStepUrl => v.verify_union_variant::<flatbuffers::ForwardsUOffset<FetchStepUrl>>("FetchStep::FetchStepUrl", pos),
           FetchStep::FetchStepFilesGlob => v.verify_union_variant::<flatbuffers::ForwardsUOffset<FetchStepFilesGlob>>("FetchStep::FetchStepFilesGlob", pos),
           FetchStep::FetchStepContainer => v.verify_union_variant::<flatbuffers::ForwardsUOffset<FetchStepContainer>>("FetchStep::FetchStepContainer", pos),
+          FetchStep::FetchStepMqtt => v.verify_union_variant::<flatbuffers::ForwardsUOffset<FetchStepMqtt>>("FetchStep::FetchStepMqtt", pos),
           _ => Ok(()),
         }
      })?
@@ -8711,6 +9176,16 @@ impl core::fmt::Debug for SetPollingSource<'_> {
             }
             FetchStep::FetchStepContainer => {
                 if let Some(x) = self.fetch_as_fetch_step_container() {
+                    ds.field("fetch", &x)
+                } else {
+                    ds.field(
+                        "fetch",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            FetchStep::FetchStepMqtt => {
+                if let Some(x) = self.fetch_as_fetch_step_mqtt() {
                     ds.field("fetch", &x)
                 } else {
                     ds.field(

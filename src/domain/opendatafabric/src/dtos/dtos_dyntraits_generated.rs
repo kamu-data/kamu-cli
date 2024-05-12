@@ -20,7 +20,7 @@ use std::path::Path;
 use chrono::{DateTime, Utc};
 
 use crate::dtos;
-use crate::dtos::{CompressionFormat, DatasetKind, SourceOrdering};
+use crate::dtos::{CompressionFormat, DatasetKind, MqttQos, SourceOrdering};
 use crate::formats::*;
 use crate::identity::*;
 
@@ -575,6 +575,7 @@ pub enum FetchStep<'a> {
     Url(&'a dyn FetchStepUrl),
     FilesGlob(&'a dyn FetchStepFilesGlob),
     Container(&'a dyn FetchStepContainer),
+    Mqtt(&'a dyn FetchStepMqtt),
 }
 
 impl<'a> From<&'a dtos::FetchStep> for FetchStep<'a> {
@@ -583,6 +584,7 @@ impl<'a> From<&'a dtos::FetchStep> for FetchStep<'a> {
             dtos::FetchStep::Url(v) => FetchStep::Url(v),
             dtos::FetchStep::FilesGlob(v) => FetchStep::FilesGlob(v),
             dtos::FetchStep::Container(v) => FetchStep::Container(v),
+            dtos::FetchStep::Mqtt(v) => FetchStep::Mqtt(v),
         }
     }
 }
@@ -593,6 +595,7 @@ impl Into<dtos::FetchStep> for FetchStep<'_> {
             FetchStep::Url(v) => dtos::FetchStep::Url(v.into()),
             FetchStep::FilesGlob(v) => dtos::FetchStep::FilesGlob(v.into()),
             FetchStep::Container(v) => dtos::FetchStep::Container(v.into()),
+            FetchStep::Mqtt(v) => dtos::FetchStep::Mqtt(v.into()),
         }
     }
 }
@@ -616,6 +619,14 @@ pub trait FetchStepContainer {
     fn command(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>>;
     fn args(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>>;
     fn env(&self) -> Option<Box<dyn Iterator<Item = &dyn EnvVar> + '_>>;
+}
+
+pub trait FetchStepMqtt {
+    fn host(&self) -> &str;
+    fn port(&self) -> i32;
+    fn username(&self) -> Option<&str>;
+    fn password(&self) -> Option<&str>;
+    fn topics(&self) -> Box<dyn Iterator<Item = &dyn MqttTopicSubscription> + '_>;
 }
 
 impl FetchStepUrl for dtos::FetchStepUrl {
@@ -683,6 +694,28 @@ impl FetchStepContainer for dtos::FetchStepContainer {
     }
 }
 
+impl FetchStepMqtt for dtos::FetchStepMqtt {
+    fn host(&self) -> &str {
+        self.host.as_ref()
+    }
+    fn port(&self) -> i32 {
+        self.port
+    }
+    fn username(&self) -> Option<&str> {
+        self.username.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+    fn password(&self) -> Option<&str> {
+        self.password.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+    fn topics(&self) -> Box<dyn Iterator<Item = &dyn MqttTopicSubscription> + '_> {
+        Box::new(
+            self.topics
+                .iter()
+                .map(|i| -> &dyn MqttTopicSubscription { i }),
+        )
+    }
+}
+
 impl Into<dtos::FetchStepUrl> for &dyn FetchStepUrl {
     fn into(self) -> dtos::FetchStepUrl {
         dtos::FetchStepUrl {
@@ -712,6 +745,18 @@ impl Into<dtos::FetchStepContainer> for &dyn FetchStepContainer {
             command: self.command().map(|v| v.map(|i| i.to_owned()).collect()),
             args: self.args().map(|v| v.map(|i| i.to_owned()).collect()),
             env: self.env().map(|v| v.map(|i| i.into()).collect()),
+        }
+    }
+}
+
+impl Into<dtos::FetchStepMqtt> for &dyn FetchStepMqtt {
+    fn into(self) -> dtos::FetchStepMqtt {
+        dtos::FetchStepMqtt {
+            host: self.host().to_owned(),
+            port: self.port(),
+            username: self.username().map(|v| v.to_owned()),
+            password: self.password().map(|v| v.to_owned()),
+            topics: self.topics().map(|i| i.into()).collect(),
         }
     }
 }
@@ -901,6 +946,34 @@ impl Into<dtos::MetadataEvent> for MetadataEvent<'_> {
             MetadataEvent::DisablePollingSource(v) => {
                 dtos::MetadataEvent::DisablePollingSource(v.into())
             }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// MqttTopicSubscription
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqtttopicsubscription-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait MqttTopicSubscription {
+    fn path(&self) -> &str;
+    fn qos(&self) -> Option<MqttQos>;
+}
+
+impl MqttTopicSubscription for dtos::MqttTopicSubscription {
+    fn path(&self) -> &str {
+        self.path.as_ref()
+    }
+    fn qos(&self) -> Option<MqttQos> {
+        self.qos.as_ref().map(|v| -> MqttQos { *v })
+    }
+}
+
+impl Into<dtos::MqttTopicSubscription> for &dyn MqttTopicSubscription {
+    fn into(self) -> dtos::MqttTopicSubscription {
+        dtos::MqttTopicSubscription {
+            path: self.path().to_owned(),
+            qos: self.qos().map(|v| v.into()),
         }
     }
 }

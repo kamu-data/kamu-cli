@@ -20,6 +20,8 @@ use kamu::utils::docker_images::BUSYBOX;
 use opendatafabric::*;
 use url::Url;
 
+use crate::MqttBroker;
+
 ///////////////////////////////////////////////////////////////////////////////
 // URL: file
 ///////////////////////////////////////////////////////////////////////////////
@@ -47,6 +49,7 @@ async fn test_fetch_url_file() {
     assert_matches!(
         fetch_svc
             .fetch(
+                &mock_dataset_handle(),
                 &generate_unique_operation_id(),
                 &fetch_step,
                 None,
@@ -64,6 +67,7 @@ async fn test_fetch_url_file() {
     // Normal fetch
     let res = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             None,
@@ -82,6 +86,7 @@ async fn test_fetch_url_file() {
     // No modifications
     let res2 = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
@@ -97,6 +102,7 @@ async fn test_fetch_url_file() {
     filetime::set_file_mtime(&src_path, filetime::FileTime::from_unix_time(0, 0)).unwrap();
     let res3 = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
@@ -133,6 +139,7 @@ async fn test_fetch_url_http_unreachable() {
     assert_matches!(
         fetch_svc
             .fetch(
+                &mock_dataset_handle(),
                 &generate_unique_operation_id(),
                 &fetch_step,
                 None,
@@ -169,6 +176,7 @@ async fn test_fetch_url_http_not_found() {
     assert_matches!(
         fetch_svc
             .fetch(
+                &mock_dataset_handle(),
                 &generate_unique_operation_id(),
                 &fetch_step,
                 None,
@@ -211,6 +219,7 @@ async fn test_fetch_url_http_ok() {
 
     let res = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             None,
@@ -242,6 +251,7 @@ async fn test_fetch_url_http_ok() {
 
     let res_repeat = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
@@ -258,6 +268,7 @@ async fn test_fetch_url_http_ok() {
     filetime::set_file_mtime(&src_path, filetime::FileTime::from_unix_time(0, 0)).unwrap();
     let res_touch = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
@@ -275,6 +286,7 @@ async fn test_fetch_url_http_ok() {
     assert_matches!(
         fetch_svc
             .fetch(
+                &mock_dataset_handle(),
                 &generate_unique_operation_id(),
                 &fetch_step,
                 update.source_state.as_ref(),
@@ -322,6 +334,7 @@ async fn test_fetch_url_http_env_interpolation() {
     assert_matches!(
         fetch_svc
             .fetch(
+                &mock_dataset_handle(),
                 &generate_unique_operation_id(),
                 &fetch_step,
                 None,
@@ -337,6 +350,7 @@ async fn test_fetch_url_http_env_interpolation() {
 
     let res = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             None,
@@ -396,6 +410,7 @@ async fn test_fetch_url_ftp_ok() {
 
     let res = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             None,
@@ -456,6 +471,7 @@ async fn test_fetch_files_glob() {
     assert_matches!(
         fetch_svc
             .fetch(
+                &mock_dataset_handle(),
                 &generate_unique_operation_id(),
                 &fetch_step,
                 None,
@@ -473,6 +489,7 @@ async fn test_fetch_files_glob() {
     // Normal fetch
     let res = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             None,
@@ -499,6 +516,7 @@ async fn test_fetch_files_glob() {
     // No modifications
     let res2 = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
@@ -514,6 +532,7 @@ async fn test_fetch_files_glob() {
     filetime::set_file_mtime(&src_path_1, filetime::FileTime::from_unix_time(0, 0)).unwrap();
     let res3 = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
@@ -532,6 +551,7 @@ async fn test_fetch_files_glob() {
 
     let res4 = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
@@ -570,6 +590,7 @@ async fn test_fetch_files_glob() {
 
     let res5 = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
@@ -596,6 +617,7 @@ async fn test_fetch_files_glob() {
 
     let res6 = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             update5.source_state.as_ref(),
@@ -619,6 +641,122 @@ async fn test_fetch_files_glob() {
         Some(Utc.with_ymd_and_hms(2020, 10, 10, 0, 0, 0).unwrap())
     );
     assert!(!update6.has_more);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// MQTT
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_fetch_mqtt_empty() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let target_path = tempdir.path().join("fetched.bin");
+
+    let broker = MqttBroker::new().await;
+
+    let fetch_step = FetchStep::Mqtt(FetchStepMqtt {
+        host: "localhost".to_string(),
+        port: i32::from(broker.host_port),
+        username: None,
+        password: None,
+        topics: vec![MqttTopicSubscription {
+            path: "test-topic".to_string(),
+            qos: None,
+        }],
+    });
+
+    let fetch_svc = FetchService::new(
+        Arc::new(ContainerRuntime::default()),
+        tempdir.path().join("run"),
+    );
+    let listener = Arc::new(TestListener::new());
+
+    let res = fetch_svc
+        .fetch(
+            &mock_dataset_handle(),
+            &generate_unique_operation_id(),
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            Some(listener.clone()),
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(res, FetchResult::UpToDate);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_fetch_mqtt_one_record() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let target_path = tempdir.path().join("fetched.bin");
+
+    let broker = MqttBroker::new().await;
+    let topic = "test-topic";
+
+    // Publish one (retained) event
+    let (client, mut eventloop) = rumqttc::AsyncClient::new(
+        rumqttc::MqttOptions::new("kamu-publisher", "localhost", broker.host_port),
+        1,
+    );
+    let data = b"{\"data\": 123}";
+    client
+        .publish(topic, rumqttc::QoS::AtLeastOnce, true, data)
+        .await
+        .unwrap();
+
+    loop {
+        let event = eventloop.poll().await.unwrap();
+        tracing::debug!("Received = {:?}", event);
+        if let rumqttc::Event::Incoming(rumqttc::Packet::PubAck(_)) = event {
+            break;
+        }
+    }
+
+    // Read retained event
+    let fetch_step = FetchStep::Mqtt(FetchStepMqtt {
+        host: "localhost".to_string(),
+        port: i32::from(broker.host_port),
+        username: None,
+        password: None,
+        topics: vec![MqttTopicSubscription {
+            path: topic.to_string(),
+            qos: None,
+        }],
+    });
+
+    let fetch_svc = FetchService::new(
+        Arc::new(ContainerRuntime::default()),
+        tempdir.path().join("run"),
+    );
+    let listener = Arc::new(TestListener::new());
+
+    let res = fetch_svc
+        .fetch(
+            &mock_dataset_handle(),
+            &generate_unique_operation_id(),
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            Some(listener.clone()),
+        )
+        .await
+        .unwrap();
+
+    let FetchResult::Updated(update) = res else {
+        panic!("Unexpected result: {res:#?}");
+    };
+    assert!(target_path.exists());
+    assert_matches!(update.source_state, None);
+    assert_eq!(update.source_event_time, None);
+    assert!(!update.has_more);
+    assert_eq!(std::fs::read(target_path).unwrap(), data);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -647,6 +785,7 @@ async fn test_fetch_container_ok() {
 
     let res = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             None,
@@ -694,6 +833,7 @@ async fn test_fetch_container_batch_size_default() {
 
     let res = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             None,
@@ -733,6 +873,7 @@ async fn test_fetch_container_batch_size_set() {
 
     let res = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             None,
@@ -772,6 +913,7 @@ async fn test_fetch_container_batch_size_invalid_format() {
 
     let res = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             None,
@@ -808,6 +950,7 @@ async fn test_fetch_container_has_more_no_data() {
 
     let res = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             None,
@@ -852,6 +995,7 @@ async fn test_fetch_container_has_more_data_is_less_than_a_batch() {
 
     let res = fetch_svc
         .fetch(
+            &mock_dataset_handle(),
             &generate_unique_operation_id(),
             &fetch_step,
             None,
@@ -915,6 +1059,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 
         let res_1 = fetch_svc
             .fetch(
+                &mock_dataset_handle(),
                 &generate_unique_operation_id(),
                 &fetch_step_1,
                 None,
@@ -968,6 +1113,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 
         let res_2 = fetch_svc
             .fetch(
+                &mock_dataset_handle(),
                 &generate_unique_operation_id(),
                 &fetch_step_2,
                 prev_source_state.as_ref(),
@@ -1020,6 +1166,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 
         let res_3 = fetch_svc
             .fetch(
+                &mock_dataset_handle(),
                 &generate_unique_operation_id(),
                 &fetch_step_3,
                 prev_source_state.as_ref(),
@@ -1068,6 +1215,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 
         let res_4 = fetch_svc
             .fetch(
+                &mock_dataset_handle(),
                 &generate_unique_operation_id(),
                 &fetch_step_4,
                 prev_source_state.as_ref(),
@@ -1141,6 +1289,13 @@ const HAS_MORE_TESTER_SCRIPT: &str = indoc! {r#"
 ///////////////////////////////////////////////////////////////////////////////
 // Utils: helpers
 ///////////////////////////////////////////////////////////////////////////////
+
+fn mock_dataset_handle() -> DatasetHandle {
+    DatasetHandle {
+        id: DatasetID::new_seeded_ed25519(b"foo"),
+        alias: "foo".try_into().unwrap(),
+    }
+}
 
 fn generate_unique_operation_id() -> String {
     nanoid::nanoid!()

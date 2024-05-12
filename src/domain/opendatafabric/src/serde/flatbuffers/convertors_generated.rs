@@ -662,6 +662,10 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::FetchStep> for odf::FetchStep {
                 fb::FetchStep::FetchStepContainer,
                 v.serialize(fb).as_union_value(),
             ),
+            odf::FetchStep::Mqtt(v) => (
+                fb::FetchStep::FetchStepMqtt,
+                v.serialize(fb).as_union_value(),
+            ),
         }
     }
 }
@@ -682,6 +686,11 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::FetchStep> for odf::FetchStep {
             fb::FetchStep::FetchStepContainer => {
                 odf::FetchStep::Container(odf::FetchStepContainer::deserialize(unsafe {
                     fb::FetchStepContainer::init_from_table(table)
+                }))
+            }
+            fb::FetchStep::FetchStepMqtt => {
+                odf::FetchStep::Mqtt(odf::FetchStepMqtt::deserialize(unsafe {
+                    fb::FetchStepMqtt::init_from_table(table)
                 }))
             }
             _ => panic!("Invalid enum value: {}", t.0),
@@ -810,6 +819,46 @@ impl<'fb> FlatbuffersDeserializable<fb::FetchStepContainer<'fb>> for odf::FetchS
             env: proxy
                 .env()
                 .map(|v| v.iter().map(|i| odf::EnvVar::deserialize(i)).collect()),
+        }
+    }
+}
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::FetchStepMqtt {
+    type OffsetT = WIPOffset<fb::FetchStepMqtt<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let host_offset = { fb.create_string(&self.host) };
+        let username_offset = self.username.as_ref().map(|v| fb.create_string(&v));
+        let password_offset = self.password.as_ref().map(|v| fb.create_string(&v));
+        let topics_offset = {
+            let offsets: Vec<_> = self.topics.iter().map(|i| i.serialize(fb)).collect();
+            fb.create_vector(&offsets)
+        };
+        let mut builder = fb::FetchStepMqttBuilder::new(fb);
+        builder.add_host(host_offset);
+        builder.add_port(self.port);
+        username_offset.map(|off| builder.add_username(off));
+        password_offset.map(|off| builder.add_password(off));
+        builder.add_topics(topics_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::FetchStepMqtt<'fb>> for odf::FetchStepMqtt {
+    fn deserialize(proxy: fb::FetchStepMqtt<'fb>) -> Self {
+        odf::FetchStepMqtt {
+            host: proxy.host().map(|v| v.to_owned()).unwrap(),
+            port: proxy.port(),
+            username: proxy.username().map(|v| v.to_owned()),
+            password: proxy.password().map(|v| v.to_owned()),
+            topics: proxy
+                .topics()
+                .map(|v| {
+                    v.iter()
+                        .map(|i| odf::MqttTopicSubscription::deserialize(i))
+                        .collect()
+                })
+                .unwrap(),
         }
     }
 }
@@ -1135,6 +1184,53 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::MetadataEvent> for odf::Metadat
                 ))
             }
             _ => panic!("Invalid enum value: {}", t.0),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// MqttTopicSubscription
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqtttopicsubscription-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::MqttTopicSubscription {
+    type OffsetT = WIPOffset<fb::MqttTopicSubscription<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let path_offset = { fb.create_string(&self.path) };
+        let mut builder = fb::MqttTopicSubscriptionBuilder::new(fb);
+        builder.add_path(path_offset);
+        self.qos.map(|v| builder.add_qos(v.into()));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::MqttTopicSubscription<'fb>> for odf::MqttTopicSubscription {
+    fn deserialize(proxy: fb::MqttTopicSubscription<'fb>) -> Self {
+        odf::MqttTopicSubscription {
+            path: proxy.path().map(|v| v.to_owned()).unwrap(),
+            qos: proxy.qos().map(|v| v.into()),
+        }
+    }
+}
+
+impl From<odf::MqttQos> for fb::MqttQos {
+    fn from(v: odf::MqttQos) -> Self {
+        match v {
+            odf::MqttQos::AtMostOnce => fb::MqttQos::AtMostOnce,
+            odf::MqttQos::AtLeastOnce => fb::MqttQos::AtLeastOnce,
+            odf::MqttQos::ExactlyOnce => fb::MqttQos::ExactlyOnce,
+        }
+    }
+}
+
+impl Into<odf::MqttQos> for fb::MqttQos {
+    fn into(self) -> odf::MqttQos {
+        match self {
+            fb::MqttQos::AtMostOnce => odf::MqttQos::AtMostOnce,
+            fb::MqttQos::AtLeastOnce => odf::MqttQos::AtLeastOnce,
+            fb::MqttQos::ExactlyOnce => odf::MqttQos::ExactlyOnce,
+            _ => panic!("Invalid enum value: {}", self.0),
         }
     }
 }

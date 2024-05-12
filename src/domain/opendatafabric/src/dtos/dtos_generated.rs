@@ -339,6 +339,7 @@ pub enum FetchStep {
     Url(FetchStepUrl),
     FilesGlob(FetchStepFilesGlob),
     Container(FetchStepContainer),
+    Mqtt(FetchStepMqtt),
 }
 
 impl_enum_with_variants!(FetchStep);
@@ -391,6 +392,23 @@ pub struct FetchStepContainer {
 }
 
 impl_enum_variant!(FetchStep::Container(FetchStepContainer));
+
+/// Connects to an MQTT broker to fetch events from the specified topic.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct FetchStepMqtt {
+    /// Hostname of the MQTT broker.
+    pub host: String,
+    /// Port of the MQTT broker.
+    pub port: i32,
+    /// Username to use for auth with the broker.
+    pub username: Option<String>,
+    /// Password to use for auth with the broker (can be templated).
+    pub password: Option<String>,
+    /// List of topic subscription parameters.
+    pub topics: Vec<MqttTopicSubscription>,
+}
+
+impl_enum_variant!(FetchStep::Mqtt(FetchStepMqtt));
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SourceOrdering {
@@ -543,6 +561,27 @@ impl_enum_variant!(MetadataEvent::AddPushSource(AddPushSource));
 impl_enum_variant!(MetadataEvent::DisablePushSource(DisablePushSource));
 
 impl_enum_variant!(MetadataEvent::DisablePollingSource(DisablePollingSource));
+
+////////////////////////////////////////////////////////////////////////////////
+// MqttTopicSubscription
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqtttopicsubscription-schema
+////////////////////////////////////////////////////////////////////////////////
+
+/// MQTT topic subscription parameters.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct MqttTopicSubscription {
+    /// Name of the topic (may include patterns).
+    pub path: String,
+    /// Quality of service class
+    pub qos: Option<MqttQos>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MqttQos {
+    AtMostOnce,
+    AtLeastOnce,
+    ExactlyOnce,
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // OffsetInterval

@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Added
+- Introduced MQTT protocol support (see [FetchStepMqtt](https://docs.kamu.dev/odf/reference/#fetchstepmqtt) and the new [`mqtt` example](/examples/mqtt))
 - The `kamu system compact` command now accepts the `--keep-metadata-only` flag, which performs hard
   compaction of dataset(root or derived) without retaining `AddData` or `ExecuteTransform` blocks
 ### Fixed

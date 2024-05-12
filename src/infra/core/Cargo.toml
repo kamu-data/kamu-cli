@@ -50,11 +50,22 @@ serde_yaml = "0.9"
 # Ingest
 # TODO: Using curl brings a lot of overhead including compiling and linking openssl
 # We should replace it with reqwest + a separate FTP client or drop FTP support in favor of container-based ingest.
-curl = { optional = true, version = "0.4", features = ["protocol-ftp", "static-curl", "static-ssl"] }
+curl = { optional = true, version = "0.4", features = [
+    "protocol-ftp",
+    "static-curl",
+    "static-ssl",
+] }
 curl-sys = { optional = true, version = "0.4" }
-flate2 = "1"  # GZip decoder
-reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "stream", "gzip", "brotli", "deflate"] }
+flate2 = "1" # GZip decoder
+reqwest = { version = "0.11", default-features = false, features = [
+    "rustls-tls",
+    "stream",
+    "gzip",
+    "brotli",
+    "deflate",
+] }
 ringbuf = "0.3"
+rumqttc = { version = "0.23" }
 zip = "0.6"
 
 # Data
@@ -69,7 +80,7 @@ aws-sdk-s3 = { version = "0.35" }
 aws-smithy-http = { version = "0.57", features = ["rt-tokio"] }
 aws-smithy-types = { version = "0.57" }
 aws-credential-types = { version = "0.57" }
-trust-dns-resolver = "0.23"  # TODO: Needed for DNSLink resolution with IPFS
+trust-dns-resolver = "0.23"                                     # TODO: Needed for DNSLink resolution with IPFS
 http = "0.2"
 
 # Utils
@@ -77,15 +88,15 @@ async-recursion = "1"
 async-stream = "0.3"
 async-trait = "0.1"
 bytes = "1"
-cfg-if = "1"  # Conditional compilation
+cfg-if = "1" # Conditional compilation
 chrono = { version = "0.4", features = ["serde"] }
 dashmap = "5"
 dill = "0.8"
 futures = "0.3"
-glob = "0.3"  # Used for glob fetch
+glob = "0.3" # Used for glob fetch
 hyper = "0.14"
 itertools = "0.11"
-libc = "0.2"  # Signal names
+libc = "0.2" # Signal names
 like = { version = "0.3", default-features = false }
 mockall = "0.11"
 pin-project = "1"
@@ -94,9 +105,16 @@ rand = "0.8"
 regex = "1"
 tempfile = "3"
 thiserror = { version = "1", default-features = false }
-tokio = { version = "1", default-features = false, features = ["fs", "process"] }
+tokio = { version = "1", default-features = false, features = [
+    "fs",
+    "process",
+] }
 tokio-stream = "0.1"
-tokio-util = { version = "0.7", default-features = false, features = ["codec", "compat", "io"] }
+tokio-util = { version = "0.7", default-features = false, features = [
+    "codec",
+    "compat",
+    "io",
+] }
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
 walkdir = "2"
@@ -107,7 +125,7 @@ tower-http = { version = "0.4", features = ["fs", "trace"] }
 axum = "0.6"
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2"  # For getting uid:gid
+libc = "0.2" # For getting uid:gid
 
 
 [dev-dependencies]
@@ -115,7 +133,6 @@ criterion = { version = "0.5", features = ["async_tokio"] }
 filetime = "0.2"
 indoc = "2"
 tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
-
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

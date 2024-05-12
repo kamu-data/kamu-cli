@@ -1,0 +1,23 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: temp
+  kind: Root
+  metadata:
+    - kind: SetPollingSource
+      fetch:
+        kind: mqtt
+        host: test.mosquitto.org
+        port: 1883
+        topics:
+          - path: dev.kamu.example.mqtt.temp
+            qos: AtMostOnce
+      read:
+        kind: NdJson
+        schema:
+          - event_time TIMESTAMP
+          - value FLOAT
+      merge:
+        kind: Ledger
+        primaryKey:
+          - event_time

@@ -324,6 +324,22 @@ table EnvVar {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// MqttTopicSubscription
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqtttopicsubscription-schema
+////////////////////////////////////////////////////////////////////////////////
+
+enum MqttQos: int32 {
+  AtMostOnce,
+  AtLeastOnce,
+  ExactlyOnce,
+}
+
+table MqttTopicSubscription {
+  path: string;
+  qos: MqttQos = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // FetchStep
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstep-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -354,10 +370,19 @@ table FetchStepContainer {
   env: [EnvVar];
 }
 
+table FetchStepMqtt {
+  host: string;
+  port: int32;
+  username: string;
+  password: string;
+  topics: [MqttTopicSubscription];
+}
+
 union FetchStep {
   FetchStepUrl,
   FetchStepFilesGlob,
   FetchStepContainer,
+  FetchStepMqtt,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
