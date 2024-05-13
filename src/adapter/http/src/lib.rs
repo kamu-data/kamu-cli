@@ -19,7 +19,9 @@ mod axum_utils;
 pub mod data;
 mod simple_protocol;
 pub mod smart_protocol;
+mod upload;
 mod ws_common;
+pub use upload::*;
 
 pub type SmartTransferProtocolClientWs =
     smart_protocol::ws_tungstenite_client::WsSmartTransferProtocolClient;

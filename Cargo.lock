@@ -3899,8 +3899,10 @@ name = "kamu-adapter-http"
 version = "0.184.0"
 dependencies = [
  "async-trait",
+ "aws-credential-types",
  "axum",
  "axum-extra",
+ "base64 0.21.7",
  "bytes",
  "chrono",
  "container-runtime",
@@ -3940,6 +3942,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "uuid",
 ]
 
 [[package]]

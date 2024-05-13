@@ -26,7 +26,7 @@ pub struct LoggedAccount {
     pub is_admin: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum AnonymousAccountReason {
     NoAuthenticationProvided,
     AuthenticationInvalid,

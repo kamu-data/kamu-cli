@@ -17,6 +17,7 @@ use dill::*;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
+use kamu_adapter_http::{UploadService, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
@@ -329,6 +330,9 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_adapter_auth_oso::KamuAuthOso>();
     b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
+
+    b.add_builder(UploadServiceLocal::builder().with_cache_dir(workspace_layout.cache_dir.clone()));
+    b.bind::<dyn UploadService, UploadServiceLocal>();
 
     b
 }
