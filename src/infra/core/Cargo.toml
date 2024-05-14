@@ -80,7 +80,7 @@ aws-sdk-s3 = { version = "0.35" }
 aws-smithy-http = { version = "0.57", features = ["rt-tokio"] }
 aws-smithy-types = { version = "0.57" }
 aws-credential-types = { version = "0.57" }
-trust-dns-resolver = "0.23"                                     # TODO: Needed for DNSLink resolution with IPFS
+trust-dns-resolver = "0.23"  # TODO: Needed for DNSLink resolution with IPFS
 http = "0.2"
 
 # Utils
