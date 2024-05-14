@@ -32,8 +32,8 @@ publish = { workspace = true }
 [dependencies]
 arrow = "51.0.0"
 async-trait = "0.1"
-aws-config = "0.57"
-aws-credential-types = "0.57"
+aws-config = "1"
+aws-credential-types = "1"
 clap = { version = "4", features = ["derive"] }
 datafusion = { version = "37", features = [
     "crypto_expressions",
@@ -45,13 +45,13 @@ datafusion = { version = "37", features = [
     "compression",
 ] }
 datafusion-common = { version = "37", default-features = false }
-dirs = "4"
+dirs = "5"
 futures = "0.3"
 object_store = { version = "0.9", features = ["aws", "gcp", "http"] }
 parking_lot = { version = "0.12" }
 parquet = { version = "51", default-features = false }
 regex = "1"
-rustyline = "11"
+rustyline = "14"
 tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "sync", "parking_lot", "signal"] }
 url = { version = "2" }
 

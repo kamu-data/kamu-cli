@@ -96,7 +96,8 @@ fn test_prep_decompress_zip_single_file() {
         use zip::write::*;
         let mut zip = ZipWriter::new(std::fs::File::create(&src_path).unwrap());
 
-        let options = FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let options =
+            FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
         zip.start_file("data.csv", options).unwrap();
         zip.write_all(content.as_bytes()).unwrap();
         zip.finish().unwrap();

@@ -55,7 +55,7 @@ curl-sys = { optional = true, version = "0.4" }
 flate2 = "1"  # GZip decoder
 reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "stream", "gzip", "brotli", "deflate"] }
 ringbuf = "0.3"
-zip = "0.6"
+zip = "1"
 
 # Data
 datafusion = { version = "37", default-features = false }
@@ -64,11 +64,11 @@ digest = "0.10"
 sha3 = "0.10"
 
 # Repositories
-aws-config = { version = "0.57" }
-aws-sdk-s3 = { version = "0.35" }
-aws-smithy-http = { version = "0.57", features = ["rt-tokio"] }
-aws-smithy-types = { version = "0.57" }
-aws-credential-types = { version = "0.57" }
+aws-config = { version = "1" }
+aws-sdk-s3 = { version = "1" }
+aws-smithy-http = { version = "0.60", features = ["rt-tokio"] }
+aws-smithy-types = { version = "1" }
+aws-credential-types = { version = "1" }
 trust-dns-resolver = "0.23"  # TODO: Needed for DNSLink resolution with IPFS
 http = "0.2"
 
@@ -84,10 +84,10 @@ dill = "0.8"
 futures = "0.3"
 glob = "0.3"  # Used for glob fetch
 hyper = "0.14"
-itertools = "0.11"
+itertools = "0.12"
 libc = "0.2"  # Signal names
 like = { version = "0.3", default-features = false }
-mockall = "0.11"
+mockall = "0.12"
 pin-project = "1"
 petgraph = { version = "0.6.4", default-features = false }
 rand = "0.8"

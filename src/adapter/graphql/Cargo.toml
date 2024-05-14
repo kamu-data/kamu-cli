@@ -63,7 +63,7 @@ kamu-task-system-inmem = { workspace = true }
 
 
 indoc = "2"
-mockall = "0.11"
+mockall = "0.12"
 tempfile = "3"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
