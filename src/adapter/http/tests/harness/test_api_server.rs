@@ -31,6 +31,14 @@ impl TestAPIServer {
                 "/platform/token/validate",
                 axum::routing::get(kamu_adapter_http::platform_token_validate_handler),
             )
+            .route(
+                "/platform/file/upload",
+                axum::routing::get(kamu_adapter_http::platform_file_upload_get_handler),
+            )
+            .route(
+                "/platform/file/upload/:upload_id/:file_name",
+                axum::routing::post(kamu_adapter_http::platform_file_upload_post_handler),
+            )
             .nest("/", kamu_adapter_http::data::root_router())
             .nest(
                 if multi_tenant {

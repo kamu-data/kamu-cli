@@ -9,32 +9,42 @@
 
 use kamu::domain::InternalError;
 use opendatafabric::AccountID;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use tokio::io::AsyncRead;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait UploadService: Send + Sync {
-    async fn organize_file_upload_context(
+    async fn make_upload_context(
         &self,
         account_id: &AccountID,
         file_name: String,
     ) -> Result<UploadContext, InternalError>;
+
+    async fn save_upload(
+        &self,
+        account_id: &AccountID,
+        upload_id: String,
+        file_name: String,
+        file_data: Box<dyn AsyncRead + Send + Unpin>,
+    ) -> Result<(), InternalError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadContext {
     pub upload_url: String,
-    pub method: &'static str,
+    pub method: String,
+    // TODO: resulting URL
     pub fields: Vec<UploadFormField>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct UploadFormField {
-    pub name: &'static str,
+    pub name: String,
     pub value: String,
 }
 

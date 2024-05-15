@@ -158,9 +158,14 @@ pub async fn platform_token_validate_handler(
 
 /////////////////////////////////////////////////////////////////////////////////
 
+#[derive(serde::Deserialize)]
+pub struct FileNameFromQuery {
+    file_name: String,
+}
+
 pub async fn platform_file_upload_get_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
-    name: String,
+    axum::extract::Query(file_name): axum::extract::Query<FileNameFromQuery>,
 ) -> Response {
     let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
     let account_id = match current_account_subject.as_ref() {
@@ -170,34 +175,55 @@ pub async fn platform_file_upload_get_handler(
 
     let upload_service = catalog.get_one::<dyn UploadService>().unwrap();
     match upload_service
-        .organize_file_upload_context(&account_id, name)
+        .make_upload_context(&account_id, file_name.file_name)
         .await
     {
         Ok(upload_context) => Json(json!(upload_context)).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "").into_response(),
+        Err(e) => {
+            tracing::error!("{e:?}");
+            (StatusCode::INTERNAL_SERVER_ERROR, "").into_response()
+        }
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////
 
+#[derive(serde::Deserialize)]
+pub struct UploadFromPath {
+    upload_id: String,
+    file_name: String,
+}
+
 #[allow(clippy::unused_async)]
 pub async fn platform_file_upload_post_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
-    axum::TypedHeader(_content_length): axum::TypedHeader<axum::headers::ContentLength>,
+    axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,
     body_stream: axum::extract::BodyStream,
 ) -> Response {
-    let _ = body_stream;
     let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
-    let _account_id = match current_account_subject.as_ref() {
+    let account_id = match current_account_subject.as_ref() {
         CurrentAccountSubject::Logged(l) => l.account_id.clone(),
         CurrentAccountSubject::Anonymous(reason) => return response_for_anonymous_denial(*reason),
     };
 
-    // TODO:
-    //  - save file body into temporary location
-    //  - return file reference (tbd)
+    let file_data = Box::new(crate::axum_utils::body_into_async_read(body_stream));
 
-    (StatusCode::OK, "").into_response()
+    let upload_local_service = catalog.get_one::<dyn UploadService>().unwrap();
+    match upload_local_service
+        .save_upload(
+            &account_id,
+            upload_param.upload_id,
+            upload_param.file_name,
+            file_data,
+        )
+        .await
+    {
+        Ok(_) => (StatusCode::OK, "").into_response(),
+        Err(e) => {
+            tracing::error!("{e:?}");
+            (StatusCode::INTERNAL_SERVER_ERROR, "").into_response()
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -208,10 +234,10 @@ fn response_for_anonymous_denial(reason: AnonymousAccountReason) -> Response {
             (StatusCode::UNAUTHORIZED, "Authentication token expired").into_response()
         }
         AnonymousAccountReason::AuthenticationInvalid => {
-            (StatusCode::BAD_REQUEST, "Authentication token invalid").into_response()
+            (StatusCode::UNAUTHORIZED, "Authentication token invalid").into_response()
         }
         AnonymousAccountReason::NoAuthenticationProvided => {
-            (StatusCode::BAD_REQUEST, "No authentication token provided").into_response()
+            (StatusCode::UNAUTHORIZED, "No authentication token provided").into_response()
         }
     }
 }

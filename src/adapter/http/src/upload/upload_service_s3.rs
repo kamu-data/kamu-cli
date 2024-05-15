@@ -13,9 +13,11 @@ use aws_credential_types::Credentials;
 use base64::prelude::*;
 use chrono::{DateTime, Duration, Utc};
 use dill::*;
-use kamu::domain::InternalError;
+use kamu::domain::{ErrorIntoInternal, InternalError};
 use kamu::utils::s3_context::S3Context;
 use opendatafabric::AccountID;
+use thiserror::Error;
+use tokio::io::AsyncRead;
 use url::Url;
 use uuid::Uuid;
 
@@ -99,7 +101,7 @@ impl UploadServiceS3 {
 
 #[async_trait::async_trait]
 impl UploadService for UploadServiceS3 {
-    async fn organize_file_upload_context(
+    async fn make_upload_context(
         &self,
         account_id: &AccountID,
         file_name: String,
@@ -119,42 +121,53 @@ impl UploadService for UploadServiceS3 {
 
         Ok(UploadContext {
             upload_url: self.upload_s3_bucket_config.bucket_http_url.to_string(),
-            method: "POST",
+            method: "POST".to_string(),
             fields: vec![
                 UploadFormField {
-                    name: "key",
+                    name: "key".to_string(),
                     value: file_key,
                 },
                 UploadFormField {
-                    name: "acl",
+                    name: "acl".to_string(),
                     value: String::from("private"),
                 },
                 UploadFormField {
-                    name: "x-amz-server-side-encryption",
+                    name: "x-amz-server-side-encryption".to_string(),
                     value: String::from("AES256"),
                 },
                 UploadFormField {
-                    name: "x-amz-credential",
+                    name: "x-amz-credential".to_string(),
                     value: amz_fields.x_amz_credential,
                 },
                 UploadFormField {
-                    name: "x-amz-date",
+                    name: "x-amz-date".to_string(),
                     value: amz_fields.x_amz_date,
                 },
                 UploadFormField {
-                    name: "x-amz-algorithm",
+                    name: "x-amz-algorithm".to_string(),
                     value: String::from(amz_fields.x_amz_algorithm),
                 },
                 UploadFormField {
-                    name: "policy",
+                    name: "policy".to_string(),
                     value: post_policy_base64,
                 },
                 UploadFormField {
-                    name: "signature",
+                    name: "signature".to_string(),
                     value: signature,
                 },
             ],
         })
+    }
+
+    async fn save_upload(
+        &self,
+        _: &AccountID,
+        _: String,
+        _: String,
+        _: Box<dyn AsyncRead + Send + Unpin>,
+    ) -> Result<(), InternalError> {
+        let err = UploadNotSupportedError {};
+        Err(err.int_err())
     }
 }
 
@@ -174,5 +187,11 @@ struct AmzFields {
     x_amz_credential: String,
     x_amz_algorithm: &'static str,
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error("Direct file uploads are not supported in this environment")]
+struct UploadNotSupportedError {}
 
 ///////////////////////////////////////////////////////////////////////////////
