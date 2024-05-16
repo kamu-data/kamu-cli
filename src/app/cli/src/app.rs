@@ -24,15 +24,7 @@ use crate::config::DatabaseConfig;
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
-use crate::{
-    accounts,
-    cli_commands,
-    config,
-    odf_server,
-    GcService,
-    WorkspaceLayout,
-    WorkspaceService,
-};
+use crate::{cli_commands, config, odf_server, GcService, WorkspaceLayout, WorkspaceService};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,13 +46,20 @@ pub async fn run(
         std::env::set_var("RUST_BACKTRACE", "1");
     }
 
-    let workspace_svc = WorkspaceService::new(Arc::new(workspace_layout.clone()));
+    // Relevant for cases where we already have a config, but no workplace yet
+    // ("kamu init" call)
+    let init_multi_tenant_workspace = matches!(matches.subcommand(), Some(("init", arg_matches)) if arg_matches.get_flag("multi-tenant"));
+    let workspace_svc = WorkspaceService::new(
+        Arc::new(workspace_layout.clone()),
+        init_multi_tenant_workspace,
+    );
     let workspace_version = workspace_svc.workspace_version()?;
-    let config = load_config(&workspace_layout);
 
-    let current_account = accounts::AccountService::current_account_indication(
+    let is_multi_tenant_workspace = workspace_svc.is_multi_tenant_workspace();
+    let config = load_config(&workspace_layout);
+    let current_account = AccountService::current_account_indication(
         &matches,
-        workspace_svc.is_multi_tenant_workspace(),
+        is_multi_tenant_workspace,
         config.users.as_ref().unwrap(),
     );
 
@@ -75,16 +74,14 @@ pub async fn run(
 
     // Configure application
     let (guards, base_catalog, cli_catalog, output_config) = {
-        let multi_tenant_workspace = workspace_svc.is_multi_tenant_workspace();
-
         let dependencies_graph_repository = prepare_dependencies_graph_repository(
             &workspace_layout,
-            multi_tenant_workspace,
+            is_multi_tenant_workspace,
             current_account.to_current_account_subject(),
         );
 
         let mut base_catalog_builder =
-            configure_base_catalog(&workspace_layout, multi_tenant_workspace, system_time);
+            configure_base_catalog(&workspace_layout, is_multi_tenant_workspace, system_time);
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
@@ -112,18 +109,18 @@ pub async fn run(
             args = ?std::env::args().collect::<Vec<_>>(),
             ?workspace_version,
             workspace_root = ?workspace_layout.root_dir,
-            "Initializing kamu-cli"
+            "Initializing {BINARY_NAME}"
         );
 
         register_config_in_catalog(
             &config,
             &mut base_catalog_builder,
-            workspace_svc.is_multi_tenant_workspace(),
+            is_multi_tenant_workspace,
         );
 
         let base_catalog = base_catalog_builder.build();
 
-        let cli_catalog = configure_cli_catalog(&base_catalog)
+        let cli_catalog = configure_cli_catalog(&base_catalog, is_multi_tenant_workspace)
             .add_value(current_account.to_current_account_subject())
             .build();
 
@@ -141,7 +138,7 @@ pub async fn run(
                 Err(CLIError::usage_error_from(NotInWorkspace))
             } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
                 Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-            } else if current_account.is_explicit() && !workspace_svc.is_multi_tenant_workspace() {
+            } else if current_account.is_explicit() && !is_multi_tenant_workspace {
                 Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
             } else {
                 command.run().await
@@ -387,12 +384,15 @@ pub fn configure_in_memory_components(catalog_builder: &mut CatalogBuilder) {
 }
 
 // Public only for tests
-pub fn configure_cli_catalog(base_catalog: &Catalog) -> CatalogBuilder {
+pub fn configure_cli_catalog(
+    base_catalog: &Catalog,
+    multi_tenant_workspace: bool,
+) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
 
     b.add::<config::ConfigService>();
     b.add::<GcService>();
-    b.add::<WorkspaceService>();
+    b.add_builder(WorkspaceService::builder().with_multi_tenant(multi_tenant_workspace));
     b.add::<odf_server::LoginService>();
 
     b

@@ -16,15 +16,17 @@ use kamu_cli::*;
 #[test_log::test(tokio::test)]
 async fn test_system_info() {
     let container_runtime = Arc::new(ContainerRuntime::new(ContainerRuntimeConfig::default()));
-    let workpace_svc = Arc::new(WorkspaceService::new(Arc::new(
-        WorkspaceService::find_workspace(),
-    )));
+    let multi_tenant = true;
+    let workpace_svc = Arc::new(WorkspaceService::new(
+        Arc::new(WorkspaceService::find_workspace()),
+        multi_tenant,
+    ));
 
     assert_matches!(
         SystemInfo::collect(&container_runtime, &workpace_svc).await,
         SystemInfo {
             build: BuildInfo {
-                app_version: kamu_cli::VERSION,
+                app_version: VERSION,
                 // We trust vergen to do its job and simply ensure that we detect any incompatible
                 // env var name changes
                 build_timestamp: Some(_),
