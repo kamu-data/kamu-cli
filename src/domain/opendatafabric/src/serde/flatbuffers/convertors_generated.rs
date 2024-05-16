@@ -1189,6 +1189,32 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::MetadataEvent> for odf::Metadat
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// MqttQos
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqttqos-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl From<odf::MqttQos> for fb::MqttQos {
+    fn from(v: odf::MqttQos) -> Self {
+        match v {
+            odf::MqttQos::AtMostOnce => fb::MqttQos::AtMostOnce,
+            odf::MqttQos::AtLeastOnce => fb::MqttQos::AtLeastOnce,
+            odf::MqttQos::ExactlyOnce => fb::MqttQos::ExactlyOnce,
+        }
+    }
+}
+
+impl Into<odf::MqttQos> for fb::MqttQos {
+    fn into(self) -> odf::MqttQos {
+        match self {
+            fb::MqttQos::AtMostOnce => odf::MqttQos::AtMostOnce,
+            fb::MqttQos::AtLeastOnce => odf::MqttQos::AtLeastOnce,
+            fb::MqttQos::ExactlyOnce => odf::MqttQos::ExactlyOnce,
+            _ => panic!("Invalid enum value: {}", self.0),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // MqttTopicSubscription
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqtttopicsubscription-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -1210,27 +1236,6 @@ impl<'fb> FlatbuffersDeserializable<fb::MqttTopicSubscription<'fb>> for odf::Mqt
         odf::MqttTopicSubscription {
             path: proxy.path().map(|v| v.to_owned()).unwrap(),
             qos: proxy.qos().map(|v| v.into()),
-        }
-    }
-}
-
-impl From<odf::MqttQos> for fb::MqttQos {
-    fn from(v: odf::MqttQos) -> Self {
-        match v {
-            odf::MqttQos::AtMostOnce => fb::MqttQos::AtMostOnce,
-            odf::MqttQos::AtLeastOnce => fb::MqttQos::AtLeastOnce,
-            odf::MqttQos::ExactlyOnce => fb::MqttQos::ExactlyOnce,
-        }
-    }
-}
-
-impl Into<odf::MqttQos> for fb::MqttQos {
-    fn into(self) -> odf::MqttQos {
-        match self {
-            fb::MqttQos::AtMostOnce => odf::MqttQos::AtMostOnce,
-            fb::MqttQos::AtLeastOnce => odf::MqttQos::AtLeastOnce,
-            fb::MqttQos::ExactlyOnce => odf::MqttQos::ExactlyOnce,
-            _ => panic!("Invalid enum value: {}", self.0),
         }
     }
 }

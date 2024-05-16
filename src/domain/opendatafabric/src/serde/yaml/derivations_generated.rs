@@ -648,6 +648,25 @@ pub enum MetadataEventDef {
 implement_serde_as!(MetadataEvent, MetadataEventDef, "MetadataEventDef");
 
 ////////////////////////////////////////////////////////////////////////////////
+// MqttQos
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqttqos-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "MqttQos")]
+#[serde(deny_unknown_fields)]
+pub enum MqttQosDef {
+    #[serde(alias = "atMostOnce", alias = "atmostonce")]
+    AtMostOnce,
+    #[serde(alias = "atLeastOnce", alias = "atleastonce")]
+    AtLeastOnce,
+    #[serde(alias = "exactlyOnce", alias = "exactlyonce")]
+    ExactlyOnce,
+}
+
+implement_serde_as!(MqttQos, MqttQosDef, "MqttQosDef");
+
+////////////////////////////////////////////////////////////////////////////////
 // MqttTopicSubscription
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqtttopicsubscription-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -669,20 +688,6 @@ implement_serde_as!(
     MqttTopicSubscriptionDef,
     "MqttTopicSubscriptionDef"
 );
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "MqttQos")]
-#[serde(deny_unknown_fields)]
-pub enum MqttQosDef {
-    #[serde(alias = "atMostOnce", alias = "atmostonce")]
-    AtMostOnce,
-    #[serde(alias = "atLeastOnce", alias = "atleastonce")]
-    AtLeastOnce,
-    #[serde(alias = "exactlyOnce", alias = "exactlyonce")]
-    ExactlyOnce,
-}
-
-implement_serde_as!(MqttQos, MqttQosDef, "MqttQosDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // OffsetInterval

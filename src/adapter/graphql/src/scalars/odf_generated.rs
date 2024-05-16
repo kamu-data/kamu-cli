@@ -667,24 +667,9 @@ impl From<odf::MetadataEvent> for MetadataEvent {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// MqttTopicSubscription
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqtttopicsubscription-schema
+// MqttQos
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqttqos-schema
 ////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct MqttTopicSubscription {
-    pub path: String,
-    pub qos: Option<MqttQos>,
-}
-
-impl From<odf::MqttTopicSubscription> for MqttTopicSubscription {
-    fn from(v: odf::MqttTopicSubscription) -> Self {
-        Self {
-            path: v.path.into(),
-            qos: v.qos.map(Into::into),
-        }
-    }
-}
 
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MqttQos {
@@ -709,6 +694,26 @@ impl Into<odf::MqttQos> for MqttQos {
             Self::AtMostOnce => odf::MqttQos::AtMostOnce,
             Self::AtLeastOnce => odf::MqttQos::AtLeastOnce,
             Self::ExactlyOnce => odf::MqttQos::ExactlyOnce,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// MqttTopicSubscription
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqtttopicsubscription-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct MqttTopicSubscription {
+    pub path: String,
+    pub qos: Option<MqttQos>,
+}
+
+impl From<odf::MqttTopicSubscription> for MqttTopicSubscription {
+    fn from(v: odf::MqttTopicSubscription) -> Self {
+        Self {
+            path: v.path.into(),
+            qos: v.qos.map(Into::into),
         }
     }
 }

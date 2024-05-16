@@ -563,6 +563,18 @@ impl_enum_variant!(MetadataEvent::DisablePushSource(DisablePushSource));
 impl_enum_variant!(MetadataEvent::DisablePollingSource(DisablePollingSource));
 
 ////////////////////////////////////////////////////////////////////////////////
+// MqttQos
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqttqos-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MqttQos {
+    AtMostOnce,
+    AtLeastOnce,
+    ExactlyOnce,
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // MqttTopicSubscription
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqtttopicsubscription-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -572,15 +584,8 @@ impl_enum_variant!(MetadataEvent::DisablePollingSource(DisablePollingSource));
 pub struct MqttTopicSubscription {
     /// Name of the topic (may include patterns).
     pub path: String,
-    /// Quality of service class
+    /// Quality of service class.
     pub qos: Option<MqttQos>,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum MqttQos {
-    AtMostOnce,
-    AtLeastOnce,
-    ExactlyOnce,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

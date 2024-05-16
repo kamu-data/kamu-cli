@@ -6841,6 +6841,7 @@ impl core::fmt::Debug for EnvVar<'_> {
 pub enum MqttTopicSubscriptionOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
+////////////////////////////////////////////////////////////////////////////////
 pub struct MqttTopicSubscription<'a> {
     pub _tab: flatbuffers::Table<'a>,
 }

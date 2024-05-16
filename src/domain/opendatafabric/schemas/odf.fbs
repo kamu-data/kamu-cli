@@ -324,8 +324,8 @@ table EnvVar {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// MqttTopicSubscription
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqtttopicsubscription-schema
+// MqttQos
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqttqos-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 enum MqttQos: int32 {
@@ -333,6 +333,11 @@ enum MqttQos: int32 {
   AtLeastOnce,
   ExactlyOnce,
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// MqttTopicSubscription
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqtttopicsubscription-schema
+////////////////////////////////////////////////////////////////////////////////
 
 table MqttTopicSubscription {
   path: string;
