@@ -308,6 +308,7 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_flow_system_services::FlowConfigurationServiceImpl>();
     b.add::<kamu_flow_system_services::FlowServiceImpl>();
+    b.add::<kamu_flow_system_services::FlowPermissionsPluginImpl>();
     b.add_value(kamu_flow_system_inmem::domain::FlowServiceRunConfig::new(
         chrono::Duration::try_seconds(1).unwrap(),
         chrono::Duration::try_minutes(1).unwrap(),

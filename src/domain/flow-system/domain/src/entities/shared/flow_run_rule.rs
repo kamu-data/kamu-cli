@@ -7,16 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod flow;
-mod flow_config_snapshot;
-mod flow_event;
-mod flow_outcome;
-mod flow_start_condition;
-mod flow_trigger;
+use crate::*;
 
-pub(crate) use flow::*;
-pub(crate) use flow_config_snapshot::*;
-pub(crate) use flow_event::*;
-pub(crate) use flow_outcome::*;
-pub(crate) use flow_start_condition::*;
-pub(crate) use flow_trigger::*;
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+pub struct ConfigSnapshot {
+    pub batching_rule: Option<BatchingRule>,
+    pub compacting_rule: Option<CompactingRule>,
+    pub schedule: Option<Schedule>,
+}

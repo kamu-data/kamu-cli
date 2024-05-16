@@ -10,9 +10,11 @@
 use kamu_flow_system::{
     BatchingRule,
     CompactingRule,
+    ConfigSnapshot,
     FlowConfigurationRule,
     Schedule,
     ScheduleCron,
+    ScheduleTimeDelta,
 };
 
 use crate::prelude::*;
@@ -82,6 +84,7 @@ impl From<BatchingRule> for FlowConfigurationBatching {
 pub struct FlowConfigurationCompacting {
     pub max_slice_size: u64,
     pub max_slice_records: u64,
+    pub is_keep_metadata_only: bool,
 }
 
 impl From<CompactingRule> for FlowConfigurationCompacting {
@@ -89,6 +92,7 @@ impl From<CompactingRule> for FlowConfigurationCompacting {
         Self {
             max_slice_size: value.max_slice_size(),
             max_slice_records: value.max_slice_records(),
+            is_keep_metadata_only: value.is_keep_metadata_only(),
         }
     }
 }
@@ -167,6 +171,104 @@ impl From<chrono::Duration> for TimeDelta {
             "Expecting intervals not smaller than 1 minute that are clearly dividable by unit, \
              but received [{value}]"
         );
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(OneofObject)]
+pub enum FlowRunConfiguration {
+    Schedule(ScheduleInput),
+    Batching(BatchingConditionInput),
+    Compacting(CompactingConditionInput),
+}
+
+#[derive(OneofObject)]
+pub enum ScheduleInput {
+    TimeDelta(TimeDeltaInput),
+    /// Supported CRON syntax: min hour dayOfMonth month dayOfWeek
+    Cron5ComponentExpression(String),
+}
+
+#[derive(InputObject, Clone)]
+pub struct TimeDeltaInput {
+    pub every: u32,
+    pub unit: TimeUnit,
+}
+
+impl From<TimeDeltaInput> for chrono::Duration {
+    fn from(value: TimeDeltaInput) -> Self {
+        let every = i64::from(value.every);
+        match value.unit {
+            TimeUnit::Weeks => chrono::Duration::try_weeks(every).unwrap(),
+            TimeUnit::Days => chrono::Duration::try_days(every).unwrap(),
+            TimeUnit::Hours => chrono::Duration::try_hours(every).unwrap(),
+            TimeUnit::Minutes => chrono::Duration::try_minutes(every).unwrap(),
+        }
+    }
+}
+
+impl From<&TimeDeltaInput> for chrono::Duration {
+    fn from(value: &TimeDeltaInput) -> Self {
+        let every = i64::from(value.every);
+        match value.unit {
+            TimeUnit::Weeks => chrono::Duration::try_weeks(every).unwrap(),
+            TimeUnit::Days => chrono::Duration::try_days(every).unwrap(),
+            TimeUnit::Hours => chrono::Duration::try_hours(every).unwrap(),
+            TimeUnit::Minutes => chrono::Duration::try_minutes(every).unwrap(),
+        }
+    }
+}
+
+#[derive(InputObject)]
+pub struct BatchingConditionInput {
+    pub min_records_to_await: u64,
+    pub max_batching_interval: TimeDeltaInput,
+}
+
+#[derive(InputObject)]
+pub struct CompactingConditionInput {
+    pub max_slice_size: u64,
+    pub max_slice_records: u64,
+    pub is_keep_metadata_only: bool,
+}
+
+impl FlowRunConfiguration {
+    pub fn try_into_snapshot(&self) -> Result<ConfigSnapshot, InternalError> {
+        let mut config_snapshot = ConfigSnapshot::default();
+        match self {
+            Self::Batching(batching_input) => {
+                config_snapshot.batching_rule = Some(
+                    BatchingRule::new_checked(
+                        batching_input.min_records_to_await,
+                        batching_input.max_batching_interval.clone().into(),
+                    )
+                    .int_err()?,
+                );
+            }
+            Self::Compacting(compacting_input) => {
+                config_snapshot.compacting_rule = Some(
+                    CompactingRule::new_checked(
+                        compacting_input.max_slice_size,
+                        compacting_input.max_slice_records,
+                        compacting_input.is_keep_metadata_only,
+                    )
+                    .int_err()?,
+                );
+            }
+            Self::Schedule(schedule_input) => {
+                config_snapshot.schedule = Some(match schedule_input {
+                    ScheduleInput::TimeDelta(td) => {
+                        Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
+                    }
+                    ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
+                        Schedule::try_from_5component_cron_expression(cron_5component_expression)
+                            .int_err()?
+                    }
+                });
+            }
+        };
+        Ok(config_snapshot)
     }
 }
 

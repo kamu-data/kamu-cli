@@ -192,6 +192,7 @@ type CommitResultSuccess implements CommitResult & UpdateReadmeResult {
 input CompactingConditionInput {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
+	isKeepMetadataOnly: Boolean!
 }
 
 enum CompressionFormat {
@@ -444,7 +445,7 @@ type DatasetFlowRuns {
 }
 
 type DatasetFlowRunsMut {
-	triggerFlow(datasetFlowType: DatasetFlowType!): TriggerFlowResult!
+	triggerFlow(datasetFlowType: DatasetFlowType!, flowRunConfiguration: FlowRunConfiguration): TriggerFlowResult!
 	cancelScheduledTasks(flowId: FlowID!): CancelScheduledTasksResult!
 }
 
@@ -773,6 +774,10 @@ type Flow {
 	Start condition
 	"""
 	startCondition: FlowStartCondition
+	"""
+	Flow config snapshot
+	"""
+	configSnapshot: FlowConfigurationSnapshot!
 }
 
 type FlowAbortedResult {
@@ -794,9 +799,16 @@ type FlowConfigurationBatching {
 type FlowConfigurationCompacting {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
+	isKeepMetadataOnly: Boolean!
 }
 
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
+
+type FlowConfigurationSnapshot {
+	batchingRule: FlowConfigurationBatching
+	schedule: FlowConfigurationSchedule
+	compactingRule: FlowConfigurationCompacting
+}
 
 type FlowConnection {
 	"""
@@ -934,6 +946,10 @@ type FlowInvalidCompactingConfig implements SetFlowCompactingConfigResult {
 	message: String!
 }
 
+type FlowInvalidRunConfigurations implements TriggerFlowResult {
+	message: String!
+}
+
 type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
 	flowId: FlowID!
 	message: String!
@@ -944,6 +960,12 @@ union FlowOutcome = FlowSuccessResult | FlowFailedError | FlowAbortedResult
 type FlowPreconditionsNotMet implements SetFlowConfigResult & SetFlowBatchingConfigResult & TriggerFlowResult {
 	preconditions: String!
 	message: String!
+}
+
+input FlowRunConfiguration @oneOf {
+	schedule: ScheduleInput
+	batching: BatchingConditionInput
+	compacting: CompactingConditionInput
 }
 
 union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionBatching | FlowStartConditionExecutor

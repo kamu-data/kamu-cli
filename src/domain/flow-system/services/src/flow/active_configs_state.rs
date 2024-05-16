@@ -101,6 +101,46 @@ impl ActiveConfigsState {
             .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
             .copied()
     }
+
+    pub fn get_merged_config_snapshot(
+        &self,
+        flow_key: &FlowKey,
+        run_config_snapshot: &ConfigSnapshot,
+    ) -> ConfigSnapshot {
+        match flow_key {
+            FlowKey::System(_) => ConfigSnapshot {
+                schedule: if run_config_snapshot.schedule.is_some() {
+                    run_config_snapshot.schedule.clone()
+                } else {
+                    self.try_get_flow_schedule(flow_key)
+                },
+                ..Default::default()
+            },
+            FlowKey::Dataset(dataset_flow_key) => ConfigSnapshot {
+                batching_rule: if run_config_snapshot.batching_rule.is_some() {
+                    run_config_snapshot.batching_rule
+                } else {
+                    self.try_get_dataset_batching_rule(
+                        &dataset_flow_key.dataset_id,
+                        dataset_flow_key.flow_type,
+                    )
+                },
+                compacting_rule: if run_config_snapshot.compacting_rule.is_some() {
+                    run_config_snapshot.compacting_rule
+                } else {
+                    self.try_get_dataset_compacting_rule(
+                        &dataset_flow_key.dataset_id,
+                        dataset_flow_key.flow_type,
+                    )
+                },
+                schedule: if run_config_snapshot.schedule.is_some() {
+                    run_config_snapshot.schedule.clone()
+                } else {
+                    self.try_get_flow_schedule(flow_key)
+                },
+            },
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

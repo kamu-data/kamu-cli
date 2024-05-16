@@ -12,7 +12,7 @@ use futures::TryStreamExt;
 use kamu_core::{DatasetChangesService, PollingIngestService};
 use {kamu_flow_system as fs, kamu_task_system as ts, opendatafabric as odf};
 
-use super::{FlowEvent, FlowOutcome, FlowStartCondition, FlowTrigger};
+use super::{FlowConfigurationSnapshot, FlowEvent, FlowOutcome, FlowStartCondition, FlowTrigger};
 use crate::prelude::*;
 use crate::queries::{Account, Task};
 
@@ -206,6 +206,11 @@ impl Flow {
             };
 
         Ok(maybe_condition)
+    }
+
+    /// Flow config snapshot
+    async fn config_snapshot(&self) -> FlowConfigurationSnapshot {
+        self.flow_state.config_snapshot.clone().into()
     }
 }
 

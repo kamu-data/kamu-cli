@@ -24,7 +24,7 @@ use kamu_core::{
     TransformService,
 };
 use kamu_flow_system_inmem::FlowConfigurationEventStoreInMem;
-use kamu_flow_system_services::FlowConfigurationServiceImpl;
+use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowPermissionsPluginImpl};
 use opendatafabric::*;
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
@@ -644,6 +644,7 @@ async fn test_crud_compacting_root_dataset() {
         "HARD_COMPACTING",
         1_000_000,
         10000,
+        false,
     );
 
     let res = schema
@@ -778,6 +779,7 @@ async fn test_compacting_config_validation() {
             "HARD_COMPACTING",
             test_case.0,
             test_case.1,
+            false,
         );
 
         let response = schema
@@ -1306,6 +1308,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         "HARD_COMPACTING",
         1000,
         1000,
+        false,
     );
 
     let res = schema
@@ -1518,6 +1521,7 @@ impl FlowConfigHarness {
             .add::<DependencyGraphServiceInMemory>()
             .add::<FlowConfigurationServiceImpl>()
             .add::<FlowConfigurationEventStoreInMem>()
+            .add::<FlowPermissionsPluginImpl>()
             .build();
 
         // Init dataset with no sources
@@ -1756,6 +1760,7 @@ impl FlowConfigHarness {
         dataset_flow_type: &str,
         max_slice_size: u64,
         max_slice_records: u64,
+        is_keep_metadata_only: bool,
     ) -> String {
         indoc!(
             r#"
@@ -1767,8 +1772,9 @@ impl FlowConfigHarness {
                                 setConfigCompacting (
                                     datasetFlowType: "<dataset_flow_type>",
                                     compactingArgs: {
-                                        maxSliceSize: <maxSliceSize>,
-                                        maxSliceRecords: <maxSliceRecords>
+                                        maxSliceSize: <max_slice_size>,
+                                        maxSliceRecords: <max_slice_records>,
+                                        isKeepMetadataOnly: <is_keep_metadata_only>
                                     }
                                 ) {
                                     __typename,
@@ -1804,8 +1810,16 @@ impl FlowConfigHarness {
         )
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
-        .replace("<maxSliceRecords>", &max_slice_records.to_string())
-        .replace("<maxSliceSize>", &max_slice_size.to_string())
+        .replace("<max_slice_records>", &max_slice_records.to_string())
+        .replace("<max_slice_size>", &max_slice_size.to_string())
+        .replace(
+            "<is_keep_metadata_only>",
+            if is_keep_metadata_only {
+                "true"
+            } else {
+                "false"
+            },
+        )
     }
 
     fn quick_flow_config_query(id: &DatasetID, dataset_flow_type: &str) -> String {

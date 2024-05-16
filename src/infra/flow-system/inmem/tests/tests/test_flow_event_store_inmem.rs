@@ -858,13 +858,28 @@ async fn make_dataset_test_flows(
     });
 
     let flow_id_waiting = flow_generator
-        .make_new_flow(dataset_flow_type, FlowStatus::Waiting, petya_manual_trigger)
+        .make_new_flow(
+            dataset_flow_type,
+            FlowStatus::Waiting,
+            petya_manual_trigger,
+            ConfigSnapshot::default(),
+        )
         .await;
     let flow_id_running = flow_generator
-        .make_new_flow(dataset_flow_type, FlowStatus::Running, wasya_manual_trigger)
+        .make_new_flow(
+            dataset_flow_type,
+            FlowStatus::Running,
+            wasya_manual_trigger,
+            ConfigSnapshot::default(),
+        )
         .await;
     let flow_id_finished = flow_generator
-        .make_new_flow(dataset_flow_type, FlowStatus::Finished, automatic_trigger)
+        .make_new_flow(
+            dataset_flow_type,
+            FlowStatus::Finished,
+            automatic_trigger,
+            ConfigSnapshot::default(),
+        )
         .await;
 
     TestFlowIDs {
@@ -896,13 +911,28 @@ async fn make_system_test_flows(
     });
 
     let flow_id_waiting = flow_generator
-        .make_new_flow(system_flow_type, FlowStatus::Waiting, petya_manual_trigger)
+        .make_new_flow(
+            system_flow_type,
+            FlowStatus::Waiting,
+            petya_manual_trigger,
+            ConfigSnapshot::default(),
+        )
         .await;
     let flow_id_running = flow_generator
-        .make_new_flow(system_flow_type, FlowStatus::Running, wasya_manual_trigger)
+        .make_new_flow(
+            system_flow_type,
+            FlowStatus::Running,
+            wasya_manual_trigger,
+            ConfigSnapshot::default(),
+        )
         .await;
     let flow_id_finished = flow_generator
-        .make_new_flow(system_flow_type, FlowStatus::Finished, automatic_trigger)
+        .make_new_flow(
+            system_flow_type,
+            FlowStatus::Finished,
+            automatic_trigger,
+            ConfigSnapshot::default(),
+        )
         .await;
 
     TestFlowIDs {
@@ -981,6 +1011,7 @@ impl<'a> DatasetFlowGenerator<'a> {
         flow_type: DatasetFlowType,
         expected_status: FlowStatus,
         initial_trigger: FlowTrigger,
+        config_snapshot: ConfigSnapshot,
     ) -> FlowID {
         let flow_id = self.flow_event_store.new_flow_id();
 
@@ -995,6 +1026,7 @@ impl<'a> DatasetFlowGenerator<'a> {
             }
             .into(),
             initial_trigger,
+            config_snapshot,
         );
 
         drive_flow_to_status(&mut flow, self.task_event_store.as_ref(), expected_status).await;
@@ -1028,6 +1060,7 @@ impl SystemFlowGenerator {
         flow_type: SystemFlowType,
         expected_status: FlowStatus,
         initial_trigger: FlowTrigger,
+        config_snapshot: ConfigSnapshot,
     ) -> FlowID {
         let flow_id = self.flow_event_store.new_flow_id();
 
@@ -1038,6 +1071,7 @@ impl SystemFlowGenerator {
             flow_id,
             FlowKey::System(FlowKeySystem { flow_type }),
             initial_trigger,
+            config_snapshot,
         );
 
         drive_flow_to_status(&mut flow, self.task_event_store.as_ref(), expected_status).await;

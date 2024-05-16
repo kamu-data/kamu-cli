@@ -69,6 +69,7 @@ pub struct HardCompactingDataset {
     pub dataset_id: DatasetID,
     pub max_slice_size: Option<u64>,
     pub max_slice_records: Option<u64>,
+    pub is_keep_metadata_only: bool,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

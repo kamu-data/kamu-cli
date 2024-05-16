@@ -15,7 +15,13 @@ use dill::*;
 use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, MockDatasetChangesService};
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{
+    AuthenticationService,
+    CurrentAccountSubject,
+    MockAuthenticationService,
+    DEFAULT_ACCOUNT_ID,
+    DEFAULT_ACCOUNT_NAME,
+};
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
@@ -23,6 +29,7 @@ use kamu_flow_system_services::*;
 use kamu_task_system::*;
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
+use mockall::predicate::eq;
 use opendatafabric::*;
 use tokio::task::yield_now;
 
@@ -475,6 +482,7 @@ async fn test_manual_trigger_compacting() {
                       dataset_id: foo_id.clone(),
                       max_slice_size: None,
                       max_slice_records: None,
+                      is_keep_metadata_only: false,
                     }),
                 });
                 let task0_handle = task0_driver.run();
@@ -488,6 +496,7 @@ async fn test_manual_trigger_compacting() {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
                     max_slice_records: None,
+                    is_keep_metadata_only: false,
                   }),
                 });
                 let task1_handle = task1_driver.run();
@@ -582,7 +591,7 @@ async fn test_manual_trigger_compacting_with_config() {
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::HardCompacting,
-            CompactingRule::new_checked(max_slice_size, max_slice_records).unwrap(),
+            CompactingRule::new_checked(max_slice_size, max_slice_records, false).unwrap(),
         )
         .await;
 
@@ -615,6 +624,7 @@ async fn test_manual_trigger_compacting_with_config() {
                       dataset_id: foo_id.clone(),
                       max_slice_size: Some(max_slice_size),
                       max_slice_records: Some(max_slice_records),
+                      is_keep_metadata_only: false,
                     }),
                 });
                 let task0_handle = task0_driver.run();
@@ -654,6 +664,198 @@ async fn test_manual_trigger_compacting_with_config() {
             #3: +40ms:
               "foo" HardCompacting:
                 Flow ID = 0 Finished Success
+
+            "#
+        )
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_manual_trigger_keep_metada_only_compacting() {
+    let max_slice_size = 1_000_000u64;
+    let max_slice_records = 1000u64;
+    let harness = FlowHarness::new();
+
+    let foo_id = harness.create_root_dataset("foo").await;
+    let foo_bar_id = harness
+        .create_derived_dataset("foo.bar", vec![foo_id.clone()])
+        .await;
+
+    harness
+        .set_dataset_flow_compacting_rule(
+            harness.now_datetime(),
+            foo_id.clone(),
+            DatasetFlowType::HardCompacting,
+            CompactingRule::new_checked(max_slice_size, max_slice_records, true).unwrap(),
+        )
+        .await;
+    harness
+        .set_dataset_flow_batching_rule(
+            harness.now_datetime(),
+            foo_bar_id.clone(),
+            DatasetFlowType::ExecuteTransform,
+            BatchingRule::new_checked(1, Duration::try_seconds(1).unwrap()).unwrap(),
+        )
+        .await;
+
+    harness.eager_dependencies_graph_init().await;
+
+    let foo_flow_key: FlowKey =
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(foo_bar_id.clone(), "foo_Bar".to_string());
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+        // Run API service
+        res = harness.flow_service.run(start_time) => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+            // Task 0: "foo_bar" execute_transform start running at 10ms, finish at 30ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+              task_id: TaskID::new(0),
+              dataset_id: Some(foo_bar_id.clone()),
+              run_since_start: Duration::try_milliseconds(10).unwrap(),
+              finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+              expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                dataset_id: foo_bar_id.clone(),
+                }),
+            });
+            let task0_handle = task0_driver.run();
+            // Task 1: "foo" start running at 30ms, finish at 40ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::try_milliseconds(30).unwrap(),
+                finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::CompactingDatasetResult(TaskCompactingDatasetResult {
+                  compacting_result: CompactingResult::Success {
+                    old_head: Multihash::from_digest_sha3_256(b"old-slice"),
+                    new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                    old_num_blocks: 5,
+                    new_num_blocks: 4,
+                }})))),
+                expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                  dataset_id: foo_id.clone(),
+                  max_slice_size: Some(max_slice_size),
+                  max_slice_records: Some(max_slice_records),
+                  is_keep_metadata_only: true,
+                }),
+            });
+            let task1_handle = task1_driver.run();
+
+            let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                flow_key: foo_flow_key,
+                run_since_start: Duration::try_milliseconds(30).unwrap(),
+            });
+            let trigger1_handle = trigger1_driver.run();
+
+              // Task 2: "foo_bar" execute_transform start running at 40ms, finish at 50ms
+              let task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                dataset_id: Some(foo_bar_id.clone()),
+                run_since_start: Duration::try_milliseconds(110).unwrap(),
+                // Send some PullResult with records to bypass batching condition
+                finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::CompactingDatasetResult(TaskCompactingDatasetResult {
+                  compacting_result: CompactingResult::Success {
+                    old_head: Multihash::from_digest_sha3_256(b"old-slice"),
+                    new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                    old_num_blocks: 5,
+                    new_num_blocks: 4,
+                }})))),
+                // Make sure we will take config from root dataset
+                expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                  dataset_id: foo_bar_id.clone(),
+                  max_slice_size: Some(max_slice_size),
+                  max_slice_records: Some(max_slice_records),
+                  is_keep_metadata_only: true,
+                }),
+            });
+            let task2_handle = task2_driver.run();
+
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::try_milliseconds(220).unwrap()).await;
+            };
+
+            tokio::join!(task0_handle, task1_handle, trigger1_handle, task2_handle, main_handle)
+        } => Ok(())
+    }
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "foo_Bar" ExecuteTransform:
+                Flow ID = 0 Waiting AutoPolling
+
+            #1: +0ms:
+              "foo_Bar" ExecuteTransform:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+
+            #2: +10ms:
+              "foo_Bar" ExecuteTransform:
+                Flow ID = 0 Running(task=0)
+
+            #3: +30ms:
+              "foo_Bar" ExecuteTransform:
+                Flow ID = 0 Finished Success
+
+            #4: +30ms:
+              "foo" HardCompacting:
+                Flow ID = 1 Waiting Manual Executor(task=1, since=30ms)
+              "foo_Bar" ExecuteTransform:
+                Flow ID = 0 Finished Success
+
+            #5: +30ms:
+              "foo" HardCompacting:
+                Flow ID = 1 Running(task=1)
+              "foo_Bar" ExecuteTransform:
+                Flow ID = 0 Finished Success
+
+            #6: +50ms:
+              "foo" HardCompacting:
+                Flow ID = 1 Finished Success
+              "foo_Bar" ExecuteTransform:
+                Flow ID = 0 Finished Success
+              "foo_Bar" HardCompacting:
+                Flow ID = 2 Waiting Input(foo) Batching(1, until=1050ms)
+
+            #7: +50ms:
+              "foo" HardCompacting:
+                Flow ID = 1 Finished Success
+              "foo_Bar" ExecuteTransform:
+                Flow ID = 0 Finished Success
+              "foo_Bar" HardCompacting:
+                Flow ID = 2 Waiting Input(foo) Executor(task=2, since=50ms)
+
+            #8: +110ms:
+              "foo" HardCompacting:
+                Flow ID = 1 Finished Success
+              "foo_Bar" ExecuteTransform:
+                Flow ID = 0 Finished Success
+              "foo_Bar" HardCompacting:
+                Flow ID = 2 Running(task=2)
+
+            #9: +130ms:
+              "foo" HardCompacting:
+                Flow ID = 1 Finished Success
+              "foo_Bar" ExecuteTransform:
+                Flow ID = 0 Finished Success
+              "foo_Bar" HardCompacting:
+                Flow ID = 2 Finished Success
 
             "#
         )
@@ -3609,6 +3811,11 @@ impl FlowHarness {
         );
 
         let mock_dataset_changes = overrides.mock_dataset_changes.unwrap_or_default();
+        let mut mock_authentication_service = MockAuthenticationService::new();
+        mock_authentication_service
+            .expect_find_account_name_by_id()
+            .with(eq(DEFAULT_ACCOUNT_ID.clone()))
+            .returning(move |_| Ok(Some(DEFAULT_ACCOUNT_NAME.clone())));
 
         let catalog = CatalogBuilder::new()
             .add::<EventBus>()
@@ -3636,6 +3843,9 @@ impl FlowHarness {
             .add::<TaskSchedulerImpl>()
             .add::<TaskSystemEventStoreInMemory>()
             .add::<FlowSystemTestListener>()
+            .add::<FlowPermissionsPluginImpl>()
+            .add_value(mock_authentication_service)
+            .bind::<dyn AuthenticationService, MockAuthenticationService>()
             .build();
 
         let flow_service = catalog.get_one::<dyn FlowService>().unwrap();

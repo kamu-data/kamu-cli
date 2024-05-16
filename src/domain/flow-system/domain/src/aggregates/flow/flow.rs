@@ -25,6 +25,7 @@ impl Flow {
         flow_id: FlowID,
         flow_key: FlowKey,
         trigger: FlowTrigger,
+        config_snapshot: ConfigSnapshot,
     ) -> Self {
         Self(
             Aggregate::new(
@@ -34,6 +35,7 @@ impl Flow {
                     flow_id,
                     flow_key,
                     trigger,
+                    config_snapshot,
                 },
             )
             .unwrap(),
@@ -76,6 +78,16 @@ impl Flow {
         } else {
             Ok(false)
         }
+    }
+
+    /// Get manual trigger of flow if such exist
+    pub fn try_get_manual_trigger(&self) -> Option<FlowTriggerManual> {
+        for trigger in &self.triggers {
+            if let FlowTrigger::Manual(manual_trigger) = trigger {
+                return Some(manual_trigger.clone());
+            }
+        }
+        None
     }
 
     /// Attaches a scheduled task

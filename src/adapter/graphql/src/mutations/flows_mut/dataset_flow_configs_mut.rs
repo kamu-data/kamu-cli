@@ -180,6 +180,7 @@ impl DatasetFlowConfigsMut {
         let compacting_rule = match CompactingRule::new_checked(
             compacting_args.max_slice_size,
             compacting_args.max_slice_records,
+            compacting_args.is_keep_metadata_only,
         ) {
             Ok(rule) => rule,
             Err(e) => {
@@ -259,51 +260,6 @@ impl DatasetFlowConfigsMut {
 
         Ok(true)
     }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(OneofObject)]
-enum ScheduleInput {
-    TimeDelta(TimeDeltaInput),
-    /// Supported CRON syntax: min hour dayOfMonth month dayOfWeek
-    Cron5ComponentExpression(String),
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(InputObject)]
-struct TimeDeltaInput {
-    pub every: u32,
-    pub unit: TimeUnit,
-}
-
-impl From<TimeDeltaInput> for chrono::Duration {
-    fn from(value: TimeDeltaInput) -> Self {
-        let every = i64::from(value.every);
-        match value.unit {
-            TimeUnit::Weeks => chrono::Duration::try_weeks(every).unwrap(),
-            TimeUnit::Days => chrono::Duration::try_days(every).unwrap(),
-            TimeUnit::Hours => chrono::Duration::try_hours(every).unwrap(),
-            TimeUnit::Minutes => chrono::Duration::try_minutes(every).unwrap(),
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(InputObject)]
-struct BatchingConditionInput {
-    pub min_records_to_await: u64,
-    pub max_batching_interval: TimeDeltaInput,
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(InputObject)]
-struct CompactingConditionInput {
-    pub max_slice_size: u64,
-    pub max_slice_records: u64,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

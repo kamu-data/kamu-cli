@@ -16,12 +16,14 @@ use thiserror::Error;
 pub struct CompactingRule {
     max_slice_size: u64,
     max_slice_records: u64,
+    is_keep_metadata_only: bool,
 }
 
 impl CompactingRule {
     pub fn new_checked(
         max_slice_size: u64,
         max_slice_records: u64,
+        is_keep_metadata_only: bool,
     ) -> Result<Self, CompactingRuleValidationError> {
         if max_slice_size == 0 {
             return Err(CompactingRuleValidationError::MaxSliceSizeNotPositive);
@@ -33,6 +35,7 @@ impl CompactingRule {
         Ok(Self {
             max_slice_size,
             max_slice_records,
+            is_keep_metadata_only,
         })
     }
 
@@ -44,6 +47,11 @@ impl CompactingRule {
     #[inline]
     pub fn max_slice_records(&self) -> u64 {
         self.max_slice_records
+    }
+
+    #[inline]
+    pub fn is_keep_metadata_only(&self) -> bool {
+        self.is_keep_metadata_only
     }
 }
 
@@ -68,15 +76,18 @@ mod tests {
 
     #[test]
     fn test_valid_compacting_rule() {
-        assert_matches!(CompactingRule::new_checked(1, 1), Ok(_));
-        assert_matches!(CompactingRule::new_checked(1_000_000, 1_000_000), Ok(_));
-        assert_matches!(CompactingRule::new_checked(1, 20), Ok(_));
+        assert_matches!(CompactingRule::new_checked(1, 1, true), Ok(_));
+        assert_matches!(
+            CompactingRule::new_checked(1_000_000, 1_000_000, true),
+            Ok(_)
+        );
+        assert_matches!(CompactingRule::new_checked(1, 20, false), Ok(_));
     }
 
     #[test]
     fn test_non_positive_max_slice_records() {
         assert_matches!(
-            CompactingRule::new_checked(100, 0),
+            CompactingRule::new_checked(100, 0, true),
             Err(CompactingRuleValidationError::MaxSliceRecordsNotPositive)
         );
     }
@@ -84,7 +95,7 @@ mod tests {
     #[test]
     fn test_non_positive_max_slice_size() {
         assert_matches!(
-            CompactingRule::new_checked(0, 100),
+            CompactingRule::new_checked(0, 100, false),
             Err(CompactingRuleValidationError::MaxSliceSizeNotPositive)
         );
     }
