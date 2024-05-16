@@ -319,26 +319,47 @@ impl Default for JupyterConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
-pub struct DatabaseConfig {
-    pub provider: DatabaseProvider,
-    pub user: String,
-    pub password: String,
-    pub database_name: String,
-    pub host: String,
-    pub port: Option<u32>,
+#[serde(tag = "kind")]
+pub enum DatabaseConfig {
+    Sqlite(SqliteDatabaseConfig),
+    Remote(RemoteDatabaseConfig),
 }
 
 impl DatabaseConfig {
     pub fn sample() -> Self {
-        Self {
+        Self::Remote(RemoteDatabaseConfig {
             provider: DatabaseProvider::Postgres,
             user: String::from("root"),
             password: String::from("p455w0rd"),
             database_name: String::from("kamu"),
             host: String::from("localhost"),
             port: Some(DatabaseProvider::Postgres.default_port()),
-        }
+        })
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct SqliteDatabaseConfig {
+    pub database_path: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteDatabaseConfig {
+    pub provider: DatabaseProvider,
+    pub user: String,
+    pub password: String,
+    pub database_name: String,
+    pub host: String,
+    pub port: Option<u32>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

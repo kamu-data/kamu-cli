@@ -517,14 +517,21 @@ pub fn register_config_in_catalog(
 }
 
 fn convert_into_db_configuration(config: DatabaseConfig) -> DatabaseConfiguration {
-    DatabaseConfiguration::new(
-        config.provider,
-        config.user,
-        config.password,
-        config.database_name,
-        config.host,
-        config.port,
-    )
+    match config {
+        DatabaseConfig::Sqlite(c) => {
+            let path = Path::new(&c.database_path);
+
+            DatabaseConfiguration::sqlite_from(path)
+        }
+        DatabaseConfig::Remote(c) => DatabaseConfiguration::new(
+            c.provider,
+            c.user,
+            c.password,
+            c.database_name,
+            c.host,
+            c.port,
+        ),
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
