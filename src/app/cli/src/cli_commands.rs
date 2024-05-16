@@ -492,7 +492,8 @@ pub fn get_command(
             )),
             Some(("generate-token", gen_matches)) => Box::new(GenerateTokenCommand::new(
                 cli_catalog.get_one()?,
-                gen_matches.get_one("login").cloned().unwrap(),
+                gen_matches.get_one("login").cloned(),
+                gen_matches.get_one("subject").cloned(),
                 *gen_matches.get_one::<usize>("expiration-time-sec").unwrap(),
             )),
             Some(("ipfs", ipfs_matches)) => match ipfs_matches.subcommand() {
