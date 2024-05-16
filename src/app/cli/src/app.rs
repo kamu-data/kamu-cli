@@ -20,6 +20,7 @@ use kamu_accounts::*;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
+use crate::config::DatabaseConfig;
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
@@ -90,14 +91,13 @@ pub async fn run(
 
         base_catalog_builder.add_value(ServerUrlConfig::load_from_env()?);
 
-        // TODO: read database settings from configuration, and make it optional
-        // let db_configuration = DatabaseConfiguration::local_postgres();
-        // let db_configuration = DatabaseConfiguration::local_mariadb();
-        // let db_configuration =
-        //    DatabaseConfiguration::sqlite_from(PathBuf::from("./kamu.sqlite.db").
-        // as_path());
-        // configure_database_components(&mut base_catalog_builder, &db_configuration)?;
-        configure_in_memory_components(&mut base_catalog_builder);
+        if let Some(cli_database_config) = config.database.clone() {
+            let db_configuration = convert_into_db_configuration(cli_database_config);
+
+            configure_database_components(&mut base_catalog_builder, &db_configuration)?;
+        } else {
+            configure_in_memory_components(&mut base_catalog_builder);
+        }
 
         base_catalog_builder
             .add_value(dependencies_graph_repository)
@@ -332,7 +332,6 @@ pub fn configure_base_catalog(
     b
 }
 
-#[allow(dead_code)]
 fn configure_database_components(
     catalog_builder: &mut CatalogBuilder,
     db_configuration: &DatabaseConfiguration,
@@ -513,8 +512,19 @@ pub fn register_config_in_catalog(
             );
         }
 
-        catalog_builder.add_value(kamu_accounts::PredefinedAccountsConfig::single_tenant());
+        catalog_builder.add_value(PredefinedAccountsConfig::single_tenant());
     }
+}
+
+fn convert_into_db_configuration(config: DatabaseConfig) -> DatabaseConfiguration {
+    DatabaseConfiguration::new(
+        config.provider,
+        config.user,
+        config.password,
+        config.database_name,
+        config.host,
+        config.port,
+    )
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
