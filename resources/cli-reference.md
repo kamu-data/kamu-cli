@@ -1209,11 +1209,12 @@ Validate a Kamu token
 
 Generate a platform token from a known secret for debugging
 
-**Usage:** `kamu system generate-token [OPTIONS] --login <login>`
+**Usage:** `kamu system generate-token [OPTIONS]`
 
 **Options:**
 
-* `--login <LOGIN>` — Account name
+* `--subject <SUBJECT>` — AccountID to generate token for
+* `--login <LOGIN>` — Account name to derive ID from (for predefined accounts only)
 * `--expiration-time-sec <EXPIRATION-TIME-SEC>` — Token expiration time in seconds
 
   Default value: `3600`
@@ -1234,7 +1235,7 @@ Compact a dataset
 
 * `--max-slice-size <SIZE>` — Maximum size of a single data slice file in bytes
 
-  Default value: `1073741824`
+  Default value: `300000000`
 * `--max-slice-records <RECORDS>` — Maximum amount of records in a single data slice file
 
   Default value: `10000`

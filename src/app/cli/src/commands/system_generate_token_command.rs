@@ -9,7 +9,9 @@
 
 use std::sync::Arc;
 
+use internal_error::*;
 use kamu_accounts_services::AuthenticationServiceImpl;
+use opendatafabric::AccountID;
 
 use crate::{CLIError, Command};
 
@@ -17,19 +19,22 @@ use crate::{CLIError, Command};
 
 pub struct GenerateTokenCommand {
     auth_service: Arc<AuthenticationServiceImpl>,
-    login: String,
+    login: Option<String>,
+    subject: Option<String>,
     expiration_time_sec: usize,
 }
 
 impl GenerateTokenCommand {
     pub fn new(
         auth_service: Arc<AuthenticationServiceImpl>,
-        login: String,
+        login: Option<String>,
+        subject: Option<String>,
         expiration_time_sec: usize,
     ) -> Self {
         Self {
             auth_service,
             login,
+            subject,
             expiration_time_sec,
         }
     }
@@ -42,9 +47,17 @@ impl Command for GenerateTokenCommand {
     }
 
     async fn run(&mut self) -> Result<(), CLIError> {
+        let subject = if let Some(subject) = &self.subject {
+            AccountID::from_did_str(subject).int_err()?
+        } else if let Some(login) = &self.login {
+            AccountID::new_seeded_ed25519(login.as_bytes())
+        } else {
+            return Err(CLIError::usage_error("Specify --login or --subject"));
+        };
+
         let token = self
             .auth_service
-            .make_access_token(self.login.clone(), self.expiration_time_sec)?;
+            .make_access_token(&subject, self.expiration_time_sec)?;
 
         println!("{token}");
         Ok(())

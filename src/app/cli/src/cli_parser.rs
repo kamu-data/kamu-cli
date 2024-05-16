@@ -1288,10 +1288,12 @@ pub fn cli() -> Command {
                         Command::new("generate-token")
                             .about("Generate a platform token from a known secret for debugging")
                             .args([
+                                Arg::new("subject")
+                                    .long("subject")
+                                    .help("AccountID to generate token for"),
                                 Arg::new("login")
                                     .long("login")
-                                    .required(true)
-                                    .help("Account name"),
+                                    .help("Account name to derive ID from (for predefined accounts only)"),
                                 Arg::new("expiration-time-sec")
                                     .long("expiration-time-sec")
                                     .value_parser(value_parser!(usize))
@@ -1311,7 +1313,7 @@ pub fn cli() -> Command {
                                     .long("max-slice-size")
                                     .value_parser(value_parser!(u64))
                                     .value_name("SIZE")
-                                    .default_value("1073741824")
+                                    .default_value("300000000")
                                     .help("Maximum size of a single data slice file in bytes"),
                                 Arg::new("max-slice-records")
                                     .long("max-slice-records")

@@ -111,17 +111,18 @@ impl AuthenticationServiceImpl {
 
     pub fn make_access_token(
         &self,
-        subject: String,
+        account_id: &AccountID,
         expiration_time_sec: usize,
     ) -> Result<String, InternalError> {
         let current_time = self.time_source.now();
         let iat = usize::try_from(current_time.timestamp()).unwrap();
         let exp = iat + expiration_time_sec;
+
         let claims = KamuAccessTokenClaims {
             iat,
             exp,
             iss: String::from(KAMU_JWT_ISSUER),
-            sub: subject,
+            sub: account_id.to_string(),
         };
 
         encode(
@@ -275,7 +276,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
         // Create access token and attach basic identity properties
         Ok(LoginResponse {
-            access_token: self.make_access_token(account_id.to_string(), EXPIRATION_TIME_SEC)?,
+            access_token: self.make_access_token(&account_id, EXPIRATION_TIME_SEC)?,
             account_id,
             account_name: provider_response.account_name,
         })

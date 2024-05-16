@@ -15,8 +15,8 @@ use thiserror::Error;
 
 use crate::*;
 
-pub const DEFAULT_MAX_SLICE_SIZE: u64 = 1_073_741_824;
-pub const DEFAULT_MAX_SLICE_RECORDS: u64 = 10000;
+pub const DEFAULT_MAX_SLICE_SIZE: u64 = 300_000_000;
+pub const DEFAULT_MAX_SLICE_RECORDS: u64 = 10_000;
 
 #[async_trait::async_trait]
 pub trait CompactingService: Send + Sync {
