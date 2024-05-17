@@ -322,12 +322,12 @@ impl Default for JupyterConfig {
 #[serde(tag = "kind")]
 pub enum DatabaseConfig {
     Sqlite(SqliteDatabaseConfig),
-    Remote(RemoteDatabaseConfig),
+    ClientServer(RemoteDatabaseConfig),
 }
 
 impl DatabaseConfig {
     pub fn sample() -> Self {
-        Self::Remote(RemoteDatabaseConfig {
+        Self::ClientServer(RemoteDatabaseConfig {
             provider: DatabaseProvider::Postgres,
             user: String::from("root"),
             password: String::from("p455w0rd"),
