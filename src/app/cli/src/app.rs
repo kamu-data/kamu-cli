@@ -46,8 +46,9 @@ pub async fn run(
         std::env::set_var("RUST_BACKTRACE", "1");
     }
 
-    // Relevant for cases where we already have a config, but no workspace yet
-    // ("kamu init" call)
+    // Sometimes (in the case of predefined users), we need to know whether the
+    // workspace to be created will be multi-tenant or not right away, even before
+    // the `kamu init` command itself is processed.
     let init_multi_tenant_workspace = matches!(matches.subcommand(), Some(("init", arg_matches)) if arg_matches.get_flag("multi-tenant"));
     let workspace_svc = WorkspaceService::new(
         Arc::new(workspace_layout.clone()),
