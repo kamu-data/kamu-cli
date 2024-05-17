@@ -524,14 +524,22 @@ fn convert_into_db_configuration(config: DatabaseConfig) -> DatabaseConfiguratio
 
             DatabaseConfiguration::sqlite_from(path)
         }
-        DatabaseConfig::Remote(c) => DatabaseConfiguration::new(
-            c.provider,
-            c.user,
-            c.password,
-            c.database_name,
-            c.host,
-            c.port,
-        ),
+        DatabaseConfig::ClientServer(c) => {
+            assert!(
+                !matches!(c.provider, DatabaseProvider::Sqlite),
+                "For SQLite configuration, please use `kind: sqlite` instead of `kind: \
+                 clientServer`"
+            );
+
+            DatabaseConfiguration::new(
+                c.provider,
+                c.user,
+                c.password,
+                c.database_name,
+                c.host,
+                c.port,
+            )
+        }
     }
 }
 
