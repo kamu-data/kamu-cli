@@ -62,7 +62,7 @@ Prerequisites:
     * rpm: `sudo dnf install -y postgresql`
   * Install MariaDB command line client `mariadb`: 
     * deb: `sudo apt install -y mariadb-client`
-    * rpm: `sudo dnf install -y postgresql`
+    * rpm: `sudo dnf install -y mariadb`
   * Install `sqlx-cli`: `cargo binstall sqlx-cli -y`
 
 Clone the repository:
