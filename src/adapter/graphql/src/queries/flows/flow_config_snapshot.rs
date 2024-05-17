@@ -7,30 +7,43 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_flow_system::{ConfigSnapshot, Schedule};
+use kamu_flow_system::{FlowConfigSnapshot, Schedule};
 
 use crate::prelude::*;
 
+#[derive(Union)]
+pub enum FlowConfigurationSnapshot {
+    Batching(FlowConfigurationBatching),
+    Schedule(FlowConfigurationScheduleRule),
+    Compacting(FlowConfigurationCompacting),
+}
+
 #[derive(SimpleObject)]
-pub struct FlowConfigurationSnapshot {
-    batching_rule: Option<FlowConfigurationBatching>,
-    schedule: Option<FlowConfigurationSchedule>,
-    compacting_rule: Option<FlowConfigurationCompacting>,
+pub struct FlowConfigurationScheduleRule {
+    schedule_rule: FlowConfigurationSchedule,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<ConfigSnapshot> for FlowConfigurationSnapshot {
-    fn from(value: ConfigSnapshot) -> Self {
-        Self {
-            batching_rule: value.batching_rule.map(Into::into),
-            schedule: value.schedule.map(|schedule| match schedule {
-                Schedule::TimeDelta(time_delta) => {
-                    FlowConfigurationSchedule::TimeDelta(time_delta.every.into())
-                }
-                Schedule::Cron(cron) => FlowConfigurationSchedule::Cron(cron.clone().into()),
-            }),
-            compacting_rule: value.compacting_rule.map(Into::into),
+impl From<FlowConfigSnapshot> for FlowConfigurationSnapshot {
+    fn from(value: FlowConfigSnapshot) -> Self {
+        match value {
+            FlowConfigSnapshot::Batching(batching_rule) => Self::Batching(batching_rule.into()),
+            FlowConfigSnapshot::Schedule(schedule) => {
+                Self::Schedule(FlowConfigurationScheduleRule {
+                    schedule_rule: match schedule {
+                        Schedule::TimeDelta(time_delta) => {
+                            FlowConfigurationSchedule::TimeDelta(time_delta.every.into())
+                        }
+                        Schedule::Cron(cron) => {
+                            FlowConfigurationSchedule::Cron(cron.clone().into())
+                        }
+                    },
+                })
+            }
+            FlowConfigSnapshot::Compacting(compacting_rule) => {
+                Self::Compacting(compacting_rule.into())
+            }
         }
     }
 }

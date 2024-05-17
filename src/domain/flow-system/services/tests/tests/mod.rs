@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_flow_configuration_service_impl;
-mod test_flow_permissions_plugin_impl;
+mod test_flow_dependencies_plan;
 mod test_flow_service_impl;
 
 mod utils;

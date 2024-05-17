@@ -31,8 +31,8 @@ pub struct FlowState {
     pub task_ids: Vec<ts::TaskID>,
     /// Flow outcome
     pub outcome: Option<FlowOutcome>,
-    /// Flow config snapshot on the monent when flow was initiated
-    pub config_snapshot: ConfigSnapshot,
+    /// Flow config snapshot on the moment when flow was initiated
+    pub config_snapshot: Option<FlowConfigSnapshot>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

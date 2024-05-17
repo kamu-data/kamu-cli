@@ -15,8 +15,8 @@ use tokio_stream::Stream;
 
 use crate::{
     AccountFlowFilters,
-    ConfigSnapshot,
     DatasetFlowFilters,
+    FlowConfigSnapshot,
     FlowID,
     FlowKey,
     FlowPaginationOpts,
@@ -37,7 +37,7 @@ pub trait FlowService: Sync + Send {
         trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
         initiator_account_id: AccountID,
-        flow_run_rule: ConfigSnapshot,
+        flow_run_snapshot_maybe: Option<FlowConfigSnapshot>,
     ) -> Result<FlowState, RequestFlowError>;
 
     /// Returns states of flows associated with a given dataset

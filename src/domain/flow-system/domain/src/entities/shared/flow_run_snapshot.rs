@@ -11,9 +11,9 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub struct ConfigSnapshot {
-    pub batching_rule: Option<BatchingRule>,
-    pub compacting_rule: Option<CompactingRule>,
-    pub schedule: Option<Schedule>,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FlowConfigSnapshot {
+    Batching(BatchingRule),
+    Compacting(CompactingRule),
+    Schedule(Schedule),
 }

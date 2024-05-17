@@ -127,7 +127,7 @@ impl TaskExecutor for TaskExecutorImpl {
                     dataset_id,
                     max_slice_size,
                     max_slice_records,
-                    is_keep_metadata_only,
+                    keep_metadata_only,
                 }) => {
                     let compacting_svc =
                         self.catalog.get_one::<dyn CompactingService>().int_err()?;
@@ -143,7 +143,7 @@ impl TaskExecutor for TaskExecutorImpl {
                             CompactingOptions {
                                 max_slice_size: *max_slice_size,
                                 max_slice_records: *max_slice_records,
-                                is_keep_metadata_only: *is_keep_metadata_only,
+                                keep_metadata_only: *keep_metadata_only,
                             },
                             None,
                         )

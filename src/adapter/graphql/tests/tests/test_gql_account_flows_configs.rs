@@ -34,11 +34,7 @@ use kamu_accounts::{
 use kamu_core::*;
 use kamu_flow_system::FlowServiceRunConfig;
 use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
-use kamu_flow_system_services::{
-    FlowConfigurationServiceImpl,
-    FlowPermissionsPluginImpl,
-    FlowServiceImpl,
-};
+use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceImpl};
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
@@ -394,7 +390,6 @@ impl FlowConfigHarness {
             .add::<FlowConfigurationEventStoreInMem>()
             .add::<FlowServiceImpl>()
             .add::<FlowEventStoreInMem>()
-            .add::<FlowPermissionsPluginImpl>()
             .add_value(FlowServiceRunConfig::new(
                 Duration::try_seconds(1).unwrap(),
                 Duration::try_minutes(1).unwrap(),

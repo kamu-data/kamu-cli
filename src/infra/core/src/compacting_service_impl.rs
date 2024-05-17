@@ -118,7 +118,7 @@ impl CompactingServiceImpl {
         dataset: Arc<dyn Dataset>,
         max_slice_size: u64,
         max_slice_records: u64,
-        is_keep_metadata_only: bool,
+        keep_metadata_only: bool,
     ) -> Result<ChainFilesInfo, CompactingError> {
         // Declare mut values for result
 
@@ -141,7 +141,7 @@ impl CompactingServiceImpl {
             old_num_blocks += 1;
             match block.event {
                 MetadataEvent::AddData(add_data_event) => {
-                    if !is_keep_metadata_only && let Some(output_slice) = &add_data_event.new_data {
+                    if !keep_metadata_only && let Some(output_slice) = &add_data_event.new_data {
                         let data_slice_url = object_data_repo
                             .get_internal_url(&output_slice.physical_hash)
                             .await;
@@ -205,7 +205,7 @@ impl CompactingServiceImpl {
                 }
                 MetadataEvent::Seed(_) => old_head = Some(block_hash),
                 MetadataEvent::ExecuteTransform(_) => {
-                    if is_keep_metadata_only {
+                    if keep_metadata_only {
                         continue;
                     }
                 }
@@ -395,7 +395,7 @@ impl CompactingServiceImpl {
         dataset: Arc<dyn Dataset>,
         max_slice_size: u64,
         max_slice_records: u64,
-        is_keep_metadata_only: bool,
+        keep_metadata_only: bool,
         listener: Arc<dyn CompactingListener>,
     ) -> Result<CompactingResult, CompactingError> {
         let compacting_dir_path = self.create_run_compacting_dir()?;
@@ -406,7 +406,7 @@ impl CompactingServiceImpl {
                 dataset.clone(),
                 max_slice_size,
                 max_slice_records,
-                is_keep_metadata_only,
+                keep_metadata_only,
             )
             .await?;
 
@@ -478,7 +478,7 @@ impl CompactingService for CompactingServiceImpl {
             .int_err()?
             .kind;
 
-        if !options.is_keep_metadata_only && dataset_kind != DatasetKind::Root {
+        if !options.keep_metadata_only && dataset_kind != DatasetKind::Root {
             return Err(CompactingError::InvalidDatasetKind(
                 InvalidDatasetKindError {
                     dataset_name: dataset_handle.alias.dataset_name.clone(),
@@ -500,7 +500,7 @@ impl CompactingService for CompactingServiceImpl {
                 dataset,
                 max_slice_size,
                 max_slice_records,
-                options.is_keep_metadata_only,
+                options.keep_metadata_only,
                 listener.clone(),
             )
             .await

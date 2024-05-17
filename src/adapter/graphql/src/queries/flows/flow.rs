@@ -209,8 +209,8 @@ impl Flow {
     }
 
     /// Flow config snapshot
-    async fn config_snapshot(&self) -> FlowConfigurationSnapshot {
-        self.flow_state.config_snapshot.clone().into()
+    async fn config_snapshot(&self) -> Option<FlowConfigurationSnapshot> {
+        self.flow_state.config_snapshot.clone().map(Into::into)
     }
 }
 

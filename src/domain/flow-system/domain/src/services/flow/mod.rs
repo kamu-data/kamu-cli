@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod flow_permissions_plugin;
 mod flow_service;
 mod flow_service_event;
 mod flow_service_test_driver;
 
-pub use flow_permissions_plugin::*;
 pub use flow_service::*;
 pub use flow_service_event::*;
 pub use flow_service_test_driver::*;

@@ -55,11 +55,7 @@ use kamu_flow_system::{
     FlowTriggerAutoPolling,
 };
 use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
-use kamu_flow_system_services::{
-    FlowConfigurationServiceImpl,
-    FlowPermissionsPluginImpl,
-    FlowServiceImpl,
-};
+use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceImpl};
 use kamu_task_system as ts;
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
@@ -167,11 +163,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": {
-                                            "batchingRule": null,
-                                            "schedule": null,
-                                            "compactingRule": null,
-                                        }
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -246,11 +238,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             "__typename": "FlowStartConditionExecutor",
                                             "taskId": "0",
                                         },
-                                        "configSnapshot": {
-                                            "batchingRule": null,
-                                            "schedule": null,
-                                            "compactingRule": null,
-                                        }
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -322,11 +310,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": {
-                                            "batchingRule": null,
-                                            "schedule": null,
-                                            "compactingRule": null,
-                                        }
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -416,11 +400,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": {
-                                            "batchingRule": null,
-                                            "schedule": null,
-                                            "compactingRule": null,
-                                        }
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -541,11 +521,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": {
-                                            "batchingRule": null,
-                                            "schedule": null,
-                                            "compactingRule": null,
-                                        }
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -645,11 +621,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": {
-                                            "batchingRule": null,
-                                            "schedule": null,
-                                            "compactingRule": null,
-                                        }
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -767,11 +739,7 @@ async fn test_trigger_compacting_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": {
-                                            "batchingRule": null,
-                                            "schedule": null,
-                                            "compactingRule": null,
-                                        }
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -846,11 +814,7 @@ async fn test_trigger_compacting_root_dataset() {
                                             "__typename": "FlowStartConditionExecutor",
                                             "taskId": "0",
                                         },
-                                        "configSnapshot": {
-                                            "batchingRule": null,
-                                            "schedule": null,
-                                            "compactingRule": null,
-                                        }
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -922,11 +886,7 @@ async fn test_trigger_compacting_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": {
-                                            "batchingRule": null,
-                                            "schedule": null,
-                                            "compactingRule": null,
-                                        }
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -1021,11 +981,7 @@ async fn test_trigger_compacting_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": {
-                                            "batchingRule": null,
-                                            "schedule": null,
-                                            "compactingRule": null,
-                                        }
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -2347,7 +2303,7 @@ async fn test_anonymous_operation_fails() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_config_snpashot_returned_correctly() {
+async fn test_config_snapshot_returned_correctly() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
         dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
@@ -2450,15 +2406,11 @@ async fn test_config_snpashot_returned_correctly() {
                                         },
                                         "startCondition": null,
                                         "configSnapshot": {
-                                            "batchingRule": null,
-                                            "schedule": null,
-                                            "compactingRule": {
-                                                "__typename": "FlowConfigurationCompacting",
-                                                "maxSliceRecords": 10000,
-                                                "maxSliceSize": 1_000_000,
-                                                "isKeepMetadataOnly": false
-                                            },
-                                        }
+                                            "__typename": "FlowConfigurationCompacting",
+                                            "maxSliceRecords": 10000,
+                                            "maxSliceSize": 1_000_000,
+                                            "keepMetadataOnly": false
+                                        },
                                     }
                                 ],
                                 "pageInfo": {
@@ -2523,7 +2475,6 @@ impl FlowRunsHarness {
             .add::<FlowConfigurationServiceImpl>()
             .add::<FlowConfigurationEventStoreInMem>()
             .add::<FlowServiceImpl>()
-            .add::<FlowPermissionsPluginImpl>()
             .add::<FlowEventStoreInMem>()
             .add_value(FlowServiceRunConfig::new(
                 Duration::try_seconds(1).unwrap(),
@@ -2829,7 +2780,7 @@ impl FlowRunsHarness {
                                             }
                                         }
                                         configSnapshot {
-                                            batchingRule {
+                                            ... on FlowConfigurationBatching {
                                                 maxBatchingInterval {
                                                     every
                                                     unit
@@ -2837,17 +2788,20 @@ impl FlowRunsHarness {
                                                 minRecordsToAwait
                                                 __typename
                                             }
-                                            schedule {
-                                                ... on TimeDelta {
-                                                    every
-                                                    unit
+                                            ... on FlowConfigurationScheduleRule {
+                                                scheduleRule {
+                                                    ... on TimeDelta {
+                                                        every
+                                                        unit
+                                                    }
+                                                    __typename
                                                 }
                                                 __typename
                                             }
-                                            compactingRule {
+                                            ... on FlowConfigurationCompacting {
                                                 maxSliceRecords
                                                 maxSliceSize
-                                                isKeepMetadataOnly
+                                                keepMetadataOnly
                                                 __typename
                                             }
                                         }
@@ -2979,7 +2933,7 @@ impl FlowRunsHarness {
     fn trigger_flow_with_compaction_config_mutation(
         id: &DatasetID,
         dataset_flow_type: &str,
-        is_keep_metadata_only: bool,
+        keep_metadata_only: bool,
         max_slice_records: u64,
         max_slice_size: u64,
     ) -> String {
@@ -2994,7 +2948,7 @@ impl FlowRunsHarness {
                                     datasetFlowType: "<dataset_flow_type>",
                                     flowRunConfiguration: {
                                         compacting: {
-                                            isKeepMetadataOnly: <is_keep_metadata_only>,
+                                            keepMetadataOnly: <keep_metadata_only>,
                                             maxSliceRecords: <max_slice_records>,
                                             maxSliceSize: <max_slice_size>
                                         }
@@ -3041,12 +2995,8 @@ impl FlowRunsHarness {
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
         .replace(
-            "<is_keep_metadata_only>",
-            if is_keep_metadata_only {
-                "true"
-            } else {
-                "false"
-            },
+            "<keep_metadata_only>",
+            if keep_metadata_only { "true" } else { "false" },
         )
         .replace("<max_slice_records>", &max_slice_records.to_string())
         .replace("<max_slice_size>", &max_slice_size.to_string())

@@ -953,7 +953,7 @@ async fn test_dataset_keep_metadata_only_compact() {
             .compact_dataset(
                 &created_derived.dataset_handle,
                 CompactingOptions {
-                    is_keep_metadata_only: true,
+                    keep_metadata_only: true,
                     ..CompactingOptions::default()
                 },
                 Some(Arc::new(NullCompactingMultiListener {}))
@@ -990,7 +990,7 @@ async fn test_dataset_keep_metadata_only_compact() {
             .compact_dataset(
                 &created_derived.dataset_handle,
                 CompactingOptions {
-                    is_keep_metadata_only: true,
+                    keep_metadata_only: true,
                     ..CompactingOptions::default()
                 },
                 Some(Arc::new(NullCompactingMultiListener {}))
@@ -1037,7 +1037,7 @@ async fn test_dataset_keep_metadata_only_compact() {
             .compact_dataset(
                 &created_root.dataset_handle,
                 CompactingOptions {
-                    is_keep_metadata_only: true,
+                    keep_metadata_only: true,
                     ..CompactingOptions::default()
                 },
                 Some(Arc::new(NullCompactingMultiListener {}))

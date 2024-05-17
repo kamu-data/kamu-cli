@@ -862,7 +862,7 @@ async fn make_dataset_test_flows(
             dataset_flow_type,
             FlowStatus::Waiting,
             petya_manual_trigger,
-            ConfigSnapshot::default(),
+            None,
         )
         .await;
     let flow_id_running = flow_generator
@@ -870,7 +870,7 @@ async fn make_dataset_test_flows(
             dataset_flow_type,
             FlowStatus::Running,
             wasya_manual_trigger,
-            ConfigSnapshot::default(),
+            None,
         )
         .await;
     let flow_id_finished = flow_generator
@@ -878,7 +878,7 @@ async fn make_dataset_test_flows(
             dataset_flow_type,
             FlowStatus::Finished,
             automatic_trigger,
-            ConfigSnapshot::default(),
+            None,
         )
         .await;
 
@@ -915,7 +915,7 @@ async fn make_system_test_flows(
             system_flow_type,
             FlowStatus::Waiting,
             petya_manual_trigger,
-            ConfigSnapshot::default(),
+            None,
         )
         .await;
     let flow_id_running = flow_generator
@@ -923,7 +923,7 @@ async fn make_system_test_flows(
             system_flow_type,
             FlowStatus::Running,
             wasya_manual_trigger,
-            ConfigSnapshot::default(),
+            None,
         )
         .await;
     let flow_id_finished = flow_generator
@@ -931,7 +931,7 @@ async fn make_system_test_flows(
             system_flow_type,
             FlowStatus::Finished,
             automatic_trigger,
-            ConfigSnapshot::default(),
+            None,
         )
         .await;
 
@@ -1011,7 +1011,7 @@ impl<'a> DatasetFlowGenerator<'a> {
         flow_type: DatasetFlowType,
         expected_status: FlowStatus,
         initial_trigger: FlowTrigger,
-        config_snapshot: ConfigSnapshot,
+        config_snapshot: Option<FlowConfigSnapshot>,
     ) -> FlowID {
         let flow_id = self.flow_event_store.new_flow_id();
 
@@ -1060,7 +1060,7 @@ impl SystemFlowGenerator {
         flow_type: SystemFlowType,
         expected_status: FlowStatus,
         initial_trigger: FlowTrigger,
-        config_snapshot: ConfigSnapshot,
+        config_snapshot: Option<FlowConfigSnapshot>,
     ) -> FlowID {
         let flow_id = self.flow_event_store.new_flow_id();
 

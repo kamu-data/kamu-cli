@@ -16,14 +16,14 @@ use thiserror::Error;
 pub struct CompactingRule {
     max_slice_size: u64,
     max_slice_records: u64,
-    is_keep_metadata_only: bool,
+    keep_metadata_only: bool,
 }
 
 impl CompactingRule {
     pub fn new_checked(
         max_slice_size: u64,
         max_slice_records: u64,
-        is_keep_metadata_only: bool,
+        keep_metadata_only: bool,
     ) -> Result<Self, CompactingRuleValidationError> {
         if max_slice_size == 0 {
             return Err(CompactingRuleValidationError::MaxSliceSizeNotPositive);
@@ -35,7 +35,7 @@ impl CompactingRule {
         Ok(Self {
             max_slice_size,
             max_slice_records,
-            is_keep_metadata_only,
+            keep_metadata_only,
         })
     }
 
@@ -50,8 +50,8 @@ impl CompactingRule {
     }
 
     #[inline]
-    pub fn is_keep_metadata_only(&self) -> bool {
-        self.is_keep_metadata_only
+    pub fn keep_metadata_only(&self) -> bool {
+        self.keep_metadata_only
     }
 }
 

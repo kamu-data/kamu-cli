@@ -192,7 +192,7 @@ type CommitResultSuccess implements CommitResult & UpdateReadmeResult {
 input CompactingConditionInput {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
-	isKeepMetadataOnly: Boolean!
+	keepMetadataOnly: Boolean!
 }
 
 enum CompressionFormat {
@@ -777,7 +777,7 @@ type Flow {
 	"""
 	Flow config snapshot
 	"""
-	configSnapshot: FlowConfigurationSnapshot!
+	configSnapshot: FlowConfigurationSnapshot
 }
 
 type FlowAbortedResult {
@@ -799,16 +799,16 @@ type FlowConfigurationBatching {
 type FlowConfigurationCompacting {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
-	isKeepMetadataOnly: Boolean!
+	keepMetadataOnly: Boolean!
 }
 
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
 
-type FlowConfigurationSnapshot {
-	batchingRule: FlowConfigurationBatching
-	schedule: FlowConfigurationSchedule
-	compactingRule: FlowConfigurationCompacting
+type FlowConfigurationScheduleRule {
+	scheduleRule: FlowConfigurationSchedule!
 }
+
+union FlowConfigurationSnapshot = FlowConfigurationBatching | FlowConfigurationScheduleRule | FlowConfigurationCompacting
 
 type FlowConnection {
 	"""

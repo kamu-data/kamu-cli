@@ -10,7 +10,7 @@
 use kamu_flow_system::{
     BatchingRule,
     CompactingRule,
-    ConfigSnapshot,
+    FlowConfigSnapshot,
     FlowConfigurationRule,
     Schedule,
     ScheduleCron,
@@ -84,7 +84,7 @@ impl From<BatchingRule> for FlowConfigurationBatching {
 pub struct FlowConfigurationCompacting {
     pub max_slice_size: u64,
     pub max_slice_records: u64,
-    pub is_keep_metadata_only: bool,
+    pub keep_metadata_only: bool,
 }
 
 impl From<CompactingRule> for FlowConfigurationCompacting {
@@ -92,7 +92,7 @@ impl From<CompactingRule> for FlowConfigurationCompacting {
         Self {
             max_slice_size: value.max_slice_size(),
             max_slice_records: value.max_slice_records(),
-            is_keep_metadata_only: value.is_keep_metadata_only(),
+            keep_metadata_only: value.keep_metadata_only(),
         }
     }
 }
@@ -230,45 +230,37 @@ pub struct BatchingConditionInput {
 pub struct CompactingConditionInput {
     pub max_slice_size: u64,
     pub max_slice_records: u64,
-    pub is_keep_metadata_only: bool,
+    pub keep_metadata_only: bool,
 }
 
 impl FlowRunConfiguration {
-    pub fn try_into_snapshot(&self) -> Result<ConfigSnapshot, InternalError> {
-        let mut config_snapshot = ConfigSnapshot::default();
-        match self {
-            Self::Batching(batching_input) => {
-                config_snapshot.batching_rule = Some(
-                    BatchingRule::new_checked(
-                        batching_input.min_records_to_await,
-                        batching_input.max_batching_interval.clone().into(),
-                    )
-                    .int_err()?,
-                );
-            }
-            Self::Compacting(compacting_input) => {
-                config_snapshot.compacting_rule = Some(
-                    CompactingRule::new_checked(
-                        compacting_input.max_slice_size,
-                        compacting_input.max_slice_records,
-                        compacting_input.is_keep_metadata_only,
-                    )
-                    .int_err()?,
-                );
-            }
-            Self::Schedule(schedule_input) => {
-                config_snapshot.schedule = Some(match schedule_input {
-                    ScheduleInput::TimeDelta(td) => {
-                        Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
-                    }
-                    ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
-                        Schedule::try_from_5component_cron_expression(cron_5component_expression)
-                            .int_err()?
-                    }
-                });
-            }
-        };
-        Ok(config_snapshot)
+    pub fn try_into_snapshot(&self) -> Result<FlowConfigSnapshot, InternalError> {
+        Ok(match self {
+            Self::Batching(batching_input) => FlowConfigSnapshot::Batching(
+                BatchingRule::new_checked(
+                    batching_input.min_records_to_await,
+                    batching_input.max_batching_interval.clone().into(),
+                )
+                .int_err()?,
+            ),
+            Self::Compacting(compacting_input) => FlowConfigSnapshot::Compacting(
+                CompactingRule::new_checked(
+                    compacting_input.max_slice_size,
+                    compacting_input.max_slice_records,
+                    compacting_input.keep_metadata_only,
+                )
+                .int_err()?,
+            ),
+            Self::Schedule(schedule_input) => FlowConfigSnapshot::Schedule(match schedule_input {
+                ScheduleInput::TimeDelta(td) => {
+                    Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
+                }
+                ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
+                    Schedule::try_from_5component_cron_expression(cron_5component_expression)
+                        .int_err()?
+                }
+            }),
+        })
     }
 }
 

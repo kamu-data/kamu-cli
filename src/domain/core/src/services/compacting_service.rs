@@ -165,7 +165,7 @@ pub enum CompactingResult {
 pub struct CompactingOptions {
     pub max_slice_size: Option<u64>,
     pub max_slice_records: Option<u64>,
-    pub is_keep_metadata_only: bool,
+    pub keep_metadata_only: bool,
 }
 
 impl Default for CompactingOptions {
@@ -173,7 +173,7 @@ impl Default for CompactingOptions {
         Self {
             max_slice_size: Some(DEFAULT_MAX_SLICE_SIZE),
             max_slice_records: Some(DEFAULT_MAX_SLICE_RECORDS),
-            is_keep_metadata_only: false,
+            keep_metadata_only: false,
         }
     }
 }

@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use fs::ConfigSnapshot;
 use {kamu_flow_system as fs, opendatafabric as odf};
 
 use super::{
@@ -67,7 +66,7 @@ impl DatasetFlowRunsMut {
 
         let flow_run_snapshot = if let Some(flow_run_config) = flow_run_configuration {
             match flow_run_config.try_into_snapshot() {
-                Ok(snapshot) => snapshot,
+                Ok(snapshot) => Some(snapshot),
                 Err(_) => {
                     return Ok(TriggerFlowResult::InvalidRunConfigurations(
                         FlowInvalidRunConfigurations,
@@ -75,7 +74,7 @@ impl DatasetFlowRunsMut {
                 }
             }
         } else {
-            ConfigSnapshot::default()
+            None
         };
 
         let flow_state = flow_service

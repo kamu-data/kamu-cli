@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chrono::Duration;
 use kamu_accounts::DEFAULT_ACCOUNT_ID;
 use kamu_core::SystemTimeSource;
-use kamu_flow_system::{ConfigSnapshot, FlowKey, FlowService};
+use kamu_flow_system::{FlowKey, FlowService};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,7 +50,7 @@ impl ManualFlowTriggerDriver {
                 start_time + self.args.run_since_start,
                 self.args.flow_key,
                 DEFAULT_ACCOUNT_ID.clone(),
-                ConfigSnapshot::default(),
+                None,
             )
             .await
             .unwrap();

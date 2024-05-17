@@ -180,7 +180,7 @@ impl DatasetFlowConfigsMut {
         let compacting_rule = match CompactingRule::new_checked(
             compacting_args.max_slice_size,
             compacting_args.max_slice_records,
-            compacting_args.is_keep_metadata_only,
+            compacting_args.keep_metadata_only,
         ) {
             Ok(rule) => rule,
             Err(e) => {

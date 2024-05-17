@@ -24,7 +24,7 @@ use kamu_core::{
     TransformService,
 };
 use kamu_flow_system_inmem::FlowConfigurationEventStoreInMem;
-use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowPermissionsPluginImpl};
+use kamu_flow_system_services::FlowConfigurationServiceImpl;
 use opendatafabric::*;
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
@@ -1521,7 +1521,6 @@ impl FlowConfigHarness {
             .add::<DependencyGraphServiceInMemory>()
             .add::<FlowConfigurationServiceImpl>()
             .add::<FlowConfigurationEventStoreInMem>()
-            .add::<FlowPermissionsPluginImpl>()
             .build();
 
         // Init dataset with no sources
@@ -1760,7 +1759,7 @@ impl FlowConfigHarness {
         dataset_flow_type: &str,
         max_slice_size: u64,
         max_slice_records: u64,
-        is_keep_metadata_only: bool,
+        keep_metadata_only: bool,
     ) -> String {
         indoc!(
             r#"
@@ -1774,7 +1773,7 @@ impl FlowConfigHarness {
                                     compactingArgs: {
                                         maxSliceSize: <max_slice_size>,
                                         maxSliceRecords: <max_slice_records>,
-                                        isKeepMetadataOnly: <is_keep_metadata_only>
+                                        keepMetadataOnly: <keep_metadata_only>
                                     }
                                 ) {
                                     __typename,
@@ -1813,12 +1812,8 @@ impl FlowConfigHarness {
         .replace("<max_slice_records>", &max_slice_records.to_string())
         .replace("<max_slice_size>", &max_slice_size.to_string())
         .replace(
-            "<is_keep_metadata_only>",
-            if is_keep_metadata_only {
-                "true"
-            } else {
-                "false"
-            },
+            "<keep_metadata_only>",
+            if keep_metadata_only { "true" } else { "false" },
         )
     }
 
