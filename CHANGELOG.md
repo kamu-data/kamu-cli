@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Loading database components relying on CLI config
 ### Fixed
-- Panic when creating a workplace with an existing config
+- Panic when creating a workspace with an existing config
 
 ## [0.181.2] - 2024-05-20
 ### Fixed
