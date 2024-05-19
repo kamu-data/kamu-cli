@@ -65,13 +65,9 @@ impl DatasetFlowRunsMut {
         let logged_account = utils::get_logged_account(ctx);
 
         let flow_run_snapshot = if let Some(flow_run_config) = flow_run_configuration {
-            match flow_run_config.try_into_snapshot() {
+            match flow_run_config.try_into_snapshot(dataset_flow_type) {
                 Ok(snapshot) => Some(snapshot),
-                Err(_) => {
-                    return Ok(TriggerFlowResult::InvalidRunConfigurations(
-                        FlowInvalidRunConfigurations,
-                    ))
-                }
+                Err(err) => return Ok(TriggerFlowResult::InvalidRunConfigurations(err)),
             }
         } else {
             None
@@ -185,13 +181,16 @@ impl CancelScheduledTasksSuccess {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct FlowInvalidRunConfigurations;
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct FlowInvalidRunConfigurations {
+    pub error: String,
+}
 
-#[Object]
+#[ComplexObject]
 impl FlowInvalidRunConfigurations {
     pub async fn message(&self) -> String {
-        "Invalid flow configurations".to_string()
+        format!("Invalid flow provided: '{}'", self.error)
     }
 }
 

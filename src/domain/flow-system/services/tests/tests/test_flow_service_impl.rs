@@ -815,7 +815,7 @@ async fn test_manual_trigger_keep_metada_only_compacting() {
 
             // Main simulation script
             let main_handle = async {
-                harness.advance_time(Duration::try_milliseconds(450).unwrap()).await;
+                harness.advance_time(Duration::try_milliseconds(500).unwrap()).await;
             };
 
             tokio::join!(task0_handle, task1_handle, trigger1_handle, task2_handle, main_handle)

@@ -947,6 +947,7 @@ type FlowInvalidCompactingConfig implements SetFlowCompactingConfigResult {
 }
 
 type FlowInvalidRunConfigurations implements TriggerFlowResult {
+	error: String!
 	message: String!
 }
 

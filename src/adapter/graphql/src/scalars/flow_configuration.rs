@@ -17,6 +17,7 @@ use kamu_flow_system::{
     ScheduleTimeDelta,
 };
 
+use crate::mutations::FlowInvalidRunConfigurations;
 use crate::prelude::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -234,32 +235,65 @@ pub struct CompactingConditionInput {
 }
 
 impl FlowRunConfiguration {
-    pub fn try_into_snapshot(&self) -> Result<FlowConfigSnapshot, InternalError> {
+    pub fn try_into_snapshot(
+        &self,
+        dataset_flow_type: DatasetFlowType,
+    ) -> Result<FlowConfigSnapshot, FlowInvalidRunConfigurations> {
         Ok(match self {
-            Self::Batching(batching_input) => FlowConfigSnapshot::Batching(
-                BatchingRule::new_checked(
-                    batching_input.min_records_to_await,
-                    batching_input.max_batching_interval.clone().into(),
+            Self::Batching(batching_input) => {
+                if dataset_flow_type != DatasetFlowType::ExecuteTransform {
+                    return Err(FlowInvalidRunConfigurations {
+                        error: "Incompatible flow run configuration and dataset flow type"
+                            .to_string(),
+                    });
+                };
+                FlowConfigSnapshot::Batching(
+                    BatchingRule::new_checked(
+                        batching_input.min_records_to_await,
+                        batching_input.max_batching_interval.clone().into(),
+                    )
+                    .map_err(|_| FlowInvalidRunConfigurations {
+                        error: "Invalid batching flow run configuration".to_string(),
+                    })?,
                 )
-                .int_err()?,
-            ),
-            Self::Compacting(compacting_input) => FlowConfigSnapshot::Compacting(
-                CompactingRule::new_checked(
-                    compacting_input.max_slice_size,
-                    compacting_input.max_slice_records,
-                    compacting_input.keep_metadata_only,
+            }
+            Self::Compacting(compacting_input) => {
+                if dataset_flow_type != DatasetFlowType::HardCompacting {
+                    return Err(FlowInvalidRunConfigurations {
+                        error: "Incompatible flow run configuration and dataset flow type"
+                            .to_string(),
+                    });
+                };
+                FlowConfigSnapshot::Compacting(
+                    CompactingRule::new_checked(
+                        compacting_input.max_slice_size,
+                        compacting_input.max_slice_records,
+                        compacting_input.keep_metadata_only,
+                    )
+                    .map_err(|_| FlowInvalidRunConfigurations {
+                        error: "Invalid compacting flow run configuration".to_string(),
+                    })?,
                 )
-                .int_err()?,
-            ),
-            Self::Schedule(schedule_input) => FlowConfigSnapshot::Schedule(match schedule_input {
-                ScheduleInput::TimeDelta(td) => {
-                    Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
-                }
-                ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
-                    Schedule::try_from_5component_cron_expression(cron_5component_expression)
-                        .int_err()?
-                }
-            }),
+            }
+            Self::Schedule(schedule_input) => {
+                if dataset_flow_type != DatasetFlowType::Ingest {
+                    return Err(FlowInvalidRunConfigurations {
+                        error: "Incompatible flow run configuration and dataset flow type"
+                            .to_string(),
+                    });
+                };
+                FlowConfigSnapshot::Schedule(match schedule_input {
+                    ScheduleInput::TimeDelta(td) => {
+                        Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
+                    }
+                    ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
+                        Schedule::try_from_5component_cron_expression(cron_5component_expression)
+                            .map_err(|_| FlowInvalidRunConfigurations {
+                                error: "Invalid schedule flow run configuration".to_string(),
+                            })?
+                    }
+                })
+            }
         })
     }
 }
