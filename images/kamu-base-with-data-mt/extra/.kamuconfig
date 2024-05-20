@@ -2,7 +2,6 @@ kind: CLIConfig
 version: 1
 content:
   users:
-    allowLoginUnknown: true
     predefined:
       - accountName: sh101-bowen
         avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png

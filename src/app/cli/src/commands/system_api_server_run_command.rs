@@ -101,7 +101,7 @@ impl APIServerRunCommand {
             .unwrap();
         let access_token = auth_svc
             .login(
-                kamu_accounts::PROVIDER_PASSWORD,
+                PROVIDER_PASSWORD,
                 serde_json::to_string::<PasswordLoginCredentials>(&login_credentials).int_err()?,
             )
             .await

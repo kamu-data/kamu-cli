@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
+use database_common::DatabaseProvider;
 use duration_string::DurationString;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
@@ -34,6 +35,8 @@ pub struct CLIConfig {
     /// Users configuration
     #[merge(strategy = merge_recursive)]
     pub users: Option<PredefinedAccountsConfig>,
+    /// Database connection configuration
+    pub database: Option<DatabaseConfig>,
 }
 
 impl CLIConfig {
@@ -43,6 +46,7 @@ impl CLIConfig {
             protocol: None,
             frontend: None,
             users: None,
+            database: None,
         }
     }
 
@@ -56,6 +60,7 @@ impl CLIConfig {
             protocol: Some(ProtocolConfig::sample()),
             frontend: Some(FrontendConfig::sample()),
             users: Some(PredefinedAccountsConfig::sample()),
+            database: Some(DatabaseConfig::sample()),
         }
     }
 }
@@ -67,6 +72,7 @@ impl Default for CLIConfig {
             protocol: Some(ProtocolConfig::default()),
             frontend: Some(FrontendConfig::default()),
             users: Some(PredefinedAccountsConfig::default()),
+            database: None,
         }
     }
 }
@@ -305,6 +311,56 @@ impl Default for JupyterConfig {
             livy_image: EngineImagesConfig::default().spark,
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "provider")]
+pub enum DatabaseConfig {
+    InMemory,
+    Sqlite(SqliteDatabaseConfig),
+    Postgres(RemoteDatabaseConfig),
+    MySql(RemoteDatabaseConfig),
+    MariaDB(RemoteDatabaseConfig),
+}
+
+impl DatabaseConfig {
+    pub fn sample() -> Self {
+        Self::Postgres(RemoteDatabaseConfig {
+            user: String::from("root"),
+            password: String::from("p455w0rd"),
+            database_name: String::from("kamu"),
+            host: String::from("localhost"),
+            port: Some(DatabaseProvider::Postgres.default_port()),
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct SqliteDatabaseConfig {
+    pub database_path: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteDatabaseConfig {
+    pub user: String,
+    pub password: String,
+    pub database_name: String,
+    pub host: String,
+    pub port: Option<u32>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

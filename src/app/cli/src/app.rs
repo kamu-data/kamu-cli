@@ -20,18 +20,11 @@ use kamu_accounts::*;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
+use crate::config::{DatabaseConfig, RemoteDatabaseConfig};
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
-use crate::{
-    accounts,
-    cli_commands,
-    config,
-    odf_server,
-    GcService,
-    WorkspaceLayout,
-    WorkspaceService,
-};
+use crate::{cli_commands, config, odf_server, GcService, WorkspaceLayout, WorkspaceService};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,13 +46,21 @@ pub async fn run(
         std::env::set_var("RUST_BACKTRACE", "1");
     }
 
-    let workspace_svc = WorkspaceService::new(Arc::new(workspace_layout.clone()));
+    // Sometimes (in the case of predefined users), we need to know whether the
+    // workspace to be created will be multi-tenant or not right away, even before
+    // the `kamu init` command itself is processed.
+    let init_multi_tenant_workspace = matches!(matches.subcommand(), Some(("init", arg_matches)) if arg_matches.get_flag("multi-tenant"));
+    let workspace_svc = WorkspaceService::new(
+        Arc::new(workspace_layout.clone()),
+        init_multi_tenant_workspace,
+    );
     let workspace_version = workspace_svc.workspace_version()?;
-    let config = load_config(&workspace_layout);
 
-    let current_account = accounts::AccountService::current_account_indication(
+    let is_multi_tenant_workspace = workspace_svc.is_multi_tenant_workspace();
+    let config = load_config(&workspace_layout);
+    let current_account = AccountService::current_account_indication(
         &matches,
-        workspace_svc.is_multi_tenant_workspace(),
+        is_multi_tenant_workspace,
         config.users.as_ref().unwrap(),
     );
 
@@ -74,30 +75,29 @@ pub async fn run(
 
     // Configure application
     let (guards, base_catalog, cli_catalog, output_config) = {
-        let multi_tenant_workspace = workspace_svc.is_multi_tenant_workspace();
-
         let dependencies_graph_repository = prepare_dependencies_graph_repository(
             &workspace_layout,
-            multi_tenant_workspace,
+            is_multi_tenant_workspace,
             current_account.to_current_account_subject(),
         );
 
         let mut base_catalog_builder =
-            configure_base_catalog(&workspace_layout, multi_tenant_workspace, system_time);
+            configure_base_catalog(&workspace_layout, is_multi_tenant_workspace, system_time);
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
 
         base_catalog_builder.add_value(ServerUrlConfig::load_from_env()?);
 
-        // TODO: read database settings from configuration, and make it optional
-        // let db_configuration = DatabaseConfiguration::local_postgres();
-        // let db_configuration = DatabaseConfiguration::local_mariadb();
-        // let db_configuration =
-        //    DatabaseConfiguration::sqlite_from(PathBuf::from("./kamu.sqlite.db").
-        // as_path());
-        // configure_database_components(&mut base_catalog_builder, &db_configuration)?;
-        configure_in_memory_components(&mut base_catalog_builder);
+        if let Some(db_configuration) = config
+            .database
+            .clone()
+            .and_then(try_convert_into_db_configuration)
+        {
+            configure_database_components(&mut base_catalog_builder, &db_configuration)?;
+        } else {
+            configure_in_memory_components(&mut base_catalog_builder);
+        }
 
         base_catalog_builder
             .add_value(dependencies_graph_repository)
@@ -112,18 +112,18 @@ pub async fn run(
             args = ?std::env::args().collect::<Vec<_>>(),
             ?workspace_version,
             workspace_root = ?workspace_layout.root_dir,
-            "Initializing kamu-cli"
+            "Initializing {BINARY_NAME}"
         );
 
         register_config_in_catalog(
             &config,
             &mut base_catalog_builder,
-            workspace_svc.is_multi_tenant_workspace(),
+            is_multi_tenant_workspace,
         );
 
         let base_catalog = base_catalog_builder.build();
 
-        let cli_catalog = configure_cli_catalog(&base_catalog)
+        let cli_catalog = configure_cli_catalog(&base_catalog, is_multi_tenant_workspace)
             .add_value(current_account.to_current_account_subject())
             .build();
 
@@ -141,7 +141,7 @@ pub async fn run(
                 Err(CLIError::usage_error_from(NotInWorkspace))
             } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
                 Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-            } else if current_account.is_explicit() && !workspace_svc.is_multi_tenant_workspace() {
+            } else if current_account.is_explicit() && !is_multi_tenant_workspace {
                 Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
             } else {
                 command.run().await
@@ -332,7 +332,6 @@ pub fn configure_base_catalog(
     b
 }
 
-#[allow(dead_code)]
 fn configure_database_components(
     catalog_builder: &mut CatalogBuilder,
     db_configuration: &DatabaseConfiguration,
@@ -359,9 +358,8 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_mysql::MySqlAccountRepository>();
-            // TODO: Task System MySQL version
 
-            Ok(())
+            todo!("Task & Flow System MySQL versions");
         }
         DatabaseProvider::Sqlite => {
             database_common::SqlitePlugin::init_database_components(
@@ -388,12 +386,15 @@ pub fn configure_in_memory_components(catalog_builder: &mut CatalogBuilder) {
 }
 
 // Public only for tests
-pub fn configure_cli_catalog(base_catalog: &Catalog) -> CatalogBuilder {
+pub fn configure_cli_catalog(
+    base_catalog: &Catalog,
+    multi_tenant_workspace: bool,
+) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
 
     b.add::<config::ConfigService>();
     b.add::<GcService>();
-    b.add::<WorkspaceService>();
+    b.add_builder(WorkspaceService::builder().with_multi_tenant(multi_tenant_workspace));
     b.add::<odf_server::LoginService>();
 
     b
@@ -513,7 +514,32 @@ pub fn register_config_in_catalog(
             );
         }
 
-        catalog_builder.add_value(kamu_accounts::PredefinedAccountsConfig::single_tenant());
+        catalog_builder.add_value(PredefinedAccountsConfig::single_tenant());
+    }
+}
+
+fn try_convert_into_db_configuration(config: DatabaseConfig) -> Option<DatabaseConfiguration> {
+    fn convert(c: RemoteDatabaseConfig, provider: DatabaseProvider) -> DatabaseConfiguration {
+        DatabaseConfiguration::new(
+            provider,
+            c.user,
+            c.password,
+            c.database_name,
+            c.host,
+            c.port,
+        )
+    }
+
+    match config {
+        DatabaseConfig::Sqlite(c) => {
+            let path = Path::new(&c.database_path);
+
+            Some(DatabaseConfiguration::sqlite_from(path))
+        }
+        DatabaseConfig::Postgres(config) => Some(convert(config, DatabaseProvider::Postgres)),
+        DatabaseConfig::MySql(config) => Some(convert(config, DatabaseProvider::MySql)),
+        DatabaseConfig::MariaDB(config) => Some(convert(config, DatabaseProvider::MariaDB)),
+        DatabaseConfig::InMemory => None,
     }
 }
 
