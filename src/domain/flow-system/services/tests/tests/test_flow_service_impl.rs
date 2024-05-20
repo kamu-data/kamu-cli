@@ -721,14 +721,6 @@ async fn test_manual_trigger_keep_metada_only_compacting() {
             CompactingRule::new_checked(max_slice_size, max_slice_records, true).unwrap(),
         )
         .await;
-    harness
-        .set_dataset_flow_batching_rule(
-            harness.now_datetime(),
-            foo_bar_id.clone(),
-            DatasetFlowType::ExecuteTransform,
-            BatchingRule::new_checked(1, Duration::try_seconds(1).unwrap()).unwrap(),
-        )
-        .await;
 
     harness.eager_dependencies_graph_init().await;
 
@@ -737,7 +729,7 @@ async fn test_manual_trigger_keep_metada_only_compacting() {
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
-    test_flow_listener.define_dataset_display_name(foo_bar_id.clone(), "foo_Bar".to_string());
+    test_flow_listener.define_dataset_display_name(foo_bar_id.clone(), "foo_bar".to_string());
 
     // Remember start time
     let start_time = harness
@@ -752,22 +744,11 @@ async fn test_manual_trigger_keep_metada_only_compacting() {
 
         // Run simulation script and task drivers
         _ = async {
-            // Task 0: "foo_bar" execute_transform start running at 10ms, finish at 30ms
+            // Task 0: "foo" start running at 10ms, finish at 80ms
             let task0_driver = harness.task_driver(TaskDriverArgs {
-              task_id: TaskID::new(0),
-              dataset_id: Some(foo_bar_id.clone()),
-              run_since_start: Duration::try_milliseconds(10).unwrap(),
-              finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-              expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                dataset_id: foo_bar_id.clone(),
-                }),
-            });
-            let task0_handle = task0_driver.run();
-            // Task 1: "foo" start running at 40ms, finish at 130ms
-            let task1_driver = harness.task_driver(TaskDriverArgs {
-                task_id: TaskID::new(1),
+                task_id: TaskID::new(0),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::try_milliseconds(40).unwrap(),
+                run_since_start: Duration::try_milliseconds(10).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(70).unwrap(), TaskOutcome::Success(TaskResult::CompactingDatasetResult(TaskCompactingDatasetResult {
                   compacting_result: CompactingResult::Success {
                     old_head: Multihash::from_digest_sha3_256(b"old-slice"),
@@ -782,19 +763,19 @@ async fn test_manual_trigger_keep_metada_only_compacting() {
                   keep_metadata_only: true,
                 }),
             });
-            let task1_handle = task1_driver.run();
+            let task0_handle = task0_driver.run();
 
-            let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                 flow_key: foo_flow_key,
-                run_since_start: Duration::try_milliseconds(30).unwrap(),
+                run_since_start: Duration::try_milliseconds(10).unwrap(),
             });
-            let trigger1_handle = trigger1_driver.run();
+            let trigger1_handle = trigger0_driver.run();
 
-              // Task 2: "foo_bar" execute_transform start running at 170ms, finish at 240ms
-              let task2_driver = harness.task_driver(TaskDriverArgs {
-                task_id: TaskID::new(2),
+              // Task 1: "foo_bar" hard_compacting start running at 110ms, finish at 180ms
+              let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
                 dataset_id: Some(foo_bar_id.clone()),
-                run_since_start: Duration::try_milliseconds(170).unwrap(),
+                run_since_start: Duration::try_milliseconds(110).unwrap(),
                 // Send some PullResult with records to bypass batching condition
                 finish_in_with: Some((Duration::try_milliseconds(70).unwrap(), TaskOutcome::Success(TaskResult::CompactingDatasetResult(TaskCompactingDatasetResult {
                   compacting_result: CompactingResult::Success {
@@ -811,14 +792,14 @@ async fn test_manual_trigger_keep_metada_only_compacting() {
                   keep_metadata_only: true,
                 }),
             });
-            let task2_handle = task2_driver.run();
+            let task1_handle = task1_driver.run();
 
             // Main simulation script
             let main_handle = async {
-                harness.advance_time(Duration::try_milliseconds(500).unwrap()).await;
+                harness.advance_time(Duration::try_milliseconds(400).unwrap()).await;
             };
 
-            tokio::join!(task0_handle, task1_handle, trigger1_handle, task2_handle, main_handle)
+            tokio::join!(task0_handle, task1_handle, trigger1_handle, main_handle)
         } => Ok(())
     }
     .unwrap();
@@ -828,64 +809,38 @@ async fn test_manual_trigger_keep_metada_only_compacting() {
         indoc::indoc!(
             r#"
             #0: +0ms:
-              "foo_Bar" ExecuteTransform:
-                Flow ID = 0 Waiting AutoPolling
 
-            #1: +0ms:
-              "foo_Bar" ExecuteTransform:
-                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+            #1: +10ms:
+              "foo" HardCompacting:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
 
             #2: +10ms:
-              "foo_Bar" ExecuteTransform:
+              "foo" HardCompacting:
                 Flow ID = 0 Running(task=0)
 
-            #3: +30ms:
-              "foo_Bar" ExecuteTransform:
-                Flow ID = 0 Finished Success
-
-            #4: +30ms:
+            #3: +80ms:
               "foo" HardCompacting:
-                Flow ID = 1 Waiting Manual Executor(task=1, since=30ms)
-              "foo_Bar" ExecuteTransform:
                 Flow ID = 0 Finished Success
+              "foo_bar" HardCompacting:
+                Flow ID = 1 Waiting Input(foo)
 
-            #5: +40ms:
+            #4: +80ms:
               "foo" HardCompacting:
+                Flow ID = 0 Finished Success
+              "foo_bar" HardCompacting:
+                Flow ID = 1 Waiting Input(foo) Executor(task=1, since=80ms)
+
+            #5: +110ms:
+              "foo" HardCompacting:
+                Flow ID = 0 Finished Success
+              "foo_bar" HardCompacting:
                 Flow ID = 1 Running(task=1)
-              "foo_Bar" ExecuteTransform:
-                Flow ID = 0 Finished Success
 
-            #6: +110ms:
+            #6: +180ms:
               "foo" HardCompacting:
-                Flow ID = 1 Finished Success
-              "foo_Bar" ExecuteTransform:
                 Flow ID = 0 Finished Success
-              "foo_Bar" HardCompacting:
-                Flow ID = 2 Waiting Input(foo)
-
-            #7: +110ms:
-              "foo" HardCompacting:
+              "foo_bar" HardCompacting:
                 Flow ID = 1 Finished Success
-              "foo_Bar" ExecuteTransform:
-                Flow ID = 0 Finished Success
-              "foo_Bar" HardCompacting:
-                Flow ID = 2 Waiting Input(foo) Executor(task=2, since=110ms)
-
-            #8: +170ms:
-              "foo" HardCompacting:
-                Flow ID = 1 Finished Success
-              "foo_Bar" ExecuteTransform:
-                Flow ID = 0 Finished Success
-              "foo_Bar" HardCompacting:
-                Flow ID = 2 Running(task=2)
-
-            #9: +240ms:
-              "foo" HardCompacting:
-                Flow ID = 1 Finished Success
-              "foo_Bar" ExecuteTransform:
-                Flow ID = 0 Finished Success
-              "foo_Bar" HardCompacting:
-                Flow ID = 2 Finished Success
 
             "#
         )
