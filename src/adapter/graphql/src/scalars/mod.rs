@@ -33,7 +33,7 @@ pub(crate) use dataset_endpoints::*;
 pub(crate) use dataset_id_name::*;
 pub(crate) use engine_desc::*;
 pub(crate) use event_id::*;
-pub use flow_configuration::*;
+pub(crate) use flow_configuration::*;
 pub(crate) use flow_scalars::*;
 pub(crate) use metadata::*;
 pub(crate) use multihash::*;

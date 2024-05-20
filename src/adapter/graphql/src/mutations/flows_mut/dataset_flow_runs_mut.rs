@@ -190,7 +190,7 @@ pub struct FlowInvalidRunConfigurations {
 #[ComplexObject]
 impl FlowInvalidRunConfigurations {
     pub async fn message(&self) -> String {
-        format!("Invalid flow provided: '{}'", self.error)
+        format!("Invalid flow configuration provided: '{}'", self.error)
     }
 }
 
