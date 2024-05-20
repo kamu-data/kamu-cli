@@ -530,17 +530,15 @@ fn try_convert_into_db_configuration(config: DatabaseConfig) -> Option<DatabaseC
         )
     }
 
-    use DatabaseProvider::*;
-
     match config {
         DatabaseConfig::Sqlite(c) => {
             let path = Path::new(&c.database_path);
 
             Some(DatabaseConfiguration::sqlite_from(path))
         }
-        DatabaseConfig::Postgres(config) => Some(convert(config, Postgres)),
-        DatabaseConfig::MySql(config) => Some(convert(config, MySql)),
-        DatabaseConfig::MariaDB(config) => Some(convert(config, MariaDB)),
+        DatabaseConfig::Postgres(config) => Some(convert(config, DatabaseProvider::Postgres)),
+        DatabaseConfig::MySql(config) => Some(convert(config, DatabaseProvider::MySql)),
+        DatabaseConfig::MariaDB(config) => Some(convert(config, DatabaseProvider::MariaDB)),
         DatabaseConfig::InMemory => None,
     }
 }
