@@ -358,9 +358,8 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_mysql::MySqlAccountRepository>();
-            // TODO: Task System MySQL version
 
-            Ok(())
+            todo!("Task System MySQL version");
         }
         DatabaseProvider::Sqlite => {
             database_common::SqlitePlugin::init_database_components(
