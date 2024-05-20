@@ -319,17 +319,18 @@ impl Default for JupyterConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
-#[serde(tag = "kind")]
+#[serde(tag = "provider")]
 pub enum DatabaseConfig {
     InMemory,
     Sqlite(SqliteDatabaseConfig),
-    ClientServer(RemoteDatabaseConfig),
+    Postgres(RemoteDatabaseConfig),
+    MySql(RemoteDatabaseConfig),
+    MariaDB(RemoteDatabaseConfig),
 }
 
 impl DatabaseConfig {
     pub fn sample() -> Self {
-        Self::ClientServer(RemoteDatabaseConfig {
-            provider: DatabaseProvider::Postgres,
+        Self::Postgres(RemoteDatabaseConfig {
             user: String::from("root"),
             password: String::from("p455w0rd"),
             database_name: String::from("kamu"),
@@ -355,7 +356,6 @@ pub struct SqliteDatabaseConfig {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteDatabaseConfig {
-    pub provider: DatabaseProvider,
     pub user: String,
     pub password: String,
     pub database_name: String,

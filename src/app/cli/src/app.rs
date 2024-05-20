@@ -20,7 +20,7 @@ use kamu_accounts::*;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
-use crate::config::DatabaseConfig;
+use crate::config::{DatabaseConfig, RemoteDatabaseConfig};
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
@@ -520,28 +520,28 @@ pub fn register_config_in_catalog(
 }
 
 fn try_convert_into_db_configuration(config: DatabaseConfig) -> Option<DatabaseConfiguration> {
+    fn convert(c: RemoteDatabaseConfig, provider: DatabaseProvider) -> DatabaseConfiguration {
+        DatabaseConfiguration::new(
+            provider,
+            c.user,
+            c.password,
+            c.database_name,
+            c.host,
+            c.port,
+        )
+    }
+
+    use DatabaseProvider::*;
+
     match config {
         DatabaseConfig::Sqlite(c) => {
             let path = Path::new(&c.database_path);
 
             Some(DatabaseConfiguration::sqlite_from(path))
         }
-        DatabaseConfig::ClientServer(c) => {
-            assert!(
-                !matches!(c.provider, DatabaseProvider::Sqlite),
-                "For SQLite configuration, please use `kind: sqlite` instead of `kind: \
-                 clientServer`"
-            );
-
-            Some(DatabaseConfiguration::new(
-                c.provider,
-                c.user,
-                c.password,
-                c.database_name,
-                c.host,
-                c.port,
-            ))
-        }
+        DatabaseConfig::Postgres(config) => Some(convert(config, Postgres)),
+        DatabaseConfig::MySql(config) => Some(convert(config, MySql)),
+        DatabaseConfig::MariaDB(config) => Some(convert(config, MariaDB)),
         DatabaseConfig::InMemory => None,
     }
 }
