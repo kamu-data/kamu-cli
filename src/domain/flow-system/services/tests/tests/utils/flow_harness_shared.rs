@@ -52,7 +52,6 @@ pub(crate) struct FlowHarness {
     pub dataset_repo: Arc<dyn DatasetRepository>,
     pub flow_configuration_service: Arc<dyn FlowConfigurationService>,
     pub flow_service: Arc<dyn FlowService>,
-    pub flow_service_impl: Arc<FlowServiceImpl>,
     pub fake_system_time_source: FakeSystemTimeSource,
 }
 
@@ -124,7 +123,6 @@ impl FlowHarness {
             .build();
 
         let flow_service = catalog.get_one::<dyn FlowService>().unwrap();
-        let flow_service_impl = catalog.get_one::<FlowServiceImpl>().unwrap();
         let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
@@ -132,7 +130,6 @@ impl FlowHarness {
             _tmp_dir: tmp_dir,
             catalog,
             flow_service,
-            flow_service_impl,
             flow_configuration_service,
             dataset_repo,
             fake_system_time_source,

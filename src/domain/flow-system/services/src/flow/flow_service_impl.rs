@@ -289,11 +289,7 @@ impl FlowServiceImpl {
     ) -> Result<(), InternalError> {
         if let FlowKey::Dataset(fk_dataset) = &flow.flow_key {
             let dependent_dataset_flow_plans = self
-                .make_downstream_dependecies_flow_plans(
-                    &fk_dataset.dataset_id,
-                    flow_result,
-                    flow.config_snapshot.clone(),
-                )
+                .make_downstream_dependecies_flow_plans(fk_dataset, flow.config_snapshot.as_ref())
                 .await?;
             let trigger = FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
                 trigger_time: input_success_time,
@@ -308,7 +304,7 @@ impl FlowServiceImpl {
                     &dependent_dataset_flow_plan.flow_key,
                     trigger.clone(),
                     dependent_dataset_flow_plan.flow_trigger_context,
-                    dependent_dataset_flow_plan.config_snapshot,
+                    dependent_dataset_flow_plan.maybe_config_snapshot,
                 )
                 .await?;
             }
@@ -800,89 +796,95 @@ impl FlowServiceImpl {
         task_outcome
     }
 
-    pub async fn make_downstream_dependecies_flow_plans(
+    async fn make_downstream_dependecies_flow_plans(
         &self,
-        dataset_id: &DatasetID,
-        flow_result: &FlowResult,
-        config_snapshot: Option<FlowConfigurationSnapshot>,
+        fk_dataset: &FlowKeyDataset,
+        maybe_config_snapshot: Option<&FlowConfigurationSnapshot>,
     ) -> Result<Vec<DownstreamDependencyFlowPlan>, InternalError> {
         // ToDo: extend dependency graph with possibility to fetch downstream
         // dependencies by owner
         let dependent_dataset_ids: Vec<_> = self
             .dependency_graph_service
-            .get_downstream_dependencies(dataset_id)
+            .get_downstream_dependencies(&fk_dataset.dataset_id)
             .await
             .int_err()?
             .collect()
             .await;
 
-        let is_keep_metadata_only_compacting = if let FlowResult::DatasetCompact(_) = flow_result
-            && let Some(config_rule) = &config_snapshot
-            && let FlowConfigurationSnapshot::Compacting(compacting_rule) = config_rule
-        {
-            compacting_rule.keep_metadata_only()
-        } else {
-            false
-        };
+        let mut plans: Vec<DownstreamDependencyFlowPlan> = vec![];
 
-        let filtered_dependent_dataset_ids = if is_keep_metadata_only_compacting {
-            let root_dataset_handle = self
-                .dataset_repo
-                .resolve_dataset_ref(&dataset_id.clone().into_local_ref())
-                .await
-                .int_err()?;
-            let mut filtered_datasets: Vec<DatasetID> = vec![];
-            for dataset_id in &dependent_dataset_ids {
-                let dataset_handle = self
-                    .dataset_repo
-                    .resolve_dataset_ref(&dataset_id.clone().into_local_ref())
-                    .await
-                    .int_err()?;
-                if dataset_handle.alias.account_name == root_dataset_handle.alias.account_name {
-                    filtered_datasets.push(dataset_handle.id);
+        match self.classify_dependent_trigger_type(fk_dataset.flow_type, maybe_config_snapshot) {
+            DownstreamDependencyTriggerType::TriggerAllEnabled => {
+                let guard = self.state.lock().unwrap();
+                for dataset_id in dependent_dataset_ids {
+                    if let Some(batching_rule) = guard.active_configs.try_get_dataset_batching_rule(
+                        &dataset_id,
+                        DatasetFlowType::ExecuteTransform,
+                    ) {
+                        plans.push(DownstreamDependencyFlowPlan {
+                            flow_key: FlowKeyDataset::new(
+                                dataset_id,
+                                DatasetFlowType::ExecuteTransform,
+                            )
+                            .into(),
+                            flow_trigger_context: FlowTriggerContext::Batching(batching_rule),
+                            maybe_config_snapshot: None,
+                        });
+                    };
                 }
             }
-            filtered_datasets
-        } else {
-            dependent_dataset_ids
-        };
 
-        let mut result: Vec<DownstreamDependencyFlowPlan> = vec![];
-        for dependent_dataset_id in &filtered_dependent_dataset_ids {
-            if is_keep_metadata_only_compacting {
-                result.push(DownstreamDependencyFlowPlan {
-                    flow_key: FlowKeyDataset::new(
-                        dependent_dataset_id.clone(),
-                        DatasetFlowType::HardCompacting,
-                    )
-                    .into(),
-                    flow_trigger_context: FlowTriggerContext::Unconditional,
-                    config_snapshot: config_snapshot.clone(),
-                });
-            // When dependent flow batching rule is enabled, schedule
-            // dependent update
-            } else if let Some(batching_rule) = self
-                .state
-                .lock()
-                .unwrap()
-                .active_configs
-                .try_get_dataset_batching_rule(
-                    dependent_dataset_id,
-                    DatasetFlowType::ExecuteTransform,
-                )
-            {
-                result.push(DownstreamDependencyFlowPlan {
-                    flow_key: FlowKeyDataset::new(
-                        dependent_dataset_id.clone(),
-                        DatasetFlowType::ExecuteTransform,
-                    )
-                    .into(),
-                    flow_trigger_context: FlowTriggerContext::Batching(batching_rule),
-                    config_snapshot: None,
-                });
-            };
+            DownstreamDependencyTriggerType::TriggerOwnUnconditionally => {
+                let root_dataset_handle = self
+                    .dataset_repo
+                    .resolve_dataset_ref(&fk_dataset.dataset_id.as_local_ref())
+                    .await
+                    .int_err()?;
+
+                for dataset_id in dependent_dataset_ids {
+                    let dataset_handle = self
+                        .dataset_repo
+                        .resolve_dataset_ref(&dataset_id.as_local_ref())
+                        .await
+                        .int_err()?;
+                    if dataset_handle.alias.account_name == root_dataset_handle.alias.account_name {
+                        plans.push(DownstreamDependencyFlowPlan {
+                            flow_key: FlowKeyDataset::new(
+                                dataset_id.clone(),
+                                DatasetFlowType::HardCompacting,
+                            )
+                            .into(),
+                            flow_trigger_context: FlowTriggerContext::Unconditional,
+                            maybe_config_snapshot: maybe_config_snapshot.cloned(),
+                        });
+                    }
+                }
+            }
         }
-        Ok(result)
+
+        Ok(plans)
+    }
+
+    fn classify_dependent_trigger_type(
+        &self,
+        dataset_flow_type: DatasetFlowType,
+        maybe_config_snapshot: Option<&FlowConfigurationSnapshot>,
+    ) -> DownstreamDependencyTriggerType {
+        match dataset_flow_type {
+            DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
+                DownstreamDependencyTriggerType::TriggerAllEnabled
+            }
+            DatasetFlowType::HardCompacting => {
+                if let Some(config_snapshot) = &maybe_config_snapshot
+                    && let FlowConfigurationSnapshot::Compacting(compacting_rule) = config_snapshot
+                    && compacting_rule.keep_metadata_only()
+                {
+                    DownstreamDependencyTriggerType::TriggerOwnUnconditionally
+                } else {
+                    DownstreamDependencyTriggerType::TriggerAllEnabled
+                }
+            }
+        }
     }
 }
 
@@ -1447,5 +1449,14 @@ pub enum FlowTriggerContext {
 pub struct DownstreamDependencyFlowPlan {
     pub flow_key: FlowKey,
     pub flow_trigger_context: FlowTriggerContext,
-    pub config_snapshot: Option<FlowConfigurationSnapshot>,
+    pub maybe_config_snapshot: Option<FlowConfigurationSnapshot>,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+enum DownstreamDependencyTriggerType {
+    TriggerAllEnabled,
+    TriggerOwnUnconditionally,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
