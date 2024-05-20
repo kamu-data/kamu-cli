@@ -89,9 +89,11 @@ pub async fn run(
 
         base_catalog_builder.add_value(ServerUrlConfig::load_from_env()?);
 
-        if let Some(cli_database_config) = config.database.clone() {
-            let db_configuration = convert_into_db_configuration(cli_database_config);
-
+        if let Some(db_configuration) = config
+            .database
+            .clone()
+            .and_then(try_convert_into_db_configuration)
+        {
             configure_database_components(&mut base_catalog_builder, &db_configuration)?;
         } else {
             configure_in_memory_components(&mut base_catalog_builder);
@@ -517,12 +519,12 @@ pub fn register_config_in_catalog(
     }
 }
 
-fn convert_into_db_configuration(config: DatabaseConfig) -> DatabaseConfiguration {
+fn try_convert_into_db_configuration(config: DatabaseConfig) -> Option<DatabaseConfiguration> {
     match config {
         DatabaseConfig::Sqlite(c) => {
             let path = Path::new(&c.database_path);
 
-            DatabaseConfiguration::sqlite_from(path)
+            Some(DatabaseConfiguration::sqlite_from(path))
         }
         DatabaseConfig::ClientServer(c) => {
             assert!(
@@ -531,15 +533,16 @@ fn convert_into_db_configuration(config: DatabaseConfig) -> DatabaseConfiguratio
                  clientServer`"
             );
 
-            DatabaseConfiguration::new(
+            Some(DatabaseConfiguration::new(
                 c.provider,
                 c.user,
                 c.password,
                 c.database_name,
                 c.host,
                 c.port,
-            )
+            ))
         }
+        DatabaseConfig::InMemory => None,
     }
 }
 

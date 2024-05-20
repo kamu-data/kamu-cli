@@ -321,6 +321,7 @@ impl Default for JupyterConfig {
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "kind")]
 pub enum DatabaseConfig {
+    InMemory,
     Sqlite(SqliteDatabaseConfig),
     ClientServer(RemoteDatabaseConfig),
 }
