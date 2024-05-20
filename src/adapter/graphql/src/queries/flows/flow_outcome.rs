@@ -78,8 +78,11 @@ impl FlowOutcome {
                             .await
                             .int_err()?;
 
-                        let dataset =
-                            Dataset::new(Account::from_dataset_alias(ctx, &hdl.alias).await?, hdl);
+                        let account = Account::from_dataset_alias(ctx, &hdl.alias)
+                            .await?
+                            .expect("Account must exist");
+
+                        let dataset = Dataset::new(account, hdl);
                         Self::Failed(FlowFailedError {
                             reason: FlowFailedReason::FlowDatasetCompactedFailed(
                                 FlowDatasetCompactedFailedError {

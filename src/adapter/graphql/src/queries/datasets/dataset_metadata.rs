@@ -105,10 +105,15 @@ impl DatasetMetadata {
                 .resolve_dataset_ref(&upstream_dataset_id.as_local_ref())
                 .await
                 .int_err()?;
-            upstream.push(Dataset::new(
-                Account::from_dataset_alias(ctx, &hdl.alias).await?,
-                hdl,
-            ));
+            let maybe_account = Account::from_dataset_alias(ctx, &hdl.alias).await?;
+            if let Some(account) = maybe_account {
+                upstream.push(Dataset::new(account, hdl));
+            } else {
+                tracing::warn!(
+                    "Skipped upstream dataset '{}' with unresolved account",
+                    hdl.alias
+                );
+            }
         }
 
         Ok(upstream)
@@ -135,10 +140,15 @@ impl DatasetMetadata {
                 .resolve_dataset_ref(&downstream_dataset_id.as_local_ref())
                 .await
                 .int_err()?;
-            downstream.push(Dataset::new(
-                Account::from_dataset_alias(ctx, &hdl.alias).await?,
-                hdl,
-            ));
+            let maybe_account = Account::from_dataset_alias(ctx, &hdl.alias).await?;
+            if let Some(account) = maybe_account {
+                downstream.push(Dataset::new(account, hdl));
+            } else {
+                tracing::warn!(
+                    "Skipped downstream dataset '{}' with unresolved account",
+                    hdl.alias
+                );
+            }
         }
 
         Ok(downstream)

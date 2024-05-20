@@ -74,28 +74,27 @@ impl Account {
     pub(crate) async fn from_account_name(
         ctx: &Context<'_>,
         account_name: odf::AccountName,
-    ) -> Result<Self, InternalError> {
+    ) -> Result<Option<Self>, InternalError> {
         let authentication_service = from_catalog::<dyn AuthenticationService>(ctx).unwrap();
 
-        let account = authentication_service
+        let maybe_account = authentication_service
             .account_by_name(&account_name)
-            .await?
-            .expect("Account must exist");
+            .await?;
 
-        Ok(Self::from_account(account))
+        Ok(maybe_account.map(Self::from_account))
     }
 
     #[graphql(skip)]
     pub(crate) async fn from_dataset_alias(
         ctx: &Context<'_>,
         alias: &odf::DatasetAlias,
-    ) -> Result<Self, InternalError> {
+    ) -> Result<Option<Self>, InternalError> {
         if alias.is_multi_tenant() {
-            Self::from_account_name(ctx, alias.account_name.as_ref().unwrap().clone()).await
+            Ok(Self::from_account_name(ctx, alias.account_name.as_ref().unwrap().clone()).await?)
         } else {
             let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
 
-            Ok(match current_account_subject.as_ref() {
+            Ok(Some(match current_account_subject.as_ref() {
                 CurrentAccountSubject::Anonymous(_) => Self::new(
                     DEFAULT_ACCOUNT_ID.clone().into(),
                     DEFAULT_ACCOUNT_NAME.clone().into(),
@@ -103,7 +102,7 @@ impl Account {
                 CurrentAccountSubject::Logged(l) => {
                     Self::new(l.account_id.clone().into(), l.account_name.clone().into())
                 }
-            })
+            }))
         }
     }
 

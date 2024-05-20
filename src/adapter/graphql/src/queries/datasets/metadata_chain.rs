@@ -75,7 +75,9 @@ impl MetadataChain {
     ) -> Result<Option<MetadataBlockExtended>> {
         let dataset = self.get_dataset(ctx).await?;
         let block = dataset.as_metadata_chain().try_get_block(&hash).await?;
-        let account = Account::from_dataset_alias(ctx, &self.dataset_handle.alias).await?;
+        let account = Account::from_dataset_alias(ctx, &self.dataset_handle.alias)
+            .await?
+            .expect("Account must exist");
         Ok(block.map(|b| MetadataBlockExtended::new(hash, b, account)))
     }
 
@@ -131,11 +133,10 @@ impl MetadataChain {
 
         let mut nodes = Vec::new();
         while let Some((hash, block)) = block_stream.try_next().await.int_err()? {
-            let block = MetadataBlockExtended::new(
-                hash,
-                block,
-                Account::from_dataset_alias(ctx, &self.dataset_handle.alias).await?,
-            );
+            let account = Account::from_dataset_alias(ctx, &self.dataset_handle.alias)
+                .await?
+                .expect("Account must exist");
+            let block = MetadataBlockExtended::new(hash, block, account);
             nodes.push(block);
         }
 
