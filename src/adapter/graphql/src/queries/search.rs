@@ -47,8 +47,12 @@ impl Search {
 
         let mut nodes: Vec<SearchResult> = Vec::new();
         for hdl in datasets.into_iter().skip(page * per_page).take(per_page) {
-            let account = Account::from_dataset_alias(ctx, &hdl.alias).await?;
-            nodes.push(SearchResult::Dataset(Dataset::new(account, hdl)));
+            let maybe_account = Account::from_dataset_alias(ctx, &hdl.alias).await?;
+            if let Some(account) = maybe_account {
+                nodes.push(SearchResult::Dataset(Dataset::new(account, hdl)));
+            } else {
+                tracing::warn!("Skipped dataset '{}' with unresolved account", hdl.alias);
+            }
         }
 
         Ok(SearchResultConnection::new(

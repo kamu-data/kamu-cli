@@ -29,10 +29,12 @@ impl Datasets {
             .try_resolve_dataset_ref(&dataset_id.as_local_ref())
             .await?;
         Ok(match hdl {
-            Some(h) => Some(Dataset::new(
-                Account::from_dataset_alias(ctx, &h.alias).await?,
-                h,
-            )),
+            Some(h) => {
+                let account = Account::from_dataset_alias(ctx, &h.alias)
+                    .await?
+                    .expect("Account must exist");
+                Some(Dataset::new(account, h))
+            }
             None => None,
         })
     }
@@ -53,10 +55,13 @@ impl Datasets {
             .await?;
 
         Ok(match hdl {
-            Some(h) => Some(Dataset::new(
-                Account::from_dataset_alias(ctx, &h.alias).await?,
-                h,
-            )),
+            Some(h) => {
+                let account = Account::from_dataset_alias(ctx, &h.alias)
+                    .await?
+                    .expect("Account must exist");
+
+                Some(Dataset::new(account, h))
+            }
             None => None,
         })
     }
@@ -139,8 +144,14 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let account_ref = Account::from_account_name(ctx, account_name.into()).await?;
-        self.by_account_impl(ctx, account_ref, page, per_page).await
+        let maybe_acccount = Account::from_account_name(ctx, account_name.into()).await?;
+        if let Some(account) = maybe_acccount {
+            self.by_account_impl(ctx, account, page, per_page).await
+        } else {
+            let page = page.unwrap_or(0);
+            let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+            Ok(DatasetConnection::new(vec![], page, per_page, 0))
+        }
     }
 }
 

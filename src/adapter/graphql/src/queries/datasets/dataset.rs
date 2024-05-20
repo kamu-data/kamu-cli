@@ -40,10 +40,10 @@ impl Dataset {
             .resolve_dataset_ref(dataset_ref)
             .await
             .int_err()?;
-        Ok(Dataset::new(
-            Account::from_dataset_alias(ctx, &hdl.alias).await?,
-            hdl,
-        ))
+        let account = Account::from_dataset_alias(ctx, &hdl.alias)
+            .await?
+            .expect("Account must exist");
+        Ok(Dataset::new(account, hdl))
     }
 
     #[graphql(skip)]
