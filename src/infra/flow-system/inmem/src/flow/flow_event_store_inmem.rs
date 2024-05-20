@@ -137,7 +137,7 @@ impl FlowIndexEntry {
             Some(InitiatorFilter::System) => self.initiator.is_none(),
             Some(InitiatorFilter::Account(filter_initiator)) => {
                 if let Some(initiator) = &self.initiator {
-                    filter_initiator == initiator
+                    filter_initiator.contains(initiator)
                 } else {
                     false
                 }

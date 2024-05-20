@@ -120,7 +120,7 @@ pub struct SystemFlowFilters {
 #[derive(Debug, Clone)]
 pub enum InitiatorFilter {
     System,
-    Account(AccountID),
+    Account(HashSet<AccountID>),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

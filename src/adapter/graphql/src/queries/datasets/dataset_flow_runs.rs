@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use futures::TryStreamExt;
-use kamu_accounts::AuthenticationService;
 use {kamu_flow_system as fs, opendatafabric as odf};
 
 use crate::mutations::{check_if_flow_belongs_to_dataset, FlowInDatasetError, FlowNotFound};
@@ -73,20 +74,11 @@ impl DatasetFlowRuns {
                         InitiatorFilterInput::System(_) => {
                             Some(kamu_flow_system::InitiatorFilter::System)
                         }
-                        InitiatorFilterInput::Account(account_name) => {
-                            let authentication_service =
-                                from_catalog::<dyn AuthenticationService>(ctx).unwrap();
-                            let account_id = authentication_service
-                                .find_account_id_by_name(&account_name)
-                                .await?
-                                .ok_or_else(|| {
-                                    GqlError::Gql(Error::new("Account not resolved").extend_with(
-                                        |_, eev| eev.set("name", account_name.to_string()),
-                                    ))
-                                })?;
-
-                            Some(kamu_flow_system::InitiatorFilter::Account(account_id))
-                        }
+                        InitiatorFilterInput::Accounts(account_ids) => Some(
+                            kamu_flow_system::InitiatorFilter::Account(HashSet::from_iter(
+                                account_ids.iter().map(Into::into).collect::<Vec<_>>(),
+                            )),
+                        ),
                     },
                     None => None,
                 },
@@ -165,7 +157,7 @@ pub struct DatasetFlowFilters {
 #[derive(OneofObject)]
 pub enum InitiatorFilterInput {
     System(bool),
-    Account(AccountName),
+    Accounts(Vec<AccountID>),
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -1071,7 +1071,7 @@ type GetFlowSuccess implements GetFlowResult {
 
 input InitiatorFilterInput @oneOf {
 	system: Boolean
-	account: AccountName
+	accounts: [AccountID!]
 }
 
 

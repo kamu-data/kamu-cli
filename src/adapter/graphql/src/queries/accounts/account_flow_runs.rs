@@ -10,7 +10,7 @@
 use std::collections::HashSet;
 
 use futures::TryStreamExt;
-use kamu_accounts::{Account, AuthenticationService};
+use kamu_accounts::Account;
 use kamu_flow_system as fs;
 
 use crate::prelude::*;
@@ -45,30 +45,25 @@ impl AccountFlowRuns {
             Some(filters) => Some(kamu_flow_system::AccountFlowFilters {
                 by_flow_type: filters.by_flow_type.map(Into::into),
                 by_flow_status: filters.by_status.map(Into::into),
+<<<<<<< HEAD
                 by_dataset_ids: filters
                     .by_dataset_ids
                     .iter()
                     .map(|dataset_id| dataset_id.clone().into())
                     .collect::<HashSet<_>>(),
+=======
+                by_dataset_id: filters.by_dataset_id.map(Into::into),
+>>>>>>> 50057c84 (Extend flow run filter with accounts)
                 by_initiator: match filters.by_initiator {
                     Some(initiator_filter) => match initiator_filter {
                         InitiatorFilterInput::System(_) => {
                             Some(kamu_flow_system::InitiatorFilter::System)
                         }
-                        InitiatorFilterInput::Account(account_name) => {
-                            let authentication_service =
-                                from_catalog::<dyn AuthenticationService>(ctx).unwrap();
-                            let account_id = authentication_service
-                                .find_account_id_by_name(&account_name)
-                                .await?
-                                .ok_or_else(|| {
-                                    GqlError::Gql(Error::new("Account not resolved").extend_with(
-                                        |_, eev| eev.set("name", account_name.to_string()),
-                                    ))
-                                })?;
-
-                            Some(kamu_flow_system::InitiatorFilter::Account(account_id))
-                        }
+                        InitiatorFilterInput::Accounts(account_ids) => Some(
+                            kamu_flow_system::InitiatorFilter::Account(HashSet::from_iter(
+                                account_ids.iter().map(Into::into).collect::<Vec<_>>(),
+                            )),
+                        ),
                     },
                     None => None,
                 },

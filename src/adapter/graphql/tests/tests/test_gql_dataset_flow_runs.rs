@@ -32,6 +32,7 @@ use kamu_accounts::{
     CurrentAccountSubject,
     JwtAuthenticationConfig,
     LoggedAccount,
+    DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME_STR,
 };
 use kamu_accounts_inmem::AccountRepositoryInMemory;
@@ -1294,7 +1295,7 @@ async fn test_list_flows_with_filters_and_pagination() {
                     runs {
                         listFlows(
                             filters: {
-                                byInitiator: { account: "<account_name>"}
+                                byInitiator: { accounts: ["<account_ids>"]}
                             }
                         ) {
                             nodes {
@@ -1313,7 +1314,10 @@ async fn test_list_flows_with_filters_and_pagination() {
     "#
     )
     .replace("<id>", &create_result.dataset_handle.id.to_string())
-    .replace("<account_name>", DEFAULT_ACCOUNT_NAME_STR);
+    .replace(
+        "<account_ids>",
+        [DEFAULT_ACCOUNT_ID.to_string()].join(",").as_str(),
+    );
 
     let response = schema
         .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))

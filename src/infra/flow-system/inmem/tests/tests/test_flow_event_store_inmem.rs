@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
@@ -195,12 +196,13 @@ async fn test_dataset_flow_filter_by_initiator() {
     let foo_cases =
         make_dataset_test_case(flow_event_store.clone(), task_event_store.clone()).await;
 
+    let wasya_filter = HashSet::from_iter([AccountID::new_seeded_ed25519(b"wasya")]);
+    let petya_filter = HashSet::from_iter([AccountID::new_seeded_ed25519(b"petya")]);
+
     let cases = vec![
         (
             DatasetFlowFilters {
-                by_initiator: Some(InitiatorFilter::Account(AccountID::new_seeded_ed25519(
-                    b"wasya",
-                ))),
+                by_initiator: Some(InitiatorFilter::Account(wasya_filter)),
                 ..Default::default()
             },
             vec![
@@ -210,9 +212,7 @@ async fn test_dataset_flow_filter_by_initiator() {
         ),
         (
             DatasetFlowFilters {
-                by_initiator: Some(InitiatorFilter::Account(AccountID::new_seeded_ed25519(
-                    b"petya",
-                ))),
+                by_initiator: Some(InitiatorFilter::Account(petya_filter)),
                 ..Default::default()
             },
             vec![
@@ -251,11 +251,72 @@ async fn test_dataset_flow_filter_by_initiator() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_dataset_flow_filter_by_initiator_with_multiple_variants() {
+    let (flow_event_store, task_event_store) = make_event_stores();
+
+    let foo_cases =
+        make_dataset_test_case(flow_event_store.clone(), task_event_store.clone()).await;
+
+    let wasya_patya_filter = HashSet::from_iter([
+        AccountID::new_seeded_ed25519(b"wasya"),
+        AccountID::new_seeded_ed25519(b"petya"),
+    ]);
+    let mut wasya_patya_unrelated_filter = wasya_patya_filter.clone();
+    wasya_patya_unrelated_filter.insert(AccountID::new_seeded_ed25519(b"unrelated_user"));
+
+    let cases = vec![
+        (
+            DatasetFlowFilters {
+                by_initiator: Some(InitiatorFilter::Account(wasya_patya_filter)),
+                ..Default::default()
+            },
+            vec![
+                foo_cases.compacting_flow_ids.flow_id_running,
+                foo_cases.compacting_flow_ids.flow_id_waiting,
+                foo_cases.ingest_flow_ids.flow_id_running,
+                foo_cases.ingest_flow_ids.flow_id_waiting,
+            ],
+        ),
+        // should return the same amount even if some non existing user was provided
+        (
+            DatasetFlowFilters {
+                by_initiator: Some(InitiatorFilter::Account(wasya_patya_unrelated_filter)),
+                ..Default::default()
+            },
+            vec![
+                foo_cases.compacting_flow_ids.flow_id_running,
+                foo_cases.compacting_flow_ids.flow_id_waiting,
+                foo_cases.ingest_flow_ids.flow_id_running,
+                foo_cases.ingest_flow_ids.flow_id_waiting,
+            ],
+        ),
+    ];
+
+    for (filters, expected_flow_ids) in cases {
+        assert_dataset_flow_expectaitons(
+            flow_event_store.clone(),
+            &foo_cases,
+            filters,
+            FlowPaginationOpts {
+                offset: 0,
+                limit: 100,
+            },
+            expected_flow_ids.len(),
+            expected_flow_ids,
+        )
+        .await;
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_dataset_flow_filter_combinations() {
     let (flow_event_store, task_event_store) = make_event_stores();
 
     let foo_cases =
         make_dataset_test_case(flow_event_store.clone(), task_event_store.clone()).await;
+    let petya_filter = HashSet::from_iter([AccountID::new_seeded_ed25519(b"petya")]);
 
     let cases = vec![
         (
@@ -270,9 +331,7 @@ async fn test_dataset_flow_filter_combinations() {
             DatasetFlowFilters {
                 by_flow_status: Some(FlowStatus::Waiting),
                 by_flow_type: Some(DatasetFlowType::HardCompacting),
-                by_initiator: Some(InitiatorFilter::Account(AccountID::new_seeded_ed25519(
-                    b"petya",
-                ))),
+                by_initiator: Some(InitiatorFilter::Account(petya_filter)),
             },
             vec![foo_cases.compacting_flow_ids.flow_id_waiting],
         ),
@@ -555,6 +614,10 @@ async fn test_system_flows_filtered_by_initiator() {
     let system_case =
         make_system_test_case(flow_event_store.clone(), task_event_store.clone()).await;
 
+    let wasya_filter = HashSet::from_iter([AccountID::new_seeded_ed25519(b"wasya")]);
+    let unrelated_user_filter =
+        HashSet::from_iter([AccountID::new_seeded_ed25519(b"unrelated-user")]);
+
     let cases = vec![
         (
             SystemFlowFilters {
@@ -565,18 +628,14 @@ async fn test_system_flows_filtered_by_initiator() {
         ),
         (
             SystemFlowFilters {
-                by_initiator: Some(InitiatorFilter::Account(AccountID::new_seeded_ed25519(
-                    b"wasya",
-                ))),
+                by_initiator: Some(InitiatorFilter::Account(wasya_filter)),
                 ..Default::default()
             },
             vec![system_case.gc_flow_ids.flow_id_running],
         ),
         (
             SystemFlowFilters {
-                by_initiator: Some(InitiatorFilter::Account(AccountID::new_seeded_ed25519(
-                    b"unrelated-user",
-                ))),
+                by_initiator: Some(InitiatorFilter::Account(unrelated_user_filter)),
                 ..Default::default()
             },
             vec![],
@@ -606,6 +665,7 @@ async fn test_system_flows_complex_filter() {
 
     let system_case =
         make_system_test_case(flow_event_store.clone(), task_event_store.clone()).await;
+    let petya_filter = HashSet::from_iter([AccountID::new_seeded_ed25519(b"petya")]);
 
     let cases = vec![
         (
@@ -618,9 +678,7 @@ async fn test_system_flows_complex_filter() {
         ),
         (
             SystemFlowFilters {
-                by_initiator: Some(InitiatorFilter::Account(AccountID::new_seeded_ed25519(
-                    b"petya",
-                ))),
+                by_initiator: Some(InitiatorFilter::Account(petya_filter)),
                 by_flow_status: Some(FlowStatus::Waiting),
                 by_flow_type: None,
             },
