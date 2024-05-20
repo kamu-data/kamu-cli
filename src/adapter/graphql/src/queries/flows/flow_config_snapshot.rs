@@ -7,9 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_flow_system::{FlowConfigSnapshot, Schedule};
+use kamu_flow_system as fs;
 
 use crate::prelude::*;
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Union)]
 pub enum FlowConfigurationSnapshot {
@@ -25,25 +27,29 @@ pub struct FlowConfigurationScheduleRule {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<FlowConfigSnapshot> for FlowConfigurationSnapshot {
-    fn from(value: FlowConfigSnapshot) -> Self {
+impl From<fs::FlowConfigurationSnapshot> for FlowConfigurationSnapshot {
+    fn from(value: fs::FlowConfigurationSnapshot) -> Self {
         match value {
-            FlowConfigSnapshot::Batching(batching_rule) => Self::Batching(batching_rule.into()),
-            FlowConfigSnapshot::Schedule(schedule) => {
+            fs::FlowConfigurationSnapshot::Batching(batching_rule) => {
+                Self::Batching(batching_rule.into())
+            }
+            fs::FlowConfigurationSnapshot::Schedule(schedule) => {
                 Self::Schedule(FlowConfigurationScheduleRule {
                     schedule_rule: match schedule {
-                        Schedule::TimeDelta(time_delta) => {
+                        fs::Schedule::TimeDelta(time_delta) => {
                             FlowConfigurationSchedule::TimeDelta(time_delta.every.into())
                         }
-                        Schedule::Cron(cron) => {
+                        fs::Schedule::Cron(cron) => {
                             FlowConfigurationSchedule::Cron(cron.clone().into())
                         }
                     },
                 })
             }
-            FlowConfigSnapshot::Compacting(compacting_rule) => {
+            fs::FlowConfigurationSnapshot::Compacting(compacting_rule) => {
                 Self::Compacting(compacting_rule.into())
             }
         }
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

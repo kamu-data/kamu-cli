@@ -10,8 +10,8 @@
 use kamu_flow_system::{
     BatchingRule,
     CompactingRule,
-    FlowConfigSnapshot,
     FlowConfigurationRule,
+    FlowConfigurationSnapshot,
     Schedule,
     ScheduleCron,
     ScheduleTimeDelta,
@@ -238,7 +238,7 @@ impl FlowRunConfiguration {
     pub fn try_into_snapshot(
         &self,
         dataset_flow_type: DatasetFlowType,
-    ) -> Result<FlowConfigSnapshot, FlowInvalidRunConfigurations> {
+    ) -> Result<FlowConfigurationSnapshot, FlowInvalidRunConfigurations> {
         Ok(match self {
             Self::Batching(batching_input) => {
                 if dataset_flow_type != DatasetFlowType::ExecuteTransform {
@@ -247,7 +247,7 @@ impl FlowRunConfiguration {
                             .to_string(),
                     });
                 };
-                FlowConfigSnapshot::Batching(
+                FlowConfigurationSnapshot::Batching(
                     BatchingRule::new_checked(
                         batching_input.min_records_to_await,
                         batching_input.max_batching_interval.clone().into(),
@@ -264,7 +264,7 @@ impl FlowRunConfiguration {
                             .to_string(),
                     });
                 };
-                FlowConfigSnapshot::Compacting(
+                FlowConfigurationSnapshot::Compacting(
                     CompactingRule::new_checked(
                         compacting_input.max_slice_size,
                         compacting_input.max_slice_records,
@@ -282,7 +282,7 @@ impl FlowRunConfiguration {
                             .to_string(),
                     });
                 };
-                FlowConfigSnapshot::Schedule(match schedule_input {
+                FlowConfigurationSnapshot::Schedule(match schedule_input {
                     ScheduleInput::TimeDelta(td) => {
                         Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
                     }

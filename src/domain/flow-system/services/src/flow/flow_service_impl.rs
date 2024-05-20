@@ -324,7 +324,7 @@ impl FlowServiceImpl {
         flow_key: &FlowKey,
         trigger: FlowTrigger,
         context: FlowTriggerContext,
-        config_snapshot_maybe: Option<FlowConfigSnapshot>,
+        config_snapshot_maybe: Option<FlowConfigurationSnapshot>,
     ) -> Result<FlowState, InternalError> {
         // Query previous runs stats to determine activation time
         let flow_run_stats = self.flow_run_stats(flow_key).await?;
@@ -341,7 +341,6 @@ impl FlowServiceImpl {
             throttling_boundary_time = trigger_time;
         }
 
-        // let current_flow_configuration = flow_run_rule.and_then(f)
         // Is a pending flow present for this config?
         match self.find_pending_flow(flow_key) {
             // Already pending flow
@@ -400,7 +399,7 @@ impl FlowServiceImpl {
             // Otherwise, initiate a new flow, and enqueue it in the time wheel
             None => {
                 // Initiate new flow
-                let config_snapshot = if config_snapshot_maybe.is_some() {
+                let config_snapshot_maybe = if config_snapshot_maybe.is_some() {
                     config_snapshot_maybe
                 } else {
                     self.state
@@ -410,7 +409,7 @@ impl FlowServiceImpl {
                         .try_get_config_snapshot_by_key(flow_key)
                 };
                 let mut flow = self
-                    .make_new_flow(flow_key.clone(), trigger, config_snapshot)
+                    .make_new_flow(flow_key.clone(), trigger, config_snapshot_maybe)
                     .await?;
 
                 match context {
@@ -626,7 +625,7 @@ impl FlowServiceImpl {
         &self,
         flow_key: FlowKey,
         trigger: FlowTrigger,
-        config_snapshot: Option<FlowConfigSnapshot>,
+        config_snapshot: Option<FlowConfigurationSnapshot>,
     ) -> Result<Flow, InternalError> {
         let flow = Flow::new(
             self.time_source.now(),
@@ -739,7 +738,7 @@ impl FlowServiceImpl {
     pub fn make_task_logical_plan(
         &self,
         flow_key: &FlowKey,
-        config_snapshot: &Option<FlowConfigSnapshot>,
+        config_snapshot: &Option<FlowConfigurationSnapshot>,
     ) -> LogicalPlan {
         match flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
@@ -754,7 +753,7 @@ impl FlowServiceImpl {
                     let mut keep_metadata_only = false;
 
                     if let Some(config_rule) = config_snapshot
-                        && let FlowConfigSnapshot::Compacting(compacting_rule) = config_rule
+                        && let FlowConfigurationSnapshot::Compacting(compacting_rule) = config_rule
                     {
                         max_slice_size = Some(compacting_rule.max_slice_size());
                         max_slice_records = Some(compacting_rule.max_slice_records());
@@ -805,7 +804,7 @@ impl FlowServiceImpl {
         &self,
         dataset_id: &DatasetID,
         flow_result: &FlowResult,
-        config_snapshot: Option<FlowConfigSnapshot>,
+        config_snapshot: Option<FlowConfigurationSnapshot>,
     ) -> Result<Vec<DownstreamDependencyFlowPlan>, InternalError> {
         // ToDo: extend dependency graph with possibility to fetch downstream
         // dependencies by owner
@@ -819,7 +818,7 @@ impl FlowServiceImpl {
 
         let is_keep_metadata_only_compacting = if let FlowResult::DatasetCompact(_) = flow_result
             && let Some(config_rule) = &config_snapshot
-            && let FlowConfigSnapshot::Compacting(compacting_rule) = config_rule
+            && let FlowConfigurationSnapshot::Compacting(compacting_rule) = config_rule
         {
             compacting_rule.keep_metadata_only()
         } else {
@@ -960,7 +959,7 @@ impl FlowService for FlowServiceImpl {
         trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
         initiator_account_id: AccountID,
-        config_snapshot_maybe: Option<FlowConfigSnapshot>,
+        config_snapshot_maybe: Option<FlowConfigurationSnapshot>,
     ) -> Result<FlowState, RequestFlowError> {
         let activation_time = self.round_time(trigger_time).int_err()?;
 
@@ -1448,5 +1447,5 @@ pub enum FlowTriggerContext {
 pub struct DownstreamDependencyFlowPlan {
     pub flow_key: FlowKey,
     pub flow_trigger_context: FlowTriggerContext,
-    pub config_snapshot: Option<FlowConfigSnapshot>,
+    pub config_snapshot: Option<FlowConfigurationSnapshot>,
 }

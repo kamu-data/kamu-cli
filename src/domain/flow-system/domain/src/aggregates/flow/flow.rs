@@ -25,7 +25,7 @@ impl Flow {
         flow_id: FlowID,
         flow_key: FlowKey,
         trigger: FlowTrigger,
-        config_snapshot: Option<FlowConfigSnapshot>,
+        config_snapshot: Option<FlowConfigurationSnapshot>,
     ) -> Self {
         Self(
             Aggregate::new(

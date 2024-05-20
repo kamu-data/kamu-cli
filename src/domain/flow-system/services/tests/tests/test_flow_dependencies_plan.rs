@@ -11,7 +11,7 @@ use kamu_core::{DEFAULT_MAX_SLICE_RECORDS, DEFAULT_MAX_SLICE_SIZE};
 use kamu_flow_system::{
     CompactingRule,
     DatasetFlowType,
-    FlowConfigSnapshot,
+    FlowConfigurationSnapshot,
     FlowKey,
     FlowKeyDataset,
     FlowResult,
@@ -97,7 +97,7 @@ async fn test_make_downstream_dependecies_flow_plans() {
                 old_num_blocks: 5,
                 new_num_blocks: 1,
             }),
-            Some(FlowConfigSnapshot::Compacting(
+            Some(FlowConfigurationSnapshot::Compacting(
                 CompactingRule::new_checked(
                     DEFAULT_MAX_SLICE_SIZE,
                     DEFAULT_MAX_SLICE_RECORDS,
@@ -120,7 +120,7 @@ async fn test_make_downstream_dependecies_flow_plans() {
             flow_type: DatasetFlowType::HardCompacting,
         }),
         flow_trigger_context: FlowTriggerContext::Unconditional,
-        config_snapshot: Some(FlowConfigSnapshot::Compacting(
+        config_snapshot: Some(FlowConfigurationSnapshot::Compacting(
             CompactingRule::new_checked(DEFAULT_MAX_SLICE_SIZE, DEFAULT_MAX_SLICE_RECORDS, true)
                 .unwrap(),
         )),
@@ -138,7 +138,7 @@ async fn test_make_downstream_dependecies_flow_plans() {
                 old_num_blocks: 5,
                 new_num_blocks: 1,
             }),
-            Some(FlowConfigSnapshot::Compacting(
+            Some(FlowConfigurationSnapshot::Compacting(
                 CompactingRule::new_checked(
                     DEFAULT_MAX_SLICE_SIZE,
                     DEFAULT_MAX_SLICE_RECORDS,

@@ -32,7 +32,7 @@ pub struct FlowState {
     /// Flow outcome
     pub outcome: Option<FlowOutcome>,
     /// Flow config snapshot on the moment when flow was initiated
-    pub config_snapshot: Option<FlowConfigSnapshot>,
+    pub config_snapshot: Option<FlowConfigurationSnapshot>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
