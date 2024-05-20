@@ -61,6 +61,42 @@ impl AccessTokenRegistryService {
         }
     }
 
+    pub fn find_by_frontend_or_backend_url(
+        &self,
+        scope: AccessTokenStoreScope,
+        odf_server_url: &Url,
+    ) -> Option<AccessTokenFindReport> {
+        let registry_ptr = match scope {
+            AccessTokenStoreScope::User => &self.user_registry,
+            AccessTokenStoreScope::Workspace => &self.workspace_registry,
+        };
+
+        let registry = registry_ptr
+            .lock()
+            .expect("Could not lock access tokens registry");
+
+        if let Some(server_record) = registry.iter().find(|c| {
+            if &c.backend_url == odf_server_url {
+                true
+            } else {
+                match &c.frontend_url {
+                    Some(frontend_url) => frontend_url == odf_server_url,
+                    _ => false,
+                }
+            }
+        }) {
+            server_record
+                .token_for_account(self.account_name())
+                .map(|ac| AccessTokenFindReport {
+                    backend_url: server_record.backend_url.clone(),
+                    frontend_url: server_record.frontend_url.clone(),
+                    access_token: ac.clone(),
+                })
+        } else {
+            None
+        }
+    }
+
     pub fn find_by_frontend_url(
         &self,
         scope: AccessTokenStoreScope,

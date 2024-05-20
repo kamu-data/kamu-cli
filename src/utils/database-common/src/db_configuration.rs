@@ -26,6 +26,24 @@ pub struct DatabaseConfiguration {
 }
 
 impl DatabaseConfiguration {
+    pub fn new(
+        provider: DatabaseProvider,
+        user: String,
+        password: String,
+        database_name: String,
+        host: String,
+        port: Option<u32>,
+    ) -> Self {
+        Self {
+            provider,
+            user,
+            password: Secret::from(password),
+            database_name,
+            host,
+            port,
+        }
+    }
+
     pub fn connection_string(&self) -> String {
         if let DatabaseProvider::Sqlite = self.provider {
             format!("{}://{}", self.provider, self.database_name)
@@ -54,28 +72,6 @@ impl DatabaseConfiguration {
                 self.host,
                 self.port.unwrap_or_else(|| self.provider.default_port()),
             )
-        }
-    }
-
-    pub fn local_postgres() -> Self {
-        Self {
-            provider: DatabaseProvider::Postgres,
-            user: String::from("root"),
-            password: Secret::new(String::from("root")),
-            database_name: String::from("kamu"),
-            host: String::from("localhost"),
-            port: None,
-        }
-    }
-
-    pub fn local_mariadb() -> Self {
-        Self {
-            provider: DatabaseProvider::MariaDB,
-            user: String::from("root"),
-            password: Secret::new(String::from("root")),
-            database_name: String::from("kamu"),
-            host: String::from("localhost"),
-            port: None,
         }
     }
 

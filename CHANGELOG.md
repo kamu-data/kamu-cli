@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `keep_metadata_only` flag to `HardCompacting` flow. Also extended `FlowState` with `ConfigSnapshot`
   and possibility to pass configuration during triggering a flow
   
+## [0.182.0] - 2024-05-20
+### Added
+- Loading database components relying on CLI config
+### Fixed
+- Panic when creating a workspace with an existing config
+
+## [0.181.2] - 2024-05-20
+### Fixed
+- `kamu login --check` supports searching both by frontend and backend URL
+
+## [0.181.1] - 2024-05-20
+### Fixed
+- Panic when resolving datasets in GraphQL API for unregistered accounts
 
 ## [0.181.0] - 2024-05-14
 ### Added

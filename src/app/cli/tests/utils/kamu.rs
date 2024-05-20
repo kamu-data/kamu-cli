@@ -231,7 +231,9 @@ impl Kamu {
             kamu_cli::configure_base_catalog(&self.workspace_layout, false, self.system_time)
                 .build();
 
-        let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(&base_catalog);
+        let multi_tenant_workspace = true;
+        let mut cli_catalog_builder =
+            kamu_cli::configure_cli_catalog(&base_catalog, multi_tenant_workspace);
         cli_catalog_builder.add_value(self.current_account.to_current_account_subject());
         cli_catalog_builder.build()
     }

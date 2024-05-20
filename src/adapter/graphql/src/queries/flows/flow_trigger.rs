@@ -38,8 +38,11 @@ impl FlowTrigger {
                     .resolve_dataset_ref(&input.dataset_id.as_local_ref())
                     .await
                     .int_err()?;
+                let account = Account::from_dataset_alias(ctx, &hdl.alias)
+                    .await?
+                    .expect("Account must exist");
                 Self::InputDatasetFlow(FlowTriggerInputDatasetFlow::new(
-                    Dataset::new(Account::from_dataset_alias(ctx, &hdl.alias).await?, hdl),
+                    Dataset::new(account, hdl),
                     input.flow_type.into(),
                     input.flow_id.into(),
                 ))

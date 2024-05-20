@@ -167,20 +167,21 @@ impl Command for LoginCommand {
     }
 
     async fn run(&mut self) -> Result<(), CLIError> {
-        let odf_server_frontend_url = self.get_server_url();
+        let odf_server_url = self.get_server_url();
 
         // Check token and exit
+        // Note: try the URL as both backend or frontend
         if self.check {
             return if let Some(token_find_report) = self
                 .access_token_registry_service
-                .find_by_frontend_url(self.scope, &odf_server_frontend_url)
+                .find_by_frontend_or_backend_url(self.scope, &odf_server_url)
             {
                 match self.validate_login(token_find_report).await {
                     Ok(_) => {
                         eprintln!(
                             "{}: {}",
                             console::style("Access token valid").green().bold(),
-                            odf_server_frontend_url
+                            odf_server_url
                         );
                         Ok(())
                     }
@@ -196,43 +197,45 @@ impl Command for LoginCommand {
                 }
             } else {
                 Err(CLIError::usage_error(format!(
-                    "No access token found for: {odf_server_frontend_url}",
+                    "No access token found for: {odf_server_url}",
                 )))
             };
         }
 
         // Login with existing token
         if let Some(access_token) = &self.access_token {
-            return self.new_login_with_token(&odf_server_frontend_url, access_token);
+            return self.new_login_with_token(&odf_server_url, access_token);
         }
 
         // Validate token and trigger browser login flow if needed
+        // Note: only check frontend URL, this flow is not supposed to cover
+        // non-interactive login, only the interactive one with the browser
         if let Some(token_find_report) = self
             .access_token_registry_service
-            .find_by_frontend_url(self.scope, &odf_server_frontend_url)
+            .find_by_frontend_url(self.scope, &odf_server_url)
         {
             match self.validate_login(token_find_report).await {
                 Ok(_) => {
                     eprintln!(
                         "{}: {}",
                         console::style("Access token valid").green().bold(),
-                        odf_server_frontend_url
+                        odf_server_url
                     );
                     Ok(())
                 }
                 Err(odf_server::ValidateAccessTokenError::ExpiredToken(_)) => {
-                    self.handle_token_expired(&odf_server_frontend_url)?;
-                    self.new_login(odf_server_frontend_url).await
+                    self.handle_token_expired(&odf_server_url)?;
+                    self.new_login(odf_server_url).await
                 }
                 Err(odf_server::ValidateAccessTokenError::InvalidToken(e)) => {
-                    self.handle_token_invalid(e, &odf_server_frontend_url)
+                    self.handle_token_invalid(e, &odf_server_url)
                 }
                 Err(odf_server::ValidateAccessTokenError::Internal(e)) => {
                     Err(CLIError::critical(e))
                 }
             }
         } else {
-            self.new_login(odf_server_frontend_url).await
+            self.new_login(odf_server_url).await
         }
     }
 }
