@@ -45,15 +45,11 @@ impl AccountFlowRuns {
             Some(filters) => Some(kamu_flow_system::AccountFlowFilters {
                 by_flow_type: filters.by_flow_type.map(Into::into),
                 by_flow_status: filters.by_status.map(Into::into),
-<<<<<<< HEAD
                 by_dataset_ids: filters
                     .by_dataset_ids
                     .iter()
                     .map(|dataset_id| dataset_id.clone().into())
                     .collect::<HashSet<_>>(),
-=======
-                by_dataset_id: filters.by_dataset_id.map(Into::into),
->>>>>>> 50057c84 (Extend flow run filter with accounts)
                 by_initiator: match filters.by_initiator {
                     Some(initiator_filter) => match initiator_filter {
                         InitiatorFilterInput::System(_) => {
