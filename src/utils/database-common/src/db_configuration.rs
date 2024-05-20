@@ -75,28 +75,6 @@ impl DatabaseConfiguration {
         }
     }
 
-    pub fn local_postgres() -> Self {
-        Self {
-            provider: DatabaseProvider::Postgres,
-            user: String::from("root"),
-            password: Secret::new(String::from("root")),
-            database_name: String::from("kamu"),
-            host: String::from("localhost"),
-            port: None,
-        }
-    }
-
-    pub fn local_mariadb() -> Self {
-        Self {
-            provider: DatabaseProvider::MariaDB,
-            user: String::from("root"),
-            password: Secret::new(String::from("root")),
-            database_name: String::from("kamu"),
-            host: String::from("localhost"),
-            port: None,
-        }
-    }
-
     pub fn sqlite_from(path: &Path) -> Self {
         Self {
             provider: DatabaseProvider::Sqlite,
