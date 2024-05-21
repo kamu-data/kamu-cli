@@ -55,31 +55,42 @@ impl Command for DeleteCommand {
             return Err(CLIError::usage_error("Specify a dataset or use --all flag"));
         }
 
-        let dataset_refs: Vec<_> = if self.all {
-            unimplemented!("All deletion is not yet supported")
+        let dataset_ids: Vec<_> = if self.all {
+            self.dataset_repo
+                .get_all_datasets()
+                .map_ok(|dataset_handle| dataset_handle.id)
+                .try_collect()
+                .await?
         } else {
-            let dataset_ids: Vec<_> = filter_datasets_by_local_pattern(
+            filter_datasets_by_local_pattern(
                 self.dataset_repo.as_ref(),
                 self.dataset_ref_patterns.clone(),
             )
             .map_ok(|dataset_handle| dataset_handle.id)
             .try_collect()
-            .await?;
+            .await?
+        };
 
-            if self.recursive {
-                self.dependency_graph_service
-                    .get_recursive_downstream_dependencies(dataset_ids)
-                    .await
-                    .int_err()?
-                    .map(DatasetRef::ID)
-                    .collect()
-                    .await
-            } else {
-                dataset_ids
-                    .iter()
-                    .map(|dataset_id| DatasetRef::ID(dataset_id.clone()))
-                    .collect()
-            }
+        let dataset_refs: Vec<_> = if self.recursive
+            || self.all
+            || self
+                .dataset_ref_patterns
+                .contains(&DatasetRefPattern::Pattern(DatasetAliasPattern::new(
+                    None,
+                    DatasetNamePattern::new_unchecked("%"),
+                ))) {
+            self.dependency_graph_service
+                .get_recursive_downstream_dependencies(dataset_ids)
+                .await
+                .int_err()?
+                .map(DatasetRef::ID)
+                .collect()
+                .await
+        } else {
+            dataset_ids
+                .iter()
+                .map(|dataset_id| DatasetRef::ID(dataset_id.clone()))
+                .collect()
         };
 
         if dataset_refs.is_empty() {
@@ -103,9 +114,9 @@ impl Command for DeleteCommand {
             }))
             .await;
             common::prompt_yes_no(&format!(
-                "{}: {}\n{}\nDo you wish to continue? [y/N]: ",
-                console::style("You are about to delete following dataset(s)").yellow(),
-                dataset_aliases.join("\n"),
+                "{}\n  {}\n{}\nDo you wish to continue? [y/N]: ",
+                console::style("You are about to delete following dataset(s):").yellow(),
+                dataset_aliases.join("\n  "),
                 console::style("This operation is irreversible!").yellow(),
             ))
         };
