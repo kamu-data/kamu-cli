@@ -24,6 +24,7 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetRepositoryLocalFs {
+    current_account_subject: Arc<CurrentAccountSubject>,
     storage_strategy: Box<dyn DatasetStorageStrategy>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
@@ -46,6 +47,7 @@ impl DatasetRepositoryLocalFs {
         system_time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
+            current_account_subject: current_account_subject.clone(),
             storage_strategy: if multi_tenant {
                 Box::new(DatasetMultiTenantStorageStrategy::new(
                     root,
@@ -306,6 +308,12 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         self.event_bus
             .dispatch_event(events::DatasetEventCreated {
                 dataset_id: dataset_handle.id.clone(),
+                owner_account_id: match self.current_account_subject.as_ref() {
+                    CurrentAccountSubject::Anonymous(_) => {
+                        panic!("Anonymous account cannot create dataset");
+                    }
+                    CurrentAccountSubject::Logged(l) => l.account_id.clone(),
+                },
             })
             .await?;
 

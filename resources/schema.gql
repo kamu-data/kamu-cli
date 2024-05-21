@@ -49,7 +49,7 @@ input AccountFlowFilters {
 	byFlowType: DatasetFlowType
 	byStatus: FlowStatus
 	byInitiator: InitiatorFilterInput
-	byDatasetName: DatasetName
+	byDatasetIds: [DatasetID!]!
 }
 
 type AccountFlowRuns {
@@ -192,6 +192,7 @@ type CommitResultSuccess implements CommitResult & UpdateReadmeResult {
 input CompactingConditionInput {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
+	keepMetadataOnly: Boolean!
 }
 
 enum CompressionFormat {
@@ -444,7 +445,7 @@ type DatasetFlowRuns {
 }
 
 type DatasetFlowRunsMut {
-	triggerFlow(datasetFlowType: DatasetFlowType!): TriggerFlowResult!
+	triggerFlow(datasetFlowType: DatasetFlowType!, flowRunConfiguration: FlowRunConfiguration): TriggerFlowResult!
 	cancelScheduledTasks(flowId: FlowID!): CancelScheduledTasksResult!
 }
 
@@ -773,6 +774,10 @@ type Flow {
 	Start condition
 	"""
 	startCondition: FlowStartCondition
+	"""
+	Flow config snapshot
+	"""
+	configSnapshot: FlowConfigurationSnapshot
 }
 
 type FlowAbortedResult {
@@ -794,9 +799,16 @@ type FlowConfigurationBatching {
 type FlowConfigurationCompacting {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
+	keepMetadataOnly: Boolean!
 }
 
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
+
+type FlowConfigurationScheduleRule {
+	scheduleRule: FlowConfigurationSchedule!
+}
+
+union FlowConfigurationSnapshot = FlowConfigurationBatching | FlowConfigurationScheduleRule | FlowConfigurationCompacting
 
 type FlowConnection {
 	"""
@@ -934,6 +946,11 @@ type FlowInvalidCompactingConfig implements SetFlowCompactingConfigResult {
 	message: String!
 }
 
+type FlowInvalidRunConfigurations implements TriggerFlowResult {
+	error: String!
+	message: String!
+}
+
 type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
 	flowId: FlowID!
 	message: String!
@@ -944,6 +961,12 @@ union FlowOutcome = FlowSuccessResult | FlowFailedError | FlowAbortedResult
 type FlowPreconditionsNotMet implements SetFlowConfigResult & SetFlowBatchingConfigResult & TriggerFlowResult {
 	preconditions: String!
 	message: String!
+}
+
+input FlowRunConfiguration @oneOf {
+	schedule: ScheduleInput
+	batching: BatchingConditionInput
+	compacting: CompactingConditionInput
 }
 
 union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionBatching | FlowStartConditionExecutor

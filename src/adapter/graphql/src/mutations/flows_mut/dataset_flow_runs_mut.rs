@@ -42,6 +42,7 @@ impl DatasetFlowRunsMut {
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
+        flow_run_configuration: Option<FlowRunConfiguration>,
     ) -> Result<TriggerFlowResult> {
         if let Some(e) =
             ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
@@ -63,12 +64,22 @@ impl DatasetFlowRunsMut {
         let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
         let logged_account = utils::get_logged_account(ctx);
 
+        let flow_run_snapshot = if let Some(flow_run_config) = flow_run_configuration {
+            match flow_run_config.try_into_snapshot(dataset_flow_type) {
+                Ok(snapshot) => Some(snapshot),
+                Err(err) => return Ok(TriggerFlowResult::InvalidRunConfigurations(err)),
+            }
+        } else {
+            None
+        };
+
         let flow_state = flow_service
             .trigger_manual_flow(
                 Utc::now(),
                 fs::FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 logged_account.account_id,
+                flow_run_snapshot,
             )
             .await
             .map_err(|e| match e {
@@ -130,6 +141,7 @@ enum TriggerFlowResult {
     Success(TriggerFlowSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
     PreconditionsNotMet(FlowPreconditionsNotMet),
+    InvalidRunConfigurations(FlowInvalidRunConfigurations),
 }
 
 #[derive(SimpleObject)]
@@ -164,6 +176,21 @@ struct CancelScheduledTasksSuccess {
 impl CancelScheduledTasksSuccess {
     pub async fn message(&self) -> String {
         "Success".to_string()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct FlowInvalidRunConfigurations {
+    pub error: String,
+}
+
+#[ComplexObject]
+impl FlowInvalidRunConfigurations {
+    pub async fn message(&self) -> String {
+        format!("Invalid flow configuration provided: '{}'", self.error)
     }
 }
 

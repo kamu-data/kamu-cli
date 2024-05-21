@@ -23,7 +23,11 @@ use kamu::testing::{
     MockPollingIngestService,
     MockTransformService,
 };
-use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu::{
+    DatasetOwnershipServiceInMemory,
+    DatasetRepositoryLocalFs,
+    DependencyGraphServiceInMemory,
+};
 use kamu_accounts::{
     CurrentAccountSubject,
     JwtAuthenticationConfig,
@@ -163,6 +167,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -237,6 +242,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             "__typename": "FlowStartConditionExecutor",
                                             "taskId": "0",
                                         },
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -308,6 +314,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -397,6 +404,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -517,6 +525,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             }
                                         },
                                         "startCondition": null,
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -616,6 +625,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             }
                                         },
                                         "startCondition": null,
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -733,6 +743,7 @@ async fn test_trigger_compacting_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -807,6 +818,7 @@ async fn test_trigger_compacting_root_dataset() {
                                             "__typename": "FlowStartConditionExecutor",
                                             "taskId": "0",
                                         },
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -878,6 +890,7 @@ async fn test_trigger_compacting_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -972,6 +985,7 @@ async fn test_trigger_compacting_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
+                                        "configSnapshot": null
                                     }
                                 ],
                                 "pageInfo": {
@@ -2292,6 +2306,134 @@ async fn test_anonymous_operation_fails() {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_config_snapshot_returned_correctly() {
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
+        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 12,
+                updated_watermark: None,
+            },
+        )),
+        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
+    });
+
+    let create_result = harness.create_root_dataset().await;
+
+    let mutation_code = FlowRunsHarness::trigger_flow_with_compaction_config_mutation(
+        &create_result.dataset_handle.id,
+        "HARD_COMPACTING",
+        false,
+        10000,
+        1_000_000,
+    );
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "triggerFlow": {
+                                "__typename": "TriggerFlowSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "__typename": "Flow",
+                                    "flowId": "0",
+                                    "status": "WAITING",
+                                    "outcome": null
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let request_code = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id);
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetHardCompacting",
+                                            "datasetId": create_result.dataset_handle.id.to_string(),
+                                            "compactingResult": null,
+                                        },
+                                        "status": "WAITING",
+                                        "outcome": null,
+                                        "timing": {
+                                            "awaitingExecutorSince": null,
+                                            "runningSince": null,
+                                            "finishedAt": null,
+                                        },
+                                        "tasks": [],
+                                        "initiator": {
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                                        },
+                                        "primaryTrigger": {
+                                            "__typename": "FlowTriggerManual",
+                                            "initiator": {
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                                            }
+                                        },
+                                        "startCondition": null,
+                                        "configSnapshot": {
+                                            "__typename": "FlowConfigurationCompacting",
+                                            "maxSliceRecords": 10000,
+                                            "maxSliceSize": 1_000_000,
+                                            "keepMetadataOnly": false
+                                        },
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 struct FlowRunsHarness {
     _tempdir: tempfile::TempDir,
     _catalog_base: dill::Catalog,
@@ -2351,6 +2493,7 @@ impl FlowRunsHarness {
             .add::<AuthenticationServiceImpl>()
             .add::<AccountRepositoryInMemory>()
             .add_value(JwtAuthenticationConfig::default())
+            .add::<DatasetOwnershipServiceInMemory>()
             .build();
 
         // Init dataset with no sources
@@ -2641,6 +2784,32 @@ impl FlowRunsHarness {
                                                 taskId
                                             }
                                         }
+                                        configSnapshot {
+                                            ... on FlowConfigurationBatching {
+                                                maxBatchingInterval {
+                                                    every
+                                                    unit
+                                                }
+                                                minRecordsToAwait
+                                                __typename
+                                            }
+                                            ... on FlowConfigurationScheduleRule {
+                                                scheduleRule {
+                                                    ... on TimeDelta {
+                                                        every
+                                                        unit
+                                                    }
+                                                    __typename
+                                                }
+                                                __typename
+                                            }
+                                            ... on FlowConfigurationCompacting {
+                                                maxSliceRecords
+                                                maxSliceSize
+                                                keepMetadataOnly
+                                                __typename
+                                            }
+                                        }
                                     }
                                     pageInfo {
                                         hasPreviousPage
@@ -2764,6 +2933,78 @@ impl FlowRunsHarness {
         )
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
+    }
+
+    fn trigger_flow_with_compaction_config_mutation(
+        id: &DatasetID,
+        dataset_flow_type: &str,
+        keep_metadata_only: bool,
+        max_slice_records: u64,
+        max_slice_size: u64,
+    ) -> String {
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            runs {
+                                triggerFlow (
+                                    datasetFlowType: "<dataset_flow_type>",
+                                    flowRunConfiguration: {
+                                        compacting: {
+                                            keepMetadataOnly: <keep_metadata_only>,
+                                            maxSliceRecords: <max_slice_records>,
+                                            maxSliceSize: <max_slice_size>
+                                        }
+                                    }
+                                ) {
+                                    __typename,
+                                    message
+                                    ... on TriggerFlowSuccess {
+                                        flow {
+                                            __typename
+                                            flowId
+                                            status
+                                            outcome {
+                                                ...on FlowSuccessResult {
+                                                    message
+                                                }
+                                                ...on FlowAbortedResult {
+                                                    message
+                                                }
+                                                ...on FlowFailedError {
+                                                    reason {
+                                                        ...on FlowFailedMessage {
+                                                            message
+                                                        }
+                                                        ...on FlowDatasetCompactedFailedError {
+                                                            message
+                                                            rootDataset {
+                                                                id
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
+        .replace("<dataset_flow_type>", dataset_flow_type)
+        .replace(
+            "<keep_metadata_only>",
+            if keep_metadata_only { "true" } else { "false" },
+        )
+        .replace("<max_slice_records>", &max_slice_records.to_string())
+        .replace("<max_slice_size>", &max_slice_size.to_string())
     }
 
     fn cancel_scheduled_tasks_mutation(id: &DatasetID, flow_id: &str) -> String {

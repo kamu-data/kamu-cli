@@ -30,7 +30,7 @@ pub struct CompactCommand {
     max_slice_records: u64,
     is_hard: bool,
     is_verify: bool,
-    is_keep_metadata_only: bool,
+    keep_metadata_only: bool,
 }
 
 impl CompactCommand {
@@ -43,7 +43,7 @@ impl CompactCommand {
         max_slice_records: u64,
         is_hard: bool,
         is_verify: bool,
-        is_keep_metadata_only: bool,
+        keep_metadata_only: bool,
     ) -> Self {
         Self {
             dataset_repo,
@@ -54,7 +54,7 @@ impl CompactCommand {
             max_slice_records,
             is_hard,
             is_verify,
-            is_keep_metadata_only,
+            keep_metadata_only,
         }
     }
 
@@ -120,7 +120,7 @@ impl Command for CompactCommand {
                 CompactingOptions {
                     max_slice_size: Some(self.max_slice_size),
                     max_slice_records: Some(self.max_slice_records),
-                    is_keep_metadata_only: self.is_keep_metadata_only,
+                    keep_metadata_only: self.keep_metadata_only,
                 },
                 Some(listener.clone()),
             )

@@ -24,13 +24,14 @@ use kamu::testing::{
     MockPollingIngestService,
     MockTransformService,
 };
-use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
-use kamu_accounts::{
-    AuthenticationService,
-    MockAuthenticationService,
-    DEFAULT_ACCOUNT_ID,
-    DEFAULT_ACCOUNT_NAME,
+use kamu::{
+    DatasetOwnershipServiceInMemory,
+    DatasetRepositoryLocalFs,
+    DependencyGraphServiceInMemory,
 };
+use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME};
+use kamu_accounts_inmem::AccountRepositoryInMemory;
+use kamu_accounts_services::AuthenticationServiceImpl;
 use kamu_core::*;
 use kamu_flow_system::FlowServiceRunConfig;
 use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
@@ -41,23 +42,18 @@ use opendatafabric::{AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetN
 
 use crate::utils::authentication_catalogs;
 
+////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_list_account_flows() {
-    let foo_account_name = DEFAULT_ACCOUNT_NAME.clone();
-    let foo_account_id = DEFAULT_ACCOUNT_ID.clone();
     let foo_dataset_name = DatasetName::new_unchecked("foo");
     let foo_dataset_alias =
-        DatasetAlias::new(Some(foo_account_name.clone()), foo_dataset_name.clone());
-    let mock_authentication_service = MockAuthenticationService::with_custom_account(
-        foo_account_id.clone(),
-        foo_account_name.clone(),
-    );
+        DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-        mock_authentication_service: Some(mock_authentication_service),
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
     });
@@ -77,7 +73,7 @@ async fn test_list_account_flows() {
     assert!(response.is_ok(), "{response:?}");
 
     // Should return list of flows for account
-    let request_code = FlowConfigHarness::list_flows_query(&foo_account_name);
+    let request_code = FlowConfigHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -131,26 +127,21 @@ async fn test_list_account_flows() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_pause_resume_account_flows() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let foo_account_name = DEFAULT_ACCOUNT_NAME.clone();
-    let foo_account_id = DEFAULT_ACCOUNT_ID.clone();
     let foo_dataset_alias = DatasetAlias::new(
-        Some(foo_account_name.clone()),
+        Some(DEFAULT_ACCOUNT_NAME.clone()),
         DatasetName::new_unchecked("foo"),
-    );
-    let mock_authentication_service = MockAuthenticationService::with_custom_account(
-        foo_account_id.clone(),
-        foo_account_name.clone(),
     );
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-        mock_authentication_service: Some(mock_authentication_service),
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
     });
@@ -167,7 +158,7 @@ async fn test_pause_resume_account_flows() {
 
     assert!(response.is_ok(), "{response:?}");
 
-    let request_code = FlowConfigHarness::list_flows_query(&foo_account_name);
+    let request_code = FlowConfigHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -237,7 +228,7 @@ async fn test_pause_resume_account_flows() {
 
     assert!(response.is_ok(), "{response:?}");
 
-    let mutation_code = FlowConfigHarness::pause_account_flows(&foo_account_name);
+    let mutation_code = FlowConfigHarness::pause_account_flows(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(mutation_code.clone())
@@ -286,7 +277,7 @@ async fn test_pause_resume_account_flows() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::resume_account_flows(&foo_account_name);
+    let mutation_code = FlowConfigHarness::resume_account_flows(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(mutation_code.clone())
@@ -336,6 +327,8 @@ async fn test_pause_resume_account_flows() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+
 struct FlowConfigHarness {
     _tempdir: tempfile::TempDir,
     _catalog_base: dill::Catalog,
@@ -350,7 +343,6 @@ struct FlowRunsHarnessOverrides {
     dataset_changes_mock: Option<MockDatasetChangesService>,
     transform_service_mock: Option<MockTransformService>,
     polling_service_mock: Option<MockPollingIngestService>,
-    mock_authentication_service: Option<MockAuthenticationService>,
     mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
 }
 
@@ -364,7 +356,6 @@ impl FlowConfigHarness {
         let dependency_graph_mock = overrides.dependency_graph_mock.unwrap_or_default();
         let transform_service_mock = overrides.transform_service_mock.unwrap_or_default();
         let polling_service_mock = overrides.polling_service_mock.unwrap_or_default();
-        let mock_authentication_service = overrides.mock_authentication_service.unwrap_or_default();
         let mock_dataset_action_authorizer =
             overrides.mock_dataset_action_authorizer.unwrap_or_default();
 
@@ -379,9 +370,10 @@ impl FlowConfigHarness {
             .add_value(dataset_changes_mock)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
             .add::<SystemTimeSourceDefault>()
-            .add_value(mock_authentication_service)
-            .bind::<dyn AuthenticationService, MockAuthenticationService>()
             .add_value(mock_dataset_action_authorizer)
+            .add::<AuthenticationServiceImpl>()
+            .add::<AccountRepositoryInMemory>()
+            .add_value(JwtAuthenticationConfig::default())
             .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(dependency_graph_mock)
@@ -400,6 +392,7 @@ impl FlowConfigHarness {
             .bind::<dyn TransformService, MockTransformService>()
             .add_value(polling_service_mock)
             .bind::<dyn PollingIngestService, MockPollingIngestService>()
+            .add::<DatasetOwnershipServiceInMemory>()
             .build();
 
         // Init dataset with no sources
@@ -735,3 +728,5 @@ impl FlowConfigHarness {
         .replace("<unit>", unit)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////

@@ -303,8 +303,9 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_task_system_services::TaskExecutorImpl>();
 
-    // TODO: initialize graph dependencies when starting API server
     b.add::<DependencyGraphServiceInMemory>();
+
+    b.add::<DatasetOwnershipServiceInMemory>();
 
     b.add::<kamu_flow_system_services::FlowConfigurationServiceImpl>();
     b.add::<kamu_flow_system_services::FlowServiceImpl>();

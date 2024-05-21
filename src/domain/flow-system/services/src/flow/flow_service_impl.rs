@@ -15,19 +15,19 @@ use std::sync::{Arc, Mutex};
 use chrono::{DateTime, DurationRound, Utc};
 use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
-use futures::{StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 use kamu_core::events::DatasetEventDeleted;
 use kamu_core::{
     DatasetChangesService,
-    DatasetRepository,
+    DatasetOwnershipService,
     DependencyGraphService,
     InternalError,
     SystemTimeSource,
-    TryStreamExtExt,
 };
 use kamu_flow_system::*;
 use kamu_task_system::*;
-use opendatafabric::{AccountID, AccountName, DatasetID};
+use opendatafabric::{AccountID, DatasetID};
+use tokio_stream::StreamExt;
 
 use super::active_configs_state::ActiveConfigsState;
 use super::flow_time_wheel::FlowTimeWheel;
@@ -43,9 +43,9 @@ pub struct FlowServiceImpl {
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
+    dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -76,9 +76,9 @@ impl FlowServiceImpl {
         time_source: Arc<dyn SystemTimeSource>,
         task_scheduler: Arc<dyn TaskScheduler>,
         flow_configuration_service: Arc<dyn FlowConfigurationService>,
-        dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_changes_service: Arc<dyn DatasetChangesService>,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dependency_graph_service: Arc<dyn DependencyGraphService>,
+        dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
@@ -88,9 +88,9 @@ impl FlowServiceImpl {
             time_source,
             task_scheduler,
             flow_configuration_service,
-            dependency_graph_service,
             dataset_changes_service,
-            dataset_repo,
+            dependency_graph_service,
+            dataset_ownership_service,
         }
     }
 
@@ -181,6 +181,12 @@ impl FlowServiceImpl {
     ) -> Result<(), InternalError> {
         match &flow_key {
             FlowKey::Dataset(dataset_flow_key) => {
+                self.state
+                    .lock()
+                    .unwrap()
+                    .active_configs
+                    .add_dataset_flow_config(dataset_flow_key, rule.clone());
+
                 match &rule {
                     FlowConfigurationRule::Schedule(schedule) => {
                         self.enqueue_scheduled_auto_polling_flow(start_time, &flow_key, schedule)
@@ -194,21 +200,17 @@ impl FlowServiceImpl {
                     // skip running it during activation flow configurations
                     FlowConfigurationRule::CompactingRule(_) => (),
                 }
-
-                let mut state = self.state.lock().unwrap();
-                state
-                    .active_configs
-                    .add_dataset_flow_config(dataset_flow_key, rule);
             }
             FlowKey::System(system_flow_key) => {
                 if let FlowConfigurationRule::Schedule(schedule) = &rule {
-                    self.enqueue_scheduled_auto_polling_flow(start_time, &flow_key, schedule)
-                        .await?;
-
-                    let mut state = self.state.lock().unwrap();
-                    state
+                    self.state
+                        .lock()
+                        .unwrap()
                         .active_configs
                         .add_system_flow_config(system_flow_key.flow_type, schedule.clone());
+
+                    self.enqueue_scheduled_auto_polling_flow(start_time, &flow_key, schedule)
+                        .await?;
                 } else {
                     unimplemented!(
                         "Doubt will ever need to schedule system flows via batching rules"
@@ -253,7 +255,8 @@ impl FlowServiceImpl {
             FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
                 trigger_time: start_time,
             }),
-            FlowTriggerContext::Scheduled(schedule),
+            FlowTriggerContext::Scheduled(schedule.clone()),
+            None,
         )
         .await
     }
@@ -271,64 +274,41 @@ impl FlowServiceImpl {
                 trigger_time: start_time,
             }),
             FlowTriggerContext::Unconditional,
+            None,
         )
         .await
     }
 
-    #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, %flow_id))]
+    #[tracing::instrument(level = "trace", skip_all, fields(?flow.flow_key, %flow.flow_id, ))]
     async fn enqueue_dependent_flows(
         &self,
         input_success_time: DateTime<Utc>,
-        flow_key: &FlowKey,
-        flow_id: FlowID,
+        flow: &Flow,
         flow_result: &FlowResult,
     ) -> Result<(), InternalError> {
-        if let FlowKey::Dataset(fk_dataset) = flow_key {
-            // Extract a list of downstream 1 level datasets
-            let dependent_dataset_ids: Vec<_> = self
-                .dependency_graph_service
-                .get_downstream_dependencies(&fk_dataset.dataset_id)
-                .await
-                .int_err()?
-                .collect()
-                .await;
-
-            // For each, scan if flows configurations are on
-            for dependent_dataset_id in dependent_dataset_ids {
-                // Is batching rule enabled?
-                let maybe_batching_rule = self
-                    .state
-                    .lock()
-                    .unwrap()
-                    .active_configs
-                    .try_get_dataset_batching_rule(
-                        &dependent_dataset_id,
-                        DatasetFlowType::ExecuteTransform,
-                    );
-
-                // When dependent flow batching rule is enabled, schedule dependent update
-                if let Some(batching_rule) = maybe_batching_rule {
-                    let dependent_flow_key = FlowKeyDataset::new(
-                        dependent_dataset_id.clone(),
-                        DatasetFlowType::ExecuteTransform,
-                    )
-                    .into();
-
-                    let trigger = FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
-                        trigger_time: input_success_time,
-                        dataset_id: fk_dataset.dataset_id.clone(),
-                        flow_type: fk_dataset.flow_type,
-                        flow_id,
-                        flow_result: flow_result.clone(),
-                    });
-
-                    self.trigger_flow_common(
-                        &dependent_flow_key,
-                        trigger,
-                        FlowTriggerContext::Batching(&batching_rule),
-                    )
-                    .await?;
-                }
+        if let FlowKey::Dataset(fk_dataset) = &flow.flow_key {
+            let dependent_dataset_flow_plans = self
+                .make_downstream_dependecies_flow_plans(fk_dataset, flow.config_snapshot.as_ref())
+                .await?;
+            if dependent_dataset_flow_plans.is_empty() {
+                return Ok(());
+            }
+            let trigger = FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
+                trigger_time: input_success_time,
+                dataset_id: fk_dataset.dataset_id.clone(),
+                flow_type: fk_dataset.flow_type,
+                flow_id: flow.flow_id,
+                flow_result: flow_result.clone(),
+            });
+            // For each, trigger needed flow
+            for dependent_dataset_flow_plan in dependent_dataset_flow_plans {
+                self.trigger_flow_common(
+                    &dependent_dataset_flow_plan.flow_key,
+                    trigger.clone(),
+                    dependent_dataset_flow_plan.flow_trigger_context,
+                    dependent_dataset_flow_plan.maybe_config_snapshot,
+                )
+                .await?;
             }
 
             Ok(())
@@ -337,11 +317,12 @@ impl FlowServiceImpl {
         }
     }
 
-    async fn trigger_flow_common<'a>(
+    async fn trigger_flow_common(
         &self,
         flow_key: &FlowKey,
         trigger: FlowTrigger,
-        context: FlowTriggerContext<'a>,
+        context: FlowTriggerContext,
+        config_snapshot_maybe: Option<FlowConfigurationSnapshot>,
     ) -> Result<FlowState, InternalError> {
         // Query previous runs stats to determine activation time
         let flow_run_stats = self.flow_run_stats(flow_key).await?;
@@ -378,7 +359,7 @@ impl FlowServiceImpl {
                             self.evaluate_flow_batching_rule(
                                 trigger_time,
                                 &mut flow,
-                                batching_rule,
+                                &batching_rule,
                                 throttling_boundary_time,
                             )
                             .await
@@ -416,7 +397,18 @@ impl FlowServiceImpl {
             // Otherwise, initiate a new flow, and enqueue it in the time wheel
             None => {
                 // Initiate new flow
-                let mut flow = self.make_new_flow(flow_key.clone(), trigger).await?;
+                let config_snapshot_maybe = if config_snapshot_maybe.is_some() {
+                    config_snapshot_maybe
+                } else {
+                    self.state
+                        .lock()
+                        .unwrap()
+                        .active_configs
+                        .try_get_config_snapshot_by_key(flow_key)
+                };
+                let mut flow = self
+                    .make_new_flow(flow_key.clone(), trigger, config_snapshot_maybe)
+                    .await?;
 
                 match context {
                     FlowTriggerContext::Batching(batching_rule) => {
@@ -424,7 +416,7 @@ impl FlowServiceImpl {
                         self.evaluate_flow_batching_rule(
                             trigger_time,
                             &mut flow,
-                            batching_rule,
+                            &batching_rule,
                             throttling_boundary_time,
                         )
                         .await
@@ -492,7 +484,9 @@ impl FlowServiceImpl {
     ) -> Result<(), InternalError> {
         assert!(matches!(
             flow.flow_key.get_type(),
-            AnyFlowType::Dataset(DatasetFlowType::ExecuteTransform)
+            AnyFlowType::Dataset(
+                DatasetFlowType::ExecuteTransform | DatasetFlowType::HardCompacting
+            )
         ));
 
         // TODO: it's likely assumed the accumulation is per each input separately, but
@@ -629,12 +623,14 @@ impl FlowServiceImpl {
         &self,
         flow_key: FlowKey,
         trigger: FlowTrigger,
+        config_snapshot: Option<FlowConfigurationSnapshot>,
     ) -> Result<Flow, InternalError> {
         let flow = Flow::new(
             self.time_source.now(),
             self.flow_event_store.new_flow_id(),
             flow_key,
             trigger,
+            config_snapshot,
         );
 
         let mut state = self.state.lock().unwrap();
@@ -680,7 +676,8 @@ impl FlowServiceImpl {
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
-        let logical_plan = self.make_task_logical_plan(&flow.flow_key);
+        let logical_plan =
+            self.make_task_logical_plan(&flow.flow_key, flow.config_snapshot.as_ref());
 
         let task = self
             .task_scheduler
@@ -737,7 +734,11 @@ impl FlowServiceImpl {
     }
 
     /// Creates task logical plan that corresponds to template
-    pub fn make_task_logical_plan(&self, flow_key: &FlowKey) -> LogicalPlan {
+    pub fn make_task_logical_plan(
+        &self,
+        flow_key: &FlowKey,
+        config_snapshot: Option<&FlowConfigurationSnapshot>,
+    ) -> LogicalPlan {
         match flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
                 DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
@@ -748,25 +749,21 @@ impl FlowServiceImpl {
                 DatasetFlowType::HardCompacting => {
                     let mut max_slice_size: Option<u64> = None;
                     let mut max_slice_records: Option<u64> = None;
+                    let mut keep_metadata_only = false;
 
-                    let maybe_compacting_rule = self
-                        .state
-                        .lock()
-                        .unwrap()
-                        .active_configs
-                        .try_get_dataset_compacting_rule(
-                            &flow_key.dataset_id,
-                            DatasetFlowType::HardCompacting,
-                        );
-                    if let Some(opts) = maybe_compacting_rule {
-                        max_slice_size = Some(opts.max_slice_size());
-                        max_slice_records = Some(opts.max_slice_records());
+                    if let Some(config_rule) = config_snapshot
+                        && let FlowConfigurationSnapshot::Compacting(compacting_rule) = config_rule
+                    {
+                        max_slice_size = Some(compacting_rule.max_slice_size());
+                        max_slice_records = Some(compacting_rule.max_slice_records());
+                        keep_metadata_only = compacting_rule.keep_metadata_only();
                     };
 
                     LogicalPlan::HardCompactingDataset(HardCompactingDataset {
                         dataset_id: flow_key.dataset_id.clone(),
                         max_slice_size,
                         max_slice_records,
+                        keep_metadata_only,
                     })
                 }
             },
@@ -800,6 +797,103 @@ impl FlowServiceImpl {
             }
         }
         task_outcome
+    }
+
+    async fn make_downstream_dependecies_flow_plans(
+        &self,
+        fk_dataset: &FlowKeyDataset,
+        maybe_config_snapshot: Option<&FlowConfigurationSnapshot>,
+    ) -> Result<Vec<DownstreamDependencyFlowPlan>, InternalError> {
+        // ToDo: extend dependency graph with possibility to fetch downstream
+        // dependencies by owner
+        let dependent_dataset_ids: Vec<_> = self
+            .dependency_graph_service
+            .get_downstream_dependencies(&fk_dataset.dataset_id)
+            .await
+            .int_err()?
+            .collect()
+            .await;
+
+        let mut plans: Vec<DownstreamDependencyFlowPlan> = vec![];
+        if dependent_dataset_ids.is_empty() {
+            return Ok(plans);
+        }
+
+        match self.classify_dependent_trigger_type(fk_dataset.flow_type, maybe_config_snapshot) {
+            DownstreamDependencyTriggerType::TriggerAllEnabled => {
+                let guard = self.state.lock().unwrap();
+                for dataset_id in dependent_dataset_ids {
+                    if let Some(batching_rule) = guard.active_configs.try_get_dataset_batching_rule(
+                        &dataset_id,
+                        DatasetFlowType::ExecuteTransform,
+                    ) {
+                        plans.push(DownstreamDependencyFlowPlan {
+                            flow_key: FlowKeyDataset::new(
+                                dataset_id,
+                                DatasetFlowType::ExecuteTransform,
+                            )
+                            .into(),
+                            flow_trigger_context: FlowTriggerContext::Batching(batching_rule),
+                            maybe_config_snapshot: None,
+                        });
+                    };
+                }
+            }
+
+            DownstreamDependencyTriggerType::TriggerOwnUnconditionally => {
+                let dataset_owner_account_ids = self
+                    .dataset_ownership_service
+                    .get_dataset_owners(&fk_dataset.dataset_id)
+                    .await
+                    .int_err()?;
+
+                for dependent_dataset_id in dependent_dataset_ids {
+                    for owner_account_id in &dataset_owner_account_ids {
+                        if self
+                            .dataset_ownership_service
+                            .is_dataset_owned_by(&dependent_dataset_id, owner_account_id)
+                            .await
+                            .int_err()?
+                        {
+                            plans.push(DownstreamDependencyFlowPlan {
+                                flow_key: FlowKeyDataset::new(
+                                    dependent_dataset_id.clone(),
+                                    DatasetFlowType::HardCompacting,
+                                )
+                                .into(),
+                                flow_trigger_context: FlowTriggerContext::Unconditional,
+                                maybe_config_snapshot: maybe_config_snapshot.cloned(),
+                            });
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(plans)
+    }
+
+    fn classify_dependent_trigger_type(
+        &self,
+        dataset_flow_type: DatasetFlowType,
+        maybe_config_snapshot: Option<&FlowConfigurationSnapshot>,
+    ) -> DownstreamDependencyTriggerType {
+        match dataset_flow_type {
+            DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
+                DownstreamDependencyTriggerType::TriggerAllEnabled
+            }
+            DatasetFlowType::HardCompacting => {
+                if let Some(config_snapshot) = &maybe_config_snapshot
+                    && let FlowConfigurationSnapshot::Compacting(compacting_rule) = config_snapshot
+                    && compacting_rule.keep_metadata_only()
+                {
+                    DownstreamDependencyTriggerType::TriggerOwnUnconditionally
+                } else {
+                    DownstreamDependencyTriggerType::TriggerAllEnabled
+                }
+            }
+        }
     }
 }
 
@@ -876,6 +970,7 @@ impl FlowService for FlowServiceImpl {
         trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
         initiator_account_id: AccountID,
+        config_snapshot_maybe: Option<FlowConfigurationSnapshot>,
     ) -> Result<FlowState, RequestFlowError> {
         let activation_time = self.round_time(trigger_time).int_err()?;
 
@@ -886,6 +981,7 @@ impl FlowService for FlowServiceImpl {
                 initiator_account_id,
             }),
             FlowTriggerContext::Unconditional,
+            config_snapshot_maybe,
         )
         .await
         .map_err(RequestFlowError::Internal)
@@ -933,32 +1029,28 @@ impl FlowService for FlowServiceImpl {
     /// Returns states of flows associated with a given account
     /// ordered by creation time from newest to oldest
     /// Applies specified filters
-    #[tracing::instrument(level = "debug", skip_all, fields(%account_name, ?filters, ?pagination))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%account_id, ?filters, ?pagination))]
     async fn list_all_flows_by_account(
         &self,
-        account_name: &AccountName,
+        account_id: &AccountID,
         filters: AccountFlowFilters,
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
-        let datasets_stream = self.dataset_repo.get_datasets_by_owner(account_name);
+        let owned_dataset_ids = self
+            .dataset_ownership_service
+            .get_owned_datasets(account_id)
+            .await
+            .map_err(ListFlowsByDatasetError::Internal)?;
 
-        let account_dataset_ids_list: Vec<_> =
-            if let Some(dataset_name_filter) = &filters.by_dataset_name {
-                datasets_stream
-                    .filter_map_ok(|dataset_handle| {
-                        if dataset_name_filter == &dataset_handle.alias.dataset_name {
-                            return Some(dataset_handle.id);
-                        }
-                        None
-                    })
-                    .try_collect()
-                    .await?
-            } else {
-                datasets_stream
-                    .map_ok(|dataset_handle| dataset_handle.id)
-                    .try_collect()
-                    .await?
-            };
+        let filtered_dataset_ids = if !filters.by_dataset_ids.is_empty() {
+            owned_dataset_ids
+                .into_iter()
+                .filter(|dataset_id| filters.by_dataset_ids.contains(dataset_id))
+                .collect()
+        } else {
+            owned_dataset_ids
+        };
+
         let mut total_count = 0;
         let dataset_flow_filters = DatasetFlowFilters {
             by_flow_status: filters.by_flow_status,
@@ -966,7 +1058,7 @@ impl FlowService for FlowServiceImpl {
             by_initiator: filters.by_initiator,
         };
 
-        for dataset_id in &account_dataset_ids_list {
+        for dataset_id in &filtered_dataset_ids {
             total_count += self
                 .flow_event_store
                 .get_count_flows_by_dataset(dataset_id, &dataset_flow_filters)
@@ -974,7 +1066,7 @@ impl FlowService for FlowServiceImpl {
                 .int_err()?;
         }
 
-        let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(account_dataset_ids_list);
+        let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(filtered_dataset_ids);
 
         let matched_stream = Box::pin(async_stream::try_stream! {
             let relevant_flow_ids: Vec<_> = self
@@ -1211,13 +1303,8 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceImpl {
                 match flow.flow_key.get_type().success_followup_method() {
                     FlowSuccessFollowupMethod::Ignore => {}
                     FlowSuccessFollowupMethod::TriggerDependent => {
-                        self.enqueue_dependent_flows(
-                            finish_time,
-                            &flow.flow_key,
-                            flow.flow_id,
-                            flow_result,
-                        )
-                        .await?;
+                        self.enqueue_dependent_flows(finish_time, &flow, flow_result)
+                            .await?;
                     }
                 }
             }
@@ -1354,10 +1441,27 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceImpl {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-enum FlowTriggerContext<'a> {
+#[derive(Debug, Eq, PartialEq)]
+pub enum FlowTriggerContext {
     Unconditional,
-    Scheduled(&'a Schedule),
-    Batching(&'a BatchingRule),
+    Scheduled(Schedule),
+    Batching(BatchingRule),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct DownstreamDependencyFlowPlan {
+    pub flow_key: FlowKey,
+    pub flow_trigger_context: FlowTriggerContext,
+    pub maybe_config_snapshot: Option<FlowConfigurationSnapshot>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+enum DownstreamDependencyTriggerType {
+    TriggerAllEnabled,
+    TriggerOwnUnconditionally,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

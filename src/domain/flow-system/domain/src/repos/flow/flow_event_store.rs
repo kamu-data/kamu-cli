@@ -11,7 +11,7 @@ use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
 use event_sourcing::EventStore;
-use opendatafabric::{AccountID, DatasetID, DatasetName};
+use opendatafabric::{AccountID, DatasetID};
 
 use crate::*;
 
@@ -104,7 +104,7 @@ pub struct DatasetFlowFilters {
 
 #[derive(Default, Debug, Clone)]
 pub struct AccountFlowFilters {
-    pub by_dataset_name: Option<DatasetName>,
+    pub by_dataset_ids: HashSet<DatasetID>,
     pub by_flow_type: Option<DatasetFlowType>,
     pub by_flow_status: Option<FlowStatus>,
     pub by_initiator: Option<InitiatorFilter>,

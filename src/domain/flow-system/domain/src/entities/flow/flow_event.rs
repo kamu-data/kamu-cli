@@ -41,6 +41,7 @@ pub struct FlowEventInitiated {
     pub flow_id: FlowID,
     pub flow_key: FlowKey,
     pub trigger: FlowTrigger,
+    pub config_snapshot: Option<FlowConfigurationSnapshot>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -101,6 +101,34 @@ impl ActiveConfigsState {
             .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
             .copied()
     }
+
+    pub fn try_get_config_snapshot_by_key(
+        &self,
+        flow_key: &FlowKey,
+    ) -> Option<FlowConfigurationSnapshot> {
+        match flow_key {
+            FlowKey::System(_) => self
+                .try_get_flow_schedule(flow_key)
+                .map(FlowConfigurationSnapshot::Schedule),
+            FlowKey::Dataset(dataset_flow_key) => match dataset_flow_key.flow_type {
+                DatasetFlowType::ExecuteTransform => self
+                    .try_get_dataset_batching_rule(
+                        &dataset_flow_key.dataset_id,
+                        dataset_flow_key.flow_type,
+                    )
+                    .map(FlowConfigurationSnapshot::Batching),
+                DatasetFlowType::Ingest => self
+                    .try_get_flow_schedule(flow_key)
+                    .map(FlowConfigurationSnapshot::Schedule),
+                DatasetFlowType::HardCompacting => self
+                    .try_get_dataset_compacting_rule(
+                        &dataset_flow_key.dataset_id,
+                        dataset_flow_key.flow_type,
+                    )
+                    .map(FlowConfigurationSnapshot::Compacting),
+            },
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

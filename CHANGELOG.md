@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Added
+- New `keep_metadata_only` flag to `HardCompacting` flow. Also extended `FlowState` with `ConfigSnapshot`
+  and possibility to pass configuration during triggering a flow
 ### Fixed
 - Added support of `--all` flag to the `kamu delete` command
 - Made recursive deletion dataset with provided `%` pattern

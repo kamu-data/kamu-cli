@@ -11,10 +11,13 @@ use kamu_flow_system::{
     BatchingRule,
     CompactingRule,
     FlowConfigurationRule,
+    FlowConfigurationSnapshot,
     Schedule,
     ScheduleCron,
+    ScheduleTimeDelta,
 };
 
+use crate::mutations::FlowInvalidRunConfigurations;
 use crate::prelude::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -82,6 +85,7 @@ impl From<BatchingRule> for FlowConfigurationBatching {
 pub struct FlowConfigurationCompacting {
     pub max_slice_size: u64,
     pub max_slice_records: u64,
+    pub keep_metadata_only: bool,
 }
 
 impl From<CompactingRule> for FlowConfigurationCompacting {
@@ -89,6 +93,7 @@ impl From<CompactingRule> for FlowConfigurationCompacting {
         Self {
             max_slice_size: value.max_slice_size(),
             max_slice_records: value.max_slice_records(),
+            keep_metadata_only: value.keep_metadata_only(),
         }
     }
 }
@@ -167,6 +172,129 @@ impl From<chrono::Duration> for TimeDelta {
             "Expecting intervals not smaller than 1 minute that are clearly dividable by unit, \
              but received [{value}]"
         );
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(OneofObject)]
+pub enum FlowRunConfiguration {
+    Schedule(ScheduleInput),
+    Batching(BatchingConditionInput),
+    Compacting(CompactingConditionInput),
+}
+
+#[derive(OneofObject)]
+pub enum ScheduleInput {
+    TimeDelta(TimeDeltaInput),
+    /// Supported CRON syntax: min hour dayOfMonth month dayOfWeek
+    Cron5ComponentExpression(String),
+}
+
+#[derive(InputObject, Clone)]
+pub struct TimeDeltaInput {
+    pub every: u32,
+    pub unit: TimeUnit,
+}
+
+impl From<TimeDeltaInput> for chrono::Duration {
+    fn from(value: TimeDeltaInput) -> Self {
+        let every = i64::from(value.every);
+        match value.unit {
+            TimeUnit::Weeks => chrono::Duration::try_weeks(every).unwrap(),
+            TimeUnit::Days => chrono::Duration::try_days(every).unwrap(),
+            TimeUnit::Hours => chrono::Duration::try_hours(every).unwrap(),
+            TimeUnit::Minutes => chrono::Duration::try_minutes(every).unwrap(),
+        }
+    }
+}
+
+impl From<&TimeDeltaInput> for chrono::Duration {
+    fn from(value: &TimeDeltaInput) -> Self {
+        let every = i64::from(value.every);
+        match value.unit {
+            TimeUnit::Weeks => chrono::Duration::try_weeks(every).unwrap(),
+            TimeUnit::Days => chrono::Duration::try_days(every).unwrap(),
+            TimeUnit::Hours => chrono::Duration::try_hours(every).unwrap(),
+            TimeUnit::Minutes => chrono::Duration::try_minutes(every).unwrap(),
+        }
+    }
+}
+
+#[derive(InputObject)]
+pub struct BatchingConditionInput {
+    pub min_records_to_await: u64,
+    pub max_batching_interval: TimeDeltaInput,
+}
+
+#[derive(InputObject)]
+pub struct CompactingConditionInput {
+    pub max_slice_size: u64,
+    pub max_slice_records: u64,
+    pub keep_metadata_only: bool,
+}
+
+impl FlowRunConfiguration {
+    pub fn try_into_snapshot(
+        &self,
+        dataset_flow_type: DatasetFlowType,
+    ) -> Result<FlowConfigurationSnapshot, FlowInvalidRunConfigurations> {
+        Ok(match self {
+            Self::Batching(batching_input) => {
+                if dataset_flow_type != DatasetFlowType::ExecuteTransform {
+                    return Err(FlowInvalidRunConfigurations {
+                        error: "Incompatible flow run configuration and dataset flow type"
+                            .to_string(),
+                    });
+                };
+                FlowConfigurationSnapshot::Batching(
+                    BatchingRule::new_checked(
+                        batching_input.min_records_to_await,
+                        batching_input.max_batching_interval.clone().into(),
+                    )
+                    .map_err(|_| FlowInvalidRunConfigurations {
+                        error: "Invalid batching flow run configuration".to_string(),
+                    })?,
+                )
+            }
+            Self::Compacting(compacting_input) => {
+                if dataset_flow_type != DatasetFlowType::HardCompacting {
+                    return Err(FlowInvalidRunConfigurations {
+                        error: "Incompatible flow run configuration and dataset flow type"
+                            .to_string(),
+                    });
+                };
+                FlowConfigurationSnapshot::Compacting(
+                    CompactingRule::new_checked(
+                        compacting_input.max_slice_size,
+                        compacting_input.max_slice_records,
+                        compacting_input.keep_metadata_only,
+                    )
+                    .map_err(|_| FlowInvalidRunConfigurations {
+                        error: "Invalid compacting flow run configuration".to_string(),
+                    })?,
+                )
+            }
+            Self::Schedule(schedule_input) => {
+                if dataset_flow_type != DatasetFlowType::Ingest {
+                    return Err(FlowInvalidRunConfigurations {
+                        error: "Incompatible flow run configuration and dataset flow type"
+                            .to_string(),
+                    });
+                };
+                FlowConfigurationSnapshot::Schedule(match schedule_input {
+                    ScheduleInput::TimeDelta(td) => {
+                        Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
+                    }
+                    ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
+                        Schedule::try_from_5component_cron_expression(cron_5component_expression)
+                            .map_err(|_| FlowInvalidRunConfigurations {
+                                error: "Invalid schedule flow run configuration".to_string(),
+                            })?
+                    }
+                })
+            }
+        })
     }
 }
 

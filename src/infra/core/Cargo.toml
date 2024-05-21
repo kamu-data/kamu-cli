@@ -137,6 +137,8 @@ test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 nanoid = "0.4.0"
+kamu-accounts-inmem = { workspace = true }
+kamu-accounts-services = { workspace = true }
 
 [[bench]]
 name = "parallel_simple_transfer_protocol"
