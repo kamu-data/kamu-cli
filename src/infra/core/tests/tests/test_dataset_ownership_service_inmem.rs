@@ -36,7 +36,7 @@ use tempfile::TempDir;
 
 #[test_log::test(tokio::test)]
 async fn test_multi_tenant_dataset_owners() {
-    let mut harness = DatasetOwnershitHarness::new(true);
+    let mut harness = DatasetOwnershipHarness::new(true);
 
     harness.create_multi_tenant_datasets().await;
     harness.eager_initialization().await;
@@ -77,7 +77,7 @@ async fn test_multi_tenant_dataset_owners() {
     }
 }
 
-struct DatasetOwnershitHarness {
+struct DatasetOwnershipHarness {
     _workdir: TempDir,
     _catalog: dill::Catalog,
     dataset_repo: Arc<dyn DatasetRepository>,
@@ -86,7 +86,7 @@ struct DatasetOwnershitHarness {
     account_datasets: HashMap<AccountID, Vec<DatasetID>>,
 }
 
-impl DatasetOwnershitHarness {
+impl DatasetOwnershipHarness {
     fn new(multi_tenant: bool) -> Self {
         let workdir = tempfile::tempdir().unwrap();
         let datasets_dir = workdir.path().join("datasets");
