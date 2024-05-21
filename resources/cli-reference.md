@@ -222,7 +222,7 @@ Set or unset configuration value
 
 Delete a dataset
 
-**Usage:** `kamu delete [OPTIONS] <dataset>...`
+**Usage:** `kamu delete [OPTIONS] [dataset]...`
 
 **Arguments:**
 
