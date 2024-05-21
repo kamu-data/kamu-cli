@@ -290,6 +290,9 @@ impl FlowServiceImpl {
             let dependent_dataset_flow_plans = self
                 .make_downstream_dependecies_flow_plans(fk_dataset, flow.config_snapshot.as_ref())
                 .await?;
+            if dependent_dataset_flow_plans.is_empty() {
+                return Ok(());
+            }
             let trigger = FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
                 trigger_time: input_success_time,
                 dataset_id: fk_dataset.dataset_id.clone(),
@@ -673,7 +676,8 @@ impl FlowServiceImpl {
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
-        let logical_plan = self.make_task_logical_plan(&flow.flow_key, &flow.config_snapshot);
+        let logical_plan =
+            self.make_task_logical_plan(&flow.flow_key, flow.config_snapshot.as_ref());
 
         let task = self
             .task_scheduler
@@ -733,7 +737,7 @@ impl FlowServiceImpl {
     pub fn make_task_logical_plan(
         &self,
         flow_key: &FlowKey,
-        config_snapshot: &Option<FlowConfigurationSnapshot>,
+        config_snapshot: Option<&FlowConfigurationSnapshot>,
     ) -> LogicalPlan {
         match flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
@@ -811,6 +815,9 @@ impl FlowServiceImpl {
             .await;
 
         let mut plans: Vec<DownstreamDependencyFlowPlan> = vec![];
+        if dependent_dataset_ids.is_empty() {
+            return Ok(plans);
+        }
 
         match self.classify_dependent_trigger_type(fk_dataset.flow_type, maybe_config_snapshot) {
             DownstreamDependencyTriggerType::TriggerAllEnabled => {

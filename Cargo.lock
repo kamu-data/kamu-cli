@@ -3612,6 +3612,8 @@ dependencies = [
  "internal-error",
  "itertools 0.11.0",
  "kamu-accounts",
+ "kamu-accounts-inmem",
+ "kamu-accounts-services",
  "kamu-core",
  "kamu-data-utils",
  "kamu-ingest-datafusion",
