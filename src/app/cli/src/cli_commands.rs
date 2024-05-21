@@ -89,7 +89,7 @@ pub fn get_command(
             cli_catalog.get_one()?,
             validate_many_dataset_patterns(
                 cli_catalog,
-                submatches.get_many("dataset").unwrap().cloned(),
+                submatches.get_many("dataset").unwrap_or_default().cloned(),
             )?,
             cli_catalog.get_one()?,
             submatches.get_flag("all"),

@@ -307,7 +307,6 @@ pub fn cli() -> Command {
                         Arg::new("dataset")
                             .action(ArgAction::Append)
                             .index(1)
-                            .required(true)
                             .value_parser(value_parse_dataset_ref_pattern_local)
                             .help("Local dataset reference(s)"),
                         Arg::new("yes")

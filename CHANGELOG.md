@@ -8,7 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - New `keep_metadata_only` flag to `HardCompacting` flow. Also extended `FlowState` with `ConfigSnapshot`
   and possibility to pass configuration during triggering a flow
-  
+### Fixed
+- Added support of `--all` flag to the `kamu delete` command
+- Made recursive deletion dataset with provided `%` pattern
+
 ## [0.182.0] - 2024-05-20
 ### Added
 - Loading database components relying on CLI config
