@@ -15,19 +15,19 @@ use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, MockDatasetChangesService};
 use kamu::*;
 use kamu_accounts::{
-    AuthenticationService,
+    AccountConfig,
     CurrentAccountSubject,
-    MockAuthenticationService,
-    DEFAULT_ACCOUNT_ID,
-    DEFAULT_ACCOUNT_NAME,
+    JwtAuthenticationConfig,
+    PredefinedAccountsConfig,
 };
+use kamu_accounts_inmem::AccountRepositoryInMemory;
+use kamu_accounts_services::AuthenticationServiceImpl;
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
-use mockall::predicate::eq;
 use opendatafabric::*;
 use tokio::task::yield_now;
 
@@ -60,6 +60,7 @@ pub(crate) struct FlowHarnessOverrides {
     pub awaiting_step: Option<Duration>,
     pub mandatory_throttling_period: Option<Duration>,
     pub mock_dataset_changes: Option<MockDatasetChangesService>,
+    pub custom_account_names: Vec<AccountName>,
     pub is_multi_tenant: bool,
 }
 
@@ -85,11 +86,18 @@ impl FlowHarness {
         );
 
         let mock_dataset_changes = overrides.mock_dataset_changes.unwrap_or_default();
-        let mut mock_authentication_service = MockAuthenticationService::new();
-        mock_authentication_service
-            .expect_find_account_name_by_id()
-            .with(eq(DEFAULT_ACCOUNT_ID.clone()))
-            .returning(move |_| Ok(Some(DEFAULT_ACCOUNT_NAME.clone())));
+
+        let predefined_accounts_config = if overrides.custom_account_names.is_empty() {
+            PredefinedAccountsConfig::single_tenant()
+        } else {
+            let mut predefined_accounts_config = PredefinedAccountsConfig::new();
+            for account_name in overrides.custom_account_names {
+                predefined_accounts_config
+                    .predefined
+                    .push(AccountConfig::from_name(account_name));
+            }
+            predefined_accounts_config
+        };
 
         let catalog = CatalogBuilder::new()
             .add::<EventBus>()
@@ -112,14 +120,16 @@ impl FlowHarness {
             .add_value(mock_dataset_changes)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
             .add_value(CurrentAccountSubject::new_test())
-            .add_value(mock_authentication_service)
-            .bind::<dyn AuthenticationService, MockAuthenticationService>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AuthenticationServiceImpl>()
+            .add_value(predefined_accounts_config)
+            .add_value(JwtAuthenticationConfig::default())
+            .add::<AccountRepositoryInMemory>()
             .add::<DependencyGraphServiceInMemory>()
+            .add::<DatasetOwnershipServiceInMemory>()
             .add::<TaskSchedulerImpl>()
             .add::<TaskSystemEventStoreInMemory>()
             .add::<FlowSystemTestListener>()
-            .bind::<dyn AuthenticationService, MockAuthenticationService>()
             .build();
 
         let flow_service = catalog.get_one::<dyn FlowService>().unwrap();
@@ -175,7 +185,7 @@ impl FlowHarness {
         create_result.dataset_handle.id
     }
 
-    pub async fn eager_dependencies_graph_init(&self) {
+    pub async fn eager_initialization(&self) {
         let dependency_graph_service = self
             .catalog
             .get_one::<dyn DependencyGraphService>()
@@ -186,12 +196,21 @@ impl FlowHarness {
             .eager_initialization(&dependency_graph_repository)
             .await
             .unwrap();
+
+        let dataset_ownership_service = self
+            .catalog
+            .get_one::<dyn DatasetOwnershipService>()
+            .unwrap();
+        dataset_ownership_service
+            .eager_initialization()
+            .await
+            .unwrap();
     }
 
     pub async fn delete_dataset(&self, dataset_id: &DatasetID) {
         // Eagerly push dependency graph initialization before deletes.
         // It's ignored, if requested 2nd time
-        self.eager_dependencies_graph_init().await;
+        self.eager_initialization().await;
 
         // Do the actual deletion
         self.dataset_repo

@@ -4238,6 +4238,8 @@ dependencies = [
  "indoc 2.0.5",
  "kamu",
  "kamu-accounts",
+ "kamu-accounts-inmem",
+ "kamu-accounts-services",
  "kamu-core",
  "kamu-flow-system",
  "kamu-flow-system-inmem",

@@ -19,15 +19,14 @@ use futures::TryStreamExt;
 use kamu_core::events::DatasetEventDeleted;
 use kamu_core::{
     DatasetChangesService,
-    DatasetRepository,
+    DatasetOwnershipService,
     DependencyGraphService,
     InternalError,
     SystemTimeSource,
-    TryStreamExtExt,
 };
 use kamu_flow_system::*;
 use kamu_task_system::*;
-use opendatafabric::{AccountID, AccountName, DatasetID};
+use opendatafabric::{AccountID, DatasetID};
 use tokio_stream::StreamExt;
 
 use super::active_configs_state::ActiveConfigsState;
@@ -45,8 +44,8 @@ pub struct FlowServiceImpl {
     task_scheduler: Arc<dyn TaskScheduler>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
-    dataset_repo: Arc<dyn DatasetRepository>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
+    dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -78,8 +77,8 @@ impl FlowServiceImpl {
         task_scheduler: Arc<dyn TaskScheduler>,
         flow_configuration_service: Arc<dyn FlowConfigurationService>,
         dataset_changes_service: Arc<dyn DatasetChangesService>,
-        dataset_repo: Arc<dyn DatasetRepository>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
+        dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
@@ -90,8 +89,8 @@ impl FlowServiceImpl {
             task_scheduler,
             flow_configuration_service,
             dataset_changes_service,
-            dataset_repo,
             dependency_graph_service,
+            dataset_ownership_service,
         }
     }
 
@@ -835,28 +834,31 @@ impl FlowServiceImpl {
             }
 
             DownstreamDependencyTriggerType::TriggerOwnUnconditionally => {
-                let root_dataset_handle = self
-                    .dataset_repo
-                    .resolve_dataset_ref(&fk_dataset.dataset_id.as_local_ref())
+                let dataset_owner_account_ids = self
+                    .dataset_ownership_service
+                    .get_dataset_owners(&fk_dataset.dataset_id)
                     .await
                     .int_err()?;
 
-                for dataset_id in dependent_dataset_ids {
-                    let dataset_handle = self
-                        .dataset_repo
-                        .resolve_dataset_ref(&dataset_id.as_local_ref())
-                        .await
-                        .int_err()?;
-                    if dataset_handle.alias.account_name == root_dataset_handle.alias.account_name {
-                        plans.push(DownstreamDependencyFlowPlan {
-                            flow_key: FlowKeyDataset::new(
-                                dataset_id.clone(),
-                                DatasetFlowType::HardCompacting,
-                            )
-                            .into(),
-                            flow_trigger_context: FlowTriggerContext::Unconditional,
-                            maybe_config_snapshot: maybe_config_snapshot.cloned(),
-                        });
+                for dependent_dataset_id in dependent_dataset_ids {
+                    for owner_account_id in &dataset_owner_account_ids {
+                        if self
+                            .dataset_ownership_service
+                            .is_dataset_owned_by(&dependent_dataset_id, owner_account_id)
+                            .await
+                            .int_err()?
+                        {
+                            plans.push(DownstreamDependencyFlowPlan {
+                                flow_key: FlowKeyDataset::new(
+                                    dependent_dataset_id.clone(),
+                                    DatasetFlowType::HardCompacting,
+                                )
+                                .into(),
+                                flow_trigger_context: FlowTriggerContext::Unconditional,
+                                maybe_config_snapshot: maybe_config_snapshot.cloned(),
+                            });
+                            break;
+                        }
                     }
                 }
             }
@@ -1020,32 +1022,28 @@ impl FlowService for FlowServiceImpl {
     /// Returns states of flows associated with a given account
     /// ordered by creation time from newest to oldest
     /// Applies specified filters
-    #[tracing::instrument(level = "debug", skip_all, fields(%account_name, ?filters, ?pagination))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%account_id, ?filters, ?pagination))]
     async fn list_all_flows_by_account(
         &self,
-        account_name: &AccountName,
+        account_id: &AccountID,
         filters: AccountFlowFilters,
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
-        let datasets_stream = self.dataset_repo.get_datasets_by_owner(account_name);
+        let owned_dataset_ids = self
+            .dataset_ownership_service
+            .get_owned_datasets(account_id)
+            .await
+            .map_err(ListFlowsByDatasetError::Internal)?;
 
-        let account_dataset_ids_list: Vec<_> =
-            if let Some(dataset_name_filter) = &filters.by_dataset_name {
-                datasets_stream
-                    .filter_map_ok(|dataset_handle| {
-                        if dataset_name_filter == &dataset_handle.alias.dataset_name {
-                            return Some(dataset_handle.id);
-                        }
-                        None
-                    })
-                    .try_collect()
-                    .await?
-            } else {
-                datasets_stream
-                    .map_ok(|dataset_handle| dataset_handle.id)
-                    .try_collect()
-                    .await?
-            };
+        let filtered_dataset_ids = if !filters.by_dataset_ids.is_empty() {
+            owned_dataset_ids
+                .into_iter()
+                .filter(|dataset_id| filters.by_dataset_ids.contains(dataset_id))
+                .collect()
+        } else {
+            owned_dataset_ids
+        };
+
         let mut total_count = 0;
         let dataset_flow_filters = DatasetFlowFilters {
             by_flow_status: filters.by_flow_status,
@@ -1053,7 +1051,7 @@ impl FlowService for FlowServiceImpl {
             by_initiator: filters.by_initiator,
         };
 
-        for dataset_id in &account_dataset_ids_list {
+        for dataset_id in &filtered_dataset_ids {
             total_count += self
                 .flow_event_store
                 .get_count_flows_by_dataset(dataset_id, &dataset_flow_filters)
@@ -1061,7 +1059,7 @@ impl FlowService for FlowServiceImpl {
                 .int_err()?;
         }
 
-        let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(account_dataset_ids_list);
+        let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(filtered_dataset_ids);
 
         let matched_stream = Box::pin(async_stream::try_stream! {
             let relevant_flow_ids: Vec<_> = self

@@ -47,6 +47,8 @@ serde_with = { version = "3", default-features = false }
 
 [dev-dependencies]
 kamu = { workspace = true }
+kamu-accounts-services = { workspace = true }
+kamu-accounts-inmem = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }

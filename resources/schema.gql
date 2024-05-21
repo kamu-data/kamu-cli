@@ -49,7 +49,7 @@ input AccountFlowFilters {
 	byFlowType: DatasetFlowType
 	byStatus: FlowStatus
 	byInitiator: InitiatorFilterInput
-	byDatasetName: DatasetName
+	byDatasetIds: [DatasetID!]!
 }
 
 type AccountFlowRuns {

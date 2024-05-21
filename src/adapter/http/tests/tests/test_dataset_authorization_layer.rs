@@ -12,7 +12,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 
-use dill::Component;
+use dill::{CatalogBuilder, Component};
 use event_bus::EventBus;
 use kamu::domain::auth::DatasetAction;
 use kamu::domain::{DatasetRepository, InternalError, ResultIntoInternal, SystemTimeSourceDefault};
@@ -209,21 +209,20 @@ impl ServerHarness {
         let datasets_dir = temp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let mut catalog_builder = dill::CatalogBuilder::new();
-        catalog_builder.add::<SystemTimeSourceDefault>();
-        catalog_builder.add::<EventBus>();
-        catalog_builder.add::<DependencyGraphServiceInMemory>();
-        catalog_builder
+        let mut base_catalog_builder = dill::CatalogBuilder::new();
+        base_catalog_builder.add::<SystemTimeSourceDefault>();
+        base_catalog_builder.add::<EventBus>();
+        base_catalog_builder.add::<DependencyGraphServiceInMemory>();
+        base_catalog_builder
             .add_value(MockAuthenticationService::resolving_token(
                 DUMMY_ACCESS_TOKEN,
                 Account::dummy(),
             ))
             .bind::<dyn AuthenticationService, MockAuthenticationService>();
-        catalog_builder
+        base_catalog_builder
             .add_value(dataset_action_authorizer)
             .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
-        catalog_builder.add_value(current_account_subject);
-        catalog_builder
+        base_catalog_builder
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_multi_tenant(false)
@@ -231,9 +230,13 @@ impl ServerHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 
-        let catalog = catalog_builder.build();
+        let base_catalog = base_catalog_builder.build();
 
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let catalog_system = CatalogBuilder::new_chained(&base_catalog)
+            .add_value(CurrentAccountSubject::new_test())
+            .build();
+
+        let dataset_repo = catalog_system.get_one::<dyn DatasetRepository>().unwrap();
         dataset_repo
             .create_dataset(
                 &Self::dataset_alias(),
@@ -242,6 +245,10 @@ impl ServerHarness {
             )
             .await
             .unwrap();
+
+        let catalog_test = CatalogBuilder::new_chained(&base_catalog)
+            .add_value(current_account_subject)
+            .build();
 
         let app = axum::Router::new()
             .route(
@@ -255,7 +262,7 @@ impl ServerHarness {
             .route("/bar", axum::routing::get(ServerHarness::bar_handler))
             .layer(
                 tower::ServiceBuilder::new()
-                    .layer(axum::Extension(catalog))
+                    .layer(axum::Extension(catalog_test))
                     .layer(axum::Extension(DatasetRef::from_str("mydataset").unwrap()))
                     .layer(kamu_adapter_http::DatasetAuthorizationLayer::new(
                         |request| {

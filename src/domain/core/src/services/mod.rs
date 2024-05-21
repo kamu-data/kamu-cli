@@ -12,6 +12,7 @@ pub use container_runtime::{NullPullImageListener, PullImageListener};
 
 pub mod compacting_service;
 pub mod dataset_changes_service;
+pub mod dataset_ownership_service;
 pub mod dependency_graph_repository;
 pub mod dependency_graph_service;
 pub mod engine_provisioner;
@@ -33,6 +34,7 @@ pub mod verification_service;
 
 pub use compacting_service::*;
 pub use dataset_changes_service::*;
+pub use dataset_ownership_service::*;
 pub use dependency_graph_repository::*;
 pub use dependency_graph_service::*;
 pub use engine_provisioner::*;

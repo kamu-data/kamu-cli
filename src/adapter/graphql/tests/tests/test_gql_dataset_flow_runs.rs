@@ -23,7 +23,11 @@ use kamu::testing::{
     MockPollingIngestService,
     MockTransformService,
 };
-use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu::{
+    DatasetOwnershipServiceInMemory,
+    DatasetRepositoryLocalFs,
+    DependencyGraphServiceInMemory,
+};
 use kamu_accounts::{
     CurrentAccountSubject,
     JwtAuthenticationConfig,
@@ -2489,6 +2493,7 @@ impl FlowRunsHarness {
             .add::<AuthenticationServiceImpl>()
             .add::<AccountRepositoryInMemory>()
             .add_value(JwtAuthenticationConfig::default())
+            .add::<DatasetOwnershipServiceInMemory>()
             .build();
 
         // Init dataset with no sources

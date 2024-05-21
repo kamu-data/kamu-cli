@@ -46,7 +46,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
             Duration::try_milliseconds(60).unwrap().into(),
         )
         .await;
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     // Remember start time
     let start_time = harness
@@ -172,7 +172,7 @@ async fn test_cron_config() {
             }),
         )
         .await;
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     // Remember start time
     let start_time = harness
@@ -268,7 +268,7 @@ async fn test_manual_trigger() {
             Duration::try_milliseconds(90).unwrap().into(),
         )
         .await;
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
     let bar_flow_key: FlowKey = FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest).into();
@@ -462,7 +462,7 @@ async fn test_manual_trigger_compacting() {
         })
         .await;
 
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     let foo_flow_key: FlowKey =
         FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
@@ -604,7 +604,7 @@ async fn test_manual_trigger_compacting_with_config() {
         })
         .await;
 
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
     harness
         .set_dataset_flow_compacting_rule(
             harness.now_datetime(),
@@ -731,7 +731,7 @@ async fn test_manual_trigger_keep_metadata_only_compacting() {
         )
         .await;
 
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     let foo_flow_key: FlowKey =
         FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
@@ -739,7 +739,8 @@ async fn test_manual_trigger_keep_metadata_only_compacting() {
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(foo_bar_id.clone(), "foo_bar".to_string());
-    test_flow_listener.define_dataset_display_name(foo_bar_baz_id.clone(), "foo_bar_baz".to_string());
+    test_flow_listener
+        .define_dataset_display_name(foo_bar_baz_id.clone(), "foo_bar_baz".to_string());
 
     // Remember start time
     let start_time = harness
@@ -760,18 +761,24 @@ async fn test_manual_trigger_keep_metadata_only_compacting() {
             });
             let trigger0_handle = trigger0_driver.run();
 
-            // Task 0: "foo" start running at 20ms, finish at 30ms
+            // Task 0: "foo" start running at 20ms, finish at 90ms
             let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::try_milliseconds(20).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::CompactingDatasetResult(TaskCompactingDatasetResult {
-                  compacting_result: CompactingResult::Success {
-                    old_head: Multihash::from_digest_sha3_256(b"old-slice"),
-                    new_head: Multihash::from_digest_sha3_256(b"new-slice"),
-                    old_num_blocks: 5,
-                    new_num_blocks: 4,
-                }})))),
+                finish_in_with: Some(
+                  (
+                    Duration::try_milliseconds(70).unwrap(),
+                    TaskOutcome::Success(TaskResult::CompactingDatasetResult(TaskCompactingDatasetResult {
+                      compacting_result: CompactingResult::Success {
+                        old_head: Multihash::from_digest_sha3_256(b"old-slice"),
+                        new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                        old_num_blocks: 5,
+                        new_num_blocks: 4,
+                      }
+                    }))
+                  )
+                ),
                 expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
                   dataset_id: foo_id.clone(),
                   max_slice_size: Some(max_slice_size),
@@ -785,10 +792,10 @@ async fn test_manual_trigger_keep_metadata_only_compacting() {
             let task1_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(1),
                 dataset_id: Some(foo_bar_id.clone()),
-                run_since_start: Duration::try_milliseconds(50).unwrap(),
+                run_since_start: Duration::try_milliseconds(110).unwrap(),
                 finish_in_with: Some(
                   (
-                    Duration::try_milliseconds(10).unwrap(), 
+                    Duration::try_milliseconds(70).unwrap(),
                     TaskOutcome::Success(TaskResult::CompactingDatasetResult(TaskCompactingDatasetResult {
                       compacting_result: CompactingResult::Success {
                         old_head: Multihash::from_digest_sha3_256(b"old-slice-2"),
@@ -812,10 +819,10 @@ async fn test_manual_trigger_keep_metadata_only_compacting() {
             let task2_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(2),
                 dataset_id: Some(foo_bar_baz_id.clone()),
-                run_since_start: Duration::try_milliseconds(90).unwrap(),
+                run_since_start: Duration::try_milliseconds(200).unwrap(),
                 finish_in_with: Some(
                   (
-                    Duration::try_milliseconds(10).unwrap(), 
+                    Duration::try_milliseconds(40).unwrap(),
                     TaskOutcome::Success(TaskResult::CompactingDatasetResult(TaskCompactingDatasetResult {
                       compacting_result: CompactingResult::Success {
                         old_head: Multihash::from_digest_sha3_256(b"old-slice-3"),
@@ -837,7 +844,7 @@ async fn test_manual_trigger_keep_metadata_only_compacting() {
 
             // Main simulation script
             let main_handle = async {
-                harness.advance_time(Duration::try_milliseconds(200).unwrap()).await;
+                harness.advance_time(Duration::try_milliseconds(300).unwrap()).await;
             };
 
             tokio::join!(trigger0_handle, task0_handle, task1_handle, task2_handle, main_handle)
@@ -859,25 +866,25 @@ async fn test_manual_trigger_keep_metadata_only_compacting() {
               "foo" HardCompacting:
                 Flow ID = 0 Running(task=0)
 
-            #3: +30ms:
+            #3: +90ms:
               "foo" HardCompacting:
                 Flow ID = 0 Finished Success
               "foo_bar" HardCompacting:
                 Flow ID = 1 Waiting Input(foo)
 
-            #4: +30ms:
+            #4: +90ms:
               "foo" HardCompacting:
                 Flow ID = 0 Finished Success
               "foo_bar" HardCompacting:
-                Flow ID = 1 Waiting Input(foo) Executor(task=1, since=30ms)
+                Flow ID = 1 Waiting Input(foo) Executor(task=1, since=90ms)
 
-            #5: +40ms:
+            #5: +110ms:
               "foo" HardCompacting:
                 Flow ID = 0 Finished Success
               "foo_bar" HardCompacting:
                 Flow ID = 1 Running(task=1)
 
-            #6: +50ms:
+            #6: +180ms:
               "foo" HardCompacting:
                 Flow ID = 0 Finished Success
               "foo_bar" HardCompacting:
@@ -885,15 +892,15 @@ async fn test_manual_trigger_keep_metadata_only_compacting() {
               "foo_bar_baz" HardCompacting:
                 Flow ID = 2 Waiting Input(foo_bar)
 
-            #7: +60ms:
+            #7: +180ms:
               "foo" HardCompacting:
                 Flow ID = 0 Finished Success
               "foo_bar" HardCompacting:
                 Flow ID = 1 Finished Success
               "foo_bar_baz" HardCompacting:
-                Flow ID = 2 Waiting Input(foo_bar) Executor(task=2, since=60ms)
+                Flow ID = 2 Waiting Input(foo_bar) Executor(task=2, since=180ms)
 
-            #8: +60ms:
+            #8: +200ms:
               "foo" HardCompacting:
                 Flow ID = 0 Finished Success
               "foo_bar" HardCompacting:
@@ -901,7 +908,7 @@ async fn test_manual_trigger_keep_metadata_only_compacting() {
               "foo_bar_baz" HardCompacting:
                 Flow ID = 2 Running(task=2)
 
-            #9: +70ms:
+            #9: +240ms:
               "foo" HardCompacting:
                 Flow ID = 0 Finished Success
               "foo_bar" HardCompacting:
@@ -925,6 +932,7 @@ async fn test_manual_trigger_keep_metadata_only_compacting_multiple_accounts() {
     let max_slice_records = 1000u64;
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         is_multi_tenant: true,
+        custom_account_names: vec![wasya_account_name.clone(), petya_account_name.clone()],
         ..Default::default()
     });
 
@@ -962,7 +970,7 @@ async fn test_manual_trigger_keep_metadata_only_compacting_multiple_accounts() {
         )
         .await;
 
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     let foo_flow_key: FlowKey =
         FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
@@ -1122,7 +1130,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
             Duration::try_milliseconds(80).unwrap().into(),
         )
         .await;
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1332,7 +1340,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -1542,7 +1550,7 @@ async fn test_dataset_deleted() {
             Duration::try_milliseconds(70).unwrap().into(),
         )
         .await;
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1729,7 +1737,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
     }
 
     // Enforce dependency graph initialization
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -1949,7 +1957,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -2170,7 +2178,7 @@ async fn test_throttling_manual_triggers() {
     let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
 
     // Enforce dependency graph initialization
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -2338,7 +2346,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -2794,7 +2802,7 @@ async fn test_batching_condition_records_reached() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -3107,7 +3115,7 @@ async fn test_batching_condition_timeout() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -3373,7 +3381,7 @@ async fn test_batching_condition_watermark() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -3703,7 +3711,7 @@ async fn test_batching_condition_with_2_inputs() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_dependencies_graph_init().await;
+    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();

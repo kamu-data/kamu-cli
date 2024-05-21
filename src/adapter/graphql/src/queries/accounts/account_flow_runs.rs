@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use futures::TryStreamExt;
 use kamu_accounts::{Account, AuthenticationService};
 use kamu_flow_system as fs;
@@ -43,7 +45,11 @@ impl AccountFlowRuns {
             Some(filters) => Some(kamu_flow_system::AccountFlowFilters {
                 by_flow_type: filters.by_flow_type.map(Into::into),
                 by_flow_status: filters.by_status.map(Into::into),
-                by_dataset_name: filters.by_dataset_name.map(Into::into),
+                by_dataset_ids: filters
+                    .by_dataset_ids
+                    .iter()
+                    .map(|dataset_id| dataset_id.clone().into())
+                    .collect::<HashSet<_>>(),
                 by_initiator: match filters.by_initiator {
                     Some(initiator_filter) => match initiator_filter {
                         InitiatorFilterInput::System(_) => {
@@ -72,7 +78,7 @@ impl AccountFlowRuns {
 
         let flows_state_listing = flow_service
             .list_all_flows_by_account(
-                &self.account.account_name,
+                &self.account.id,
                 match filters {
                     Some(filters) => filters,
                     None => Default::default(),
@@ -106,5 +112,5 @@ pub struct AccountFlowFilters {
     by_flow_type: Option<DatasetFlowType>,
     by_status: Option<FlowStatus>,
     by_initiator: Option<InitiatorFilterInput>,
-    by_dataset_name: Option<DatasetName>,
+    by_dataset_ids: Vec<DatasetID>,
 }

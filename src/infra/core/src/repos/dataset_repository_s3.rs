@@ -466,6 +466,12 @@ impl DatasetRepository for DatasetRepositoryS3 {
         self.event_bus
             .dispatch_event(events::DatasetEventCreated {
                 dataset_id: dataset_handle.id.clone(),
+                owner_account_id: match self.current_account_subject.as_ref() {
+                    CurrentAccountSubject::Anonymous(_) => {
+                        panic!("Anonymous account cannot create dataset");
+                    }
+                    CurrentAccountSubject::Logged(l) => l.account_id.clone(),
+                },
             })
             .await?;
 
