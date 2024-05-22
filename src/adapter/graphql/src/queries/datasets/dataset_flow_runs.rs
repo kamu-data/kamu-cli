@@ -124,13 +124,10 @@ impl DatasetFlowRuns {
 
         let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
 
-        let flow_initiator_ids: Vec<_> = flow_service
-            .list_all_flow_initiators_by_dataset(&self.dataset_handle.id)
+        let flow_initiator_ids = flow_service
+            .get_all_flow_initiators_by_dataset(&self.dataset_handle.id)
             .await
-            .int_err()?
-            .matched_stream
-            .try_collect()
-            .await?;
+            .int_err()?;
 
         let authentication_service = from_catalog::<dyn AuthenticationService>(ctx).unwrap();
 

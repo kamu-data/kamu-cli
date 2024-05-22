@@ -15,13 +15,11 @@ use kamu_task_system::{LogicalPlan, Probe, TaskScheduler, TaskState, TaskStatus}
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_creates_task() {
-    let event_store = Arc::new(TaskSystemEventStoreInMemory::new());
-    let time_source = Arc::new(SystemTimeSourceStub::new());
-    let task_sched = TaskSchedulerImpl::new(event_store, time_source);
+    let task_sched = create_task_scheduler();
 
     let logical_plan_expected: LogicalPlan = Probe { ..Probe::default() }.into();
 
@@ -43,9 +41,7 @@ async fn test_creates_task() {
 
 #[test_log::test(tokio::test)]
 async fn test_queues_tasks() {
-    let event_store = Arc::new(TaskSystemEventStoreInMemory::new());
-    let time_source = Arc::new(SystemTimeSourceStub::new());
-    let task_sched = TaskSchedulerImpl::new(event_store, time_source);
+    let task_sched = create_task_scheduler();
 
     let task_id_1 = task_sched
         .create_task(Probe { ..Probe::default() }.into())
@@ -66,9 +62,7 @@ async fn test_queues_tasks() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_cancellation() {
-    let event_store = Arc::new(TaskSystemEventStoreInMemory::new());
-    let time_source = Arc::new(SystemTimeSourceStub::new());
-    let task_sched = TaskSchedulerImpl::new(event_store, time_source);
+    let task_sched = create_task_scheduler();
 
     let task_id_1 = task_sched
         .create_task(Probe { ..Probe::default() }.into())
@@ -87,3 +81,14 @@ async fn test_task_cancellation() {
     assert_eq!(task_sched.try_take().await.unwrap(), Some(task_id_2));
     assert_eq!(task_sched.try_take().await.unwrap(), None);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+fn create_task_scheduler() -> impl TaskScheduler {
+    let event_store = Arc::new(TaskSystemEventStoreInMemory::new());
+    let time_source = Arc::new(SystemTimeSourceStub::new());
+
+    TaskSchedulerImpl::new(event_store, time_source)
+}
+
+////////////////////////////////////////////////////////////////////////////////

@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use async_graphql::value;
 use chrono::{DateTime, Duration, DurationRound, Utc};
+use database_common::FakeDatabasePlugin;
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
@@ -2557,40 +2558,47 @@ impl FlowRunsHarness {
         let transform_service_mock = overrides.transform_service_mock.unwrap_or_default();
         let polling_service_mock = overrides.polling_service_mock.unwrap_or_default();
 
-        let catalog_base = dill::CatalogBuilder::new()
-            .add::<EventBus>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(false),
-            )
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_value(dataset_changes_mock)
-            .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
-            .add::<SystemTimeSourceDefault>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceInMemory>()
-            .add_value(dependency_graph_mock)
-            .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
-            .add::<FlowConfigurationServiceImpl>()
-            .add::<FlowConfigurationEventStoreInMem>()
-            .add::<FlowServiceImpl>()
-            .add::<FlowEventStoreInMem>()
-            .add_value(FlowServiceRunConfig::new(
-                Duration::try_seconds(1).unwrap(),
-                Duration::try_minutes(1).unwrap(),
-            ))
-            .add::<TaskSchedulerImpl>()
-            .add::<TaskSystemEventStoreInMemory>()
-            .add_value(transform_service_mock)
-            .bind::<dyn TransformService, MockTransformService>()
-            .add_value(polling_service_mock)
-            .bind::<dyn PollingIngestService, MockPollingIngestService>()
-            .add::<AuthenticationServiceImpl>()
-            .add::<AccountRepositoryInMemory>()
-            .add_value(JwtAuthenticationConfig::default())
-            .add::<DatasetOwnershipServiceInMemory>()
-            .build();
+        let catalog_base = {
+            let mut builder = dill::CatalogBuilder::new();
+
+            builder
+                .add::<EventBus>()
+                .add_builder(
+                    DatasetRepositoryLocalFs::builder()
+                        .with_root(datasets_dir)
+                        .with_multi_tenant(false),
+                )
+                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .add_value(dataset_changes_mock)
+                .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
+                .add::<SystemTimeSourceDefault>()
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<DependencyGraphServiceInMemory>()
+                .add_value(dependency_graph_mock)
+                .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
+                .add::<FlowConfigurationServiceImpl>()
+                .add::<FlowConfigurationEventStoreInMem>()
+                .add::<FlowServiceImpl>()
+                .add::<FlowEventStoreInMem>()
+                .add_value(FlowServiceRunConfig::new(
+                    Duration::try_seconds(1).unwrap(),
+                    Duration::try_minutes(1).unwrap(),
+                ))
+                .add::<TaskSchedulerImpl>()
+                .add::<TaskSystemEventStoreInMemory>()
+                .add_value(transform_service_mock)
+                .bind::<dyn TransformService, MockTransformService>()
+                .add_value(polling_service_mock)
+                .bind::<dyn PollingIngestService, MockPollingIngestService>()
+                .add::<AuthenticationServiceImpl>()
+                .add::<AccountRepositoryInMemory>()
+                .add_value(JwtAuthenticationConfig::default())
+                .add::<DatasetOwnershipServiceInMemory>();
+
+            FakeDatabasePlugin::init_database_components(&mut builder);
+
+            builder.build()
+        };
 
         // Init dataset with no sources
         let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base);

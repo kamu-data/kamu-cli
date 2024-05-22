@@ -53,10 +53,10 @@ pub trait FlowService: Sync + Send {
     /// Returns initiators of flows associated with a given dataset
     /// ordered by creation time from newest to oldest.
     /// Applies specified filters/pagination
-    async fn list_all_flow_initiators_by_dataset(
+    async fn get_all_flow_initiators_by_dataset(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<FlowInitiatorListing, ListFlowsByDatasetError>;
+    ) -> Result<Vec<AccountID>, ListFlowsByDatasetError>;
 
     /// Returns datasets with flows associated with a given account
     /// ordered by creation time from newest to oldest.
@@ -111,15 +111,6 @@ pub struct FlowStateListing<'a> {
 
 pub type FlowStateStream<'a> =
     std::pin::Pin<Box<dyn Stream<Item = Result<FlowState, InternalError>> + Send + 'a>>;
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct FlowInitiatorListing<'a> {
-    pub matched_stream: InitiatorssStream<'a>,
-}
-
-pub type InitiatorssStream<'a> =
-    std::pin::Pin<Box<dyn Stream<Item = Result<AccountID, InternalError>> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

@@ -52,11 +52,9 @@ impl TaskSchedulerImpl {
 impl TaskScheduler for TaskSchedulerImpl {
     #[tracing::instrument(level = "info", skip_all, fields(?logical_plan))]
     async fn create_task(&self, logical_plan: LogicalPlan) -> Result<TaskState, CreateTaskError> {
-        let mut task = Task::new(
-            self.time_source.now(),
-            self.event_store.new_task_id().await?,
-            logical_plan,
-        );
+        let new_task_id = self.event_store.new_task_id().await?;
+        let mut task = Task::new(self.time_source.now(), new_task_id, logical_plan);
+
         task.save(self.event_store.as_ref()).await.int_err()?;
 
         let queue_len = {
@@ -77,6 +75,7 @@ impl TaskScheduler for TaskSchedulerImpl {
     #[tracing::instrument(level = "info", skip_all, fields(%task_id))]
     async fn get_task(&self, task_id: TaskID) -> Result<TaskState, GetTaskError> {
         let task = Task::load(task_id, self.event_store.as_ref()).await?;
+
         Ok(task.into())
     }
 
@@ -106,21 +105,22 @@ impl TaskScheduler for TaskSchedulerImpl {
             .get_count_tasks_by_dataset(dataset_id)
             .await?;
 
-        let dataset_id = dataset_id.clone();
-
         use futures::TryStreamExt;
+
+        let dataset_id = dataset_id.clone();
         let stream = Box::pin(async_stream::stream! {
-            let relevant_task_ids: Vec<_> = self
+            let relevant_task_ids  = self
                 .event_store
                 .get_tasks_by_dataset(&dataset_id, pagination)
                 .await
-                .try_collect()
+                .try_collect::<Vec<_>>()
                 .await
                 .int_err()?;
 
             // TODO: implement batch loading
             for task_id in relevant_task_ids {
                 let task = Task::load(task_id, self.event_store.as_ref()).await.int_err()?;
+
                 yield Ok(task.into());
             }
         });
@@ -156,6 +156,7 @@ impl TaskScheduler for TaskSchedulerImpl {
         let mut task = Task::load(task_id, self.event_store.as_ref())
             .await
             .int_err()?;
+
         task.run(self.time_source.now()).int_err()?;
         task.save(self.event_store.as_ref()).await.int_err()?;
 

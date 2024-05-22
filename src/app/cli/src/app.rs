@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
-use database_common::{DatabaseConfiguration, DatabaseProvider};
+use database_common::{DatabaseConfiguration, DatabaseProvider, DatabaseTransactionRunner};
 use dill::*;
 use kamu::domain::*;
 use kamu::*;
@@ -136,20 +136,28 @@ pub async fn run(
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
-    let result = match cli_commands::get_command(&base_catalog, &cli_catalog, &matches) {
-        Ok(mut command) => {
-            if command.needs_workspace() && !workspace_svc.is_in_workspace() {
-                Err(CLIError::usage_error_from(NotInWorkspace))
-            } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
-                Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-            } else if current_account.is_explicit() && !is_multi_tenant_workspace {
-                Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
-            } else {
-                command.run().await
+    // Wrap command execution in a transaction
+    let result = DatabaseTransactionRunner::run_transactional(
+        &cli_catalog,
+        |cli_catalog_with_transaction| async move {
+            match cli_commands::get_command(&base_catalog, &cli_catalog_with_transaction, &matches)
+            {
+                Ok(mut command) => {
+                    if command.needs_workspace() && !workspace_svc.is_in_workspace() {
+                        Err(CLIError::usage_error_from(NotInWorkspace))
+                    } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
+                        Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
+                    } else if current_account.is_explicit() && !is_multi_tenant_workspace {
+                        Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
+                    } else {
+                        command.run().await
+                    }
+                }
+                Err(e) => Err(e),
             }
-        }
-        Err(e) => Err(e),
-    };
+        },
+    )
+    .await;
 
     match &result {
         Ok(()) => {
@@ -343,6 +351,9 @@ fn configure_database_components(
     catalog_builder: &mut CatalogBuilder,
     db_configuration: &DatabaseConfiguration,
 ) -> Result<(), InternalError> {
+    // TODO: Remove after adding implementation of FlowEventStore for databases
+    catalog_builder.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
+
     match db_configuration.provider {
         DatabaseProvider::Postgres => {
             database_common::PostgresPlugin::init_database_components(
@@ -352,7 +363,7 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_postgres::PostgresAccountRepository>();
-            catalog_builder.add::<kamu_flow_system_postgres::FlowSystemEventStorePostgres>();
+            catalog_builder.add::<kamu_flow_system_postgres::FlowConfigurationEventStorePostgres>();
             catalog_builder.add::<kamu_task_system_postgres::TaskSystemEventStorePostgres>();
 
             Ok(())

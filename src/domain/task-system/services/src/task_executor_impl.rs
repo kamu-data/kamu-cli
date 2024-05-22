@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use database_common::DatabaseTransactionRunner;
 use dill::*;
 use event_bus::EventBus;
 use kamu_core::{
@@ -21,32 +22,26 @@ use kamu_core::{
 };
 use kamu_task_system::*;
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 pub struct TaskExecutorImpl {
-    task_sched: Arc<dyn TaskScheduler>,
-    event_store: Arc<dyn TaskSystemEventStore>,
     event_bus: Arc<EventBus>,
     time_source: Arc<dyn SystemTimeSource>,
     catalog: Catalog,
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn TaskExecutor)]
 #[scope(Singleton)]
 impl TaskExecutorImpl {
     pub fn new(
-        task_sched: Arc<dyn TaskScheduler>,
-        event_store: Arc<dyn TaskSystemEventStore>,
         event_bus: Arc<EventBus>,
         time_source: Arc<dyn SystemTimeSource>,
         catalog: Catalog,
     ) -> Self {
         Self {
-            task_sched,
-            event_store,
             event_bus,
             time_source,
             catalog,
@@ -77,20 +72,32 @@ impl TaskExecutorImpl {
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl TaskExecutor for TaskExecutorImpl {
     // TODO: Error and panic handling strategy
     async fn run(&self) -> Result<(), InternalError> {
         loop {
-            let task_id = self.task_sched.take().await.int_err()?;
-            let mut task = Task::load(task_id, self.event_store.as_ref())
-                .await
-                .int_err()?;
+            let mut task = DatabaseTransactionRunner::run_transactional(
+                &self.catalog,
+                |catalog_with_transaction| async move {
+                    let task_scheduler = catalog_with_transaction
+                        .get_one::<dyn TaskScheduler>()
+                        .int_err()?;
+                    let event_store = catalog_with_transaction
+                        .get_one::<dyn TaskSystemEventStore>()
+                        .int_err()?;
+
+                    let task_id = task_scheduler.take().await.int_err()?;
+
+                    Task::load(task_id, event_store.as_ref()).await.int_err()
+                },
+            )
+            .await?;
 
             tracing::info!(
-                %task_id,
+                %task.task_id,
                 logical_plan = ?task.logical_plan,
                 "Executing task",
             );
@@ -155,7 +162,7 @@ impl TaskExecutor for TaskExecutorImpl {
                         }
                         Err(err) => {
                             tracing::info!(
-                                %task_id,
+                                %task.task_id,
                                 logical_plan = ?task.logical_plan,
                                 err = ?err,
                                 "Task failed",
@@ -167,21 +174,30 @@ impl TaskExecutor for TaskExecutorImpl {
             };
 
             tracing::info!(
-                %task_id,
+                %task.task_id,
                 logical_plan = ?task.logical_plan,
                 ?outcome,
                 "Task finished",
             );
 
-            // Refresh the task in case it was updated concurrently (e.g. late cancellation)
-            task.update(self.event_store.as_ref()).await.int_err()?;
-            task.finish(self.time_source.now(), outcome.clone())
-                .int_err()?;
-            task.save(self.event_store.as_ref()).await.int_err()?;
+            let cloned_outcome = outcome.clone();
+            let saved_task_id = DatabaseTransactionRunner::run_transactional_with(
+                &self.catalog,
+                |event_store: Arc<dyn TaskSystemEventStore>| async move {
+                    // Refresh the task in case it was updated concurrently (e.g. late cancellation)
+                    task.update(event_store.as_ref()).await.int_err()?;
+                    task.finish(self.time_source.now(), cloned_outcome)
+                        .int_err()?;
+                    task.save(event_store.as_ref()).await.int_err()?;
 
-            self.publish_task_finished(task.task_id, outcome).await?;
+                    Ok(task.task_id)
+                },
+            )
+            .await?;
+
+            self.publish_task_finished(saved_task_id, outcome).await?;
         }
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
