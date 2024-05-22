@@ -34,13 +34,13 @@ pub trait DatabaseTransactionManager: Send + Sync {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn run_transactional<H, HFut>(
+pub async fn run_transactional<H, HFut, HFutResultT>(
     base_catalog: &Catalog,
     callback: H,
-) -> Result<(), InternalError>
+) -> Result<HFutResultT, InternalError>
 where
     H: FnOnce(Catalog) -> HFut + Send + Sync + 'static,
-    HFut: std::future::Future<Output = Result<(), InternalError>> + Send + 'static,
+    HFut: std::future::Future<Output = Result<HFutResultT, InternalError>> + Send + 'static,
 {
     // Extract transaction manager, specific for the database
     let db_transaction_manager = base_catalog
@@ -62,11 +62,11 @@ where
     // Commit or rollback transaction depending on the result
     match result {
         // In case everything succeeded, commit the transaction
-        Ok(_) => {
+        Ok(res) => {
             db_transaction_manager
                 .commit_transaction(transaction_ref)
                 .await?;
-            Ok(())
+            Ok(res)
         }
 
         // Otherwise, do an explicit rollback
