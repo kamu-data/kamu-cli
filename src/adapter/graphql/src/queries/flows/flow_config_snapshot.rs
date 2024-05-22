@@ -17,12 +17,17 @@ use crate::prelude::*;
 pub enum FlowConfigurationSnapshot {
     Batching(FlowConfigurationBatching),
     Schedule(FlowConfigurationScheduleRule),
-    Compacting(FlowConfigurationCompacting),
+    Compacting(FlowConfigurationCompactingRule),
 }
 
 #[derive(SimpleObject)]
 pub struct FlowConfigurationScheduleRule {
     schedule_rule: FlowConfigurationSchedule,
+}
+
+#[derive(SimpleObject)]
+pub struct FlowConfigurationCompactingRule {
+    compacting_rule: FlowConfigurationCompacting,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -46,7 +51,18 @@ impl From<fs::FlowConfigurationSnapshot> for FlowConfigurationSnapshot {
                 })
             }
             fs::FlowConfigurationSnapshot::Compacting(compacting_rule) => {
-                Self::Compacting(compacting_rule.into())
+                Self::Compacting(FlowConfigurationCompactingRule {
+                    compacting_rule: match compacting_rule {
+                        fs::CompactingRule::Full(compacting_full_rule) => {
+                            FlowConfigurationCompacting::Full(compacting_full_rule.into())
+                        }
+                        fs::CompactingRule::MetadataOnly(compacting_metadata_only_rule) => {
+                            FlowConfigurationCompacting::MetadataOnly(
+                                compacting_metadata_only_rule.into(),
+                            )
+                        }
+                    },
+                })
             }
         }
     }

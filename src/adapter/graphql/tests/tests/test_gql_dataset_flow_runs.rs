@@ -2326,7 +2326,6 @@ async fn test_config_snapshot_returned_correctly() {
     let mutation_code = FlowRunsHarness::trigger_flow_with_compaction_config_mutation(
         &create_result.dataset_handle.id,
         "HARD_COMPACTING",
-        false,
         10000,
         1_000_000,
     );
@@ -2410,10 +2409,11 @@ async fn test_config_snapshot_returned_correctly() {
                                         },
                                         "startCondition": null,
                                         "configSnapshot": {
-                                            "__typename": "FlowConfigurationCompacting",
-                                            "maxSliceRecords": 10000,
-                                            "maxSliceSize": 1_000_000,
-                                            "keepMetadataOnly": false
+                                            "__typename": "FlowConfigurationCompactingRule",
+                                            "compactingRule": {
+                                                "maxSliceRecords": 10000,
+                                                "maxSliceSize": 1_000_000,
+                                            }
                                         },
                                     }
                                 ],
@@ -2803,10 +2803,16 @@ impl FlowRunsHarness {
                                                 }
                                                 __typename
                                             }
-                                            ... on FlowConfigurationCompacting {
-                                                maxSliceRecords
-                                                maxSliceSize
-                                                keepMetadataOnly
+                                            ... on FlowConfigurationCompactingRule {
+                                                compactingRule {
+                                                    ... on CompactingFull {
+                                                        maxSliceRecords
+                                                        maxSliceSize
+                                                    }
+                                                    ... on CompactingMetadataOnly {
+                                                        recursive
+                                                    }
+                                                }
                                                 __typename
                                             }
                                         }
@@ -2938,7 +2944,6 @@ impl FlowRunsHarness {
     fn trigger_flow_with_compaction_config_mutation(
         id: &DatasetID,
         dataset_flow_type: &str,
-        keep_metadata_only: bool,
         max_slice_records: u64,
         max_slice_size: u64,
     ) -> String {
@@ -2953,9 +2958,10 @@ impl FlowRunsHarness {
                                     datasetFlowType: "<dataset_flow_type>",
                                     flowRunConfiguration: {
                                         compacting: {
-                                            keepMetadataOnly: <keep_metadata_only>,
-                                            maxSliceRecords: <max_slice_records>,
-                                            maxSliceSize: <max_slice_size>
+                                            full: {
+                                                maxSliceRecords: <max_slice_records>,
+                                                maxSliceSize: <max_slice_size>
+                                            }
                                         }
                                     }
                                 ) {
@@ -2999,10 +3005,6 @@ impl FlowRunsHarness {
         )
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
-        .replace(
-            "<keep_metadata_only>",
-            if keep_metadata_only { "true" } else { "false" },
-        )
         .replace("<max_slice_records>", &max_slice_records.to_string())
         .replace("<max_slice_size>", &max_slice_size.to_string())
     }

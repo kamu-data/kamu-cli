@@ -189,10 +189,27 @@ type CommitResultSuccess implements CommitResult & UpdateReadmeResult {
 	message: String!
 }
 
-input CompactingConditionInput {
+input CompactingConditionFull {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
-	keepMetadataOnly: Boolean!
+}
+
+input CompactingConditionInput @oneOf {
+	full: CompactingConditionFull
+	metadataOnly: CompactingConditionMetadataOnly
+}
+
+input CompactingConditionMetadataOnly {
+	recursive: Boolean!
+}
+
+type CompactingFull {
+	maxSliceSize: Int!
+	maxSliceRecords: Int!
+}
+
+type CompactingMetadataOnly {
+	recursive: Boolean!
 }
 
 enum CompressionFormat {
@@ -796,10 +813,10 @@ type FlowConfigurationBatching {
 	maxBatchingInterval: TimeDelta!
 }
 
-type FlowConfigurationCompacting {
-	maxSliceSize: Int!
-	maxSliceRecords: Int!
-	keepMetadataOnly: Boolean!
+union FlowConfigurationCompacting = CompactingFull | CompactingMetadataOnly
+
+type FlowConfigurationCompactingRule {
+	compactingRule: FlowConfigurationCompacting!
 }
 
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
@@ -808,7 +825,7 @@ type FlowConfigurationScheduleRule {
 	scheduleRule: FlowConfigurationSchedule!
 }
 
-union FlowConfigurationSnapshot = FlowConfigurationBatching | FlowConfigurationScheduleRule | FlowConfigurationCompacting
+union FlowConfigurationSnapshot = FlowConfigurationBatching | FlowConfigurationScheduleRule | FlowConfigurationCompactingRule
 
 type FlowConnection {
 	"""

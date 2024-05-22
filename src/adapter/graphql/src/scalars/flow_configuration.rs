@@ -10,6 +10,8 @@
 use kamu_flow_system::{
     BatchingRule,
     CompactingRule,
+    CompactingRuleFull,
+    CompactingRuleMetadataOnly,
     FlowConfigurationRule,
     FlowConfigurationSnapshot,
     Schedule,
@@ -51,8 +53,16 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
             } else {
                 None
             },
-            compacting: if let FlowConfigurationRule::CompactingRule(args) = value.rule {
-                Some(args.into())
+            compacting: if let FlowConfigurationRule::CompactingRule(compacting_args) = &value.rule
+            {
+                match compacting_args {
+                    CompactingRule::Full(compacting_rule) => {
+                        Some(FlowConfigurationCompacting::Full((*compacting_rule).into()))
+                    }
+                    CompactingRule::MetadataOnly(compacting_rule) => Some(
+                        FlowConfigurationCompacting::MetadataOnly((*compacting_rule).into()),
+                    ),
+                }
             } else {
                 None
             },
@@ -81,19 +91,36 @@ impl From<BatchingRule> for FlowConfigurationBatching {
     }
 }
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowConfigurationCompacting {
-    pub max_slice_size: u64,
-    pub max_slice_records: u64,
-    pub keep_metadata_only: bool,
+#[derive(Union, Clone, PartialEq, Eq)]
+pub enum FlowConfigurationCompacting {
+    Full(CompactingFull),
+    MetadataOnly(CompactingMetadataOnly),
 }
 
-impl From<CompactingRule> for FlowConfigurationCompacting {
-    fn from(value: CompactingRule) -> Self {
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct CompactingFull {
+    pub max_slice_size: u64,
+    pub max_slice_records: u64,
+}
+
+impl From<CompactingRuleFull> for CompactingFull {
+    fn from(value: CompactingRuleFull) -> Self {
         Self {
-            max_slice_size: value.max_slice_size(),
             max_slice_records: value.max_slice_records(),
-            keep_metadata_only: value.keep_metadata_only(),
+            max_slice_size: value.max_slice_size(),
+        }
+    }
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct CompactingMetadataOnly {
+    pub recursive: bool,
+}
+
+impl From<CompactingRuleMetadataOnly> for CompactingMetadataOnly {
+    fn from(value: CompactingRuleMetadataOnly) -> Self {
+        Self {
+            recursive: value.recursive,
         }
     }
 }
@@ -227,11 +254,21 @@ pub struct BatchingConditionInput {
     pub max_batching_interval: TimeDeltaInput,
 }
 
-#[derive(InputObject)]
-pub struct CompactingConditionInput {
+#[derive(OneofObject)]
+pub enum CompactingConditionInput {
+    Full(CompactingConditionFull),
+    MetadataOnly(CompactingConditionMetadataOnly),
+}
+
+#[derive(InputObject, Clone)]
+pub struct CompactingConditionFull {
     pub max_slice_size: u64,
     pub max_slice_records: u64,
-    pub keep_metadata_only: bool,
+}
+
+#[derive(InputObject)]
+pub struct CompactingConditionMetadataOnly {
+    pub recursive: bool,
 }
 
 impl FlowRunConfiguration {
@@ -264,16 +301,22 @@ impl FlowRunConfiguration {
                             .to_string(),
                     });
                 };
-                FlowConfigurationSnapshot::Compacting(
-                    CompactingRule::new_checked(
-                        compacting_input.max_slice_size,
-                        compacting_input.max_slice_records,
-                        compacting_input.keep_metadata_only,
-                    )
-                    .map_err(|_| FlowInvalidRunConfigurations {
-                        error: "Invalid compacting flow run configuration".to_string(),
-                    })?,
-                )
+                FlowConfigurationSnapshot::Compacting(match compacting_input {
+                    CompactingConditionInput::Full(compacting_input) => CompactingRule::Full(
+                        CompactingRuleFull::new_checked(
+                            compacting_input.max_slice_size,
+                            compacting_input.max_slice_records,
+                        )
+                        .map_err(|_| FlowInvalidRunConfigurations {
+                            error: "Invalid compacting flow run configuration".to_string(),
+                        })?,
+                    ),
+                    CompactingConditionInput::MetadataOnly(compacting_input) => {
+                        CompactingRule::MetadataOnly(CompactingRuleMetadataOnly {
+                            recursive: compacting_input.recursive,
+                        })
+                    }
+                })
             }
             Self::Schedule(schedule_input) => {
                 if dataset_flow_type != DatasetFlowType::Ingest {
