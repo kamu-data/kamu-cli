@@ -29,7 +29,7 @@ use kamu::{
     DatasetRepositoryLocalFs,
     DependencyGraphServiceInMemory,
 };
-use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME};
+use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::AuthenticationServiceImpl;
 use kamu_core::*;
@@ -115,6 +115,105 @@ async fn test_list_account_flows() {
                                 "pageInfo": {
                                     "hasPreviousPage": false,
                                     "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_list_flow_initiators() {
+    let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
+    let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
+        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
+        mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
+        ..Default::default()
+    });
+    let foo_dataset_name = DatasetName::new_unchecked("foo");
+    let foo_dataset_alias =
+        DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
+
+    let create_result = harness.create_root_dataset(foo_dataset_alias).await;
+
+    let ingest_mutation_code =
+        FlowConfigHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+    let compacting_mutation_code = FlowConfigHarness::trigger_flow_mutation(
+        &create_result.dataset_handle.id,
+        "HARD_COMPACTING",
+    );
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(ingest_mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(response.is_ok(), "{response:?}");
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(compacting_mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(response.is_ok(), "{response:?}");
+
+    // Pure initiator listing
+    let request_code = indoc!(
+        r#"
+        {
+            accounts {
+                byName (name: "<account_name>") {
+                    flows {
+                        runs {
+                            listFlowInitiators {
+                                nodes {
+                                    accountName
+                                }
+                                pageInfo {
+                                    currentPage
+                                    totalPages
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("<account_name>", DEFAULT_ACCOUNT_NAME_STR);
+
+    let response = schema
+        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "accounts": {
+                "byName": {
+                    "flows": {
+                        "runs": {
+                            "listFlowInitiators": {
+                                "nodes": [
+                                    {
+                                        "accountName": "kamu",
+                                    },
+                                ],
+                                "pageInfo": {
                                     "currentPage": 0,
                                     "totalPages": 1,
                                 }

@@ -14,7 +14,7 @@ use {kamu_flow_system as fs, opendatafabric as odf};
 
 use crate::mutations::{check_if_flow_belongs_to_dataset, FlowInDatasetError, FlowNotFound};
 use crate::prelude::*;
-use crate::queries::Flow;
+use crate::queries::{Account, Flow};
 use crate::utils;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -117,11 +117,52 @@ impl DatasetFlowRuns {
             total_count,
         ))
     }
+
+    async fn list_flow_initiators(
+        &self,
+        ctx: &Context<'_>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<AccountConnection> {
+        utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
+
+        let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+
+        let flow_initiators_listing = flow_service
+            .list_all_flow_initiators_by_dataset(
+                &self.dataset_handle.id,
+                fs::FlowPaginationOpts {
+                    offset: page * per_page,
+                    limit: per_page,
+                },
+            )
+            .await
+            .int_err()?;
+
+        let matched_flow_initiators: Vec<_> = futures::future::try_join_all(
+            flow_initiators_listing
+                .initiator_ids
+                .iter()
+                .map(|initiator_id| Account::from_account_id(ctx, initiator_id.clone())),
+        )
+        .await?;
+        let total_count = flow_initiators_listing.total_count;
+
+        Ok(AccountConnection::new(
+            matched_flow_initiators,
+            page,
+            per_page,
+            total_count,
+        ))
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 page_based_connection!(Flow, FlowConnection, FlowEdge);
+page_based_connection!(Account, AccountConnection, AccountEdge);
 
 ///////////////////////////////////////////////////////////////////////////////
 

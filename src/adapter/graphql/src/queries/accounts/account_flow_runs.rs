@@ -10,14 +10,14 @@
 use std::collections::HashSet;
 
 use futures::TryStreamExt;
-use kamu_accounts::Account;
+use kamu_accounts::Account as AccountEntity;
 use kamu_flow_system as fs;
 
 use crate::prelude::*;
-use crate::queries::{Flow, FlowConnection, InitiatorFilterInput};
+use crate::queries::{Account, AccountConnection, Flow, FlowConnection, InitiatorFilterInput};
 
 pub struct AccountFlowRuns {
-    account: Account,
+    account: AccountEntity,
 }
 
 #[Object]
@@ -25,7 +25,7 @@ impl AccountFlowRuns {
     const DEFAULT_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
-    pub fn new(account: Account) -> Self {
+    pub fn new(account: AccountEntity) -> Self {
         Self { account }
     }
 
@@ -91,6 +91,45 @@ impl AccountFlowRuns {
 
         Ok(FlowConnection::new(
             matched_flows,
+            page,
+            per_page,
+            total_count,
+        ))
+    }
+
+    async fn list_flow_initiators(
+        &self,
+        ctx: &Context<'_>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<AccountConnection> {
+        let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+
+        let flow_initiators_listing = flow_service
+            .list_all_flow_initiators_by_account(
+                &self.account.id,
+                fs::FlowPaginationOpts {
+                    offset: page * per_page,
+                    limit: per_page,
+                },
+            )
+            .await
+            .int_err()?;
+
+        let matched_flow_initiators: Vec<_> = futures::future::try_join_all(
+            flow_initiators_listing
+                .initiator_ids
+                .iter()
+                .map(|initiator_id| Account::from_account_id(ctx, initiator_id.clone())),
+        )
+        .await?;
+
+        let total_count = flow_initiators_listing.total_count;
+
+        Ok(AccountConnection::new(
+            matched_flow_initiators,
             page,
             per_page,
             total_count,

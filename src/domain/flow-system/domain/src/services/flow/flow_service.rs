@@ -50,9 +50,27 @@ pub trait FlowService: Sync + Send {
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
 
-    /// Returns states of flows associated with a given account
+    /// Returns initiators of flows associated with a given dataset
     /// ordered by creation time from newest to oldest.
     /// Applies specified filters/pagination
+    async fn list_all_flow_initiators_by_dataset(
+        &self,
+        dataset_id: &DatasetID,
+        pagination: FlowPaginationOpts,
+    ) -> Result<FlowInitiatorListing, ListFlowsByDatasetError>;
+
+    /// Returns initiators of flows associated with a given account
+    /// ordered by creation time from newest to oldest.
+    /// Applies specified pagination
+    async fn list_all_flow_initiators_by_account(
+        &self,
+        account_id: &AccountID,
+        pagination: FlowPaginationOpts,
+    ) -> Result<FlowInitiatorListing, ListFlowsByDatasetError>;
+
+    /// Returns states of flows associated with a given account
+    /// ordered by creation time from newest to oldest.
+    /// Applies specified pagination
     async fn list_all_flows_by_account(
         &self,
         account_id: &AccountID,
@@ -95,6 +113,13 @@ pub struct FlowStateListing<'a> {
 
 pub type FlowStateStream<'a> =
     std::pin::Pin<Box<dyn Stream<Item = Result<FlowState, InternalError>> + Send + 'a>>;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct FlowInitiatorListing {
+    pub initiator_ids: Vec<AccountID>,
+    pub total_count: usize,
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
