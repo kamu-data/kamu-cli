@@ -871,7 +871,7 @@ impl FlowServiceImpl {
                 }
             }
 
-            _ => {}
+            DownstreamDependencyTriggerType::Empty => {}
         }
 
         Ok(plans)
