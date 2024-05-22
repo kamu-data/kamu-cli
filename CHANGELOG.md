@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Added support of `--all` flag to the `kamu delete` command
 - Made recursive deletion dataset with provided `%` pattern
+### Changed
+- `HardCompacting` configuration now is one of `Full` or `KeepMetadataOnly` variants. In case of 
+  `KeepMetadataOnly` variant required to provide `recursive` value which will trigger downstream
+  dependecnies compacting
 
 ## [0.182.0] - 2024-05-20
 ### Added

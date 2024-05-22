@@ -602,8 +602,13 @@ async fn test_crud_compacting_root_dataset() {
                                 }
                                 compacting {
                                     __typename
-                                    maxSliceSize
-                                    maxSliceRecords
+                                    ... on CompactingFull {
+                                        maxSliceSize
+                                        maxSliceRecords
+                                    }
+                                    ... on CompactingMetadataOnly {
+                                        recursive
+                                    }
                                 }
                             }
                         }
@@ -639,12 +644,11 @@ async fn test_crud_compacting_root_dataset() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_config_compacting_mutation(
+    let mutation_code = FlowConfigHarness::set_config_compacting_full_mutation(
         &create_result.dataset_handle.id,
         "HARD_COMPACTING",
         1_000_000,
         10000,
-        false,
     );
 
     let res = schema
@@ -671,7 +675,7 @@ async fn test_crud_compacting_root_dataset() {
                                     "schedule": null,
                                     "batching": null,
                                     "compacting": {
-                                        "__typename": "FlowConfigurationCompacting",
+                                        "__typename": "CompactingFull",
                                         "maxSliceSize": 1_000_000,
                                         "maxSliceRecords": 10000
                                     }
@@ -774,12 +778,11 @@ async fn test_compacting_config_validation() {
             "Maximum slice records must be a positive number",
         ),
     ] {
-        let mutation_code = FlowConfigHarness::set_config_compacting_mutation(
+        let mutation_code = FlowConfigHarness::set_config_compacting_full_mutation(
             &create_derived_result.dataset_handle.id,
             "HARD_COMPACTING",
             test_case.0,
             test_case.1,
-            false,
         );
 
         let response = schema
@@ -1303,12 +1306,11 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     ////
 
-    let mutation_code = FlowConfigHarness::set_config_compacting_mutation(
+    let mutation_code = FlowConfigHarness::set_config_compacting_full_mutation(
         &create_derived_result.dataset_handle.id,
         "HARD_COMPACTING",
         1000,
         1000,
-        false,
     );
 
     let res = schema
@@ -1754,12 +1756,11 @@ impl FlowConfigHarness {
         .replace("<minRecordsToAwait>", &min_records_to_await.to_string())
     }
 
-    fn set_config_compacting_mutation(
+    fn set_config_compacting_full_mutation(
         id: &DatasetID,
         dataset_flow_type: &str,
         max_slice_size: u64,
         max_slice_records: u64,
-        keep_metadata_only: bool,
     ) -> String {
         indoc!(
             r#"
@@ -1771,9 +1772,10 @@ impl FlowConfigHarness {
                                 setConfigCompacting (
                                     datasetFlowType: "<dataset_flow_type>",
                                     compactingArgs: {
-                                        maxSliceSize: <max_slice_size>,
-                                        maxSliceRecords: <max_slice_records>,
-                                        keepMetadataOnly: <keep_metadata_only>
+                                        full: {
+                                            maxSliceSize: <max_slice_size>,
+                                            maxSliceRecords: <max_slice_records>,
+                                        }
                                     }
                                 ) {
                                     __typename,
@@ -1793,8 +1795,13 @@ impl FlowConfigHarness {
                                                 }
                                                 compacting {
                                                     __typename
-                                                    maxSliceSize
-                                                    maxSliceRecords
+                                                    ... on CompactingFull {
+                                                        maxSliceSize
+                                                        maxSliceRecords
+                                                    }
+                                                    ... on CompactingMetadataOnly {
+                                                        recursive
+                                                    }
                                                 }
                                             }
                                         }
@@ -1811,10 +1818,6 @@ impl FlowConfigHarness {
         .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<max_slice_records>", &max_slice_records.to_string())
         .replace("<max_slice_size>", &max_slice_size.to_string())
-        .replace(
-            "<keep_metadata_only>",
-            if keep_metadata_only { "true" } else { "false" },
-        )
     }
 
     fn quick_flow_config_query(id: &DatasetID, dataset_flow_type: &str) -> String {

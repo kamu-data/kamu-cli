@@ -754,9 +754,10 @@ impl FlowServiceImpl {
                     if let Some(config_rule) = config_snapshot
                         && let FlowConfigurationSnapshot::Compacting(compacting_rule) = config_rule
                     {
-                        max_slice_size = Some(compacting_rule.max_slice_size());
-                        max_slice_records = Some(compacting_rule.max_slice_records());
-                        keep_metadata_only = compacting_rule.keep_metadata_only();
+                        max_slice_size = compacting_rule.max_slice_size();
+                        max_slice_records = compacting_rule.max_slice_records();
+                        keep_metadata_only =
+                            matches!(compacting_rule, CompactingRule::MetadataOnly(_));
                     };
 
                     LogicalPlan::HardCompactingDataset(HardCompactingDataset {
@@ -869,6 +870,8 @@ impl FlowServiceImpl {
                     }
                 }
             }
+
+            _ => {}
         }
 
         Ok(plans)
@@ -886,9 +889,13 @@ impl FlowServiceImpl {
             DatasetFlowType::HardCompacting => {
                 if let Some(config_snapshot) = &maybe_config_snapshot
                     && let FlowConfigurationSnapshot::Compacting(compacting_rule) = config_snapshot
-                    && compacting_rule.keep_metadata_only()
+                    && let CompactingRule::MetadataOnly(metadata_only_rule) = compacting_rule
                 {
-                    DownstreamDependencyTriggerType::TriggerOwnUnconditionally
+                    if metadata_only_rule.recursive {
+                        DownstreamDependencyTriggerType::TriggerOwnUnconditionally
+                    } else {
+                        DownstreamDependencyTriggerType::Empty
+                    }
                 } else {
                     DownstreamDependencyTriggerType::TriggerAllEnabled
                 }
@@ -1462,6 +1469,7 @@ pub struct DownstreamDependencyFlowPlan {
 enum DownstreamDependencyTriggerType {
     TriggerAllEnabled,
     TriggerOwnUnconditionally,
+    Empty,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -610,7 +610,9 @@ async fn test_manual_trigger_compacting_with_config() {
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::HardCompacting,
-            CompactingRule::new_checked(max_slice_size, max_slice_records, false).unwrap(),
+            CompactingRule::Full(
+                CompactingRuleFull::new_checked(max_slice_size, max_slice_records).unwrap(),
+            ),
         )
         .await;
 
@@ -692,9 +694,7 @@ async fn test_manual_trigger_compacting_with_config() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_manual_trigger_keep_metadata_only_compacting() {
-    let max_slice_size = 1_000_000u64;
-    let max_slice_records = 1000u64;
+async fn test_manual_trigger_keep_metadata_only_with_recursive_compacting() {
     let harness = FlowHarness::new();
 
     let foo_id = harness
@@ -727,7 +727,7 @@ async fn test_manual_trigger_keep_metadata_only_compacting() {
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::HardCompacting,
-            CompactingRule::new_checked(max_slice_size, max_slice_records, true).unwrap(),
+            CompactingRule::MetadataOnly(CompactingRuleMetadataOnly { recursive: true }),
         )
         .await;
 
@@ -781,8 +781,8 @@ async fn test_manual_trigger_keep_metadata_only_compacting() {
                 ),
                 expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
                   dataset_id: foo_id.clone(),
-                  max_slice_size: Some(max_slice_size),
-                  max_slice_records: Some(max_slice_records),
+                  max_slice_size: None,
+                  max_slice_records: None,
                   keep_metadata_only: true,
                 }),
             });
@@ -808,8 +808,8 @@ async fn test_manual_trigger_keep_metadata_only_compacting() {
                 )),
                 expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
                   dataset_id: foo_bar_id.clone(),
-                  max_slice_size: Some(max_slice_size),
-                  max_slice_records: Some(max_slice_records),
+                  max_slice_size: None,
+                  max_slice_records: None,
                   keep_metadata_only: true,
                 }),
             });
@@ -835,8 +835,8 @@ async fn test_manual_trigger_keep_metadata_only_compacting() {
                 )),
                 expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
                   dataset_id: foo_bar_baz_id.clone(),
-                  max_slice_size: Some(max_slice_size),
-                  max_slice_records: Some(max_slice_records),
+                  max_slice_size: None,
+                  max_slice_records: None,
                   keep_metadata_only: true,
                 }),
             });
@@ -924,12 +924,140 @@ async fn test_manual_trigger_keep_metadata_only_compacting() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_manual_trigger_keep_metadata_only_without_recursive_compacting() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(DatasetAlias {
+            dataset_name: DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let foo_bar_id = harness
+        .create_derived_dataset(
+            DatasetAlias {
+                dataset_name: DatasetName::new_unchecked("foo.bar"),
+                account_name: None,
+            },
+            vec![foo_id.clone()],
+        )
+        .await;
+    let foo_bar_baz_id = harness
+        .create_derived_dataset(
+            DatasetAlias {
+                dataset_name: DatasetName::new_unchecked("foo.bar.baz"),
+                account_name: None,
+            },
+            vec![foo_bar_id.clone()],
+        )
+        .await;
+
+    harness
+        .set_dataset_flow_compacting_rule(
+            harness.now_datetime(),
+            foo_id.clone(),
+            DatasetFlowType::HardCompacting,
+            CompactingRule::MetadataOnly(CompactingRuleMetadataOnly { recursive: false }),
+        )
+        .await;
+
+    harness.eager_initialization().await;
+
+    let foo_flow_key: FlowKey =
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(foo_bar_id.clone(), "foo_bar".to_string());
+    test_flow_listener
+        .define_dataset_display_name(foo_bar_baz_id.clone(), "foo_bar_baz".to_string());
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+        // Run API service
+        res = harness.flow_service.run(start_time) => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                flow_key: foo_flow_key,
+                run_since_start: Duration::try_milliseconds(10).unwrap(),
+            });
+            let trigger0_handle = trigger0_driver.run();
+
+            // Task 0: "foo" start running at 20ms, finish at 90ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::try_milliseconds(20).unwrap(),
+                finish_in_with: Some(
+                  (
+                    Duration::try_milliseconds(70).unwrap(),
+                    TaskOutcome::Success(TaskResult::CompactingDatasetResult(TaskCompactingDatasetResult {
+                      compacting_result: CompactingResult::Success {
+                        old_head: Multihash::from_digest_sha3_256(b"old-slice"),
+                        new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                        old_num_blocks: 5,
+                        new_num_blocks: 4,
+                      }
+                    }))
+                  )
+                ),
+                expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                  dataset_id: foo_id.clone(),
+                  max_slice_size: None,
+                  max_slice_records: None,
+                  keep_metadata_only: true,
+                }),
+            });
+            let task0_handle = task0_driver.run();
+
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::try_milliseconds(150).unwrap()).await;
+            };
+
+            tokio::join!(trigger0_handle, task0_handle, main_handle)
+        } => Ok(())
+    }
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+
+            #1: +10ms:
+              "foo" HardCompacting:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
+
+            #2: +20ms:
+              "foo" HardCompacting:
+                Flow ID = 0 Running(task=0)
+
+            #3: +90ms:
+              "foo" HardCompacting:
+                Flow ID = 0 Finished Success
+
+            "#
+        )
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_manual_trigger_keep_metadata_only_compacting_multiple_accounts() {
     let wasya_account_name = AccountName::new_unchecked("wasya");
     let petya_account_name = AccountName::new_unchecked("petya");
 
-    let max_slice_size = 1_000_000u64;
-    let max_slice_records = 1000u64;
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         is_multi_tenant: true,
         custom_account_names: vec![wasya_account_name.clone(), petya_account_name.clone()],
@@ -966,7 +1094,7 @@ async fn test_manual_trigger_keep_metadata_only_compacting_multiple_accounts() {
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::HardCompacting,
-            CompactingRule::new_checked(max_slice_size, max_slice_records, true).unwrap(),
+            CompactingRule::MetadataOnly(CompactingRuleMetadataOnly { recursive: true }),
         )
         .await;
 
@@ -1007,8 +1135,8 @@ async fn test_manual_trigger_keep_metadata_only_compacting_multiple_accounts() {
                 }})))),
                 expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
                   dataset_id: foo_id.clone(),
-                  max_slice_size: Some(max_slice_size),
-                  max_slice_records: Some(max_slice_records),
+                  max_slice_size: None,
+                  max_slice_records: None,
                   keep_metadata_only: true,
                 }),
             });
@@ -1036,8 +1164,8 @@ async fn test_manual_trigger_keep_metadata_only_compacting_multiple_accounts() {
                 // Make sure we will take config from root dataset
                 expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
                   dataset_id: foo_bar_id.clone(),
-                  max_slice_size: Some(max_slice_size),
-                  max_slice_records: Some(max_slice_records),
+                  max_slice_size: None,
+                  max_slice_records: None,
                   keep_metadata_only: true,
                 }),
             });
@@ -1048,7 +1176,7 @@ async fn test_manual_trigger_keep_metadata_only_compacting_multiple_accounts() {
                 harness.advance_time(Duration::try_milliseconds(400).unwrap()).await;
             };
 
-            tokio::join!(task0_handle, task1_handle, trigger0_handle, main_handle)
+            tokio::join!(task0_handle, trigger0_handle, task1_handle, main_handle)
         } => Ok(())
     }
     .unwrap();

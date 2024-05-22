@@ -11,6 +11,8 @@ use chrono::Utc;
 use kamu_flow_system::{
     BatchingRule,
     CompactingRule,
+    CompactingRuleFull,
+    CompactingRuleMetadataOnly,
     FlowConfigurationRule,
     FlowConfigurationService,
     FlowKeyDataset,
@@ -177,18 +179,27 @@ impl DatasetFlowConfigsMut {
                 FlowTypeIsNotSupported,
             ));
         }
-        let compacting_rule = match CompactingRule::new_checked(
-            compacting_args.max_slice_size,
-            compacting_args.max_slice_records,
-            compacting_args.keep_metadata_only,
-        ) {
-            Ok(rule) => rule,
-            Err(e) => {
-                return Ok(SetFlowCompactingConfigResult::InvalidCompactingConfig(
-                    FlowInvalidCompactingConfig {
-                        reason: e.to_string(),
-                    },
-                ))
+
+        let compacting_rule = match compacting_args {
+            CompactingConditionInput::Full(compacting_input) => {
+                match CompactingRuleFull::new_checked(
+                    compacting_input.max_slice_size,
+                    compacting_input.max_slice_records,
+                ) {
+                    Ok(rule) => CompactingRule::Full(rule),
+                    Err(e) => {
+                        return Ok(SetFlowCompactingConfigResult::InvalidCompactingConfig(
+                            FlowInvalidCompactingConfig {
+                                reason: e.to_string(),
+                            },
+                        ))
+                    }
+                }
+            }
+            CompactingConditionInput::MetadataOnly(compacting_input) => {
+                CompactingRule::MetadataOnly(CompactingRuleMetadataOnly {
+                    recursive: compacting_input.recursive,
+                })
             }
         };
 
