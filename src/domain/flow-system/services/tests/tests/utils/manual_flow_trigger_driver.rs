@@ -13,6 +13,7 @@ use chrono::Duration;
 use kamu_accounts::DEFAULT_ACCOUNT_ID;
 use kamu_core::SystemTimeSource;
 use kamu_flow_system::{FlowKey, FlowService};
+use opendatafabric::AccountID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,6 +26,7 @@ pub(crate) struct ManualFlowTriggerDriver {
 pub(crate) struct ManualFlowTriggerArgs {
     pub(crate) flow_key: FlowKey,
     pub(crate) run_since_start: Duration,
+    pub(crate) initiator_id: Option<AccountID>,
 }
 
 impl ManualFlowTriggerDriver {
@@ -49,7 +51,7 @@ impl ManualFlowTriggerDriver {
             .trigger_manual_flow(
                 start_time + self.args.run_since_start,
                 self.args.flow_key,
-                DEFAULT_ACCOUNT_ID.clone(),
+                self.args.initiator_id.unwrap_or(DEFAULT_ACCOUNT_ID.clone()),
                 None,
             )
             .await

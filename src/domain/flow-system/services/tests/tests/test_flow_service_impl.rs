@@ -11,6 +11,7 @@ use std::str::FromStr;
 
 use chrono::{Duration, DurationRound, Utc};
 use kamu::testing::MockDatasetChangesService;
+use kamu_accounts::DEFAULT_ACCOUNT_ID;
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_task_system::*;
@@ -330,6 +331,7 @@ async fn test_manual_trigger() {
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: foo_flow_key,
                     run_since_start: Duration::try_milliseconds(40).unwrap(),
+                    initiator_id: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -337,6 +339,7 @@ async fn test_manual_trigger() {
                 let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: bar_flow_key,
                     run_since_start: Duration::try_milliseconds(80).unwrap(),
+                    initiator_id: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -519,6 +522,7 @@ async fn test_manual_trigger_compacting() {
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: foo_flow_key,
                     run_since_start: Duration::try_milliseconds(10).unwrap(),
+                    initiator_id: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -526,6 +530,7 @@ async fn test_manual_trigger_compacting() {
                 let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: bar_flow_key,
                     run_since_start: Duration::try_milliseconds(50).unwrap(),
+                    initiator_id: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -653,6 +658,7 @@ async fn test_manual_trigger_compacting_with_config() {
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: foo_flow_key,
                     run_since_start: Duration::try_milliseconds(20).unwrap(),
+                    initiator_id: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -758,6 +764,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compacting() {
             let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                 flow_key: foo_flow_key,
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
+                initiator_id: None,
             });
             let trigger0_handle = trigger0_driver.run();
 
@@ -1145,6 +1152,7 @@ async fn test_manual_trigger_keep_metadata_only_compacting_multiple_accounts() {
             let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                 flow_key: foo_flow_key,
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
+                initiator_id: None,
             });
             let trigger0_handle = trigger0_driver.run();
 
@@ -2329,6 +2337,7 @@ async fn test_throttling_manual_triggers() {
         let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
             flow_key: foo_flow_key.clone(),
             run_since_start: Duration::try_milliseconds(20).unwrap(),
+            initiator_id: None,
         });
         let trigger0_handle = trigger0_driver.run();
 
@@ -2336,6 +2345,7 @@ async fn test_throttling_manual_triggers() {
         let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
             flow_key: foo_flow_key.clone(),
             run_since_start: Duration::try_milliseconds(30).unwrap(),
+            initiator_id: None,
         });
         let trigger1_handle = trigger1_driver.run();
 
@@ -2343,6 +2353,7 @@ async fn test_throttling_manual_triggers() {
         let trigger2_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
           flow_key: foo_flow_key,
           run_since_start: Duration::try_milliseconds(70).unwrap(),
+          initiator_id: None,
         });
         let trigger2_handle = trigger2_driver.run();
 
@@ -4246,6 +4257,183 @@ async fn test_batching_condition_with_2_inputs() {
 
         "#
         )
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_list_all_flow_initiators() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(DatasetAlias {
+            dataset_name: DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let bar_id = harness
+        .create_root_dataset(DatasetAlias {
+            dataset_name: DatasetName::new_unchecked("bar"),
+            account_name: None,
+        })
+        .await;
+
+    harness.eager_initialization().await;
+
+    let foo_flow_key: FlowKey =
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
+    let bar_flow_key: FlowKey =
+        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompacting).into();
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .unwrap();
+    let foo_account_id = AccountID::new_seeded_ed25519(b"foo");
+    let bar_account_id = AccountID::new_seeded_ed25519(b"bar");
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+        // Run API service
+        res = harness.flow_service.run(start_time) => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+                  // Task 0: "foo" start running at 10ms, finish at 20ms
+                  let task0_driver = harness.task_driver(TaskDriverArgs {
+                    task_id: TaskID::new(0),
+                    dataset_id: Some(foo_id.clone()),
+                    run_since_start: Duration::try_milliseconds(10).unwrap(),
+                    finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                      dataset_id: foo_id.clone(),
+                      max_slice_size: None,
+                      max_slice_records: None,
+                      keep_metadata_only: false,
+                    }),
+                });
+                let task0_handle = task0_driver.run();
+
+                let task1_driver = harness.task_driver(TaskDriverArgs {
+                  task_id: TaskID::new(1),
+                  dataset_id: Some(bar_id.clone()),
+                  run_since_start: Duration::try_milliseconds(60).unwrap(),
+                  finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                  expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                    dataset_id: bar_id.clone(),
+                    max_slice_size: None,
+                    max_slice_records: None,
+                    keep_metadata_only: false,
+                  }),
+                });
+                let task1_handle = task1_driver.run();
+
+                // Manual trigger for "foo" at 10ms
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                    flow_key: foo_flow_key,
+                    run_since_start: Duration::try_milliseconds(10).unwrap(),
+                    initiator_id: Some(foo_account_id.clone()),
+                });
+                let trigger0_handle = trigger0_driver.run();
+
+                // Manual trigger for "bar" at 50ms
+                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                    flow_key: bar_flow_key,
+                    run_since_start: Duration::try_milliseconds(50).unwrap(),
+                    initiator_id: Some(bar_account_id.clone()),
+                });
+                let trigger1_handle = trigger1_driver.run();
+
+                // Main simulation script
+                let main_handle = async {
+                    // Moment 10ms - manual foo trigger happens here:
+                    //  - flow 0 gets trigger and finishes at 30ms
+
+                    // Moment 50ms - manual foo trigger happens here:
+                    //  - flow 1 trigger and finishes
+                    //  - task 1 starts at 60ms, finishes at 70ms (leave some gap to fight with random order)
+
+                    harness.advance_time(Duration::try_milliseconds(100).unwrap()).await;
+                };
+
+                tokio::join!(task0_handle, task1_handle, trigger0_handle, trigger1_handle, main_handle)
+            } => Ok(())
+    }
+    .unwrap();
+
+    let foo_dataset_initiators_list = harness
+        .flow_service
+        .list_all_flow_initiators_by_dataset(
+            &foo_id,
+            FlowPaginationOpts {
+                offset: 0,
+                limit: 2,
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        foo_dataset_initiators_list.initiator_ids,
+        [foo_account_id.clone()]
+    );
+
+    let bar_dataset_initiators_list = harness
+        .flow_service
+        .list_all_flow_initiators_by_dataset(
+            &bar_id,
+            FlowPaginationOpts {
+                offset: 0,
+                limit: 2,
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        bar_dataset_initiators_list.initiator_ids,
+        [bar_account_id.clone()]
+    );
+
+    let all_dataset_initiators_list = harness
+        .flow_service
+        .list_all_flow_initiators_by_account(
+            &DEFAULT_ACCOUNT_ID,
+            FlowPaginationOpts {
+                offset: 0,
+                limit: 2,
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        all_dataset_initiators_list.initiator_ids,
+        [bar_account_id.clone(), foo_account_id.clone()]
+    );
+
+    // Try to apply offset
+    let all_dataset_initiators_list = harness
+        .flow_service
+        .list_all_flow_initiators_by_account(
+            &DEFAULT_ACCOUNT_ID,
+            FlowPaginationOpts {
+                offset: 1,
+                limit: 2,
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        all_dataset_initiators_list.initiator_ids,
+        [foo_account_id.clone()]
     );
 }
 

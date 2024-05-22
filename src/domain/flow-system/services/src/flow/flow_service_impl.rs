@@ -1050,6 +1050,7 @@ impl FlowService for FlowServiceImpl {
 
         let dataset_id = dataset_id.clone();
         let mut unique_initiators: HashSet<AccountID> = HashSet::new();
+        let mut initiator_ids = vec![];
 
         let relevant_flow_ids: Vec<_> = self
             .flow_event_store
@@ -1070,17 +1071,19 @@ impl FlowService for FlowServiceImpl {
                 .await
                 .int_err()?;
             if let Some(initiator_id) = flow.primary_trigger().initiator_account_id() {
-                unique_initiators.insert(initiator_id.clone());
+                let is_unique = unique_initiators.insert(initiator_id.clone());
+                if is_unique
+                    && unique_initiators.len() > pagination.offset
+                    && unique_initiators.len() < pagination.limit
+                {
+                    initiator_ids.push(initiator_id.clone());
+                }
             }
         }
 
         Ok(FlowInitiatorListing {
             total_count: unique_initiators.len(),
-            initiator_ids: unique_initiators
-                .into_iter()
-                .skip(pagination.offset)
-                .take(pagination.limit)
-                .collect(),
+            initiator_ids,
         })
     }
 
@@ -1163,44 +1166,48 @@ impl FlowService for FlowServiceImpl {
             .map_err(ListFlowsByDatasetError::Internal)?;
 
         let mut unique_initiators: HashSet<AccountID> = HashSet::new();
-        for dataset_id in &owned_dataset_ids {
-            let total_dataset_flows_count = self
-                .flow_event_store
-                .get_count_flows_by_dataset(dataset_id, &Default::default())
+        let mut initiator_ids = vec![];
+        let flows_count = self
+            .flow_event_store
+            .get_count_all_flows()
+            .await
+            .int_err()?;
+
+        let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(owned_dataset_ids);
+
+        let relevant_flow_ids: Vec<_> = self
+            .flow_event_store
+            .get_all_flow_ids_by_datasets(
+                account_dataset_ids,
+                &Default::default(),
+                FlowPaginationOpts {
+                    offset: 0,
+                    limit: flows_count,
+                },
+            )
+            .try_collect()
+            .await
+            .int_err()?;
+
+        for flow_id in relevant_flow_ids {
+            let flow = Flow::load(flow_id, self.flow_event_store.as_ref())
                 .await
                 .int_err()?;
 
-            let relevant_flow_ids: Vec<_> = self
-                .flow_event_store
-                .get_all_flow_ids_by_dataset(
-                    dataset_id,
-                    Default::default(),
-                    FlowPaginationOpts {
-                        offset: 0,
-                        limit: total_dataset_flows_count,
-                    },
-                )
-                .try_collect()
-                .await
-                .int_err()?;
-
-            for flow_id in relevant_flow_ids {
-                let flow = Flow::load(flow_id, self.flow_event_store.as_ref())
-                    .await
-                    .int_err()?;
-                if let Some(initiator_id) = flow.primary_trigger().initiator_account_id() {
-                    unique_initiators.insert(initiator_id.clone());
+            if let Some(initiator_id) = flow.primary_trigger().initiator_account_id() {
+                let is_unique = unique_initiators.insert(initiator_id.clone());
+                if is_unique
+                    && unique_initiators.len() > pagination.offset
+                    && unique_initiators.len() <= pagination.limit
+                {
+                    initiator_ids.push(initiator_id.clone());
                 }
             }
         }
 
         Ok(FlowInitiatorListing {
             total_count: unique_initiators.len(),
-            initiator_ids: unique_initiators
-                .into_iter()
-                .skip(pagination.offset)
-                .take(pagination.limit)
-                .collect(),
+            initiator_ids,
         })
     }
 
