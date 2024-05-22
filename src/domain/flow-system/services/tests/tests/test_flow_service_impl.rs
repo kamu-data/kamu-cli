@@ -995,6 +995,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compacting() {
             let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                 flow_key: foo_flow_key,
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
+                initiator_id: None,
             });
             let trigger0_handle = trigger0_driver.run();
 

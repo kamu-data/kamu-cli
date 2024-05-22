@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Changed
 - `InitiatorFilterInput` now accept `[AccountID]` instead of `AccountName`
-  `AccountFlowFilters` now filter by `DatasetId` instead of `DatasetName`
+  `AccountFlowFilters` now filter by `DatasetId` instead of `DatasetName`.
+### Added
+- New `listFlowInitiators` api to fetch all initiators of flows
 
 ## [0.183.0] - 2024-05-22
 ### Added
