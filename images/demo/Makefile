@@ -5,6 +5,16 @@ DEMO_VERSION = 0.14.0
 
 #########################################################################################
 
+.PHONY: prepare-multi-arch
+prepare-multi-arch-build:
+	docker buildx \
+		create \
+		--platform $(IMAGE_PLATFORMS) \
+		--use \
+		--name kamu-multi-platform-builder
+
+#########################################################################################
+
 .PHONY: all-examples
 all-examples:
 	rsync -avu --delete --exclude=".*/" "../../examples/" "user-home/XX - Other Examples"
