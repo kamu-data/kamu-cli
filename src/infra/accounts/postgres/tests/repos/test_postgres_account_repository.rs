@@ -19,7 +19,7 @@ use sqlx::PgPool;
 async fn test_missing_account_not_found(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+    run_transactional([&harness.catalog], |[catalog]| async move {
         kamu_accounts_repo_tests::test_missing_account_not_found(&catalog).await;
         Ok(())
     })
@@ -34,7 +34,7 @@ async fn test_missing_account_not_found(pg_pool: PgPool) {
 async fn test_insert_and_locate_cli_account(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+    run_transactional([&harness.catalog], |[catalog]| async move {
         kamu_accounts_repo_tests::test_insert_and_locate_password_account(&catalog).await;
         Ok(())
     })
@@ -49,7 +49,7 @@ async fn test_insert_and_locate_cli_account(pg_pool: PgPool) {
 async fn test_insert_and_locate_github_account(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+    run_transactional([&harness.catalog], |[catalog]| async move {
         kamu_accounts_repo_tests::test_insert_and_locate_github_account(&catalog).await;
         Ok(())
     })
@@ -79,7 +79,7 @@ async fn test_insert_and_locate_multiple_github_account(pg_pool: PgPool) {
 async fn test_insert_and_locate_account_without_email(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+    run_transactional([&harness.catalog], |[catalog]| async move {
         kamu_accounts_repo_tests::test_insert_and_locate_account_without_email(&catalog).await;
         Ok(())
     })
@@ -94,7 +94,7 @@ async fn test_insert_and_locate_account_without_email(pg_pool: PgPool) {
 async fn test_duplicate_password_account_id(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+    run_transactional([&harness.catalog], |[catalog]| async move {
         kamu_accounts_repo_tests::test_duplicate_password_account_id(&catalog).await;
         Ok(())
     })
@@ -109,7 +109,7 @@ async fn test_duplicate_password_account_id(pg_pool: PgPool) {
 async fn test_duplicate_password_account_email(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+    run_transactional([&harness.catalog], |[catalog]| async move {
         kamu_accounts_repo_tests::test_duplicate_password_account_email(&catalog).await;
         Ok(())
     })
@@ -124,7 +124,7 @@ async fn test_duplicate_password_account_email(pg_pool: PgPool) {
 async fn test_duplicate_github_account_id(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+    run_transactional([&harness.catalog], |[catalog]| async move {
         kamu_accounts_repo_tests::test_duplicate_github_account_id(&catalog).await;
         Ok(())
     })
@@ -139,7 +139,7 @@ async fn test_duplicate_github_account_id(pg_pool: PgPool) {
 async fn test_duplicate_github_account_name(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+    run_transactional([&harness.catalog], |[catalog]| async move {
         kamu_accounts_repo_tests::test_duplicate_github_account_name(&catalog).await;
         Ok(())
     })
@@ -154,7 +154,7 @@ async fn test_duplicate_github_account_name(pg_pool: PgPool) {
 async fn test_duplicate_github_account_provider_identity(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+    run_transactional([&harness.catalog], |[catalog]| async move {
         kamu_accounts_repo_tests::test_duplicate_github_account_provider_identity(&catalog).await;
         Ok(())
     })
@@ -169,7 +169,7 @@ async fn test_duplicate_github_account_provider_identity(pg_pool: PgPool) {
 async fn test_duplicate_github_account_email(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+    run_transactional([&harness.catalog], |[catalog]| async move {
         kamu_accounts_repo_tests::test_duplicate_github_account_email(&catalog).await;
         Ok(())
     })

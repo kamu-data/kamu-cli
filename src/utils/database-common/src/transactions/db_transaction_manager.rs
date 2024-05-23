@@ -34,14 +34,26 @@ pub trait DatabaseTransactionManager: Send + Sync {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn run_transactional<H, HFut, HFutResultT>(
-    base_catalog: &Catalog,
+/// Enriching passed catalogs with [`TransactionRef`]
+///
+/// # Arguments
+///
+/// * `catalogs` - Catalogs in which `base_catalog` is expected to be the first
+///   one
+/// * `callback` - A callback that receives updated catalogs. If necessary, we
+///   can return a value from it
+pub async fn run_transactional<H, HFut, HFutResultT, const N: usize>(
+    catalogs: [&Catalog; N],
     callback: H,
 ) -> Result<HFutResultT, InternalError>
 where
-    H: FnOnce(Catalog) -> HFut + Send + Sync + 'static,
+    H: FnOnce([Catalog; N]) -> HFut + Send + Sync + 'static,
     HFut: std::future::Future<Output = Result<HFutResultT, InternalError>> + Send + 'static,
 {
+    assert_ne!(catalogs.len(), 0);
+
+    let base_catalog = catalogs.first().unwrap();
+
     // Extract transaction manager, specific for the database
     let db_transaction_manager = base_catalog
         .get_one::<dyn DatabaseTransactionManager>()
@@ -50,14 +62,16 @@ where
     // Start transaction
     let transaction_ref = db_transaction_manager.make_transaction_ref().await?;
 
-    // Create a chained catalog for transaction-aware components,
+    // Create chained catalogs for transaction-aware components,
     // but keep a local copy of a transaction pointer
-    let chained_catalog = CatalogBuilder::new_chained(base_catalog)
-        .add_value(transaction_ref.clone())
-        .build();
+    let updated_catalogs: [Catalog; N] = catalogs.map(|catalog| {
+        CatalogBuilder::new_chained(catalog)
+            .add_value(transaction_ref.clone())
+            .build()
+    });
 
     // Run transactional code in the callback
-    let result = callback(chained_catalog).await;
+    let result = callback(updated_catalogs).await;
 
     // Commit or rollback transaction depending on the result
     match result {

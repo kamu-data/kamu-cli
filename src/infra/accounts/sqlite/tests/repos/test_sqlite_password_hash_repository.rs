@@ -19,7 +19,7 @@ use sqlx::SqlitePool;
 async fn test_no_password_stored(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+    run_transactional([&harness.catalog], |[catalog]| async move {
         kamu_accounts_repo_tests::test_no_password_stored(&catalog).await;
         Ok(())
     })
@@ -34,7 +34,7 @@ async fn test_no_password_stored(sqlite_pool: SqlitePool) {
 async fn test_store_couple_account_passwords(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+    run_transactional([&harness.catalog], |[catalog]| async move {
         kamu_accounts_repo_tests::test_store_couple_account_passwords(&catalog).await;
         Ok(())
     })
