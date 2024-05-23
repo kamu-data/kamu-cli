@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Added
+- Added a public image with [sqlx-cli](/images/sqlx-cli)
 - Added a [configuration](/images/persistence-storage) of running a `kamu` API server along with a database,
   for persistent storage of data
 
