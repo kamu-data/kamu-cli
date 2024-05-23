@@ -1,7 +1,9 @@
 /target
 /examples/**/.kamu
 /examples/**/.ipynb_checkpoints
+/examples/persistent-storage/postgres-data
 /images/demo/**/.kamu
 /images/demo/**/.ipynb_checkpoints
+
 .env
 /kamu.sqlite.db*
