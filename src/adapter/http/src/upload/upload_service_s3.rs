@@ -8,10 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 use aws_credential_types::Credentials;
+use aws_sigv4::sign::v4::{calculate_signature, generate_signing_key};
 use base64::prelude::*;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use dill::*;
 use kamu::domain::{ErrorIntoInternal, InternalError};
 use kamu::utils::s3_context::S3Context;
@@ -68,7 +70,7 @@ impl UploadServiceS3 {
         request_time: DateTime<Utc>,
         amz_fields: &AmzFields,
     ) -> String {
-        let valid_util = request_time + Duration::minutes(1);
+        let valid_util = request_time + Duration::from_secs(60);
 
         let policy_json = serde_json::json!({
             "expiration": valid_util.to_rfc3339(),
@@ -89,13 +91,18 @@ impl UploadServiceS3 {
 
     fn sign_policy(
         &self,
-        _post_policy_base64: &str,
-        _credentials: &Credentials,
-        _request_time: DateTime<Utc>,
-        _amz_fields: &AmzFields,
+        post_policy_base64: &str,
+        credentials: &Credentials,
+        request_time: SystemTime,
     ) -> String {
-        // TODO
-        String::from("<todo:signature>")
+        let signing_key = generate_signing_key(
+            credentials.secret_access_key(),
+            request_time,
+            self.s3_upload_context.region().unwrap(),
+            "s3",
+        );
+
+        return calculate_signature(signing_key, post_policy_base64.as_bytes());
     }
 }
 
@@ -111,13 +118,13 @@ impl UploadService for UploadServiceS3 {
         let upload_id = Uuid::new_v4().simple().to_string();
         let file_key = format!("{}/{}/{}", account_id.as_multibase(), upload_id, file_name,);
 
-        let request_time = Utc::now();
-        let amz_fields = self.generate_amz_fields(&credentials, request_time);
-        let post_policy = self.generate_post_policy(&file_key, request_time, &amz_fields);
+        let request_time = SystemTime::now();
+        let request_chrono_time: DateTime<Utc> = request_time.into();
 
+        let amz_fields = self.generate_amz_fields(&credentials, request_chrono_time);
+        let post_policy = self.generate_post_policy(&file_key, request_chrono_time, &amz_fields);
         let post_policy_base64 = BASE64_STANDARD.encode(post_policy.as_bytes());
-        let signature =
-            self.sign_policy(&post_policy_base64, &credentials, request_time, &amz_fields);
+        let signature = self.sign_policy(&post_policy_base64, &credentials, request_time);
 
         Ok(UploadContext {
             upload_url: self.upload_s3_bucket_config.bucket_http_url.to_string(),

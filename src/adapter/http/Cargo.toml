@@ -30,6 +30,7 @@ kamu-data-utils = { workspace = true }
 event-bus = { workspace = true }
 
 aws-credential-types = "0.57"
+aws-sigv4 = "1"
 
 axum = { version = "0.6", features = ["ws", "headers"] }
 axum-extra = { version = "0.8", features = ["async-read-body"] }

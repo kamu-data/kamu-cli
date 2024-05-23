@@ -15,9 +15,10 @@ use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use database_common::{DatabaseConfiguration, DatabaseProvider};
 use dill::*;
 use kamu::domain::*;
+use kamu::utils::s3_context::S3Context;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_adapter_http::{UploadService, UploadServiceLocal};
+use kamu_adapter_http::{UploadS3BucketConfig, UploadService, UploadServiceLocal, UploadServiceS3};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
@@ -84,6 +85,27 @@ pub async fn run(
 
         let mut base_catalog_builder =
             configure_base_catalog(&workspace_layout, is_multi_tenant_workspace, system_time);
+
+        //////////////////////////// MAKE THIS NICE /////////////////////////////////
+
+        let s3_upload_http_url = url::Url::parse(
+            "https://s3.us-west-2.amazonaws.com/upload.demo.stg.kamu.dev.us-west-2",
+        )
+        .unwrap();
+        let s3_upload_direct_url =
+            url::Url::parse("s3://upload.demo.stg.kamu.dev.us-west-2").unwrap();
+        base_catalog_builder.add_value(UploadS3BucketConfig {
+            bucket_http_url: s3_upload_http_url,
+            bucket_name: String::from("upload.demo.stg.kamu.dev.us-west-2"),
+            max_file_size_mb: 50,
+        });
+        base_catalog_builder.add_builder(
+            UploadServiceS3::builder()
+                .with_s3_upload_context(S3Context::from_url(&s3_upload_direct_url).await),
+        );
+        base_catalog_builder.bind::<dyn UploadService, UploadServiceS3>();
+
+        ////////////////////////////
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
@@ -331,8 +353,8 @@ pub fn configure_base_catalog(
     b.add::<kamu_adapter_auth_oso::KamuAuthOso>();
     b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
 
-    b.add_builder(UploadServiceLocal::builder().with_cache_dir(workspace_layout.cache_dir.clone()));
-    b.bind::<dyn UploadService, UploadServiceLocal>();
+    //b.add_builder(UploadServiceLocal::builder().with_cache_dir(workspace_layout.
+    // cache_dir.clone())); b.bind::<dyn UploadService, UploadServiceLocal>();
 
     b
 }
