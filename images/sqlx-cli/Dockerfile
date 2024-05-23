@@ -2,6 +2,8 @@ FROM rust:1.78-alpine as builder
 
 ARG VERSION
 
+LABEL org.opencontainers.image.source https://github.com/kamu-data/kamu-cli
+
 ################################################################################
 
 # cargo-binstall: preparation
