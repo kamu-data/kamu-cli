@@ -13,7 +13,7 @@ use std::sync::Arc;
 use console::style as s;
 use database_common::run_transactional;
 use dill::Catalog;
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::*;
 use kamu_accounts_services::PasswordLoginCredentials;
 use kamu_adapter_oauth::*;
@@ -77,7 +77,7 @@ impl APIServerRunCommand {
         Ok(())
     }
 
-    async fn get_access_token(&self) -> Result<String, CLIError> {
+    async fn get_access_token(&self, base_catalog: &Catalog) -> Result<String, InternalError> {
         let current_account_name = match self.account_subject.as_ref() {
             CurrentAccountSubject::Logged(l) => l.account_name.clone(),
             CurrentAccountSubject::Anonymous(_) => {
@@ -96,21 +96,17 @@ impl APIServerRunCommand {
             password: account_config.get_password(),
         };
 
-        let login_response = run_transactional(&self.base_catalog, |catalog: Catalog| async move {
-            let auth_svc = catalog.get_one::<dyn AuthenticationService>().unwrap();
+        let auth_svc = base_catalog.get_one::<dyn AuthenticationService>().unwrap();
+        let access_token = auth_svc
+            .login(
+                PROVIDER_PASSWORD,
+                serde_json::to_string::<PasswordLoginCredentials>(&login_credentials).int_err()?,
+            )
+            .await
+            .int_err()?
+            .access_token;
 
-            auth_svc
-                .login(
-                    PROVIDER_PASSWORD,
-                    serde_json::to_string::<PasswordLoginCredentials>(&login_credentials)
-                        .int_err()?,
-                )
-                .await
-                .int_err()
-        })
-        .await?;
-
-        Ok(login_response.access_token)
+        Ok(access_token)
     }
 }
 
@@ -119,43 +115,52 @@ impl Command for APIServerRunCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         self.check_required_env_vars()?;
 
-        let access_token = self.get_access_token().await?;
+        // The borrow checker is happy if self is not explicitly used
+        let self_ref = &self;
 
-        // TODO: Cloning catalog is too expensive currently
-        let api_server = crate::explore::APIServer::new(
-            self.base_catalog.clone(),
-            &self.cli_catalog,
-            self.multi_tenant_workspace,
-            self.address,
-            self.port,
-        );
+        run_transactional(
+            [&self.base_catalog, &self.cli_catalog],
+            move |[base_catalog, cli_catalog]| async move {
+                let access_token = self_ref.get_access_token(&base_catalog).await?;
 
-        tracing::info!(
-            "API server is listening on: http://{}",
-            api_server.local_addr()
-        );
-
-        if self.output_config.is_tty
-            && self.output_config.verbosity_level == 0
-            && !self.output_config.quiet
-        {
-            eprintln!(
-                "{}\n  {}",
-                s("API server is listening on:").green().bold(),
-                s(format!("http://{}", api_server.local_addr())).bold(),
-            );
-            eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
-
-            if self.get_token {
-                eprintln!(
-                    "{} {}",
-                    s("JWT token:").green().bold(),
-                    s(access_token).dim()
+                let api_server = crate::explore::APIServer::new(
+                    base_catalog,
+                    &cli_catalog,
+                    self_ref.multi_tenant_workspace,
+                    self_ref.address,
+                    self_ref.port,
                 );
-            }
-        }
 
-        api_server.run().await.map_err(CLIError::critical)?;
+                tracing::info!(
+                    "API server is listening on: http://{}",
+                    api_server.local_addr()
+                );
+
+                if self_ref.output_config.is_tty
+                    && self_ref.output_config.verbosity_level == 0
+                    && !self_ref.output_config.quiet
+                {
+                    eprintln!(
+                        "{}\n  {}",
+                        s("API server is listening on:").green().bold(),
+                        s(format!("http://{}", api_server.local_addr())).bold(),
+                    );
+                    eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
+
+                    if self_ref.get_token {
+                        eprintln!(
+                            "{} {}",
+                            s("JWT token:").green().bold(),
+                            s(access_token).dim()
+                        );
+                    }
+                }
+
+                api_server.run().await
+            },
+        )
+        .await
+        .map_err(CLIError::critical)?;
 
         Ok(())
     }

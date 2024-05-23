@@ -47,8 +47,8 @@ pub async fn run_transactional<H, HFut, HFutResultT, const N: usize>(
     callback: H,
 ) -> Result<HFutResultT, InternalError>
 where
-    H: FnOnce([Catalog; N]) -> HFut + Send + Sync + 'static,
-    HFut: std::future::Future<Output = Result<HFutResultT, InternalError>> + Send + 'static,
+    H: FnOnce([Catalog; N]) -> HFut + Send + Sync,
+    HFut: std::future::Future<Output = Result<HFutResultT, InternalError>> + Send,
 {
     assert_ne!(catalogs.len(), 0);
 
