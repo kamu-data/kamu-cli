@@ -4,6 +4,10 @@ IMAGE_JUPYTER_TAG = 0.6.1
 
 KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "kamu") | .version')
 
+SQLX_VERSION = 0.7.4
+
+#########################################################################################
+
 
 # Build image for local testing purposes
 .PHONY: jupyter
@@ -77,3 +81,24 @@ kamu-base-with-data-mt-push:
 		IMAGE_REPO=$(IMAGE_REPO) \
 		KAMU_VERSION=$(KAMU_VERSION) \
 		image-push
+
+
+#########################################################################################
+
+
+.PHONY: sqlx-cli
+sqlx-cli:
+	docker build \
+		--build-arg VERSION=$(SQLX_VERSION) \
+		-t $(IMAGE_REPO)/sqlx-cli:$(SQLX_VERSION) \
+		sqlx-cli/
+
+
+.PHONY: sqlx-push
+sqlx-cli-push:
+	docker push $(IMAGE_REPO)/sqlx-cli:$(SQLX_VERSION)
+	docker tag $(IMAGE_REPO)/sqlx-cli:$(SQLX_VERSION) $(IMAGE_REPO)/sqlx-cli:latest
+	docker push $(IMAGE_REPO)/sqlx-cli:latest
+
+
+#########################################################################################
