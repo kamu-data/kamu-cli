@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Added
-- Added an [example](/examples/persistence-storage) of running a `kamu` API server along with a database,
+- Added a [configuration](/images/persistence-storage) of running a `kamu` API server along with a database,
   for persistent storage of data
 
 ## [0.183.0] - 2024-05-22
