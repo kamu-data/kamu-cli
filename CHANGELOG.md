@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.184.1] - 2024-05-29
+### Fixed
+- Stabilized startup using connection to databases
+- Fixed potential crash when attempting to rollback a transaction if the connection fails to establish
+
+## [0.184.0] - 2024-05-28
 ### Changed
 - `InitiatorFilterInput` now accept `[AccountID]` instead of `AccountName`
   `AccountFlowFilters` now filter by `DatasetId` instead of `DatasetName`.
@@ -26,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `HardCompacting` configuration now is one of `Full` or `KeepMetadataOnly` variants. In case of 
   `KeepMetadataOnly` variant required to provide `recursive` value which will trigger downstream
-  dependecnies compacting
+  dependencies compacting
 
 ## [0.182.0] - 2024-05-20
 ### Added
