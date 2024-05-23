@@ -18,10 +18,11 @@ services:
       db:
         condition: service_healthy
     restart: "no"
-    image: ruurdadema/sqlx-cli
+    image: ghcr.io/kamu-data/sqlx-cli:latest
+    entrypoint: [ "sh", "-c" ]
     command: >
-      sh -c "sqlx database create &&
-             sqlx migrate run --source /migrations"
+      "sqlx database create &&
+       sqlx migrate run --source /migrations"
     volumes:
       - ../../migrations/postgres:/migrations
     environment:
