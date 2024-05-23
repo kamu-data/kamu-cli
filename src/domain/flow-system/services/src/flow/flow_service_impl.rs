@@ -1033,57 +1033,17 @@ impl FlowService for FlowServiceImpl {
         })
     }
 
-    /// Returns states of flows associated with a given dataset
+    /// Returns initiators of flows associated with a given dataset
     /// ordered by creation time from newest to oldest
-    /// Applies specified filters
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?pagination))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn list_all_flow_initiators_by_dataset(
         &self,
         dataset_id: &DatasetID,
-        pagination: FlowPaginationOpts,
     ) -> Result<FlowInitiatorListing, ListFlowsByDatasetError> {
-        let total_flows_count = self
-            .flow_event_store
-            .get_count_flows_by_dataset(dataset_id, &Default::default())
-            .await
-            .int_err()?;
-
-        let dataset_id = dataset_id.clone();
-        let mut unique_initiators: HashSet<AccountID> = HashSet::new();
-        let mut initiator_ids = vec![];
-
-        let relevant_flow_ids: Vec<_> = self
-            .flow_event_store
-            .get_all_flow_ids_by_dataset(
-                &dataset_id,
-                Default::default(),
-                FlowPaginationOpts {
-                    offset: 0,
-                    limit: total_flows_count,
-                },
-            )
-            .try_collect()
-            .await
-            .int_err()?;
-
-        for flow_id in relevant_flow_ids {
-            let flow = Flow::load(flow_id, self.flow_event_store.as_ref())
-                .await
-                .int_err()?;
-            if let Some(initiator_id) = flow.primary_trigger().initiator_account_id() {
-                let is_unique = unique_initiators.insert(initiator_id.clone());
-                if is_unique
-                    && unique_initiators.len() > pagination.offset
-                    && unique_initiators.len() < pagination.limit
-                {
-                    initiator_ids.push(initiator_id.clone());
-                }
-            }
-        }
-
         Ok(FlowInitiatorListing {
-            total_count: unique_initiators.len(),
-            initiator_ids,
+            matched_stream: self
+                .flow_event_store
+                .get_unique_flow_initiator_ids_by_dataset(dataset_id),
         })
     }
 
@@ -1150,65 +1110,33 @@ impl FlowService for FlowServiceImpl {
         })
     }
 
-    /// Returns initiators of flows associated with a given account
+    /// Returns datasets with flows associated with a given account
     /// ordered by creation time from newest to oldest.
-    /// Applies specified filters/pagination
-    #[tracing::instrument(level = "debug", skip_all, fields(%account_id, ?pagination))]
-    async fn list_all_flow_initiators_by_account(
+    #[tracing::instrument(level = "debug", skip_all, fields(%account_id))]
+    async fn list_all_datasets_with_flow_by_account(
         &self,
         account_id: &AccountID,
-        pagination: FlowPaginationOpts,
-    ) -> Result<FlowInitiatorListing, ListFlowsByDatasetError> {
+    ) -> Result<FlowDatasetListing, ListFlowsByDatasetError> {
         let owned_dataset_ids = self
             .dataset_ownership_service
             .get_owned_datasets(account_id)
             .await
             .map_err(ListFlowsByDatasetError::Internal)?;
 
-        let mut unique_initiators: HashSet<AccountID> = HashSet::new();
-        let mut initiator_ids = vec![];
-        let flows_count = self
-            .flow_event_store
-            .get_count_all_flows()
-            .await
-            .int_err()?;
-
-        let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(owned_dataset_ids);
-
-        let relevant_flow_ids: Vec<_> = self
-            .flow_event_store
-            .get_all_flow_ids_by_datasets(
-                account_dataset_ids,
-                &Default::default(),
-                FlowPaginationOpts {
-                    offset: 0,
-                    limit: flows_count,
-                },
-            )
-            .try_collect()
-            .await
-            .int_err()?;
-
-        for flow_id in relevant_flow_ids {
-            let flow = Flow::load(flow_id, self.flow_event_store.as_ref())
-                .await
-                .int_err()?;
-
-            if let Some(initiator_id) = flow.primary_trigger().initiator_account_id() {
-                let is_unique = unique_initiators.insert(initiator_id.clone());
-                if is_unique
-                    && unique_initiators.len() > pagination.offset
-                    && unique_initiators.len() <= pagination.limit
-                {
-                    initiator_ids.push(initiator_id.clone());
+        let matched_stream = Box::pin(async_stream::try_stream! {
+            for dataset_id in &owned_dataset_ids {
+                let dataset_flows_count = self
+                    .flow_event_store
+                    .get_count_flows_by_dataset(dataset_id, &Default::default())
+                    .await
+                    .int_err()?;
+                if dataset_flows_count > 0 {
+                    yield dataset_id.clone();
                 }
             }
-        }
+        });
 
-        Ok(FlowInitiatorListing {
-            total_count: unique_initiators.len(),
-            initiator_ids,
-        })
+        Ok(FlowDatasetListing { matched_stream })
     }
 
     /// Returns states of system flows

@@ -118,42 +118,31 @@ impl DatasetFlowRuns {
         ))
     }
 
-    async fn list_flow_initiators(
-        &self,
-        ctx: &Context<'_>,
-        page: Option<usize>,
-        per_page: Option<usize>,
-    ) -> Result<AccountConnection> {
+    async fn list_flow_initiators(&self, ctx: &Context<'_>) -> Result<AccountConnection> {
         utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
         let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
-        let page = page.unwrap_or(0);
-        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let flow_initiators_listing = flow_service
-            .list_all_flow_initiators_by_dataset(
-                &self.dataset_handle.id,
-                fs::FlowPaginationOpts {
-                    offset: page * per_page,
-                    limit: per_page,
-                },
-            )
+        let flow_initiator_ids: Vec<_> = flow_service
+            .list_all_flow_initiators_by_dataset(&self.dataset_handle.id)
             .await
-            .int_err()?;
+            .int_err()?
+            .matched_stream
+            .try_collect()
+            .await?;
 
         let matched_flow_initiators: Vec<_> = futures::future::try_join_all(
-            flow_initiators_listing
-                .initiator_ids
+            flow_initiator_ids
                 .iter()
                 .map(|initiator_id| Account::from_account_id(ctx, initiator_id.clone())),
         )
         .await?;
-        let total_count = flow_initiators_listing.total_count;
+        let total_count = matched_flow_initiators.len();
 
         Ok(AccountConnection::new(
             matched_flow_initiators,
-            page,
-            per_page,
+            0,
+            total_count,
             total_count,
         ))
     }

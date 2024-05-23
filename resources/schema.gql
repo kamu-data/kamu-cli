@@ -74,7 +74,7 @@ input AccountFlowFilters {
 
 type AccountFlowRuns {
 	listFlows(page: Int, perPage: Int, filters: AccountFlowFilters): FlowConnection!
-	listFlowInitiators(page: Int, perPage: Int): AccountConnection!
+	listDatasetsWithFlow: DatasetConnection!
 }
 
 type AccountFlows {
@@ -480,7 +480,7 @@ input DatasetFlowFilters {
 type DatasetFlowRuns {
 	getFlow(flowId: FlowID!): GetFlowResult!
 	listFlows(page: Int, perPage: Int, filters: DatasetFlowFilters): FlowConnection!
-	listFlowInitiators(page: Int, perPage: Int): AccountConnection!
+	listFlowInitiators: AccountConnection!
 }
 
 type DatasetFlowRunsMut {

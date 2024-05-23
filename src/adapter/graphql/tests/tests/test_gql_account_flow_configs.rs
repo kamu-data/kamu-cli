@@ -130,7 +130,7 @@ async fn test_list_account_flows() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_list_flow_initiators() {
+async fn test_list_datasets_with_flow() {
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
         transform_service_mock: Some(MockTransformService::with_set_transform()),
@@ -142,7 +142,12 @@ async fn test_list_flow_initiators() {
     let foo_dataset_alias =
         DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
 
+    let bar_dataset_name = DatasetName::new_unchecked("bar");
+    let bar_dataset_alias =
+        DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), bar_dataset_name.clone());
+
     let create_result = harness.create_root_dataset(foo_dataset_alias).await;
+    let _bar_create_result = harness.create_root_dataset(bar_dataset_alias).await;
 
     let ingest_mutation_code =
         FlowConfigHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
@@ -169,7 +174,7 @@ async fn test_list_flow_initiators() {
         .await;
     assert!(response.is_ok(), "{response:?}");
 
-    // Pure initiator listing
+    // Pure datasets listing
     let request_code = indoc!(
         r#"
         {
@@ -177,9 +182,9 @@ async fn test_list_flow_initiators() {
                 byName (name: "<account_name>") {
                     flows {
                         runs {
-                            listFlowInitiators {
+                            listDatasetsWithFlow {
                                 nodes {
-                                    accountName
+                                    id
                                 }
                                 pageInfo {
                                     currentPage
@@ -207,10 +212,10 @@ async fn test_list_flow_initiators() {
                 "byName": {
                     "flows": {
                         "runs": {
-                            "listFlowInitiators": {
+                            "listDatasetsWithFlow": {
                                 "nodes": [
                                     {
-                                        "accountName": "kamu",
+                                        "id": create_result.dataset_handle.id,
                                     },
                                 ],
                                 "pageInfo": {

@@ -14,7 +14,7 @@ use kamu_accounts::Account as AccountEntity;
 use kamu_flow_system as fs;
 
 use crate::prelude::*;
-use crate::queries::{Account, AccountConnection, Flow, FlowConnection, InitiatorFilterInput};
+use crate::queries::{Dataset, DatasetConnection, Flow, FlowConnection, InitiatorFilterInput};
 
 pub struct AccountFlowRuns {
     account: AccountEntity,
@@ -97,45 +97,36 @@ impl AccountFlowRuns {
         ))
     }
 
-    async fn list_flow_initiators(
-        &self,
-        ctx: &Context<'_>,
-        page: Option<usize>,
-        per_page: Option<usize>,
-    ) -> Result<AccountConnection> {
+    async fn list_datasets_with_flow(&self, ctx: &Context<'_>) -> Result<DatasetConnection> {
         let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
-        let page = page.unwrap_or(0);
-        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let flow_initiators_listing = flow_service
-            .list_all_flow_initiators_by_account(
-                &self.account.id,
-                fs::FlowPaginationOpts {
-                    offset: page * per_page,
-                    limit: per_page,
-                },
-            )
+        let datasets_with_flows: Vec<_> = flow_service
+            .list_all_datasets_with_flow_by_account(&self.account.id)
             .await
-            .int_err()?;
+            .int_err()?
+            .matched_stream
+            .try_collect()
+            .await?;
 
-        let matched_flow_initiators: Vec<_> = futures::future::try_join_all(
-            flow_initiators_listing
-                .initiator_ids
-                .iter()
-                .map(|initiator_id| Account::from_account_id(ctx, initiator_id.clone())),
-        )
-        .await?;
+        let matched_datasets: Vec<_> =
+            futures::future::try_join_all(datasets_with_flows.iter().map(|dataset_id| {
+                let dataset_ref = dataset_id.as_local_ref();
+                async move { Dataset::from_ref(ctx, &dataset_ref).await }
+            }))
+            .await?;
 
-        let total_count = flow_initiators_listing.total_count;
+        let total_count = matched_datasets.len();
 
-        Ok(AccountConnection::new(
-            matched_flow_initiators,
-            page,
-            per_page,
+        Ok(DatasetConnection::new(
+            matched_datasets,
+            0,
+            total_count,
             total_count,
         ))
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject)]
 pub struct AccountFlowFilters {
@@ -144,3 +135,5 @@ pub struct AccountFlowFilters {
     by_initiator: Option<InitiatorFilterInput>,
     by_dataset_ids: Vec<DatasetID>,
 }
+
+///////////////////////////////////////////////////////////////////////////////
