@@ -55,7 +55,7 @@ impl Harness {
 
         let authentication_service = catalog.get_one::<AuthenticationServiceImpl>().unwrap();
         let access_token = authentication_service
-            .make_access_token(DEFAULT_ACCOUNT_ID.to_string(), 60)
+            .make_access_token(&DEFAULT_ACCOUNT_ID, 60)
             .unwrap();
 
         let api_server = TestAPIServer::new(catalog, bind_socket, true);
