@@ -15,7 +15,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use console::style as s;
+use database_common::run_transactional;
 use dill::Catalog;
+use internal_error::ResultIntoInternal;
 use kamu_accounts::PredefinedAccountsConfig;
 use opendatafabric::AccountName;
 
@@ -61,49 +63,56 @@ impl UICommand {
 #[async_trait::async_trait(?Send)]
 impl Command for UICommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let web_server = crate::explore::WebUIServer::new(
-            self.base_catalog.clone(),
-            self.multi_tenant_workspace,
-            self.current_account_name.clone(),
-            self.predefined_accounts_config.clone(),
-            self.address,
-            self.port,
-        )
-        .await;
+        // The borrow checker is happy if self is not explicitly used
+        let self_ref = &self;
 
-        let web_server_url = format!("http://{}", web_server.local_addr());
-        tracing::info!("HTTP server is listening on: {}", web_server_url);
+        run_transactional([&self.base_catalog], move |[base_catalog]| async move {
+            let web_server = crate::explore::WebUIServer::new(
+                base_catalog,
+                self_ref.multi_tenant_workspace,
+                self_ref.current_account_name.clone(),
+                self_ref.predefined_accounts_config.clone(),
+                self_ref.address,
+                self_ref.port,
+            )
+            .await;
 
-        if self.get_token {
-            tracing::info!(
-                token = %web_server.get_access_token(),
-                "Issued API server token"
-            );
-        }
+            let web_server_url = format!("http://{}", web_server.local_addr());
+            tracing::info!("HTTP server is listening on: {}", web_server_url);
 
-        if self.output_config.is_tty
-            && self.output_config.verbosity_level == 0
-            && !self.output_config.quiet
-        {
-            eprintln!(
-                "{}\n  {}",
-                s("HTTP server is listening on:").green().bold(),
-                s(&web_server_url).bold(),
-            );
-            eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
-
-            if self.get_token {
-                eprintln!(
-                    "{} {}",
-                    s("JWT token:").green().bold(),
-                    s(web_server.get_access_token()).dim()
+            if self_ref.get_token {
+                tracing::info!(
+                    token = %web_server.get_access_token(),
+                    "Issued API server token"
                 );
             }
-        }
 
-        let _ = webbrowser::open(&web_server_url);
+            if self_ref.output_config.is_tty
+                && self_ref.output_config.verbosity_level == 0
+                && !self_ref.output_config.quiet
+            {
+                eprintln!(
+                    "{}\n  {}",
+                    s("HTTP server is listening on:").green().bold(),
+                    s(&web_server_url).bold(),
+                );
+                eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
 
-        web_server.run().await.map_err(|e| CLIError::critical(e))?;
+                if self_ref.get_token {
+                    eprintln!(
+                        "{} {}",
+                        s("JWT token:").green().bold(),
+                        s(web_server.get_access_token()).dim()
+                    );
+                }
+            }
+
+            let _ = webbrowser::open(&web_server_url);
+
+            web_server.run().await.int_err()
+        })
+        .await
+        .map_err(CLIError::critical)?;
 
         Ok(())
     }
