@@ -79,6 +79,9 @@ impl UploadServiceS3 {
                 { "bucket": self.upload_s3_bucket_config.bucket_name },
                 [ "content-length-range", 0, self.upload_s3_bucket_config.max_file_size_mb * 1024 * 1024 ],
                 { "key": key },
+                { "x-amz-meta-uuid": "14365123651274" },
+                { "x-amz-server-side-encryption": "AES256" },
+                [ "starts-with", "$x-amz-meta-tag", "" ],
 
                 { "x-amz-algorithm": amz_fields.x_amz_algorithm },
                 { "x-amz-credential": amz_fields.x_amz_credential.clone() },
@@ -139,27 +142,35 @@ impl UploadService for UploadServiceS3 {
                     value: String::from("private"),
                 },
                 UploadFormField {
+                    name: "x-amz-meta-uuid".to_string(),
+                    value: String::from("14365123651274"),
+                },
+                UploadFormField {
                     name: "x-amz-server-side-encryption".to_string(),
                     value: String::from("AES256"),
                 },
                 UploadFormField {
-                    name: "x-amz-credential".to_string(),
+                    name: "X-Amz-Credential".to_string(),
                     value: amz_fields.x_amz_credential,
                 },
                 UploadFormField {
-                    name: "x-amz-date".to_string(),
+                    name: "X-Amz-Date".to_string(),
                     value: amz_fields.x_amz_date,
                 },
                 UploadFormField {
-                    name: "x-amz-algorithm".to_string(),
+                    name: "X-Amz-Algorithm".to_string(),
                     value: String::from(amz_fields.x_amz_algorithm),
                 },
                 UploadFormField {
-                    name: "policy".to_string(),
+                    name: "x-amx-meta-tag".to_string(),
+                    value: String::from(""),
+                },
+                UploadFormField {
+                    name: "Policy".to_string(),
                     value: post_policy_base64,
                 },
                 UploadFormField {
-                    name: "signature".to_string(),
+                    name: "X-Amz-Signature".to_string(),
                     value: signature,
                 },
             ],
