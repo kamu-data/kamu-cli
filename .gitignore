@@ -1,7 +1,4 @@
 /target
-/opendatafabric/target
-/kamu-core/target
-/kamu-cli/target
 /examples/**/.kamu
 /examples/**/.ipynb_checkpoints
 /images/demo/**/.kamu
