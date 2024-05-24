@@ -27,7 +27,7 @@ This will run:
 * `kamu-cli` HTTP API
 
 > [!Note]
-> To save the database data between runs, `postgres-data/` directory will be created locally.
+> To save the database data between runs, `./postgres-data/` directory will be created locally.
 
 Enjoy, and please send us your feedback!
 
