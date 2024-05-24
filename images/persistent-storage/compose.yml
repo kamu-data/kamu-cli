@@ -20,13 +20,11 @@ services:
       db:
         condition: service_healthy
     restart: "no"
-    image: ghcr.io/kamu-data/sqlx-cli:latest
+    image: ghcr.io/kamu-data/sqlx-cli-with-migrations:latest
     entrypoint: [ "sh", "-c" ]
     command: >
       "sqlx database create &&
-       sqlx migrate run --source /migrations"
-    volumes:
-      - ../../migrations/postgres:/migrations
+       sqlx migrate run --source /migrations/postgres"
     environment:
       - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT}/${DB_DATABASE_NAME}?sslmode=disable
 
