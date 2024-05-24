@@ -11,6 +11,7 @@ use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use opendatafabric::{AccountID, AccountName};
+use sqlx::Row;
 
 use crate::domain::*;
 
@@ -142,6 +143,73 @@ impl AccountRepository for MySqlAccountRepository {
                 account_id: account_id.clone(),
             }))
         }
+    }
+
+    async fn get_accounts_by_ids(
+        &self,
+        account_ids: Vec<AccountID>,
+    ) -> Result<Vec<Account>, GetAccountByIdError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(GetAccountByIdError::Internal)?;
+
+        let placeholders = account_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let query_str = format!(
+            r#"
+                SELECT
+                    id,
+                    account_name,
+                    email,
+                    display_name,
+                    account_type,
+                    avatar_url,
+                    registered_at,
+                    is_admin,
+                    provider,
+                    provider_identity_key
+                FROM accounts
+                WHERE id IN ({placeholders})
+                "#,
+        );
+
+        // ToDo replace it by macro once sqlx will support it
+        // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
+        let mut query = sqlx::query(&query_str);
+        for account_id in &account_ids {
+            query = query.bind(account_id.to_string());
+        }
+
+        let account_rows = query
+            .fetch_all(connection_mut)
+            .await
+            .int_err()
+            .map_err(GetAccountByIdError::Internal)?;
+
+        Ok(account_rows
+            .into_iter()
+            .map(|account_row| Account {
+                id: AccountID::from_did_str(account_row.get::<&str, &str>("id")).unwrap(),
+                account_name: AccountName::new_unchecked(
+                    &account_row.get::<String, &str>("account_name"),
+                ),
+                email: account_row.get("email"),
+                display_name: account_row.get("display_name"),
+                account_type: account_row.get_unchecked("account_type"),
+                avatar_url: account_row.get("avatar_url"),
+                registered_at: account_row.get("registered_at"),
+                is_admin: account_row.get::<bool, &str>("is_admin"),
+                provider: account_row.get("provider"),
+                provider_identity_key: account_row.get("provider_identity_key"),
+            })
+            .collect())
     }
 
     async fn get_account_by_name(

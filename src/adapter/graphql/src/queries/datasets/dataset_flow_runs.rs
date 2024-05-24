@@ -10,6 +10,7 @@
 use std::collections::HashSet;
 
 use futures::TryStreamExt;
+use kamu_accounts::AuthenticationService;
 use {kamu_flow_system as fs, opendatafabric as odf};
 
 use crate::mutations::{check_if_flow_belongs_to_dataset, FlowInDatasetError, FlowNotFound};
@@ -131,12 +132,15 @@ impl DatasetFlowRuns {
             .try_collect()
             .await?;
 
-        let matched_flow_initiators: Vec<_> = futures::future::try_join_all(
-            flow_initiator_ids
-                .iter()
-                .map(|initiator_id| Account::from_account_id(ctx, initiator_id.clone())),
-        )
-        .await?;
+        let authentication_service = from_catalog::<dyn AuthenticationService>(ctx).unwrap();
+
+        let matched_flow_initiators: Vec<_> = authentication_service
+            .accounts_by_ids(flow_initiator_ids)
+            .await?
+            .into_iter()
+            .map(|account| Account::new(account.id.into(), account.account_name.into()))
+            .collect();
+
         let total_count = matched_flow_initiators.len();
 
         Ok(AccountConnection::new(

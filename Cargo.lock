@@ -3669,6 +3669,7 @@ dependencies = [
  "serde_with",
  "sqlx",
  "thiserror",
+ "tokio-stream",
  "tracing",
  "uuid",
 ]
@@ -3680,6 +3681,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "dill",
+ "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",

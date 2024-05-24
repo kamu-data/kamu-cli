@@ -10,9 +10,13 @@
 use std::collections::HashSet;
 
 use futures::TryStreamExt;
+use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use kamu_accounts::Account as AccountEntity;
+use kamu_core::DatasetRepository;
 use kamu_flow_system as fs;
+use opendatafabric::DatasetRefPattern;
 
+use super::Account;
 use crate::prelude::*;
 use crate::queries::{Dataset, DatasetConnection, Flow, FlowConnection, InitiatorFilterInput};
 
@@ -105,15 +109,23 @@ impl AccountFlowRuns {
             .await
             .int_err()?
             .matched_stream
+            .map_ok(|dataset_id| DatasetRefPattern::Ref(dataset_id.as_local_ref()))
             .try_collect()
             .await?;
 
+        let dataset_repo = from_catalog::<dyn DatasetRepository>(ctx).unwrap();
+
+        let account = Account::new(
+            self.account.id.clone().into(),
+            self.account.account_name.clone().into(),
+        );
+
         let matched_datasets: Vec<_> =
-            futures::future::try_join_all(datasets_with_flows.iter().map(|dataset_id| {
-                let dataset_ref = dataset_id.as_local_ref();
-                async move { Dataset::from_ref(ctx, &dataset_ref).await }
-            }))
-            .await?;
+            filter_datasets_by_local_pattern(dataset_repo.as_ref(), datasets_with_flows)
+                .map_ok(|dataset_handle| Dataset::new(account.clone(), dataset_handle))
+                .try_collect()
+                .await
+                .int_err()?;
 
         let total_count = matched_datasets.len();
 

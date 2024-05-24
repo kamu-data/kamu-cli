@@ -25,6 +25,7 @@ doctest = false
 internal-error = { workspace = true }
 opendatafabric = { workspace = true, features = ["arrow"] }
 
+kamu = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-data-utils = { workspace = true }
 kamu-core = { workspace = true }
@@ -54,7 +55,6 @@ url = { version = "2", default-features = false }
 # TODO: Limit to mock or in-memory implementations only
 container-runtime = { workspace = true }
 event-bus = { workspace = true }
-kamu = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }

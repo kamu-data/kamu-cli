@@ -56,6 +56,11 @@ mockall::mock! {
             account_id: &AccountID,
         ) -> Result<Option<Account>, InternalError>;
 
+        async fn accounts_by_ids(
+            &self,
+            account_ids: Vec<AccountID>,
+        ) -> Result<Vec<Account>, InternalError>;
+
         async fn account_by_name(
             &self,
             account_name: &AccountName,
