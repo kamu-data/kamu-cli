@@ -14,6 +14,7 @@ pub use http_server_dataset_router::*;
 mod middleware;
 pub use middleware::*;
 mod access_token;
+pub use access_token::*;
 pub mod api_error;
 mod axum_utils;
 pub mod data;

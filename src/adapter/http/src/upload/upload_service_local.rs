@@ -11,13 +11,19 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use dill::*;
-use kamu::domain::{ErrorIntoInternal, InternalError, ResultIntoInternal, ServerUrlConfig};
+use kamu::domain::{ErrorIntoInternal, InternalError, ServerUrlConfig};
 use opendatafabric::AccountID;
 use thiserror::Error;
 use tokio::io::AsyncRead;
 use uuid::Uuid;
 
-use crate::{UploadContext, UploadService};
+use crate::{
+    AccessToken,
+    ContentTooLargeError,
+    MakeUploadContextError,
+    UploadContext,
+    UploadService,
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -26,13 +32,19 @@ use crate::{UploadContext, UploadService};
 pub struct UploadServiceLocal {
     server_url_config: Arc<ServerUrlConfig>,
     cache_dir: PathBuf,
+    max_file_size_bytes: i64,
 }
 
 impl UploadServiceLocal {
-    pub fn new(server_url_config: Arc<ServerUrlConfig>, cache_dir: PathBuf) -> Self {
+    pub fn new(
+        server_url_config: Arc<ServerUrlConfig>,
+        cache_dir: PathBuf,
+        max_file_size_bytes: i64,
+    ) -> Self {
         Self {
             server_url_config,
             cache_dir,
+            max_file_size_bytes,
         }
     }
 
@@ -58,13 +70,20 @@ impl UploadService for UploadServiceLocal {
         &self,
         account_id: &AccountID,
         file_name: String,
-    ) -> Result<UploadContext, InternalError> {
+        content_length: i64,
+        access_token: &AccessToken,
+    ) -> Result<UploadContext, MakeUploadContextError> {
+        if content_length > self.max_file_size_bytes {
+            return Err(MakeUploadContextError::TooLarge(ContentTooLargeError {}));
+        }
+
         let upload_id = Uuid::new_v4().simple().to_string();
 
         let upload_folder_path = self
             .make_account_folder_path(account_id)
             .join(upload_id.clone());
-        std::fs::create_dir_all(upload_folder_path).int_err()?;
+        std::fs::create_dir_all(upload_folder_path)
+            .map_err(|e| MakeUploadContextError::Internal(e.int_err()))?;
 
         let context = UploadContext {
             upload_url: format!(
@@ -72,6 +91,10 @@ impl UploadService for UploadServiceLocal {
                 self.server_url_config.protocols.base_url_rest, upload_id, file_name
             ),
             method: "POST".to_string(),
+            headers: vec![(
+                String::from("Authorization"),
+                format!("Bearer {}", access_token.token),
+            )],
             fields: vec![],
         };
         Ok(context)

@@ -10,7 +10,10 @@
 use kamu::domain::InternalError;
 use opendatafabric::AccountID;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tokio::io::AsyncRead;
+
+use crate::AccessToken;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +23,9 @@ pub trait UploadService: Send + Sync {
         &self,
         account_id: &AccountID,
         file_name: String,
-    ) -> Result<UploadContext, InternalError>;
+        content_length: i64,
+        access_token: &AccessToken,
+    ) -> Result<UploadContext, MakeUploadContextError>;
 
     async fn save_upload(
         &self,
@@ -38,14 +43,22 @@ pub trait UploadService: Send + Sync {
 pub struct UploadContext {
     pub upload_url: String,
     pub method: String,
-    // TODO: resulting URL
-    pub fields: Vec<UploadFormField>,
+    pub headers: Vec<(String, String)>,
+    pub fields: Vec<(String, String)>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct UploadFormField {
-    pub name: String,
-    pub value: String,
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum MakeUploadContextError {
+    #[error(transparent)]
+    TooLarge(ContentTooLargeError),
+    #[error(transparent)]
+    Internal(InternalError),
 }
+
+#[derive(Debug, Error)]
+#[error("Content too large")]
+pub struct ContentTooLargeError {}
 
 ///////////////////////////////////////////////////////////////////////////////

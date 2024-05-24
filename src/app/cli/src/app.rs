@@ -18,7 +18,7 @@ use kamu::domain::*;
 use kamu::utils::s3_context::S3Context;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_adapter_http::{UploadS3BucketConfig, UploadService, UploadServiceLocal, UploadServiceS3};
+use kamu_adapter_http::{UploadS3BucketConfig, UploadService, UploadServiceS3};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
@@ -97,7 +97,7 @@ pub async fn run(
         base_catalog_builder.add_value(UploadS3BucketConfig {
             bucket_http_url: s3_upload_http_url,
             bucket_name: String::from("upload.demo.stg.kamu.dev.us-west-2"),
-            max_file_size_mb: 50,
+            max_file_size_bytes: i64::from(50 * 1024 * 1024),
         });
         base_catalog_builder.add_builder(
             UploadServiceS3::builder()
@@ -353,8 +353,12 @@ pub fn configure_base_catalog(
     b.add::<kamu_adapter_auth_oso::KamuAuthOso>();
     b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
 
-    //b.add_builder(UploadServiceLocal::builder().with_cache_dir(workspace_layout.
-    // cache_dir.clone())); b.bind::<dyn UploadService, UploadServiceLocal>();
+    /*b.add_builder(
+        UploadServiceLocal::builder()
+            .with_cache_dir(workspace_layout.cache_dir.clone())
+            .with_max_file_size_bytes(i64::from(50 * 1024 * 1024)),
+    );
+    b.bind::<dyn UploadService, UploadServiceLocal>();*/
 
     b
 }

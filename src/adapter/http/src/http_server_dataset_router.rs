@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::simple_protocol::*;
-use crate::{DatasetAuthorizationLayer, DatasetResolverLayer, UploadService};
+use crate::{AccessToken, DatasetAuthorizationLayer, DatasetResolverLayer, UploadService};
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -159,13 +159,14 @@ pub async fn platform_token_validate_handler(
 /////////////////////////////////////////////////////////////////////////////////
 
 #[derive(serde::Deserialize)]
-pub struct FileNameFromQuery {
+pub struct PlatformFileUploadQuery {
     file_name: String,
+    content_length: i64,
 }
 
 pub async fn platform_file_upload_get_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
-    axum::extract::Query(file_name): axum::extract::Query<FileNameFromQuery>,
+    axum::extract::Query(query): axum::extract::Query<PlatformFileUploadQuery>,
 ) -> Response {
     let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
     let account_id = match current_account_subject.as_ref() {
@@ -173,9 +174,16 @@ pub async fn platform_file_upload_get_handler(
         CurrentAccountSubject::Anonymous(reason) => return response_for_anonymous_denial(*reason),
     };
 
+    let access_token = catalog.get_one::<AccessToken>().unwrap();
+
     let upload_service = catalog.get_one::<dyn UploadService>().unwrap();
     match upload_service
-        .make_upload_context(&account_id, file_name.file_name)
+        .make_upload_context(
+            &account_id,
+            query.file_name,
+            query.content_length,
+            access_token.as_ref(),
+        )
         .await
     {
         Ok(upload_context) => Json(json!(upload_context)).into_response(),
