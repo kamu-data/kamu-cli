@@ -3680,7 +3680,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "dill",
- "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",

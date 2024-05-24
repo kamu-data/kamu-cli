@@ -196,7 +196,7 @@ impl AccountRepository for MySqlAccountRepository {
         Ok(account_rows
             .into_iter()
             .map(|account_row| Account {
-                id: AccountID::from_did_str(account_row.get::<&str, &str>("id")).unwrap(),
+                id: account_row.get_unchecked("id"),
                 account_name: AccountName::new_unchecked(
                     &account_row.get::<String, &str>("account_name"),
                 ),
