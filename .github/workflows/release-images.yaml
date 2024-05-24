@@ -1,7 +1,7 @@
 name: release-images
 on:
   # Manual trigger
-  workflow_dispatch: {}
+  workflow_dispatch: { }
   # Automatic trigger after each release
   # Note: Triggers on both successes and failures (see conditional below)
   workflow_run:
@@ -42,9 +42,15 @@ jobs:
           make kamu-base-with-data
           make kamu-base-with-data-mt
 
+      - name: Build sqlx-cli image with migrations
+        run: |
+          cd images/
+          make sqlx-cli-with-migrations
+
       - name: Publish images
         run: |
           cd images
           make kamu-base-push
           make kamu-base-with-data-push
           make kamu-base-with-data-mt-push
+          make sqlx-cli-with-migrations-push

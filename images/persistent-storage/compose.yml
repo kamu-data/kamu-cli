@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - ${DB_PORT}:5432
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_DATABASE_NAME}
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d ${DB_DATABASE_NAME} -U ${DB_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db_migrator:
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    image: ghcr.io/kamu-data/sqlx-cli-with-migrations:latest
+    entrypoint: [ "sh", "-c" ]
+    command: >
+      "sqlx database create &&
+       sqlx migrate run --source /migrations/postgres"
+    environment:
+      - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT}/${DB_DATABASE_NAME}?sslmode=disable
+
+  kamu:
+    depends_on:
+      db_migrator:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    image: ghcr.io/kamu-data/kamu-base:latest-with-data-mt
+    command: kamu system api-server --address 0.0.0.0 --http-port ${KAMU_PORT}
+    configs:
+      - source: .kamuconfig
+        target: /opt/kamu/workspace/.kamu/.kamuconfig
+    environment:
+      - KAMU_AUTH_GITHUB_CLIENT_ID=${KAMU_AUTH_GITHUB_CLIENT_ID}
+      - KAMU_AUTH_GITHUB_CLIENT_SECRET=${KAMU_AUTH_GITHUB_CLIENT_SECRET}
+    ports:
+      - "${KAMU_PORT}:${KAMU_PORT}"
+
+configs:
+  .kamuconfig:
+    content: |
+      kind: CLIConfig
+      version: 1
+      content:
+        database:
+          provider: postgres
+          host: db
+          user: ${DB_USER}
+          password: ${DB_PASSWORD}
+          databaseName: ${DB_DATABASE_NAME}
