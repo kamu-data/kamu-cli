@@ -3,7 +3,6 @@
 /examples/**/.ipynb_checkpoints
 /images/demo/**/.kamu
 /images/demo/**/.ipynb_checkpoints
-/images/persistent-storage/postgres-data
 
 .env
 /kamu.sqlite.db*
