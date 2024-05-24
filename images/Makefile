@@ -7,7 +7,7 @@ KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | 
 SQLX_VERSION = 0.7.4
 IMAGE_SQLX_TAG = $(SQLX_VERSION)-1
 
-#########################################################################################
+################################################################################
 
 
 # Build image for local testing purposes
@@ -28,7 +28,7 @@ jupyter-multi-arch:
 		jupyter/
 
 
-#########################################################################################
+################################################################################
 
 
 .PHONY: kamu-base
@@ -46,7 +46,7 @@ kamu-base-push:
 	docker push $(IMAGE_REPO)/kamu-base:latest
 
 
-#########################################################################################
+################################################################################
 
 
 .PHONY: kamu-base-with-data
@@ -65,7 +65,7 @@ kamu-base-with-data-push:
 		image-push
 
 
-#########################################################################################
+################################################################################
 
 
 .PHONY: kamu-base-with-data-mt
@@ -84,7 +84,7 @@ kamu-base-with-data-mt-push:
 		image-push
 
 
-#########################################################################################
+################################################################################
 
 
 .PHONY: sqlx-cli
@@ -106,4 +106,24 @@ sqlx-cli-push:
 	docker push $(IMAGE_REPO)/sqlx-cli:latest
 
 
-#########################################################################################
+################################################################################
+
+
+.PHONY: sqlx-cli-with-migrations
+sqlx-cli-with-migrations:
+	make -C sqlx-cli-with-migrations/ \
+		IMAGE_REPO=$(IMAGE_REPO) \
+		KAMU_VERSION=$(KAMU_VERSION) \
+		IMAGE_SQLX_TAG=$(IMAGE_SQLX_TAG) \
+		image
+
+
+.PHONY: sqlx-push
+sqlx-cli-with-migrations-push:
+	make -C sqlx-cli-with-migrations/ \
+		IMAGE_REPO=$(IMAGE_REPO) \
+		KAMU_VERSION=$(KAMU_VERSION) \
+		IMAGE_SQLX_TAG=$(IMAGE_SQLX_TAG) \
+		image-push
+
+################################################################################
