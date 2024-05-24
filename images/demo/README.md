@@ -5,22 +5,22 @@ This demo guides you through the basics of using `kamu` and its key concepts. It
 ## Requirements
 To run this demo you'll only need:
 * `docker`
-* `docker-compose`
 
 ## Running
 First you will need to download the `docker-compose.yml` file:
 
-```bash
+```shell
 wget https://raw.githubusercontent.com/kamu-data/kamu-cli/master/images/demo/docker-compose.yml
 ```
 
 To run all demo components on your computer simply do:
 
-```bash
-docker-compose up
+```shell
+docker compose up
 ```
 
-> If you've run the environment before you might want to get latest versions of the images using `docker-compose pull` command.
+> [!TIP]
+> If you've run the environment before you might want to get latest versions of the images using `docker compose pull` command.
 
 This will run:
 * JupyterHub web notebooks with Kamu integration
@@ -33,6 +33,6 @@ Enjoy, and please send us your feedback!
 ## Shutting down
 To shutdown the environment do:
 
-```bash
-docker-compose down
+```shell
+docker compose down
 ```

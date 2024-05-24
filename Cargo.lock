@@ -3669,7 +3669,6 @@ dependencies = [
  "serde_with",
  "sqlx",
  "thiserror",
- "tokio-stream",
  "tracing",
  "uuid",
 ]

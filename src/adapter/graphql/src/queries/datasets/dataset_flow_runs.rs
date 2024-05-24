@@ -138,7 +138,7 @@ impl DatasetFlowRuns {
             .accounts_by_ids(flow_initiator_ids)
             .await?
             .into_iter()
-            .map(|account| Account::new(account.id.into(), account.account_name.into()))
+            .map(|account| Account::from_account(account))
             .collect();
 
         let total_count = matched_flow_initiators.len();

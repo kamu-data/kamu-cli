@@ -59,7 +59,7 @@ async fn test_insert_and_locate_github_account(mysql_pool: MySqlPool) {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// #[test_group::group(database, mysql)]
+#[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_insert_and_locate_multiple_github_account(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
