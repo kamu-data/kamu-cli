@@ -11,6 +11,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use dill::Catalog;
+use indoc::indoc;
 use internal_error::*;
 use kamu::domain::SystemTimeSource;
 use kamu_flow_system_inmem::domain::FlowService;
@@ -129,14 +130,14 @@ impl APIServer {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn root() -> impl axum::response::IntoResponse {
-    axum::response::Html(
+    axum::response::Html(indoc!(
         r#"
-<h1>Kamu HTTP Server</h1>
-<ul>
-    <li><a href="/graphql">GraphQL Playground</li>
-</ul>
-"#,
-    )
+        <h1>Kamu HTTP Server</h1>
+        <ul>
+            <li><a href="/graphql">GraphQL Playground</li>
+        </ul>
+        "#
+    ))
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
