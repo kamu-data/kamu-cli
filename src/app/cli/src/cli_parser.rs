@@ -774,6 +774,10 @@ pub fn cli() -> Command {
                             .long("force")
                             .action(ArgAction::SetTrue)
                             .help("Overwrite local version with remote, even if revisions have diverged"),
+                        Arg::new("reset-derivatives-on-fail")
+                            .long("reset-derivatives-on-fail")
+                            .action(ArgAction::SetTrue)
+                            .help("Run hard compacting of derivative dataset if transformation failed"),
                     ])
                     .after_help(indoc::indoc!(
                         r#"

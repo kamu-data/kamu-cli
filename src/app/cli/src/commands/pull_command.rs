@@ -19,6 +19,7 @@ use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
+use crate::CompactingProgress;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Command
@@ -37,6 +38,7 @@ pub struct PullCommand {
     as_name: Option<DatasetName>,
     add_aliases: bool,
     force: bool,
+    reset_derivatives: bool,
 }
 
 impl PullCommand {
@@ -53,6 +55,7 @@ impl PullCommand {
         as_name: Option<DatasetName>,
         add_aliases: bool,
         force: bool,
+        reset_derivatives: bool,
     ) -> Self
     where
         I: IntoIterator<Item = DatasetRefAnyPattern>,
@@ -70,6 +73,7 @@ impl PullCommand {
             as_name,
             add_aliases,
             force,
+            reset_derivatives,
         }
     }
 
@@ -131,6 +135,7 @@ impl PullCommand {
                     recursive: self.recursive,
                     all: self.all,
                     add_aliases: self.add_aliases,
+                    reset_derivatives: self.reset_derivatives,
                     ingest_options: PollingIngestOptions {
                         fetch_uncacheable: self.fetch_uncacheable,
                         exhaust_sources: true,
@@ -295,6 +300,10 @@ impl PullMultiListener for PrettyPullProgress {
     fn get_sync_listener(self: Arc<Self>) -> Option<Arc<dyn SyncMultiListener>> {
         Some(self)
     }
+
+    fn get_compacting_listener(self: Arc<Self>) -> Option<Arc<dyn CompactingMultiListener>> {
+        Some(self)
+    }
 }
 
 impl PollingIngestMultiListener for PrettyPullProgress {
@@ -333,6 +342,15 @@ impl SyncMultiListener for PrettyPullProgress {
                 .expect("Expected local ref"),
             src.as_remote_ref(|_| true).expect("Expected remote ref"),
             self.multi_progress.clone(),
+        )))
+    }
+}
+
+impl CompactingMultiListener for PrettyPullProgress {
+    fn begin_compact(&self, dataset_handle: &DatasetHandle) -> Option<Arc<dyn CompactingListener>> {
+        Some(Arc::new(CompactingProgress::new(
+            dataset_handle,
+            &self.multi_progress,
         )))
     }
 }

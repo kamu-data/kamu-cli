@@ -25,6 +25,7 @@ pub struct PullServiceImpl {
     ingest_svc: Arc<dyn PollingIngestService>,
     transform_svc: Arc<dyn TransformService>,
     sync_svc: Arc<dyn SyncService>,
+    compacting_svc: Arc<dyn CompactingService>,
     system_time_source: Arc<dyn SystemTimeSource>,
     current_account_subject: Arc<CurrentAccountSubject>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
@@ -39,6 +40,7 @@ impl PullServiceImpl {
         ingest_svc: Arc<dyn PollingIngestService>,
         transform_svc: Arc<dyn TransformService>,
         sync_svc: Arc<dyn SyncService>,
+        compacting_svc: Arc<dyn CompactingService>,
         system_time_source: Arc<dyn SystemTimeSource>,
         current_account_subject: Arc<CurrentAccountSubject>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
@@ -49,6 +51,7 @@ impl PullServiceImpl {
             ingest_svc,
             transform_svc,
             sync_svc,
+            compacting_svc,
             system_time_source,
             current_account_subject,
             dataset_action_authorizer,
@@ -419,19 +422,63 @@ impl PullServiceImpl {
         Ok(results)
     }
 
+    #[async_recursion::async_recursion]
     async fn transform_multi(
         &self,
         batch: &[PullItem], // TODO: Move to avoid cloning
-        listener: Option<Arc<dyn TransformMultiListener>>,
+        transform_listener: Option<Arc<dyn TransformMultiListener>>,
+        compacting_listener: Option<Arc<dyn CompactingMultiListener>>,
+        retry_with_compaction: bool,
     ) -> Result<Vec<PullResponse>, InternalError> {
         let transform_requests = batch.iter().map(|pi| pi.local_ref.clone()).collect();
 
         let transform_results = self
             .transform_svc
-            .transform_multi(transform_requests, listener)
+            .transform_multi(transform_requests, transform_listener.clone())
             .await;
 
         assert_eq!(batch.len(), transform_results.len());
+
+        if retry_with_compaction {
+            let mut compacting_target_refs = vec![];
+            for (dataset_ref, transform_result) in &transform_results {
+                if let Err(transform_err) = transform_result
+                    && let TransformError::InvalidInterval(_) = transform_err
+                {
+                    compacting_target_refs.push(dataset_ref.clone());
+                }
+            }
+
+            if !compacting_target_refs.is_empty() {
+                let compacting_results = self
+                    .compacting_svc
+                    .compact_multi(
+                        compacting_target_refs,
+                        CompactingOptions {
+                            keep_metadata_only: true,
+                            ..Default::default()
+                        },
+                        compacting_listener,
+                    )
+                    .await;
+
+                let retry_items: Vec<_> = std::iter::zip(batch, compacting_results)
+                    .filter_map(|(pi, response)| {
+                        assert_eq!(pi.local_ref, response.dataset_ref);
+                        if let Ok(result) = response.result
+                            && let CompactingResult::Success { .. } = result
+                        {
+                            return Some(pi.clone());
+                        }
+                        None
+                    })
+                    .collect();
+
+                return self
+                    .transform_multi(&retry_items, transform_listener, None, false)
+                    .await;
+            }
+        }
 
         Ok(std::iter::zip(batch, transform_results)
             .map(|(pi, res)| {
@@ -475,6 +522,7 @@ impl PullService for PullServiceImpl {
                 PullMultiOptions {
                     recursive: false,
                     all: false,
+                    reset_derivatives: options.reset_derivatives,
                     add_aliases: options.add_aliases,
                     ingest_options: options.ingest_options,
                     sync_options: options.sync_options,
@@ -583,6 +631,10 @@ impl PullService for PullServiceImpl {
                     listener
                         .as_ref()
                         .and_then(|l| l.clone().get_transform_listener()),
+                    listener
+                        .as_ref()
+                        .and_then(|l| l.clone().get_compacting_listener()),
+                    options.reset_derivatives,
                 )
                 .await?
             };
@@ -756,6 +808,10 @@ impl PullMultiListener for ListenerMultiAdapter {
     fn get_sync_listener(self: Arc<Self>) -> Option<Arc<dyn SyncMultiListener>> {
         Some(self)
     }
+
+    fn get_compacting_listener(self: Arc<Self>) -> Option<Arc<dyn CompactingMultiListener>> {
+        Some(self)
+    }
 }
 
 impl PollingIngestMultiListener for ListenerMultiAdapter {
@@ -777,5 +833,11 @@ impl SyncMultiListener for ListenerMultiAdapter {
         _dst: &DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         self.0.clone().get_sync_listener()
+    }
+}
+
+impl CompactingMultiListener for ListenerMultiAdapter {
+    fn begin_compact(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn CompactingListener>> {
+        self.0.clone().get_compacting_listener()
     }
 }

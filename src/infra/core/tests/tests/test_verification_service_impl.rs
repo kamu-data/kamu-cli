@@ -21,7 +21,7 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 
-use super::test_pull_service_impl::TestTransformService;
+use super::test_pull_service_impl::{TestTransformService, TestTransfromResult};
 
 #[tokio::test]
 async fn test_verify_data_consistency() {
@@ -46,7 +46,10 @@ async fn test_verify_data_consistency() {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
+        .add_value(TestTransformService::new(
+            Arc::new(Mutex::new(Vec::new())),
+            TestTransfromResult::Success,
+        ))
         .bind::<dyn TransformService, TestTransformService>()
         .add::<VerificationServiceImpl>()
         .build();

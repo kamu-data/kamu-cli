@@ -14,13 +14,7 @@ use chrono::{DateTime, NaiveDate, TimeDelta, TimeZone, Utc};
 use datafusion::execution::config::SessionConfig;
 use datafusion::execution::context::SessionContext;
 use dill::Component;
-use domain::{
-    CompactingError,
-    CompactingOptions,
-    CompactingResult,
-    CompactingService,
-    NullCompactingMultiListener,
-};
+use domain::{CompactingError, CompactingOptions, CompactingResult, CompactingService};
 use event_bus::EventBus;
 use futures::TryStreamExt;
 use indoc::{formatdoc, indoc};
@@ -32,7 +26,7 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth;
 use opendatafabric::*;
 
-use super::test_pull_service_impl::TestTransformService;
+use super::test_pull_service_impl::{TestTransformService, TestTransfromResult};
 use crate::mock_engine_provisioner;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -77,7 +71,7 @@ async fn test_dataset_compact() {
             .compact_dataset(
                 &created.dataset_handle,
                 CompactingOptions::default(),
-                Some(Arc::new(NullCompactingMultiListener {}))
+                Some(Arc::new(NullCompactingListener {}))
             )
             .await,
         Ok(CompactingResult::NothingToDo)
@@ -121,7 +115,7 @@ async fn test_dataset_compact() {
             .compact_dataset(
                 &created.dataset_handle,
                 CompactingOptions::default(),
-                Some(Arc::new(NullCompactingMultiListener {}))
+                Some(Arc::new(NullCompactingListener {}))
             )
             .await,
         Ok(CompactingResult::Success {
@@ -219,7 +213,7 @@ async fn test_dataset_compact_s3() {
             .compact_dataset(
                 &created.dataset_handle,
                 CompactingOptions::default(),
-                Some(Arc::new(NullCompactingMultiListener {}))
+                Some(Arc::new(NullCompactingListener {}))
             )
             .await,
         Ok(CompactingResult::NothingToDo)
@@ -263,7 +257,7 @@ async fn test_dataset_compact_s3() {
             .compact_dataset(
                 &created.dataset_handle,
                 CompactingOptions::default(),
-                Some(Arc::new(NullCompactingMultiListener {}))
+                Some(Arc::new(NullCompactingListener {}))
             )
             .await,
         Ok(CompactingResult::Success {
@@ -381,7 +375,7 @@ async fn test_dataset_compacting_watermark_only_blocks() {
         .compact_dataset(
             &created.dataset_handle,
             CompactingOptions::default(),
-            Some(Arc::new(NullCompactingMultiListener {})),
+            Some(Arc::new(NullCompactingListener {})),
         )
         .await
         .unwrap();
@@ -552,7 +546,7 @@ async fn test_dataset_compacting_limits() {
                     max_slice_size: None,
                     ..CompactingOptions::default()
                 },
-                Some(Arc::new(NullCompactingMultiListener {}))
+                Some(Arc::new(NullCompactingListener {}))
             )
             .await,
         Ok(CompactingResult::Success {
@@ -709,7 +703,7 @@ async fn test_dataset_compacting_keep_all_non_data_blocks() {
             .compact_dataset(
                 &created.dataset_handle,
                 CompactingOptions::default(),
-                Some(Arc::new(NullCompactingMultiListener {}))
+                Some(Arc::new(NullCompactingListener {}))
             )
             .await,
         Ok(CompactingResult::Success {
@@ -796,7 +790,7 @@ async fn test_dataset_compacting_derive_error() {
             .compact_dataset(
                 &created.dataset_handle,
                 CompactingOptions::default(),
-                Some(Arc::new(NullCompactingMultiListener {}))
+                Some(Arc::new(NullCompactingListener {}))
             )
             .await,
         Err(CompactingError::InvalidDatasetKind(_)),
@@ -859,7 +853,7 @@ async fn test_large_dataset_compact() {
                     max_slice_size: None,
                     ..CompactingOptions::default()
                 },
-                Some(Arc::new(NullCompactingMultiListener {}))
+                Some(Arc::new(NullCompactingListener {}))
             )
             .await,
         Ok(CompactingResult::Success {
@@ -956,7 +950,7 @@ async fn test_dataset_keep_metadata_only_compact() {
                     keep_metadata_only: true,
                     ..CompactingOptions::default()
                 },
-                Some(Arc::new(NullCompactingMultiListener {}))
+                Some(Arc::new(NullCompactingListener {}))
             )
             .await,
         Ok(CompactingResult::NothingToDo)
@@ -993,7 +987,7 @@ async fn test_dataset_keep_metadata_only_compact() {
                     keep_metadata_only: true,
                     ..CompactingOptions::default()
                 },
-                Some(Arc::new(NullCompactingMultiListener {}))
+                Some(Arc::new(NullCompactingListener {}))
             )
             .await,
         Ok(CompactingResult::Success {
@@ -1040,7 +1034,7 @@ async fn test_dataset_keep_metadata_only_compact() {
                     keep_metadata_only: true,
                     ..CompactingOptions::default()
                 },
-                Some(Arc::new(NullCompactingMultiListener {}))
+                Some(Arc::new(NullCompactingListener {}))
             )
             .await,
         Ok(CompactingResult::Success {
@@ -1161,7 +1155,10 @@ impl CompactTestHarness {
             .add::<ObjectStoreBuilderLocalFs>()
             .add_value(ObjectStoreBuilderS3::new(s3_context.clone(), true))
             .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
-            .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
+            .add_value(TestTransformService::new(
+                Arc::new(Mutex::new(Vec::new())),
+                TestTransfromResult::Success,
+            ))
             .bind::<dyn TransformService, TestTransformService>()
             .add::<VerificationServiceImpl>()
             .add_value(CurrentAccountSubject::new_test())

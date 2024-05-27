@@ -133,6 +133,12 @@ pub enum TransformError {
         AccessError,
     ),
     #[error(transparent)]
+    InvalidInterval(
+        #[from]
+        #[backtrace]
+        InvalidIntervalError,
+    ),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]

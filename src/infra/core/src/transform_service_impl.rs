@@ -405,7 +405,10 @@ impl TransformServiceImpl {
                 .iter_blocks_interval(new_block_hash, query_input.prev_block_hash.as_ref(), false)
                 .try_collect()
                 .await
-                .int_err()?
+                .map_err(|chain_err| match chain_err {
+                    IterBlocksError::InvalidInterval(err) => TransformError::InvalidInterval(err),
+                    _ => TransformError::Internal(chain_err.int_err()),
+                })?
         } else {
             Vec::new()
         };
