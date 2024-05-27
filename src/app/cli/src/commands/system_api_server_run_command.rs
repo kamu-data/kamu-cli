@@ -115,52 +115,42 @@ impl Command for APIServerRunCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         self.check_required_env_vars()?;
 
-        // The borrow checker is happy if self is not explicitly used
-        let self_ref = &self;
+        let access_token = self.get_access_token().await?;
 
-        run_transactional(
-            [&self.base_catalog, &self.cli_catalog],
-            move |[base_catalog, cli_catalog]| async move {
-                let access_token = self_ref.get_access_token(&base_catalog).await?;
+        let api_server = crate::explore::APIServer::new(
+            self.base_catalog.clone(),
+            &self.cli_catalog,
+            self.multi_tenant_workspace,
+            self.address,
+            self.port,
+        );
 
-                let api_server = crate::explore::APIServer::new(
-                    base_catalog,
-                    &cli_catalog,
-                    self_ref.multi_tenant_workspace,
-                    self_ref.address,
-                    self_ref.port,
+        tracing::info!(
+            "API server is listening on: http://{}",
+            api_server.local_addr()
+        );
+
+        if self.output_config.is_tty
+            && self.output_config.verbosity_level == 0
+            && !self.output_config.quiet
+        {
+            eprintln!(
+                "{}\n  {}",
+                s("API server is listening on:").green().bold(),
+                s(format!("http://{}", api_server.local_addr())).bold(),
+            );
+            eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
+
+            if self.get_token {
+                eprintln!(
+                    "{} {}",
+                    s("JWT token:").green().bold(),
+                    s(access_token).dim()
                 );
+            }
+        }
 
-                tracing::info!(
-                    "API server is listening on: http://{}",
-                    api_server.local_addr()
-                );
-
-                if self_ref.output_config.is_tty
-                    && self_ref.output_config.verbosity_level == 0
-                    && !self_ref.output_config.quiet
-                {
-                    eprintln!(
-                        "{}\n  {}",
-                        s("API server is listening on:").green().bold(),
-                        s(format!("http://{}", api_server.local_addr())).bold(),
-                    );
-                    eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
-
-                    if self_ref.get_token {
-                        eprintln!(
-                            "{} {}",
-                            s("JWT token:").green().bold(),
-                            s(access_token).dim()
-                        );
-                    }
-                }
-
-                api_server.run().await
-            },
-        )
-        .await
-        .map_err(CLIError::critical)?;
+        api_server.run().await.map_err(CLIError::critical)?;
 
         Ok(())
     }
