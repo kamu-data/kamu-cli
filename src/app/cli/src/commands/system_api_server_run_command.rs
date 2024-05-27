@@ -77,7 +77,7 @@ impl APIServerRunCommand {
         Ok(())
     }
 
-    async fn get_access_token(&self, base_catalog: &Catalog) -> Result<String, InternalError> {
+    async fn get_access_token(&self) -> Result<String, InternalError> {
         let current_account_name = match self.account_subject.as_ref() {
             CurrentAccountSubject::Logged(l) => l.account_name.clone(),
             CurrentAccountSubject::Anonymous(_) => {
@@ -96,17 +96,21 @@ impl APIServerRunCommand {
             password: account_config.get_password(),
         };
 
-        let auth_svc = base_catalog.get_one::<dyn AuthenticationService>().unwrap();
-        let access_token = auth_svc
-            .login(
-                PROVIDER_PASSWORD,
-                serde_json::to_string::<PasswordLoginCredentials>(&login_credentials).int_err()?,
-            )
-            .await
-            .int_err()?
-            .access_token;
+        let login_response = run_transactional(&self.base_catalog, |catalog: Catalog| async move {
+            let auth_svc = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
-        Ok(access_token)
+            auth_svc
+                .login(
+                    PROVIDER_PASSWORD,
+                    serde_json::to_string::<PasswordLoginCredentials>(&login_credentials)
+                        .int_err()?,
+                )
+                .await
+                .int_err()
+        })
+        .await?;
+
+        Ok(login_response.access_token)
     }
 }
 
