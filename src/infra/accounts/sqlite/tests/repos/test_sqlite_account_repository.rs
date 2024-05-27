@@ -19,7 +19,7 @@ use sqlx::SqlitePool;
 async fn test_missing_account_not_found(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_missing_account_not_found(&catalog).await;
         Ok(())
     })
@@ -34,7 +34,7 @@ async fn test_missing_account_not_found(sqlite_pool: SqlitePool) {
 async fn test_insert_and_locate_cli_account(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_insert_and_locate_password_account(&catalog).await;
         Ok(())
     })
@@ -49,7 +49,7 @@ async fn test_insert_and_locate_cli_account(sqlite_pool: SqlitePool) {
 async fn test_insert_and_locate_github_account(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_insert_and_locate_github_account(&catalog).await;
         Ok(())
     })
@@ -79,7 +79,7 @@ async fn test_insert_and_locate_multiple_github_account(sqlite_pool: SqlitePool)
 async fn test_insert_and_locate_account_without_email(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_insert_and_locate_account_without_email(&catalog).await;
         Ok(())
     })
@@ -94,7 +94,7 @@ async fn test_insert_and_locate_account_without_email(sqlite_pool: SqlitePool) {
 async fn test_duplicate_password_account_id(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_duplicate_password_account_id(&catalog).await;
         Ok(())
     })
@@ -109,7 +109,7 @@ async fn test_duplicate_password_account_id(sqlite_pool: SqlitePool) {
 async fn test_duplicate_password_account_email(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_duplicate_password_account_email(&catalog).await;
         Ok(())
     })
@@ -124,7 +124,7 @@ async fn test_duplicate_password_account_email(sqlite_pool: SqlitePool) {
 async fn test_duplicate_github_account_id(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_duplicate_github_account_id(&catalog).await;
         Ok(())
     })
@@ -139,7 +139,7 @@ async fn test_duplicate_github_account_id(sqlite_pool: SqlitePool) {
 async fn test_duplicate_github_account_name(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_duplicate_github_account_name(&catalog).await;
         Ok(())
     })
@@ -154,7 +154,7 @@ async fn test_duplicate_github_account_name(sqlite_pool: SqlitePool) {
 async fn test_duplicate_github_account_provider_identity(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_duplicate_github_account_provider_identity(&catalog).await;
         Ok(())
     })
@@ -169,7 +169,7 @@ async fn test_duplicate_github_account_provider_identity(sqlite_pool: SqlitePool
 async fn test_duplicate_github_account_email(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_duplicate_github_account_email(&catalog).await;
         Ok(())
     })

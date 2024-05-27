@@ -19,7 +19,7 @@ use sqlx::PgPool;
 async fn test_no_password_stored(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_no_password_stored(&catalog).await;
         Ok(())
     })
@@ -34,7 +34,7 @@ async fn test_no_password_stored(pg_pool: PgPool) {
 async fn test_store_couple_account_passwords(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_store_couple_account_passwords(&catalog).await;
         Ok(())
     })

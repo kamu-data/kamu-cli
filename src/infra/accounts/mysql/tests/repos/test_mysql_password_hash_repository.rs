@@ -19,7 +19,7 @@ use sqlx::MySqlPool;
 async fn test_no_password_stored(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_no_password_stored(&catalog).await;
         Ok(())
     })
@@ -34,7 +34,7 @@ async fn test_no_password_stored(mysql_pool: MySqlPool) {
 async fn test_store_couple_account_passwords(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_store_couple_account_passwords(&catalog).await;
         Ok(())
     })

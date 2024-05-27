@@ -19,7 +19,7 @@ use sqlx::PgPool;
 async fn test_event_store_empty(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_flow_system_repo_tests::test_event_store_empty(&catalog).await;
         Ok(())
     })
@@ -34,7 +34,7 @@ async fn test_event_store_empty(pg_pool: PgPool) {
 async fn test_event_store_get_streams(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_flow_system_repo_tests::test_event_store_get_streams(&catalog).await;
         Ok(())
     })
@@ -49,7 +49,7 @@ async fn test_event_store_get_streams(pg_pool: PgPool) {
 async fn test_event_store_get_events_with_windowing(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional([&harness.catalog], |[catalog]| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_flow_system_repo_tests::test_event_store_get_events_with_windowing(&catalog).await;
         Ok(())
     })
