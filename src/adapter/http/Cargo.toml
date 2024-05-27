@@ -56,7 +56,6 @@ url = { version = "2", features = ["serde"] }
 
 [dev-dependencies]
 container-runtime = { workspace = true }
-event-bus = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 
