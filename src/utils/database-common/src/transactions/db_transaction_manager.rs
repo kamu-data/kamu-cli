@@ -39,7 +39,7 @@ pub async fn run_transactional<H, HFut, HFutResultT>(
     callback: H,
 ) -> Result<HFutResultT, InternalError>
 where
-    H: FnOnce(Catalog) -> HFut + Send + Sync + 'static,
+    H: FnOnce(Catalog) -> HFut + Send + 'static,
     HFut: std::future::Future<Output = Result<HFutResultT, InternalError>> + Send + 'static,
 {
     // Extract transaction manager, specific for the database
