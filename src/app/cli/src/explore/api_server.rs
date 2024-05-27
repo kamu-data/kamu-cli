@@ -96,6 +96,7 @@ impl APIServer {
                     )
                     .layer(Extension(base_catalog))
                     .layer(Extension(gql_schema))
+                    .layer(kamu_adapter_http::RunInDatabaseTransactionLayer::new())
                     .layer(kamu_adapter_http::AuthenticationLayer::new()),
             );
 
