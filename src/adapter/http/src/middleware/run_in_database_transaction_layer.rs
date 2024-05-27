@@ -70,7 +70,7 @@ where
                 .expect("Catalog not found in http server extensions")
                 .clone();
 
-            run_transactional([base_catalog], |[updated_catalog]| async move {
+            run_transactional(&base_catalog, |updated_catalog| async move {
                 request.extensions_mut().insert(updated_catalog);
 
                 let inner_result = inner.call(request).await;
