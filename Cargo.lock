@@ -3904,6 +3904,7 @@ dependencies = [
  "bytes",
  "chrono",
  "container-runtime",
+ "database-common",
  "datafusion",
  "dill",
  "event-bus",

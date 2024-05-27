@@ -28,6 +28,7 @@ kamu = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-data-utils = { workspace = true }
 event-bus = { workspace = true }
+database-common = { workspace = true }
 
 axum = { version = "0.6", features = ["ws", "headers"] }
 axum-extra = { version = "0.8", features = ["async-read-body"] }
