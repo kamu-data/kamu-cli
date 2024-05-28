@@ -87,11 +87,16 @@ impl UploadService for UploadServiceLocal {
         std::fs::create_dir_all(upload_folder_path)
             .map_err(|e| MakeUploadContextError::Internal(e.int_err()))?;
 
+        let upload_url = format!(
+            "{}platform/file/upload/{}/{}",
+            self.server_url_config.protocols.base_url_rest,
+            upload_id.clone(),
+            file_name
+        );
+
         let context = UploadContext {
-            upload_url: format!(
-                "{}platform/file/upload/{}/{}",
-                self.server_url_config.protocols.base_url_rest, upload_id, file_name
-            ),
+            upload_id,
+            upload_url,
             method: "POST".to_string(),
             headers: vec![(
                 String::from("Authorization"),

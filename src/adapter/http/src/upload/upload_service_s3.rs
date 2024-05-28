@@ -61,7 +61,12 @@ impl UploadService for UploadServiceS3 {
         }
 
         let upload_id = Uuid::new_v4().simple().to_string();
-        let file_key = format!("{}/{}/{}", account_id.as_multibase(), upload_id, file_name,);
+        let file_key = format!(
+            "{}/{}/{}",
+            account_id.as_multibase(),
+            upload_id.clone(),
+            file_name,
+        );
 
         let presigned_conf = PresigningConfig::builder()
             .expires_in(
@@ -85,6 +90,7 @@ impl UploadService for UploadServiceS3 {
             .map_err(|e| MakeUploadContextError::Internal(e.int_err()))?;
 
         Ok(UploadContext {
+            upload_id,
             upload_url: String::from(presigned_request.uri()),
             method: String::from("PUT"),
             headers: presigned_request

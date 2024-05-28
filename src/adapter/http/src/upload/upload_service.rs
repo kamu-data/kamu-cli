@@ -42,6 +42,7 @@ pub trait UploadService: Send + Sync {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadContext {
+    pub upload_id: String,
     pub upload_url: String,
     pub method: String,
     pub headers: Vec<(String, String)>,
