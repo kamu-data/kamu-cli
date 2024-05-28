@@ -15,10 +15,9 @@ use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use database_common::{DatabaseConfiguration, DatabaseProvider};
 use dill::*;
 use kamu::domain::*;
-use kamu::utils::s3_context::S3Context;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_adapter_http::{UploadS3BucketConfig, UploadService, UploadServiceS3};
+use kamu_adapter_http::{FileUploadLimitConfig, UploadService, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
@@ -86,24 +85,18 @@ pub async fn run(
         let mut base_catalog_builder =
             configure_base_catalog(&workspace_layout, is_multi_tenant_workspace, system_time);
 
-        //////////////////////////// MAKE THIS NICE /////////////////////////////////
+        //////////////////////////// Move this to Node /////////////////////////////////
 
-        let s3_upload_http_url = url::Url::parse(
-            "https://s3.us-west-2.amazonaws.com/upload.demo.stg.kamu.dev.us-west-2",
-        )
-        .unwrap();
+        /*
+        use kamu::utils::s3_context::S3Context;
+        use kamu_adapter_http::UploadServiceS3;
         let s3_upload_direct_url =
             url::Url::parse("s3://upload.demo.stg.kamu.dev.us-west-2").unwrap();
-        base_catalog_builder.add_value(UploadS3BucketConfig {
-            bucket_http_url: s3_upload_http_url,
-            bucket_name: String::from("upload.demo.stg.kamu.dev.us-west-2"),
-            max_file_size_bytes: (50 * 1024 * 1024) as usize,
-        });
         base_catalog_builder.add_builder(
             UploadServiceS3::builder()
                 .with_s3_upload_context(S3Context::from_url(&s3_upload_direct_url).await),
         );
-        base_catalog_builder.bind::<dyn UploadService, UploadServiceS3>();
+        base_catalog_builder.bind::<dyn UploadService, UploadServiceS3>();*/
 
         ////////////////////////////
 
@@ -353,12 +346,8 @@ pub fn configure_base_catalog(
     b.add::<kamu_adapter_auth_oso::KamuAuthOso>();
     b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
 
-    /*b.add_builder(
-        UploadServiceLocal::builder()
-            .with_cache_dir(workspace_layout.cache_dir.clone())
-            .with_max_file_size_bytes(i64::from(50 * 1024 * 1024)),
-    );
-    b.bind::<dyn UploadService, UploadServiceLocal>();*/
+    b.add_builder(UploadServiceLocal::builder().with_cache_dir(workspace_layout.cache_dir.clone()));
+    b.bind::<dyn UploadService, UploadServiceLocal>();
 
     b
 }
@@ -547,6 +536,11 @@ pub fn register_config_in_catalog(
 
         catalog_builder.add_value(PredefinedAccountsConfig::single_tenant());
     }
+
+    let uploads_config = config.uploads.as_ref().unwrap();
+    catalog_builder.add_value(FileUploadLimitConfig {
+        max_file_size_in_bytes: uploads_config.max_file_size_in_mb.unwrap() * 1024 * 1024,
+    });
 }
 
 fn try_convert_into_db_configuration(config: DatabaseConfig) -> Option<DatabaseConfiguration> {

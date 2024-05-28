@@ -16,7 +16,7 @@ use kamu::domain::{InternalError, ResultIntoInternal, ServerUrlConfig, SystemTim
 use kamu_accounts::{JwtAuthenticationConfig, PredefinedAccountsConfig, DEFAULT_ACCOUNT_ID};
 use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::{AuthenticationServiceImpl, LoginPasswordAuthProvider};
-use kamu_adapter_http::{UploadContext, UploadService, UploadServiceLocal};
+use kamu_adapter_http::{FileUploadLimitConfig, UploadContext, UploadService, UploadServiceLocal};
 
 use crate::harness::{await_client_server_flow, TestAPIServer};
 
@@ -49,11 +49,10 @@ impl Harness {
             .add::<LoginPasswordAuthProvider>()
             .add_value(JwtAuthenticationConfig::default())
             .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
-            .add_builder(
-                UploadServiceLocal::builder()
-                    .with_cache_dir(cache_dir.clone())
-                    .with_max_file_size_bytes(100),
-            )
+            .add_value(FileUploadLimitConfig {
+                max_file_size_in_bytes: 100,
+            })
+            .add_builder(UploadServiceLocal::builder().with_cache_dir(cache_dir.clone()))
             .bind::<dyn UploadService, UploadServiceLocal>()
             .build();
 

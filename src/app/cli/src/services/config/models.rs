@@ -37,6 +37,9 @@ pub struct CLIConfig {
     pub users: Option<PredefinedAccountsConfig>,
     /// Database connection configuration
     pub database: Option<DatabaseConfig>,
+    /// Uploads configuration
+    #[merge(strategy = merge_recursive)]
+    pub uploads: Option<UploadsConfig>,
 }
 
 impl CLIConfig {
@@ -47,6 +50,7 @@ impl CLIConfig {
             frontend: None,
             users: None,
             database: None,
+            uploads: None,
         }
     }
 
@@ -61,6 +65,7 @@ impl CLIConfig {
             frontend: Some(FrontendConfig::sample()),
             users: Some(PredefinedAccountsConfig::sample()),
             database: Some(DatabaseConfig::sample()),
+            uploads: Some(UploadsConfig::sample()),
         }
     }
 }
@@ -73,6 +78,7 @@ impl Default for CLIConfig {
             frontend: Some(FrontendConfig::default()),
             users: Some(PredefinedAccountsConfig::default()),
             database: None,
+            uploads: Some(UploadsConfig::default()),
         }
     }
 }
@@ -340,16 +346,12 @@ impl DatabaseConfig {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct SqliteDatabaseConfig {
     pub database_path: String,
 }
-
-////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -361,6 +363,30 @@ pub struct RemoteDatabaseConfig {
     pub database_name: String,
     pub host: String,
     pub port: Option<u32>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadsConfig {
+    pub max_file_size_in_mb: Option<usize>,
+}
+
+impl UploadsConfig {
+    pub fn sample() -> Self {
+        Default::default()
+    }
+}
+
+impl Default for UploadsConfig {
+    fn default() -> Self {
+        Self {
+            max_file_size_in_mb: Some(50),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

@@ -20,6 +20,7 @@ use uuid::Uuid;
 use crate::{
     AccessToken,
     ContentTooLargeError,
+    FileUploadLimitConfig,
     MakeUploadContextError,
     SaveUploadError,
     UploadContext,
@@ -32,20 +33,20 @@ use crate::{
 #[interface(dyn UploadService)]
 pub struct UploadServiceLocal {
     server_url_config: Arc<ServerUrlConfig>,
+    uploads_config: Arc<FileUploadLimitConfig>,
     cache_dir: PathBuf,
-    max_file_size_bytes: usize,
 }
 
 impl UploadServiceLocal {
     pub fn new(
         server_url_config: Arc<ServerUrlConfig>,
+        uploads_config: Arc<FileUploadLimitConfig>,
         cache_dir: PathBuf,
-        max_file_size_bytes: usize,
     ) -> Self {
         Self {
             server_url_config,
+            uploads_config,
             cache_dir,
-            max_file_size_bytes,
         }
     }
 
@@ -74,7 +75,7 @@ impl UploadService for UploadServiceLocal {
         content_length: usize,
         access_token: &AccessToken,
     ) -> Result<UploadContext, MakeUploadContextError> {
-        if content_length > self.max_file_size_bytes {
+        if content_length > self.uploads_config.max_file_size_in_bytes {
             return Err(MakeUploadContextError::TooLarge(ContentTooLargeError {}));
         }
 
@@ -109,7 +110,7 @@ impl UploadService for UploadServiceLocal {
         content_length: usize,
         file_data: Box<dyn AsyncRead + Send + Unpin>,
     ) -> Result<(), SaveUploadError> {
-        if content_length > self.max_file_size_bytes {
+        if content_length > self.uploads_config.max_file_size_in_bytes {
             return Err(SaveUploadError::TooLarge(ContentTooLargeError {}));
         }
 

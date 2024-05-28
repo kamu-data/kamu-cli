@@ -16,12 +16,12 @@ use kamu::domain::ErrorIntoInternal;
 use kamu::utils::s3_context::S3Context;
 use opendatafabric::AccountID;
 use tokio::io::AsyncRead;
-use url::Url;
 use uuid::Uuid;
 
 use crate::{
     AccessToken,
     ContentTooLargeError,
+    FileUploadLimitConfig,
     MakeUploadContextError,
     SaveUploadError,
     UploadContext,
@@ -35,17 +35,14 @@ use crate::{
 #[interface(dyn UploadService)]
 pub struct UploadServiceS3 {
     s3_upload_context: S3Context,
-    upload_s3_bucket_config: Arc<UploadS3BucketConfig>,
+    upload_config: Arc<FileUploadLimitConfig>,
 }
 
 impl UploadServiceS3 {
-    pub fn new(
-        s3_upload_context: S3Context,
-        upload_s3_bucket_config: Arc<UploadS3BucketConfig>,
-    ) -> Self {
+    pub fn new(s3_upload_context: S3Context, upload_config: Arc<FileUploadLimitConfig>) -> Self {
         Self {
             s3_upload_context,
-            upload_s3_bucket_config,
+            upload_config,
         }
     }
 }
@@ -59,7 +56,7 @@ impl UploadService for UploadServiceS3 {
         content_length: usize,
         _: &AccessToken, // S3 does not require our own token
     ) -> Result<UploadContext, MakeUploadContextError> {
-        if content_length > self.upload_s3_bucket_config.max_file_size_bytes {
+        if content_length > self.upload_config.max_file_size_in_bytes {
             return Err(MakeUploadContextError::TooLarge(ContentTooLargeError {}));
         }
 
@@ -108,15 +105,6 @@ impl UploadService for UploadServiceS3 {
     ) -> Result<(), SaveUploadError> {
         Err(SaveUploadError::NotSupported(UploadNotSupportedError {}))
     }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub struct UploadS3BucketConfig {
-    pub bucket_http_url: Url,
-    pub bucket_name: String,
-    pub max_file_size_bytes: usize,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
