@@ -50,9 +50,25 @@ pub trait FlowService: Sync + Send {
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
 
-    /// Returns states of flows associated with a given account
+    /// Returns initiators of flows associated with a given dataset
     /// ordered by creation time from newest to oldest.
     /// Applies specified filters/pagination
+    async fn list_all_flow_initiators_by_dataset(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<FlowInitiatorListing, ListFlowsByDatasetError>;
+
+    /// Returns datasets with flows associated with a given account
+    /// ordered by creation time from newest to oldest.
+    /// Applies specified pagination
+    async fn list_all_datasets_with_flow_by_account(
+        &self,
+        account_id: &AccountID,
+    ) -> Result<FlowDatasetListing, ListFlowsByDatasetError>;
+
+    /// Returns states of flows associated with a given account
+    /// ordered by creation time from newest to oldest.
+    /// Applies specified pagination
     async fn list_all_flows_by_account(
         &self,
         account_id: &AccountID,
@@ -95,6 +111,24 @@ pub struct FlowStateListing<'a> {
 
 pub type FlowStateStream<'a> =
     std::pin::Pin<Box<dyn Stream<Item = Result<FlowState, InternalError>> + Send + 'a>>;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct FlowInitiatorListing<'a> {
+    pub matched_stream: InitiatorssStream<'a>,
+}
+
+pub type InitiatorssStream<'a> =
+    std::pin::Pin<Box<dyn Stream<Item = Result<AccountID, InternalError>> + Send + 'a>>;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct FlowDatasetListing<'a> {
+    pub matched_stream: DatasetsStream<'a>,
+}
+
+pub type DatasetsStream<'a> =
+    std::pin::Pin<Box<dyn Stream<Item = Result<DatasetID, InternalError>> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

@@ -86,6 +86,12 @@ pub struct FlowTriggerManual {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub type InitiatorIDStream<'a> = std::pin::Pin<
+    Box<dyn tokio_stream::Stream<Item = Result<AccountID, InternalError>> + Send + 'a>,
+>;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowTriggerAutoPolling {
     pub trigger_time: DateTime<Utc>,

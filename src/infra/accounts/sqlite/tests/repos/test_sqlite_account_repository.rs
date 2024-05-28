@@ -61,6 +61,21 @@ async fn test_insert_and_locate_github_account(sqlite_pool: SqlitePool) {
 
 #[test_group::group(database, sqlite)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
+async fn test_insert_and_locate_multiple_github_account(sqlite_pool: SqlitePool) {
+    let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
+
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+        kamu_accounts_repo_tests::test_insert_and_locate_multiple_github_account(&catalog).await;
+        Ok(())
+    })
+    .await
+    .unwrap();
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(database, sqlite)]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
 async fn test_insert_and_locate_account_without_email(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 

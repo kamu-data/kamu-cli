@@ -38,7 +38,27 @@ type Account {
 	flows: AccountFlows
 }
 
+type AccountConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [Account!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [AccountEdge!]!
+}
+
 scalar AccountDisplayName
+
+type AccountEdge {
+	node: Account!
+}
 
 type AccountFlowConfigsMut {
 	resumeAccountDatasetFlows: Boolean!
@@ -54,6 +74,7 @@ input AccountFlowFilters {
 
 type AccountFlowRuns {
 	listFlows(page: Int, perPage: Int, filters: AccountFlowFilters): FlowConnection!
+	listDatasetsWithFlow: DatasetConnection!
 }
 
 type AccountFlows {
@@ -459,6 +480,7 @@ input DatasetFlowFilters {
 type DatasetFlowRuns {
 	getFlow(flowId: FlowID!): GetFlowResult!
 	listFlows(page: Int, perPage: Int, filters: DatasetFlowFilters): FlowConnection!
+	listFlowInitiators: AccountConnection!
 }
 
 type DatasetFlowRunsMut {
@@ -1071,7 +1093,7 @@ type GetFlowSuccess implements GetFlowResult {
 
 input InitiatorFilterInput @oneOf {
 	system: Boolean
-	account: AccountName
+	accounts: [AccountID!]
 }
 
 

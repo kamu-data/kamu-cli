@@ -1033,6 +1033,20 @@ impl FlowService for FlowServiceImpl {
         })
     }
 
+    /// Returns initiators of flows associated with a given dataset
+    /// ordered by creation time from newest to oldest
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
+    async fn list_all_flow_initiators_by_dataset(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<FlowInitiatorListing, ListFlowsByDatasetError> {
+        Ok(FlowInitiatorListing {
+            matched_stream: self
+                .flow_event_store
+                .get_unique_flow_initiator_ids_by_dataset(dataset_id),
+        })
+    }
+
     /// Returns states of flows associated with a given account
     /// ordered by creation time from newest to oldest
     /// Applies specified filters
@@ -1094,6 +1108,35 @@ impl FlowService for FlowServiceImpl {
             matched_stream,
             total_count,
         })
+    }
+
+    /// Returns datasets with flows associated with a given account
+    /// ordered by creation time from newest to oldest.
+    #[tracing::instrument(level = "debug", skip_all, fields(%account_id))]
+    async fn list_all_datasets_with_flow_by_account(
+        &self,
+        account_id: &AccountID,
+    ) -> Result<FlowDatasetListing, ListFlowsByDatasetError> {
+        let owned_dataset_ids = self
+            .dataset_ownership_service
+            .get_owned_datasets(account_id)
+            .await
+            .map_err(ListFlowsByDatasetError::Internal)?;
+
+        let matched_stream = Box::pin(async_stream::try_stream! {
+            for dataset_id in &owned_dataset_ids {
+                let dataset_flows_count = self
+                    .flow_event_store
+                    .get_count_flows_by_dataset(dataset_id, &Default::default())
+                    .await
+                    .int_err()?;
+                if dataset_flows_count > 0 {
+                    yield dataset_id.clone();
+                }
+            }
+        });
+
+        Ok(FlowDatasetListing { matched_stream })
     }
 
     /// Returns states of system flows

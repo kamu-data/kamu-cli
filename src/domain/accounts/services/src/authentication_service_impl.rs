@@ -314,6 +314,18 @@ impl AuthenticationService for AuthenticationServiceImpl {
         }
     }
 
+    async fn accounts_by_ids(
+        &self,
+        account_ids: Vec<AccountID>,
+    ) -> Result<Vec<Account>, InternalError> {
+        self.ensure_predefined_accounts_registration().await?;
+
+        self.account_repository
+            .get_accounts_by_ids(account_ids)
+            .await
+            .int_err()
+    }
+
     async fn account_by_name(
         &self,
         account_name: &AccountName,

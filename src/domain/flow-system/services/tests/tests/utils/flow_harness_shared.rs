@@ -16,6 +16,7 @@ use kamu::testing::{MetadataFactory, MockDatasetChangesService};
 use kamu::*;
 use kamu_accounts::{
     AccountConfig,
+    AuthenticationService,
     CurrentAccountSubject,
     JwtAuthenticationConfig,
     PredefinedAccountsConfig,
@@ -52,6 +53,7 @@ pub(crate) struct FlowHarness {
     pub dataset_repo: Arc<dyn DatasetRepository>,
     pub flow_configuration_service: Arc<dyn FlowConfigurationService>,
     pub flow_service: Arc<dyn FlowService>,
+    pub auth_svc: Arc<dyn AuthenticationService>,
     pub fake_system_time_source: FakeSystemTimeSource,
 }
 
@@ -135,6 +137,7 @@ impl FlowHarness {
         let flow_service = catalog.get_one::<dyn FlowService>().unwrap();
         let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let auth_svc = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
         Self {
             _tmp_dir: tmp_dir,
@@ -143,6 +146,7 @@ impl FlowHarness {
             flow_configuration_service,
             dataset_repo,
             fake_system_time_source,
+            auth_svc,
         }
     }
 

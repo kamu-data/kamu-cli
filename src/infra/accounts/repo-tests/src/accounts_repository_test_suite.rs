@@ -139,6 +139,59 @@ pub async fn test_insert_and_locate_github_account(catalog: &Catalog) {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_insert_and_locate_multiple_github_account(catalog: &Catalog) {
+    const GITHUB_ACCOUNT_ID_WASYA: &str = "8875907";
+    const GITHUB_ACCOUNT_ID_PETYA: &str = "8875908";
+
+    let account_wasya = Account {
+        email: Some(String::from("wasya_test@example.com")),
+        display_name: String::from("Wasya Pupkin"),
+        ..make_test_account(
+            "wasya",
+            kamu_adapter_oauth::PROVIDER_GITHUB,
+            GITHUB_ACCOUNT_ID_WASYA,
+        )
+    };
+    let account_petya = Account {
+        email: Some(String::from("test@example.com")),
+        display_name: String::from("Petya Pupkin"),
+        ..make_test_account(
+            "petya",
+            kamu_adapter_oauth::PROVIDER_GITHUB,
+            GITHUB_ACCOUNT_ID_PETYA,
+        )
+    };
+
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
+    account_repo.create_account(&account_wasya).await.unwrap();
+    account_repo.create_account(&account_petya).await.unwrap();
+
+    let account_id_wasya = account_repo
+        .find_account_id_by_name(&AccountName::new_unchecked("wasya"))
+        .await
+        .unwrap()
+        .unwrap();
+    let account_id_petya = account_repo
+        .find_account_id_by_name(&AccountName::new_unchecked("petya"))
+        .await
+        .unwrap()
+        .unwrap();
+
+    let mut db_accounts = account_repo
+        .get_accounts_by_ids(vec![account_id_wasya, account_id_petya])
+        .await
+        .unwrap();
+
+    // Different databases returning different order for where in clause
+    // Such as for this specific query order is not important sort here to
+    // keep tests consistent
+    db_accounts.sort_by(|a, b| a.registered_at.cmp(&b.registered_at));
+    assert_eq!(db_accounts, [account_wasya, account_petya]);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_insert_and_locate_account_without_email(catalog: &Catalog) {
     let account = Account {
         display_name: String::from("Wasya Pupkin"),

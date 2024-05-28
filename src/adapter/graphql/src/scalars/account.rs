@@ -17,7 +17,7 @@ use crate::prelude::*;
 // AccountID
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct AccountID(odf::AccountID);
 
 impl From<odf::AccountID> for AccountID {
@@ -29,6 +29,12 @@ impl From<odf::AccountID> for AccountID {
 impl From<AccountID> for odf::AccountID {
     fn from(val: AccountID) -> Self {
         val.0
+    }
+}
+
+impl From<&AccountID> for odf::AccountID {
+    fn from(val: &AccountID) -> Self {
+        val.0.clone()
     }
 }
 

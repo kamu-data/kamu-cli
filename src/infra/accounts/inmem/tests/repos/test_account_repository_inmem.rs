@@ -37,6 +37,15 @@ async fn test_insert_and_locate_github_account() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_insert_and_locate_multiple_github_account() {
+    let harness = InmemAccountRepositoryHarness::new();
+    kamu_accounts_repo_tests::test_insert_and_locate_multiple_github_account(&harness.catalog)
+        .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_insert_and_locate_account_without_email() {
     let harness = InmemAccountRepositoryHarness::new();
     kamu_accounts_repo_tests::test_insert_and_locate_account_without_email(&harness.catalog).await;

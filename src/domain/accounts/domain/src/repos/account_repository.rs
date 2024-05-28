@@ -26,6 +26,11 @@ pub trait AccountRepository: Send + Sync {
         account_id: &AccountID,
     ) -> Result<Account, GetAccountByIdError>;
 
+    async fn get_accounts_by_ids(
+        &self,
+        account_ids: Vec<AccountID>,
+    ) -> Result<Vec<Account>, GetAccountByIdError>;
+
     async fn get_account_by_name(
         &self,
         account_name: &AccountName,

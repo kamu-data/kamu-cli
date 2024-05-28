@@ -7,13 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use futures::TryStreamExt;
 use kamu_accounts::AuthenticationService;
 use {kamu_flow_system as fs, opendatafabric as odf};
 
 use crate::mutations::{check_if_flow_belongs_to_dataset, FlowInDatasetError, FlowNotFound};
 use crate::prelude::*;
-use crate::queries::Flow;
+use crate::queries::{Account, Flow};
 use crate::utils;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -73,20 +75,11 @@ impl DatasetFlowRuns {
                         InitiatorFilterInput::System(_) => {
                             Some(kamu_flow_system::InitiatorFilter::System)
                         }
-                        InitiatorFilterInput::Account(account_name) => {
-                            let authentication_service =
-                                from_catalog::<dyn AuthenticationService>(ctx).unwrap();
-                            let account_id = authentication_service
-                                .find_account_id_by_name(&account_name)
-                                .await?
-                                .ok_or_else(|| {
-                                    GqlError::Gql(Error::new("Account not resolved").extend_with(
-                                        |_, eev| eev.set("name", account_name.to_string()),
-                                    ))
-                                })?;
-
-                            Some(kamu_flow_system::InitiatorFilter::Account(account_id))
-                        }
+                        InitiatorFilterInput::Accounts(account_ids) => Some(
+                            kamu_flow_system::InitiatorFilter::Account(HashSet::from_iter(
+                                account_ids.iter().map(Into::into).collect::<Vec<_>>(),
+                            )),
+                        ),
                     },
                     None => None,
                 },
@@ -125,11 +118,44 @@ impl DatasetFlowRuns {
             total_count,
         ))
     }
+
+    async fn list_flow_initiators(&self, ctx: &Context<'_>) -> Result<AccountConnection> {
+        utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
+
+        let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
+
+        let flow_initiator_ids: Vec<_> = flow_service
+            .list_all_flow_initiators_by_dataset(&self.dataset_handle.id)
+            .await
+            .int_err()?
+            .matched_stream
+            .try_collect()
+            .await?;
+
+        let authentication_service = from_catalog::<dyn AuthenticationService>(ctx).unwrap();
+
+        let matched_flow_initiators: Vec<_> = authentication_service
+            .accounts_by_ids(flow_initiator_ids)
+            .await?
+            .into_iter()
+            .map(Account::from_account)
+            .collect();
+
+        let total_count = matched_flow_initiators.len();
+
+        Ok(AccountConnection::new(
+            matched_flow_initiators,
+            0,
+            total_count,
+            total_count,
+        ))
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 page_based_connection!(Flow, FlowConnection, FlowEdge);
+page_based_connection!(Account, AccountConnection, AccountEdge);
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -165,7 +191,7 @@ pub struct DatasetFlowFilters {
 #[derive(OneofObject)]
 pub enum InitiatorFilterInput {
     System(bool),
-    Account(AccountName),
+    Accounts(Vec<AccountID>),
 }
 
 ///////////////////////////////////////////////////////////////////////////////

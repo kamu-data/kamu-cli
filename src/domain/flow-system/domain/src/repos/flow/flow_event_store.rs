@@ -45,6 +45,11 @@ pub trait FlowEventStore: EventStore<FlowState> {
         pagination: FlowPaginationOpts,
     ) -> FlowIDStream;
 
+    /// Returns IDs of the flow initiators associated with the specified
+    /// dataset in reverse chronological order based on creation time.
+    fn get_unique_flow_initiator_ids_by_dataset(&self, dataset_id: &DatasetID)
+        -> InitiatorIDStream;
+
     /// Returns number of flows associated with the specified dataset and
     /// matching filters, if specified
     async fn get_count_flows_by_dataset(
@@ -120,7 +125,7 @@ pub struct SystemFlowFilters {
 #[derive(Debug, Clone)]
 pub enum InitiatorFilter {
     System,
-    Account(AccountID),
+    Account(HashSet<AccountID>),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

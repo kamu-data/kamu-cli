@@ -119,6 +119,21 @@ impl AccountRepository for AccountRepositoryInMemory {
             }))
         }
     }
+
+    async fn get_accounts_by_ids(
+        &self,
+        account_ids: Vec<AccountID>,
+    ) -> Result<Vec<Account>, GetAccountByIdError> {
+        let guard = self.state.lock().unwrap();
+
+        let accounts: Vec<Account> = account_ids
+            .into_iter()
+            .filter_map(|account_id| guard.accounts_by_id.get(&account_id).cloned())
+            .collect();
+
+        Ok(accounts)
+    }
+
     async fn get_account_by_name(
         &self,
         account_name: &AccountName,

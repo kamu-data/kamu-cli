@@ -137,7 +137,7 @@ impl FlowIndexEntry {
             Some(InitiatorFilter::System) => self.initiator.is_none(),
             Some(InitiatorFilter::Account(filter_initiator)) => {
                 if let Some(initiator) = &self.initiator {
-                    filter_initiator == initiator
+                    filter_initiator.contains(initiator)
                 } else {
                     false
                 }
@@ -341,6 +341,41 @@ impl FlowEventStore for FlowEventStoreInMem {
         };
 
         Box::pin(futures::stream::iter(flow_ids_page))
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
+    fn get_unique_flow_initiator_ids_by_dataset(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> InitiatorIDStream {
+        let flow_initiators: Vec<_> = {
+            let state = self.inner.as_state();
+            let g = state.lock().unwrap();
+            let mut unique_initiators = HashSet::new();
+            g.all_flows_by_dataset
+                .get(dataset_id)
+                .map(|dataset_flow_ids| {
+                    dataset_flow_ids
+                        .iter()
+                        .filter_map(|flow_id| {
+                            let search_index_maybe = g.flow_search_index.get(flow_id);
+                            if let Some(search_index) = search_index_maybe
+                                && let Some(initiator_id) = &search_index.initiator
+                            {
+                                let is_added = unique_initiators.insert(initiator_id);
+                                if is_added {
+                                    return Some(Ok(initiator_id.clone()));
+                                }
+                                return None;
+                            }
+                            None
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+
+        Box::pin(futures::stream::iter(flow_initiators))
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, ?pagination))]

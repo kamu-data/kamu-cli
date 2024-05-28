@@ -32,6 +32,7 @@ use kamu_accounts::{
     CurrentAccountSubject,
     JwtAuthenticationConfig,
     LoggedAccount,
+    DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME_STR,
 };
 use kamu_accounts_inmem::AccountRepositoryInMemory;
@@ -1294,7 +1295,7 @@ async fn test_list_flows_with_filters_and_pagination() {
                     runs {
                         listFlows(
                             filters: {
-                                byInitiator: { account: "<account_name>"}
+                                byInitiator: { accounts: ["<account_ids>"]}
                             }
                         ) {
                             nodes {
@@ -1313,7 +1314,10 @@ async fn test_list_flows_with_filters_and_pagination() {
     "#
     )
     .replace("<id>", &create_result.dataset_handle.id.to_string())
-    .replace("<account_name>", DEFAULT_ACCOUNT_NAME_STR);
+    .replace(
+        "<account_ids>",
+        [DEFAULT_ACCOUNT_ID.to_string()].join(",").as_str(),
+    );
 
     let response = schema
         .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
@@ -1394,6 +1398,98 @@ async fn test_list_flows_with_filters_and_pagination() {
                                 "pageInfo": {
                                     "currentPage": 0,
                                     "totalPages": 0,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_list_flow_initiators() {
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dependency_graph_mock: None,
+        dataset_changes_mock: None,
+        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
+    });
+    let create_result = harness.create_root_dataset().await;
+
+    let ingest_mutation_code =
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+    let compacting_mutation_code =
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTING");
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(ingest_mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(response.is_ok(), "{response:?}");
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(compacting_mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(response.is_ok(), "{response:?}");
+
+    // Pure initiator listing
+    let request_code = indoc!(
+        r#"
+        {
+            datasets {
+                byId (datasetId: "<id>") {
+                    flows {
+                        runs {
+                            listFlowInitiators {
+                                nodes {
+                                    accountName
+                                }
+                                pageInfo {
+                                    currentPage
+                                    totalPages
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("<id>", &create_result.dataset_handle.id.to_string());
+
+    let response = schema
+        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlowInitiators": {
+                                "nodes": [
+                                    {
+                                        "accountName": "kamu",
+                                    },
+                                ],
+                                "pageInfo": {
+                                    "currentPage": 0,
+                                    "totalPages": 1,
                                 }
                             }
                         }

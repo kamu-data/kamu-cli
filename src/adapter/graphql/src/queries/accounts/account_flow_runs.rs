@@ -10,14 +10,18 @@
 use std::collections::HashSet;
 
 use futures::TryStreamExt;
-use kamu_accounts::{Account, AuthenticationService};
+use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
+use kamu_accounts::Account as AccountEntity;
+use kamu_core::DatasetRepository;
 use kamu_flow_system as fs;
+use opendatafabric::DatasetRefPattern;
 
+use super::Account;
 use crate::prelude::*;
-use crate::queries::{Flow, FlowConnection, InitiatorFilterInput};
+use crate::queries::{Dataset, DatasetConnection, Flow, FlowConnection, InitiatorFilterInput};
 
 pub struct AccountFlowRuns {
-    account: Account,
+    account: AccountEntity,
 }
 
 #[Object]
@@ -25,7 +29,7 @@ impl AccountFlowRuns {
     const DEFAULT_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
-    pub fn new(account: Account) -> Self {
+    pub fn new(account: AccountEntity) -> Self {
         Self { account }
     }
 
@@ -55,20 +59,11 @@ impl AccountFlowRuns {
                         InitiatorFilterInput::System(_) => {
                             Some(kamu_flow_system::InitiatorFilter::System)
                         }
-                        InitiatorFilterInput::Account(account_name) => {
-                            let authentication_service =
-                                from_catalog::<dyn AuthenticationService>(ctx).unwrap();
-                            let account_id = authentication_service
-                                .find_account_id_by_name(&account_name)
-                                .await?
-                                .ok_or_else(|| {
-                                    GqlError::Gql(Error::new("Account not resolved").extend_with(
-                                        |_, eev| eev.set("name", account_name.to_string()),
-                                    ))
-                                })?;
-
-                            Some(kamu_flow_system::InitiatorFilter::Account(account_id))
-                        }
+                        InitiatorFilterInput::Accounts(account_ids) => Some(
+                            kamu_flow_system::InitiatorFilter::Account(HashSet::from_iter(
+                                account_ids.iter().map(Into::into).collect::<Vec<_>>(),
+                            )),
+                        ),
                     },
                     None => None,
                 },
@@ -105,7 +100,45 @@ impl AccountFlowRuns {
             total_count,
         ))
     }
+
+    async fn list_datasets_with_flow(&self, ctx: &Context<'_>) -> Result<DatasetConnection> {
+        let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
+
+        let datasets_with_flows: Vec<_> = flow_service
+            .list_all_datasets_with_flow_by_account(&self.account.id)
+            .await
+            .int_err()?
+            .matched_stream
+            .map_ok(|dataset_id| DatasetRefPattern::Ref(dataset_id.as_local_ref()))
+            .try_collect()
+            .await?;
+
+        let dataset_repo = from_catalog::<dyn DatasetRepository>(ctx).unwrap();
+
+        let account = Account::new(
+            self.account.id.clone().into(),
+            self.account.account_name.clone().into(),
+        );
+
+        let matched_datasets: Vec<_> =
+            filter_datasets_by_local_pattern(dataset_repo.as_ref(), datasets_with_flows)
+                .map_ok(|dataset_handle| Dataset::new(account.clone(), dataset_handle))
+                .try_collect()
+                .await
+                .int_err()?;
+
+        let total_count = matched_datasets.len();
+
+        Ok(DatasetConnection::new(
+            matched_datasets,
+            0,
+            total_count,
+            total_count,
+        ))
+    }
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject)]
 pub struct AccountFlowFilters {
@@ -114,3 +147,5 @@ pub struct AccountFlowFilters {
     by_initiator: Option<InitiatorFilterInput>,
     by_dataset_ids: Vec<DatasetID>,
 }
+
+///////////////////////////////////////////////////////////////////////////////
