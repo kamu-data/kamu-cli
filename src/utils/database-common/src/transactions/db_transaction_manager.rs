@@ -39,8 +39,8 @@ pub async fn run_transactional<H, HFut, HFutResultT>(
     callback: H,
 ) -> Result<HFutResultT, InternalError>
 where
-    H: FnOnce(Catalog) -> HFut + Send + 'static,
-    HFut: std::future::Future<Output = Result<HFutResultT, InternalError>> + Send + 'static,
+    H: FnOnce(Catalog) -> HFut + Send,
+    HFut: std::future::Future<Output = Result<HFutResultT, InternalError>> + Send,
 {
     // Extract transaction manager, specific for the database
     let db_transaction_manager = base_catalog
