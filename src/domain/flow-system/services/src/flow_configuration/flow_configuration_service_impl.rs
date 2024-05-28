@@ -351,8 +351,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 
         for flow_key in flow_keys {
             self.pause_flow_configuration(request_time, flow_key)
-                .await
-                .int_err()?;
+                .await?;
         }
 
         Ok(())
@@ -369,8 +368,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 
         for flow_key in flow_keys {
             self.pause_flow_configuration(request_time, flow_key)
-                .await
-                .int_err()?;
+                .await?;
         }
 
         Ok(())
@@ -389,8 +387,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 
         for flow_key in flow_keys {
             self.resume_flow_configuration(request_time, flow_key)
-                .await
-                .int_err()?;
+                .await?;
         }
 
         Ok(())
@@ -408,8 +405,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 
         for flow_key in flow_keys {
             self.resume_flow_configuration(request_time, flow_key)
-                .await
-                .int_err()?;
+                .await?;
         }
 
         Ok(())
