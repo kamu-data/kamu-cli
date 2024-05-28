@@ -111,7 +111,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         Ok(maybe_flow_configuration.map(Into::into))
     }
 
-    /// Find all configurations by flow keys
+    /// Find all configurations by datasets
     #[tracing::instrument(level = "info", skip_all, fields(?dataset_ids))]
     async fn find_configurations_by_datasets(
         &self,

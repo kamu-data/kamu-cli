@@ -31,7 +31,7 @@ pub trait FlowConfigurationService: Sync + Send {
         flow_key: FlowKey,
     ) -> Result<Option<FlowConfigurationState>, FindFlowConfigurationError>;
 
-    /// Find all configurations by flow keys
+    /// Find all configurations by dataset ids
     async fn find_configurations_by_datasets(
         &self,
         dataset_ids: Vec<DatasetID>,

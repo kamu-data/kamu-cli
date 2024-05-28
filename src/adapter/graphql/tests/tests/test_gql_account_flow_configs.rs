@@ -970,7 +970,7 @@ impl FlowConfigHarness {
             }
             "#
         )
-        .replace("<account_name>", &account_name.to_string())
+        .replace("<account_name>", account_name)
     }
 
     fn set_config_time_delta_mutation(

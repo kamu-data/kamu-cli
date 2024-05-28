@@ -62,7 +62,7 @@ type AccountEdge {
 
 type AccountFlowConfigs {
 	"""
-	Checks if all configs of this dataset are disabled
+	Checks if all configs of all datasets in account are disabled
 	"""
 	allPaused: Boolean!
 }
