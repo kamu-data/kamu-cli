@@ -11,7 +11,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use console::style as s;
-use database_common::run_transactional;
+use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::*;
@@ -20,6 +20,8 @@ use kamu_adapter_oauth::*;
 
 use super::{CLIError, Command};
 use crate::OutputConfig;
+
+///////////////////////////////////////////////////////////////////////////////
 
 pub struct APIServerRunCommand {
     base_catalog: Catalog,
@@ -96,18 +98,21 @@ impl APIServerRunCommand {
             password: account_config.get_password(),
         };
 
-        let login_response = run_transactional(&self.base_catalog, |catalog: Catalog| async move {
-            let auth_svc = catalog.get_one::<dyn AuthenticationService>().unwrap();
+        let login_response = DatabaseTransactionRunner::run_transactional(
+            &self.base_catalog,
+            |catalog: Catalog| async move {
+                let auth_svc = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
-            auth_svc
-                .login(
-                    PROVIDER_PASSWORD,
-                    serde_json::to_string::<PasswordLoginCredentials>(&login_credentials)
-                        .int_err()?,
-                )
-                .await
-                .int_err()
-        })
+                auth_svc
+                    .login(
+                        PROVIDER_PASSWORD,
+                        serde_json::to_string::<PasswordLoginCredentials>(&login_credentials)
+                            .int_err()?,
+                    )
+                    .await
+                    .int_err()
+            },
+        )
         .await?;
 
         Ok(login_response.access_token)
@@ -159,3 +164,5 @@ impl Command for APIServerRunCommand {
         Ok(())
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////

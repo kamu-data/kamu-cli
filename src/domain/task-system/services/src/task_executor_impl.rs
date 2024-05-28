@@ -22,7 +22,7 @@ use kamu_core::{
 };
 use kamu_task_system::*;
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 pub struct TaskExecutorImpl {
     task_sched: Arc<dyn TaskScheduler>,
@@ -31,7 +31,7 @@ pub struct TaskExecutorImpl {
     catalog: Catalog,
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn TaskExecutor)]
@@ -75,7 +75,7 @@ impl TaskExecutorImpl {
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl TaskExecutor for TaskExecutorImpl {
@@ -180,7 +180,7 @@ impl TaskExecutor for TaskExecutorImpl {
                 "Task finished",
             );
 
-            let outcome_clone = outcome.clone();
+            let cloned_outcome = outcome.clone();
             let task = DatabaseTransactionRunner::run_transactional(
                 &self.catalog,
                 |updated_catalog| async move {
@@ -190,7 +190,7 @@ impl TaskExecutor for TaskExecutorImpl {
 
                     // Refresh the task in case it was updated concurrently (e.g. late cancellation)
                     task.update(event_store.as_ref()).await.int_err()?;
-                    task.finish(self.time_source.now(), outcome_clone)
+                    task.finish(self.time_source.now(), cloned_outcome)
                         .int_err()?;
                     task.save(event_store.as_ref()).await.int_err()?;
 
@@ -204,4 +204,4 @@ impl TaskExecutor for TaskExecutorImpl {
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////

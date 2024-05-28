@@ -49,54 +49,40 @@ impl<HFutResultE> DatabaseTransactionRunner<HFutResultE> {
         HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>> + Send,
         HFutResultE: From<InternalError>,
     {
-        run_transactional(base_catalog, callback).await
-    }
-}
+        // Extract transaction manager, specific for the database
+        let db_transaction_manager = base_catalog
+            .get_one::<dyn DatabaseTransactionManager>()
+            .unwrap();
 
-// Remove after migration
-pub async fn run_transactional<H, HFut, HFutResultT, HFutResultE>(
-    // TODO: use Catalog (w/o ref) after dill-rs has been upgraded to version 0.8.1
-    base_catalog: &Catalog,
-    callback: H,
-) -> Result<HFutResultT, HFutResultE>
-where
-    H: FnOnce(Catalog) -> HFut + Send,
-    HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>> + Send,
-    HFutResultE: From<InternalError>,
-{
-    // Extract transaction manager, specific for the database
-    let db_transaction_manager = base_catalog
-        .get_one::<dyn DatabaseTransactionManager>()
-        .unwrap();
+        // Start transaction
+        let transaction_ref = db_transaction_manager.make_transaction_ref().await?;
 
-    // Start transaction
-    let transaction_ref = db_transaction_manager.make_transaction_ref().await?;
+        // Create a chained catalog for transaction-aware components,
+        // but keep a local copy of a transaction pointer
+        let chained_catalog = CatalogBuilder::new_chained(base_catalog)
+            .add_value(transaction_ref.clone())
+            .build();
 
-    // Create a chained catalog for transaction-aware components,
-    // but keep a local copy of a transaction pointer
-    let chained_catalog = CatalogBuilder::new_chained(base_catalog)
-        .add_value(transaction_ref.clone())
-        .build();
+        // Run transactional code in the callback
+        let result = callback(chained_catalog).await;
 
-    // Run transactional code in the callback
-    let result = callback(chained_catalog).await;
+        // Commit or rollback transaction depending on the result
+        match result {
+            // In case everything succeeded, commit the transaction
+            Ok(res) => {
+                db_transaction_manager
+                    .commit_transaction(transaction_ref)
+                    .await?;
+                Ok(res)
+            }
 
-    // Commit or rollback transaction depending on the result
-    match result {
-        // In case everything succeeded, commit the transaction
-        Ok(res) => {
-            db_transaction_manager
-                .commit_transaction(transaction_ref)
-                .await?;
-            Ok(res)
-        }
-
-        // Otherwise, do an explicit rollback
-        Err(e) => {
-            db_transaction_manager
-                .rollback_transaction(transaction_ref)
-                .await?;
-            Err(e)
+            // Otherwise, do an explicit rollback
+            Err(e) => {
+                db_transaction_manager
+                    .rollback_transaction(transaction_ref)
+                    .await?;
+                Err(e)
+            }
         }
     }
 }

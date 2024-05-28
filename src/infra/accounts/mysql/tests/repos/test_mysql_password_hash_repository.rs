@@ -7,19 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{run_transactional, MySqlTransactionManager};
+use database_common::{DatabaseTransactionRunner, MySqlTransactionManager};
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_mysql::MySqlAccountRepository;
 use sqlx::MySqlPool;
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_no_password_stored(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    run_transactional(&harness.catalog, |catalog| async move {
+    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_no_password_stored(&catalog).await;
         Ok(())
     })
@@ -27,14 +27,14 @@ async fn test_no_password_stored(mysql_pool: MySqlPool) {
     .unwrap();
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_store_couple_account_passwords(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    run_transactional(&harness.catalog, |catalog| async move {
+    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_store_couple_account_passwords(&catalog).await;
         Ok(())
     })
@@ -42,7 +42,7 @@ async fn test_store_couple_account_passwords(mysql_pool: MySqlPool) {
     .unwrap();
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 struct MySqlAccountRepositoryHarness {
     catalog: Catalog,
@@ -62,4 +62,4 @@ impl MySqlAccountRepositoryHarness {
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
