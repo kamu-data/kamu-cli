@@ -10,11 +10,13 @@
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use http::StatusCode;
-use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
+use kamu_accounts::CurrentAccountSubject;
 use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use crate::api_error::ApiError;
+use crate::axum_utils::response_for_anonymous_denial;
 use crate::simple_protocol::*;
 use crate::{
     AccessToken,
@@ -151,15 +153,12 @@ pub async fn platform_login_handler(
 #[allow(clippy::unused_async)]
 pub async fn platform_token_validate_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
-) -> axum::response::Response {
+) -> Result<(), ApiError> {
     let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
 
     match current_account_subject.as_ref() {
-        CurrentAccountSubject::Logged(_) => axum::response::Response::builder()
-            .status(http::StatusCode::OK)
-            .body(Default::default())
-            .unwrap(),
-        CurrentAccountSubject::Anonymous(reason) => response_for_anonymous_denial(*reason),
+        CurrentAccountSubject::Logged(_) => Ok(()),
+        CurrentAccountSubject::Anonymous(reason) => Err(response_for_anonymous_denial(*reason)),
     }
 }
 
@@ -179,7 +178,9 @@ pub async fn platform_file_upload_get_handler(
     let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
     let account_id = match current_account_subject.as_ref() {
         CurrentAccountSubject::Logged(l) => l.account_id.clone(),
-        CurrentAccountSubject::Anonymous(reason) => return response_for_anonymous_denial(*reason),
+        CurrentAccountSubject::Anonymous(reason) => {
+            return response_for_anonymous_denial(*reason).into_response()
+        }
     };
 
     let access_token = catalog.get_one::<AccessToken>().unwrap();
@@ -225,7 +226,9 @@ pub async fn platform_file_upload_post_handler(
     let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
     let account_id = match current_account_subject.as_ref() {
         CurrentAccountSubject::Logged(l) => l.account_id.clone(),
-        CurrentAccountSubject::Anonymous(reason) => return response_for_anonymous_denial(*reason),
+        CurrentAccountSubject::Anonymous(reason) => {
+            return response_for_anonymous_denial(*reason).into_response()
+        }
     };
 
     let file_data = Box::new(crate::axum_utils::body_into_async_read(body_stream));
@@ -251,22 +254,6 @@ pub async fn platform_file_upload_post_handler(
                 (StatusCode::INTERNAL_SERVER_ERROR, "").into_response()
             }
         },
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////
-
-fn response_for_anonymous_denial(reason: AnonymousAccountReason) -> Response {
-    match reason {
-        AnonymousAccountReason::AuthenticationExpired => {
-            (StatusCode::UNAUTHORIZED, "Authentication token expired").into_response()
-        }
-        AnonymousAccountReason::AuthenticationInvalid => {
-            (StatusCode::UNAUTHORIZED, "Authentication token invalid").into_response()
-        }
-        AnonymousAccountReason::NoAuthenticationProvided => {
-            (StatusCode::UNAUTHORIZED, "No authentication token provided").into_response()
-        }
     }
 }
 

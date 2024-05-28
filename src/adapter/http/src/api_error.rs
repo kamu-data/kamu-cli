@@ -81,6 +81,10 @@ impl ApiError {
         AccessError::Unauthorized("Unauthorized access".into()).api_err()
     }
 
+    pub fn new_unauthorized_custom(custom_reason: &str) -> Self {
+        AccessError::Unauthorized(custom_reason.into()).api_err()
+    }
+
     pub fn new_forbidden() -> Self {
         AccessError::Forbidden("Forbidden access".into()).api_err()
     }

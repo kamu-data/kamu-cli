@@ -12,7 +12,7 @@ use std::sync::Arc;
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::types::ObjectCannedAcl;
 use dill::*;
-use kamu::domain::ErrorIntoInternal;
+use kamu::domain::{ErrorIntoInternal, InternalError};
 use kamu::utils::s3_context::S3Context;
 use opendatafabric::AccountID;
 use tokio::io::AsyncRead;
@@ -45,6 +45,10 @@ impl UploadServiceS3 {
             upload_config,
         }
     }
+
+    fn make_file_key(&self, account_id: &AccountID, upload_id: &str, file_name: &str) -> String {
+        format!("{}/{}/{}", account_id.as_multibase(), upload_id, file_name,)
+    }
 }
 
 #[async_trait::async_trait]
@@ -61,12 +65,7 @@ impl UploadService for UploadServiceS3 {
         }
 
         let upload_id = Uuid::new_v4().simple().to_string();
-        let file_key = format!(
-            "{}/{}/{}",
-            account_id.as_multibase(),
-            upload_id.clone(),
-            file_name,
-        );
+        let file_key = self.make_file_key(account_id, &upload_id, &file_name);
 
         let presigned_conf = PresigningConfig::builder()
             .expires_in(
@@ -99,6 +98,23 @@ impl UploadService for UploadServiceS3 {
                 .collect(),
             fields: vec![],
         })
+    }
+
+    async fn upload_reference_into_stream(
+        &self,
+        account_id: &AccountID,
+        upload_id: &str,
+        file_name: &str,
+    ) -> Result<Box<dyn AsyncRead + Send + Unpin>, InternalError> {
+        let file_key = self.make_file_key(account_id, upload_id, file_name);
+
+        let resp = match self.s3_upload_context.get_object(file_key).await {
+            Ok(resp) => Ok(resp),
+            Err(err) => return Err(err.int_err()),
+        }?;
+
+        let stream = resp.body.into_async_read();
+        Ok(Box::new(stream))
     }
 
     async fn save_upload(

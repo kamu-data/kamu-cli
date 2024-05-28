@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use dill::*;
-use kamu::domain::{ErrorIntoInternal, ServerUrlConfig};
+use kamu::domain::{ErrorIntoInternal, InternalError, ResultIntoInternal, ServerUrlConfig};
 use opendatafabric::AccountID;
 use thiserror::Error;
 use tokio::io::AsyncRead;
@@ -64,6 +64,13 @@ impl UploadServiceLocal {
         tokio::io::copy(&mut data, &mut file).await?;
         Ok(())
     }
+
+    async fn file_to_stream(
+        path: &Path,
+    ) -> Result<Box<dyn AsyncRead + Send + Unpin>, InternalError> {
+        let file = tokio::fs::File::open(path).await.int_err()?;
+        Ok(Box::new(file))
+    }
 }
 
 #[async_trait::async_trait]
@@ -105,6 +112,20 @@ impl UploadService for UploadServiceLocal {
             fields: vec![],
         };
         Ok(context)
+    }
+
+    async fn upload_reference_into_stream(
+        &self,
+        account_id: &AccountID,
+        upload_id: &str,
+        file_name: &str,
+    ) -> Result<Box<dyn AsyncRead + Send + Unpin>, InternalError> {
+        let upload_file_path = self
+            .make_account_folder_path(account_id)
+            .join(upload_id)
+            .join(file_name);
+
+        UploadServiceLocal::file_to_stream(&upload_file_path).await
     }
 
     async fn save_upload(

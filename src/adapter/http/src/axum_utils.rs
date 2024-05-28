@@ -11,6 +11,10 @@
 // Errors
 /////////////////////////////////////////////////////////////////////////////////
 
+use kamu_accounts::AnonymousAccountReason;
+
+use crate::api_error::ApiError;
+
 pub(crate) fn bad_request_response() -> axum::response::Response {
     error_response(http::status::StatusCode::BAD_REQUEST)
 }
@@ -62,6 +66,22 @@ pub(crate) fn body_into_async_read(
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
         .into_async_read()
         .compat()
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+pub fn response_for_anonymous_denial(reason: AnonymousAccountReason) -> ApiError {
+    match reason {
+        AnonymousAccountReason::AuthenticationExpired => {
+            ApiError::new_unauthorized_custom("Authentication token expired")
+        }
+        AnonymousAccountReason::AuthenticationInvalid => {
+            ApiError::new_unauthorized_custom("Authentication token invalid")
+        }
+        AnonymousAccountReason::NoAuthenticationProvided => {
+            ApiError::new_unauthorized_custom("No authentication token provided")
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////
