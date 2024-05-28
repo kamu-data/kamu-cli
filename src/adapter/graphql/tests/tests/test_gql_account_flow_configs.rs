@@ -433,6 +433,185 @@ async fn test_pause_resume_account_flows() {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_account_configs_all_paused() {
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let foo_dataset_alias = DatasetAlias::new(
+        Some(DEFAULT_ACCOUNT_NAME.clone()),
+        DatasetName::new_unchecked("foo"),
+    );
+    let bar_dataset_alias = DatasetAlias::new(
+        Some(DEFAULT_ACCOUNT_NAME.clone()),
+        DatasetName::new_unchecked("bar"),
+    );
+
+    let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
+    let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
+        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
+        mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
+        ..Default::default()
+    });
+    let foo_create_result = harness.create_root_dataset(foo_dataset_alias).await;
+    let bar_create_result = harness.create_root_dataset(bar_dataset_alias).await;
+
+    let request_code =
+        FlowConfigHarness::trigger_flow_mutation(&foo_create_result.dataset_handle.id, "INGEST");
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+
+    let request_code = FlowConfigHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "accounts": {
+                "byName": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetPollingIngest",
+                                            "datasetId": foo_create_result.dataset_handle.id.to_string(),
+                                            "ingestResult": null,
+                                        },
+                                        "status": "WAITING",
+                                        "outcome": null,
+                                        "timing": {
+                                            "awaitingExecutorSince": null,
+                                            "runningSince": null,
+                                            "finishedAt": null,
+                                        },
+                                        "tasks": [],
+                                        "primaryTrigger": {
+                                            "__typename": "FlowTriggerManual",
+
+                                        },
+                                        "startCondition": null,
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let mutation_code = FlowConfigHarness::set_config_time_delta_mutation(
+        &bar_create_result.dataset_handle.id,
+        "INGEST",
+        false,
+        1,
+        "DAYS",
+    );
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+
+    let request_code = FlowConfigHarness::all_paused_account_configs_query(&DEFAULT_ACCOUNT_NAME);
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "accounts": {
+                "byName": {
+                    "flows": {
+                        "configs": {
+                            "allPaused": false
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let mutation_code = FlowConfigHarness::pause_account_flows(&DEFAULT_ACCOUNT_NAME);
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "accounts": {
+                "byName": {
+                    "flows": {
+                        "configs": {
+                            "pauseAccountDatasetFlows": true
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let request_code = FlowConfigHarness::all_paused_account_configs_query(&DEFAULT_ACCOUNT_NAME);
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "accounts": {
+                "byName": {
+                    "flows": {
+                        "configs": {
+                            "allPaused": true
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 struct FlowConfigHarness {
     _tempdir: tempfile::TempDir,
     _catalog_base: dill::Catalog,
@@ -773,6 +952,25 @@ impl FlowConfigHarness {
             "#
         )
         .replace("<id>", &id.to_string())
+    }
+
+    fn all_paused_account_configs_query(account_name: &AccountName) -> String {
+        indoc!(
+            r#"
+            {
+                accounts {
+                    byName (name: "<account_name>") {
+                        flows {
+                            configs {
+                                allPaused
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<account_name>", account_name)
     }
 
     fn set_config_time_delta_mutation(

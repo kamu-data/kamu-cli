@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a [configuration](/images/persistence-storage) of running a `kamu` API server along with a database,
   for persistent storage of data
 - New `listFlowInitiators` api to fetch all initiators of flows
+- New `allPaused` method in `AccountFlowConfigs` API
 
 ## [0.183.0] - 2024-05-22
 ### Added

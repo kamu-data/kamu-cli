@@ -9,9 +9,8 @@
 
 use chrono::Utc;
 use fs::FlowConfigurationService;
-use futures::TryStreamExt;
 use kamu_accounts::Account;
-use kamu_core::DatasetRepository;
+use kamu_core::DatasetOwnershipService;
 use kamu_flow_system as fs;
 use opendatafabric::DatasetID;
 
@@ -30,11 +29,9 @@ impl AccountFlowConfigsMut {
 
     #[graphql(skip)]
     async fn get_account_dataset_ids(&self, ctx: &Context<'_>) -> Result<Vec<DatasetID>> {
-        let datset_repo = from_catalog::<dyn DatasetRepository>(ctx).unwrap();
-        let datset_ids: Vec<_> = datset_repo
-            .get_datasets_by_owner(&self.account.account_name)
-            .map_ok(|dataset_handle| dataset_handle.id)
-            .try_collect()
+        let dataset_ownership_service = from_catalog::<dyn DatasetOwnershipService>(ctx).unwrap();
+        let datset_ids: Vec<_> = dataset_ownership_service
+            .get_owned_datasets(&self.account.id)
             .await?;
 
         Ok(datset_ids)
