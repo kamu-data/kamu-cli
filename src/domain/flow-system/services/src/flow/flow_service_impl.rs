@@ -1122,6 +1122,7 @@ impl FlowService for FlowServiceImpl {
         )
         .await?;
 
+        let cloned_dataset_id = dataset_id.clone();
         let matched_stream = Box::pin(async_stream::try_stream! {
             let relevant_flow_ids = DatabaseTransactionRunner::run_transactional(
                 &self.catalog,
@@ -1129,7 +1130,7 @@ impl FlowService for FlowServiceImpl {
                     let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
 
                     flow_event_store
-                        .get_all_flow_ids_by_dataset(&dataset_id, filters, pagination)
+                        .get_all_flow_ids_by_dataset(&cloned_dataset_id, filters, pagination)
                         .try_collect::<Vec<_>>()
                         .await
                 },
@@ -1583,13 +1584,27 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceImpl {
         let finish_time = self.round_time(event.event_time)?;
 
         if let Some(flow_id) = maybe_flow_id {
-            let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
-                .await
-                .int_err()?;
-            let event_outcome = self.get_task_outcome(&flow, event.outcome.clone());
-            flow.on_task_finished(event.event_time, event.task_id, event_outcome.clone())
-                .int_err()?;
-            flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+            let (flow, is_event_outcome_success) = <DatabaseTransactionRunner>::run_transactional(
+                &self.catalog,
+                |updated_catalog| async move {
+                    let flow_event_store =
+                        updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
+
+                    let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
+                        .await
+                        .int_err()?;
+                    let event_outcome = self.get_task_outcome(&flow, event.outcome.clone());
+                    let is_event_outcome_success = event_outcome.is_success();
+
+                    flow.on_task_finished(event.event_time, event.task_id, event_outcome)
+                        .int_err()?;
+                    flow.save(flow_event_store.as_ref()).await.int_err()?;
+
+                    Ok((flow, is_event_outcome_success))
+                },
+            )
+            .await
+            .int_err()?;
 
             {
                 let mut state = self.state.lock().unwrap();
@@ -1613,7 +1628,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceImpl {
 
             // In case of success:
             //  - enqueue next auto-polling flow cycle
-            if event_outcome.is_success() {
+            if is_event_outcome_success {
                 self.try_enqueue_scheduled_auto_polling_flow_if_enabled(
                     finish_time,
                     &flow.flow_key,
