@@ -10,6 +10,7 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
+use database_common::DatabaseTransactionRunner;
 use dill::*;
 use kamu_core::SystemTimeSource;
 use kamu_task_system::*;
@@ -19,8 +20,8 @@ use opendatafabric::DatasetID;
 
 pub struct TaskSchedulerImpl {
     state: Arc<Mutex<State>>,
-    event_store: Arc<dyn TaskSystemEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
+    catalog: Catalog,
 }
 
 #[derive(Default)]
@@ -34,14 +35,11 @@ struct State {
 #[interface(dyn TaskScheduler)]
 #[scope(Singleton)]
 impl TaskSchedulerImpl {
-    pub fn new(
-        event_store: Arc<dyn TaskSystemEventStore>,
-        time_source: Arc<dyn SystemTimeSource>,
-    ) -> Self {
+    pub fn new(time_source: Arc<dyn SystemTimeSource>, catalog: Catalog) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
-            event_store,
             time_source,
+            catalog,
         }
     }
 }
@@ -52,12 +50,22 @@ impl TaskSchedulerImpl {
 impl TaskScheduler for TaskSchedulerImpl {
     #[tracing::instrument(level = "info", skip_all, fields(?logical_plan))]
     async fn create_task(&self, logical_plan: LogicalPlan) -> Result<TaskState, CreateTaskError> {
-        let mut task = Task::new(
-            self.time_source.now(),
-            self.event_store.new_task_id().await?,
-            logical_plan,
-        );
-        task.save(self.event_store.as_ref()).await.int_err()?;
+        let task = <DatabaseTransactionRunner>::run_transactional(
+            &self.catalog,
+            |updated_catalog| async move {
+                let event_store = updated_catalog
+                    .get_one::<dyn TaskSystemEventStore>()
+                    .int_err()?;
+
+                let new_task_id = event_store.new_task_id().await?;
+                let mut task = Task::new(self.time_source.now(), new_task_id, logical_plan);
+
+                task.save(event_store.as_ref()).await.int_err()?;
+
+                Ok(task)
+            },
+        )
+        .await?;
 
         let queue_len = {
             let mut state = self.state.lock().unwrap();
@@ -76,20 +84,48 @@ impl TaskScheduler for TaskSchedulerImpl {
 
     #[tracing::instrument(level = "info", skip_all, fields(%task_id))]
     async fn get_task(&self, task_id: TaskID) -> Result<TaskState, GetTaskError> {
-        let task = Task::load(task_id, self.event_store.as_ref()).await?;
+        let task = DatabaseTransactionRunner::run_transactional(
+            &self.catalog,
+            |updated_catalog| async move {
+                let event_store = updated_catalog
+                    .get_one::<dyn TaskSystemEventStore>()
+                    .int_err()?;
+
+                Task::load(task_id, event_store.as_ref()).await
+            },
+        )
+        .await?;
+
         Ok(task.into())
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%task_id))]
     async fn cancel_task(&self, task_id: TaskID) -> Result<TaskState, CancelTaskError> {
-        let mut task = Task::load(task_id, self.event_store.as_ref()).await?;
+        let task = DatabaseTransactionRunner::<CancelTaskError>::run_transactional(
+            &self.catalog,
+            |updated_catalog| async move {
+                let event_store = updated_catalog
+                    .get_one::<dyn TaskSystemEventStore>()
+                    .int_err()?;
+
+                let mut task = Task::load(task_id, event_store.as_ref()).await?;
+
+                if task.can_cancel() {
+                    task.cancel(self.time_source.now()).int_err()?;
+                    task.save(event_store.as_ref()).await.int_err()?;
+                }
+
+                Ok(task)
+            },
+        )
+        .await?;
 
         if task.can_cancel() {
-            task.cancel(self.time_source.now()).int_err()?;
-            task.save(self.event_store.as_ref()).await.int_err()?;
-
             let mut state = self.state.lock().unwrap();
-            state.task_queue.retain(|task_id| *task_id != task.task_id);
+
+            state
+                .task_queue
+                .retain(|task_id_from_queue| *task_id_from_queue != task_id);
         }
 
         Ok(task.into())
@@ -101,26 +137,55 @@ impl TaskScheduler for TaskSchedulerImpl {
         dataset_id: &DatasetID,
         pagination: TaskPaginationOpts,
     ) -> Result<TaskStateListing, ListTasksByDatasetError> {
-        let total_count = self
-            .event_store
-            .get_count_tasks_by_dataset(dataset_id)
-            .await?;
+        let total_count = <DatabaseTransactionRunner>::run_transactional(
+            &self.catalog,
+            |updated_catalog| async move {
+                let event_store = updated_catalog
+                    .get_one::<dyn TaskSystemEventStore>()
+                    .int_err()?;
 
-        let dataset_id = dataset_id.clone();
+                let total_count = event_store.get_count_tasks_by_dataset(dataset_id).await?;
+
+                Ok(total_count)
+            },
+        )
+        .await?;
 
         use futures::TryStreamExt;
+
+        let dataset_id = dataset_id.clone();
         let stream = Box::pin(async_stream::stream! {
-            let relevant_task_ids: Vec<_> = self
-                .event_store
-                .get_tasks_by_dataset(&dataset_id, pagination)
-                .await
-                .try_collect()
-                .await
-                .int_err()?;
+            let relevant_task_ids = DatabaseTransactionRunner::run_transactional(
+                &self.catalog,
+                |updated_catalog| async move {
+                    let event_store = updated_catalog
+                        .get_one::<dyn TaskSystemEventStore>()
+                        .int_err()?;
+
+                    event_store
+                        .get_tasks_by_dataset(&dataset_id, pagination)
+                        .await
+                        .try_collect::<Vec<_>>().await
+                },
+            )
+            .await
+            .int_err()?;
 
             // TODO: implement batch loading
             for task_id in relevant_task_ids {
-                let task = Task::load(task_id, self.event_store.as_ref()).await.int_err()?;
+                let task = DatabaseTransactionRunner::run_transactional(
+                    &self.catalog,
+                    |updated_catalog| async move {
+                        let event_store = updated_catalog
+                            .get_one::<dyn TaskSystemEventStore>()
+                            .int_err()?;
+
+                        Task::load(task_id, event_store.as_ref()).await
+                    },
+                )
+                .await
+                .int_err()?;
+
                 yield Ok(task.into());
             }
         });
@@ -153,11 +218,22 @@ impl TaskScheduler for TaskSchedulerImpl {
             return Ok(None);
         };
 
-        let mut task = Task::load(task_id, self.event_store.as_ref())
-            .await
-            .int_err()?;
-        task.run(self.time_source.now()).int_err()?;
-        task.save(self.event_store.as_ref()).await.int_err()?;
+        let task = <DatabaseTransactionRunner>::run_transactional(
+            &self.catalog,
+            |updated_catalog| async move {
+                let event_store = updated_catalog
+                    .get_one::<dyn TaskSystemEventStore>()
+                    .int_err()?;
+
+                let mut task = Task::load(task_id, event_store.as_ref()).await.int_err()?;
+
+                task.run(self.time_source.now()).int_err()?;
+                task.save(event_store.as_ref()).await.int_err()?;
+
+                Ok(task)
+            },
+        )
+        .await?;
 
         tracing::info!(
             %task_id,
