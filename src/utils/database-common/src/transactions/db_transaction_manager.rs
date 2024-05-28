@@ -34,13 +34,35 @@ pub trait DatabaseTransactionManager: Send + Sync {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn run_transactional<H, HFut, HFutResultT>(
+pub struct DatabaseTransactionRunner<HFutResultE = InternalError> {
+    _phantom: PhantomData<HFutResultE>,
+}
+
+impl<HFutResultE> DatabaseTransactionRunner<HFutResultE> {
+    pub async fn run_transactional<H, HFut, HFutResultT>(
+        // TODO: use Catalog (w/o ref) after dill-rs has been upgraded to version 0.8.1
+        base_catalog: &Catalog,
+        callback: H,
+    ) -> Result<HFutResultT, HFutResultE>
+    where
+        H: FnOnce(Catalog) -> HFut + Send,
+        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>> + Send,
+        HFutResultE: From<InternalError>,
+    {
+        run_transactional(base_catalog, callback).await
+    }
+}
+
+// Remove after migration
+pub async fn run_transactional<H, HFut, HFutResultT, HFutResultE>(
+    // TODO: use Catalog (w/o ref) after dill-rs has been upgraded to version 0.8.1
     base_catalog: &Catalog,
     callback: H,
-) -> Result<HFutResultT, InternalError>
+) -> Result<HFutResultT, HFutResultE>
 where
     H: FnOnce(Catalog) -> HFut + Send,
-    HFut: std::future::Future<Output = Result<HFutResultT, InternalError>> + Send,
+    HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>> + Send,
+    HFutResultE: From<InternalError>,
 {
     // Extract transaction manager, specific for the database
     let db_transaction_manager = base_catalog
