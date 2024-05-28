@@ -12,7 +12,7 @@ use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::response::{IntoResponse, Response};
-use database_common::run_transactional;
+use database_common::DatabaseTransactionRunner;
 use futures::Future;
 use tower::{Layer, Service};
 
@@ -70,13 +70,16 @@ where
                 .expect("Catalog not found in http server extensions")
                 .clone();
 
-            run_transactional(&base_catalog, |updated_catalog| async move {
-                request.extensions_mut().insert(updated_catalog);
+            <DatabaseTransactionRunner>::run_transactional(
+                &base_catalog,
+                |updated_catalog| async move {
+                    request.extensions_mut().insert(updated_catalog);
 
-                let inner_result = inner.call(request).await;
+                    let inner_result = inner.call(request).await;
 
-                Ok(inner_result)
-            })
+                    Ok(inner_result)
+                },
+            )
             .await
             .unwrap_or_else(|e| Ok(e.api_err().into_response()))
         })
