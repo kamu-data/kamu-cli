@@ -236,7 +236,7 @@ pub async fn platform_file_upload_post_handler(
             &account_id,
             upload_param.upload_id,
             upload_param.file_name,
-            content_length.0 as usize,
+            usize::try_from(content_length.0).unwrap(),
             file_data,
         )
         .await
