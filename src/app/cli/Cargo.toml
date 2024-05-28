@@ -123,7 +123,7 @@ tracing-bunyan-formatter = "0.3"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1"  # Conditional compilation
-datafusion = { version = "37", default-features = false, features = ["crypto_expressions", "encoding_expressions", "parquet", "regex_expressions", "unicode_expressions", "compression"] }
+datafusion = { version = "38", default-features = false, features = ["crypto_expressions", "encoding_expressions", "parquet", "regex_expressions", "unicode_expressions", "compression"] }
 dill = "0.8"
 dirs = "5"
 fs_extra = "1.3"

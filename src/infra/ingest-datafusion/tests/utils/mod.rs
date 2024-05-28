@@ -12,8 +12,9 @@ use std::sync::Arc;
 use datafusion::arrow::array;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::common::DFField;
+use datafusion::common::DFSchema;
 use datafusion::prelude::*;
+use datafusion::sql::TableReference;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -73,28 +74,31 @@ pub async fn assert_dfs_equivalent(
         (lhs.sort(lhs_cols).unwrap(), rhs.sort(rhs_cols).unwrap())
     };
 
-    let map_field = |f: &DFField| -> DFField {
-        let f = f.clone();
-        let f = if !ignore_qualifiers {
-            f
-        } else {
-            f.strip_qualifier()
+    let map_field =
+        |(q, f): (Option<&TableReference>, &Arc<Field>)| -> (Option<TableReference>, Arc<Field>) {
+            let q = q.cloned();
+            let f = f.clone();
+            let (q, f) = if !ignore_qualifiers {
+                (q, f)
+            } else {
+                (None, f)
+            };
+            let f = if !ignore_nullability {
+                f
+            } else {
+                Arc::new(f.as_ref().clone().with_nullable(true))
+            };
+            (q, f)
         };
-        if !ignore_nullability {
-            f
-        } else {
-            f.with_nullable(true)
-        }
-    };
 
     let lhs_schema_stripped = datafusion::common::DFSchema::new_with_metadata(
-        lhs.schema().fields().iter().map(map_field).collect(),
+        qualified_fields(lhs.schema()).map(map_field).collect(),
         Default::default(),
     )
     .unwrap();
 
     let rhs_schema_stripped = datafusion::common::DFSchema::new_with_metadata(
-        rhs.schema().fields().iter().map(map_field).collect(),
+        qualified_fields(rhs.schema()).map(map_field).collect(),
         Default::default(),
     )
     .unwrap();
@@ -122,6 +126,18 @@ pub async fn assert_dfs_equivalent(
         .to_string();
 
     pretty_assertions::assert_eq!(lhs_str, rhs_str);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+fn qualified_fields(
+    schema: &DFSchema,
+) -> impl Iterator<Item = (Option<&TableReference>, &Arc<Field>)> {
+    schema
+        .fields()
+        .iter()
+        .enumerate()
+        .map(|(i, f)| (schema.qualified_field(i).0, f))
 }
 
 ///////////////////////////////////////////////////////////////////////////////

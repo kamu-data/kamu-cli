@@ -120,12 +120,15 @@ repository = "https://github.com/kamu-data/kamu-cli"
 authors = ["Kamu Data Inc. <dev@kamu.dev>"]
 readme = "README.md"
 license-file = "LICENSE.txt"
-keywords = ["data", "collaboration", "etl", "pipeline", "provenance", "blockchain"]
-include = [
-    "benches/*.rs",
-    "src/**/*.rs",
-    "Cargo.toml",
+keywords = [
+    "data",
+    "collaboration",
+    "etl",
+    "pipeline",
+    "provenance",
+    "blockchain",
 ]
+include = ["benches/*.rs", "src/**/*.rs", "Cargo.toml"]
 publish = false
 
 
@@ -196,4 +199,4 @@ debug = 1
 [patch.crates-io]
 # datafusion = { git = 'https://github.com/apache/arrow-datafusion.git', tag = '37.1.0-rc2' }
 # datafusion-common = { git = 'https://github.com/apache/arrow-datafusion.git', tag = '37.1.0-rc2' }
-# datafusion-odata = { git = 'https://github.com/kamu-data/datafusion-odata.git', tag = '37.0.0-rc2' }
+datafusion-odata = { git = 'https://github.com/kamu-data/datafusion-odata.git', branch = 'axum-0.6' }

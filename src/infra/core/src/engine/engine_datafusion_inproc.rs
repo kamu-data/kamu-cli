@@ -56,7 +56,7 @@ impl EngineDatafusionInproc {
         };
 
         let create_view = LogicalPlan::Ddl(DdlStatement::CreateView(CreateView {
-            name: TableReference::bare(alias).to_owned_reference(),
+            name: TableReference::bare(alias),
             input: Arc::new(logical_plan),
             or_replace: false,
             definition: Some(query.to_string()),

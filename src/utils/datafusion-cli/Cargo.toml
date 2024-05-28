@@ -35,7 +35,7 @@ async-trait = "0.1"
 aws-config = "0.57"
 aws-credential-types = "0.57"
 clap = { version = "4", features = ["derive"] }
-datafusion = { version = "37", features = [
+datafusion = { version = "38", features = [
     "crypto_expressions",
     "datetime_expressions",
     "encoding_expressions",
@@ -44,7 +44,7 @@ datafusion = { version = "37", features = [
     "unicode_expressions",
     "compression",
 ] }
-datafusion-common = { version = "37", default-features = false }
+datafusion-common = { version = "38", default-features = false }
 dirs = "4"
 futures = "0.3"
 object_store = { version = "0.9", features = ["aws", "gcp", "http"] }

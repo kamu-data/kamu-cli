@@ -283,6 +283,7 @@ impl Engine for ODFEngine {
                         ..Default::default()
                     },
                     column_specific_options: HashMap::new(),
+                    key_value_metadata: HashMap::new(),
                 }),
             )
             .await

@@ -431,6 +431,7 @@ impl DataWriterDataFusion {
                     },
                 ),
             ]),
+            key_value_metadata: HashMap::new(),
         }
     }
 
