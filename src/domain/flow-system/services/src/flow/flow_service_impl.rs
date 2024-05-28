@@ -155,8 +155,7 @@ impl FlowServiceImpl {
             .flow_configuration_service
             .list_enabled_configurations()
             .try_collect()
-            .await
-            .int_err()?;
+            .await?;
 
         // Split configs by those which have a schedule or different rules
         let (schedule_configs, non_schedule_configs): (Vec<_>, Vec<_>) = enabled_configurations
@@ -366,8 +365,7 @@ impl FlowServiceImpl {
                             .int_err()
                     },
                 )
-                .await
-                .int_err()?;
+                .await?;
 
                 // Only merge unique triggers, ignore identical
                 flow.add_trigger_if_unique(self.time_source.now(), trigger)
@@ -383,8 +381,7 @@ impl FlowServiceImpl {
                                 &batching_rule,
                                 throttling_boundary_time,
                             )
-                            .await
-                            .int_err()?;
+                            .await?;
                         } else {
                             // Skip, the flow waits for something else
                         }
@@ -422,8 +419,7 @@ impl FlowServiceImpl {
                         Ok(flow)
                     },
                 )
-                .await
-                .int_err()?;
+                .await?;
 
                 Ok(saved_flow.into())
             }
@@ -453,8 +449,7 @@ impl FlowServiceImpl {
                             &batching_rule,
                             throttling_boundary_time,
                         )
-                        .await
-                        .int_err()?;
+                        .await?;
                     }
                     FlowTriggerContext::Scheduled(schedule) => {
                         // Next activation time depends on:
@@ -514,8 +509,7 @@ impl FlowServiceImpl {
                         Ok(flow)
                     },
                 )
-                .await
-                .int_err()?;
+                .await?;
 
                 Ok(saved_flow.into())
             }
@@ -950,16 +944,14 @@ impl FlowServiceImpl {
                 let dataset_owner_account_ids = self
                     .dataset_ownership_service
                     .get_dataset_owners(&fk_dataset.dataset_id)
-                    .await
-                    .int_err()?;
+                    .await?;
 
                 for dependent_dataset_id in dependent_dataset_ids {
                     for owner_account_id in &dataset_owner_account_ids {
                         if self
                             .dataset_ownership_service
                             .is_dataset_owned_by(&dependent_dataset_id, owner_account_id)
-                            .await
-                            .int_err()?
+                            .await?
                         {
                             plans.push(DownstreamDependencyFlowPlan {
                                 flow_key: FlowKeyDataset::new(
@@ -1031,8 +1023,7 @@ impl FlowService for FlowServiceImpl {
                     event_time: start_time,
                 },
             ))
-            .await
-            .int_err()?;
+            .await?;
 
         // Main scanning loop
         let main_loop_span = tracing::debug_span!("FlowService main loop");
@@ -1052,9 +1043,7 @@ impl FlowService for FlowServiceImpl {
                 && nearest_activation_time <= current_time
             {
                 // Run scheduling for current time slot. Should not throw any errors
-                self.run_current_timeslot(nearest_activation_time)
-                    .await
-                    .int_err()?;
+                self.run_current_timeslot(nearest_activation_time).await?;
 
                 // Publish progress event
                 self.event_bus
@@ -1063,8 +1052,7 @@ impl FlowService for FlowServiceImpl {
                             event_time: nearest_activation_time,
                         },
                     ))
-                    .await
-                    .int_err()?;
+                    .await?;
             }
 
             self.time_source.sleep(self.run_config.awaiting_step).await;
@@ -1084,7 +1072,7 @@ impl FlowService for FlowServiceImpl {
         initiator_account_id: AccountID,
         config_snapshot_maybe: Option<FlowConfigurationSnapshot>,
     ) -> Result<FlowState, RequestFlowError> {
-        let activation_time = self.round_time(trigger_time).int_err()?;
+        let activation_time = self.round_time(trigger_time)?;
 
         self.trigger_flow_common(
             &flow_key,
@@ -1135,8 +1123,7 @@ impl FlowService for FlowServiceImpl {
                         .await
                 },
             )
-            .await
-            .int_err()?;
+            .await?;
 
             // TODO: implement batch loading
             for flow_id in relevant_flow_ids {
@@ -1149,8 +1136,7 @@ impl FlowService for FlowServiceImpl {
                             .await.int_err()
                     },
                 )
-                .await
-                .int_err()?;
+                .await?;
 
                 yield flow.into();
             }
@@ -1219,15 +1205,13 @@ impl FlowService for FlowServiceImpl {
                 for dataset_id in filtered_dataset_ids_ref {
                     total_count += flow_event_store
                         .get_count_flows_by_dataset(dataset_id, dataset_flow_filters_ref)
-                        .await
-                        .int_err()?;
+                        .await?;
                 }
 
                 Ok(total_count)
             },
         )
-        .await
-        .int_err()?;
+        .await?;
 
         let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(filtered_dataset_ids);
 
@@ -1247,8 +1231,7 @@ impl FlowService for FlowServiceImpl {
                         .await
                 },
             )
-            .await
-            .int_err()?;
+            .await?;
 
             // TODO: implement batch loading
             for flow_id in relevant_flow_ids {
@@ -1261,8 +1244,7 @@ impl FlowService for FlowServiceImpl {
                             .await.int_err()
                     },
                 )
-                .await
-                .int_err()?;
+                .await?;
 
                 yield flow.into();
             }
@@ -1335,8 +1317,7 @@ impl FlowService for FlowServiceImpl {
                         .await
                 },
             )
-            .await
-            .int_err()?;
+            .await?;
 
             // TODO: implement batch loading
             for flow_id in relevant_flow_ids {
@@ -1349,8 +1330,7 @@ impl FlowService for FlowServiceImpl {
                             .await.int_err()
                     },
                 )
-                .await
-                .int_err()?;
+                .await?;
 
                 yield flow.into();
             }
@@ -1403,8 +1383,7 @@ impl FlowService for FlowServiceImpl {
                             .await.int_err()
                     },
                 )
-                .await
-                .int_err()?;
+                .await?;
 
                 yield flow.into();
             }
@@ -1429,8 +1408,7 @@ impl FlowService for FlowServiceImpl {
                     .int_err()
             },
         )
-        .await
-        .int_err()?;
+        .await?;
 
         Ok(flow.into())
     }
@@ -1455,8 +1433,7 @@ impl FlowService for FlowServiceImpl {
                     .int_err()
             },
         )
-        .await
-        .int_err()?;
+        .await?;
 
         // Cancel tasks for flows in Waiting/Running state.
         // Ignore in Finished state
@@ -1504,13 +1481,10 @@ impl FlowServiceTestDriver for FlowServiceImpl {
                     .int_err()
             },
         )
-        .await
-        .int_err()?;
+        .await?;
 
-        let task_id = self
-            .schedule_flow_task(&mut flow, schedule_time)
-            .await
-            .int_err()?;
+        let task_id = self.schedule_flow_task(&mut flow, schedule_time).await?;
+
         Ok(task_id)
     }
 }
@@ -1549,8 +1523,7 @@ impl AsyncEventHandler<TaskEventRunning> for FlowServiceImpl {
                     Ok(())
                 },
             )
-            .await
-            .int_err()?;
+            .await?;
         }
 
         // Publish progress event
@@ -1558,8 +1531,7 @@ impl AsyncEventHandler<TaskEventRunning> for FlowServiceImpl {
             .dispatch_event(FlowServiceEvent::FlowRunning(FlowServiceEventFlowRunning {
                 event_time: event.event_time,
             }))
-            .await
-            .int_err()?;
+            .await?;
 
         Ok(())
     }
@@ -1603,8 +1575,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceImpl {
                     Ok((flow, is_event_outcome_success))
                 },
             )
-            .await
-            .int_err()?;
+            .await?;
 
             {
                 let mut state = self.state.lock().unwrap();
@@ -1643,8 +1614,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceImpl {
                         event_time: finish_time,
                     },
                 ))
-                .await
-                .int_err()?;
+                .await?;
 
             // TODO: retry logic in case of failed outcome
         }
@@ -1754,8 +1724,7 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceImpl {
                     Ok(())
                 },
             )
-            .await
-            .int_err()?;
+            .await?;
         }
 
         // Not deleting task->update association, it should be safe.
