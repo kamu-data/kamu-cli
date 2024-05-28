@@ -96,6 +96,8 @@ impl APIServer {
                     )
                     .layer(Extension(base_catalog))
                     .layer(Extension(gql_schema))
+                    // TODO: Use a more subtle application of this middleware,
+                    //       since not for every request, we need a transaction
                     .layer(kamu_adapter_http::RunInDatabaseTransactionLayer::new())
                     .layer(kamu_adapter_http::AuthenticationLayer::new()),
             );
