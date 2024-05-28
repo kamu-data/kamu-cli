@@ -28,6 +28,7 @@ kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-flow-system = { workspace = true }
 event-bus = { workspace = true }
+database-common = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
