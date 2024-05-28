@@ -30,11 +30,11 @@ impl AccountFlowConfigsMut {
     #[graphql(skip)]
     async fn get_account_dataset_ids(&self, ctx: &Context<'_>) -> Result<Vec<DatasetID>> {
         let dataset_ownership_service = from_catalog::<dyn DatasetOwnershipService>(ctx).unwrap();
-        let datset_ids: Vec<_> = dataset_ownership_service
+        let dataset_ids: Vec<_> = dataset_ownership_service
             .get_owned_datasets(&self.account.id)
             .await?;
 
-        Ok(datset_ids)
+        Ok(dataset_ids)
     }
 
     async fn resume_account_dataset_flows(&self, ctx: &Context<'_>) -> Result<bool> {
