@@ -97,7 +97,7 @@ pub async fn run(
         base_catalog_builder.add_value(UploadS3BucketConfig {
             bucket_http_url: s3_upload_http_url,
             bucket_name: String::from("upload.demo.stg.kamu.dev.us-west-2"),
-            max_file_size_bytes: i64::from(50 * 1024 * 1024),
+            max_file_size_bytes: (50 * 1024 * 1024) as usize,
         });
         base_catalog_builder.add_builder(
             UploadServiceS3::builder()

@@ -12,10 +12,9 @@ use std::sync::Arc;
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::types::ObjectCannedAcl;
 use dill::*;
-use kamu::domain::{ErrorIntoInternal, InternalError};
+use kamu::domain::ErrorIntoInternal;
 use kamu::utils::s3_context::S3Context;
 use opendatafabric::AccountID;
-use thiserror::Error;
 use tokio::io::AsyncRead;
 use url::Url;
 use uuid::Uuid;
@@ -24,7 +23,9 @@ use crate::{
     AccessToken,
     ContentTooLargeError,
     MakeUploadContextError,
+    SaveUploadError,
     UploadContext,
+    UploadNotSupportedError,
     UploadService,
 };
 
@@ -55,7 +56,7 @@ impl UploadService for UploadServiceS3 {
         &self,
         account_id: &AccountID,
         file_name: String,
-        content_length: i64,
+        content_length: usize,
         _: &AccessToken, // S3 does not require our own token
     ) -> Result<UploadContext, MakeUploadContextError> {
         if content_length > self.upload_s3_bucket_config.max_file_size_bytes {
@@ -102,10 +103,10 @@ impl UploadService for UploadServiceS3 {
         _: &AccountID,
         _: String,
         _: String,
+        _: usize,
         _: Box<dyn AsyncRead + Send + Unpin>,
-    ) -> Result<(), InternalError> {
-        let err = UploadNotSupportedError {};
-        Err(err.int_err())
+    ) -> Result<(), SaveUploadError> {
+        Err(SaveUploadError::NotSupported(UploadNotSupportedError {}))
     }
 }
 
@@ -115,13 +116,7 @@ impl UploadService for UploadServiceS3 {
 pub struct UploadS3BucketConfig {
     pub bucket_http_url: Url,
     pub bucket_name: String,
-    pub max_file_size_bytes: i64,
+    pub max_file_size_bytes: usize,
 }
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-#[error("Direct file uploads are not supported in this environment")]
-struct UploadNotSupportedError {}
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use dill::*;
-use kamu::domain::{ErrorIntoInternal, InternalError, ServerUrlConfig};
+use kamu::domain::{ErrorIntoInternal, ServerUrlConfig};
 use opendatafabric::AccountID;
 use thiserror::Error;
 use tokio::io::AsyncRead;
@@ -21,6 +21,7 @@ use crate::{
     AccessToken,
     ContentTooLargeError,
     MakeUploadContextError,
+    SaveUploadError,
     UploadContext,
     UploadService,
 };
@@ -32,14 +33,14 @@ use crate::{
 pub struct UploadServiceLocal {
     server_url_config: Arc<ServerUrlConfig>,
     cache_dir: PathBuf,
-    max_file_size_bytes: i64,
+    max_file_size_bytes: usize,
 }
 
 impl UploadServiceLocal {
     pub fn new(
         server_url_config: Arc<ServerUrlConfig>,
         cache_dir: PathBuf,
-        max_file_size_bytes: i64,
+        max_file_size_bytes: usize,
     ) -> Self {
         Self {
             server_url_config,
@@ -70,7 +71,7 @@ impl UploadService for UploadServiceLocal {
         &self,
         account_id: &AccountID,
         file_name: String,
-        content_length: i64,
+        content_length: usize,
         access_token: &AccessToken,
     ) -> Result<UploadContext, MakeUploadContextError> {
         if content_length > self.max_file_size_bytes {
@@ -105,16 +106,23 @@ impl UploadService for UploadServiceLocal {
         account_id: &AccountID,
         upload_id: String,
         file_name: String,
+        content_length: usize,
         file_data: Box<dyn AsyncRead + Send + Unpin>,
-    ) -> Result<(), InternalError> {
+    ) -> Result<(), SaveUploadError> {
+        if content_length > self.max_file_size_bytes {
+            return Err(SaveUploadError::TooLarge(ContentTooLargeError {}));
+        }
+
         let upload_folder_path = self
             .make_account_folder_path(account_id)
             .join(upload_id.clone());
         if !upload_folder_path.is_dir() {
-            return Err(SaveUploadError {
-                reason: String::from("Upload folder does not exists"),
-            }
-            .int_err());
+            return Err(SaveUploadError::Internal(
+                SaveUploadFailure {
+                    reason: String::from("Upload folder does not exists"),
+                }
+                .int_err(),
+            ));
         }
 
         let file_path = upload_folder_path.join(file_name);
@@ -122,7 +130,7 @@ impl UploadService for UploadServiceLocal {
             .await
             .map_err(|e| {
                 tracing::error!("{:?}", e);
-                e.int_err()
+                SaveUploadError::Internal(e.int_err())
             })?;
 
         Ok(())
@@ -133,7 +141,7 @@ impl UploadService for UploadServiceLocal {
 
 #[derive(Debug, Error)]
 #[error("Failed to save uploaded file: {reason}")]
-struct SaveUploadError {
+struct SaveUploadFailure {
     pub reason: String,
 }
 

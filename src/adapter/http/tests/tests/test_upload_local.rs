@@ -49,7 +49,11 @@ impl Harness {
             .add::<LoginPasswordAuthProvider>()
             .add_value(JwtAuthenticationConfig::default())
             .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
-            .add_builder(UploadServiceLocal::builder().with_cache_dir(cache_dir.clone()))
+            .add_builder(
+                UploadServiceLocal::builder()
+                    .with_cache_dir(cache_dir.clone())
+                    .with_max_file_size_bytes(100),
+            )
             .bind::<dyn UploadService, UploadServiceLocal>()
             .build();
 
@@ -72,11 +76,10 @@ impl Harness {
         self.api_server.local_addr().to_string()
     }
 
-    fn upload_get_url(&self, file_name: &str) -> String {
+    fn upload_get_url(&self, file_name: &str, file_size: usize) -> String {
         format!(
-            "http://{}/platform/file/upload?file_name={}",
+            "http://{}/platform/file/upload?fileName={file_name}&contentLength={file_size}",
             self.api_server_addr(),
-            file_name
         )
     }
 
@@ -113,7 +116,7 @@ impl Harness {
 #[test_log::test(tokio::test)]
 async fn test_attempt_upload_file_unauthorized() {
     let harness = Harness::new();
-    let upload_get_url = harness.upload_get_url("test.txt");
+    let upload_get_url = harness.upload_get_url("test.txt", 100);
     let upload_post_url = harness.upload_post_url("upload-1", "test.txt");
 
     let client = async move {
@@ -126,7 +129,12 @@ async fn test_attempt_upload_file_unauthorized() {
             upload_get_response.text().await.unwrap()
         );
 
-        let upload_post_reponse = client.post(upload_post_url).send().await.unwrap();
+        let upload_post_reponse = client
+            .post(upload_post_url)
+            .body("some file")
+            .send()
+            .await
+            .unwrap();
         assert_eq!(401, upload_post_reponse.status());
         assert_eq!(
             "No authentication token provided",
@@ -144,7 +152,7 @@ async fn test_attempt_upload_file_authorized() {
     const FILE_BODY: &str = "a-test-file-body";
 
     let harness = Harness::new();
-    let upload_url = harness.upload_get_url("test.txt");
+    let upload_url = harness.upload_get_url("test.txt", FILE_BODY.len());
     let access_token = harness.access_token.clone();
     let cache_dir = harness.cache_dir.clone();
 
@@ -178,6 +186,57 @@ async fn test_attempt_upload_file_authorized() {
         let expected_upload_path = Harness::target_path_from_upload_url(&cache_dir, &upload_url);
         let file_body = std::fs::read_to_string(expected_upload_path).unwrap();
         assert_eq!(FILE_BODY, file_body);
+    };
+
+    await_client_server_flow!(harness.api_server_run(), client);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_attempt_upload_file_that_is_too_large() {
+    const FILE_BODY: &str =
+        "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum \
+         has been the industry's standard dummy text ever since the 1500s, when an unknown \
+         printer took a galley of type and scrambled it to make a type specimen book. It has \
+         survived not only five centuries, but also the leap into electronic typesetting, \
+         remaining essentially unchanged. It was popularised in the 1960s with the release of \
+         Letraset sheets containing Lorem Ipsum passages, and more recently with desktop \
+         publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
+
+    let harness = Harness::new();
+    let upload_url = harness.upload_get_url("test.txt", FILE_BODY.len());
+    let upload_post_url = harness.upload_post_url("upload-1", "test.txt");
+    let access_token = harness.access_token.clone();
+
+    let client = async move {
+        let client = reqwest::Client::new();
+
+        let upload_get_response = client
+            .get(upload_url)
+            .bearer_auth(access_token.clone())
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(400, upload_get_response.status());
+        assert_eq!(
+            "Content too large",
+            upload_get_response.text().await.unwrap()
+        );
+
+        let upload_post_reponse = client
+            .post(upload_post_url)
+            .bearer_auth(access_token.clone())
+            .body(FILE_BODY)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(400, upload_post_reponse.status());
+        assert_eq!(
+            "Content too large",
+            upload_post_reponse.text().await.unwrap()
+        );
     };
 
     await_client_server_flow!(harness.api_server_run(), client);

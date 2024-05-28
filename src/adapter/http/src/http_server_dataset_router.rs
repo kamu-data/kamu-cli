@@ -16,7 +16,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::simple_protocol::*;
-use crate::{AccessToken, DatasetAuthorizationLayer, DatasetResolverLayer, UploadService};
+use crate::{
+    AccessToken,
+    DatasetAuthorizationLayer,
+    DatasetResolverLayer,
+    MakeUploadContextError,
+    SaveUploadError,
+    UploadService,
+};
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -159,9 +166,10 @@ pub async fn platform_token_validate_handler(
 /////////////////////////////////////////////////////////////////////////////////
 
 #[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PlatformFileUploadQuery {
     file_name: String,
-    content_length: i64,
+    content_length: usize,
 }
 
 pub async fn platform_file_upload_get_handler(
@@ -187,10 +195,15 @@ pub async fn platform_file_upload_get_handler(
         .await
     {
         Ok(upload_context) => Json(json!(upload_context)).into_response(),
-        Err(e) => {
-            tracing::error!("{e:?}");
-            (StatusCode::INTERNAL_SERVER_ERROR, "").into_response()
-        }
+        Err(e) => match e {
+            MakeUploadContextError::TooLarge(_) => {
+                (StatusCode::BAD_REQUEST, e.to_string()).into_response()
+            }
+            MakeUploadContextError::Internal(e) => {
+                tracing::error!("{e:?}");
+                (StatusCode::INTERNAL_SERVER_ERROR, "").into_response()
+            }
+        },
     }
 }
 
@@ -206,6 +219,7 @@ pub struct UploadFromPath {
 pub async fn platform_file_upload_post_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
     axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,
+    axum::TypedHeader(content_length): axum::TypedHeader<axum::headers::ContentLength>,
     body_stream: axum::extract::BodyStream,
 ) -> Response {
     let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
@@ -222,15 +236,21 @@ pub async fn platform_file_upload_post_handler(
             &account_id,
             upload_param.upload_id,
             upload_param.file_name,
+            content_length.0 as usize,
             file_data,
         )
         .await
     {
         Ok(_) => (StatusCode::OK, "").into_response(),
-        Err(e) => {
-            tracing::error!("{e:?}");
-            (StatusCode::INTERNAL_SERVER_ERROR, "").into_response()
-        }
+        Err(e) => match e {
+            SaveUploadError::TooLarge(_) => {
+                (StatusCode::BAD_REQUEST, e.to_string()).into_response()
+            }
+            SaveUploadError::Internal(_) | SaveUploadError::NotSupported(_) => {
+                tracing::error!("{e:?}");
+                (StatusCode::INTERNAL_SERVER_ERROR, "").into_response()
+            }
+        },
     }
 }
 

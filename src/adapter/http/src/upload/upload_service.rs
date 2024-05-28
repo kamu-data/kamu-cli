@@ -23,7 +23,7 @@ pub trait UploadService: Send + Sync {
         &self,
         account_id: &AccountID,
         file_name: String,
-        content_length: i64,
+        content_length: usize,
         access_token: &AccessToken,
     ) -> Result<UploadContext, MakeUploadContextError>;
 
@@ -32,8 +32,9 @@ pub trait UploadService: Send + Sync {
         account_id: &AccountID,
         upload_id: String,
         file_name: String,
+        content_length: usize,
         file_data: Box<dyn AsyncRead + Send + Unpin>,
-    ) -> Result<(), InternalError>;
+    ) -> Result<(), SaveUploadError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -58,7 +59,21 @@ pub enum MakeUploadContextError {
 }
 
 #[derive(Debug, Error)]
+pub enum SaveUploadError {
+    #[error(transparent)]
+    NotSupported(UploadNotSupportedError),
+    #[error(transparent)]
+    TooLarge(ContentTooLargeError),
+    #[error(transparent)]
+    Internal(InternalError),
+}
+
+#[derive(Debug, Error)]
 #[error("Content too large")]
 pub struct ContentTooLargeError {}
+
+#[derive(Debug, Error)]
+#[error("Direct file uploads are not supported in this environment")]
+pub struct UploadNotSupportedError {}
 
 ///////////////////////////////////////////////////////////////////////////////
