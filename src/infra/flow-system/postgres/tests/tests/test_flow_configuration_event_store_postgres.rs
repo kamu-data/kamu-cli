@@ -9,7 +9,7 @@
 
 use database_common::{run_transactional, PostgresTransactionManager};
 use dill::{Catalog, CatalogBuilder};
-use kamu_flow_system_postgres::FlowSystemEventStorePostgres;
+use kamu_flow_system_postgres::FlowConfigurationEventStorePostgres;
 use sqlx::PgPool;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -71,7 +71,7 @@ impl PostgresAccountRepositoryHarness {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add_value(pg_pool);
         catalog_builder.add::<PostgresTransactionManager>();
-        catalog_builder.add::<FlowSystemEventStorePostgres>();
+        catalog_builder.add::<FlowConfigurationEventStorePostgres>();
 
         Self {
             catalog: catalog_builder.build(),

@@ -349,7 +349,7 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_postgres::PostgresAccountRepository>();
-            catalog_builder.add::<kamu_flow_system_postgres::FlowSystemEventStorePostgres>();
+            catalog_builder.add::<kamu_flow_system_postgres::FlowConfigurationEventStorePostgres>();
             catalog_builder.add::<kamu_task_system_postgres::TaskSystemEventStorePostgres>();
 
             Ok(())
