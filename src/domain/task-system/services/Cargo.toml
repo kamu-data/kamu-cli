@@ -26,6 +26,7 @@ event-bus = { workspace = true }
 opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
+database-common = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
