@@ -580,42 +580,42 @@ async fn test_transform_with_engine_risingwave() {
 
 /// Accounts for engine-specific quirks in the schema
 fn normalize_schema(s: &DFSchema, engine: &str) -> DFSchema {
-    DFSchema::new_with_metadata(
-        s.fields()
-            .iter()
-            .map(|f| {
-                match engine {
-                    // Datafusion has poor control over nullability
-                    "datafusion" => match f.name().as_str() {
-                        "offset" | "event_time" => f.clone().with_nullable(false),
-                        _ => f.clone(),
-                    },
-                    // Spark:
-                    // - produces optional `offset` and `event_time`
-                    "spark" => match f.name().as_str() {
-                        "op" => {
-                            assert!(f.is_nullable());
-                            f.clone().with_nullable(false)
-                        }
-                        "event_time" => f.clone().with_nullable(false),
-                        _ => f.clone(),
-                    },
-                    // Flink:
-                    // - produces optional `event_time`
-                    "flink" => match f.name().as_str() {
-                        "event_time" => f.clone().with_nullable(false),
-                        _ => f.clone(),
-                    },
-                    // RisingWave has no control over nulability
-                    "risingwave" => match f.name().as_str() {
-                        "offset" | "event_time" => f.clone().with_nullable(false),
-                        _ => f.clone(),
-                    },
-                    _ => unreachable!(),
+    let mut fields = Vec::new();
+    for (i, f) in s.fields().iter().enumerate() {
+        let f = f.clone();
+        let (q, _) = s.qualified_field(i);
+        let f = match engine {
+            // Datafusion has poor control over nullability
+            "datafusion" => match f.name().as_str() {
+                "offset" | "event_time" => Arc::new(f.as_ref().clone().with_nullable(false)),
+                _ => f,
+            },
+            // Spark:
+            // - produces optional `offset` and `event_time`
+            "spark" => match f.name().as_str() {
+                "op" => {
+                    assert!(f.is_nullable());
+                    Arc::new(f.as_ref().clone().with_nullable(false))
                 }
-            })
-            .collect::<Vec<_>>(),
-        s.metadata().clone(),
-    )
-    .unwrap()
+                "event_time" => Arc::new(f.as_ref().clone().with_nullable(false)),
+                _ => f,
+            },
+            // Flink:
+            // - produces optional `event_time`
+            "flink" => match f.name().as_str() {
+                "event_time" => Arc::new(f.as_ref().clone().with_nullable(false)),
+                _ => f,
+            },
+            // RisingWave has no control over nullability
+            "risingwave" => match f.name().as_str() {
+                "offset" | "event_time" => Arc::new(f.as_ref().clone().with_nullable(false)),
+                _ => f,
+            },
+            _ => unreachable!(),
+        };
+
+        fields.push((q.cloned(), f));
+    }
+
+    DFSchema::new_with_metadata(fields, s.metadata().clone()).unwrap()
 }

@@ -347,7 +347,7 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
 1. Start by either creating a release branch or with an existing feature branch
 2. We try to stay up-to-date with all dependencies, so before every release we:
    1. Run `cargo update` to pull in any minor releases
-   2. Run `cargo upgrade --dry-run` and see which packages have major upgrades - either perform them or ticket them up
+   2. Run `cargo upgrade --dry-run --incompatible` and see which packages have major upgrades - either perform them or ticket them up
    3. Run `cargo deny check` to audit updated dependencies for licenses, security advisories etc.
 3. Bump the version using: `make release-patch / make release-minor / make release-major`
 4. Create a dated `CHANGELOG` entry for the new version

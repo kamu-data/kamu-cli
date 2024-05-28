@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `InitiatorFilterInput` now accept `[AccountID]` instead of `AccountName`
   `AccountFlowFilters` now filter by `DatasetId` instead of `DatasetName`.
+- Upgraded to `datafusion v38`
 ### Added
 - Added a public image with [sqlx-cli](/images/sqlx-cli)
 - Added a [configuration](/images/persistence-storage) of running a `kamu` API server along with a database,

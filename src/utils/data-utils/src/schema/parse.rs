@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
-use datafusion::common::{DFField, DFSchema};
+use datafusion::common::DFSchema;
 use datafusion::error::DataFusionError;
 use datafusion::prelude::SessionContext;
 
@@ -81,28 +81,24 @@ fn do_force_utc_time(schema: DFSchema) -> DFSchema {
         return schema;
     }
 
-    let mut fields = schema.fields().clone();
+    let mut fields = Vec::new();
     let metadata = schema.metadata().clone();
 
     let utc = Arc::from("UTC");
 
-    for field in &mut fields {
-        force_utc_time_rec(field, &utc);
+    for (i, field) in schema.fields().iter().enumerate() {
+        let (qualifier, _) = schema.qualified_field(i);
+        fields.push((qualifier.cloned(), force_utc_time_rec(field, &utc)));
     }
 
     DFSchema::new_with_metadata(fields, metadata).unwrap()
 }
 
-fn force_utc_time_rec(field: &mut DFField, tz: &Arc<str>) {
+fn force_utc_time_rec(field: &Arc<Field>, tz: &Arc<str>) -> Arc<Field> {
     match field.data_type() {
         DataType::Timestamp(unit, None) => {
             let data_type = DataType::Timestamp(unit.clone(), Some(tz.clone()));
-            *field = DFField::new(
-                field.qualifier().cloned(),
-                field.name(),
-                data_type,
-                field.is_nullable(),
-            );
+            Arc::new(Field::new(field.name(), data_type, field.is_nullable()))
         }
         DataType::Struct(fields) => {
             let fields: Vec<_> = fields
@@ -110,14 +106,9 @@ fn force_utc_time_rec(field: &mut DFField, tz: &Arc<str>) {
                 .map(|fr| force_utc_time_field_rec(fr.as_ref().clone(), tz))
                 .collect();
             let data_type = DataType::Struct(fields.into());
-            *field = DFField::new(
-                field.qualifier().cloned(),
-                field.name(),
-                data_type,
-                field.is_nullable(),
-            );
+            Arc::new(Field::new(field.name(), data_type, field.is_nullable()))
         }
-        _ => (),
+        _ => field.clone(),
     }
 }
 

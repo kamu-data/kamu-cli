@@ -130,8 +130,8 @@ impl MergeStrategySnapshot {
         old_qual: &TableReference,
         new_qual: &TableReference,
     ) -> Expr {
-        let old_qual = old_qual.to_owned_reference();
-        let new_qual = new_qual.to_owned_reference();
+        let old_qual = old_qual.clone();
+        let new_qual = new_qual.clone();
 
         let columns: Vec<_> = if let Some(compare_columns) = &self.compare_columns {
             compare_columns.iter().map(String::as_str).collect()
