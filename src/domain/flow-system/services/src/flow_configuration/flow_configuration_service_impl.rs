@@ -111,6 +111,29 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         Ok(maybe_flow_configuration.map(Into::into))
     }
 
+    /// Find all configurations by flow keys
+    #[tracing::instrument(level = "info", skip_all, fields(?dataset_ids))]
+    async fn find_configurations_by_datasets(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+    ) -> FlowConfigurationStateStream {
+        Box::pin(async_stream::try_stream! {
+            for dataset_flow_type in kamu_flow_system::DatasetFlowType::all() {
+                for dataset_id in &dataset_ids {
+                    let maybe_flow_configuration =
+                        FlowConfiguration::try_load(
+                            FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into(), self.event_store.as_ref()
+                        )
+                        .await
+                        .int_err()?;
+                    if let Some(flow_configuration) = maybe_flow_configuration {
+                        yield flow_configuration.into();
+                    }
+                }
+            }
+        })
+    }
+
     /// Set or modify dataset update schedule
     #[tracing::instrument(level = "info", skip_all, fields(?flow_key, %paused, ?rule))]
     async fn set_configuration(

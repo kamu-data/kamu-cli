@@ -60,6 +60,13 @@ type AccountEdge {
 	node: Account!
 }
 
+type AccountFlowConfigs {
+	"""
+	Checks if all configs of this dataset are disabled
+	"""
+	allPaused: Boolean!
+}
+
 type AccountFlowConfigsMut {
 	resumeAccountDatasetFlows: Boolean!
 	pauseAccountDatasetFlows: Boolean!
@@ -82,6 +89,10 @@ type AccountFlows {
 	Returns interface for flow runs queries
 	"""
 	runs: AccountFlowRuns!
+	"""
+	Returns interface for flow configurations queries
+	"""
+	configs: AccountFlowConfigs!
 }
 
 type AccountFlowsMut {
