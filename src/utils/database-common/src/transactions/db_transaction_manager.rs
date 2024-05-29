@@ -40,7 +40,6 @@ pub struct DatabaseTransactionRunner<HFutResultE = InternalError> {
 
 impl<HFutResultE> DatabaseTransactionRunner<HFutResultE> {
     pub async fn run_transactional<H, HFut, HFutResultT>(
-        // TODO: use Catalog (w/o ref) after dill-rs has been upgraded to version 0.8.1
         base_catalog: &Catalog,
         callback: H,
     ) -> Result<HFutResultT, HFutResultE>
@@ -84,6 +83,24 @@ impl<HFutResultE> DatabaseTransactionRunner<HFutResultE> {
                 Err(e)
             }
         }
+    }
+
+    pub async fn run_transactional_with<Store, H, HFut, HFutResultT>(
+        base_catalog: &Catalog,
+        callback: H,
+    ) -> Result<HFutResultT, HFutResultE>
+    where
+        Store: 'static + ?Sized + Send + Sync,
+        H: FnOnce(Arc<Store>) -> HFut + Send,
+        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>> + Send,
+        HFutResultE: From<InternalError>,
+    {
+        Self::run_transactional(base_catalog, |updated_catalog| async move {
+            let event_store = updated_catalog.get_one::<Store>().int_err()?;
+
+            callback(event_store).await
+        })
+        .await
     }
 }
 

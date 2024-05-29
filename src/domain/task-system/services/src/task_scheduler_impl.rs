@@ -50,13 +50,9 @@ impl TaskSchedulerImpl {
 impl TaskScheduler for TaskSchedulerImpl {
     #[tracing::instrument(level = "info", skip_all, fields(?logical_plan))]
     async fn create_task(&self, logical_plan: LogicalPlan) -> Result<TaskState, CreateTaskError> {
-        let task = <DatabaseTransactionRunner>::run_transactional(
+        let task = <DatabaseTransactionRunner>::run_transactional_with(
             &self.catalog,
-            |updated_catalog| async move {
-                let event_store = updated_catalog
-                    .get_one::<dyn TaskSystemEventStore>()
-                    .int_err()?;
-
+            |event_store: Arc<dyn TaskSystemEventStore>| async move {
                 let new_task_id = event_store.new_task_id().await?;
                 let mut task = Task::new(self.time_source.now(), new_task_id, logical_plan);
 
@@ -84,13 +80,9 @@ impl TaskScheduler for TaskSchedulerImpl {
 
     #[tracing::instrument(level = "info", skip_all, fields(%task_id))]
     async fn get_task(&self, task_id: TaskID) -> Result<TaskState, GetTaskError> {
-        let task = DatabaseTransactionRunner::run_transactional(
+        let task = DatabaseTransactionRunner::run_transactional_with(
             &self.catalog,
-            |updated_catalog| async move {
-                let event_store = updated_catalog
-                    .get_one::<dyn TaskSystemEventStore>()
-                    .int_err()?;
-
+            |event_store: Arc<dyn TaskSystemEventStore>| async move {
                 Task::load(task_id, event_store.as_ref()).await
             },
         )
@@ -101,28 +93,25 @@ impl TaskScheduler for TaskSchedulerImpl {
 
     #[tracing::instrument(level = "info", skip_all, fields(%task_id))]
     async fn cancel_task(&self, task_id: TaskID) -> Result<TaskState, CancelTaskError> {
-        let (task, has_canceled) = DatabaseTransactionRunner::<CancelTaskError>::run_transactional(
-            &self.catalog,
-            |updated_catalog| async move {
-                let event_store = updated_catalog
-                    .get_one::<dyn TaskSystemEventStore>()
-                    .int_err()?;
+        let (task, has_canceled) =
+            DatabaseTransactionRunner::<CancelTaskError>::run_transactional_with(
+                &self.catalog,
+                |event_store: Arc<dyn TaskSystemEventStore>| async move {
+                    let mut task = Task::load(task_id, event_store.as_ref()).await?;
 
-                let mut task = Task::load(task_id, event_store.as_ref()).await?;
+                    let has_canceled = if task.can_cancel() {
+                        task.cancel(self.time_source.now()).int_err()?;
+                        task.save(event_store.as_ref()).await.int_err()?;
 
-                let has_canceled = if task.can_cancel() {
-                    task.cancel(self.time_source.now()).int_err()?;
-                    task.save(event_store.as_ref()).await.int_err()?;
+                        true
+                    } else {
+                        false
+                    };
 
-                    true
-                } else {
-                    false
-                };
-
-                Ok((task, has_canceled))
-            },
-        )
-        .await?;
+                    Ok((task, has_canceled))
+                },
+            )
+            .await?;
 
         if has_canceled {
             let mut state = self.state.lock().unwrap();
@@ -141,13 +130,9 @@ impl TaskScheduler for TaskSchedulerImpl {
         dataset_id: &DatasetID,
         pagination: TaskPaginationOpts,
     ) -> Result<TaskStateListing, ListTasksByDatasetError> {
-        let total_count = <DatabaseTransactionRunner>::run_transactional(
+        let total_count = <DatabaseTransactionRunner>::run_transactional_with(
             &self.catalog,
-            |updated_catalog| async move {
-                let event_store = updated_catalog
-                    .get_one::<dyn TaskSystemEventStore>()
-                    .int_err()?;
-
+            |event_store: Arc<dyn TaskSystemEventStore>| async move {
                 let total_count = event_store.get_count_tasks_by_dataset(dataset_id).await?;
 
                 Ok(total_count)
@@ -159,13 +144,9 @@ impl TaskScheduler for TaskSchedulerImpl {
 
         let dataset_id = dataset_id.clone();
         let stream = Box::pin(async_stream::stream! {
-            let relevant_task_ids = DatabaseTransactionRunner::run_transactional(
+            let relevant_task_ids = DatabaseTransactionRunner::run_transactional_with(
                 &self.catalog,
-                |updated_catalog| async move {
-                    let event_store = updated_catalog
-                        .get_one::<dyn TaskSystemEventStore>()
-                        .int_err()?;
-
+                |event_store: Arc<dyn TaskSystemEventStore>| async move {
                     event_store
                         .get_tasks_by_dataset(&dataset_id, pagination)
                         .await
@@ -177,13 +158,9 @@ impl TaskScheduler for TaskSchedulerImpl {
 
             // TODO: implement batch loading
             for task_id in relevant_task_ids {
-                let task = DatabaseTransactionRunner::run_transactional(
+                let task = DatabaseTransactionRunner::run_transactional_with(
                     &self.catalog,
-                    |updated_catalog| async move {
-                        let event_store = updated_catalog
-                            .get_one::<dyn TaskSystemEventStore>()
-                            .int_err()?;
-
+                    |event_store: Arc<dyn TaskSystemEventStore>| async move {
                         Task::load(task_id, event_store.as_ref()).await
                     },
                 )
@@ -222,13 +199,9 @@ impl TaskScheduler for TaskSchedulerImpl {
             return Ok(None);
         };
 
-        let task = <DatabaseTransactionRunner>::run_transactional(
+        let task = <DatabaseTransactionRunner>::run_transactional_with(
             &self.catalog,
-            |updated_catalog| async move {
-                let event_store = updated_catalog
-                    .get_one::<dyn TaskSystemEventStore>()
-                    .int_err()?;
-
+            |event_store: Arc<dyn TaskSystemEventStore>| async move {
                 let mut task = Task::load(task_id, event_store.as_ref()).await.int_err()?;
 
                 task.run(self.time_source.now()).int_err()?;
