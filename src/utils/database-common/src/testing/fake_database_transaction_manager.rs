@@ -15,7 +15,8 @@ use crate::{DatabaseTransactionManager, TransactionRef};
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct FakeDatabaseTransactionManager {
-    // Since the pool will never be connected, an SqlitePool is used for simplicity
+    // Since the pool will never be connected, SqlitePool is used for simplicity
+    // (in terms of typing)
     never_connected_pool: SqlitePool,
 }
 
@@ -37,6 +38,8 @@ impl DatabaseTransactionManager for FakeDatabaseTransactionManager {
         &self,
         _transaction_ref: TransactionRef,
     ) -> Result<(), InternalError> {
+        // No-op
+
         Ok(())
     }
 
@@ -44,6 +47,8 @@ impl DatabaseTransactionManager for FakeDatabaseTransactionManager {
         &self,
         _transaction_ref: TransactionRef,
     ) -> Result<(), InternalError> {
+        // No-op
+
         Ok(())
     }
 }

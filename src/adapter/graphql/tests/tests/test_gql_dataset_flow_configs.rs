@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use async_graphql::value;
+use database_common::FakeDatabasePlugin;
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
@@ -1506,24 +1507,31 @@ impl FlowConfigHarness {
         let transform_service_mock = overrides.transform_service_mock.unwrap_or_default();
         let polling_service_mock = overrides.polling_service_mock.unwrap_or_default();
 
-        let catalog_base = dill::CatalogBuilder::new()
-            .add::<EventBus>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(false),
-            )
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add::<SystemTimeSourceDefault>()
-            .add_value(polling_service_mock)
-            .bind::<dyn PollingIngestService, MockPollingIngestService>()
-            .add_value(transform_service_mock)
-            .bind::<dyn TransformService, MockTransformService>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceInMemory>()
-            .add::<FlowConfigurationServiceImpl>()
-            .add::<FlowConfigurationEventStoreInMem>()
-            .build();
+        let catalog_base = {
+            let mut builder = dill::CatalogBuilder::new();
+
+            builder
+                .add::<EventBus>()
+                .add_builder(
+                    DatasetRepositoryLocalFs::builder()
+                        .with_root(datasets_dir)
+                        .with_multi_tenant(false),
+                )
+                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .add::<SystemTimeSourceDefault>()
+                .add_value(polling_service_mock)
+                .bind::<dyn PollingIngestService, MockPollingIngestService>()
+                .add_value(transform_service_mock)
+                .bind::<dyn TransformService, MockTransformService>()
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<DependencyGraphServiceInMemory>()
+                .add::<FlowConfigurationServiceImpl>()
+                .add::<FlowConfigurationEventStoreInMem>();
+
+            FakeDatabasePlugin::init_database_components(&mut builder);
+
+            builder.build()
+        };
 
         // Init dataset with no sources
         let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base);

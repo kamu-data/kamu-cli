@@ -3860,6 +3860,7 @@ dependencies = [
  "chrono",
  "container-runtime",
  "cron",
+ "database-common",
  "datafusion",
  "dill",
  "event-bus",

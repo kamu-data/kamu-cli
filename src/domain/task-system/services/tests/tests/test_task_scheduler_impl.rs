@@ -96,9 +96,8 @@ fn create_task_scheduler() -> impl TaskScheduler {
         .build();
 
     let time_source = Arc::new(SystemTimeSourceStub::new());
-    let task_scheduler = TaskSchedulerImpl::new(time_source, catalog);
 
-    task_scheduler
+    TaskSchedulerImpl::new(time_source, catalog)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
