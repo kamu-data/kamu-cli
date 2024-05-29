@@ -12,6 +12,7 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 use kamu_accounts::AnonymousAccountReason;
+use thiserror::Error;
 
 use crate::api_error::ApiError;
 
@@ -71,15 +72,27 @@ pub(crate) fn body_into_async_read(
 /////////////////////////////////////////////////////////////////////////////////
 
 pub fn response_for_anonymous_denial(reason: AnonymousAccountReason) -> ApiError {
+    #[derive(Debug, Error)]
+    #[error("{reason}")]
+    struct AnonymousAccessError {
+        pub reason: &'static str,
+    }
+
     match reason {
         AnonymousAccountReason::AuthenticationExpired => {
-            ApiError::new_unauthorized_custom("Authentication token expired")
+            ApiError::new_unauthorized_custom(AnonymousAccessError {
+                reason: "Authentication token expired",
+            })
         }
         AnonymousAccountReason::AuthenticationInvalid => {
-            ApiError::new_unauthorized_custom("Authentication token invalid")
+            ApiError::new_unauthorized_custom(AnonymousAccessError {
+                reason: "Authentication token invalid",
+            })
         }
         AnonymousAccountReason::NoAuthenticationProvided => {
-            ApiError::new_unauthorized_custom("No authentication token provided")
+            ApiError::new_unauthorized_custom(AnonymousAccessError {
+                reason: "No authentication token provided",
+            })
         }
     }
 }

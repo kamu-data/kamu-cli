@@ -137,7 +137,7 @@ async fn resolve_ready_upload_arguments(
     let data = upload_svc
         .upload_reference_into_stream(&account_id, upload_id, &upload_file_name)
         .await
-        .map_err(|e| e.api_err())?;
+        .map_err(IntoApiError::api_err)?;
 
     Ok(IngestTaskArguments {
         data,

@@ -31,7 +31,7 @@ event-bus = { workspace = true }
 
 aws-sdk-s3 = { version = "0.35" }
 
-axum = { version = "0.6", features = ["ws", "headers"] }
+axum = { version = "0.6", features = ["ws", "headers", "multipart"] }
 axum-extra = { version = "0.8", features = ["async-read-body"] }
 async-trait = "0.1"
 base64 = "0.21"
@@ -43,7 +43,7 @@ flate2 = "1"                                                           # GZip de
 futures = "0.3"
 http = "0.2"
 hyper = "0.14"
-reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json", "stream", "gzip", "brotli", "deflate"] }
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "multipart", "json", "stream", "gzip", "brotli", "deflate"] }
 serde = "1"
 serde_json = "1"
 tar = "0.4"

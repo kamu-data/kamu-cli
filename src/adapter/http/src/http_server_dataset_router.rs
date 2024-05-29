@@ -7,25 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use axum::response::{IntoResponse, Response};
 use axum::Json;
-use http::StatusCode;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 
-use crate::api_error::ApiError;
+use crate::api_error::{ApiError, IntoApiError};
 use crate::axum_utils::response_for_anonymous_denial;
 use crate::simple_protocol::*;
-use crate::{
-    AccessToken,
-    DatasetAuthorizationLayer,
-    DatasetResolverLayer,
-    MakeUploadContextError,
-    SaveUploadError,
-    UploadService,
-};
+use crate::{DatasetAuthorizationLayer, DatasetResolverLayer};
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -109,7 +100,7 @@ pub struct LoginResponseBody {
 pub async fn platform_login_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
     Json(payload): Json<LoginRequestBody>,
-) -> Response {
+) -> Result<axum::Json<Value>, ApiError> {
     let authentication_service = catalog
         .get_one::<dyn kamu_accounts::AuthenticationService>()
         .unwrap();
@@ -126,25 +117,19 @@ pub async fn platform_login_handler(
             let response_body = LoginResponseBody {
                 access_token: login_response.access_token,
             };
-            Json(json!(response_body)).into_response()
+            Ok(Json(json!(response_body)))
         }
-        Err(e) => match e {
-            kamu_accounts::LoginError::UnsupportedMethod(e) => {
-                (StatusCode::BAD_REQUEST, e.to_string()).into_response()
-            }
+        Err(e) => Err(match e {
+            kamu_accounts::LoginError::UnsupportedMethod(e) => ApiError::bad_request(e),
             kamu_accounts::LoginError::InvalidCredentials(e) => {
-                (StatusCode::UNAUTHORIZED, e.to_string()).into_response()
+                ApiError::new_unauthorized_custom(e)
             }
             kamu_accounts::LoginError::RejectedCredentials(e) => {
-                (StatusCode::UNAUTHORIZED, e.to_string()).into_response()
+                ApiError::new_unauthorized_custom(e)
             }
-            kamu_accounts::LoginError::DuplicateCredentials => {
-                (StatusCode::BAD_REQUEST, e.to_string()).into_response()
-            }
-            kamu_accounts::LoginError::Internal(_) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "").into_response()
-            }
-        },
+            kamu_accounts::LoginError::DuplicateCredentials => ApiError::bad_request(e),
+            kamu_accounts::LoginError::Internal(e) => e.api_err(),
+        }),
     }
 }
 
@@ -159,101 +144,6 @@ pub async fn platform_token_validate_handler(
     match current_account_subject.as_ref() {
         CurrentAccountSubject::Logged(_) => Ok(()),
         CurrentAccountSubject::Anonymous(reason) => Err(response_for_anonymous_denial(*reason)),
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PlatformFileUploadQuery {
-    file_name: String,
-    content_length: usize,
-}
-
-pub async fn platform_file_upload_get_handler(
-    catalog: axum::extract::Extension<dill::Catalog>,
-    axum::extract::Query(query): axum::extract::Query<PlatformFileUploadQuery>,
-) -> Response {
-    let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
-    let account_id = match current_account_subject.as_ref() {
-        CurrentAccountSubject::Logged(l) => l.account_id.clone(),
-        CurrentAccountSubject::Anonymous(reason) => {
-            return response_for_anonymous_denial(*reason).into_response()
-        }
-    };
-
-    let access_token = catalog.get_one::<AccessToken>().unwrap();
-
-    let upload_service = catalog.get_one::<dyn UploadService>().unwrap();
-    match upload_service
-        .make_upload_context(
-            &account_id,
-            query.file_name,
-            query.content_length,
-            access_token.as_ref(),
-        )
-        .await
-    {
-        Ok(upload_context) => Json(json!(upload_context)).into_response(),
-        Err(e) => match e {
-            MakeUploadContextError::TooLarge(_) => {
-                (StatusCode::BAD_REQUEST, e.to_string()).into_response()
-            }
-            MakeUploadContextError::Internal(e) => {
-                tracing::error!("{e:?}");
-                (StatusCode::INTERNAL_SERVER_ERROR, "").into_response()
-            }
-        },
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////
-
-#[derive(serde::Deserialize)]
-pub struct UploadFromPath {
-    upload_id: String,
-    file_name: String,
-}
-
-#[allow(clippy::unused_async)]
-pub async fn platform_file_upload_post_handler(
-    catalog: axum::extract::Extension<dill::Catalog>,
-    axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,
-    axum::TypedHeader(content_length): axum::TypedHeader<axum::headers::ContentLength>,
-    body_stream: axum::extract::BodyStream,
-) -> Response {
-    let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
-    let account_id = match current_account_subject.as_ref() {
-        CurrentAccountSubject::Logged(l) => l.account_id.clone(),
-        CurrentAccountSubject::Anonymous(reason) => {
-            return response_for_anonymous_denial(*reason).into_response()
-        }
-    };
-
-    let file_data = Box::new(crate::axum_utils::body_into_async_read(body_stream));
-
-    let upload_local_service = catalog.get_one::<dyn UploadService>().unwrap();
-    match upload_local_service
-        .save_upload(
-            &account_id,
-            upload_param.upload_id,
-            upload_param.file_name,
-            usize::try_from(content_length.0).unwrap(),
-            file_data,
-        )
-        .await
-    {
-        Ok(_) => (StatusCode::OK, "").into_response(),
-        Err(e) => match e {
-            SaveUploadError::TooLarge(_) => {
-                (StatusCode::BAD_REQUEST, e.to_string()).into_response()
-            }
-            SaveUploadError::Internal(_) | SaveUploadError::NotSupported(_) => {
-                tracing::error!("{e:?}");
-                (StatusCode::INTERNAL_SERVER_ERROR, "").into_response()
-            }
-        },
     }
 }
 

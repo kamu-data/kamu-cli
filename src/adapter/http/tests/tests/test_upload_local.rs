@@ -130,7 +130,15 @@ async fn test_attempt_upload_file_unauthorized() {
 
         let upload_post_reponse = client
             .post(upload_post_url)
-            .body("some file")
+            .multipart(
+                reqwest::multipart::Form::new().part(
+                    "file",
+                    reqwest::multipart::Part::text("some file")
+                        .file_name("test.txt")
+                        .mime_str("text/plain")
+                        .unwrap(),
+                ),
+            )
             .send()
             .await
             .unwrap();
@@ -175,7 +183,15 @@ async fn test_attempt_upload_file_authorized() {
         let upload_response = client
             .post(upload_url.clone())
             .bearer_auth(access_token)
-            .body(FILE_BODY)
+            .multipart(
+                reqwest::multipart::Form::new().part(
+                    "file",
+                    reqwest::multipart::Part::text(FILE_BODY)
+                        .file_name("test.txt")
+                        .mime_str("text/plain")
+                        .unwrap(),
+                ),
+            )
             .send()
             .await
             .unwrap();
@@ -227,7 +243,15 @@ async fn test_attempt_upload_file_that_is_too_large() {
         let upload_post_reponse = client
             .post(upload_post_url)
             .bearer_auth(access_token.clone())
-            .body(FILE_BODY)
+            .multipart(
+                reqwest::multipart::Form::new().part(
+                    "file",
+                    reqwest::multipart::Part::text(FILE_BODY)
+                        .file_name("test.txt")
+                        .mime_str("text/plain")
+                        .unwrap(),
+                ),
+            )
             .send()
             .await
             .unwrap();

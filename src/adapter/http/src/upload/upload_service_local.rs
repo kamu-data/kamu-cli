@@ -10,6 +10,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use bytes::Bytes;
 use dill::*;
 use kamu::domain::{ErrorIntoInternal, InternalError, ResultIntoInternal, ServerUrlConfig};
 use opendatafabric::AccountID;
@@ -54,15 +55,6 @@ impl UploadServiceLocal {
         self.cache_dir
             .join("uploads")
             .join(account_id.as_multibase().to_string())
-    }
-
-    async fn copy_stream_to_file(
-        mut data: Box<dyn AsyncRead + Send + Unpin>,
-        target_path: &Path,
-    ) -> Result<(), std::io::Error> {
-        let mut file = tokio::fs::File::create(target_path).await?;
-        tokio::io::copy(&mut data, &mut file).await?;
-        Ok(())
     }
 
     async fn file_to_stream(
@@ -134,7 +126,7 @@ impl UploadService for UploadServiceLocal {
         upload_id: String,
         file_name: String,
         content_length: usize,
-        file_data: Box<dyn AsyncRead + Send + Unpin>,
+        file_data: Bytes,
     ) -> Result<(), SaveUploadError> {
         if content_length > self.uploads_config.max_file_size_in_bytes {
             return Err(SaveUploadError::TooLarge(ContentTooLargeError {}));
@@ -153,12 +145,10 @@ impl UploadService for UploadServiceLocal {
         }
 
         let file_path = upload_folder_path.join(file_name);
-        Self::copy_stream_to_file(file_data, &file_path)
-            .await
-            .map_err(|e| {
-                tracing::error!("{:?}", e);
-                SaveUploadError::Internal(e.int_err())
-            })?;
+        tokio::fs::write(&file_path, file_data).await.map_err(|e| {
+            tracing::error!("{:?}", e);
+            SaveUploadError::Internal(e.int_err())
+        })?;
 
         Ok(())
     }

@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::types::ObjectCannedAcl;
+use bytes::Bytes;
 use dill::*;
 use kamu::domain::{ErrorIntoInternal, InternalError};
 use kamu::utils::s3_context::S3Context;
@@ -123,7 +124,7 @@ impl UploadService for UploadServiceS3 {
         _: String,
         _: String,
         _: usize,
-        _: Box<dyn AsyncRead + Send + Unpin>,
+        _: Bytes,
     ) -> Result<(), SaveUploadError> {
         Err(SaveUploadError::NotSupported(UploadNotSupportedError {}))
     }

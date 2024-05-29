@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use bytes::Bytes;
 use kamu::domain::InternalError;
 use opendatafabric::AccountID;
 use serde::{Deserialize, Serialize};
@@ -40,7 +41,7 @@ pub trait UploadService: Send + Sync {
         upload_id: String,
         file_name: String,
         content_length: usize,
-        file_data: Box<dyn AsyncRead + Send + Unpin>,
+        file_data: Bytes,
     ) -> Result<(), SaveUploadError>;
 }
 
