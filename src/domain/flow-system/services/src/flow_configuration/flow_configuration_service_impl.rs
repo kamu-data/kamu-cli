@@ -107,13 +107,9 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         &self,
         flow_key: FlowKey,
     ) -> Result<Option<FlowConfigurationState>, FindFlowConfigurationError> {
-        let maybe_flow_configuration = DatabaseTransactionRunner::run_transactional(
+        let maybe_flow_configuration = DatabaseTransactionRunner::run_transactional_with(
             &self.catalog,
-            |updated_catalog| async move {
-                let event_store = updated_catalog
-                    .get_one::<dyn FlowConfigurationEventStore>()
-                    .int_err()?;
-
+            |event_store: Arc<dyn FlowConfigurationEventStore>| async move {
                 FlowConfiguration::try_load(flow_key, event_store.as_ref()).await
             },
         )
@@ -155,13 +151,9 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         rule: FlowConfigurationRule,
     ) -> Result<FlowConfigurationState, SetFlowConfigurationError> {
         let flow_configuration =
-            DatabaseTransactionRunner::<SetFlowConfigurationError>::run_transactional(
+            DatabaseTransactionRunner::<SetFlowConfigurationError>::run_transactional_with(
                 &self.catalog,
-                |updated_catalog| async move {
-                    let event_store = updated_catalog
-                        .get_one::<dyn FlowConfigurationEventStore>()
-                        .int_err()?;
-
+                |event_store: Arc<dyn FlowConfigurationEventStore>| async move {
                     let maybe_flow_configuration =
                         FlowConfiguration::try_load(flow_key.clone(), event_store.as_ref()).await?;
 
@@ -205,30 +197,23 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         Box::pin(async_stream::try_stream! {
             for system_flow_type in SystemFlowType::all() {
                 let flow_key = (*system_flow_type).into();
-                let maybe_flow_configuration = DatabaseTransactionRunner::run_transactional(
+                let maybe_flow_configuration = DatabaseTransactionRunner::run_transactional_with(
                     &self.catalog,
-                    |updated_catalog| async move {
-                        let event_store = updated_catalog
-                            .get_one::<dyn FlowConfigurationEventStore>()
-                            .int_err()?;
-
-                        FlowConfiguration::try_load(flow_key, event_store.as_ref()).await.int_err()
+                    |event_store: Arc<dyn FlowConfigurationEventStore>| async move {
+                        FlowConfiguration::try_load(flow_key, event_store.as_ref()).await
                     },
                 )
-                .await?;
+                .await
+                .int_err()?;
 
                 if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
                     yield flow_configuration.into();
                 }
             }
 
-            let dataset_ids: Vec<_> = DatabaseTransactionRunner::run_transactional(
+            let dataset_ids: Vec<_> = DatabaseTransactionRunner::run_transactional_with(
                 &self.catalog,
-                |updated_catalog| async move {
-                    let event_store = updated_catalog
-                        .get_one::<dyn FlowConfigurationEventStore>()
-                        .int_err()?;
-
+                |event_store: Arc<dyn FlowConfigurationEventStore>| async move {
                     event_store.list_all_dataset_ids().await.try_collect().await
                 },
             )
@@ -238,20 +223,17 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
             for dataset_id in dataset_ids {
                 for dataset_flow_type in DatasetFlowType::all() {
                     let dataset_id_clone = dataset_id.clone();
-                    let maybe_flow_configuration = DatabaseTransactionRunner::run_transactional(
+                    let maybe_flow_configuration = DatabaseTransactionRunner::run_transactional_with(
                         &self.catalog,
-                        |updated_catalog| async move {
-                            let event_store = updated_catalog
-                                .get_one::<dyn FlowConfigurationEventStore>()
-                                .int_err()?;
-
+                        |event_store: Arc<dyn FlowConfigurationEventStore>| async move {
                             FlowConfiguration::try_load(
                                 FlowKeyDataset::new(dataset_id_clone, *dataset_flow_type).into(),
                                 event_store.as_ref()
-                            ).await.int_err()
+                            ).await
                         },
                     )
-                    .await?;
+                    .await
+                    .int_err()?;
 
                     if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
                         yield flow_configuration.into();
@@ -267,13 +249,9 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         request_time: DateTime<Utc>,
         flow_key: FlowKey,
     ) -> Result<(), InternalError> {
-        let maybe_flow_configuration = DatabaseTransactionRunner::run_transactional(
+        let maybe_flow_configuration = DatabaseTransactionRunner::run_transactional_with(
             &self.catalog,
-            |updated_catalog| async move {
-                let event_store = updated_catalog
-                    .get_one::<dyn FlowConfigurationEventStore>()
-                    .int_err()?;
-
+            |event_store: Arc<dyn FlowConfigurationEventStore>| async move {
                 let mut maybe_flow_configuration =
                     FlowConfiguration::try_load(flow_key.clone(), event_store.as_ref())
                         .await
@@ -306,13 +284,9 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         request_time: DateTime<Utc>,
         flow_key: FlowKey,
     ) -> Result<(), InternalError> {
-        let maybe_flow_configuration = DatabaseTransactionRunner::run_transactional(
+        let maybe_flow_configuration = DatabaseTransactionRunner::run_transactional_with(
             &self.catalog,
-            |updated_catalog| async move {
-                let event_store = updated_catalog
-                    .get_one::<dyn FlowConfigurationEventStore>()
-                    .int_err()?;
-
+            |event_store: Arc<dyn FlowConfigurationEventStore>| async move {
                 let mut maybe_flow_configuration =
                     FlowConfiguration::try_load(flow_key.clone(), event_store.as_ref())
                         .await
@@ -419,13 +393,9 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
         for flow_type in DatasetFlowType::all() {
-            DatabaseTransactionRunner::run_transactional(
+            DatabaseTransactionRunner::run_transactional_with(
                 &self.catalog,
-                |updated_catalog| async move {
-                    let event_store = updated_catalog
-                        .get_one::<dyn FlowConfigurationEventStore>()
-                        .int_err()?;
-
+                |event_store: Arc<dyn FlowConfigurationEventStore>| async move {
                     let maybe_flow_configuration = FlowConfiguration::try_load(
                         FlowKeyDataset::new(event.dataset_id.clone(), *flow_type).into(),
                         event_store.as_ref(),
