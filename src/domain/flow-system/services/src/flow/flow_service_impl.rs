@@ -103,11 +103,24 @@ impl FlowServiceImpl {
     }
 
     async fn load_flow(&self, flow_id: FlowID) -> Result<Flow, LoadError<FlowState>> {
-        DatabaseTransactionRunner::run_transactional(&self.catalog, |updated_catalog| async move {
-            let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
+        DatabaseTransactionRunner::run_transactional_with(
+            &self.catalog,
+            |event_store: Arc<dyn FlowEventStore>| async move {
+                Flow::load(flow_id, event_store.as_ref()).await
+            },
+        )
+        .await
+    }
 
-            Flow::load(flow_id, flow_event_store.as_ref()).await
-        })
+    async fn save_flow(&self, flow: &mut Flow) -> Result<(), InternalError> {
+        DatabaseTransactionRunner::run_transactional_with(
+            &self.catalog,
+            |event_store: Arc<dyn FlowEventStore>| async move {
+                flow.save(event_store.as_ref()).await.int_err()?;
+
+                Ok(())
+            },
+        )
         .await
     }
 
@@ -177,17 +190,6 @@ impl FlowServiceImpl {
         }
 
         Ok(())
-    }
-
-    async fn save_flow(&self, flow: &mut Flow) -> Result<(), InternalError> {
-        DatabaseTransactionRunner::run_transactional(&self.catalog, |updated_catalog| async move {
-            let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
-
-            flow.save(flow_event_store.as_ref()).await.int_err()?;
-
-            Ok(())
-        })
-        .await
     }
 
     #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?rule))]
@@ -641,13 +643,9 @@ impl FlowServiceImpl {
         trigger: FlowTrigger,
         config_snapshot: Option<FlowConfigurationSnapshot>,
     ) -> Result<Flow, InternalError> {
-        let new_flow_id = <DatabaseTransactionRunner>::run_transactional(
+        let new_flow_id = DatabaseTransactionRunner::run_transactional_with(
             &self.catalog,
-            |updated_catalog| async move {
-                let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
-
-                Ok(flow_event_store.new_flow_id())
-            },
+            |event_store: Arc<dyn FlowEventStore>| async move { Ok(event_store.new_flow_id()) },
         )
         .await?;
 
@@ -671,14 +669,12 @@ impl FlowServiceImpl {
     }
 
     async fn flow_run_stats(&self, flow_key: &FlowKey) -> Result<FlowRunStats, InternalError> {
-        <DatabaseTransactionRunner>::run_transactional(
+        DatabaseTransactionRunner::run_transactional_with(
             &self.catalog,
-            |updated_catalog| async move {
-                let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
-
+            |event_store: Arc<dyn FlowEventStore>| async move {
                 match flow_key {
                     FlowKey::Dataset(fk_dataset) => {
-                        flow_event_store
+                        event_store
                             .get_dataset_flow_run_stats(
                                 &fk_dataset.dataset_id,
                                 fk_dataset.flow_type,
@@ -686,7 +682,7 @@ impl FlowServiceImpl {
                             .await
                     }
                     FlowKey::System(fk_system) => {
-                        flow_event_store
+                        event_store
                             .get_system_flow_run_stats(fk_system.flow_type)
                             .await
                     }
@@ -1043,12 +1039,10 @@ impl FlowService for FlowServiceImpl {
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
         let filters_ref = &filters;
-        let total_count = DatabaseTransactionRunner::run_transactional(
+        let total_count = DatabaseTransactionRunner::run_transactional_with(
             &self.catalog,
-            |updated_catalog| async move {
-                let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
-
-                flow_event_store
+            |event_store: Arc<dyn FlowEventStore>| async move {
+                event_store
                     .get_count_flows_by_dataset(dataset_id, filters_ref)
                     .await
             },
@@ -1057,12 +1051,10 @@ impl FlowService for FlowServiceImpl {
 
         let cloned_dataset_id = dataset_id.clone();
         let matched_stream = Box::pin(async_stream::try_stream! {
-            let relevant_flow_ids = DatabaseTransactionRunner::run_transactional(
+            let relevant_flow_ids = DatabaseTransactionRunner::run_transactional_with(
                 &self.catalog,
-                |updated_catalog| async move {
-                    let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
-
-                    flow_event_store
+                |event_store: Arc<dyn FlowEventStore>| async move {
+                    event_store
                         .get_all_flow_ids_by_dataset(&cloned_dataset_id, filters, pagination)
                         .try_collect::<Vec<_>>()
                         .await
@@ -1131,15 +1123,13 @@ impl FlowService for FlowServiceImpl {
         };
         let dataset_flow_filters_ref = &dataset_flow_filters;
 
-        let total_count = <DatabaseTransactionRunner>::run_transactional(
+        let total_count = <DatabaseTransactionRunner>::run_transactional_with(
             &self.catalog,
-            |updated_catalog| async move {
-                let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
-
+            |event_store: Arc<dyn FlowEventStore>| async move {
                 let mut total_count = 0;
 
                 for dataset_id in filtered_dataset_ids_ref {
-                    total_count += flow_event_store
+                    total_count += event_store
                         .get_count_flows_by_dataset(dataset_id, dataset_flow_filters_ref)
                         .await?;
                 }
@@ -1152,12 +1142,10 @@ impl FlowService for FlowServiceImpl {
         let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(filtered_dataset_ids);
 
         let matched_stream = Box::pin(async_stream::try_stream! {
-            let relevant_flow_ids = <DatabaseTransactionRunner>::run_transactional(
+            let relevant_flow_ids = DatabaseTransactionRunner::run_transactional_with(
                 &self.catalog,
-                |updated_catalog| async move {
-                    let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
-
-                    flow_event_store
+                |event_store: Arc<dyn FlowEventStore>| async move {
+                    event_store
                         .get_all_flow_ids_by_datasets(
                             account_dataset_ids,
                             &dataset_flow_filters,
@@ -1222,23 +1210,19 @@ impl FlowService for FlowServiceImpl {
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListSystemFlowsError> {
         let filters_ref = &filters;
-        let total_count = <DatabaseTransactionRunner>::run_transactional(
+        let total_count = DatabaseTransactionRunner::run_transactional_with(
             &self.catalog,
-            |updated_catalog| async move {
-                let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
-
-                flow_event_store.get_count_system_flows(filters_ref).await
+            |event_store: Arc<dyn FlowEventStore>| async move {
+                event_store.get_count_system_flows(filters_ref).await
             },
         )
         .await?;
 
         let matched_stream = Box::pin(async_stream::try_stream! {
-            let relevant_flow_ids = <DatabaseTransactionRunner>::run_transactional(
+            let relevant_flow_ids = DatabaseTransactionRunner::run_transactional_with(
                 &self.catalog,
-                |updated_catalog| async move {
-                    let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
-
-                    flow_event_store
+                |event_store: Arc<dyn FlowEventStore>| async move {
+                    event_store
                         .get_all_system_flow_ids(filters, pagination)
                         .try_collect::<Vec<_>>()
                         .await
@@ -1267,23 +1251,19 @@ impl FlowService for FlowServiceImpl {
         &self,
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsError> {
-        let total_count = <DatabaseTransactionRunner>::run_transactional(
+        let total_count = DatabaseTransactionRunner::run_transactional_with(
             &self.catalog,
-            |updated_catalog| async move {
-                let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
-
-                flow_event_store.get_count_all_flows().await
+            |event_store: Arc<dyn FlowEventStore>| async move {
+                event_store.get_count_all_flows().await
             },
         )
         .await?;
 
         let matched_stream = Box::pin(async_stream::try_stream! {
-            let all_flow_ids = <DatabaseTransactionRunner>::run_transactional(
+            let all_flow_ids = DatabaseTransactionRunner::run_transactional_with(
                 &self.catalog,
-                |updated_catalog| async move {
-                    let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
-
-                    flow_event_store
+                |event_store: Arc<dyn FlowEventStore>| async move {
+                    event_store
                         .get_all_flow_ids(pagination)
                         .try_collect::<Vec<_>>()
                         .await
@@ -1385,19 +1365,14 @@ impl AsyncEventHandler<TaskEventRunning> for FlowServiceImpl {
         };
 
         if let Some(flow_id) = maybe_flow_id {
-            DatabaseTransactionRunner::run_transactional(
+            DatabaseTransactionRunner::run_transactional_with(
                 &self.catalog,
-                |updated_catalog| async move {
-                    let flow_event_store =
-                        updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
-
-                    let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
-                        .await
-                        .int_err()?;
+                |event_store: Arc<dyn FlowEventStore>| async move {
+                    let mut flow = Flow::load(flow_id, event_store.as_ref()).await.int_err()?;
 
                     flow.on_task_running(event.event_time, event.task_id)
                         .int_err()?;
-                    flow.save(flow_event_store.as_ref()).await.int_err()?;
+                    flow.save(event_store.as_ref()).await.int_err()?;
 
                     Ok(())
                 },
@@ -1435,26 +1410,22 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceImpl {
         let finish_time = self.round_time(event.event_time)?;
 
         if let Some(flow_id) = maybe_flow_id {
-            let (flow, is_event_outcome_success) = DatabaseTransactionRunner::run_transactional(
-                &self.catalog,
-                |updated_catalog| async move {
-                    let flow_event_store =
-                        updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
+            let (flow, is_event_outcome_success) =
+                DatabaseTransactionRunner::run_transactional_with(
+                    &self.catalog,
+                    |event_store: Arc<dyn FlowEventStore>| async move {
+                        let mut flow = Flow::load(flow_id, event_store.as_ref()).await.int_err()?;
+                        let event_outcome = self.get_task_outcome(&flow, event.outcome.clone());
+                        let is_event_outcome_success = event_outcome.is_success();
 
-                    let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
-                        .await
-                        .int_err()?;
-                    let event_outcome = self.get_task_outcome(&flow, event.outcome.clone());
-                    let is_event_outcome_success = event_outcome.is_success();
+                        flow.on_task_finished(event.event_time, event.task_id, event_outcome)
+                            .int_err()?;
+                        flow.save(event_store.as_ref()).await.int_err()?;
 
-                    flow.on_task_finished(event.event_time, event.task_id, event_outcome)
-                        .int_err()?;
-                    flow.save(flow_event_store.as_ref()).await.int_err()?;
-
-                    Ok((flow, is_event_outcome_success))
-                },
-            )
-            .await?;
+                        Ok((flow, is_event_outcome_success))
+                    },
+                )
+                .await?;
 
             {
                 let mut state = self.state.lock().unwrap();
@@ -1587,18 +1558,13 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceImpl {
 
         // Abort matched flows
         for flow_id in flow_ids_2_abort {
-            DatabaseTransactionRunner::run_transactional(
+            DatabaseTransactionRunner::run_transactional_with(
                 &self.catalog,
-                |updated_catalog| async move {
-                    let flow_event_store =
-                        updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
-
-                    let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
-                        .await
-                        .int_err()?;
+                |event_store: Arc<dyn FlowEventStore>| async move {
+                    let mut flow = Flow::load(flow_id, event_store.as_ref()).await.int_err()?;
 
                     flow.abort(self.time_source.now()).int_err()?;
-                    flow.save(flow_event_store.as_ref()).await.int_err()?;
+                    flow.save(event_store.as_ref()).await.int_err()?;
 
                     Ok(())
                 },
