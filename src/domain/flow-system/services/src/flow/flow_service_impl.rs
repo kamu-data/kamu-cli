@@ -115,18 +115,17 @@ impl FlowServiceImpl {
         let mut planned_task_futures = Vec::new();
         for planned_flow_id in planned_flow_ids {
             planned_task_futures.push(async move {
-                let mut flow = <DatabaseTransactionRunner>::run_transactional(
+                let mut flow = DatabaseTransactionRunner::run_transactional(
                     &self.catalog,
                     |updated_catalog| async move {
                         let flow_event_store =
                             updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
 
-                        Flow::load(planned_flow_id, flow_event_store.as_ref())
-                            .await
-                            .int_err()
+                        Flow::load(planned_flow_id, flow_event_store.as_ref()).await
                     },
                 )
-                .await?;
+                .await
+                .int_err()?;
 
                 self.schedule_flow_task(&mut flow, timeslot_time).await?;
                 Ok(())
@@ -360,12 +359,11 @@ impl FlowServiceImpl {
                         let flow_event_store =
                             updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
 
-                        Flow::load(flow_id, flow_event_store.as_ref())
-                            .await
-                            .int_err()
+                        Flow::load(flow_id, flow_event_store.as_ref()).await
                     },
                 )
-                .await?;
+                .await
+                .int_err()?;
 
                 // Only merge unique triggers, ignore identical
                 flow.add_trigger_if_unique(self.time_source.now(), trigger)
@@ -785,17 +783,16 @@ impl FlowServiceImpl {
     }
 
     async fn abort_flow(&self, flow_id: FlowID) -> Result<(), InternalError> {
-        let mut flow = <DatabaseTransactionRunner>::run_transactional(
+        let mut flow = DatabaseTransactionRunner::run_transactional(
             &self.catalog,
             |updated_catalog| async move {
                 let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
 
-                Flow::load(flow_id, flow_event_store.as_ref())
-                    .await
-                    .int_err()
+                Flow::load(flow_id, flow_event_store.as_ref()).await
             },
         )
-        .await?;
+        .await
+        .int_err()?;
 
         // Mark flow as aborted
         self.abort_flow_impl(&mut flow).await
@@ -1133,10 +1130,11 @@ impl FlowService for FlowServiceImpl {
                         let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
 
                         Flow::load(flow_id, flow_event_store.as_ref())
-                            .await.int_err()
+                            .await
                     },
                 )
-                .await?;
+                .await
+                .int_err()?;
 
                 yield flow.into();
             }
@@ -1241,10 +1239,11 @@ impl FlowService for FlowServiceImpl {
                         let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
 
                         Flow::load(flow_id, flow_event_store.as_ref())
-                            .await.int_err()
+                            .await
                     },
                 )
-                .await?;
+                .await
+                .int_err()?;
 
                 yield flow.into();
             }
@@ -1327,10 +1326,11 @@ impl FlowService for FlowServiceImpl {
                         let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
 
                         Flow::load(flow_id, flow_event_store.as_ref())
-                            .await.int_err()
+                            .await
                     },
                 )
-                .await?;
+                .await
+                .int_err()?;
 
                 yield flow.into();
             }
@@ -1380,10 +1380,11 @@ impl FlowService for FlowServiceImpl {
                         let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
 
                         Flow::load(flow_id, flow_event_store.as_ref())
-                            .await.int_err()
+                            .await
                     },
                 )
-                .await?;
+                .await
+                .int_err()?;
 
                 yield flow.into();
             }
@@ -1403,9 +1404,7 @@ impl FlowService for FlowServiceImpl {
             |updated_catalog| async move {
                 let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
 
-                Flow::load(flow_id, flow_event_store.as_ref())
-                    .await
-                    .int_err()
+                Flow::load(flow_id, flow_event_store.as_ref()).await
             },
         )
         .await?;
@@ -1428,9 +1427,7 @@ impl FlowService for FlowServiceImpl {
             |updated_catalog| async move {
                 let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
 
-                Flow::load(flow_id, flow_event_store.as_ref())
-                    .await
-                    .int_err()
+                Flow::load(flow_id, flow_event_store.as_ref()).await
             },
         )
         .await?;
@@ -1476,12 +1473,11 @@ impl FlowServiceTestDriver for FlowServiceImpl {
             |updated_catalog| async move {
                 let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
 
-                Flow::load(flow_id, flow_event_store.as_ref())
-                    .await
-                    .int_err()
+                Flow::load(flow_id, flow_event_store.as_ref()).await
             },
         )
-        .await?;
+        .await
+        .int_err()?;
 
         let task_id = self.schedule_flow_task(&mut flow, schedule_time).await?;
 
