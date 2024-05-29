@@ -108,15 +108,15 @@ pub struct PullOptions {
     /// Sync-specific options,
     pub sync_options: SyncOptions,
     /// Run compacting of derivative dataset without saving data
-    /// if transformation failed
-    pub reset_derivatives: bool,
+    /// if transformation failed due to root dataset compaction
+    pub reset_derivatives_on_diverged_input: bool,
 }
 
 impl Default for PullOptions {
     fn default() -> Self {
         Self {
             add_aliases: true,
-            reset_derivatives: false,
+            reset_derivatives_on_diverged_input: false,
             ingest_options: PollingIngestOptions::default(),
             sync_options: SyncOptions::default(),
         }
@@ -137,8 +137,8 @@ pub struct PullMultiOptions {
     /// Sync-specific options,
     pub sync_options: SyncOptions,
     /// Run compacting of all derivative datasets without saving data
-    /// if transformation fails
-    pub reset_derivatives: bool,
+    /// if transformation fails due to root dataset compaction
+    pub reset_derivatives_on_diverged_input: bool,
 }
 
 impl Default for PullMultiOptions {
@@ -149,7 +149,7 @@ impl Default for PullMultiOptions {
             add_aliases: true,
             ingest_options: PollingIngestOptions::default(),
             sync_options: SyncOptions::default(),
-            reset_derivatives: false,
+            reset_derivatives_on_diverged_input: false,
         }
     }
 }
@@ -160,14 +160,12 @@ pub trait PullListener: Send + Sync {
     fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn PollingIngestListener>>;
     fn get_transform_listener(self: Arc<Self>) -> Option<Arc<dyn TransformListener>>;
     fn get_sync_listener(self: Arc<Self>) -> Option<Arc<dyn SyncListener>>;
-    fn get_compacting_listener(self: Arc<Self>) -> Option<Arc<dyn CompactingListener>>;
 }
 
 pub trait PullMultiListener: Send + Sync {
     fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn PollingIngestMultiListener>>;
     fn get_transform_listener(self: Arc<Self>) -> Option<Arc<dyn TransformMultiListener>>;
     fn get_sync_listener(self: Arc<Self>) -> Option<Arc<dyn SyncMultiListener>>;
-    fn get_compacting_listener(self: Arc<Self>) -> Option<Arc<dyn CompactingMultiListener>>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

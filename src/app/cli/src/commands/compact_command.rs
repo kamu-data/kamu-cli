@@ -150,7 +150,10 @@ impl Command for CompactCommand {
             Ok(())
         } else {
             Err(BatchError::new(
-                format!("Failed to compact {} dataset(s)", errors.len()),
+                format!(
+                    "Failed to compact {}/{total_results} dataset(s)",
+                    errors.len()
+                ),
                 errors,
             )
             .into())

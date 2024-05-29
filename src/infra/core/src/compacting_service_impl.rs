@@ -523,7 +523,7 @@ impl CompactingService for CompactingServiceImpl {
         options: CompactingOptions,
         multi_listener: Option<Arc<dyn CompactingMultiListener>>,
     ) -> Vec<CompactingResponse> {
-        let dataset_handles: Vec<_> = match filter_datasets_by_local_pattern(
+        let filtered_dataset_results = filter_datasets_by_local_pattern(
             self.dataset_repo.as_ref(),
             dataset_refs
                 .into_iter()
@@ -531,10 +531,12 @@ impl CompactingService for CompactingServiceImpl {
                 .collect(),
         )
         .try_collect()
-        .await
-        {
-            Ok(matched_datasets) => matched_datasets,
-            Err(_) => return vec![],
+        .await;
+
+        let dataset_handles: Vec<_> = if let Ok(matched_datasets) = filtered_dataset_results {
+            matched_datasets
+        } else {
+            return vec![];
         };
 
         let listener = multi_listener.unwrap_or(Arc::new(NullCompactingMultiListener {}));

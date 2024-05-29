@@ -30,12 +30,14 @@ pub trait TransformService: Send + Sync {
     async fn transform(
         &self,
         dataset_ref: &DatasetRef,
+        transfrom_options: TransformOptions,
         listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError>;
 
     async fn transform_multi(
         &self,
         dataset_refs: Vec<DatasetRef>,
+        transfrom_options: TransformOptions,
         listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetRef, Result<TransformResult, TransformError>)>;
 
@@ -58,6 +60,13 @@ pub enum TransformResult {
         old_head: Multihash,
         new_head: Multihash,
     },
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct TransformOptions {
+    /// Run compacting of derivative datasets without saving data
+    /// if transformation fails due to root dataset compaction
+    pub reset_derivatives_on_diverged_input: bool,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

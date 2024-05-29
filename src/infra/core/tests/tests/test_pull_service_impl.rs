@@ -723,7 +723,6 @@ async fn test_set_watermark() {
             4,
         ),
         false,
-        PullTestHarnessResultOwerrides::default(),
     );
 
     let dataset_alias = n!("foo");
@@ -787,7 +786,6 @@ async fn test_set_watermark_unauthorized() {
         tmp_dir.path(),
         MockDatasetActionAuthorizer::denying(),
         true,
-        PullTestHarnessResultOwerrides::default(),
     );
 
     let dataset_alias = n!("foo");
@@ -814,7 +812,6 @@ async fn test_set_watermark_rejects_on_derivative() {
         tmp_dir.path(),
         AlwaysHappyDatasetActionAuthorizer::new(),
         true,
-        PullTestHarnessResultOwerrides::default(),
     );
 
     let dataset_alias = n!("foo");
@@ -843,43 +840,6 @@ async fn test_set_watermark_rejects_on_derivative() {
     assert_eq!(harness.num_blocks(&dataset_alias).await, 1);
 }
 
-#[tokio::test]
-async fn test_compactin_on_transform_faile() {
-    let harnes_owerrides = PullTestHarnessResultOwerrides {
-        transfrom_test_service_result: Some(TestTransfromResult::Failed),
-    };
-
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness =
-        PullTestHarness::new_with_result_owerrides(tmp_dir.path(), false, harnes_owerrides);
-
-    create_graph(
-        harness.dataset_repo.as_ref(),
-        vec![(n!("a"), names![]), (n!("b"), names!["a"])],
-    )
-    .await;
-
-    // Pulling b results in a sync
-    assert_eq!(
-        harness
-            .pull_failed(
-                refs!["b"],
-                PullMultiOptions {
-                    recursive: true,
-                    reset_derivatives: true,
-                    ..PullMultiOptions::default()
-                }
-            )
-            .await,
-        vec![
-            PullBatch::Ingest(refs!("a")),
-            PullBatch::Transform(refs!("b")),
-            PullBatch::Compact(refs!("b")),
-            PullBatch::Transform(refs!("b")),
-        ],
-    );
-}
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct PullTestHarness {
@@ -892,25 +852,11 @@ struct PullTestHarness {
 }
 
 impl PullTestHarness {
-    fn new_with_result_owerrides(
-        tmp_path: &Path,
-        multi_tenant: bool,
-        result_owerrides: PullTestHarnessResultOwerrides,
-    ) -> Self {
-        Self::new_with_authorizer(
-            tmp_path,
-            auth::AlwaysHappyDatasetActionAuthorizer::new(),
-            multi_tenant,
-            result_owerrides,
-        )
-    }
-
     fn new(tmp_path: &Path, multi_tenant: bool) -> Self {
         Self::new_with_authorizer(
             tmp_path,
             auth::AlwaysHappyDatasetActionAuthorizer::new(),
             multi_tenant,
-            PullTestHarnessResultOwerrides::default(),
         )
     }
 
@@ -918,15 +864,11 @@ impl PullTestHarness {
         tmp_path: &Path,
         dataset_action_authorizer: TDatasetAuthorizer,
         multi_tenant: bool,
-        result_owerrides: PullTestHarnessResultOwerrides,
     ) -> Self {
         let calls = Arc::new(Mutex::new(Vec::new()));
 
         let datasets_dir_path = tmp_path.join("datasets");
         std::fs::create_dir(&datasets_dir_path).unwrap();
-        let test_transform_service_result = result_owerrides
-            .transfrom_test_service_result
-            .unwrap_or(TestTransfromResult::Success);
 
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
@@ -946,13 +888,8 @@ impl PullTestHarness {
             .add::<RemoteAliasesRegistryImpl>()
             .add_value(TestIngestService::new(calls.clone()))
             .bind::<dyn PollingIngestService, TestIngestService>()
-            .add_value(TestTransformService::new(
-                calls.clone(),
-                test_transform_service_result,
-            ))
+            .add_value(TestTransformService::new(calls.clone()))
             .bind::<dyn TransformService, TestTransformService>()
-            .add_value(TestCompactingService::new(calls.clone()))
-            .bind::<dyn CompactingService, TestCompactingService>()
             .add_builder(TestSyncService::builder().with_calls(calls.clone()))
             .bind::<dyn SyncService, TestSyncService>()
             .add::<PullServiceImpl>()
@@ -1011,23 +948,6 @@ impl PullTestHarness {
 
         self.collect_calls()
     }
-
-    async fn pull_failed(
-        &self,
-        refs: Vec<DatasetRefAny>,
-        options: PullMultiOptions,
-    ) -> Vec<PullBatch> {
-        self.pull_svc
-            .pull_multi(refs.clone(), options, None)
-            .await
-            .unwrap();
-        self.collect_calls()
-    }
-}
-
-#[derive(Default)]
-struct PullTestHarnessResultOwerrides {
-    pub transfrom_test_service_result: Option<TestTransfromResult>,
 }
 
 #[derive(Debug, Clone, Eq)]
@@ -1035,7 +955,6 @@ pub enum PullBatch {
     Ingest(Vec<DatasetRefAny>),
     Transform(Vec<DatasetRefAny>),
     Sync(Vec<(DatasetRefAny, DatasetRefAny)>),
-    Compact(Vec<DatasetRefAny>),
 }
 
 impl PullBatch {
@@ -1097,13 +1016,6 @@ impl std::cmp::PartialEq for PullBatch {
                 l.len() == r.len() && std::iter::zip(&l, &r).all(|(li, ri)| Self::cmp_ref(li, ri))
             }
             (Self::Transform(l), Self::Transform(r)) => {
-                let mut l = l.clone();
-                l.sort();
-                let mut r = r.clone();
-                r.sort();
-                l.len() == r.len() && std::iter::zip(&l, &r).all(|(li, ri)| Self::cmp_ref(li, ri))
-            }
-            (Self::Compact(l), Self::Compact(r)) => {
                 let mut l = l.clone();
                 l.sort();
                 let mut r = r.clone();
@@ -1180,19 +1092,13 @@ impl PollingIngestService for TestIngestService {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub enum TestTransfromResult {
-    Success,
-    Failed,
-}
-
 pub struct TestTransformService {
     calls: Arc<Mutex<Vec<PullBatch>>>,
-    mock_result: TestTransfromResult,
 }
 
 impl TestTransformService {
-    pub fn new(calls: Arc<Mutex<Vec<PullBatch>>>, mock_result: TestTransfromResult) -> Self {
-        Self { calls, mock_result }
+    pub fn new(calls: Arc<Mutex<Vec<PullBatch>>>) -> Self {
+        Self { calls }
     }
 }
 
@@ -1208,6 +1114,7 @@ impl TransformService for TestTransformService {
     async fn transform(
         &self,
         _dataset_ref: &DatasetRef,
+        _options: TransformOptions,
         _maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
         unimplemented!();
@@ -1216,20 +1123,12 @@ impl TransformService for TestTransformService {
     async fn transform_multi(
         &self,
         dataset_refs: Vec<DatasetRef>,
+        _options: TransformOptions,
         _maybe_multi_listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetRef, Result<TransformResult, TransformError>)> {
         let results = dataset_refs
             .iter()
-            .map(|r| match &self.mock_result {
-                TestTransfromResult::Success => (r.clone(), Ok(TransformResult::UpToDate)),
-                TestTransfromResult::Failed => (
-                    r.clone(),
-                    Err(TransformError::InvalidInterval(InvalidIntervalError {
-                        head: Multihash::from_digest_sha3_256(b"foo"),
-                        tail: Multihash::from_digest_sha3_256(b"bar"),
-                    })),
-                ),
-            })
+            .map(|r| (r.clone(), Ok(TransformResult::UpToDate)))
             .collect();
         self.calls.lock().unwrap().push(PullBatch::Transform(
             dataset_refs.into_iter().map(Into::into).collect(),
@@ -1324,53 +1223,5 @@ impl SyncService for TestSyncService {
 
     async fn ipfs_add(&self, _src: &DatasetRef) -> Result<String, SyncError> {
         unimplemented!()
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct TestCompactingService {
-    calls: Arc<Mutex<Vec<PullBatch>>>,
-}
-
-impl TestCompactingService {
-    pub fn new(calls: Arc<Mutex<Vec<PullBatch>>>) -> Self {
-        Self { calls }
-    }
-}
-
-#[async_trait::async_trait]
-impl CompactingService for TestCompactingService {
-    async fn compact_dataset(
-        &self,
-        _dataset_handle: &DatasetHandle,
-        _options: CompactingOptions,
-        _listener: Option<Arc<dyn CompactingListener>>,
-    ) -> Result<CompactingResult, CompactingError> {
-        unimplemented!()
-    }
-
-    async fn compact_multi(
-        &self,
-        dataset_refs: Vec<DatasetRef>,
-        _options: CompactingOptions,
-        _listener: Option<Arc<dyn CompactingMultiListener>>,
-    ) -> Vec<CompactingResponse> {
-        let results = dataset_refs
-            .iter()
-            .map(|r| CompactingResponse {
-                dataset_ref: r.clone(),
-                result: Ok(CompactingResult::Success {
-                    old_head: Multihash::from_digest_sha3_256(b"old_head"),
-                    new_head: Multihash::from_digest_sha3_256(b"new_head"),
-                    old_num_blocks: 5,
-                    new_num_blocks: 4,
-                }),
-            })
-            .collect();
-        self.calls.lock().unwrap().push(PullBatch::Compact(
-            dataset_refs.into_iter().map(Into::into).collect(),
-        ));
-        results
     }
 }

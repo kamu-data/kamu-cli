@@ -115,9 +115,6 @@ impl ClientSideHarness {
 
         b.add::<TransformServiceImpl>();
 
-        b.add_builder(CompactingServiceImpl::builder().with_run_info_dir(run_info_dir))
-            .bind::<dyn CompactingService, CompactingServiceImpl>();
-
         b.add::<PullServiceImpl>();
 
         b.add::<PushServiceImpl>();

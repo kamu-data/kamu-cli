@@ -15,6 +15,7 @@ use kamu_core::{
     TransformError,
     TransformListener,
     TransformMultiListener,
+    TransformOptions,
     TransformResult,
     TransformService,
     VerificationError,
@@ -43,12 +44,14 @@ mockall::mock! {
       async fn transform(
           &self,
           dataset_ref: &DatasetRef,
+          options: TransformOptions,
           listener: Option<Arc<dyn TransformListener>>,
       ) -> Result<TransformResult, TransformError>;
 
       async fn transform_multi(
           &self,
           dataset_refs: Vec<DatasetRef>,
+          options: TransformOptions,
           listener: Option<Arc<dyn TransformMultiListener>>,
       ) -> Vec<(DatasetRef, Result<TransformResult, TransformError>)>;
 

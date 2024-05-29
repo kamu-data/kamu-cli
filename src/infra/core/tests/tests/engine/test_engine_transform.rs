@@ -347,7 +347,11 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
     time_source.set(Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap());
 
     let res = transform_svc
-        .transform(&deriv_alias.as_local_ref(), None)
+        .transform(
+            &deriv_alias.as_local_ref(),
+            TransformOptions::default(),
+            None,
+        )
         .await
         .unwrap();
     assert_matches!(res, TransformResult::Updated { .. });
@@ -421,7 +425,11 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
     time_source.set(Utc.with_ymd_and_hms(2050, 1, 3, 12, 0, 0).unwrap());
 
     let res = transform_svc
-        .transform(&deriv_alias.as_local_ref(), None)
+        .transform(
+            &deriv_alias.as_local_ref(),
+            TransformOptions::default(),
+            None,
+        )
         .await
         .unwrap();
     assert_matches!(res, TransformResult::Updated { .. });

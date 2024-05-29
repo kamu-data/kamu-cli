@@ -25,6 +25,7 @@ pub struct TransformServiceImpl {
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     time_source: Arc<dyn SystemTimeSource>,
+    compacting_svc: Arc<dyn CompactingService>,
 }
 
 #[component(pub)]
@@ -35,12 +36,14 @@ impl TransformServiceImpl {
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         time_source: Arc<dyn SystemTimeSource>,
+        compacting_svc: Arc<dyn CompactingService>,
     ) -> Self {
         Self {
             dataset_repo,
             dataset_action_authorizer,
             engine_provisioner,
             time_source,
+            compacting_svc,
         }
     }
 
@@ -683,10 +686,12 @@ impl TransformServiceImpl {
         Ok(plan)
     }
 
+    #[async_recursion::async_recursion]
     #[tracing::instrument(level = "info", name = "transform", skip_all, fields(%dataset_ref))]
     async fn transform_impl(
         &self,
         dataset_ref: DatasetRef,
+        options: TransformOptions,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
@@ -700,9 +705,39 @@ impl TransformServiceImpl {
         // TODO: Inject time source
         let next_operation = self
             .get_next_operation(&dataset_handle, self.time_source.now())
-            .await?;
+            .await;
 
-        if let Some(operation) = next_operation {
+        if options.reset_derivatives_on_diverged_input
+            && let Err(transform_err) = &next_operation
+            && let TransformError::InvalidInterval(_) = transform_err
+        {
+            let compacting_result = self
+                .compacting_svc
+                .compact_dataset(
+                    &dataset_handle,
+                    CompactingOptions {
+                        keep_metadata_only: true,
+                        ..Default::default()
+                    },
+                    None,
+                )
+                .await
+                .int_err()?;
+
+            if let CompactingResult::Success { .. } = compacting_result {
+                return self
+                    .transform_impl(
+                        dataset_ref.clone(),
+                        TransformOptions {
+                            reset_derivatives_on_diverged_input: false,
+                        },
+                        Some(listener),
+                    )
+                    .await;
+            }
+        }
+
+        if let Some(operation) = next_operation? {
             let dataset_repo = self.dataset_repo.clone();
             Self::do_transform(
                 self.engine_provisioner.clone(),
@@ -742,17 +777,19 @@ impl TransformService for TransformServiceImpl {
     async fn transform(
         &self,
         dataset_ref: &DatasetRef,
+        options: TransformOptions,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
         tracing::info!(?dataset_ref, "Transforming a single dataset");
 
-        self.transform_impl(dataset_ref.clone(), maybe_listener)
+        self.transform_impl(dataset_ref.clone(), options, maybe_listener)
             .await
     }
 
     async fn transform_multi(
         &self,
         dataset_refs: Vec<DatasetRef>,
+        options: TransformOptions,
         maybe_multi_listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetRef, Result<TransformResult, TransformError>)> {
         let multi_listener =
@@ -766,10 +803,10 @@ impl TransformService for TransformServiceImpl {
             let f = match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
                 Ok(hdl) => {
                     let maybe_listener = multi_listener.begin_transform(&hdl);
-                    self.transform_impl(hdl.into(), maybe_listener)
+                    self.transform_impl(hdl.into(), options.clone(), maybe_listener)
                 }
                 // Relying on this call to fail to avoid boxing the futures
-                Err(_) => self.transform_impl(dataset_ref.clone(), None),
+                Err(_) => self.transform_impl(dataset_ref.clone(), options.clone(), None),
             };
             futures.push(f);
         }

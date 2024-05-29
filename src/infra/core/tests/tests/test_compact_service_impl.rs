@@ -26,7 +26,7 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth;
 use opendatafabric::*;
 
-use super::test_pull_service_impl::{TestTransformService, TestTransfromResult};
+use super::test_pull_service_impl::TestTransformService;
 use crate::mock_engine_provisioner;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -973,7 +973,7 @@ async fn test_dataset_keep_metadata_only_compact() {
     // After: seed <- set_transform
     let res = harness
         .transform_svc
-        .transform(&derived_dataset_ref, None)
+        .transform(&derived_dataset_ref, TransformOptions::default(), None)
         .await
         .unwrap();
     assert_matches!(res, TransformResult::Updated { .. });
@@ -1155,10 +1155,7 @@ impl CompactTestHarness {
             .add::<ObjectStoreBuilderLocalFs>()
             .add_value(ObjectStoreBuilderS3::new(s3_context.clone(), true))
             .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
-            .add_value(TestTransformService::new(
-                Arc::new(Mutex::new(Vec::new())),
-                TestTransfromResult::Success,
-            ))
+            .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
             .bind::<dyn TransformService, TestTransformService>()
             .add::<VerificationServiceImpl>()
             .add_value(CurrentAccountSubject::new_test())
