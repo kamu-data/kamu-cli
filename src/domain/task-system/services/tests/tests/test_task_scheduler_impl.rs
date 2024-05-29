@@ -21,79 +21,72 @@ use kamu_task_system_services::TaskSchedulerImpl;
 
 #[test_log::test(tokio::test)]
 async fn test_creates_task() {
-    prepare_task_scheduler(|task_sched| async move {
-        let logical_plan_expected: LogicalPlan = Probe { ..Probe::default() }.into();
+    let task_sched = create_task_scheduler();
 
-        let task_state_actual = task_sched
-            .create_task(logical_plan_expected.clone())
-            .await
-            .unwrap();
+    let logical_plan_expected: LogicalPlan = Probe { ..Probe::default() }.into();
 
-        assert_matches!(task_state_actual, TaskState {
-            status: TaskStatus::Queued,
-            cancellation_requested: false,
-            logical_plan,
-            ran_at: None,
-            cancellation_requested_at: None,
-            finished_at: None,
-            ..
-        } if logical_plan == logical_plan_expected);
-    })
-    .await;
+    let task_state_actual = task_sched
+        .create_task(logical_plan_expected.clone())
+        .await
+        .unwrap();
+
+    assert_matches!(task_state_actual, TaskState {
+        status: TaskStatus::Queued,
+        cancellation_requested: false,
+        logical_plan,
+        ran_at: None,
+        cancellation_requested_at: None,
+        finished_at: None,
+        ..
+    } if logical_plan == logical_plan_expected);
 }
 
 #[test_log::test(tokio::test)]
 async fn test_queues_tasks() {
-    prepare_task_scheduler(|task_sched| async move {
-        let task_id_1 = task_sched
-            .create_task(Probe { ..Probe::default() }.into())
-            .await
-            .unwrap()
-            .task_id;
+    let task_sched = create_task_scheduler();
 
-        let task_id_2 = task_sched
-            .create_task(Probe { ..Probe::default() }.into())
-            .await
-            .unwrap()
-            .task_id;
+    let task_id_1 = task_sched
+        .create_task(Probe { ..Probe::default() }.into())
+        .await
+        .unwrap()
+        .task_id;
 
-        assert_eq!(task_sched.try_take().await.unwrap(), Some(task_id_1));
-        assert_eq!(task_sched.try_take().await.unwrap(), Some(task_id_2));
-        assert_eq!(task_sched.try_take().await.unwrap(), None);
-    })
-    .await;
+    let task_id_2 = task_sched
+        .create_task(Probe { ..Probe::default() }.into())
+        .await
+        .unwrap()
+        .task_id;
+
+    assert_eq!(task_sched.try_take().await.unwrap(), Some(task_id_1));
+    assert_eq!(task_sched.try_take().await.unwrap(), Some(task_id_2));
+    assert_eq!(task_sched.try_take().await.unwrap(), None);
 }
 
 #[test_log::test(tokio::test)]
 async fn test_task_cancellation() {
-    prepare_task_scheduler(|task_sched| async move {
-        let task_id_1 = task_sched
-            .create_task(Probe { ..Probe::default() }.into())
-            .await
-            .unwrap()
-            .task_id;
+    let task_sched = create_task_scheduler();
 
-        let task_id_2 = task_sched
-            .create_task(Probe { ..Probe::default() }.into())
-            .await
-            .unwrap()
-            .task_id;
+    let task_id_1 = task_sched
+        .create_task(Probe { ..Probe::default() }.into())
+        .await
+        .unwrap()
+        .task_id;
 
-        task_sched.cancel_task(task_id_1).await.unwrap();
+    let task_id_2 = task_sched
+        .create_task(Probe { ..Probe::default() }.into())
+        .await
+        .unwrap()
+        .task_id;
 
-        assert_eq!(task_sched.try_take().await.unwrap(), Some(task_id_2));
-        assert_eq!(task_sched.try_take().await.unwrap(), None);
-    })
-    .await;
+    task_sched.cancel_task(task_id_1).await.unwrap();
+
+    assert_eq!(task_sched.try_take().await.unwrap(), Some(task_id_2));
+    assert_eq!(task_sched.try_take().await.unwrap(), None);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-async fn prepare_task_scheduler<F, R>(callback: F)
-where
-    F: FnOnce(TaskSchedulerImpl) -> R + Send,
-    R: std::future::Future<Output = ()> + Send,
-{
+fn create_task_scheduler() -> impl TaskScheduler {
     let mut catalog_builder = CatalogBuilder::new();
 
     FakeDatabasePlugin::init_database_components(&mut catalog_builder);
@@ -105,7 +98,7 @@ where
     let time_source = Arc::new(SystemTimeSourceStub::new());
     let task_scheduler = TaskSchedulerImpl::new(time_source, catalog);
 
-    callback(task_scheduler).await;
+    task_scheduler
 }
 
 ////////////////////////////////////////////////////////////////////////////////
