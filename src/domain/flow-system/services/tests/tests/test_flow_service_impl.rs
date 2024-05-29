@@ -449,7 +449,7 @@ async fn test_manual_trigger() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_manual_trigger_compacting() {
+async fn test_manual_trigger_compaction() {
     let harness = FlowHarness::new();
 
     let foo_id = harness
@@ -468,9 +468,9 @@ async fn test_manual_trigger_compacting() {
     harness.eager_initialization().await;
 
     let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
     let bar_flow_key: FlowKey =
-        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompacting).into();
+        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompaction).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -495,7 +495,7 @@ async fn test_manual_trigger_compacting() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(10).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                    expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                       dataset_id: foo_id.clone(),
                       max_slice_size: None,
                       max_slice_records: None,
@@ -509,7 +509,7 @@ async fn test_manual_trigger_compacting() {
                   dataset_id: Some(bar_id.clone()),
                   run_since_start: Duration::try_milliseconds(60).unwrap(),
                   finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                  expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                  expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
                     max_slice_records: None,
@@ -558,35 +558,35 @@ async fn test_manual_trigger_compacting() {
             #0: +0ms:
 
             #1: +10ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
 
             #2: +10ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Running(task=0)
 
             #3: +30ms:
-              "bar" HardCompacting:
+              "bar" HardCompaction:
                 Flow ID = 1 Waiting Manual
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
 
             #4: +50ms:
-              "bar" HardCompacting:
+              "bar" HardCompaction:
                 Flow ID = 1 Waiting Manual Executor(task=1, since=50ms)
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
 
             #5: +60ms:
-              "bar" HardCompacting:
+              "bar" HardCompaction:
                 Flow ID = 1 Running(task=1)
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
 
             #6: +70ms:
-              "bar" HardCompacting:
+              "bar" HardCompaction:
                 Flow ID = 1 Finished Success
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
 
             "#
@@ -597,7 +597,7 @@ async fn test_manual_trigger_compacting() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_manual_trigger_compacting_with_config() {
+async fn test_manual_trigger_compaction_with_config() {
     let max_slice_size = 1_000_000u64;
     let max_slice_records = 1000u64;
     let harness = FlowHarness::new();
@@ -611,18 +611,18 @@ async fn test_manual_trigger_compacting_with_config() {
 
     harness.eager_initialization().await;
     harness
-        .set_dataset_flow_compacting_rule(
+        .set_dataset_flow_compaction_rule(
             harness.now_datetime(),
             foo_id.clone(),
-            DatasetFlowType::HardCompacting,
-            CompactingRule::Full(
-                CompactingRuleFull::new_checked(max_slice_size, max_slice_records).unwrap(),
+            DatasetFlowType::HardCompaction,
+            CompactionRule::Full(
+                CompactionRuleFull::new_checked(max_slice_size, max_slice_records).unwrap(),
             ),
         )
         .await;
 
     let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -646,7 +646,7 @@ async fn test_manual_trigger_compacting_with_config() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(30).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                    expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                       dataset_id: foo_id.clone(),
                       max_slice_size: Some(max_slice_size),
                       max_slice_records: Some(max_slice_records),
@@ -681,15 +681,15 @@ async fn test_manual_trigger_compacting_with_config() {
             #0: +0ms:
 
             #1: +20ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Waiting Manual Executor(task=0, since=20ms)
 
             #2: +30ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Running(task=0)
 
             #3: +40ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
 
             "#
@@ -700,7 +700,7 @@ async fn test_manual_trigger_compacting_with_config() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_manual_trigger_keep_metadata_only_with_recursive_compacting() {
+async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
     let harness = FlowHarness::new();
 
     let foo_id = harness
@@ -729,18 +729,18 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compacting() {
         .await;
 
     harness
-        .set_dataset_flow_compacting_rule(
+        .set_dataset_flow_compaction_rule(
             harness.now_datetime(),
             foo_id.clone(),
-            DatasetFlowType::HardCompacting,
-            CompactingRule::MetadataOnly(CompactingRuleMetadataOnly { recursive: true }),
+            DatasetFlowType::HardCompaction,
+            CompactionRule::MetadataOnly(CompactionRuleMetadataOnly { recursive: true }),
         )
         .await;
 
     harness.eager_initialization().await;
 
     let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -776,8 +776,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compacting() {
                 finish_in_with: Some(
                   (
                     Duration::try_milliseconds(70).unwrap(),
-                    TaskOutcome::Success(TaskResult::CompactingDatasetResult(TaskCompactingDatasetResult {
-                      compacting_result: CompactingResult::Success {
+                    TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                      compaction_result: CompactionResult::Success {
                         old_head: Multihash::from_digest_sha3_256(b"old-slice"),
                         new_head: Multihash::from_digest_sha3_256(b"new-slice"),
                         old_num_blocks: 5,
@@ -786,7 +786,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compacting() {
                     }))
                   )
                 ),
-                expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                   dataset_id: foo_id.clone(),
                   max_slice_size: None,
                   max_slice_records: None,
@@ -803,8 +803,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compacting() {
                 finish_in_with: Some(
                   (
                     Duration::try_milliseconds(70).unwrap(),
-                    TaskOutcome::Success(TaskResult::CompactingDatasetResult(TaskCompactingDatasetResult {
-                      compacting_result: CompactingResult::Success {
+                    TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                      compaction_result: CompactionResult::Success {
                         old_head: Multihash::from_digest_sha3_256(b"old-slice-2"),
                         new_head: Multihash::from_digest_sha3_256(b"new-slice-2"),
                         old_num_blocks: 5,
@@ -813,7 +813,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compacting() {
                     }
                   ))
                 )),
-                expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                   dataset_id: foo_bar_id.clone(),
                   max_slice_size: None,
                   max_slice_records: None,
@@ -830,8 +830,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compacting() {
                 finish_in_with: Some(
                   (
                     Duration::try_milliseconds(40).unwrap(),
-                    TaskOutcome::Success(TaskResult::CompactingDatasetResult(TaskCompactingDatasetResult {
-                      compacting_result: CompactingResult::Success {
+                    TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                      compaction_result: CompactionResult::Success {
                         old_head: Multihash::from_digest_sha3_256(b"old-slice-3"),
                         new_head: Multihash::from_digest_sha3_256(b"new-slice-3"),
                         old_num_blocks: 8,
@@ -840,7 +840,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compacting() {
                     }
                   ))
                 )),
-                expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                   dataset_id: foo_bar_baz_id.clone(),
                   max_slice_size: None,
                   max_slice_records: None,
@@ -866,61 +866,61 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compacting() {
             #0: +0ms:
 
             #1: +10ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
 
             #2: +20ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Running(task=0)
 
             #3: +90ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
-              "foo_bar" HardCompacting:
+              "foo_bar" HardCompaction:
                 Flow ID = 1 Waiting Input(foo)
 
             #4: +90ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
-              "foo_bar" HardCompacting:
+              "foo_bar" HardCompaction:
                 Flow ID = 1 Waiting Input(foo) Executor(task=1, since=90ms)
 
             #5: +110ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
-              "foo_bar" HardCompacting:
+              "foo_bar" HardCompaction:
                 Flow ID = 1 Running(task=1)
 
             #6: +180ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
-              "foo_bar" HardCompacting:
+              "foo_bar" HardCompaction:
                 Flow ID = 1 Finished Success
-              "foo_bar_baz" HardCompacting:
+              "foo_bar_baz" HardCompaction:
                 Flow ID = 2 Waiting Input(foo_bar)
 
             #7: +180ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
-              "foo_bar" HardCompacting:
+              "foo_bar" HardCompaction:
                 Flow ID = 1 Finished Success
-              "foo_bar_baz" HardCompacting:
+              "foo_bar_baz" HardCompaction:
                 Flow ID = 2 Waiting Input(foo_bar) Executor(task=2, since=180ms)
 
             #8: +200ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
-              "foo_bar" HardCompacting:
+              "foo_bar" HardCompaction:
                 Flow ID = 1 Finished Success
-              "foo_bar_baz" HardCompacting:
+              "foo_bar_baz" HardCompaction:
                 Flow ID = 2 Running(task=2)
 
             #9: +240ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
-              "foo_bar" HardCompacting:
+              "foo_bar" HardCompaction:
                 Flow ID = 1 Finished Success
-              "foo_bar_baz" HardCompacting:
+              "foo_bar_baz" HardCompaction:
                 Flow ID = 2 Finished Success
 
             "#
@@ -931,7 +931,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compacting() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_manual_trigger_keep_metadata_only_without_recursive_compacting() {
+async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
     let harness = FlowHarness::new();
 
     let foo_id = harness
@@ -960,18 +960,18 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compacting() {
         .await;
 
     harness
-        .set_dataset_flow_compacting_rule(
+        .set_dataset_flow_compaction_rule(
             harness.now_datetime(),
             foo_id.clone(),
-            DatasetFlowType::HardCompacting,
-            CompactingRule::MetadataOnly(CompactingRuleMetadataOnly { recursive: false }),
+            DatasetFlowType::HardCompaction,
+            CompactionRule::MetadataOnly(CompactionRuleMetadataOnly { recursive: false }),
         )
         .await;
 
     harness.eager_initialization().await;
 
     let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1007,8 +1007,8 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compacting() {
                 finish_in_with: Some(
                   (
                     Duration::try_milliseconds(70).unwrap(),
-                    TaskOutcome::Success(TaskResult::CompactingDatasetResult(TaskCompactingDatasetResult {
-                      compacting_result: CompactingResult::Success {
+                    TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                      compaction_result: CompactionResult::Success {
                         old_head: Multihash::from_digest_sha3_256(b"old-slice"),
                         new_head: Multihash::from_digest_sha3_256(b"new-slice"),
                         old_num_blocks: 5,
@@ -1017,7 +1017,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compacting() {
                     }))
                   )
                 ),
-                expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                   dataset_id: foo_id.clone(),
                   max_slice_size: None,
                   max_slice_records: None,
@@ -1043,15 +1043,15 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compacting() {
             #0: +0ms:
 
             #1: +10ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
 
             #2: +20ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Running(task=0)
 
             #3: +90ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
 
             "#
@@ -1062,7 +1062,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compacting() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_manual_trigger_keep_metadata_only_compacting_multiple_accounts() {
+async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
     let wasya_account_name = AccountName::new_unchecked("wasya");
     let petya_account_name = AccountName::new_unchecked("petya");
 
@@ -1098,18 +1098,18 @@ async fn test_manual_trigger_keep_metadata_only_compacting_multiple_accounts() {
         .await;
 
     harness
-        .set_dataset_flow_compacting_rule(
+        .set_dataset_flow_compaction_rule(
             harness.now_datetime(),
             foo_id.clone(),
-            DatasetFlowType::HardCompacting,
-            CompactingRule::MetadataOnly(CompactingRuleMetadataOnly { recursive: true }),
+            DatasetFlowType::HardCompaction,
+            CompactionRule::MetadataOnly(CompactionRuleMetadataOnly { recursive: true }),
         )
         .await;
 
     harness.eager_initialization().await;
 
     let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1134,14 +1134,14 @@ async fn test_manual_trigger_keep_metadata_only_compacting_multiple_accounts() {
                 task_id: TaskID::new(0),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(70).unwrap(), TaskOutcome::Success(TaskResult::CompactingDatasetResult(TaskCompactingDatasetResult {
-                  compacting_result: CompactingResult::Success {
+                finish_in_with: Some((Duration::try_milliseconds(70).unwrap(), TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                  compaction_result: CompactionResult::Success {
                     old_head: Multihash::from_digest_sha3_256(b"old-slice"),
                     new_head: Multihash::from_digest_sha3_256(b"new-slice"),
                     old_num_blocks: 5,
                     new_num_blocks: 4,
                 }})))),
-                expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                   dataset_id: foo_id.clone(),
                   max_slice_size: None,
                   max_slice_records: None,
@@ -1157,21 +1157,21 @@ async fn test_manual_trigger_keep_metadata_only_compacting_multiple_accounts() {
             });
             let trigger0_handle = trigger0_driver.run();
 
-            // Task 1: "foo_bar" hard_compacting start running at 110ms, finish at 180ms
+            // Task 1: "foo_bar" hard_compaction start running at 110ms, finish at 180ms
             let task1_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(1),
                 dataset_id: Some(foo_bar_id.clone()),
                 run_since_start: Duration::try_milliseconds(110).unwrap(),
                 // Send some PullResult with records to bypass batching condition
-                finish_in_with: Some((Duration::try_milliseconds(70).unwrap(), TaskOutcome::Success(TaskResult::CompactingDatasetResult(TaskCompactingDatasetResult {
-                  compacting_result: CompactingResult::Success {
+                finish_in_with: Some((Duration::try_milliseconds(70).unwrap(), TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                  compaction_result: CompactionResult::Success {
                     old_head: Multihash::from_digest_sha3_256(b"old-slice"),
                     new_head: Multihash::from_digest_sha3_256(b"new-slice"),
                     old_num_blocks: 5,
                     new_num_blocks: 4,
                 }})))),
                 // Make sure we will take config from root dataset
-                expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                   dataset_id: foo_bar_id.clone(),
                   max_slice_size: None,
                   max_slice_records: None,
@@ -1197,35 +1197,35 @@ async fn test_manual_trigger_keep_metadata_only_compacting_multiple_accounts() {
             #0: +0ms:
 
             #1: +10ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
 
             #2: +10ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Running(task=0)
 
             #3: +80ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
-              "foo_bar" HardCompacting:
+              "foo_bar" HardCompaction:
                 Flow ID = 1 Waiting Input(foo)
 
             #4: +80ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
-              "foo_bar" HardCompacting:
+              "foo_bar" HardCompaction:
                 Flow ID = 1 Waiting Input(foo) Executor(task=1, since=80ms)
 
             #5: +110ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
-              "foo_bar" HardCompacting:
+              "foo_bar" HardCompaction:
                 Flow ID = 1 Running(task=1)
 
             #6: +180ms:
-              "foo" HardCompacting:
+              "foo" HardCompaction:
                 Flow ID = 0 Finished Success
-              "foo_bar" HardCompacting:
+              "foo_bar" HardCompaction:
                 Flow ID = 1 Finished Success
 
             "#
@@ -4303,9 +4303,9 @@ async fn test_list_all_flow_initiators() {
     harness.eager_initialization().await;
 
     let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
     let bar_flow_key: FlowKey =
-        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompacting).into();
+        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompaction).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -4330,7 +4330,7 @@ async fn test_list_all_flow_initiators() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(10).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                    expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                       dataset_id: foo_id.clone(),
                       max_slice_size: None,
                       max_slice_records: None,
@@ -4344,7 +4344,7 @@ async fn test_list_all_flow_initiators() {
                   dataset_id: Some(bar_id.clone()),
                   run_since_start: Duration::try_milliseconds(60).unwrap(),
                   finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                  expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                  expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
                     max_slice_records: None,
@@ -4462,9 +4462,9 @@ async fn test_list_all_datasets_with_flow() {
     harness.eager_initialization().await;
 
     let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompacting).into();
+        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
     let bar_flow_key: FlowKey =
-        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompacting).into();
+        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompaction).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -4489,7 +4489,7 @@ async fn test_list_all_datasets_with_flow() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::try_milliseconds(10).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                    expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                       dataset_id: foo_id.clone(),
                       max_slice_size: None,
                       max_slice_records: None,
@@ -4503,7 +4503,7 @@ async fn test_list_all_datasets_with_flow() {
                   dataset_id: Some(bar_id.clone()),
                   run_since_start: Duration::try_milliseconds(60).unwrap(),
                   finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
-                  expected_logical_plan: LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                  expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
                     max_slice_records: None,

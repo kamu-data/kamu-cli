@@ -10,9 +10,9 @@
 use chrono::Utc;
 use kamu_flow_system::{
     BatchingRule,
-    CompactingRule,
-    CompactingRuleFull,
-    CompactingRuleMetadataOnly,
+    CompactionRule,
+    CompactionRuleFull,
+    CompactionRuleMetadataOnly,
     FlowConfigurationRule,
     FlowConfigurationService,
     FlowKeyDataset,
@@ -165,40 +165,40 @@ impl DatasetFlowConfigsMut {
     }
 
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn set_config_compacting(
+    async fn set_config_compaction(
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
-        compacting_args: CompactingConditionInput,
-    ) -> Result<SetFlowCompactingConfigResult> {
+        compaction_args: CompactionConditionInput,
+    ) -> Result<SetFlowCompactionConfigResult> {
         if !ensure_set_config_flow_supported(
             dataset_flow_type,
-            std::any::type_name::<CompactingRule>(),
+            std::any::type_name::<CompactionRule>(),
         ) {
-            return Ok(SetFlowCompactingConfigResult::TypeIsNotSupported(
+            return Ok(SetFlowCompactionConfigResult::TypeIsNotSupported(
                 FlowTypeIsNotSupported,
             ));
         }
 
-        let compacting_rule = match compacting_args {
-            CompactingConditionInput::Full(compacting_input) => {
-                match CompactingRuleFull::new_checked(
-                    compacting_input.max_slice_size,
-                    compacting_input.max_slice_records,
+        let compaction_rule = match compaction_args {
+            CompactionConditionInput::Full(compaction_input) => {
+                match CompactionRuleFull::new_checked(
+                    compaction_input.max_slice_size,
+                    compaction_input.max_slice_records,
                 ) {
-                    Ok(rule) => CompactingRule::Full(rule),
+                    Ok(rule) => CompactionRule::Full(rule),
                     Err(e) => {
-                        return Ok(SetFlowCompactingConfigResult::InvalidCompactingConfig(
-                            FlowInvalidCompactingConfig {
+                        return Ok(SetFlowCompactionConfigResult::InvalidCompactionConfig(
+                            FlowInvalidCompactionConfig {
                                 reason: e.to_string(),
                             },
                         ))
                     }
                 }
             }
-            CompactingConditionInput::MetadataOnly(compacting_input) => {
-                CompactingRule::MetadataOnly(CompactingRuleMetadataOnly {
-                    recursive: compacting_input.recursive,
+            CompactionConditionInput::MetadataOnly(compaction_input) => {
+                CompactionRule::MetadataOnly(CompactionRuleMetadataOnly {
+                    recursive: compaction_input.recursive,
                 })
             }
         };
@@ -206,7 +206,7 @@ impl DatasetFlowConfigsMut {
         if let Some(e) =
             ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
         {
-            return Ok(SetFlowCompactingConfigResult::IncompatibleDatasetKind(e));
+            return Ok(SetFlowCompactionConfigResult::IncompatibleDatasetKind(e));
         }
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
@@ -218,14 +218,14 @@ impl DatasetFlowConfigsMut {
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 false,
-                FlowConfigurationRule::CompactingRule(compacting_rule),
+                FlowConfigurationRule::CompactionRule(compaction_rule),
             )
             .await
             .map_err(|e| match e {
                 SetFlowConfigurationError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        Ok(SetFlowCompactingConfigResult::Success(
+        Ok(SetFlowCompactionConfigResult::Success(
             SetFlowConfigSuccess { config: res.into() },
         ))
     }
@@ -322,12 +322,12 @@ impl FlowInvalidBatchingConfig {
 
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
-pub(crate) struct FlowInvalidCompactingConfig {
+pub(crate) struct FlowInvalidCompactionConfig {
     reason: String,
 }
 
 #[ComplexObject]
-impl FlowInvalidCompactingConfig {
+impl FlowInvalidCompactionConfig {
     pub async fn message(&self) -> String {
         self.reason.clone()
     }
@@ -335,10 +335,10 @@ impl FlowInvalidCompactingConfig {
 
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
-enum SetFlowCompactingConfigResult {
+enum SetFlowCompactionConfigResult {
     Success(SetFlowConfigSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
-    InvalidCompactingConfig(FlowInvalidCompactingConfig),
+    InvalidCompactionConfig(FlowInvalidCompactionConfig),
     TypeIsNotSupported(FlowTypeIsNotSupported),
 }
 

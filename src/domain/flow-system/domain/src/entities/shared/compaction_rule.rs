@@ -13,32 +13,32 @@ use thiserror::Error;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum CompactingRule {
-    Full(CompactingRuleFull),
-    MetadataOnly(CompactingRuleMetadataOnly),
+pub enum CompactionRule {
+    Full(CompactionRuleFull),
+    MetadataOnly(CompactionRuleMetadataOnly),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CompactingRuleFull {
+pub struct CompactionRuleFull {
     max_slice_size: u64,
     max_slice_records: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CompactingRuleMetadataOnly {
+pub struct CompactionRuleMetadataOnly {
     pub recursive: bool,
 }
 
-impl CompactingRuleFull {
+impl CompactionRuleFull {
     pub fn new_checked(
         max_slice_size: u64,
         max_slice_records: u64,
-    ) -> Result<Self, CompactingRuleValidationError> {
+    ) -> Result<Self, CompactionRuleValidationError> {
         if max_slice_size == 0 {
-            return Err(CompactingRuleValidationError::MaxSliceSizeNotPositive);
+            return Err(CompactionRuleValidationError::MaxSliceSizeNotPositive);
         }
         if max_slice_records == 0 {
-            return Err(CompactingRuleValidationError::MaxSliceRecordsNotPositive);
+            return Err(CompactionRuleValidationError::MaxSliceRecordsNotPositive);
         }
 
         Ok(Self {
@@ -58,11 +58,11 @@ impl CompactingRuleFull {
     }
 }
 
-impl CompactingRule {
+impl CompactionRule {
     #[inline]
     pub fn max_slice_size(&self) -> Option<u64> {
         match self {
-            Self::Full(compacting_rule) => Some(compacting_rule.max_slice_size()),
+            Self::Full(compaction_rule) => Some(compaction_rule.max_slice_size()),
             _ => None,
         }
     }
@@ -70,7 +70,7 @@ impl CompactingRule {
     #[inline]
     pub fn max_slice_records(&self) -> Option<u64> {
         match self {
-            Self::Full(compacting_rule) => Some(compacting_rule.max_slice_records()),
+            Self::Full(compaction_rule) => Some(compaction_rule.max_slice_records()),
             _ => None,
         }
     }
@@ -78,7 +78,7 @@ impl CompactingRule {
     #[inline]
     pub fn recursive(&self) -> bool {
         match self {
-            Self::MetadataOnly(compacting_rule) => compacting_rule.recursive,
+            Self::MetadataOnly(compaction_rule) => compaction_rule.recursive,
             _ => false,
         }
     }
@@ -87,7 +87,7 @@ impl CompactingRule {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum CompactingRuleValidationError {
+pub enum CompactionRuleValidationError {
     #[error("Maximum slice records must be a positive number")]
     MaxSliceRecordsNotPositive,
 
@@ -101,28 +101,28 @@ pub enum CompactingRuleValidationError {
 mod tests {
     use std::assert_matches::assert_matches;
 
-    use crate::{CompactingRuleFull, CompactingRuleValidationError};
+    use crate::{CompactionRuleFull, CompactionRuleValidationError};
 
     #[test]
-    fn test_valid_compacting_rule() {
-        assert_matches!(CompactingRuleFull::new_checked(1, 1), Ok(_));
-        assert_matches!(CompactingRuleFull::new_checked(1_000_000, 1_000_000), Ok(_));
-        assert_matches!(CompactingRuleFull::new_checked(1, 20), Ok(_));
+    fn test_valid_compaction_rule() {
+        assert_matches!(CompactionRuleFull::new_checked(1, 1), Ok(_));
+        assert_matches!(CompactionRuleFull::new_checked(1_000_000, 1_000_000), Ok(_));
+        assert_matches!(CompactionRuleFull::new_checked(1, 20), Ok(_));
     }
 
     #[test]
     fn test_non_positive_max_slice_records() {
         assert_matches!(
-            CompactingRuleFull::new_checked(100, 0),
-            Err(CompactingRuleValidationError::MaxSliceRecordsNotPositive)
+            CompactionRuleFull::new_checked(100, 0),
+            Err(CompactionRuleValidationError::MaxSliceRecordsNotPositive)
         );
     }
 
     #[test]
     fn test_non_positive_max_slice_size() {
         assert_matches!(
-            CompactingRuleFull::new_checked(0, 100),
-            Err(CompactingRuleValidationError::MaxSliceSizeNotPositive)
+            CompactionRuleFull::new_checked(0, 100),
+            Err(CompactionRuleValidationError::MaxSliceSizeNotPositive)
         );
     }
 }

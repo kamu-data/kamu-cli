@@ -151,9 +151,9 @@ async fn test_list_datasets_with_flow() {
 
     let ingest_mutation_code =
         FlowConfigHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
-    let compacting_mutation_code = FlowConfigHarness::trigger_flow_mutation(
+    let compaction_mutation_code = FlowConfigHarness::trigger_flow_mutation(
         &create_result.dataset_handle.id,
-        "HARD_COMPACTING",
+        "HARD_COMPACTION",
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -168,7 +168,7 @@ async fn test_list_datasets_with_flow() {
 
     let response = schema
         .execute(
-            async_graphql::Request::new(compacting_mutation_code.clone())
+            async_graphql::Request::new(compaction_mutation_code.clone())
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
@@ -720,15 +720,15 @@ impl FlowConfigHarness {
                                       flowId
                                       description {
                                           __typename
-                                          ... on FlowDescriptionDatasetHardCompacting {
+                                          ... on FlowDescriptionDatasetHardCompaction {
                                               datasetId
-                                              compactingResult {
-                                                  ... on FlowDescriptionHardCompactingSuccess {
+                                              compactionResult {
+                                                  ... on FlowDescriptionHardCompactionSuccess {
                                                       originalBlocksCount
                                                       resultingBlocksCount
                                                       newHead
                                                   }
-                                                  ... on FlowDescriptionHardCompactingNothingToDo {
+                                                  ... on FlowDescriptionHardCompactionNothingToDo {
                                                       message
                                                   }
                                               }
@@ -1010,7 +1010,7 @@ impl FlowConfigHarness {
                                             batching {
                                                 __typename
                                             }
-                                            compacting {
+                                            compaction {
                                                 __typename
                                             }
                                         }

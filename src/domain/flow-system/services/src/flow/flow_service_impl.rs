@@ -196,9 +196,9 @@ impl FlowServiceImpl {
                         self.enqueue_auto_polling_flow_unconditionally(start_time, &flow_key)
                             .await?;
                     }
-                    // Sucn as compacting is very dangerous operation we
+                    // Sucn as compaction is very dangerous operation we
                     // skip running it during activation flow configurations
-                    FlowConfigurationRule::CompactingRule(_) => (),
+                    FlowConfigurationRule::CompactionRule(_) => (),
                 }
             }
             FlowKey::System(system_flow_key) => {
@@ -485,7 +485,7 @@ impl FlowServiceImpl {
         assert!(matches!(
             flow.flow_key.get_type(),
             AnyFlowType::Dataset(
-                DatasetFlowType::ExecuteTransform | DatasetFlowType::HardCompacting
+                DatasetFlowType::ExecuteTransform | DatasetFlowType::HardCompaction
             )
         ));
 
@@ -746,21 +746,21 @@ impl FlowServiceImpl {
                         dataset_id: flow_key.dataset_id.clone(),
                     })
                 }
-                DatasetFlowType::HardCompacting => {
+                DatasetFlowType::HardCompaction => {
                     let mut max_slice_size: Option<u64> = None;
                     let mut max_slice_records: Option<u64> = None;
                     let mut keep_metadata_only = false;
 
                     if let Some(config_rule) = config_snapshot
-                        && let FlowConfigurationSnapshot::Compacting(compacting_rule) = config_rule
+                        && let FlowConfigurationSnapshot::Compaction(compaction_rule) = config_rule
                     {
-                        max_slice_size = compacting_rule.max_slice_size();
-                        max_slice_records = compacting_rule.max_slice_records();
+                        max_slice_size = compaction_rule.max_slice_size();
+                        max_slice_records = compaction_rule.max_slice_records();
                         keep_metadata_only =
-                            matches!(compacting_rule, CompactingRule::MetadataOnly(_));
+                            matches!(compaction_rule, CompactionRule::MetadataOnly(_));
                     };
 
-                    LogicalPlan::HardCompactingDataset(HardCompactingDataset {
+                    LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                         dataset_id: flow_key.dataset_id.clone(),
                         max_slice_size,
                         max_slice_records,
@@ -859,7 +859,7 @@ impl FlowServiceImpl {
                             plans.push(DownstreamDependencyFlowPlan {
                                 flow_key: FlowKeyDataset::new(
                                     dependent_dataset_id.clone(),
-                                    DatasetFlowType::HardCompacting,
+                                    DatasetFlowType::HardCompaction,
                                 )
                                 .into(),
                                 flow_trigger_context: FlowTriggerContext::Unconditional,
@@ -886,10 +886,10 @@ impl FlowServiceImpl {
             DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
                 DownstreamDependencyTriggerType::TriggerAllEnabled
             }
-            DatasetFlowType::HardCompacting => {
+            DatasetFlowType::HardCompaction => {
                 if let Some(config_snapshot) = &maybe_config_snapshot
-                    && let FlowConfigurationSnapshot::Compacting(compacting_rule) = config_snapshot
-                    && let CompactingRule::MetadataOnly(metadata_only_rule) = compacting_rule
+                    && let FlowConfigurationSnapshot::Compaction(compaction_rule) = config_snapshot
+                    && let CompactionRule::MetadataOnly(metadata_only_rule) = compaction_rule
                 {
                     if metadata_only_rule.recursive {
                         DownstreamDependencyTriggerType::TriggerOwnUnconditionally

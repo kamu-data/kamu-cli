@@ -270,9 +270,9 @@ pub fn configure_base_catalog(
     b.add::<VerificationServiceImpl>();
 
     b.add_builder(
-        CompactingServiceImpl::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()),
+        CompactionServiceImpl::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()),
     );
-    b.bind::<dyn CompactingService, CompactingServiceImpl>();
+    b.bind::<dyn CompactionService, CompactionServiceImpl>();
 
     b.add::<SearchServiceImpl>();
 
