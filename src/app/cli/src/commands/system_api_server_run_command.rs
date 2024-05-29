@@ -98,11 +98,9 @@ impl APIServerRunCommand {
             password: account_config.get_password(),
         };
 
-        let login_response = DatabaseTransactionRunner::run_transactional(
+        let login_response = DatabaseTransactionRunner::run_transactional_with(
             &self.base_catalog,
-            |catalog: Catalog| async move {
-                let auth_svc = catalog.get_one::<dyn AuthenticationService>().unwrap();
-
+            |auth_svc: Arc<dyn AuthenticationService>| async move {
                 auth_svc
                     .login(
                         PROVIDER_PASSWORD,
