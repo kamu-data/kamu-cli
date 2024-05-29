@@ -101,7 +101,7 @@ impl TaskScheduler for TaskSchedulerImpl {
 
     #[tracing::instrument(level = "info", skip_all, fields(%task_id))]
     async fn cancel_task(&self, task_id: TaskID) -> Result<TaskState, CancelTaskError> {
-        let task = DatabaseTransactionRunner::<CancelTaskError>::run_transactional(
+        let (task, has_canceled) = DatabaseTransactionRunner::<CancelTaskError>::run_transactional(
             &self.catalog,
             |updated_catalog| async move {
                 let event_store = updated_catalog
@@ -110,17 +110,21 @@ impl TaskScheduler for TaskSchedulerImpl {
 
                 let mut task = Task::load(task_id, event_store.as_ref()).await?;
 
-                if task.can_cancel() {
+                let has_canceled = if task.can_cancel() {
                     task.cancel(self.time_source.now()).int_err()?;
                     task.save(event_store.as_ref()).await.int_err()?;
-                }
 
-                Ok(task)
+                    true
+                } else {
+                    false
+                };
+
+                Ok((task, has_canceled))
             },
         )
         .await?;
 
-        if task.can_cancel() {
+        if has_canceled {
             let mut state = self.state.lock().unwrap();
 
             state
