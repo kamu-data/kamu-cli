@@ -64,10 +64,14 @@ async fn test_insert_and_locate_github_account(sqlite_pool: SqlitePool) {
 async fn test_insert_and_locate_multiple_github_account(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_accounts_repo_tests::test_insert_and_locate_multiple_github_account(&catalog).await;
-        Ok(())
-    })
+    <DatabaseTransactionRunner>::run_transactional(
+        &harness.catalog,
+        |catalog: Catalog| async move {
+            kamu_accounts_repo_tests::test_insert_and_locate_multiple_github_account(&catalog)
+                .await;
+            Ok(())
+        },
+    )
     .await
     .unwrap();
 }
