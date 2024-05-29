@@ -777,7 +777,7 @@ pub fn cli() -> Command {
                         Arg::new("reset-derivatives-on-diverged-input")
                             .long("reset-derivatives-on-diverged-input")
                             .action(ArgAction::SetTrue)
-                            .help("Run hard compacting of derivative dataset if transformation failed"),
+                            .help("Run hard compacting of derivative dataset if transformation failed due to root dataset compaction"),
                     ])
                     .after_help(indoc::indoc!(
                         r#"

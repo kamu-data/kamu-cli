@@ -46,9 +46,7 @@ async fn test_verify_data_consistency() {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .add_value(TestTransformService::new(
-            Arc::new(Mutex::new(Vec::new())),
-        ))
+        .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
         .bind::<dyn TransformService, TestTransformService>()
         .add::<VerificationServiceImpl>()
         .build();
@@ -144,7 +142,7 @@ async fn test_verify_data_consistency() {
         .new_head;
 
     assert_matches!(
-        dataset.as_metadata_chain().get_block(&head).await.unwrap(), 
+        dataset.as_metadata_chain().get_block(&head).await.unwrap(),
         MetadataBlock {
             event: MetadataEvent::AddData(AddData {
                 new_data: Some(DataSlice {

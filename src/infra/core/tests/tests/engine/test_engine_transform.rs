@@ -246,10 +246,12 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .add_builder(
             PollingIngestServiceImpl::builder()
                 .with_cache_dir(cache_dir)
-                .with_run_info_dir(run_info_dir),
+                .with_run_info_dir(run_info_dir.clone()),
         )
         .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
         .add::<TransformServiceImpl>()
+        .add_builder(CompactingServiceImpl::builder().with_run_info_dir(run_info_dir))
+        .bind::<dyn CompactingService, CompactingServiceImpl>()
         .add_value(SystemTimeSourceStub::new_set(
             Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
         ))

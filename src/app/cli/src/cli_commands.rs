@@ -303,7 +303,7 @@ pub fn get_command(
                     submatches.get_one("as").cloned(),
                     !submatches.get_flag("no-alias"),
                     submatches.get_flag("force"),
-                    submatches.get_flag("reset-derivatives-on-fail"),
+                    submatches.get_flag("reset-derivatives-on-diverged-input"),
                 ))
             }
         }
