@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Changed
+- Renamed all places compacting -> compacting
+
+## [0.184.0] - 2024-05-28
+### Changed
 - `InitiatorFilterInput` now accept `[AccountID]` instead of `AccountName`
   `AccountFlowFilters` now filter by `DatasetId` instead of `DatasetName`.
 - Upgraded to `datafusion v38`
