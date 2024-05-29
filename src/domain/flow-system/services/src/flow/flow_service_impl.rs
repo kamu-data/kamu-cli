@@ -124,6 +124,22 @@ impl FlowServiceImpl {
         .await
     }
 
+    async fn get_count_flows_by_dataset(
+        &self,
+        dataset_id: &DatasetID,
+        filters: &DatasetFlowFilters,
+    ) -> Result<usize, InternalError> {
+        DatabaseTransactionRunner::run_transactional_with(
+            &self.catalog,
+            |event_store: Arc<dyn FlowEventStore>| async move {
+                event_store
+                    .get_count_flows_by_dataset(dataset_id, filters)
+                    .await
+            },
+        )
+        .await
+    }
+
     #[tracing::instrument(level = "debug", skip_all)]
     async fn run_current_timeslot(
         &self,
@@ -1038,16 +1054,9 @@ impl FlowService for FlowServiceImpl {
         filters: DatasetFlowFilters,
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
-        let filters_ref = &filters;
-        let total_count = DatabaseTransactionRunner::run_transactional_with(
-            &self.catalog,
-            |event_store: Arc<dyn FlowEventStore>| async move {
-                event_store
-                    .get_count_flows_by_dataset(dataset_id, filters_ref)
-                    .await
-            },
-        )
-        .await?;
+        let total_count = self
+            .get_count_flows_by_dataset(dataset_id, &filters)
+            .await?;
 
         let cloned_dataset_id = dataset_id.clone();
         let matched_stream = Box::pin(async_stream::try_stream! {
@@ -1194,10 +1203,9 @@ impl FlowService for FlowServiceImpl {
         let matched_stream = Box::pin(async_stream::try_stream! {
             for dataset_id in &owned_dataset_ids {
                 let dataset_flows_count = self
-                    .flow_event_store
                     .get_count_flows_by_dataset(dataset_id, &Default::default())
-                    .await
-                    .int_err()?;
+                    .await?;
+
                 if dataset_flows_count > 0 {
                     yield dataset_id.clone();
                 }
