@@ -1079,15 +1079,22 @@ impl FlowService for FlowServiceImpl {
     /// Returns initiators of flows associated with a given dataset
     /// ordered by creation time from newest to oldest
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    async fn list_all_flow_initiators_by_dataset(
+    async fn get_all_flow_initiators_by_dataset(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<FlowInitiatorListing, ListFlowsByDatasetError> {
-        Ok(FlowInitiatorListing {
-            matched_stream: self
-                .flow_event_store
-                .get_unique_flow_initiator_ids_by_dataset(dataset_id),
-        })
+    ) -> Result<Vec<AccountID>, ListFlowsByDatasetError> {
+        let initiator_ids: Vec<_> = <DatabaseTransactionRunner>::run_transactional_with(
+            &self.catalog,
+            |event_store: Arc<dyn FlowEventStore>| async move {
+                event_store
+                    .get_unique_flow_initiator_ids_by_dataset(dataset_id)
+                    .try_collect()
+                    .await
+            },
+        )
+        .await?;
+
+        Ok(initiator_ids)
     }
 
     /// Returns states of flows associated with a given account

@@ -4386,25 +4386,17 @@ async fn test_list_all_flow_initiators() {
     }
     .unwrap();
 
-    let foo_dataset_initiators_list: Vec<_> = harness
+    let foo_dataset_initiators_list = harness
         .flow_service
-        .list_all_flow_initiators_by_dataset(&foo_id)
-        .await
-        .unwrap()
-        .matched_stream
-        .try_collect()
+        .get_all_flow_initiators_by_dataset(&foo_id)
         .await
         .unwrap();
 
     assert_eq!(foo_dataset_initiators_list, [foo_account_id.clone()]);
 
-    let bar_dataset_initiators_list: Vec<_> = harness
+    let bar_dataset_initiators_list = harness
         .flow_service
-        .list_all_flow_initiators_by_dataset(&bar_id)
-        .await
-        .unwrap()
-        .matched_stream
-        .try_collect()
+        .get_all_flow_initiators_by_dataset(&bar_id)
         .await
         .unwrap();
 
@@ -4545,25 +4537,17 @@ async fn test_list_all_datasets_with_flow() {
     }
     .unwrap();
 
-    let foo_dataset_initiators_list: Vec<_> = harness
+    let foo_dataset_initiators_list = harness
         .flow_service
-        .list_all_flow_initiators_by_dataset(&foo_id)
-        .await
-        .unwrap()
-        .matched_stream
-        .try_collect()
+        .get_all_flow_initiators_by_dataset(&foo_id)
         .await
         .unwrap();
 
     assert_eq!(foo_dataset_initiators_list, [foo_account_id.clone()]);
 
-    let bar_dataset_initiators_list: Vec<_> = harness
+    let bar_dataset_initiators_list = harness
         .flow_service
-        .list_all_flow_initiators_by_dataset(&bar_id)
-        .await
-        .unwrap()
-        .matched_stream
-        .try_collect()
+        .get_all_flow_initiators_by_dataset(&bar_id)
         .await
         .unwrap();
 
