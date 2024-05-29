@@ -179,6 +179,17 @@ impl FlowServiceImpl {
         Ok(())
     }
 
+    async fn save_flow(&self, flow: &mut Flow) -> Result<(), InternalError> {
+        DatabaseTransactionRunner::run_transactional(&self.catalog, |updated_catalog| async move {
+            let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
+
+            flow.save(flow_event_store.as_ref()).await.int_err()?;
+
+            Ok(())
+        })
+        .await
+    }
+
     #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?rule))]
     async fn activate_flow_configuration(
         &self,
@@ -394,20 +405,9 @@ impl FlowServiceImpl {
                     }
                 }
 
-                let saved_flow = <DatabaseTransactionRunner>::run_transactional(
-                    &self.catalog,
-                    |updated_catalog| async move {
-                        let flow_event_store =
-                            updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
+                self.save_flow(&mut flow).await?;
 
-                        flow.save(flow_event_store.as_ref()).await.int_err()?;
-
-                        Ok(flow)
-                    },
-                )
-                .await?;
-
-                Ok(saved_flow.into())
+                Ok(flow.into())
             }
 
             // Otherwise, initiate a new flow, and enqueue it in the time wheel
@@ -484,20 +484,9 @@ impl FlowServiceImpl {
                     }
                 }
 
-                let saved_flow = <DatabaseTransactionRunner>::run_transactional(
-                    &self.catalog,
-                    |updated_catalog| async move {
-                        let flow_event_store =
-                            updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
+                self.save_flow(&mut flow).await?;
 
-                        flow.save(flow_event_store.as_ref()).await.int_err()?;
-
-                        Ok(flow)
-                    },
-                )
-                .await?;
-
-                Ok(saved_flow.into())
+                Ok(flow.into())
             }
         }
     }
@@ -747,24 +736,14 @@ impl FlowServiceImpl {
         flow.on_task_scheduled(schedule_time, task.task_id)
             .int_err()?;
 
-        let saved_flow = DatabaseTransactionRunner::run_transactional(
-            &self.catalog,
-            |updated_catalog| async move {
-                let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
-
-                flow.save(flow_event_store.as_ref()).await.int_err()?;
-
-                Ok(flow)
-            },
-        )
-        .await?;
+        self.save_flow(flow).await?;
 
         {
             let mut state = self.state.lock().unwrap();
 
             state
                 .pending_flows
-                .track_flow_task(saved_flow.flow_id, task.task_id);
+                .track_flow_task(flow.flow_id, task.task_id);
         }
 
         Ok(task.task_id)
@@ -781,27 +760,17 @@ impl FlowServiceImpl {
         // Abort flow itself
         flow.abort(self.time_source.now()).int_err()?;
 
-        let saved_flow = <DatabaseTransactionRunner>::run_transactional(
-            &self.catalog,
-            |updated_catalog| async move {
-                let flow_event_store = updated_catalog.get_one::<dyn FlowEventStore>().int_err()?;
-
-                flow.save(flow_event_store.as_ref()).await.int_err()?;
-
-                Ok(flow)
-            },
-        )
-        .await?;
+        self.save_flow(flow).await?;
 
         // Cancel associated tasks, but first drop task -> flow associations
         {
             let mut state = self.state.lock().unwrap();
-            for task_id in &saved_flow.task_ids {
+            for task_id in &flow.task_ids {
                 state.pending_flows.untrack_flow_by_task(*task_id);
             }
         }
 
-        for task_id in &saved_flow.task_ids {
+        for task_id in &flow.task_ids {
             self.task_scheduler.cancel_task(*task_id).await.int_err()?;
         }
 
