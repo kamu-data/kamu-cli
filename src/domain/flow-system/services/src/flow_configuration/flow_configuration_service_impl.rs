@@ -46,6 +46,19 @@ impl FlowConfigurationServiceImpl {
         }
     }
 
+    async fn try_load_configuration(
+        &self,
+        flow_key: FlowKey,
+    ) -> Result<Option<FlowConfiguration>, TryLoadError<FlowConfigurationState>> {
+        DatabaseTransactionRunner::run_transactional_with(
+            &self.catalog,
+            |event_store: Arc<dyn FlowConfigurationEventStore>| async move {
+                FlowConfiguration::try_load(flow_key, event_store.as_ref()).await
+            },
+        )
+        .await
+    }
+
     async fn publish_flow_configuration_modified(
         &self,
         state: &FlowConfigurationState,
@@ -107,13 +120,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         &self,
         flow_key: FlowKey,
     ) -> Result<Option<FlowConfigurationState>, FindFlowConfigurationError> {
-        let maybe_flow_configuration = DatabaseTransactionRunner::run_transactional_with(
-            &self.catalog,
-            |event_store: Arc<dyn FlowConfigurationEventStore>| async move {
-                FlowConfiguration::try_load(flow_key, event_store.as_ref()).await
-            },
-        )
-        .await?;
+        let maybe_flow_configuration = self.try_load_configuration(flow_key).await?;
 
         Ok(maybe_flow_configuration.map(Into::into))
     }
@@ -125,14 +132,13 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         dataset_ids: Vec<DatasetID>,
     ) -> FlowConfigurationStateStream {
         Box::pin(async_stream::try_stream! {
-            for dataset_flow_type in kamu_flow_system::DatasetFlowType::all() {
+            for dataset_flow_type in DatasetFlowType::all() {
                 for dataset_id in &dataset_ids {
+                    let flow_key =
+                        FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into();
                     let maybe_flow_configuration =
-                        FlowConfiguration::try_load(
-                            FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into(), self.event_store.as_ref()
-                        )
-                        .await
-                        .int_err()?;
+                        self.try_load_configuration(flow_key).await.int_err()?;
+
                     if let Some(flow_configuration) = maybe_flow_configuration {
                         yield flow_configuration.into();
                     }
@@ -197,14 +203,8 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         Box::pin(async_stream::try_stream! {
             for system_flow_type in SystemFlowType::all() {
                 let flow_key = (*system_flow_type).into();
-                let maybe_flow_configuration = DatabaseTransactionRunner::run_transactional_with(
-                    &self.catalog,
-                    |event_store: Arc<dyn FlowConfigurationEventStore>| async move {
-                        FlowConfiguration::try_load(flow_key, event_store.as_ref()).await
-                    },
-                )
-                .await
-                .int_err()?;
+                let maybe_flow_configuration =
+                    self.try_load_configuration(flow_key).await.int_err()?;
 
                 if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
                     yield flow_configuration.into();
@@ -222,18 +222,9 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 
             for dataset_id in dataset_ids {
                 for dataset_flow_type in DatasetFlowType::all() {
-                    let dataset_id_clone = dataset_id.clone();
-                    let maybe_flow_configuration = DatabaseTransactionRunner::run_transactional_with(
-                        &self.catalog,
-                        |event_store: Arc<dyn FlowConfigurationEventStore>| async move {
-                            FlowConfiguration::try_load(
-                                FlowKeyDataset::new(dataset_id_clone, *dataset_flow_type).into(),
-                                event_store.as_ref()
-                            ).await
-                        },
-                    )
-                    .await
-                    .int_err()?;
+                    let flow_key = FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into();
+                    let maybe_flow_configuration =
+                        self.try_load_configuration(flow_key).await.int_err()?;
 
                     if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
                         yield flow_configuration.into();
