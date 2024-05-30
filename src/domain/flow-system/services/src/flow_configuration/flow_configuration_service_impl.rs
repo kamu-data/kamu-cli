@@ -22,6 +22,7 @@ use opendatafabric::DatasetID;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FlowConfigurationServiceImpl {
+    event_store: Arc<dyn FlowConfigurationEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
     event_bus: Arc<EventBus>,
     catalog: Catalog,
@@ -35,11 +36,13 @@ pub struct FlowConfigurationServiceImpl {
 #[scope(Singleton)]
 impl FlowConfigurationServiceImpl {
     pub fn new(
+        event_store: Arc<dyn FlowConfigurationEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
         event_bus: Arc<EventBus>,
         catalog: Catalog,
     ) -> Self {
         Self {
+            event_store,
             time_source,
             event_bus,
             catalog,
@@ -125,17 +128,12 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         dataset_ids: Vec<DatasetID>,
     ) -> FlowConfigurationStateStream {
         Box::pin(async_stream::try_stream! {
-            let event_store = self
-                .catalog
-                .get_one::<dyn FlowConfigurationEventStore>()
-                .unwrap();
-
             for dataset_flow_type in DatasetFlowType::all() {
                 for dataset_id in &dataset_ids {
                     let flow_key =
                         FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into();
                     let maybe_flow_configuration =
-                        FlowConfiguration::try_load(flow_key, event_store.as_ref())
+                        FlowConfiguration::try_load(flow_key, self.event_store.as_ref())
                             .await
                             .int_err()?;
 
@@ -156,13 +154,8 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         paused: bool,
         rule: FlowConfigurationRule,
     ) -> Result<FlowConfigurationState, SetFlowConfigurationError> {
-        let event_store = self
-            .catalog
-            .get_one::<dyn FlowConfigurationEventStore>()
-            .unwrap();
-
         let maybe_flow_configuration =
-            FlowConfiguration::try_load(flow_key.clone(), event_store.as_ref()).await?;
+            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await?;
         let mut flow_configuration = match maybe_flow_configuration {
             // Modification
             Some(mut flow_configuration) => {
@@ -177,7 +170,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         };
 
         flow_configuration
-            .save(event_store.as_ref())
+            .save(self.event_store.as_ref())
             .await
             .int_err()?;
 
@@ -191,15 +184,10 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
     fn list_enabled_configurations(&self) -> FlowConfigurationStateStream {
         // Note: terribly inefficient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
-            let event_store = self
-                .catalog
-                .get_one::<dyn FlowConfigurationEventStore>()
-                .unwrap();
-
             for system_flow_type in SystemFlowType::all() {
                 let flow_key = (*system_flow_type).into();
                 let maybe_flow_configuration =
-                    FlowConfiguration::try_load(flow_key, event_store.as_ref())
+                    FlowConfiguration::try_load(flow_key, self.event_store.as_ref())
                         .await
                         .int_err()?;
 
@@ -210,18 +198,19 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
                 }
             }
 
-            let dataset_ids = event_store
+            let dataset_ids: Vec<_> = self
+                .event_store
                 .list_all_dataset_ids()
                 .await
-                .try_collect::<Vec<_>>()
+                .try_collect()
                 .await?;
 
-            for dataset_id in dataset_ids.into_iter() {
+            for dataset_id in dataset_ids {
                 for dataset_flow_type in DatasetFlowType::all() {
                     let flow_key =
                         FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into();
                     let maybe_flow_configuration =
-                        FlowConfiguration::try_load(flow_key, event_store.as_ref())
+                        FlowConfiguration::try_load(flow_key, self.event_store.as_ref())
                             .await
                             .int_err()?;
 
@@ -241,20 +230,15 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         request_time: DateTime<Utc>,
         flow_key: FlowKey,
     ) -> Result<(), InternalError> {
-        let event_store = self
-            .catalog
-            .get_one::<dyn FlowConfigurationEventStore>()
-            .unwrap();
-
         let maybe_flow_configuration =
-            FlowConfiguration::try_load(flow_key.clone(), event_store.as_ref())
+            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref())
                 .await
                 .int_err()?;
 
         if let Some(mut flow_configuration) = maybe_flow_configuration {
             flow_configuration.pause(request_time).int_err()?;
             flow_configuration
-                .save(event_store.as_ref())
+                .save(self.event_store.as_ref())
                 .await
                 .int_err()?;
 
@@ -271,20 +255,15 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         request_time: DateTime<Utc>,
         flow_key: FlowKey,
     ) -> Result<(), InternalError> {
-        let event_store = self
-            .catalog
-            .get_one::<dyn FlowConfigurationEventStore>()
-            .unwrap();
-
         let maybe_flow_configuration =
-            FlowConfiguration::try_load(flow_key.clone(), event_store.as_ref())
+            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref())
                 .await
                 .int_err()?;
 
         if let Some(mut flow_configuration) = maybe_flow_configuration {
             flow_configuration.resume(request_time).int_err()?;
             flow_configuration
-                .save(event_store.as_ref())
+                .save(self.event_store.as_ref())
                 .await
                 .int_err()?;
 
