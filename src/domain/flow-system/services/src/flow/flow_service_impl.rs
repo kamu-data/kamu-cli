@@ -1382,14 +1382,19 @@ impl FlowServiceTestDriver for FlowServiceImpl {
         flow_id: FlowID,
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
+        let flow_event_store = self.catalog.get_one::<dyn FlowEventStore>().unwrap();
+
         {
             let mut state = self.state.lock().unwrap();
             state.time_wheel.cancel_flow_activation(flow_id).int_err()?;
         }
 
-        let mut flow = self.load_flow(flow_id).await.int_err()?;
-
-        let task_id = self.schedule_flow_task(&mut flow, schedule_time).await?;
+        let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
+            .await
+            .int_err()?;
+        let task_id = self
+            .schedule_flow_task(&mut flow, schedule_time, flow_event_store)
+            .await?;
 
         Ok(task_id)
     }
