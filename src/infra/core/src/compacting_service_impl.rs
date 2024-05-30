@@ -34,6 +34,8 @@ use opendatafabric::{
     Checkpoint,
     DatasetHandle,
     DatasetKind,
+    DatasetRef,
+    DatasetRefPattern,
     DatasetVocabulary,
     MetadataEvent,
     Multihash,
@@ -44,6 +46,7 @@ use opendatafabric::{
 use random_names::get_random_name;
 use url::Url;
 
+use crate::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use crate::*;
 
 pub struct CompactingServiceImpl {
@@ -461,7 +464,7 @@ impl CompactingService for CompactingServiceImpl {
         &self,
         dataset_handle: &DatasetHandle,
         options: CompactingOptions,
-        multi_listener: Option<Arc<dyn CompactingMultiListener>>,
+        maybe_listener: Option<Arc<dyn CompactingListener>>,
     ) -> Result<CompactingResult, CompactingError> {
         self.dataset_authorizer
             .check_action_allowed(dataset_handle, domain::auth::DatasetAction::Write)
@@ -486,9 +489,7 @@ impl CompactingService for CompactingServiceImpl {
             ));
         }
 
-        let listener = multi_listener
-            .and_then(|l| l.begin_compact(dataset_handle))
-            .unwrap_or(Arc::new(NullCompactingListener {}));
+        let listener = maybe_listener.unwrap_or(Arc::new(NullCompactingListener {}));
 
         let max_slice_size = options.max_slice_size.unwrap_or(DEFAULT_MAX_SLICE_SIZE);
         let max_slice_records = options
@@ -514,5 +515,45 @@ impl CompactingService for CompactingServiceImpl {
                 Err(err)
             }
         }
+    }
+
+    async fn compact_multi(
+        &self,
+        dataset_refs: Vec<DatasetRef>,
+        options: CompactingOptions,
+        multi_listener: Option<Arc<dyn CompactingMultiListener>>,
+    ) -> Vec<CompactingResponse> {
+        let filtered_dataset_results = filter_datasets_by_local_pattern(
+            self.dataset_repo.as_ref(),
+            dataset_refs
+                .into_iter()
+                .map(DatasetRefPattern::Ref)
+                .collect(),
+        )
+        .try_collect()
+        .await;
+
+        let dataset_handles: Vec<_> = if let Ok(matched_datasets) = filtered_dataset_results {
+            matched_datasets
+        } else {
+            return vec![];
+        };
+
+        let listener = multi_listener.unwrap_or(Arc::new(NullCompactingMultiListener {}));
+
+        let mut result = vec![];
+        for dataset_handle in &dataset_handles {
+            result.push(CompactingResponse {
+                dataset_ref: dataset_handle.as_local_ref(),
+                result: self
+                    .compact_dataset(
+                        dataset_handle,
+                        options.clone(),
+                        listener.begin_compact(dataset_handle),
+                    )
+                    .await,
+            });
+        }
+        result
     }
 }

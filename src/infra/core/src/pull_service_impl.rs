@@ -422,13 +422,20 @@ impl PullServiceImpl {
     async fn transform_multi(
         &self,
         batch: &[PullItem], // TODO: Move to avoid cloning
-        listener: Option<Arc<dyn TransformMultiListener>>,
+        transform_listener: Option<Arc<dyn TransformMultiListener>>,
+        reset_derivatives_on_diverged_input: bool,
     ) -> Result<Vec<PullResponse>, InternalError> {
         let transform_requests = batch.iter().map(|pi| pi.local_ref.clone()).collect();
 
         let transform_results = self
             .transform_svc
-            .transform_multi(transform_requests, listener)
+            .transform_multi(
+                transform_requests,
+                TransformOptions {
+                    reset_derivatives_on_diverged_input,
+                },
+                transform_listener,
+            )
             .await;
 
         assert_eq!(batch.len(), transform_results.len());
@@ -475,6 +482,8 @@ impl PullService for PullServiceImpl {
                 PullMultiOptions {
                     recursive: false,
                     all: false,
+                    reset_derivatives_on_diverged_input: options
+                        .reset_derivatives_on_diverged_input,
                     add_aliases: options.add_aliases,
                     ingest_options: options.ingest_options,
                     sync_options: options.sync_options,
@@ -583,6 +592,7 @@ impl PullService for PullServiceImpl {
                     listener
                         .as_ref()
                         .and_then(|l| l.clone().get_transform_listener()),
+                    options.reset_derivatives_on_diverged_input,
                 )
                 .await?
             };

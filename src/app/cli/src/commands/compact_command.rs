@@ -19,7 +19,7 @@ use kamu::domain::{
 };
 use opendatafabric::{DatasetHandle, DatasetRef};
 
-use crate::{CLIError, Command, CompactingMultiProgress, VerificationMultiProgress};
+use crate::{BatchError, CLIError, Command, CompactingMultiProgress, VerificationMultiProgress};
 
 pub struct CompactCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
@@ -114,9 +114,10 @@ impl Command for CompactCommand {
             progress.draw();
         });
 
-        self.compacting_svc
-            .compact_dataset(
-                &dataset_handle,
+        let compacting_results = self
+            .compacting_svc
+            .compact_multi(
+                vec![dataset_handle.as_local_ref()],
                 CompactingOptions {
                     max_slice_size: Some(self.max_slice_size),
                     max_slice_records: Some(self.max_slice_records),
@@ -124,12 +125,38 @@ impl Command for CompactCommand {
                 },
                 Some(listener.clone()),
             )
-            .await
-            .map_err(CLIError::failure)?;
+            .await;
+
+        let total_results = compacting_results.len();
 
         listener.finish();
         draw_thread.join().unwrap();
 
-        Ok(())
+        let errors: Vec<_> = compacting_results
+            .into_iter()
+            .filter_map(|response| match response.result {
+                Ok(_) => None,
+                Err(e) => Some((e, format!("Failed to compact {}", response.dataset_ref))),
+            })
+            .collect();
+
+        if errors.is_empty() {
+            eprintln!(
+                "{}",
+                console::style(format!("{total_results} dataset(s) were compacted"))
+                    .green()
+                    .bold()
+            );
+            Ok(())
+        } else {
+            Err(BatchError::new(
+                format!(
+                    "Failed to compact {}/{total_results} dataset(s)",
+                    errors.len()
+                ),
+                errors,
+            )
+            .into())
+        }
     }
 }

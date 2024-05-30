@@ -142,7 +142,7 @@ async fn test_verify_data_consistency() {
         .new_head;
 
     assert_matches!(
-        dataset.as_metadata_chain().get_block(&head).await.unwrap(), 
+        dataset.as_metadata_chain().get_block(&head).await.unwrap(),
         MetadataBlock {
             event: MetadataEvent::AddData(AddData {
                 new_data: Some(DataSlice {

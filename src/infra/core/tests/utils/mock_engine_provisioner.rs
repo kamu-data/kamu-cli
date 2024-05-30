@@ -33,6 +33,12 @@ impl MockEngineProvisioner {
             .return_once(|_, _| Ok(Arc::new(EngineStub {})));
         self
     }
+
+    pub fn always_provision_engine(mut self) -> Self {
+        self.expect_provision_engine()
+            .returning(|_, _| Ok(Arc::new(EngineStub {})));
+        self
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

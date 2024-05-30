@@ -1114,6 +1114,7 @@ impl TransformService for TestTransformService {
     async fn transform(
         &self,
         _dataset_ref: &DatasetRef,
+        _options: TransformOptions,
         _maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
         unimplemented!();
@@ -1122,6 +1123,7 @@ impl TransformService for TestTransformService {
     async fn transform_multi(
         &self,
         dataset_refs: Vec<DatasetRef>,
+        _options: TransformOptions,
         _maybe_multi_listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetRef, Result<TransformResult, TransformError>)> {
         let results = dataset_refs
