@@ -40,7 +40,6 @@ pub struct FlowServiceImpl {
     state: Arc<Mutex<State>>,
     run_config: Arc<FlowServiceRunConfig>,
     event_bus: Arc<EventBus>,
-    flow_event_store: Arc<dyn FlowEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
@@ -73,7 +72,6 @@ impl FlowServiceImpl {
     pub fn new(
         run_config: Arc<FlowServiceRunConfig>,
         event_bus: Arc<EventBus>,
-        flow_event_store: Arc<dyn FlowEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
         task_scheduler: Arc<dyn TaskScheduler>,
         dataset_changes_service: Arc<dyn DatasetChangesService>,
@@ -85,7 +83,6 @@ impl FlowServiceImpl {
             state: Arc::new(Mutex::new(State::default())),
             run_config,
             event_bus,
-            flow_event_store,
             time_source,
             task_scheduler,
             dataset_changes_service,
@@ -1335,7 +1332,8 @@ impl FlowService for FlowServiceImpl {
     /// Returns current state of a given flow
     #[tracing::instrument(level = "debug", skip_all, fields(%flow_id))]
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError> {
-        let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
+        let flow_event_store = self.catalog.get_one::<dyn FlowEventStore>().unwrap();
+        let flow = Flow::load(flow_id, flow_event_store.as_ref()).await?;
 
         Ok(flow.into())
     }
