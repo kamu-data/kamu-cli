@@ -62,7 +62,7 @@ pub enum TransformResult {
     },
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct TransformOptions {
     /// Run compacting of derivative datasets without saving data
     /// if transformation fails due to root dataset compaction

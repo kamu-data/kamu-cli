@@ -803,10 +803,10 @@ impl TransformService for TransformServiceImpl {
             let f = match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
                 Ok(hdl) => {
                     let maybe_listener = multi_listener.begin_transform(&hdl);
-                    self.transform_impl(hdl.into(), options.clone(), maybe_listener)
+                    self.transform_impl(hdl.into(), options, maybe_listener)
                 }
                 // Relying on this call to fail to avoid boxing the futures
-                Err(_) => self.transform_impl(dataset_ref.clone(), options.clone(), None),
+                Err(_) => self.transform_impl(dataset_ref.clone(), options, None),
             };
             futures.push(f);
         }
