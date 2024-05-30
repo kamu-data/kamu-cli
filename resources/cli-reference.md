@@ -638,7 +638,7 @@ Pull new data into the datasets
 * `--no-alias` — Don't automatically add a remote push alias for this destination
 * `--set-watermark <TIME>` — Injects a manual watermark into the dataset to signify that no data is expected to arrive with event time that precedes it
 * `-f`, `--force` — Overwrite local version with remote, even if revisions have diverged
-* `--reset-derivatives-on-diverged-input` — Run hard compacting of derivative dataset if transformation failed due to root dataset compaction
+* `--reset-derivatives-on-diverged-input` — Run hard compaction of derivative dataset if transformation failed due to root dataset compaction
 
 Pull is a multi-functional command that lets you update a local dataset. Depending on the parameters and the types of datasets involved it can be used to:
 - Run polling ingest to pull data into a root dataset from an external source

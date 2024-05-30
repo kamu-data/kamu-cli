@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `--reset-derivatives-on-diverged-input` flag to `kamu pull` command, which will trigger
   compaction for derived dataset if transformation fails due to root dataset compaction and retry transformation
 
-## [0.184.0] - 2024-05-28
+## Unreleased
 ### Changed
 - Renamed all places compacting -> compacting
 
