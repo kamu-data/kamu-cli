@@ -1348,7 +1348,8 @@ impl FlowService for FlowServiceImpl {
         &self,
         flow_id: FlowID,
     ) -> Result<FlowState, CancelScheduledTasksError> {
-        let mut flow = self.load_flow(flow_id).await?;
+        let flow_event_store = self.catalog.get_one::<dyn FlowEventStore>().unwrap();
+        let mut flow = Flow::load(flow_id, flow_event_store.as_ref()).await?;
 
         // Cancel tasks for flows in Waiting/Running state.
         // Ignore in Finished state
