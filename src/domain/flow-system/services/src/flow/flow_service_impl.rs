@@ -42,7 +42,6 @@ pub struct FlowServiceImpl {
     event_bus: Arc<EventBus>,
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
-    flow_configuration_service: Arc<dyn FlowConfigurationService>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
@@ -75,7 +74,6 @@ impl FlowServiceImpl {
         event_bus: Arc<EventBus>,
         time_source: Arc<dyn SystemTimeSource>,
         task_scheduler: Arc<dyn TaskScheduler>,
-        flow_configuration_service: Arc<dyn FlowConfigurationService>,
         dataset_changes_service: Arc<dyn DatasetChangesService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
@@ -87,7 +85,6 @@ impl FlowServiceImpl {
             event_bus,
             time_source,
             task_scheduler,
-            flow_configuration_service,
             dataset_changes_service,
             dependency_graph_service,
             dataset_ownership_service,
@@ -175,13 +172,19 @@ impl FlowServiceImpl {
     async fn initialize_auto_polling_flows_from_configurations(
         &self,
         start_time: DateTime<Utc>,
+        catalog_with_transaction: &Catalog,
     ) -> Result<(), InternalError> {
         // Query all enabled flow configurations
-        let enabled_configurations: Vec<_> = self
-            .flow_configuration_service
-            .list_enabled_configurations()
-            .try_collect()
-            .await?;
+        let enabled_configurations = {
+            let flow_configuration_service = catalog_with_transaction
+                .get_one::<dyn FlowConfigurationService>()
+                .unwrap();
+
+            flow_configuration_service
+                .list_enabled_configurations()
+                .try_collect::<Vec<_>>()
+                .await?
+        };
 
         // Split configs by those which have a schedule or different rules
         let (schedule_configs, non_schedule_configs): (Vec<_>, Vec<_>) = enabled_configurations
@@ -970,8 +973,14 @@ impl FlowService for FlowServiceImpl {
 
         // Initial scheduling
         let start_time = self.round_time(planned_start_time)?;
-        self.initialize_auto_polling_flows_from_configurations(start_time)
-            .await?;
+
+        DatabaseTransactionRunner::run_transactional(&self.catalog, |catalog| async move {
+            self.initialize_auto_polling_flows_from_configurations(start_time, &catalog)
+                .await?;
+
+            Ok(())
+        })
+        .await?;
 
         // Publish progress event
         self.event_bus
