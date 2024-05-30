@@ -141,17 +141,29 @@ impl FlowServiceImpl {
     async fn run_current_timeslot(
         &self,
         timeslot_time: DateTime<Utc>,
+        catalog_with_transaction: &Catalog,
     ) -> Result<(), InternalError> {
+        let flow_event_store = catalog_with_transaction
+            .get_one::<dyn FlowEventStore>()
+            .unwrap();
+
         let planned_flow_ids: Vec<_> = {
             let mut state = self.state.lock().unwrap();
             state.time_wheel.take_nearest_planned_flows()
         };
 
-        let mut planned_task_futures = Vec::new();
+        let mut planned_task_futures = Vec::with_capacity(planned_flow_ids.len());
         for planned_flow_id in planned_flow_ids {
+            let cloned_flow_event_store = flow_event_store.clone();
+
             planned_task_futures.push(async move {
-                let mut flow = self.load_flow(planned_flow_id).await.int_err()?;
-                self.schedule_flow_task(&mut flow, timeslot_time).await?;
+                let mut flow = Flow::load(planned_flow_id, cloned_flow_event_store.as_ref())
+                    .await
+                    .int_err()?;
+
+                self.schedule_flow_task(&mut flow, timeslot_time, cloned_flow_event_store)
+                    .await?;
+
                 Ok(())
             });
         }
@@ -730,6 +742,7 @@ impl FlowServiceImpl {
         &self,
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
+        flow_event_store: Arc<dyn FlowEventStore>,
     ) -> Result<TaskID, InternalError> {
         let logical_plan =
             self.make_task_logical_plan(&flow.flow_key, flow.config_snapshot.as_ref());
@@ -751,11 +764,10 @@ impl FlowServiceImpl {
         flow.on_task_scheduled(schedule_time, task.task_id)
             .int_err()?;
 
-        self.save_flow(flow).await?;
+        flow.save(flow_event_store.as_ref()).await.int_err()?;
 
         {
             let mut state = self.state.lock().unwrap();
-
             state
                 .pending_flows
                 .track_flow_task(flow.flow_id, task.task_id);
@@ -1008,8 +1020,17 @@ impl FlowService for FlowServiceImpl {
             if let Some(nearest_activation_time) = maybe_nearest_activation_time
                 && nearest_activation_time <= current_time
             {
-                // Run scheduling for current time slot. Should not throw any errors
-                self.run_current_timeslot(nearest_activation_time).await?;
+                DatabaseTransactionRunner::run_transactional(
+                    &self.catalog,
+                    |updated_catalog| async move {
+                        // Run scheduling for current time slot. Should not throw any errors
+                        self.run_current_timeslot(nearest_activation_time, &updated_catalog)
+                            .await?;
+
+                        Ok(())
+                    },
+                )
+                .await?;
 
                 // Publish progress event
                 self.event_bus
