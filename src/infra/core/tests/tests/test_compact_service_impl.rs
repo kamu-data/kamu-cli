@@ -14,13 +14,7 @@ use chrono::{DateTime, NaiveDate, TimeDelta, TimeZone, Utc};
 use datafusion::execution::config::SessionConfig;
 use datafusion::execution::context::SessionContext;
 use dill::Component;
-use domain::{
-    CompactionError,
-    CompactionOptions,
-    CompactionResult,
-    CompactionService,
-    NullCompactionMultiListener,
-};
+use domain::{CompactionError, CompactionOptions, CompactionResult, CompactionService};
 use event_bus::EventBus;
 use futures::TryStreamExt;
 use indoc::{formatdoc, indoc};
@@ -77,7 +71,7 @@ async fn test_dataset_compact() {
             .compact_dataset(
                 &created.dataset_handle,
                 CompactionOptions::default(),
-                Some(Arc::new(NullCompactionMultiListener {}))
+                Some(Arc::new(NullCompactionListener {}))
             )
             .await,
         Ok(CompactionResult::NothingToDo)
@@ -121,7 +115,7 @@ async fn test_dataset_compact() {
             .compact_dataset(
                 &created.dataset_handle,
                 CompactionOptions::default(),
-                Some(Arc::new(NullCompactionMultiListener {}))
+                Some(Arc::new(NullCompactionListener {}))
             )
             .await,
         Ok(CompactionResult::Success {
@@ -219,7 +213,7 @@ async fn test_dataset_compact_s3() {
             .compact_dataset(
                 &created.dataset_handle,
                 CompactionOptions::default(),
-                Some(Arc::new(NullCompactionMultiListener {}))
+                Some(Arc::new(NullCompactionListener {}))
             )
             .await,
         Ok(CompactionResult::NothingToDo)
@@ -263,7 +257,7 @@ async fn test_dataset_compact_s3() {
             .compact_dataset(
                 &created.dataset_handle,
                 CompactionOptions::default(),
-                Some(Arc::new(NullCompactionMultiListener {}))
+                Some(Arc::new(NullCompactionListener {}))
             )
             .await,
         Ok(CompactionResult::Success {
@@ -381,7 +375,7 @@ async fn test_dataset_compaction_watermark_only_blocks() {
         .compact_dataset(
             &created.dataset_handle,
             CompactionOptions::default(),
-            Some(Arc::new(NullCompactionMultiListener {})),
+            Some(Arc::new(NullCompactionListener {})),
         )
         .await
         .unwrap();
@@ -549,10 +543,9 @@ async fn test_dataset_compaction_limits() {
                 &created.dataset_handle,
                 CompactionOptions {
                     max_slice_records: Some(6),
-                    max_slice_size: None,
                     ..CompactionOptions::default()
                 },
-                Some(Arc::new(NullCompactionMultiListener {}))
+                Some(Arc::new(NullCompactionListener {}))
             )
             .await,
         Ok(CompactionResult::Success {
@@ -709,7 +702,7 @@ async fn test_dataset_compaction_keep_all_non_data_blocks() {
             .compact_dataset(
                 &created.dataset_handle,
                 CompactionOptions::default(),
-                Some(Arc::new(NullCompactionMultiListener {}))
+                Some(Arc::new(NullCompactionListener {}))
             )
             .await,
         Ok(CompactionResult::Success {
@@ -796,7 +789,7 @@ async fn test_dataset_compaction_derive_error() {
             .compact_dataset(
                 &created.dataset_handle,
                 CompactionOptions::default(),
-                Some(Arc::new(NullCompactionMultiListener {}))
+                Some(Arc::new(NullCompactionListener {}))
             )
             .await,
         Err(CompactionError::InvalidDatasetKind(_)),
@@ -859,7 +852,7 @@ async fn test_large_dataset_compact() {
                     max_slice_size: None,
                     ..CompactionOptions::default()
                 },
-                Some(Arc::new(NullCompactionMultiListener {}))
+                Some(Arc::new(NullCompactionListener {}))
             )
             .await,
         Ok(CompactionResult::Success {
@@ -956,7 +949,7 @@ async fn test_dataset_keep_metadata_only_compact() {
                     keep_metadata_only: true,
                     ..CompactionOptions::default()
                 },
-                Some(Arc::new(NullCompactionMultiListener {}))
+                Some(Arc::new(NullCompactionListener {}))
             )
             .await,
         Ok(CompactionResult::NothingToDo)
@@ -979,7 +972,7 @@ async fn test_dataset_keep_metadata_only_compact() {
     // After: seed <- set_transform
     let res = harness
         .transform_svc
-        .transform(&derived_dataset_ref, None)
+        .transform(&derived_dataset_ref, TransformOptions::default(), None)
         .await
         .unwrap();
     assert_matches!(res, TransformResult::Updated { .. });
@@ -993,7 +986,7 @@ async fn test_dataset_keep_metadata_only_compact() {
                     keep_metadata_only: true,
                     ..CompactionOptions::default()
                 },
-                Some(Arc::new(NullCompactionMultiListener {}))
+                Some(Arc::new(NullCompactionListener {}))
             )
             .await,
         Ok(CompactionResult::Success {
@@ -1040,7 +1033,7 @@ async fn test_dataset_keep_metadata_only_compact() {
                     keep_metadata_only: true,
                     ..CompactionOptions::default()
                 },
-                Some(Arc::new(NullCompactionMultiListener {}))
+                Some(Arc::new(NullCompactionListener {}))
             )
             .await,
         Ok(CompactionResult::Success {

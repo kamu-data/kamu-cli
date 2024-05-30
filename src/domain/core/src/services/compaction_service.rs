@@ -24,8 +24,15 @@ pub trait CompactionService: Send + Sync {
         &self,
         dataset_handle: &DatasetHandle,
         options: CompactionOptions,
-        listener: Option<Arc<dyn CompactionMultiListener>>,
+        listener: Option<Arc<dyn CompactionListener>>,
     ) -> Result<CompactionResult, CompactionError>;
+
+    async fn compact_multi(
+        &self,
+        dataset_refs: Vec<DatasetRef>,
+        options: CompactionOptions,
+        listener: Option<Arc<dyn CompactionMultiListener>>,
+    ) -> Vec<CompactionResponse>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -157,6 +164,12 @@ pub enum CompactionResult {
         old_num_blocks: usize,
         new_num_blocks: usize,
     },
+}
+
+#[derive(Debug)]
+pub struct CompactionResponse {
+    pub dataset_ref: DatasetRef,
+    pub result: Result<CompactionResult, CompactionError>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

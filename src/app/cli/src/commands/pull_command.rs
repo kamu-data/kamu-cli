@@ -37,6 +37,7 @@ pub struct PullCommand {
     as_name: Option<DatasetName>,
     add_aliases: bool,
     force: bool,
+    reset_derivatives_on_diverged_input: bool,
 }
 
 impl PullCommand {
@@ -53,6 +54,7 @@ impl PullCommand {
         as_name: Option<DatasetName>,
         add_aliases: bool,
         force: bool,
+        reset_derivatives_on_diverged_input: bool,
     ) -> Self
     where
         I: IntoIterator<Item = DatasetRefAnyPattern>,
@@ -70,6 +72,7 @@ impl PullCommand {
             as_name,
             add_aliases,
             force,
+            reset_derivatives_on_diverged_input,
         }
     }
 
@@ -131,6 +134,7 @@ impl PullCommand {
                     recursive: self.recursive,
                     all: self.all,
                     add_aliases: self.add_aliases,
+                    reset_derivatives_on_diverged_input: self.reset_derivatives_on_diverged_input,
                     ingest_options: PollingIngestOptions {
                         fetch_uncacheable: self.fetch_uncacheable,
                         exhaust_sources: true,

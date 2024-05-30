@@ -14,6 +14,7 @@ use chrono::{TimeZone, Utc};
 use dill::Component;
 use event_bus::EventBus;
 use futures::TryStreamExt;
+use indoc::indoc;
 use kamu::domain::engine::*;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -30,6 +31,8 @@ struct TransformTestHarness {
     _tempdir: TempDir,
     dataset_repo: Arc<dyn DatasetRepository>,
     transform_service: Arc<TransformServiceImpl>,
+    compaction_service: Arc<dyn CompactionService>,
+    push_ingest_svc: Arc<PushIngestServiceImpl>,
 }
 
 impl TransformTestHarness {
@@ -42,33 +45,53 @@ impl TransformTestHarness {
     ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
+        let run_info_dir = tempdir.path().join("run");
         std::fs::create_dir(&datasets_dir).unwrap();
+        std::fs::create_dir(&run_info_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
-            .add_value(dataset_action_authorizer)
-            .bind::<dyn auth::DatasetActionAuthorizer, TAuthorizer>()
-            .add_value(engine_provisioner)
-            .bind::<dyn EngineProvisioner, TEngineProvisioner>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
                     .with_multi_tenant(false),
             )
-            .add::<SystemTimeSourceDefault>()
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add_value(dataset_action_authorizer)
+            .bind::<dyn auth::DatasetActionAuthorizer, TAuthorizer>()
+            .add::<SystemTimeSourceDefault>()
+            .add::<ObjectStoreRegistryImpl>()
+            .add::<ObjectStoreBuilderLocalFs>()
+            .add_builder(CompactionServiceImpl::builder().with_run_info_dir(run_info_dir.clone()))
+            .bind::<dyn CompactionService, CompactionServiceImpl>()
+            .add_builder(
+                PushIngestServiceImpl::builder()
+                    .with_object_store_registry(Arc::new(ObjectStoreRegistryImpl::new(vec![
+                        Arc::new(ObjectStoreBuilderLocalFs::new()),
+                    ])))
+                    .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new()))
+                    .with_run_info_dir(run_info_dir),
+            )
+            .bind::<dyn PushIngestService, PushIngestServiceImpl>()
+            .add_value(engine_provisioner)
+            .bind::<dyn EngineProvisioner, TEngineProvisioner>()
             .add::<TransformServiceImpl>()
+            .add::<VerificationServiceImpl>()
             .build();
 
-        let transform_service = catalog.get_one::<TransformServiceImpl>().unwrap();
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let compaction_service = catalog.get_one::<dyn CompactionService>().unwrap();
+        let push_ingest_svc = catalog.get_one::<PushIngestServiceImpl>().unwrap();
+        let transform_service = catalog.get_one::<TransformServiceImpl>().unwrap();
 
         Self {
             _tempdir: tempdir,
             dataset_repo,
             transform_service,
+            compaction_service,
+            push_ingest_svc,
         }
     }
 
@@ -171,6 +194,21 @@ impl TransformTestHarness {
             .unwrap();
         (block_hash, block.into_typed::<AddData>().unwrap())
     }
+
+    async fn ingest_data(&self, data_str: String, dataset_ref: &DatasetRef) {
+        let data = std::io::Cursor::new(data_str);
+
+        self.push_ingest_svc
+            .ingest_from_file_stream(
+                dataset_ref,
+                None,
+                Box::new(data),
+                PushIngestOpts::default(),
+                None,
+            )
+            .await
+            .unwrap();
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -243,7 +281,7 @@ async fn test_transform_enforces_authorization() {
 
     let transform_result = harness
         .transform_service
-        .transform(&bar.as_local_ref(), None)
+        .transform(&bar.as_local_ref(), TransformOptions::default(), None)
         .await;
 
     assert_matches!(transform_result, Ok(_));
@@ -263,7 +301,7 @@ async fn test_transform_unauthorized() {
 
     let transform_result = harness
         .transform_service
-        .transform(&bar.as_local_ref(), None)
+        .transform(&bar.as_local_ref(), TransformOptions::default(), None)
         .await;
 
     assert_matches!(
@@ -601,7 +639,122 @@ async fn test_get_verification_plan_one_to_one() {
     assert_requests_equivalent(&plan[2].request, deriv_req_t6);
 }
 
+#[test_log::test(tokio::test)]
+async fn test_transform_with_compaction_retry() {
+    let harness = TransformTestHarness::new_custom(
+        auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
+    );
+    let root_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+
+    let foo_created_result = harness
+        .dataset_repo
+        .create_dataset_from_snapshot(
+            MetadataFactory::dataset_snapshot()
+                .name(root_alias)
+                .kind(DatasetKind::Root)
+                .push_event(
+                    MetadataFactory::add_push_source()
+                        .read(ReadStepCsv {
+                            header: Some(true),
+                            schema: Some(
+                                ["date TIMESTAMP", "city STRING", "population BIGINT"]
+                                    .iter()
+                                    .map(|s| (*s).to_string())
+                                    .collect(),
+                            ),
+                            ..ReadStepCsv::default()
+                        })
+                        .merge(MergeStrategyLedger {
+                            primary_key: vec!["date".to_string(), "city".to_string()],
+                        })
+                        .build(),
+                )
+                .push_event(SetVocab {
+                    event_time_column: Some("date".to_string()),
+                    ..Default::default()
+                })
+                .build(),
+        )
+        .await
+        .unwrap();
+
+    let data_str = indoc!(
+        "
+            date,city,population
+            2020-01-01,A,1000
+            2020-01-02,B,2000
+            2020-01-03,C,3000
+            "
+    );
+    harness
+        .ingest_data(
+            data_str.to_string(),
+            &foo_created_result.dataset_handle.as_local_ref(),
+        )
+        .await;
+    let data_str = indoc!(
+        "
+            date,city,population
+            2020-01-04,A,4000
+            2020-01-05,B,5000
+            2020-01-06,C,6000
+            "
+    );
+    harness
+        .ingest_data(
+            data_str.to_string(),
+            &foo_created_result.dataset_handle.as_local_ref(),
+        )
+        .await;
+
+    let (bar, _) = harness
+        .new_deriv("bar", &[foo_created_result.dataset_handle.alias.clone()])
+        .await;
+
+    let transform_result = harness
+        .transform_service
+        .transform(&bar.as_local_ref(), TransformOptions::default(), None)
+        .await;
+
+    assert_matches!(transform_result, Ok(TransformResult::Updated { .. }));
+
+    harness
+        .compaction_service
+        .compact_dataset(
+            &foo_created_result.dataset_handle,
+            CompactionOptions::default(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    let transform_result = harness
+        .transform_service
+        .transform(&bar.as_local_ref(), TransformOptions::default(), None)
+        .await;
+
+    assert_matches!(
+        transform_result,
+        Err(TransformError::InvalidInterval(InvalidIntervalError { .. }))
+    );
+
+    let transform_result = harness
+        .transform_service
+        .transform(
+            &bar.as_local_ref(),
+            TransformOptions {
+                reset_derivatives_on_diverged_input: true,
+            },
+            None,
+        )
+        .await;
+
+    assert_matches!(transform_result, Ok(TransformResult::Updated { .. }));
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
+
 fn assert_requests_equivalent(lhs: &TransformRequestExt, mut rhs: TransformRequestExt) {
     // Operation IDs are randomly generated, so ignoring them for this check
     rhs.operation_id = lhs.operation_id.clone();

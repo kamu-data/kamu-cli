@@ -102,7 +102,7 @@ impl ClientSideHarness {
 
         b.add_builder(
             PollingIngestServiceImpl::builder()
-                .with_run_info_dir(run_info_dir)
+                .with_run_info_dir(run_info_dir.clone())
                 .with_cache_dir(cache_dir),
         )
         .bind::<dyn PollingIngestService, PollingIngestServiceImpl>();
@@ -114,6 +114,9 @@ impl ClientSideHarness {
         b.add::<SyncServiceImpl>();
 
         b.add::<TransformServiceImpl>();
+
+        b.add_builder(CompactionServiceImpl::builder().with_run_info_dir(run_info_dir))
+            .bind::<dyn CompactionService, CompactionServiceImpl>();
 
         b.add::<PullServiceImpl>();
 

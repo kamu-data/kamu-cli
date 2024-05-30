@@ -107,12 +107,16 @@ pub struct PullOptions {
     pub ingest_options: PollingIngestOptions,
     /// Sync-specific options,
     pub sync_options: SyncOptions,
+    /// Run compaction of derivative dataset without saving data
+    /// if transformation failed due to root dataset compaction
+    pub reset_derivatives_on_diverged_input: bool,
 }
 
 impl Default for PullOptions {
     fn default() -> Self {
         Self {
             add_aliases: true,
+            reset_derivatives_on_diverged_input: false,
             ingest_options: PollingIngestOptions::default(),
             sync_options: SyncOptions::default(),
         }
@@ -132,6 +136,9 @@ pub struct PullMultiOptions {
     pub ingest_options: PollingIngestOptions,
     /// Sync-specific options,
     pub sync_options: SyncOptions,
+    /// Run compaction of all derivative datasets without saving data
+    /// if transformation fails due to root dataset compaction
+    pub reset_derivatives_on_diverged_input: bool,
 }
 
 impl Default for PullMultiOptions {
@@ -142,6 +149,7 @@ impl Default for PullMultiOptions {
             add_aliases: true,
             ingest_options: PollingIngestOptions::default(),
             sync_options: SyncOptions::default(),
+            reset_derivatives_on_diverged_input: false,
         }
     }
 }

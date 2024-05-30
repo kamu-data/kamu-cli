@@ -36,17 +36,19 @@ async fn test_engine_io_common(
     ));
 
     let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
+    let object_store_registry = Arc::new(ObjectStoreRegistryImpl::new(object_stores));
+    let time_source = Arc::new(SystemTimeSourceDefault);
 
     let ingest_svc = PollingIngestServiceImpl::new(
         dataset_repo.clone(),
         dataset_action_authorizer.clone(),
         engine_provisioner.clone(),
-        Arc::new(ObjectStoreRegistryImpl::new(object_stores)),
+        object_store_registry.clone(),
         Arc::new(DataFormatRegistryImpl::new()),
         Arc::new(ContainerRuntime::default()),
         run_info_dir.to_path_buf(),
         cache_dir.to_path_buf(),
-        Arc::new(SystemTimeSourceDefault),
+        time_source.clone(),
     );
 
     let transform_svc = TransformServiceImpl::new(
@@ -54,6 +56,13 @@ async fn test_engine_io_common(
         dataset_action_authorizer.clone(),
         engine_provisioner.clone(),
         Arc::new(SystemTimeSourceDefault),
+        Arc::new(CompactionServiceImpl::new(
+            dataset_action_authorizer.clone(),
+            dataset_repo.clone(),
+            object_store_registry.clone(),
+            time_source.clone(),
+            run_info_dir.to_path_buf(),
+        )),
     );
 
     ///////////////////////////////////////////////////////////////////////////
@@ -136,7 +145,11 @@ async fn test_engine_io_common(
         .dataset;
 
     let block_hash = match transform_svc
-        .transform(&deriv_alias.as_local_ref(), None)
+        .transform(
+            &deriv_alias.as_local_ref(),
+            TransformOptions::default(),
+            None,
+        )
         .await
         .unwrap()
     {
@@ -186,7 +199,11 @@ async fn test_engine_io_common(
         .unwrap();
 
     let block_hash = match transform_svc
-        .transform(&deriv_alias.as_local_ref(), None)
+        .transform(
+            &deriv_alias.as_local_ref(),
+            TransformOptions::default(),
+            None,
+        )
         .await
         .unwrap()
     {
