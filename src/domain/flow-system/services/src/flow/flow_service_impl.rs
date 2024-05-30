@@ -776,18 +776,29 @@ impl FlowServiceImpl {
         Ok(task.task_id)
     }
 
-    async fn abort_flow(&self, flow_id: FlowID) -> Result<(), InternalError> {
-        let mut flow = self.load_flow(flow_id).await.int_err()?;
+    async fn abort_flow(
+        &self,
+        flow_id: FlowID,
+        flow_event_store: Arc<dyn FlowEventStore>,
+    ) -> Result<(), InternalError> {
+        // Mark flow as aborted
+        let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
+            .await
+            .int_err()?;
 
         // Mark flow as aborted
-        self.abort_flow_impl(&mut flow).await
+        self.abort_flow_impl(&mut flow, flow_event_store).await
     }
 
-    async fn abort_flow_impl(&self, flow: &mut Flow) -> Result<(), InternalError> {
+    async fn abort_flow_impl(
+        &self,
+        flow: &mut Flow,
+        flow_event_store: Arc<dyn FlowEventStore>,
+    ) -> Result<(), InternalError> {
         // Abort flow itself
         flow.abort(self.time_source.now()).int_err()?;
 
-        self.save_flow(flow).await?;
+        flow.save(flow_event_store.as_ref()).await.int_err()?;
 
         // Cancel associated tasks, but first drop task -> flow associations
         {
@@ -1356,7 +1367,7 @@ impl FlowService for FlowServiceImpl {
         match flow.status() {
             FlowStatus::Waiting | FlowStatus::Running => {
                 // Abort current flow and it's scheduled tasks
-                self.abort_flow_impl(&mut flow).await?;
+                self.abort_flow_impl(&mut flow, flow_event_store).await?;
             }
             FlowStatus::Finished => { /* Skip, idempotence */ }
         }
@@ -1552,7 +1563,9 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceImpl {
             };
 
             if let Some(flow_id) = maybe_pending_flow_id {
-                self.abort_flow(flow_id).await?;
+                let flow_event_store = self.catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+                self.abort_flow(flow_id, flow_event_store).await?;
             }
         } else {
             {
