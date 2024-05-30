@@ -46,19 +46,6 @@ impl FlowConfigurationServiceImpl {
         }
     }
 
-    async fn try_load_configuration(
-        &self,
-        flow_key: FlowKey,
-    ) -> Result<Option<FlowConfiguration>, TryLoadError<FlowConfigurationState>> {
-        DatabaseTransactionRunner::run_transactional_with(
-            &self.catalog,
-            |event_store: Arc<dyn FlowConfigurationEventStore>| async move {
-                FlowConfiguration::try_load(flow_key, event_store.as_ref()).await
-            },
-        )
-        .await
-    }
-
     async fn publish_flow_configuration_modified(
         &self,
         state: &FlowConfigurationState,
@@ -204,32 +191,43 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
     fn list_enabled_configurations(&self) -> FlowConfigurationStateStream {
         // Note: terribly inefficient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
+            let event_store = self
+                .catalog
+                .get_one::<dyn FlowConfigurationEventStore>()
+                .unwrap();
+
             for system_flow_type in SystemFlowType::all() {
                 let flow_key = (*system_flow_type).into();
                 let maybe_flow_configuration =
-                    self.try_load_configuration(flow_key).await.int_err()?;
+                    FlowConfiguration::try_load(flow_key, event_store.as_ref())
+                        .await
+                        .int_err()?;
 
-                if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
+                if let Some(flow_configuration) = maybe_flow_configuration
+                    && flow_configuration.is_active()
+                {
                     yield flow_configuration.into();
                 }
             }
 
-            let dataset_ids = DatabaseTransactionRunner::run_transactional_with(
-                &self.catalog,
-                |event_store: Arc<dyn FlowConfigurationEventStore>| async move {
-                    event_store.list_all_dataset_ids().await.try_collect::<Vec<_>>().await
-                },
-            )
-            .await?;
+            let dataset_ids = event_store
+                .list_all_dataset_ids()
+                .await
+                .try_collect::<Vec<_>>()
+                .await?;
 
-
-            for dataset_id in dataset_ids {
+            for dataset_id in dataset_ids.into_iter() {
                 for dataset_flow_type in DatasetFlowType::all() {
-                    let flow_key = FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into();
+                    let flow_key =
+                        FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into();
                     let maybe_flow_configuration =
-                        self.try_load_configuration(flow_key).await.int_err()?;
+                        FlowConfiguration::try_load(flow_key, event_store.as_ref())
+                            .await
+                            .int_err()?;
 
-                    if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
+                    if let Some(flow_configuration) = maybe_flow_configuration
+                        && flow_configuration.is_active()
+                    {
                         yield flow_configuration.into();
                     }
                 }
