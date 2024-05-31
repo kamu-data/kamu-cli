@@ -1295,6 +1295,7 @@ impl FlowService for FlowServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(%flow_id))]
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError> {
         let flow_event_store = self.catalog.get_one::<dyn FlowEventStore>().unwrap();
+
         let flow = Flow::load(flow_id, flow_event_store.as_ref()).await?;
 
         Ok(flow.into())
