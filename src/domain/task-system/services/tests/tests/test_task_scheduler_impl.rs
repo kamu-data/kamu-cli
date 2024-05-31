@@ -10,8 +10,6 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use database_common::FakeDatabasePlugin;
-use dill::CatalogBuilder;
 use kamu_core::SystemTimeSourceStub;
 use kamu_task_system::{LogicalPlan, Probe, TaskScheduler, TaskState, TaskStatus};
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
@@ -87,17 +85,10 @@ async fn test_task_cancellation() {
 ////////////////////////////////////////////////////////////////////////////////
 
 fn create_task_scheduler() -> impl TaskScheduler {
-    let mut catalog_builder = CatalogBuilder::new();
-
-    FakeDatabasePlugin::init_database_components(&mut catalog_builder);
-
-    let catalog = catalog_builder
-        .add::<TaskSystemEventStoreInMemory>()
-        .build();
-
+    let event_store = Arc::new(TaskSystemEventStoreInMemory::new());
     let time_source = Arc::new(SystemTimeSourceStub::new());
 
-    TaskSchedulerImpl::new(time_source, catalog)
+    TaskSchedulerImpl::new(event_store, time_source)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
