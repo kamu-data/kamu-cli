@@ -1516,6 +1516,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceImpl {
 impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &FlowConfigurationEventModified) -> Result<(), InternalError> {
+        // We are already in a begun database transaction
         let flow_event_store = self.catalog.get_one::<dyn FlowEventStore>().unwrap();
         let task_scheduler = self.catalog.get_one::<dyn TaskScheduler>().unwrap();
 
