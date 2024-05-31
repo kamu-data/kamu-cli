@@ -41,7 +41,6 @@ pub struct FlowServiceImpl {
     run_config: Arc<FlowServiceRunConfig>,
     event_bus: Arc<EventBus>,
     time_source: Arc<dyn SystemTimeSource>,
-    task_scheduler: Arc<dyn TaskScheduler>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
@@ -73,7 +72,6 @@ impl FlowServiceImpl {
         run_config: Arc<FlowServiceRunConfig>,
         event_bus: Arc<EventBus>,
         time_source: Arc<dyn SystemTimeSource>,
-        task_scheduler: Arc<dyn TaskScheduler>,
         dataset_changes_service: Arc<dyn DatasetChangesService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
@@ -84,7 +82,6 @@ impl FlowServiceImpl {
             run_config,
             event_bus,
             time_source,
-            task_scheduler,
             dataset_changes_service,
             dependency_graph_service,
             dataset_ownership_service,
@@ -134,6 +131,9 @@ impl FlowServiceImpl {
         let flow_event_store = catalog_with_transaction
             .get_one::<dyn FlowEventStore>()
             .unwrap();
+        let task_scheduler = catalog_with_transaction
+            .get_one::<dyn TaskScheduler>()
+            .unwrap();
 
         let planned_flow_ids: Vec<_> = {
             let mut state = self.state.lock().unwrap();
@@ -143,14 +143,20 @@ impl FlowServiceImpl {
         let mut planned_task_futures = Vec::with_capacity(planned_flow_ids.len());
         for planned_flow_id in planned_flow_ids {
             let cloned_flow_event_store = flow_event_store.clone();
+            let cloned_task_scheduler = task_scheduler.clone();
 
             planned_task_futures.push(async move {
                 let mut flow = Flow::load(planned_flow_id, cloned_flow_event_store.as_ref())
                     .await
                     .int_err()?;
 
-                self.schedule_flow_task(&mut flow, timeslot_time, cloned_flow_event_store)
-                    .await?;
+                self.schedule_flow_task(
+                    &mut flow,
+                    timeslot_time,
+                    cloned_flow_event_store,
+                    cloned_task_scheduler,
+                )
+                .await?;
 
                 Ok(())
             });
@@ -765,15 +771,11 @@ impl FlowServiceImpl {
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
         flow_event_store: Arc<dyn FlowEventStore>,
+        task_scheduler: Arc<dyn TaskScheduler>,
     ) -> Result<TaskID, InternalError> {
         let logical_plan =
             self.make_task_logical_plan(&flow.flow_key, flow.config_snapshot.as_ref());
-
-        let task = self
-            .task_scheduler
-            .create_task(logical_plan)
-            .await
-            .int_err()?;
+        let task = task_scheduler.create_task(logical_plan).await.int_err()?;
 
         flow.set_relevant_start_condition(
             schedule_time,
@@ -802,6 +804,7 @@ impl FlowServiceImpl {
         &self,
         flow_id: FlowID,
         flow_event_store: Arc<dyn FlowEventStore>,
+        task_scheduler: Arc<dyn TaskScheduler>,
     ) -> Result<(), InternalError> {
         // Mark flow as aborted
         let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
@@ -809,13 +812,15 @@ impl FlowServiceImpl {
             .int_err()?;
 
         // Mark flow as aborted
-        self.abort_flow_impl(&mut flow, flow_event_store).await
+        self.abort_flow_impl(&mut flow, flow_event_store, task_scheduler)
+            .await
     }
 
     async fn abort_flow_impl(
         &self,
         flow: &mut Flow,
         flow_event_store: Arc<dyn FlowEventStore>,
+        task_scheduler: Arc<dyn TaskScheduler>,
     ) -> Result<(), InternalError> {
         // Abort flow itself
         flow.abort(self.time_source.now()).int_err()?;
@@ -831,7 +836,7 @@ impl FlowServiceImpl {
         }
 
         for task_id in &flow.task_ids {
-            self.task_scheduler.cancel_task(*task_id).await.int_err()?;
+            task_scheduler.cancel_task(*task_id).await.int_err()?;
         }
 
         Ok(())
@@ -1385,6 +1390,8 @@ impl FlowService for FlowServiceImpl {
         flow_id: FlowID,
     ) -> Result<FlowState, CancelScheduledTasksError> {
         let flow_event_store = self.catalog.get_one::<dyn FlowEventStore>().unwrap();
+        let task_scheduler = self.catalog.get_one::<dyn TaskScheduler>().unwrap();
+
         let mut flow = Flow::load(flow_id, flow_event_store.as_ref()).await?;
 
         // Cancel tasks for flows in Waiting/Running state.
@@ -1392,7 +1399,8 @@ impl FlowService for FlowServiceImpl {
         match flow.status() {
             FlowStatus::Waiting | FlowStatus::Running => {
                 // Abort current flow and it's scheduled tasks
-                self.abort_flow_impl(&mut flow, flow_event_store).await?;
+                self.abort_flow_impl(&mut flow, flow_event_store, task_scheduler)
+                    .await?;
             }
             FlowStatus::Finished => { /* Skip, idempotence */ }
         }
@@ -1419,6 +1427,7 @@ impl FlowServiceTestDriver for FlowServiceImpl {
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
         let flow_event_store = self.catalog.get_one::<dyn FlowEventStore>().unwrap();
+        let task_scheduler = self.catalog.get_one::<dyn TaskScheduler>().unwrap();
 
         {
             let mut state = self.state.lock().unwrap();
@@ -1429,7 +1438,7 @@ impl FlowServiceTestDriver for FlowServiceImpl {
             .await
             .int_err()?;
         let task_id = self
-            .schedule_flow_task(&mut flow, schedule_time, flow_event_store)
+            .schedule_flow_task(&mut flow, schedule_time, flow_event_store, task_scheduler)
             .await?;
 
         Ok(task_id)
@@ -1584,6 +1593,7 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &FlowConfigurationEventModified) -> Result<(), InternalError> {
         let flow_event_store = self.catalog.get_one::<dyn FlowEventStore>().unwrap();
+        let task_scheduler = self.catalog.get_one::<dyn TaskScheduler>().unwrap();
 
         if event.paused {
             let maybe_pending_flow_id = {
@@ -1606,7 +1616,8 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceImpl {
             };
 
             if let Some(flow_id) = maybe_pending_flow_id {
-                self.abort_flow(flow_id, flow_event_store).await?;
+                self.abort_flow(flow_id, flow_event_store, task_scheduler)
+                    .await?;
             }
         } else {
             {
