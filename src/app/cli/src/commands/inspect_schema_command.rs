@@ -16,6 +16,8 @@ use opendatafabric::*;
 
 use super::{CLIError, Command};
 
+////////////////////////////////////////////////////////////////////////////////
+
 pub struct InspectSchemaCommand {
     query_svc: Arc<dyn QueryService>,
     dataset_ref: DatasetRef,
@@ -163,7 +165,7 @@ impl InspectSchemaCommand {
     }
 }
 
-#[async_trait::async_trait(? Send)]
+#[async_trait::async_trait(?Send)]
 impl Command for InspectSchemaCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         match self.output_format.as_deref() {
@@ -210,3 +212,5 @@ impl Command for InspectSchemaCommand {
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////

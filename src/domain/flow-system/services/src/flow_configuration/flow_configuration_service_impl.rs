@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common::DatabaseTransactionRunner;
 use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
 use futures::TryStreamExt;
@@ -19,7 +18,7 @@ use kamu_core::SystemTimeSource;
 use kamu_flow_system::*;
 use opendatafabric::DatasetID;
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 pub struct FlowConfigurationServiceImpl {
     event_store: Arc<dyn FlowConfigurationEventStore>,
@@ -28,7 +27,7 @@ pub struct FlowConfigurationServiceImpl {
     catalog: Catalog,
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn FlowConfigurationService)]
@@ -99,7 +98,7 @@ impl FlowConfigurationServiceImpl {
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl FlowConfigurationService for FlowConfigurationServiceImpl {
@@ -347,42 +346,39 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
+        let flow_configuration_event_store = self
+            .catalog
+            .get_one::<dyn FlowConfigurationEventStore>()
+            .unwrap();
+
         for flow_type in DatasetFlowType::all() {
-            DatabaseTransactionRunner::run_transactional_with(
-                &self.catalog,
-                |event_store: Arc<dyn FlowConfigurationEventStore>| async move {
-                    let maybe_flow_configuration = FlowConfiguration::try_load(
-                        FlowKeyDataset::new(event.dataset_id.clone(), *flow_type).into(),
-                        event_store.as_ref(),
-                    )
-                    .await
+            let maybe_flow_configuration = FlowConfiguration::try_load(
+                FlowKeyDataset::new(event.dataset_id.clone(), *flow_type).into(),
+                flow_configuration_event_store.as_ref(),
+            )
+            .await
+            .int_err()?;
+
+            if let Some(mut flow_configuration) = maybe_flow_configuration {
+                flow_configuration
+                    .notify_dataset_removed(self.time_source.now())
                     .int_err()?;
 
-                    if let Some(mut flow_configuration) = maybe_flow_configuration {
-                        flow_configuration
-                            .notify_dataset_removed(self.time_source.now())
-                            .int_err()?;
-
-                        flow_configuration
-                            .save(event_store.as_ref())
-                            .await
-                            .int_err()?;
-                    }
-
-                    Ok(())
-                },
-            )
-            .await?;
+                flow_configuration
+                    .save(flow_configuration_event_store.as_ref())
+                    .await
+                    .int_err()?;
+            }
         }
 
         Ok(())
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////

@@ -44,8 +44,8 @@ impl<HFutResultE> DatabaseTransactionRunner<HFutResultE> {
         callback: H,
     ) -> Result<HFutResultT, HFutResultE>
     where
-        H: FnOnce(Catalog) -> HFut + Send,
-        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>> + Send,
+        H: FnOnce(Catalog) -> HFut,
+        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
         HFutResultE: From<InternalError>,
     {
         // Extract transaction manager, specific for the database
@@ -91,8 +91,8 @@ impl<HFutResultE> DatabaseTransactionRunner<HFutResultE> {
     ) -> Result<HFutResultT, HFutResultE>
     where
         Iface: 'static + ?Sized + Send + Sync,
-        H: FnOnce(Arc<Iface>) -> HFut + Send,
-        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>> + Send,
+        H: FnOnce(Arc<Iface>) -> HFut,
+        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
         HFutResultE: From<InternalError>,
     {
         Self::run_transactional(base_catalog, |catalog_with_transaction| async move {

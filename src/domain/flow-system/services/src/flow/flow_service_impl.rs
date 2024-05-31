@@ -1574,6 +1574,8 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceImpl {
 impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
+        let flow_event_store = self.catalog.get_one::<dyn FlowEventStore>().unwrap();
+
         let flow_ids_2_abort = {
             let mut state = self.state.lock().unwrap();
             if !state.running {
@@ -1587,7 +1589,7 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceImpl {
             //  - drop it from pending state
             //  - drop queued activations
             //  - collect ID of aborted flow
-            let mut flow_ids_2_abort: Vec<_> = Vec::new();
+            let mut flow_ids_2_abort: Vec<_> = Vec::with_capacity(DatasetFlowType::all().len());
             for flow_type in DatasetFlowType::all() {
                 if let Some(flow_id) = state
                     .pending_flows
@@ -1602,20 +1604,12 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceImpl {
 
         // Abort matched flows
         for flow_id in flow_ids_2_abort {
-            DatabaseTransactionRunner::run_transactional_with(
-                &self.catalog,
-                |flow_event_store: Arc<dyn FlowEventStore>| async move {
-                    let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
-                        .await
-                        .int_err()?;
+            let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
+                .await
+                .int_err()?;
 
-                    flow.abort(self.time_source.now()).int_err()?;
-                    flow.save(flow_event_store.as_ref()).await.int_err()?;
-
-                    Ok(())
-                },
-            )
-            .await?;
+            flow.abort(self.time_source.now()).int_err()?;
+            flow.save(flow_event_store.as_ref()).await.int_err()?;
         }
 
         // Not deleting task->update association, it should be safe.
