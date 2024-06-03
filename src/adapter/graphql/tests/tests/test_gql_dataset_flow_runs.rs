@@ -2927,7 +2927,7 @@ impl FlowRunsHarness {
             }
             "#
         )
-        .replace("<id>", &id.to_string())
+            .replace("<id>", &id.to_string())
     }
 
     fn flow_history_query(id: &DatasetID, flow_id: &str) -> String {
