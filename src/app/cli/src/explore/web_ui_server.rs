@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
+use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
 use kamu_accounts::{
     AccountConfig,
@@ -101,15 +102,21 @@ impl WebUIServer {
             login_credentials_json: serde_json::to_string(&login_credentials).unwrap(),
         };
 
-        let auth_svc = base_catalog.get_one::<dyn AuthenticationService>().unwrap();
-        let access_token = auth_svc
-            .login(
-                &login_instructions.login_method,
-                login_instructions.login_credentials_json.clone(),
-            )
-            .await
-            .unwrap()
-            .access_token;
+        let cloned_login_instructions = login_instructions.clone();
+        let access_token = DatabaseTransactionRunner::run_transactional_with(
+            &base_catalog,
+            |auth_svc: Arc<dyn AuthenticationService>| async move {
+                auth_svc
+                    .login(
+                        &cloned_login_instructions.login_method,
+                        cloned_login_instructions.login_credentials_json,
+                    )
+                    .await
+            },
+        )
+        .await
+        .unwrap()
+        .access_token;
 
         let web_ui_config = WebUIConfig {
             api_server_gql_url: format!("http://{}/graphql", bound_addr.local_addr()),
