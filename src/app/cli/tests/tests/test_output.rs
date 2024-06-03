@@ -29,6 +29,7 @@ async fn test_records_format() {
         Arc::new(Schema::new(vec![
             Field::new("num", DataType::UInt64, false),
             Field::new("str", DataType::Utf8, true),
+            Field::new("bin", DataType::Binary, true),
             Field::new(
                 "time",
                 DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("UTC"))),
@@ -37,7 +38,14 @@ async fn test_records_format() {
         ])),
         vec![
             Arc::new(UInt64Array::from(vec![0, 1000])),
-            Arc::new(StringArray::from(vec!["a".to_string(), "b".to_string()])),
+            Arc::new(StringArray::from(vec![
+                "abcd".to_string(),
+                "abcdefg".to_string(),
+            ])),
+            Arc::new(BinaryArray::from(vec![
+                &hex::decode("aabb").unwrap()[..],
+                &hex::decode("aabbccddeeff").unwrap()[..],
+            ])),
             Arc::new(
                 TimestampMillisecondArray::from(vec![
                     DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
@@ -57,8 +65,8 @@ async fn test_records_format() {
         ColumnFormat::new()
             .with_style_spec("r")
             .with_value_fmt_t(humanize_quantity),
-        ColumnFormat::new().with_style_spec("l"),
-        ColumnFormat::default(),
+        ColumnFormat::new().with_style_spec("l").with_max_len(5),
+        ColumnFormat::default().with_max_len(5),
     ]);
 
     let mut buf = Vec::new();
@@ -66,19 +74,19 @@ async fn test_records_format() {
     writer.write_batch(&records).unwrap();
     writer.finish().unwrap();
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         std::str::from_utf8(&buf)
             .unwrap()
             .trim()
             .replace("\r\n", "\n"),
         indoc::indoc!(
             r#"
-            ┌───────┬─────┬──────────────────────┐
-            │  num  │ str │         time         │
-            ├───────┼─────┼──────────────────────┤
-            │     - │ a   │ 2023-01-01T00:00:00Z │
-            │ 1,000 │ b   │ 2023-01-02T00:00:00Z │
-            └───────┴─────┴──────────────────────┘
+            ┌───────┬───────┬───────┬──────────────────────┐
+            │  num  │  str  │  bin  │         time         │
+            ├───────┼───────┼───────┼──────────────────────┤
+            │     - │ abcd  │  aabb │ 2023-01-01T00:00:00Z │
+            │ 1,000 │ ab…fg │ aa…ff │ 2023-01-02T00:00:00Z │
+            └───────┴───────┴───────┴──────────────────────┘
             "#
         )
         .trim()

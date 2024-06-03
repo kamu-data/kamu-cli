@@ -254,6 +254,8 @@ pub fn configure_base_catalog(
 
     b.add::<DataFormatRegistryImpl>();
 
+    b.add_builder(FetchService::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()));
+
     b.add_builder(
         PollingIngestServiceImpl::builder()
             .with_run_info_dir(workspace_layout.run_info_dir.clone())
