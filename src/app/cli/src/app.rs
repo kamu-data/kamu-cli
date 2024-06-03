@@ -343,6 +343,9 @@ fn configure_database_components(
     catalog_builder: &mut CatalogBuilder,
     db_configuration: &DatabaseConfiguration,
 ) -> Result<(), InternalError> {
+    // TODO: Remove after adding implementation of FlowEventStore for databases
+    catalog_builder.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
+
     match db_configuration.provider {
         DatabaseProvider::Postgres => {
             database_common::PostgresPlugin::init_database_components(
@@ -352,7 +355,7 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_postgres::PostgresAccountRepository>();
-            catalog_builder.add::<kamu_flow_system_postgres::FlowSystemEventStorePostgres>();
+            catalog_builder.add::<kamu_flow_system_postgres::FlowConfigurationEventStorePostgres>();
             catalog_builder.add::<kamu_task_system_postgres::TaskSystemEventStorePostgres>();
 
             Ok(())

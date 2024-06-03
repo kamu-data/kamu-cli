@@ -12,10 +12,12 @@ mod db_error;
 mod db_provider;
 
 mod plugins;
+mod testing;
 mod transactions;
 
 pub use db_configuration::*;
 pub use db_error::*;
 pub use db_provider::*;
 pub use plugins::*;
+pub use testing::*;
 pub use transactions::*;

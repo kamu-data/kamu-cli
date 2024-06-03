@@ -18,7 +18,7 @@ use kamu_core::SystemTimeSource;
 use kamu_flow_system::*;
 use opendatafabric::DatasetID;
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 pub struct FlowConfigurationServiceImpl {
     event_store: Arc<dyn FlowConfigurationEventStore>,
@@ -26,7 +26,7 @@ pub struct FlowConfigurationServiceImpl {
     event_bus: Arc<EventBus>,
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn FlowConfigurationService)]
@@ -118,7 +118,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         dataset_ids: Vec<DatasetID>,
     ) -> FlowConfigurationStateStream {
         Box::pin(async_stream::try_stream! {
-            for dataset_flow_type in kamu_flow_system::DatasetFlowType::all() {
+            for dataset_flow_type in DatasetFlowType::all() {
                 for dataset_id in &dataset_ids {
                     let maybe_flow_configuration =
                         FlowConfiguration::try_load(
@@ -258,8 +258,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 
         for flow_key in flow_keys {
             self.pause_flow_configuration(request_time, flow_key)
-                .await
-                .int_err()?;
+                .await?;
         }
 
         Ok(())
@@ -276,8 +275,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 
         for flow_key in flow_keys {
             self.pause_flow_configuration(request_time, flow_key)
-                .await
-                .int_err()?;
+                .await?;
         }
 
         Ok(())
@@ -296,8 +294,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 
         for flow_key in flow_keys {
             self.resume_flow_configuration(request_time, flow_key)
-                .await
-                .int_err()?;
+                .await?;
         }
 
         Ok(())
@@ -315,15 +312,14 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 
         for flow_key in flow_keys {
             self.resume_flow_configuration(request_time, flow_key)
-                .await
-                .int_err()?;
+                .await?;
         }
 
         Ok(())
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceImpl {
@@ -353,4 +349,4 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceImpl {
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////

@@ -7,12 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod authentication_layer;
-mod dataset_authorization_layer;
-mod dataset_resolver_layer;
-mod run_in_database_transaction_layer;
+mod fake_database_plugin;
+mod fake_database_transaction_manager;
 
-pub use authentication_layer::*;
-pub use dataset_authorization_layer::*;
-pub use dataset_resolver_layer::*;
-pub use run_in_database_transaction_layer::*;
+pub use fake_database_plugin::*;
+pub use fake_database_transaction_manager::*;

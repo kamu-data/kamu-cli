@@ -19,7 +19,7 @@ use sqlx::MySqlPool;
 async fn test_missing_account_not_found(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+    run_transactional(&harness.catalog, |catalog| async move {
         kamu_accounts_repo_tests::test_missing_account_not_found(&catalog).await;
         Ok(())
     })
