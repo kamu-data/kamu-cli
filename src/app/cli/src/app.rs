@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
-use database_common::{DatabaseConfiguration, DatabaseProvider};
+use database_common::{DatabaseConfiguration, DatabaseProvider, DatabaseTransactionRunner};
 use dill::*;
 use kamu::domain::*;
 use kamu::*;
@@ -346,6 +346,11 @@ fn configure_database_components(
     // TODO: Remove after adding implementation of FlowEventStore for databases
     catalog_builder.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
 
+    // TODO: Delete after preparing services for transactional work and replace with
+    //       permanent storage options
+    catalog_builder.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
+    catalog_builder.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
+
     match db_configuration.provider {
         DatabaseProvider::Postgres => {
             database_common::PostgresPlugin::init_database_components(
@@ -355,8 +360,6 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_postgres::PostgresAccountRepository>();
-            catalog_builder.add::<kamu_flow_system_postgres::FlowConfigurationEventStorePostgres>();
-            catalog_builder.add::<kamu_task_system_postgres::TaskSystemEventStorePostgres>();
 
             Ok(())
         }
@@ -379,8 +382,6 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
-            catalog_builder.add::<kamu_flow_system_sqlite::FlowSystemEventStoreSqlite>();
-            catalog_builder.add::<kamu_task_system_sqlite::TaskSystemEventStoreSqlite>();
 
             Ok(())
         }
