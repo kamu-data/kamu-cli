@@ -84,6 +84,24 @@ impl<HFutResultE> DatabaseTransactionRunner<HFutResultE> {
             }
         }
     }
+
+    pub async fn run_transactional_with<Iface, H, HFut, HFutResultT>(
+        base_catalog: &Catalog,
+        callback: H,
+    ) -> Result<HFutResultT, HFutResultE>
+    where
+        Iface: 'static + ?Sized + Send + Sync,
+        H: FnOnce(Arc<Iface>) -> HFut,
+        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
+        HFutResultE: From<InternalError>,
+    {
+        Self::run_transactional(base_catalog, |catalog_with_transaction| async move {
+            let catalog_item = catalog_with_transaction.get_one().int_err()?;
+
+            callback(catalog_item).await
+        })
+        .await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
