@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded to `datafusion v38`
 ### Added
 - Added a public image with [sqlx-cli](/images/sqlx-cli)
-- Added a [configuration](/images/persistence-storage) of running a `kamu` API server along with a database,
+- Added a [configuration](/images/persistent-storage) of running a `kamu` API server along with a database,
   for persistent storage of data
 - New `listFlowInitiators` api to fetch all initiators of flows
 - New `allPaused` method in `AccountFlowConfigs` API
