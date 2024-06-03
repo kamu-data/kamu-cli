@@ -53,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `HardCompacting` configuration now is one of `Full` or `KeepMetadataOnly` variants. In case of 
   `KeepMetadataOnly` variant required to provide `recursive` value which will trigger downstream
-  dependecnies compacting
+  dependencies compacting
 
 ## [0.182.0] - 2024-05-20
 ### Added
