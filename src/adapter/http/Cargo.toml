@@ -28,7 +28,6 @@ kamu = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-data-utils = { workspace = true }
 event-bus = { workspace = true }
-database-common = { workspace = true }
 
 aws-sdk-s3 = { version = "0.35" }
 
@@ -73,6 +72,7 @@ uuid = { version = "1", default-features = false, features = ["v4"] }
 
 [dev-dependencies]
 container-runtime = { workspace = true }
+event-bus = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 

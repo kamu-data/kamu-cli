@@ -8,11 +8,10 @@
 // by the Apache License, Version 2.0.
 
 mod authentication_layer;
-mod dataset_authorization_layer;
-mod dataset_resolver_layer;
-mod run_in_database_transaction_layer;
-
 pub use authentication_layer::*;
+
+mod dataset_authorization_layer;
 pub use dataset_authorization_layer::*;
+
+mod dataset_resolver_layer;
 pub use dataset_resolver_layer::*;
-pub use run_in_database_transaction_layer::*;

@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use database_common::FakeDatabasePlugin;
 use dill::*;
 use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, MockDatasetChangesService};
@@ -102,45 +101,38 @@ impl FlowHarness {
             predefined_accounts_config
         };
 
-        let catalog = {
-            let mut builder = CatalogBuilder::new();
-
-            builder
-                .add::<EventBus>()
-                .add_value(FlowServiceRunConfig::new(
-                    awaiting_step,
-                    mandatory_throttling_period,
-                ))
-                .add::<FlowServiceImpl>()
-                .add::<FlowEventStoreInMem>()
-                .add::<FlowConfigurationServiceImpl>()
-                .add::<FlowConfigurationEventStoreInMem>()
-                .add_value(fake_system_time_source.clone())
-                .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
-                .add_builder(
-                    DatasetRepositoryLocalFs::builder()
-                        .with_root(datasets_dir)
-                        .with_multi_tenant(overrides.is_multi_tenant),
-                )
-                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .add_value(mock_dataset_changes)
-                .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
-                .add_value(CurrentAccountSubject::new_test())
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-                .add::<AuthenticationServiceImpl>()
-                .add_value(predefined_accounts_config)
-                .add_value(JwtAuthenticationConfig::default())
-                .add::<AccountRepositoryInMemory>()
-                .add::<DependencyGraphServiceInMemory>()
-                .add::<DatasetOwnershipServiceInMemory>()
-                .add::<TaskSchedulerImpl>()
-                .add::<TaskSystemEventStoreInMemory>()
-                .add::<FlowSystemTestListener>();
-
-            FakeDatabasePlugin::init_database_components(&mut builder);
-
-            builder.build()
-        };
+        let catalog = CatalogBuilder::new()
+            .add::<EventBus>()
+            .add_value(FlowServiceRunConfig::new(
+                awaiting_step,
+                mandatory_throttling_period,
+            ))
+            .add::<FlowServiceImpl>()
+            .add::<FlowEventStoreInMem>()
+            .add::<FlowConfigurationServiceImpl>()
+            .add::<FlowConfigurationEventStoreInMem>()
+            .add_value(fake_system_time_source.clone())
+            .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(datasets_dir)
+                    .with_multi_tenant(overrides.is_multi_tenant),
+            )
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add_value(mock_dataset_changes)
+            .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
+            .add_value(CurrentAccountSubject::new_test())
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AuthenticationServiceImpl>()
+            .add_value(predefined_accounts_config)
+            .add_value(JwtAuthenticationConfig::default())
+            .add::<AccountRepositoryInMemory>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add::<DatasetOwnershipServiceInMemory>()
+            .add::<TaskSchedulerImpl>()
+            .add::<TaskSystemEventStoreInMemory>()
+            .add::<FlowSystemTestListener>()
+            .build();
 
         let flow_service = catalog.get_one::<dyn FlowService>().unwrap();
         let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();

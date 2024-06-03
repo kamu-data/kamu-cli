@@ -16,8 +16,6 @@ use opendatafabric::*;
 
 use super::{common, CLIError, Command};
 
-////////////////////////////////////////////////////////////////////////////////
-
 pub struct DeleteCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_ref_patterns: Vec<DatasetRefPattern>,
@@ -115,7 +113,6 @@ impl Command for DeleteCommand {
                 dataset_hdl.alias.to_string()
             }))
             .await;
-
             common::prompt_yes_no(&format!(
                 "{}\n  {}\n{}\nDo you wish to continue? [y/N]: ",
                 console::style("You are about to delete following dataset(s):").yellow(),
@@ -147,5 +144,3 @@ impl Command for DeleteCommand {
         Ok(())
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////

@@ -16,14 +16,11 @@ use std::sync::Arc;
 
 use console::style as s;
 use dill::Catalog;
-use internal_error::ResultIntoInternal;
 use kamu_accounts::PredefinedAccountsConfig;
 use opendatafabric::AccountName;
 
 use super::{CLIError, Command};
 use crate::OutputConfig;
-
-///////////////////////////////////////////////////////////////////////////////
 
 pub struct UICommand {
     base_catalog: Catalog,
@@ -106,13 +103,11 @@ impl Command for UICommand {
 
         let _ = webbrowser::open(&web_server_url);
 
-        web_server.run().await.map_err(CLIError::critical)?;
+        web_server.run().await.map_err(|e| CLIError::critical(e))?;
 
         Ok(())
     }
 }
-
-///////////////////////////////////////////////////////////////////////////////
 
 #[cfg(not(feature = "web-ui"))]
 #[async_trait::async_trait(?Send)]
@@ -123,5 +118,3 @@ impl Command for UICommand {
         ))
     }
 }
-
-///////////////////////////////////////////////////////////////////////////////

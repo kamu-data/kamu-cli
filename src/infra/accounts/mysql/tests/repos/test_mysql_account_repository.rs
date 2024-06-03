@@ -7,19 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabaseTransactionRunner, MySqlTransactionManager};
+use database_common::{run_transactional, MySqlTransactionManager};
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_mysql::MySqlAccountRepository;
 use sqlx::MySqlPool;
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_missing_account_not_found(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_accounts_repo_tests::test_missing_account_not_found(&catalog).await;
         Ok(())
     })
@@ -27,14 +27,14 @@ async fn test_missing_account_not_found(mysql_pool: MySqlPool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_insert_and_locate_cli_account(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_accounts_repo_tests::test_insert_and_locate_password_account(&catalog).await;
         Ok(())
     })
@@ -42,14 +42,14 @@ async fn test_insert_and_locate_cli_account(mysql_pool: MySqlPool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_insert_and_locate_github_account(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_accounts_repo_tests::test_insert_and_locate_github_account(&catalog).await;
         Ok(())
     })
@@ -57,21 +57,17 @@ async fn test_insert_and_locate_github_account(mysql_pool: MySqlPool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_insert_and_locate_multiple_github_account(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(
-        &harness.catalog,
-        |catalog: Catalog| async move {
-            kamu_accounts_repo_tests::test_insert_and_locate_multiple_github_account(&catalog)
-                .await;
-            Ok(())
-        },
-    )
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+        kamu_accounts_repo_tests::test_insert_and_locate_multiple_github_account(&catalog).await;
+        Ok(())
+    })
     .await
     .unwrap();
 }
@@ -83,7 +79,7 @@ async fn test_insert_and_locate_multiple_github_account(mysql_pool: MySqlPool) {
 async fn test_insert_and_locate_account_without_email(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_accounts_repo_tests::test_insert_and_locate_account_without_email(&catalog).await;
         Ok(())
     })
@@ -91,14 +87,14 @@ async fn test_insert_and_locate_account_without_email(mysql_pool: MySqlPool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_duplicate_password_account_id(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_accounts_repo_tests::test_duplicate_password_account_id(&catalog).await;
         Ok(())
     })
@@ -106,14 +102,14 @@ async fn test_duplicate_password_account_id(mysql_pool: MySqlPool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_duplicate_password_account_email(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_accounts_repo_tests::test_duplicate_password_account_email(&catalog).await;
         Ok(())
     })
@@ -121,14 +117,14 @@ async fn test_duplicate_password_account_email(mysql_pool: MySqlPool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_duplicate_github_account_id(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_accounts_repo_tests::test_duplicate_github_account_id(&catalog).await;
         Ok(())
     })
@@ -136,14 +132,14 @@ async fn test_duplicate_github_account_id(mysql_pool: MySqlPool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_duplicate_github_account_name(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_accounts_repo_tests::test_duplicate_github_account_name(&catalog).await;
         Ok(())
     })
@@ -151,14 +147,14 @@ async fn test_duplicate_github_account_name(mysql_pool: MySqlPool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_duplicate_github_account_provider_identity(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_accounts_repo_tests::test_duplicate_github_account_provider_identity(&catalog).await;
         Ok(())
     })
@@ -166,14 +162,14 @@ async fn test_duplicate_github_account_provider_identity(mysql_pool: MySqlPool) 
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_duplicate_github_account_email(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_accounts_repo_tests::test_duplicate_github_account_email(&catalog).await;
         Ok(())
     })
@@ -181,7 +177,7 @@ async fn test_duplicate_github_account_email(mysql_pool: MySqlPool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 struct MySqlAccountRepositoryHarness {
     catalog: Catalog,
@@ -201,4 +197,4 @@ impl MySqlAccountRepositoryHarness {
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////

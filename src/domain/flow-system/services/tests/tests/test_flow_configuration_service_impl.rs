@@ -12,7 +12,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use chrono::{Duration, Utc};
-use database_common::FakeDatabasePlugin;
 use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
 use futures::TryStreamExt;
@@ -433,29 +432,22 @@ impl FlowConfigurationHarness {
         let datasets_dir = tmp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = {
-            let mut builder = CatalogBuilder::new();
-
-            builder
-                .add::<EventBus>()
-                .add::<FlowConfigurationServiceImpl>()
-                .add::<FlowConfigurationEventStoreInMem>()
-                .add::<SystemTimeSourceDefault>()
-                .add_builder(
-                    DatasetRepositoryLocalFs::builder()
-                        .with_root(datasets_dir)
-                        .with_multi_tenant(false),
-                )
-                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .add_value(CurrentAccountSubject::new_test())
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-                .add::<DependencyGraphServiceInMemory>()
-                .add::<FlowConfigEventsListener>();
-
-            FakeDatabasePlugin::init_database_components(&mut builder);
-
-            builder.build()
-        };
+        let catalog = CatalogBuilder::new()
+            .add::<EventBus>()
+            .add::<FlowConfigurationServiceImpl>()
+            .add::<FlowConfigurationEventStoreInMem>()
+            .add::<SystemTimeSourceDefault>()
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(datasets_dir)
+                    .with_multi_tenant(false),
+            )
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add_value(CurrentAccountSubject::new_test())
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add::<FlowConfigEventsListener>()
+            .build();
 
         let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
         let flow_configuration_event_store = catalog

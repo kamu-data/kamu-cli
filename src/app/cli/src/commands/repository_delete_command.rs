@@ -13,9 +13,6 @@ use kamu::domain::*;
 use opendatafabric::RepoName;
 
 use super::{CLIError, Command};
-use crate::commands::common;
-
-/////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RepositoryDeleteCommand {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
@@ -40,6 +37,18 @@ impl RepositoryDeleteCommand {
             all,
             no_confirmation,
         }
+    }
+
+    fn prompt_yes_no(&self, msg: &str) -> bool {
+        use read_input::prelude::*;
+
+        let answer: String = input()
+            .repeat_msg(msg)
+            .default("n".to_owned())
+            .add_test(|v| matches!(v.as_ref(), "n" | "N" | "no" | "y" | "Y" | "yes"))
+            .get();
+
+        !matches!(answer.as_ref(), "n" | "N" | "no")
     }
 }
 
@@ -66,7 +75,7 @@ impl Command for RepositoryDeleteCommand {
         let confirmed = if self.no_confirmation {
             true
         } else {
-            common::prompt_yes_no(&format!(
+            self.prompt_yes_no(&format!(
                 "{}: {}\nDo you wish to continue? [y/N]: ",
                 console::style("You are about to delete following repository(s)").yellow(),
                 repo_names
@@ -97,5 +106,3 @@ impl Command for RepositoryDeleteCommand {
         Ok(())
     }
 }
-
-/////////////////////////////////////////////////////////////////////////////////////////

@@ -7,19 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabaseTransactionRunner, SqliteTransactionManager};
+use database_common::{run_transactional, SqliteTransactionManager};
 use dill::{Catalog, CatalogBuilder};
 use kamu_task_system_sqlite::TaskSystemEventStoreSqlite;
 use sqlx::SqlitePool;
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, sqlite)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
 async fn test_event_store_empty(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_task_system_repo_tests::test_event_store_empty(&catalog).await;
         Ok(())
     })
@@ -27,14 +27,14 @@ async fn test_event_store_empty(sqlite_pool: SqlitePool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, sqlite)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
 async fn test_event_store_get_streams(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_task_system_repo_tests::test_event_store_get_streams(&catalog).await;
         Ok(())
     })
@@ -42,14 +42,14 @@ async fn test_event_store_get_streams(sqlite_pool: SqlitePool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, sqlite)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
 async fn test_event_store_get_events_with_windowing(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_task_system_repo_tests::test_event_store_get_events_with_windowing(&catalog).await;
         Ok(())
     })
@@ -57,14 +57,14 @@ async fn test_event_store_get_events_with_windowing(sqlite_pool: SqlitePool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, sqlite)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
 async fn test_event_store_get_events_by_tasks(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_task_system_repo_tests::test_event_store_get_events_by_tasks(&catalog).await;
         Ok(())
     })
@@ -72,14 +72,14 @@ async fn test_event_store_get_events_by_tasks(sqlite_pool: SqlitePool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, sqlite)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
 async fn test_event_store_get_dataset_tasks(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_task_system_repo_tests::test_event_store_get_dataset_tasks(&catalog).await;
         Ok(())
     })
@@ -87,7 +87,7 @@ async fn test_event_store_get_dataset_tasks(sqlite_pool: SqlitePool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 struct SqliteAccountRepositoryHarness {
     catalog: Catalog,
@@ -107,4 +107,4 @@ impl SqliteAccountRepositoryHarness {
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////

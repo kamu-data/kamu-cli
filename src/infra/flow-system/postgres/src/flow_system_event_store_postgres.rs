@@ -16,13 +16,13 @@ use sqlx::{FromRow, Postgres, QueryBuilder};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct FlowConfigurationEventStorePostgres {
+pub struct FlowSystemEventStorePostgres {
     transaction: TransactionRefT<Postgres>,
 }
 
 #[component(pub)]
 #[interface(dyn FlowConfigurationEventStore)]
-impl FlowConfigurationEventStorePostgres {
+impl FlowSystemEventStorePostgres {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
@@ -113,7 +113,7 @@ impl FlowConfigurationEventStorePostgres {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl EventStore<FlowConfigurationState> for FlowConfigurationEventStorePostgres {
+impl EventStore<FlowConfigurationState> for FlowSystemEventStorePostgres {
     async fn get_events(
         &self,
         flow_key: &FlowKey,
@@ -228,7 +228,7 @@ impl EventStore<FlowConfigurationState> for FlowConfigurationEventStorePostgres 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowConfigurationEventStore for FlowConfigurationEventStorePostgres {
+impl FlowConfigurationEventStore for FlowSystemEventStorePostgres {
     async fn list_all_dataset_ids(&self) -> FailableDatasetIDStream<'_> {
         let mut tr = self.transaction.lock().await;
 

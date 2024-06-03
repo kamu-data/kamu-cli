@@ -34,7 +34,8 @@ impl PostgresAccountRepository {
 #[async_trait::async_trait]
 impl AccountRepository for PostgresAccountRepository {
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
-        let mut tr = self.transaction.lock().await;
+        let mut tr: database_common::TransactionGuard<'_, sqlx::Postgres> =
+            self.transaction.lock().await;
 
         let connection_mut = tr
             .connection_mut()

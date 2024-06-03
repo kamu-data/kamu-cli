@@ -7,19 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabaseTransactionRunner, SqliteTransactionManager};
+use database_common::{run_transactional, SqliteTransactionManager};
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_sqlite::SqliteAccountRepository;
 use sqlx::SqlitePool;
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, sqlite)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
 async fn test_no_password_stored(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_accounts_repo_tests::test_no_password_stored(&catalog).await;
         Ok(())
     })
@@ -27,14 +27,14 @@ async fn test_no_password_stored(sqlite_pool: SqlitePool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, sqlite)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
 async fn test_store_couple_account_passwords(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         kamu_accounts_repo_tests::test_store_couple_account_passwords(&catalog).await;
         Ok(())
     })
@@ -42,7 +42,7 @@ async fn test_store_couple_account_passwords(sqlite_pool: SqlitePool) {
     .unwrap();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
 struct SqliteAccountRepositoryHarness {
     catalog: Catalog,
@@ -62,4 +62,4 @@ impl SqliteAccountRepositoryHarness {
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////

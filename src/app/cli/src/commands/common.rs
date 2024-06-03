@@ -11,12 +11,9 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use kamu::domain::PullImageListener;
-
-/////////////////////////////////////////////////////////////////////////////////////////
+use read_input::prelude::*;
 
 pub fn prompt_yes_no(msg: &str) -> bool {
-    use read_input::prelude::*;
-
     let answer: String = input()
         .repeat_msg(msg)
         .default("n".to_owned())
@@ -58,5 +55,3 @@ impl PullImageListener for PullImageProgress {
         self.progress_bar.lock().unwrap().take();
     }
 }
-
-/////////////////////////////////////////////////////////////////////////////////////////

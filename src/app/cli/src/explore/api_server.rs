@@ -11,7 +11,6 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use dill::Catalog;
-use indoc::indoc;
 use internal_error::*;
 use kamu::domain::SystemTimeSource;
 use kamu_flow_system_inmem::domain::FlowService;
@@ -104,9 +103,6 @@ impl APIServer {
                     )
                     .layer(Extension(base_catalog))
                     .layer(Extension(gql_schema))
-                    // TODO: Use a more subtle application of this middleware,
-                    //       since not for every request, we need a transaction
-                    .layer(kamu_adapter_http::RunInDatabaseTransactionLayer::new())
                     .layer(kamu_adapter_http::AuthenticationLayer::new()),
             );
 
@@ -141,14 +137,14 @@ impl APIServer {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn root() -> impl axum::response::IntoResponse {
-    axum::response::Html(indoc!(
+    axum::response::Html(
         r#"
-        <h1>Kamu HTTP Server</h1>
-        <ul>
-            <li><a href="/graphql">GraphQL Playground</li>
-        </ul>
-        "#
-    ))
+<h1>Kamu HTTP Server</h1>
+<ul>
+    <li><a href="/graphql">GraphQL Playground</li>
+</ul>
+"#,
+    )
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
