@@ -136,19 +136,34 @@ pub async fn run(
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
-    let result = match cli_commands::get_command(&base_catalog, &cli_catalog, &matches) {
-        Ok(mut command) => {
-            if command.needs_workspace() && !workspace_svc.is_in_workspace() {
-                Err(CLIError::usage_error_from(NotInWorkspace))
-            } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
-                Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-            } else if current_account.is_explicit() && !is_multi_tenant_workspace {
-                Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
-            } else {
-                command.run().await
+    // TODO: Extend Command trait with the corresponding property
+    let need_to_wrap_with_transaction = matches!(matches.subcommand(), Some(("login", _)));
+    let run_command = move |cli_catalog: Catalog| async move {
+        match cli_commands::get_command(&base_catalog, &cli_catalog, &matches) {
+            Ok(mut command) => {
+                if command.needs_workspace() && !workspace_svc.is_in_workspace() {
+                    Err(CLIError::usage_error_from(NotInWorkspace))
+                } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
+                    Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
+                } else if current_account.is_explicit() && !is_multi_tenant_workspace {
+                    Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
+                } else {
+                    command.run().await
+                }
             }
+            Err(e) => Err(e),
         }
-        Err(e) => Err(e),
+    };
+    let result = if need_to_wrap_with_transaction {
+        DatabaseTransactionRunner::run_transactional(
+            &cli_catalog,
+            |cli_catalog_with_transaction| async move {
+                run_command(cli_catalog_with_transaction).await
+            },
+        )
+        .await
+    } else {
+        run_command(cli_catalog).await
     };
 
     match &result {

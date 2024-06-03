@@ -14,6 +14,8 @@ use url::Url;
 use crate::commands::*;
 use crate::{accounts, odf_server, CommandInterpretationFailed, WorkspaceService};
 
+////////////////////////////////////////////////////////////////////////////////
+
 pub fn get_command(
     base_catalog: &dill::Catalog,
     cli_catalog: &dill::Catalog,
@@ -580,6 +582,10 @@ pub fn get_command(
     Ok(command)
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Dataset reference validation
+////////////////////////////////////////////////////////////////////////////////
+
 fn validate_dataset_ref(
     catalog: &dill::Catalog,
     dataset_ref: DatasetRef,
@@ -645,3 +651,5 @@ where
         .map(|p| validate_dataset_ref_pattern(catalog, p))
         .collect()
 }
+
+////////////////////////////////////////////////////////////////////////////////
