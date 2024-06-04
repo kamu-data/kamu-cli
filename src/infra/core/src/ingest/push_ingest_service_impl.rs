@@ -185,7 +185,10 @@ impl PushIngestServiceImpl {
         let commit_result = dataset
             .commit_event(
                 MetadataEvent::AddPushSource(add_push_source_event.clone()),
-                CommitOpts::default(),
+                CommitOpts {
+                    system_time: opts.source_event_time,
+                    ..CommitOpts::default()
+                },
             )
             .await;
         match commit_result {

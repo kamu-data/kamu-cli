@@ -73,7 +73,12 @@ pub async fn dataset_ingest_handler(
 
     // TODO: Settle on the header name and document it
     let source_event_time: Option<DateTime<Utc>> =
-        get_header(&headers, "odf-event-time", DateTime::parse_from_rfc3339)?.map(Into::into);
+        get_header(&headers, "odf-event-time", DateTime::parse_from_rfc3339)?
+            .map(Into::into)
+            .or_else(|| {
+                let time_source = catalog.get_one::<dyn SystemTimeSource>().unwrap();
+                Some(time_source.now())
+            });
 
     let ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
     match ingest_svc
