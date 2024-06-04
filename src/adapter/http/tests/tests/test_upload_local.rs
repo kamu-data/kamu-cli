@@ -187,6 +187,7 @@ async fn test_attempt_upload_file_authorized() {
             .await
             .unwrap();
         assert_eq!("POST", upload_context.method);
+        assert!(upload_context.use_multipart);
         assert!(upload_context.fields.is_empty());
 
         let upload_main_url = upload_context.upload_url;

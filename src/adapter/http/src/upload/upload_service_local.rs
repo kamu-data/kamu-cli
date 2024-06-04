@@ -101,6 +101,7 @@ impl UploadService for UploadServiceLocal {
             upload_url,
             upload_token,
             method: "POST".to_string(),
+            use_multipart: true,
             headers: vec![(
                 String::from("Authorization"),
                 format!("Bearer {}", access_token.token),

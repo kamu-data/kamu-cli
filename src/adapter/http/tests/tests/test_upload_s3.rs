@@ -160,6 +160,7 @@ async fn test_attempt_upload_file_authorized() {
             .await
             .unwrap();
         assert_eq!("PUT", upload_context.method);
+        assert!(!upload_context.use_multipart);
         assert!(upload_context.fields.is_empty());
 
         assert_eq!(
@@ -180,7 +181,7 @@ async fn test_attempt_upload_file_authorized() {
         let s3_upload_response = client
             .put(upload_main_url.clone())
             .headers(header_map)
-            .body(FILE_BODY) // Note: real S3 expects multi-part form, but Minio wants a raw body
+            .body(FILE_BODY)
             .send()
             .await
             .unwrap();

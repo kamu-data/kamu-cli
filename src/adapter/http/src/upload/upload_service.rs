@@ -54,6 +54,7 @@ pub trait UploadService: Send + Sync {
 pub struct UploadContext {
     pub upload_url: String,
     pub method: String,
+    pub use_multipart: bool,
     pub headers: Vec<(String, String)>,
     pub fields: Vec<(String, String)>,
     pub upload_token: String,

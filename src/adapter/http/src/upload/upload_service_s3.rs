@@ -97,6 +97,7 @@ impl UploadService for UploadServiceS3 {
             upload_url: String::from(presigned_request.uri()),
             upload_token,
             method: String::from("PUT"),
+            use_multipart: false, // Only POST Policy would require multiparts
             headers: presigned_request
                 .headers()
                 .map(|(key, value)| (key.to_string(), value.to_string()))
