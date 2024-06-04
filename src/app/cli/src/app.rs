@@ -137,7 +137,13 @@ pub async fn run(
     }
 
     // TODO: Extend Command trait with the corresponding property
-    let need_to_wrap_with_transaction = matches!(matches.subcommand(), Some(("login", _)));
+    let need_to_wrap_with_transaction = match matches.subcommand() {
+        Some(("login", _)) => true,
+        Some(("add", _)) => true,
+        Some(("delete", _)) => true,
+        Some(("pull", _)) => true,
+        _ => false,
+    };
     let run_command = move |cli_catalog: Catalog| async move {
         match cli_commands::get_command(&base_catalog, &cli_catalog, &matches) {
             Ok(mut command) => {
