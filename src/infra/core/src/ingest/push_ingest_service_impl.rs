@@ -84,19 +84,25 @@ impl PushIngestServiceImpl {
         let ctx: SessionContext =
             ingest_common::new_session_context(self.object_store_registry.clone());
 
-        let data_writer = match DataWriterDataFusion::builder(dataset.clone(), ctx.clone())
-            .with_metadata_state_scanned(source_name)
-            .await
-        {
-            Ok(b) => Ok(b.build()),
-            Err(ScanMetadataError::SourceNotFound(err)) => {
-                Err(PushIngestError::SourceNotFound(err.into()))
-            }
-            Err(ScanMetadataError::Internal(err)) => Err(PushIngestError::Internal(err)),
-        }?;
+        let mut data_writer = self
+            .make_data_writer(dataset.clone(), source_name, ctx.clone())
+            .await?;
 
         let push_source = match data_writer.source_event() {
+            None => {
+                let add_push_source_event = self
+                    .auto_create_push_source(dataset.clone(), "auto", &opts)
+                    .await?;
+
+                // Update data writer, as we've modified the dataset
+                data_writer = self
+                    .make_data_writer(dataset.clone(), source_name, ctx.clone())
+                    .await?;
+                Ok(add_push_source_event)
+            }
+
             Some(MetadataEvent::AddPushSource(e)) => Ok(e.clone()),
+
             _ => Err(PushIngestError::SourceNotFound(
                 PushSourceNotFoundError::new(source_name),
             )),
@@ -127,6 +133,64 @@ impl PushIngestServiceImpl {
                 listener.error(&err);
                 Err(err)
             }
+        }
+    }
+
+    async fn make_data_writer(
+        &self,
+        dataset: Arc<dyn Dataset>,
+        source_name: Option<&str>,
+        ctx: SessionContext,
+    ) -> Result<DataWriterDataFusion, PushIngestError> {
+        match DataWriterDataFusion::builder(dataset, ctx)
+            .with_metadata_state_scanned(source_name)
+            .await
+        {
+            Ok(b) => Ok(b.build()),
+            Err(ScanMetadataError::SourceNotFound(err)) => {
+                Err(PushIngestError::SourceNotFound(err.into()))
+            }
+            Err(ScanMetadataError::Internal(err)) => Err(PushIngestError::Internal(err)),
+        }
+    }
+
+    async fn auto_create_push_source(
+        &self,
+        dataset: Arc<dyn Dataset>,
+        source_name: &str,
+        opts: &PushIngestOpts,
+    ) -> Result<AddPushSource, PushIngestError> {
+        let read = match &opts.media_type {
+            Some(media_type) => {
+                match self
+                    .data_format_registry
+                    .get_best_effort_config(None, media_type)
+                {
+                    Ok(read_step) => Ok(read_step),
+                    Err(e) => Err(PushIngestError::UnsupportedMediaType(e)),
+                }
+            }
+            None => Err(PushIngestError::SourceNotFound(
+                PushSourceNotFoundError::new(Some(source_name)),
+            )),
+        }?;
+
+        let add_push_source_event = AddPushSource {
+            source_name: String::from("auto"),
+            read,
+            preprocess: None,
+            merge: opendatafabric::MergeStrategy::Append(opendatafabric::MergeStrategyAppend {}),
+        };
+
+        let commit_result = dataset
+            .commit_event(
+                MetadataEvent::AddPushSource(add_push_source_event.clone()),
+                CommitOpts::default(),
+            )
+            .await;
+        match commit_result {
+            Ok(_) => Ok(add_push_source_event),
+            Err(e) => Err(PushIngestError::CommitError(e)),
         }
     }
 
