@@ -56,11 +56,15 @@ random-names = { workspace = true }
 
 kamu-flow-system-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
+# TODO: Activate after preparing services for transactional work
+# kamu-flow-system-postgres = { workspace = true }
+# kamu-flow-system-sqlite = { workspace = true }
 
 kamu-task-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
-kamu-task-system-postgres = { workspace = true }
-kamu-task-system-sqlite = { workspace = true }
+# TODO: Activate after preparing services for transactional work
+# kamu-task-system-postgres = { workspace = true }
+# kamu-task-system-sqlite = { workspace = true }
 
 kamu-accounts = { workspace = true }
 kamu-accounts-services = { workspace = true }
@@ -68,8 +72,6 @@ kamu-accounts-inmem = { workspace = true }
 kamu-accounts-postgres = { workspace = true }
 kamu-accounts-mysql = { workspace = true }
 kamu-accounts-sqlite = { workspace = true }
-kamu-flow-system-postgres = { workspace = true }
-kamu-flow-system-sqlite = { workspace = true }
 
 # CLI
 chrono-humanize = "0.2"                                           # Human readable durations
