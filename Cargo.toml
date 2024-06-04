@@ -10,6 +10,7 @@ members = [
     "src/utils/event-sourcing",
     "src/utils/event-sourcing-macros",
     "src/utils/internal-error",
+    "src/utils/kamu-cli-wrapper",
     "src/utils/multiformats",
     "src/utils/random-names",
     "src/utils/repo-tools",
@@ -66,6 +67,7 @@ event-bus = { version = "0.185.1", path = "src/utils/event-bus", default-feature
 event-sourcing = { version = "0.185.1", path = "src/utils/event-sourcing", default-features = false }
 event-sourcing-macros = { version = "0.185.1", path = "src/utils/event-sourcing-macros", default-features = false }
 internal-error = { version = "0.185.1", path = "src/utils/internal-error", default-features = false }
+kamu-cli-wrapper = { version = "0.185.1", path = "src/utils/kamu-cli-wrapper", default-features = false }
 multiformats = { version = "0.185.1", path = "src/utils/multiformats", default-features = false }
 kamu-data-utils = { version = "0.185.1", path = "src/utils/data-utils", default-features = false }
 kamu-datafusion-cli = { version = "0.185.1", path = "src/utils/datafusion-cli", default-features = false }

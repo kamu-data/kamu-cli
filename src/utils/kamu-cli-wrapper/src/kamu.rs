@@ -16,12 +16,14 @@ use chrono::{DateTime, Utc};
 use datafusion::prelude::*;
 use dill::Component;
 use event_bus::EventBus;
-use kamu::domain::*;
 use kamu::*;
 use kamu_cli::*;
+use kamu_core::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 use thiserror::Error;
+
+////////////////////////////////////////////////////////////////////////////////
 
 // Test wrapper on top of CLI library
 pub struct Kamu {
@@ -81,7 +83,7 @@ impl Kamu {
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(self.current_account.to_current_account_subject())
-            .add::<domain::auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(self.workspace_layout.datasets_dir.clone())
@@ -176,7 +178,7 @@ impl Kamu {
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(self.current_account.to_current_account_subject())
-            .add::<domain::auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(self.workspace_layout.datasets_dir.clone())
@@ -242,7 +244,7 @@ impl Kamu {
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(self.current_account.to_current_account_subject())
-            .add::<domain::auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(self.workspace_layout.datasets_dir.clone())
@@ -279,3 +281,5 @@ pub struct CommandError {
     pub cmd: Vec<OsString>,
     pub error: CLIError,
 }
+
+////////////////////////////////////////////////////////////////////////////////

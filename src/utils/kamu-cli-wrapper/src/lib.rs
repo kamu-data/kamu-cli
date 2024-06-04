@@ -8,4 +8,4 @@
 // by the Apache License, Version 2.0.
 
 mod kamu;
-pub use self::kamu::*;
+pub use kamu::*;

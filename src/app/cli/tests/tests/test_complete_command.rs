@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_cli_wrapper::Kamu;
 use opendatafabric::*;
 
-use crate::utils::Kamu;
+////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_complete_subcommand() {
@@ -44,3 +45,5 @@ async fn test_complete_dataset_name() {
     let completions = kamu.complete("kamu log", 2).await.unwrap();
     assert_eq!(completions, ["foo.bar"]);
 }
+
+////////////////////////////////////////////////////////////////////////////////

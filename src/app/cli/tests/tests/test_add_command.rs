@@ -10,9 +10,10 @@
 use futures::TryStreamExt;
 use kamu::domain;
 use kamu::testing::MetadataFactory;
+use kamu_cli_wrapper::Kamu;
 use opendatafabric as odf;
 
-use crate::utils::Kamu;
+////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_add_recursive() {
@@ -88,3 +89,5 @@ async fn test_add_recursive() {
 
     assert_eq!(datasets, ["commented", "plain"]);
 }
+
+////////////////////////////////////////////////////////////////////////////////
