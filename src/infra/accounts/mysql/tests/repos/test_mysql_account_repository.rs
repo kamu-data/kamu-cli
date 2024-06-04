@@ -64,14 +64,10 @@ async fn test_insert_and_locate_github_account(mysql_pool: MySqlPool) {
 async fn test_insert_and_locate_multiple_github_account(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(
-        &harness.catalog,
-        |catalog: Catalog| async move {
-            kamu_accounts_repo_tests::test_insert_and_locate_multiple_github_account(&catalog)
-                .await;
-            Ok(())
-        },
-    )
+    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
+        kamu_accounts_repo_tests::test_insert_and_locate_multiple_github_account(&catalog).await;
+        Ok(())
+    })
     .await
     .unwrap();
 }
