@@ -63,11 +63,6 @@ impl Kamu {
 
         inst.execute(["init"]).await.unwrap();
 
-        // TODO: Remove when podman is the default
-        inst.execute(["config", "set", "engine.runtime", "podman"])
-            .await
-            .unwrap();
-
         inst
     }
 
