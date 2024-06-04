@@ -75,14 +75,14 @@ impl Harness {
         self.api_server.local_addr().to_string()
     }
 
-    fn upload_get_url(&self, file_name: &str, file_size: usize) -> String {
+    fn upload_prepare_url(&self, file_name: &str, file_size: usize) -> String {
         format!(
-            "http://{}/platform/file/upload?fileName={file_name}&contentLength={file_size}",
+            "http://{}/platform/file/upload/prepare?fileName={file_name}&contentLength={file_size}",
             self.api_server_addr(),
         )
     }
 
-    fn upload_post_url(&self, upload_id: &str, file_name: &str) -> String {
+    fn upload_main_url(&self, upload_id: &str, file_name: &str) -> String {
         format!(
             "http://{}/platform/file/upload/{}/{}",
             self.api_server_addr(),
@@ -115,21 +115,25 @@ impl Harness {
 #[test_log::test(tokio::test)]
 async fn test_attempt_upload_file_unauthorized() {
     let harness = Harness::new();
-    let upload_get_url = harness.upload_get_url("test.txt", 100);
-    let upload_post_url = harness.upload_post_url("upload-1", "test.txt");
+    let upload_prepare_url = harness.upload_prepare_url("test.txt", 100);
+    let upload_main_url = harness.upload_main_url("upload-1", "test.txt");
 
     let client = async move {
         let client = reqwest::Client::new();
 
-        let upload_get_response = client.get(upload_get_url.clone()).send().await.unwrap();
-        assert_eq!(401, upload_get_response.status());
+        let upload_prepare_response = client
+            .post(upload_prepare_url.clone())
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(401, upload_prepare_response.status());
         assert_eq!(
             "No authentication token provided",
-            upload_get_response.text().await.unwrap()
+            upload_prepare_response.text().await.unwrap()
         );
 
-        let upload_post_reponse = client
-            .post(upload_post_url)
+        let upload_main_reponse = client
+            .post(upload_main_url)
             .multipart(
                 reqwest::multipart::Form::new().part(
                     "file",
@@ -142,10 +146,10 @@ async fn test_attempt_upload_file_unauthorized() {
             .send()
             .await
             .unwrap();
-        assert_eq!(401, upload_post_reponse.status());
+        assert_eq!(401, upload_main_reponse.status());
         assert_eq!(
             "No authentication token provided",
-            upload_post_reponse.text().await.unwrap()
+            upload_main_reponse.text().await.unwrap()
         );
     };
 
@@ -159,29 +163,32 @@ async fn test_attempt_upload_file_authorized() {
     const FILE_BODY: &str = "a-test-file-body";
 
     let harness = Harness::new();
-    let upload_url = harness.upload_get_url("test.txt", FILE_BODY.len());
+    let upload_prepare_url = harness.upload_prepare_url("test.txt", FILE_BODY.len());
     let access_token = harness.access_token.clone();
     let cache_dir = harness.cache_dir.clone();
 
     let client = async move {
         let client = reqwest::Client::new();
 
-        let upload_get_response = client
-            .get(upload_url)
+        let upload_prepare_response = client
+            .post(upload_prepare_url)
             .bearer_auth(access_token.clone())
             .send()
             .await
             .unwrap();
 
-        assert_eq!(200, upload_get_response.status());
-        let upload_context = upload_get_response.json::<UploadContext>().await.unwrap();
+        assert_eq!(200, upload_prepare_response.status());
+        let upload_context = upload_prepare_response
+            .json::<UploadContext>()
+            .await
+            .unwrap();
         assert_eq!("POST", upload_context.method);
         assert!(upload_context.fields.is_empty());
 
-        let upload_url = upload_context.upload_url;
+        let upload_main_url = upload_context.upload_url;
 
-        let upload_response = client
-            .post(upload_url.clone())
+        let upload_main_response = client
+            .post(upload_main_url.clone())
             .bearer_auth(access_token)
             .multipart(
                 reqwest::multipart::Form::new().part(
@@ -196,9 +203,10 @@ async fn test_attempt_upload_file_authorized() {
             .await
             .unwrap();
 
-        assert_eq!(200, upload_response.status());
+        assert_eq!(200, upload_main_response.status());
 
-        let expected_upload_path = Harness::target_path_from_upload_url(&cache_dir, &upload_url);
+        let expected_upload_path =
+            Harness::target_path_from_upload_url(&cache_dir, &upload_main_url);
         let file_body = std::fs::read_to_string(expected_upload_path).unwrap();
         assert_eq!(FILE_BODY, file_body);
     };
@@ -220,28 +228,28 @@ async fn test_attempt_upload_file_that_is_too_large() {
          publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
 
     let harness = Harness::new();
-    let upload_url = harness.upload_get_url("test.txt", FILE_BODY.len());
-    let upload_post_url = harness.upload_post_url("upload-1", "test.txt");
+    let upload_prepare_url = harness.upload_prepare_url("test.txt", FILE_BODY.len());
+    let upload_main_url = harness.upload_main_url("upload-1", "test.txt");
     let access_token = harness.access_token.clone();
 
     let client = async move {
         let client = reqwest::Client::new();
 
-        let upload_get_response = client
-            .get(upload_url)
+        let upload_prepare_response = client
+            .post(upload_prepare_url)
             .bearer_auth(access_token.clone())
             .send()
             .await
             .unwrap();
 
-        assert_eq!(400, upload_get_response.status());
+        assert_eq!(400, upload_prepare_response.status());
         assert_eq!(
             "Content too large",
-            upload_get_response.text().await.unwrap()
+            upload_prepare_response.text().await.unwrap()
         );
 
-        let upload_post_reponse = client
-            .post(upload_post_url)
+        let upload_main_reponse = client
+            .post(upload_main_url)
             .bearer_auth(access_token.clone())
             .multipart(
                 reqwest::multipart::Form::new().part(
@@ -255,10 +263,10 @@ async fn test_attempt_upload_file_that_is_too_large() {
             .send()
             .await
             .unwrap();
-        assert_eq!(400, upload_post_reponse.status());
+        assert_eq!(400, upload_main_reponse.status());
         assert_eq!(
             "Content too large",
-            upload_post_reponse.text().await.unwrap()
+            upload_main_reponse.text().await.unwrap()
         );
     };
 

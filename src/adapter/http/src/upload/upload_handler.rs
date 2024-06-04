@@ -26,7 +26,7 @@ pub struct PlatformFileUploadQuery {
     content_length: usize,
 }
 
-pub async fn platform_file_upload_get_handler(
+pub async fn platform_file_upload_prepare_post_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
     axum::extract::Query(query): axum::extract::Query<PlatformFileUploadQuery>,
 ) -> Result<axum::Json<Value>, ApiError> {
