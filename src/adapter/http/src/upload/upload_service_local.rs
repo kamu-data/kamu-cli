@@ -19,7 +19,10 @@ use tokio::io::AsyncRead;
 use uuid::Uuid;
 
 use crate::{
+    decode_upload_token_payload,
+    make_upload_token,
     AccessToken,
+    ContentLengthMismatchError,
     ContentTooLargeError,
     FileUploadLimitConfig,
     MakeUploadContextError,
@@ -71,6 +74,7 @@ impl UploadService for UploadServiceLocal {
         &self,
         account_id: &AccountID,
         file_name: String,
+        content_type: String,
         content_length: usize,
         access_token: &AccessToken,
     ) -> Result<UploadContext, MakeUploadContextError> {
@@ -86,16 +90,16 @@ impl UploadService for UploadServiceLocal {
         std::fs::create_dir_all(upload_folder_path)
             .map_err(|e| MakeUploadContextError::Internal(e.int_err()))?;
 
+        let upload_token = make_upload_token(upload_id, file_name, content_type, content_length);
+
         let upload_url = format!(
-            "{}platform/file/upload/{}/{}",
-            self.server_url_config.protocols.base_url_rest,
-            upload_id.clone(),
-            file_name
+            "{}platform/file/upload/{}",
+            self.server_url_config.protocols.base_url_rest, upload_token
         );
 
         let context = UploadContext {
-            upload_id,
             upload_url,
+            upload_token,
             method: "POST".to_string(),
             headers: vec![(
                 String::from("Authorization"),
@@ -123,8 +127,7 @@ impl UploadService for UploadServiceLocal {
     async fn save_upload(
         &self,
         account_id: &AccountID,
-        upload_id: String,
-        file_name: String,
+        upload_token: &str,
         content_length: usize,
         file_data: Bytes,
     ) -> Result<(), SaveUploadError> {
@@ -132,9 +135,21 @@ impl UploadService for UploadServiceLocal {
             return Err(SaveUploadError::TooLarge(ContentTooLargeError {}));
         }
 
+        let upload_token_payload =
+            decode_upload_token_payload(upload_token).map_err(SaveUploadError::Internal)?;
+
+        if content_length != upload_token_payload.content_length {
+            return Err(SaveUploadError::ContentLengthMismatch(
+                ContentLengthMismatchError {
+                    declared: upload_token_payload.content_length,
+                    actual: content_length,
+                },
+            ));
+        }
+
         let upload_folder_path = self
             .make_account_folder_path(account_id)
-            .join(upload_id.clone());
+            .join(upload_token_payload.upload_id.clone());
         if !upload_folder_path.is_dir() {
             return Err(SaveUploadError::Internal(
                 SaveUploadFailure {
@@ -144,7 +159,7 @@ impl UploadService for UploadServiceLocal {
             ));
         }
 
-        let file_path = upload_folder_path.join(file_name);
+        let file_path = upload_folder_path.join(upload_token_payload.file_name);
         tokio::fs::write(&file_path, file_data).await.map_err(|e| {
             tracing::error!("{:?}", e);
             SaveUploadError::Internal(e.int_err())

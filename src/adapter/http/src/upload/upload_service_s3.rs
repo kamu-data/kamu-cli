@@ -20,6 +20,7 @@ use tokio::io::AsyncRead;
 use uuid::Uuid;
 
 use crate::{
+    make_upload_token,
     AccessToken,
     ContentTooLargeError,
     FileUploadLimitConfig,
@@ -58,6 +59,7 @@ impl UploadService for UploadServiceS3 {
         &self,
         account_id: &AccountID,
         file_name: String,
+        content_type: String,
         content_length: usize,
         _: &AccessToken, // S3 does not require our own token
     ) -> Result<UploadContext, MakeUploadContextError> {
@@ -89,9 +91,11 @@ impl UploadService for UploadServiceS3 {
             .await
             .map_err(|e| MakeUploadContextError::Internal(e.int_err()))?;
 
+        let upload_token = make_upload_token(upload_id, file_name, content_type, content_length);
+
         Ok(UploadContext {
-            upload_id,
             upload_url: String::from(presigned_request.uri()),
+            upload_token,
             method: String::from("PUT"),
             headers: presigned_request
                 .headers()
@@ -121,8 +125,7 @@ impl UploadService for UploadServiceS3 {
     async fn save_upload(
         &self,
         _: &AccountID,
-        _: String,
-        _: String,
+        _: &str,
         _: usize,
         _: Bytes,
     ) -> Result<(), SaveUploadError> {

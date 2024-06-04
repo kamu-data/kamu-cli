@@ -24,6 +24,7 @@ use crate::{AccessToken, MakeUploadContextError, SaveUploadError, UploadService}
 pub struct PlatformFileUploadQuery {
     file_name: String,
     content_length: usize,
+    content_type: String,
 }
 
 pub async fn platform_file_upload_prepare_post_handler(
@@ -45,6 +46,7 @@ pub async fn platform_file_upload_prepare_post_handler(
         .make_upload_context(
             &account_id,
             query.file_name,
+            query.content_type,
             query.content_length,
             access_token.as_ref(),
         )
@@ -62,8 +64,7 @@ pub async fn platform_file_upload_prepare_post_handler(
 
 #[derive(serde::Deserialize)]
 pub struct UploadFromPath {
-    upload_id: String,
-    file_name: String,
+    upload_token: String,
 }
 
 #[allow(clippy::unused_async)]
@@ -89,8 +90,7 @@ pub async fn platform_file_upload_post_handler(
     match upload_local_service
         .save_upload(
             &account_id,
-            upload_param.upload_id,
-            upload_param.file_name,
+            &upload_param.upload_token,
             file_data.len(),
             file_data,
         )
@@ -99,6 +99,7 @@ pub async fn platform_file_upload_post_handler(
         Ok(_) => Ok(()),
         Err(e) => match e {
             SaveUploadError::TooLarge(e) => Err(ApiError::bad_request(e)),
+            SaveUploadError::ContentLengthMismatch(e) => Err(ApiError::bad_request(e)),
             SaveUploadError::Internal(e) => Err(e.api_err()),
             SaveUploadError::NotSupported(e) => Err(ApiError::bad_request(e)),
         },

@@ -16,7 +16,13 @@ use kamu::domain::{InternalError, ResultIntoInternal, ServerUrlConfig, SystemTim
 use kamu_accounts::{JwtAuthenticationConfig, PredefinedAccountsConfig, DEFAULT_ACCOUNT_ID};
 use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::{AuthenticationServiceImpl, LoginPasswordAuthProvider};
-use kamu_adapter_http::{FileUploadLimitConfig, UploadContext, UploadService, UploadServiceLocal};
+use kamu_adapter_http::{
+    decode_upload_token_payload,
+    FileUploadLimitConfig,
+    UploadContext,
+    UploadService,
+    UploadServiceLocal,
+};
 
 use crate::harness::{await_client_server_flow, TestAPIServer};
 
@@ -75,20 +81,15 @@ impl Harness {
         self.api_server.local_addr().to_string()
     }
 
-    fn upload_prepare_url(&self, file_name: &str, file_size: usize) -> String {
+    fn upload_prepare_url(&self, file_name: &str, content_type: &str, file_size: usize) -> String {
         format!(
-            "http://{}/platform/file/upload/prepare?fileName={file_name}&contentLength={file_size}",
+            "http://{}/platform/file/upload/prepare?fileName={file_name}&contentType={content_type}&contentLength={file_size}",
             self.api_server_addr(),
         )
     }
 
-    fn upload_main_url(&self, upload_id: &str, file_name: &str) -> String {
-        format!(
-            "http://{}/platform/file/upload/{}/{}",
-            self.api_server_addr(),
-            upload_id,
-            file_name
-        )
+    fn upload_main_url(&self) -> String {
+        format!("http://{}/platform/file/upload", self.api_server_addr(),)
     }
 
     fn target_path_from_upload_url(cache_dir: &Path, upload_url: &str) -> PathBuf {
@@ -99,10 +100,13 @@ impl Harness {
             .add(PATTERN.len());
 
         let url_suffix = &upload_url[pos..];
+        let upload_token_payload = decode_upload_token_payload(url_suffix).unwrap();
+
         cache_dir
             .join("uploads")
             .join(DEFAULT_ACCOUNT_ID.as_multibase().to_string())
-            .join(url_suffix)
+            .join(upload_token_payload.upload_id)
+            .join(upload_token_payload.file_name)
     }
 
     async fn api_server_run(self) -> Result<(), InternalError> {
@@ -115,8 +119,8 @@ impl Harness {
 #[test_log::test(tokio::test)]
 async fn test_attempt_upload_file_unauthorized() {
     let harness = Harness::new();
-    let upload_prepare_url = harness.upload_prepare_url("test.txt", 100);
-    let upload_main_url = harness.upload_main_url("upload-1", "test.txt");
+    let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", 100);
+    let upload_main_url = harness.upload_main_url();
 
     let client = async move {
         let client = reqwest::Client::new();
@@ -133,7 +137,7 @@ async fn test_attempt_upload_file_unauthorized() {
         );
 
         let upload_main_reponse = client
-            .post(upload_main_url)
+            .post(format!("{upload_main_url}/someUploadToken"))
             .multipart(
                 reqwest::multipart::Form::new().part(
                     "file",
@@ -163,7 +167,7 @@ async fn test_attempt_upload_file_authorized() {
     const FILE_BODY: &str = "a-test-file-body";
 
     let harness = Harness::new();
-    let upload_prepare_url = harness.upload_prepare_url("test.txt", FILE_BODY.len());
+    let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
     let access_token = harness.access_token.clone();
     let cache_dir = harness.cache_dir.clone();
 
@@ -228,8 +232,8 @@ async fn test_attempt_upload_file_that_is_too_large() {
          publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
 
     let harness = Harness::new();
-    let upload_prepare_url = harness.upload_prepare_url("test.txt", FILE_BODY.len());
-    let upload_main_url = harness.upload_main_url("upload-1", "test.txt");
+    let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
+    let upload_main_url = harness.upload_main_url();
     let access_token = harness.access_token.clone();
 
     let client = async move {
@@ -249,7 +253,7 @@ async fn test_attempt_upload_file_that_is_too_large() {
         );
 
         let upload_main_reponse = client
-            .post(upload_main_url)
+            .post(format!("{upload_main_url}/someUploadToken"))
             .bearer_auth(access_token.clone())
             .multipart(
                 reqwest::multipart::Form::new().part(
@@ -267,6 +271,59 @@ async fn test_attempt_upload_file_that_is_too_large() {
         assert_eq!(
             "Content too large",
             upload_main_reponse.text().await.unwrap()
+        );
+    };
+
+    await_client_server_flow!(harness.api_server_run(), client);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_attempt_upload_file_that_has_different_length_than_declared() {
+    const FILE_BODY: &str = "Some text";
+
+    let harness = Harness::new();
+    let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
+    let access_token = harness.access_token.clone();
+
+    let client = async move {
+        let client = reqwest::Client::new();
+
+        let upload_prepare_response = client
+            .post(upload_prepare_url)
+            .bearer_auth(access_token.clone())
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(200, upload_prepare_response.status());
+        let upload_context = upload_prepare_response
+            .json::<UploadContext>()
+            .await
+            .unwrap();
+
+        let upload_main_url = upload_context.upload_url;
+
+        let upload_main_response = client
+            .post(upload_main_url.clone())
+            .bearer_auth(access_token)
+            .multipart(
+                reqwest::multipart::Form::new().part(
+                    "file",
+                    reqwest::multipart::Part::text("Some totally different text")
+                        .file_name("test.txt")
+                        .mime_str("text/plain")
+                        .unwrap(),
+                ),
+            )
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(400, upload_main_response.status());
+        assert_eq!(
+            "Actual content length 27 does not match the initially declared length 9",
+            upload_main_response.text().await.unwrap()
         );
     };
 

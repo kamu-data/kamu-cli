@@ -23,12 +23,11 @@ use http::HeaderMap;
 use kamu::domain::*;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::DatasetRef;
-use thiserror::Error;
 use tokio::io::AsyncRead;
 
 use crate::api_error::*;
 use crate::axum_utils::response_for_anonymous_denial;
-use crate::UploadService;
+use crate::{decode_upload_token_payload, UploadService};
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -36,9 +35,7 @@ use crate::UploadService;
 #[serde(rename_all = "camelCase")]
 pub struct IngestQueryParams {
     source_name: Option<String>,
-    upload_id: Option<String>,
-    upload_content_type: Option<String>,
-    upload_file_name: Option<String>,
+    upload_token: Option<String>,
 }
 
 struct IngestTaskArguments {
@@ -62,7 +59,7 @@ pub async fn dataset_ingest_handler(
     headers: HeaderMap,
     body_stream: axum::extract::BodyStream,
 ) -> Result<(), ApiError> {
-    let arguments = if params.upload_id.is_some() {
+    let arguments = if params.upload_token.is_some() {
         resolve_ready_upload_arguments(&catalog, &params).await?
     } else {
         let media_type = headers
@@ -110,20 +107,13 @@ async fn resolve_ready_upload_arguments(
     catalog: &Catalog,
     params: &IngestQueryParams,
 ) -> Result<IngestTaskArguments, ApiError> {
-    let upload_id = params
-        .upload_id
-        .as_ref()
-        .expect("Upload ID must be present");
-
-    let upload_content_type = match &params.upload_content_type {
-        Some(uploaded_content_type) => Ok(uploaded_content_type.clone()),
-        None => Err(ApiError::bad_request(MissingUploadContentTypeError {})),
-    }?;
-
-    let upload_file_name = match &params.upload_file_name {
-        Some(upload_file_name) => Ok(upload_file_name.clone()),
-        None => Err(ApiError::bad_request(MissingUploadFileNameError {})),
-    }?;
+    let upload_token_payload = decode_upload_token_payload(
+        params
+            .upload_token
+            .as_ref()
+            .expect("Upload token must be present"),
+    )
+    .api_err()?;
 
     let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
     let account_id = match current_account_subject.as_ref() {
@@ -135,13 +125,17 @@ async fn resolve_ready_upload_arguments(
 
     let upload_svc = catalog.get_one::<dyn UploadService>().unwrap();
     let data = upload_svc
-        .upload_reference_into_stream(&account_id, upload_id, &upload_file_name)
+        .upload_reference_into_stream(
+            &account_id,
+            &upload_token_payload.upload_id,
+            &upload_token_payload.file_name,
+        )
         .await
         .map_err(IntoApiError::api_err)?;
 
     Ok(IngestTaskArguments {
         data,
-        media_type: Some(MediaType(upload_content_type)),
+        media_type: Some(MediaType(upload_token_payload.content_type)),
     })
 }
 
@@ -160,15 +154,5 @@ fn get_header<T, E: std::error::Error + Send + Sync + 'static>(
 
     parse(v).map(Some).map_err(ApiError::bad_request)
 }
-
-/////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-#[error("Missing 'uploadContentType' query parameter")]
-struct MissingUploadContentTypeError {}
-
-#[derive(Debug, Error)]
-#[error("Missing 'uploadFileName' query parameter")]
-struct MissingUploadFileNameError {}
 
 /////////////////////////////////////////////////////////////////////////////////
