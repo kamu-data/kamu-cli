@@ -74,6 +74,10 @@ pub async fn run(
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
+    let maybe_db_configuration = config
+        .database
+        .clone()
+        .and_then(try_convert_into_db_configuration);
     // Configure application
     let (guards, base_catalog, cli_catalog, output_config) = {
         let dependencies_graph_repository = prepare_dependencies_graph_repository(
@@ -90,15 +94,11 @@ pub async fn run(
 
         base_catalog_builder.add_value(ServerUrlConfig::load_from_env()?);
 
-        if let Some(db_configuration) = config
-            .database
-            .clone()
-            .and_then(try_convert_into_db_configuration)
-        {
-            configure_database_components(&mut base_catalog_builder, &db_configuration)?;
+        if let Some(db_configuration) = maybe_db_configuration.as_ref() {
+            configure_database_components(&mut base_catalog_builder, db_configuration)?;
         } else {
             configure_in_memory_components(&mut base_catalog_builder);
-        }
+        };
 
         base_catalog_builder
             .add_value(dependencies_graph_repository)
@@ -157,7 +157,8 @@ pub async fn run(
             Err(e) => Err(e),
         }
     };
-    let result = if need_to_wrap_with_transaction {
+    let is_database_used = maybe_db_configuration.is_some();
+    let result = if is_database_used && need_to_wrap_with_transaction {
         DatabaseTransactionRunner::run_transactional(
             &cli_catalog,
             |cli_catalog_with_transaction| async move {
