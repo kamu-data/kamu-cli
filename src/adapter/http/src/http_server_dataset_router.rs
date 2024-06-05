@@ -134,7 +134,7 @@ pub async fn platform_login_handler(
 pub async fn platform_token_validate_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
 ) -> Result<(), ApiError> {
-    ensure_authenticated_account(&catalog).map_err(|e| ApiError::new_unauthorized_from(e))?;
+    ensure_authenticated_account(&catalog).map_err(ApiError::new_unauthorized_from)?;
     Ok(())
 }
 

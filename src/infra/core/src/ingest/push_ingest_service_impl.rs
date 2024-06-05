@@ -88,8 +88,9 @@ impl PushIngestServiceImpl {
             .make_data_writer(dataset.clone(), source_name, ctx.clone())
             .await?;
 
-        let push_source = match data_writer.source_event() {
-            None => {
+        let push_source = match (data_writer.source_event(), opts.auto_create_push_source) {
+            // No push source, and it's allowed to create
+            (None, true) => {
                 let add_push_source_event = self
                     .auto_create_push_source(dataset.clone(), "auto", &opts)
                     .await?;
@@ -101,8 +102,10 @@ impl PushIngestServiceImpl {
                 Ok(add_push_source_event)
             }
 
-            Some(MetadataEvent::AddPushSource(e)) => Ok(e.clone()),
+            // Got existing push source
+            (Some(MetadataEvent::AddPushSource(e)), _) => Ok(e.clone()),
 
+            // No push source and not allowed to create
             _ => Err(PushIngestError::SourceNotFound(
                 PushSourceNotFoundError::new(source_name),
             )),

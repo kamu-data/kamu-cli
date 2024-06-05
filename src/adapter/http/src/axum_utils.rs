@@ -84,19 +84,17 @@ pub fn ensure_authenticated_account(catalog: &Catalog) -> Result<AccountID, Anon
 
     match current_account_subject.as_ref() {
         CurrentAccountSubject::Logged(l) => Ok(l.account_id.clone()),
-        CurrentAccountSubject::Anonymous(reason) => {
-            return Err(match reason {
-                AnonymousAccountReason::AuthenticationExpired => AnonymousAccessError {
-                    reason: "Authentication token expired",
-                },
-                AnonymousAccountReason::AuthenticationInvalid => AnonymousAccessError {
-                    reason: "Authentication token invalid",
-                },
-                AnonymousAccountReason::NoAuthenticationProvided => AnonymousAccessError {
-                    reason: "No authentication token provided",
-                },
-            });
-        }
+        CurrentAccountSubject::Anonymous(reason) => Err(match reason {
+            AnonymousAccountReason::AuthenticationExpired => AnonymousAccessError {
+                reason: "Authentication token expired",
+            },
+            AnonymousAccountReason::AuthenticationInvalid => AnonymousAccessError {
+                reason: "Authentication token invalid",
+            },
+            AnonymousAccountReason::NoAuthenticationProvided => AnonymousAccessError {
+                reason: "No authentication token provided",
+            },
+        }),
     }
 }
 

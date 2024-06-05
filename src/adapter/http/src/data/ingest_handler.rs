@@ -88,6 +88,7 @@ pub async fn dataset_ingest_handler(
             PushIngestOpts {
                 media_type: arguments.media_type,
                 source_event_time,
+                auto_create_push_source: params.upload_token.is_some(),
             },
             None,
         )
@@ -120,7 +121,7 @@ async fn resolve_ready_upload_arguments(
     .api_err()?;
 
     let account_id =
-        ensure_authenticated_account(catalog).map_err(|e| ApiError::new_unauthorized_from(e))?;
+        ensure_authenticated_account(catalog).map_err(ApiError::new_unauthorized_from)?;
 
     let upload_svc = catalog.get_one::<dyn UploadService>().unwrap();
 

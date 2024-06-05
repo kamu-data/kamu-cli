@@ -31,7 +31,7 @@ pub async fn platform_file_upload_prepare_post_handler(
     axum::extract::Query(query): axum::extract::Query<PlatformFileUploadQuery>,
 ) -> Result<axum::Json<Value>, ApiError> {
     let account_id =
-        ensure_authenticated_account(&catalog).map_err(|e| ApiError::new_unauthorized_from(e))?;
+        ensure_authenticated_account(&catalog).map_err(ApiError::new_unauthorized_from)?;
 
     let upload_service = catalog.get_one::<dyn UploadService>().unwrap();
     match upload_service
@@ -65,7 +65,7 @@ pub async fn platform_file_upload_post_handler(
     mut multipart: axum::extract::Multipart,
 ) -> Result<(), ApiError> {
     let account_id =
-        ensure_authenticated_account(&catalog).map_err(|e| ApiError::new_unauthorized_from(e))?;
+        ensure_authenticated_account(&catalog).map_err(ApiError::new_unauthorized_from)?;
 
     let file_data = match find_correct_multi_part_field(&mut multipart).await {
         Ok(file_data) => file_data,

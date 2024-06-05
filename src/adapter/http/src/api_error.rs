@@ -81,8 +81,8 @@ impl ApiError {
         AccessError::Unauthorized("Unauthorized access".into()).api_err()
     }
 
-    pub fn new_unauthorized_from(source: impl Into<BoxedError>) -> Self {
-        AccessError::Unauthorized(source.into()).api_err()
+    pub fn new_unauthorized_from(source: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::new(source, http::StatusCode::UNAUTHORIZED)
     }
 
     pub fn new_forbidden() -> Self {
