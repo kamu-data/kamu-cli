@@ -21,7 +21,6 @@ use uuid::Uuid;
 
 use crate::{
     make_upload_token,
-    AccessToken,
     ContentTooLargeError,
     FileUploadLimitConfig,
     MakeUploadContextError,
@@ -61,7 +60,6 @@ impl UploadService for UploadServiceS3 {
         file_name: String,
         content_type: String,
         content_length: usize,
-        _: &AccessToken, // S3 does not require our own token
     ) -> Result<UploadContext, MakeUploadContextError> {
         if content_length > self.upload_config.max_file_size_in_bytes {
             return Err(MakeUploadContextError::TooLarge(ContentTooLargeError {}));

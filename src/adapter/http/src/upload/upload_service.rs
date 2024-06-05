@@ -16,8 +16,6 @@ use serde_json::json;
 use thiserror::Error;
 use tokio::io::AsyncRead;
 
-use crate::AccessToken;
-
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -28,7 +26,6 @@ pub trait UploadService: Send + Sync {
         file_name: String,
         content_type: String,
         content_length: usize,
-        access_token: &AccessToken,
     ) -> Result<UploadContext, MakeUploadContextError>;
 
     async fn upload_reference_size(

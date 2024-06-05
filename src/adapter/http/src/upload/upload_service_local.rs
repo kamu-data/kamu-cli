@@ -38,6 +38,7 @@ use crate::{
 pub struct UploadServiceLocal {
     server_url_config: Arc<ServerUrlConfig>,
     uploads_config: Arc<FileUploadLimitConfig>,
+    access_token: Arc<AccessToken>,
     cache_dir: PathBuf,
 }
 
@@ -45,11 +46,13 @@ impl UploadServiceLocal {
     pub fn new(
         server_url_config: Arc<ServerUrlConfig>,
         uploads_config: Arc<FileUploadLimitConfig>,
+        access_token: Arc<AccessToken>,
         cache_dir: PathBuf,
     ) -> Self {
         Self {
             server_url_config,
             uploads_config,
+            access_token,
             cache_dir,
         }
     }
@@ -76,7 +79,6 @@ impl UploadService for UploadServiceLocal {
         file_name: String,
         content_type: String,
         content_length: usize,
-        access_token: &AccessToken,
     ) -> Result<UploadContext, MakeUploadContextError> {
         if content_length > self.uploads_config.max_file_size_in_bytes {
             return Err(MakeUploadContextError::TooLarge(ContentTooLargeError {}));
@@ -104,7 +106,7 @@ impl UploadService for UploadServiceLocal {
             use_multipart: true,
             headers: vec![(
                 String::from("Authorization"),
-                format!("Bearer {}", access_token.token),
+                format!("Bearer {}", self.access_token.token),
             )],
             fields: vec![],
         };

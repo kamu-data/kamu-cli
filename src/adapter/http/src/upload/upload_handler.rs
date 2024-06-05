@@ -14,7 +14,7 @@ use thiserror::Error;
 
 use crate::api_error::{ApiError, IntoApiError};
 use crate::axum_utils::ensure_authenticated_account;
-use crate::{AccessToken, MakeUploadContextError, SaveUploadError, UploadService};
+use crate::{MakeUploadContextError, SaveUploadError, UploadService};
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -33,8 +33,6 @@ pub async fn platform_file_upload_prepare_post_handler(
     let account_id =
         ensure_authenticated_account(&catalog).map_err(|e| ApiError::new_unauthorized_from(e))?;
 
-    let access_token = catalog.get_one::<AccessToken>().unwrap();
-
     let upload_service = catalog.get_one::<dyn UploadService>().unwrap();
     match upload_service
         .make_upload_context(
@@ -42,7 +40,6 @@ pub async fn platform_file_upload_prepare_post_handler(
             query.file_name,
             query.content_type,
             query.content_length,
-            access_token.as_ref(),
         )
         .await
     {
