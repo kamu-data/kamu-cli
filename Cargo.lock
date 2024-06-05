@@ -5215,7 +5215,6 @@ dependencies = [
 name = "kamu-cli-e2e-postgres"
 version = "0.184.0"
 dependencies = [
- "kamu-cli",
  "kamu-cli-wrapper",
  "sqlx",
  "test-group",

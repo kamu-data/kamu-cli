@@ -22,7 +22,7 @@ doctest = false
 
 
 [dependencies]
-kamu-cli = { path = "../../app/cli" }
+kamu-cli = { path = "../../app/cli", version = "0" }
 
 event-bus = { workspace = true }
 kamu = { workspace = true }

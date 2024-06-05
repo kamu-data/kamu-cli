@@ -24,7 +24,6 @@ doctest = false
 # We have only tests in this crate
 
 [dev-dependencies]
-kamu-cli = { path = "../../../../app/cli" }
 kamu-cli-wrapper = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }
