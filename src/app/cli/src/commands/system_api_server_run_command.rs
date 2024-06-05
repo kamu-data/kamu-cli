@@ -34,6 +34,7 @@ pub struct APIServerRunCommand {
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     account_subject: Arc<CurrentAccountSubject>,
     github_auth_config: Arc<GithubAuthenticationConfig>,
+    is_e2e_testing: bool,
 }
 
 impl APIServerRunCommand {
@@ -48,6 +49,7 @@ impl APIServerRunCommand {
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         account_subject: Arc<CurrentAccountSubject>,
         github_auth_config: Arc<GithubAuthenticationConfig>,
+        is_e2e_testing: bool,
     ) -> Self {
         Self {
             base_catalog,
@@ -60,6 +62,7 @@ impl APIServerRunCommand {
             predefined_accounts_config,
             account_subject,
             github_auth_config,
+            is_e2e_testing,
         }
     }
 
@@ -130,7 +133,7 @@ impl Command for APIServerRunCommand {
             self.multi_tenant_workspace,
             self.address,
             self.port,
-            false,
+            self.is_e2e_testing,
         );
 
         tracing::info!(

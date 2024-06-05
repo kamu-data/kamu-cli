@@ -467,6 +467,7 @@ pub fn get_command(
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,
+                        arg_matches.get_flag("e2e-testing"),
                     ))
                 }
                 Some(("gql-query", query_matches)) => Box::new(APIServerGqlQueryCommand::new(
