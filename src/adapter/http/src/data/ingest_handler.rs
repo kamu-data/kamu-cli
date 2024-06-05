@@ -26,7 +26,7 @@ use tokio::io::AsyncRead;
 
 use crate::api_error::*;
 use crate::axum_utils::ensure_authenticated_account;
-use crate::{decode_upload_token_payload, ContentLengthMismatchError, UploadService};
+use crate::{UploadService, UploadTokenIntoStreamError};
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -38,7 +38,7 @@ pub struct IngestQueryParams {
 }
 
 struct IngestTaskArguments {
-    data: Box<dyn AsyncRead + Send + Unpin>,
+    data_stream: Box<dyn AsyncRead + Send + Unpin>,
     media_type: Option<MediaType>,
 }
 
@@ -67,7 +67,10 @@ pub async fn dataset_ingest_handler(
 
         let data = Box::new(crate::axum_utils::body_into_async_read(body_stream));
 
-        IngestTaskArguments { data, media_type }
+        IngestTaskArguments {
+            data_stream: data,
+            media_type,
+        }
     };
 
     // TODO: Settle on the header name and document it
@@ -84,7 +87,7 @@ pub async fn dataset_ingest_handler(
         .ingest_from_file_stream(
             &dataset_ref,
             params.source_name.as_deref(),
-            arguments.data,
+            arguments.data_stream,
             PushIngestOpts {
                 media_type: arguments.media_type,
                 source_event_time,
@@ -112,47 +115,27 @@ async fn resolve_ready_upload_arguments(
     catalog: &Catalog,
     params: &IngestQueryParams,
 ) -> Result<IngestTaskArguments, ApiError> {
-    let upload_token_payload = decode_upload_token_payload(
-        params
-            .upload_token
-            .as_ref()
-            .expect("Upload token must be present"),
-    )
-    .api_err()?;
+    let upload_token = params
+        .upload_token
+        .as_ref()
+        .expect("Upload token must be present");
 
     let account_id =
         ensure_authenticated_account(catalog).map_err(ApiError::new_unauthorized_from)?;
 
     let upload_svc = catalog.get_one::<dyn UploadService>().unwrap();
 
-    let actual_data_size = upload_svc
-        .upload_reference_size(
-            &account_id,
-            &upload_token_payload.upload_id,
-            &upload_token_payload.file_name,
-        )
+    let (data_stream, media_type) = upload_svc
+        .upload_token_into_stream(&account_id, upload_token)
         .await
-        .map_err(IntoApiError::api_err)?;
-    if actual_data_size != upload_token_payload.content_length {
-        let e = ContentLengthMismatchError {
-            actual: actual_data_size,
-            declared: upload_token_payload.content_length,
-        };
-        return Err(ApiError::bad_request(e));
-    }
-
-    let data = upload_svc
-        .upload_reference_into_stream(
-            &account_id,
-            &upload_token_payload.upload_id,
-            &upload_token_payload.file_name,
-        )
-        .await
-        .map_err(IntoApiError::api_err)?;
+        .map_err(|e| match e {
+            UploadTokenIntoStreamError::ContentLengthMismatch(e) => ApiError::bad_request(e),
+            UploadTokenIntoStreamError::Internal(e) => e.api_err(),
+        })?;
 
     Ok(IngestTaskArguments {
-        data,
-        media_type: Some(MediaType(upload_token_payload.content_type)),
+        data_stream,
+        media_type: Some(media_type),
     })
 }
 

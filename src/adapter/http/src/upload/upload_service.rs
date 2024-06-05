@@ -9,7 +9,7 @@
 
 use base64::Engine;
 use bytes::Bytes;
-use kamu::domain::{InternalError, ResultIntoInternal};
+use kamu::domain::{InternalError, MediaType, ResultIntoInternal};
 use opendatafabric::AccountID;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -27,6 +27,43 @@ pub trait UploadService: Send + Sync {
         content_type: String,
         content_length: usize,
     ) -> Result<UploadContext, MakeUploadContextError>;
+
+    async fn upload_token_into_stream(
+        &self,
+        account_id: &AccountID,
+        upload_token: &str,
+    ) -> Result<(Box<dyn AsyncRead + Send + Unpin>, MediaType), UploadTokenIntoStreamError> {
+        let upload_token_payload = decode_upload_token_payload(upload_token)
+            .map_err(UploadTokenIntoStreamError::Internal)?;
+
+        let actual_data_size = self
+            .upload_reference_size(
+                account_id,
+                &upload_token_payload.upload_id,
+                &upload_token_payload.file_name,
+            )
+            .await
+            .map_err(UploadTokenIntoStreamError::Internal)?;
+
+        if actual_data_size != upload_token_payload.content_length {
+            let e = ContentLengthMismatchError {
+                actual: actual_data_size,
+                declared: upload_token_payload.content_length,
+            };
+            return Err(UploadTokenIntoStreamError::ContentLengthMismatch(e));
+        }
+
+        let stream = self
+            .upload_reference_into_stream(
+                account_id,
+                &upload_token_payload.upload_id,
+                &upload_token_payload.file_name,
+            )
+            .await
+            .map_err(UploadTokenIntoStreamError::Internal)?;
+
+        Ok((stream, MediaType(upload_token_payload.content_type)))
+    }
 
     async fn upload_reference_size(
         &self,
@@ -80,6 +117,14 @@ pub enum SaveUploadError {
     NotSupported(UploadNotSupportedError),
     #[error(transparent)]
     TooLarge(ContentTooLargeError),
+    #[error(transparent)]
+    ContentLengthMismatch(ContentLengthMismatchError),
+    #[error(transparent)]
+    Internal(InternalError),
+}
+
+#[derive(Debug, Error)]
+pub enum UploadTokenIntoStreamError {
     #[error(transparent)]
     ContentLengthMismatch(ContentLengthMismatchError),
     #[error(transparent)]
