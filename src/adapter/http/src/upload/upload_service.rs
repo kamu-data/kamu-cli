@@ -124,7 +124,7 @@ pub fn make_upload_token(
     };
 
     let payload_json = json!(payload).to_string();
-    base64::engine::general_purpose::STANDARD.encode(payload_json)
+    base64::engine::general_purpose::URL_SAFE.encode(payload_json)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -132,7 +132,7 @@ pub fn make_upload_token(
 pub fn decode_upload_token_payload(
     upload_token: &str,
 ) -> Result<UploadTokenPayload, InternalError> {
-    let payload_json_bytes = base64::engine::general_purpose::STANDARD
+    let payload_json_bytes = base64::engine::general_purpose::URL_SAFE
         .decode(upload_token)
         .int_err()?;
     let payload_json = String::from_utf8(payload_json_bytes).int_err()?;
