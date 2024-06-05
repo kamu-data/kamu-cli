@@ -120,12 +120,8 @@ pub async fn platform_login_handler(
         }
         Err(e) => Err(match e {
             kamu_accounts::LoginError::UnsupportedMethod(e) => ApiError::bad_request(e),
-            kamu_accounts::LoginError::InvalidCredentials(e) => {
-                ApiError::new_unauthorized_custom(e)
-            }
-            kamu_accounts::LoginError::RejectedCredentials(e) => {
-                ApiError::new_unauthorized_custom(e)
-            }
+            kamu_accounts::LoginError::InvalidCredentials(e) => ApiError::new_unauthorized_from(e),
+            kamu_accounts::LoginError::RejectedCredentials(e) => ApiError::new_unauthorized_from(e),
             kamu_accounts::LoginError::DuplicateCredentials => ApiError::bad_request(e),
             kamu_accounts::LoginError::Internal(e) => e.api_err(),
         }),
@@ -138,7 +134,7 @@ pub async fn platform_login_handler(
 pub async fn platform_token_validate_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
 ) -> Result<(), ApiError> {
-    ensure_authenticated_account(&catalog).map_err(|e| ApiError::new_unauthorized_custom(e))?;
+    ensure_authenticated_account(&catalog).map_err(|e| ApiError::new_unauthorized_from(e))?;
     Ok(())
 }
 

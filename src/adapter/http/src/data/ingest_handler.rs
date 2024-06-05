@@ -120,7 +120,7 @@ async fn resolve_ready_upload_arguments(
     .api_err()?;
 
     let account_id =
-        ensure_authenticated_account(catalog).map_err(|e| ApiError::new_unauthorized_custom(e))?;
+        ensure_authenticated_account(catalog).map_err(|e| ApiError::new_unauthorized_from(e))?;
 
     let upload_svc = catalog.get_one::<dyn UploadService>().unwrap();
 
