@@ -106,6 +106,22 @@ impl UploadService for UploadServiceS3 {
         })
     }
 
+    async fn upload_reference_size(
+        &self,
+        account_id: &AccountID,
+        upload_id: &str,
+        file_name: &str,
+    ) -> Result<usize, InternalError> {
+        let file_key = self.make_file_key(account_id, upload_id, file_name);
+
+        let res = self
+            .s3_upload_context
+            .head_object(file_key)
+            .await
+            .map_err(ErrorIntoInternal::int_err)?;
+        Ok(usize::try_from(res.content_length).unwrap())
+    }
+
     async fn upload_reference_into_stream(
         &self,
         account_id: &AccountID,
@@ -113,12 +129,11 @@ impl UploadService for UploadServiceS3 {
         file_name: &str,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>, InternalError> {
         let file_key = self.make_file_key(account_id, upload_id, file_name);
-
-        let resp = match self.s3_upload_context.get_object(file_key).await {
-            Ok(resp) => Ok(resp),
-            Err(err) => return Err(err.int_err()),
-        }?;
-
+        let resp = self
+            .s3_upload_context
+            .get_object(file_key)
+            .await
+            .map_err(ErrorIntoInternal::int_err)?;
         let stream = resp.body.into_async_read();
         Ok(Box::new(stream))
     }

@@ -27,7 +27,7 @@ use tokio::io::AsyncRead;
 
 use crate::api_error::*;
 use crate::axum_utils::response_for_anonymous_denial;
-use crate::{decode_upload_token_payload, UploadService};
+use crate::{decode_upload_token_payload, ContentLengthMismatchError, UploadService};
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -129,6 +129,23 @@ async fn resolve_ready_upload_arguments(
     };
 
     let upload_svc = catalog.get_one::<dyn UploadService>().unwrap();
+
+    let actual_data_size = upload_svc
+        .upload_reference_size(
+            &account_id,
+            &upload_token_payload.upload_id,
+            &upload_token_payload.file_name,
+        )
+        .await
+        .map_err(IntoApiError::api_err)?;
+    if actual_data_size != upload_token_payload.content_length {
+        let e = ContentLengthMismatchError {
+            actual: actual_data_size,
+            declared: upload_token_payload.content_length,
+        };
+        return Err(ApiError::bad_request(e));
+    }
+
     let data = upload_svc
         .upload_reference_into_stream(
             &account_id,

@@ -29,7 +29,7 @@ use crate::harness::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// #[test_group::group(engine, ingest, datafusion)]
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_push_ingest_handler() {
     let harness = DataIngestHarness::new();
@@ -273,7 +273,7 @@ async fn test_data_push_ingest_handler() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// #[test_group::group(engine, ingest, datafusion)]
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_push_ingest_upload_token_no_initial_source() {
     let harness = DataIngestHarness::new();
@@ -358,7 +358,7 @@ async fn test_data_push_ingest_upload_token_no_initial_source() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// #[test_group::group(engine, ingest, datafusion)]
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_push_ingest_upload_token_with_initial_source() {
     let harness = DataIngestHarness::new();
@@ -438,6 +438,69 @@ async fn test_data_push_ingest_upload_token_with_initial_source() {
                 ),
             )
             .await;
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_push_ingest_upload_token_actual_file_different_size() {
+    let harness = DataIngestHarness::new();
+
+    let create_result = harness.create_population_dataset(false).await;
+
+    const FILE_CONTENT: &str = r#"
+        [
+            {
+                "event_time": "2020-01-01T00:00:00",
+                "city": "A",
+                "population": 100
+            },
+            {
+                "event_time": "2020-01-02T00:00:00",
+                "city": "B",
+                "population": 200
+            }
+        ]
+        "#;
+
+    let upload_id = Uuid::new_v4().simple().to_string();
+
+    harness
+        .upload_file(&upload_id, "population.json", FILE_CONTENT)
+        .await;
+
+    let upload_token = make_upload_token(
+        upload_id,
+        String::from("population.json"),
+        String::from("application/json"),
+        FILE_CONTENT.len() - 17, // Intentionally wrong file size
+    );
+
+    let dataset_url = harness.dataset_http_url(&create_result.dataset_handle.alias);
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+        let ingest_url = format!("{dataset_url}/ingest?uploadToken={upload_token}");
+        tracing::info!(%ingest_url, "Client request");
+
+        let res = cl
+            .execute(
+                cl.post(&ingest_url)
+                    .bearer_auth(DUMMY_ACCESS_TOKEN)
+                    .build()
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+        assert_eq!(
+            "Actual content length 318 does not match the initially declared length 301",
+            res.text().await.unwrap()
+        );
     };
 
     await_client_server_flow!(harness.server_harness.api_server_run(), client);

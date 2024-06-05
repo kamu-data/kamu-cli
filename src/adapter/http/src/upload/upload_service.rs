@@ -31,6 +31,13 @@ pub trait UploadService: Send + Sync {
         access_token: &AccessToken,
     ) -> Result<UploadContext, MakeUploadContextError>;
 
+    async fn upload_reference_size(
+        &self,
+        account_id: &AccountID,
+        upload_id: &str,
+        file_name: &str,
+    ) -> Result<usize, InternalError>;
+
     async fn upload_reference_into_stream(
         &self,
         account_id: &AccountID,

@@ -111,6 +111,21 @@ impl UploadService for UploadServiceLocal {
         Ok(context)
     }
 
+    async fn upload_reference_size(
+        &self,
+        account_id: &AccountID,
+        upload_id: &str,
+        file_name: &str,
+    ) -> Result<usize, InternalError> {
+        let upload_file_path = self
+            .make_account_folder_path(account_id)
+            .join(upload_id)
+            .join(file_name);
+
+        let metadata = tokio::fs::metadata(upload_file_path).await.int_err()?;
+        Ok(usize::try_from(metadata.len()).unwrap())
+    }
+
     async fn upload_reference_into_stream(
         &self,
         account_id: &AccountID,
