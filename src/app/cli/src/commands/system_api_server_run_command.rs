@@ -130,6 +130,7 @@ impl Command for APIServerRunCommand {
             self.multi_tenant_workspace,
             self.address,
             self.port,
+            false,
         );
 
         tracing::info!(
