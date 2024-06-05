@@ -53,6 +53,8 @@ members = [
     "src/adapter/odata",
     # Apps
     "src/app/cli",
+    # E2E
+    "src/e2e/app/cli/postgres",
 ]
 resolver = "2"
 

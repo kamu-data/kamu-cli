@@ -4,6 +4,7 @@ LICENSE_HEADER=docs/license_header.txt
 TEST_LOG_PARAMS=RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug
 
 POSTGRES_CRATES := ./src/infra/accounts/postgres ./src/infra/task-system/postgres ./src/infra/flow-system/postgres
+POSTGRES_E2E_CRATES := ./src/e2e/app/cli/postgres
 MYSQL_CRATES := ./src/infra/accounts/mysql
 SQLITE_CRATES := ./src/infra/accounts/sqlite ./src/infra/task-system/sqlite ./src/infra/flow-system/sqlite
 ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES) $(SQLITE_CRATES)
@@ -55,7 +56,7 @@ sqlx-local-setup-postgres:
 	docker pull postgres:latest
 	docker stop kamu-postgres || true && docker rm kamu-postgres || true
 	docker run --name kamu-postgres -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=root -d postgres:latest
-	$(foreach crate,$(POSTGRES_CRATES),$(call Setup_EnvFile,postgres,5432,$(crate)))
+	$(foreach crate,$(POSTGRES_CRATES) $(POSTGRES_E2E_CRATES),$(call Setup_EnvFile,postgres,5432,$(crate)))
 	sleep 3  # Letting the container to start
 	until PGPASSWORD=root psql -h localhost -U root -p 5432 -d root -c '\q'; do sleep 3; done
 	sqlx database create --database-url postgres://root:root@localhost:5432/kamu
@@ -85,7 +86,7 @@ sqlx-local-clean: sqlx-local-clean-postgres sqlx-local-clean-mariadb sqlx-local-
 .PHONY: sqlx-local-clean-postgres
 sqlx-local-clean-postgres:
 	docker stop kamu-postgres || true && docker rm kamu-postgres || true
-	$(foreach crate,$(POSTGRES_CRATES),rm $(crate)/.env -f ;)
+	$(foreach crate,$(POSTGRES_CRATES) $(POSTGRES_E2E_CRATES),rm $(crate)/.env -f ;)
 
 .PHONY: sqlx-local-clean-mariadb
 sqlx-local-clean-mariadb:
