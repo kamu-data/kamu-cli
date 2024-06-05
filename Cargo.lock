@@ -5161,6 +5161,7 @@ dependencies = [
  "kamu-adapter-http",
  "kamu-adapter-oauth",
  "kamu-adapter-odata",
+ "kamu-cli-wrapper",
  "kamu-data-utils",
  "kamu-datafusion-cli",
  "kamu-flow-system-inmem",
@@ -5208,6 +5209,23 @@ dependencies = [
  "vergen",
  "webbrowser",
  "whoami",
+]
+
+[[package]]
+name = "kamu-cli-wrapper"
+version = "0.184.0"
+dependencies = [
+ "chrono",
+ "datafusion",
+ "dill",
+ "event-bus",
+ "kamu",
+ "kamu-cli",
+ "kamu-core",
+ "kamu-data-utils",
+ "opendatafabric",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]
