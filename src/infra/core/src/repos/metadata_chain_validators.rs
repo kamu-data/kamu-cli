@@ -19,6 +19,7 @@ use kamu_core::{
 use opendatafabric::{
     AddData,
     ExecuteTransform,
+    FetchStep,
     IntoDataStreamBlock,
     IntoDataStreamEvent,
     MetadataBlock,
@@ -396,6 +397,13 @@ impl ValidateSetPollingSourceVisitor {
                 // Queries must be normalized
                 if let Some(transform) = &e.preprocess {
                     validate_transform(&block.event, transform)?;
+                }
+
+                // Eth source must identify the chain
+                if let FetchStep::EthereumLogs(f) = &e.fetch {
+                    if f.chain_id.is_none() && f.node_url.is_none() {
+                        invalid_event!(e.clone(), "Eth source must specify chainId or nodeUrl")
+                    }
                 }
 
                 true

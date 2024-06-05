@@ -56,6 +56,12 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
+datafusion-ethers = { version = "38" }
+datafusion-functions-json = { version = "0.1" }
+ethers = { version = "2", default-features = false, features = [
+    "ws",
+    "rustls",
+] }
 flate2 = "1" # GZip decoder
 reqwest = { version = "0.11", default-features = false, features = [
     "rustls-tls",
@@ -80,7 +86,7 @@ aws-sdk-s3 = { version = "0.35" }
 aws-smithy-http = { version = "0.57", features = ["rt-tokio"] }
 aws-smithy-types = { version = "0.57" }
 aws-credential-types = { version = "0.57" }
-trust-dns-resolver = "0.23"  # TODO: Needed for DNSLink resolution with IPFS
+trust-dns-resolver = "0.23"                                     # TODO: Needed for DNSLink resolution with IPFS
 http = "0.2"
 
 # Utils

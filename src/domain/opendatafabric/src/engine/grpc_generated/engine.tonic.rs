@@ -143,15 +143,16 @@ pub mod engine_server {
     #[async_trait]
     pub trait Engine: Send + Sync + 'static {
         /// Server streaming response type for the ExecuteRawQuery method.
-        type ExecuteRawQueryStream: futures_core::Stream<Item = std::result::Result<super::RawQueryResponse, tonic::Status>>
-            + Send
+        type ExecuteRawQueryStream: tonic::codegen::tokio_stream::Stream<
+                Item = std::result::Result<super::RawQueryResponse, tonic::Status>,
+            > + Send
             + 'static;
         async fn execute_raw_query(
             &self,
             request: tonic::Request<super::RawQueryRequest>,
         ) -> std::result::Result<tonic::Response<Self::ExecuteRawQueryStream>, tonic::Status>;
         /// Server streaming response type for the ExecuteTransform method.
-        type ExecuteTransformStream: futures_core::Stream<
+        type ExecuteTransformStream: tonic::codegen::tokio_stream::Stream<
                 Item = std::result::Result<super::TransformResponse, tonic::Status>,
             > + Send
             + 'static;
@@ -252,7 +253,9 @@ pub mod engine_server {
                             request: tonic::Request<super::RawQueryRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move { (*inner).execute_raw_query(request).await };
+                            let fut = async move {
+                                <T as Engine>::execute_raw_query(&inner, request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -294,7 +297,9 @@ pub mod engine_server {
                             request: tonic::Request<super::TransformRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move { (*inner).execute_transform(request).await };
+                            let fut = async move {
+                                <T as Engine>::execute_transform(&inner, request).await
+                            };
                             Box::pin(fut)
                         }
                     }

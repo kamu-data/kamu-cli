@@ -492,6 +492,28 @@ pub fn register_config_in_catalog(
             .unwrap(),
     });
 
+    catalog_builder.add_value(config.source.as_ref().unwrap().to_infra_cfg());
+    catalog_builder.add_value(
+        config
+            .source
+            .as_ref()
+            .unwrap()
+            .mqtt
+            .as_ref()
+            .unwrap()
+            .to_infra_cfg(),
+    );
+    catalog_builder.add_value(
+        config
+            .source
+            .as_ref()
+            .unwrap()
+            .ethereum
+            .as_ref()
+            .unwrap()
+            .to_infra_cfg(),
+    );
+
     let ipfs_conf = config.protocol.as_ref().unwrap().ipfs.as_ref().unwrap();
 
     catalog_builder.add_value(IpfsGateway {

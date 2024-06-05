@@ -383,11 +383,19 @@ table FetchStepMqtt {
   topics: [MqttTopicSubscription];
 }
 
+table FetchStepEthereumLogs {
+  chain_id: uint64 = null;
+  node_url: string;
+  filter: string;
+  signature: string;
+}
+
 union FetchStep {
   FetchStepUrl,
   FetchStepFilesGlob,
   FetchStepContainer,
   FetchStepMqtt,
+  FetchStepEthereumLogs,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
