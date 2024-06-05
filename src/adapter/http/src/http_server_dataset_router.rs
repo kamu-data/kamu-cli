@@ -8,13 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use axum::Json;
-use kamu_accounts::CurrentAccountSubject;
 use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::api_error::{ApiError, IntoApiError};
-use crate::axum_utils::response_for_anonymous_denial;
+use crate::axum_utils::ensure_authenticated_account;
 use crate::simple_protocol::*;
 use crate::{DatasetAuthorizationLayer, DatasetResolverLayer};
 
@@ -139,12 +138,8 @@ pub async fn platform_login_handler(
 pub async fn platform_token_validate_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
 ) -> Result<(), ApiError> {
-    let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
-
-    match current_account_subject.as_ref() {
-        CurrentAccountSubject::Logged(_) => Ok(()),
-        CurrentAccountSubject::Anonymous(reason) => Err(response_for_anonymous_denial(*reason)),
-    }
+    ensure_authenticated_account(&catalog).map_err(|e| ApiError::new_unauthorized_custom(e))?;
+    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////

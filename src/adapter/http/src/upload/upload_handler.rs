@@ -9,12 +9,11 @@
 
 use bytes::Bytes;
 use kamu::domain::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_accounts::CurrentAccountSubject;
 use serde_json::{json, Value};
 use thiserror::Error;
 
 use crate::api_error::{ApiError, IntoApiError};
-use crate::axum_utils::response_for_anonymous_denial;
+use crate::axum_utils::ensure_authenticated_account;
 use crate::{AccessToken, MakeUploadContextError, SaveUploadError, UploadService};
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -31,13 +30,8 @@ pub async fn platform_file_upload_prepare_post_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
     axum::extract::Query(query): axum::extract::Query<PlatformFileUploadQuery>,
 ) -> Result<axum::Json<Value>, ApiError> {
-    let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
-    let account_id = match current_account_subject.as_ref() {
-        CurrentAccountSubject::Logged(l) => l.account_id.clone(),
-        CurrentAccountSubject::Anonymous(reason) => {
-            return Err(response_for_anonymous_denial(*reason));
-        }
-    };
+    let account_id =
+        ensure_authenticated_account(&catalog).map_err(|e| ApiError::new_unauthorized_custom(e))?;
 
     let access_token = catalog.get_one::<AccessToken>().unwrap();
 
@@ -73,13 +67,8 @@ pub async fn platform_file_upload_post_handler(
     axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,
     mut multipart: axum::extract::Multipart,
 ) -> Result<(), ApiError> {
-    let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
-    let account_id = match current_account_subject.as_ref() {
-        CurrentAccountSubject::Logged(l) => l.account_id.clone(),
-        CurrentAccountSubject::Anonymous(reason) => {
-            return Err(response_for_anonymous_denial(*reason))
-        }
-    };
+    let account_id =
+        ensure_authenticated_account(&catalog).map_err(|e| ApiError::new_unauthorized_custom(e))?;
 
     let file_data = match find_correct_multi_part_field(&mut multipart).await {
         Ok(file_data) => file_data,

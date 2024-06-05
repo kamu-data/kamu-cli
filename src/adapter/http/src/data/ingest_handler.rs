@@ -21,12 +21,11 @@ use chrono::{DateTime, Utc};
 use dill::Catalog;
 use http::HeaderMap;
 use kamu::domain::*;
-use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::DatasetRef;
 use tokio::io::AsyncRead;
 
 use crate::api_error::*;
-use crate::axum_utils::response_for_anonymous_denial;
+use crate::axum_utils::ensure_authenticated_account;
 use crate::{decode_upload_token_payload, ContentLengthMismatchError, UploadService};
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -120,13 +119,8 @@ async fn resolve_ready_upload_arguments(
     )
     .api_err()?;
 
-    let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
-    let account_id = match current_account_subject.as_ref() {
-        CurrentAccountSubject::Logged(l) => l.account_id.clone(),
-        CurrentAccountSubject::Anonymous(reason) => {
-            return Err(response_for_anonymous_denial(*reason))
-        }
-    };
+    let account_id =
+        ensure_authenticated_account(catalog).map_err(|e| ApiError::new_unauthorized_custom(e))?;
 
     let upload_svc = catalog.get_one::<dyn UploadService>().unwrap();
 

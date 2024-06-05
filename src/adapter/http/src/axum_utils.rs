@@ -11,10 +11,12 @@
 // Errors
 /////////////////////////////////////////////////////////////////////////////////
 
-use kamu_accounts::AnonymousAccountReason;
+use dill::Catalog;
+use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
+use opendatafabric::AccountID;
 use thiserror::Error;
 
-use crate::api_error::ApiError;
+/////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn bad_request_response() -> axum::response::Response {
     error_response(http::status::StatusCode::BAD_REQUEST)
@@ -71,28 +73,29 @@ pub(crate) fn body_into_async_read(
 
 /////////////////////////////////////////////////////////////////////////////////
 
-pub fn response_for_anonymous_denial(reason: AnonymousAccountReason) -> ApiError {
-    #[derive(Debug, Error)]
-    #[error("{reason}")]
-    struct AnonymousAccessError {
-        pub reason: &'static str,
-    }
+#[derive(Debug, Error)]
+#[error("{reason}")]
+pub struct AnonymousAccessError {
+    pub reason: &'static str,
+}
 
-    match reason {
-        AnonymousAccountReason::AuthenticationExpired => {
-            ApiError::new_unauthorized_custom(AnonymousAccessError {
-                reason: "Authentication token expired",
-            })
-        }
-        AnonymousAccountReason::AuthenticationInvalid => {
-            ApiError::new_unauthorized_custom(AnonymousAccessError {
-                reason: "Authentication token invalid",
-            })
-        }
-        AnonymousAccountReason::NoAuthenticationProvided => {
-            ApiError::new_unauthorized_custom(AnonymousAccessError {
-                reason: "No authentication token provided",
-            })
+pub fn ensure_authenticated_account(catalog: &Catalog) -> Result<AccountID, AnonymousAccessError> {
+    let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
+
+    match current_account_subject.as_ref() {
+        CurrentAccountSubject::Logged(l) => Ok(l.account_id.clone()),
+        CurrentAccountSubject::Anonymous(reason) => {
+            return Err(match reason {
+                AnonymousAccountReason::AuthenticationExpired => AnonymousAccessError {
+                    reason: "Authentication token expired",
+                },
+                AnonymousAccountReason::AuthenticationInvalid => AnonymousAccessError {
+                    reason: "Authentication token invalid",
+                },
+                AnonymousAccountReason::NoAuthenticationProvided => AnonymousAccessError {
+                    reason: "No authentication token provided",
+                },
+            });
         }
     }
 }
