@@ -85,21 +85,6 @@ pub async fn run(
         let mut base_catalog_builder =
             configure_base_catalog(&workspace_layout, is_multi_tenant_workspace, system_time);
 
-        //////////////////////////// Move this to Node /////////////////////////////////
-
-        /*
-        use kamu::utils::s3_context::S3Context;
-        use kamu_adapter_http::UploadServiceS3;
-        let s3_upload_direct_url =
-            url::Url::parse("s3://upload.demo.stg.kamu.dev.us-west-2").unwrap();
-        base_catalog_builder.add_builder(
-            UploadServiceS3::builder()
-                .with_s3_upload_context(S3Context::from_url(&s3_upload_direct_url).await),
-        );
-        base_catalog_builder.bind::<dyn UploadService, UploadServiceS3>();*/
-
-        ////////////////////////////
-
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
 

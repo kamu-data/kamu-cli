@@ -26,7 +26,7 @@ use tokio::io::AsyncRead;
 
 use crate::api_error::*;
 use crate::axum_utils::ensure_authenticated_account;
-use crate::{UploadService, UploadTokenIntoStreamError};
+use crate::{upload_token_into_stream, UploadService, UploadTokenIntoStreamError};
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -120,18 +120,17 @@ async fn resolve_ready_upload_arguments(
         .as_ref()
         .expect("Upload token must be present");
 
-    let account_id =
-        ensure_authenticated_account(catalog).map_err(ApiError::new_unauthorized_from)?;
+    let account_id = ensure_authenticated_account(catalog).api_err()?;
 
     let upload_svc = catalog.get_one::<dyn UploadService>().unwrap();
 
-    let (data_stream, media_type) = upload_svc
-        .upload_token_into_stream(&account_id, upload_token)
-        .await
-        .map_err(|e| match e {
-            UploadTokenIntoStreamError::ContentLengthMismatch(e) => ApiError::bad_request(e),
-            UploadTokenIntoStreamError::Internal(e) => e.api_err(),
-        })?;
+    let (data_stream, media_type) =
+        upload_token_into_stream(upload_svc.as_ref(), &account_id, upload_token)
+            .await
+            .map_err(|e| match e {
+                UploadTokenIntoStreamError::ContentLengthMismatch(e) => ApiError::bad_request(e),
+                UploadTokenIntoStreamError::Internal(e) => e.api_err(),
+            })?;
 
     Ok(IngestTaskArguments {
         data_stream,

@@ -16,6 +16,8 @@ use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
 use opendatafabric::AccountID;
 use thiserror::Error;
 
+use crate::api_error::{ApiError, IntoApiError};
+
 /////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn bad_request_response() -> axum::response::Response {
@@ -78,6 +80,14 @@ pub(crate) fn body_into_async_read(
 pub struct AnonymousAccessError {
     pub reason: &'static str,
 }
+
+impl IntoApiError for AnonymousAccessError {
+    fn api_err(self) -> ApiError {
+        ApiError::new_unauthorized_from(self)
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
 
 pub fn ensure_authenticated_account(catalog: &Catalog) -> Result<AccountID, AnonymousAccessError> {
     let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();

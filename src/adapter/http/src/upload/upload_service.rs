@@ -28,43 +28,6 @@ pub trait UploadService: Send + Sync {
         content_length: usize,
     ) -> Result<UploadContext, MakeUploadContextError>;
 
-    async fn upload_token_into_stream(
-        &self,
-        account_id: &AccountID,
-        upload_token: &str,
-    ) -> Result<(Box<dyn AsyncRead + Send + Unpin>, MediaType), UploadTokenIntoStreamError> {
-        let upload_token_payload = decode_upload_token_payload(upload_token)
-            .map_err(UploadTokenIntoStreamError::Internal)?;
-
-        let actual_data_size = self
-            .upload_reference_size(
-                account_id,
-                &upload_token_payload.upload_id,
-                &upload_token_payload.file_name,
-            )
-            .await
-            .map_err(UploadTokenIntoStreamError::Internal)?;
-
-        if actual_data_size != upload_token_payload.content_length {
-            let e = ContentLengthMismatchError {
-                actual: actual_data_size,
-                declared: upload_token_payload.content_length,
-            };
-            return Err(UploadTokenIntoStreamError::ContentLengthMismatch(e));
-        }
-
-        let stream = self
-            .upload_reference_into_stream(
-                account_id,
-                &upload_token_payload.upload_id,
-                &upload_token_payload.file_name,
-            )
-            .await
-            .map_err(UploadTokenIntoStreamError::Internal)?;
-
-        Ok((stream, MediaType(upload_token_payload.content_type)))
-    }
-
     async fn upload_reference_size(
         &self,
         account_id: &AccountID,
@@ -192,6 +155,45 @@ pub struct UploadTokenPayload {
     pub file_name: String,
     pub content_type: String,
     pub content_length: usize,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub async fn upload_token_into_stream(
+    upload_svc: &dyn UploadService,
+    account_id: &AccountID,
+    upload_token: &str,
+) -> Result<(Box<dyn AsyncRead + Send + Unpin>, MediaType), UploadTokenIntoStreamError> {
+    let upload_token_payload =
+        decode_upload_token_payload(upload_token).map_err(UploadTokenIntoStreamError::Internal)?;
+
+    let actual_data_size = upload_svc
+        .upload_reference_size(
+            account_id,
+            &upload_token_payload.upload_id,
+            &upload_token_payload.file_name,
+        )
+        .await
+        .map_err(UploadTokenIntoStreamError::Internal)?;
+
+    if actual_data_size != upload_token_payload.content_length {
+        let e = ContentLengthMismatchError {
+            actual: actual_data_size,
+            declared: upload_token_payload.content_length,
+        };
+        return Err(UploadTokenIntoStreamError::ContentLengthMismatch(e));
+    }
+
+    let stream = upload_svc
+        .upload_reference_into_stream(
+            account_id,
+            &upload_token_payload.upload_id,
+            &upload_token_payload.file_name,
+        )
+        .await
+        .map_err(UploadTokenIntoStreamError::Internal)?;
+
+    Ok((stream, MediaType(upload_token_payload.content_type)))
 }
 
 ///////////////////////////////////////////////////////////////////////////////

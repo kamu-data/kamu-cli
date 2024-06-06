@@ -12,7 +12,7 @@ use kamu::domain::{ErrorIntoInternal, ResultIntoInternal};
 use serde_json::{json, Value};
 use thiserror::Error;
 
-use crate::api_error::{ApiError, IntoApiError};
+use crate::api_error::{ApiError, IntoApiError, ResultIntoApiError};
 use crate::axum_utils::ensure_authenticated_account;
 use crate::{MakeUploadContextError, SaveUploadError, UploadService};
 
@@ -30,8 +30,7 @@ pub async fn platform_file_upload_prepare_post_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
     axum::extract::Query(query): axum::extract::Query<PlatformFileUploadQuery>,
 ) -> Result<axum::Json<Value>, ApiError> {
-    let account_id =
-        ensure_authenticated_account(&catalog).map_err(ApiError::new_unauthorized_from)?;
+    let account_id = ensure_authenticated_account(&catalog).api_err()?;
 
     let upload_service = catalog.get_one::<dyn UploadService>().unwrap();
     match upload_service
@@ -64,8 +63,7 @@ pub async fn platform_file_upload_post_handler(
     axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,
     mut multipart: axum::extract::Multipart,
 ) -> Result<(), ApiError> {
-    let account_id =
-        ensure_authenticated_account(&catalog).map_err(ApiError::new_unauthorized_from)?;
+    let account_id = ensure_authenticated_account(&catalog).api_err()?;
 
     let file_data = match find_correct_multi_part_field(&mut multipart).await {
         Ok(file_data) => file_data,
