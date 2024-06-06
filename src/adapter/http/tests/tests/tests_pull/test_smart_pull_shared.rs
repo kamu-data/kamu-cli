@@ -211,3 +211,36 @@ pub(crate) async fn test_smart_pull_aborted_read_of_existing_evolved_dataset_rer
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn test_smart_pull_new_empty_dataset<TServerHarness: ServerSideHarness>(
+    a_client_harness: ClientSideHarness,
+    a_server_harness: TServerHarness,
+) {
+    let scenario =
+        SmartPullNewEmptyDatasetScenario::prepare(a_client_harness, a_server_harness).await;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+    let client_handle = async {
+        let pull_result = scenario
+            .client_harness
+            .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref))
+            .await;
+
+        assert_eq!(
+            PullResult::Updated {
+                old_head: None,
+                new_head: scenario.server_create_result.head,
+            },
+            pull_result
+        );
+
+        DatasetTestHelper::assert_datasets_in_sync(
+            &scenario.server_dataset_layout,
+            &scenario.client_dataset_layout,
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

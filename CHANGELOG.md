@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `AddPushSource` event may omit specifying a schema. In this case, the very first push ingestion invokation 
   would try to make a best-effort auto-inferrence of the data schema.
+### Fixed
+- Fixed issue with smart protocol transfer operations upon empty datasets  
 
 ## [0.184.0] - 2024-05-28
 ### Changed

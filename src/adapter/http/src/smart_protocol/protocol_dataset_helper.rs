@@ -209,6 +209,12 @@ pub async fn dataset_append_metadata(
     dataset: &dyn Dataset,
     metadata: VecDeque<HashedMetadataBlock>,
 ) -> Result<AppendMetadataResponse, AppendError> {
+    if metadata.is_empty() {
+        return Ok(AppendMetadataResponse {
+            new_upstream_ids: vec![],
+        });
+    }
+
     let old_head = metadata.front().unwrap().1.prev_block_hash.clone();
     let new_head = metadata.back().unwrap().0.clone();
 

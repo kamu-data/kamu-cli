@@ -13,6 +13,7 @@ mod scenario_existing_advanced_dataset_fails;
 mod scenario_existing_evolved_dataset;
 mod scenario_existing_up_to_date_dataset;
 mod scenario_new_dataset;
+mod scenario_new_empty_dataset;
 
 pub(crate) use scenario_aborted_read_of_existing_evolved_dataset_reread_succeeds::*;
 pub(crate) use scenario_aborted_read_of_new_reread_succeeds::*;
@@ -20,3 +21,4 @@ pub(crate) use scenario_existing_advanced_dataset_fails::*;
 pub(crate) use scenario_existing_evolved_dataset::*;
 pub(crate) use scenario_existing_up_to_date_dataset::*;
 pub(crate) use scenario_new_dataset::*;
+pub(crate) use scenario_new_empty_dataset::*;
