@@ -344,14 +344,6 @@ impl ValidateAddPushSourceVisitor {
     pub fn new(block: &MetadataBlock) -> Result<Self, AppendValidationError> {
         let is_push_source_appended = match &block.event {
             MetadataEvent::AddPushSource(e) => {
-                // Ensure specifies the schema
-                if e.read.schema().is_none() {
-                    invalid_event!(
-                        e.clone(),
-                        "Push sources must specify the read schema explicitly",
-                    );
-                }
-
                 // Queries must be normalized
                 if let Some(transform) = &e.preprocess {
                     validate_transform(&block.event, transform)?;

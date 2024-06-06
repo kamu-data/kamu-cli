@@ -118,7 +118,15 @@ impl DataFormatRegistry for DataFormatRegistryImpl {
 
         // Perform best-effort conversion
         let schema = base_conf.schema().cloned();
-        match MediaTypeRef(actual_media_type.0.as_str()) {
+        self.get_best_effort_config(schema, actual_media_type)
+    }
+
+    fn get_best_effort_config(
+        &self,
+        schema: Option<Vec<String>>,
+        media_type: &MediaType,
+    ) -> Result<ReadStep, UnsupportedMediaTypeError> {
+        match MediaTypeRef(media_type.0.as_str()) {
             MediaType::CSV => Ok(ReadStepCsv {
                 schema,
                 ..Default::default()
@@ -142,7 +150,7 @@ impl DataFormatRegistry for DataFormatRegistryImpl {
                 ..Default::default()
             }
             .into()),
-            _ => Err(UnsupportedMediaTypeError::new(actual_media_type.clone())),
+            _ => Err(UnsupportedMediaTypeError::new(media_type.clone())),
         }
     }
 }

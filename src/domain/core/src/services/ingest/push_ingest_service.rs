@@ -61,6 +61,7 @@ pub trait PushIngestService: Send + Sync {
 pub struct PushIngestOpts {
     pub media_type: Option<MediaType>,
     pub source_event_time: Option<DateTime<Utc>>,
+    pub auto_create_push_source: bool,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

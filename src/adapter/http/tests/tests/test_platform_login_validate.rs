@@ -239,7 +239,7 @@ async fn test_validate_invalid_token_fails() {
             .send()
             .await
             .unwrap();
-        assert_eq!(400, validate_response.status());
+        assert_eq!(401, validate_response.status());
 
         let validate_response_error = validate_response.text().await.unwrap();
         assert_eq!(validate_response_error, "Authentication token invalid");
@@ -259,7 +259,7 @@ async fn test_validate_without_token_fails() {
         let client = reqwest::Client::new();
 
         let validate_response = client.get(validate_url).send().await.unwrap();
-        assert_eq!(400, validate_response.status());
+        assert_eq!(401, validate_response.status());
 
         let validate_response_error = validate_response.text().await.unwrap();
         assert_eq!(validate_response_error, "No authentication token provided");

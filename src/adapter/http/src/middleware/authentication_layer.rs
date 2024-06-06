@@ -23,9 +23,9 @@ use kamu_accounts::{
 };
 use tower::{Layer, Service};
 
-use crate::access_token::AccessToken;
 use crate::axum_utils::*;
 use crate::smart_protocol::BearerHeader;
+use crate::AccessToken;
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -132,17 +132,21 @@ where
                 .expect("Catalog not found in http server extensions");
 
             let current_account_subject =
-                match Self::current_account_subject(base_catalog, maybe_access_token).await {
+                match Self::current_account_subject(base_catalog, maybe_access_token.clone()).await
+                {
                     Ok(current_account_subject) => current_account_subject,
                     Err(response) => return Ok(response),
                 };
 
             tracing::debug!(subject = ?current_account_subject, "Authenticated request");
 
-            let derived_catalog = dill::CatalogBuilder::new_chained(base_catalog)
-                .add_value(current_account_subject)
-                .build();
+            let mut derived_catalog_builder = dill::CatalogBuilder::new_chained(base_catalog);
+            derived_catalog_builder.add_value(current_account_subject);
+            if let Some(access_token) = maybe_access_token {
+                derived_catalog_builder.add_value(access_token);
+            }
 
+            let derived_catalog = derived_catalog_builder.build();
             request.extensions_mut().insert(derived_catalog);
 
             inner.call(request).await

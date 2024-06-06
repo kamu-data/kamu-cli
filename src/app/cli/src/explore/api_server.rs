@@ -62,6 +62,14 @@ impl APIServer {
                 "/platform/token/validate",
                 axum::routing::get(kamu_adapter_http::platform_token_validate_handler),
             )
+            .route(
+                "/platform/file/upload/prepare",
+                axum::routing::post(kamu_adapter_http::platform_file_upload_prepare_post_handler),
+            )
+            .route(
+                "/platform/file/upload/:upload_token",
+                axum::routing::post(kamu_adapter_http::platform_file_upload_post_handler),
+            )
             .nest("/", kamu_adapter_http::data::root_router())
             .nest(
                 "/odata",

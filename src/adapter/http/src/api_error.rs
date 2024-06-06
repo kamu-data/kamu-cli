@@ -81,6 +81,10 @@ impl ApiError {
         AccessError::Unauthorized("Unauthorized access".into()).api_err()
     }
 
+    pub fn new_unauthorized_from(source: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::new(source, http::StatusCode::UNAUTHORIZED)
+    }
+
     pub fn new_forbidden() -> Self {
         AccessError::Forbidden("Forbidden access".into()).api_err()
     }
@@ -112,6 +116,7 @@ impl axum::response::IntoResponse for ApiError {
                 status_code = %self.status_code,
                 "Internal API error",
             );
+            (self.status_code, "").into_response()
         } else {
             tracing::warn!(
                 error = ?self.source,
@@ -119,12 +124,8 @@ impl axum::response::IntoResponse for ApiError {
                 status_code = %self.status_code,
                 "API error",
             );
+            (self.status_code, self.source.to_string()).into_response()
         }
-
-        axum::response::Response::builder()
-            .status(self.status_code)
-            .body(Default::default())
-            .unwrap()
     }
 }
 

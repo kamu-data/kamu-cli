@@ -17,6 +17,7 @@ use dill::*;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
+use kamu_adapter_http::{FileUploadLimitConfig, UploadService, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
@@ -330,6 +331,9 @@ pub fn configure_base_catalog(
     b.add::<kamu_adapter_auth_oso::KamuAuthOso>();
     b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
 
+    b.add_builder(UploadServiceLocal::builder().with_cache_dir(workspace_layout.cache_dir.clone()));
+    b.bind::<dyn UploadService, UploadServiceLocal>();
+
     b
 }
 
@@ -517,6 +521,11 @@ pub fn register_config_in_catalog(
 
         catalog_builder.add_value(PredefinedAccountsConfig::single_tenant());
     }
+
+    let uploads_config = config.uploads.as_ref().unwrap();
+    catalog_builder.add_value(FileUploadLimitConfig {
+        max_file_size_in_bytes: uploads_config.max_file_size_in_mb.unwrap() * 1024 * 1024,
+    });
 }
 
 fn try_convert_into_db_configuration(config: DatabaseConfig) -> Option<DatabaseConfiguration> {

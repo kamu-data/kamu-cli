@@ -40,6 +40,12 @@ pub trait DataFormatRegistry: Send + Sync {
         base_conf: odf::ReadStep,
         actual_media_type: &MediaType,
     ) -> Result<odf::ReadStep, UnsupportedMediaTypeError>;
+
+    fn get_best_effort_config(
+        &self,
+        schema: Option<Vec<String>>,
+        media_type: &MediaType,
+    ) -> Result<odf::ReadStep, UnsupportedMediaTypeError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
