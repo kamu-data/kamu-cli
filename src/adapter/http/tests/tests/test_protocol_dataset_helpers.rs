@@ -488,6 +488,7 @@ async fn create_test_case(server_harness: &dyn ServerSideHarness) -> TestCase {
         &commit_result.new_head,
         None,
         false,
+        false,
     )
     .await
     .unwrap();

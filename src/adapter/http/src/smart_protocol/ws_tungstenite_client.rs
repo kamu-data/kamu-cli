@@ -17,8 +17,8 @@ use kamu::domain::events::DatasetEventDependenciesUpdated;
 use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::{
     DatasetFactoryFn,
-    ObjectTransferOptions,
     SmartTransferProtocolClient,
+    TransferOptions,
 };
 use opendatafabric::{AsTypedBlock, Multihash};
 use serde::de::DeserializeOwned;
@@ -60,10 +60,12 @@ impl WsSmartTransferProtocolClient {
         &self,
         socket: &mut TungsteniteStream,
         dst_head: Option<Multihash>,
+        force: bool,
     ) -> Result<DatasetPullSuccessResponse, PullClientError> {
         let pull_request_message = DatasetPullRequest {
             begin_after: dst_head,
             stop_at: None,
+            force,
         };
 
         tracing::debug!("Sending pull request: {:?}", pull_request_message);
@@ -193,10 +195,12 @@ impl WsSmartTransferProtocolClient {
         socket: &mut TungsteniteStream,
         transfer_plan: TransferPlan,
         dst_head: Option<&Multihash>,
+        force: bool,
     ) -> Result<DatasetPushRequestAccepted, PushClientError> {
         let push_request_message = DatasetPushRequest {
             current_head: dst_head.cloned(),
             transfer_plan,
+            force,
         };
 
         tracing::debug!("Sending push request: {:?}", push_request_message);
@@ -240,13 +244,18 @@ impl WsSmartTransferProtocolClient {
         src_dataset: &dyn Dataset,
         src_head: &Multihash,
         dst_head: Option<&Multihash>,
+        force: bool,
     ) -> Result<DatasetPushMetadataAccepted, PushClientError> {
         tracing::debug!("Sending push metadata request");
 
-        let metadata_batch =
-            prepare_dataset_metadata_batch(src_dataset.as_metadata_chain(), src_head, dst_head)
-                .await
-                .int_err()?;
+        let metadata_batch = prepare_dataset_metadata_batch(
+            src_dataset.as_metadata_chain(),
+            src_head,
+            dst_head,
+            force,
+        )
+        .await
+        .int_err()?;
 
         tracing::debug!(
             num_blocks = % metadata_batch.num_blocks,
@@ -341,7 +350,7 @@ impl WsSmartTransferProtocolClient {
         socket: &mut TungsteniteStream,
         push_objects_response: DatasetPushObjectsTransferResponse,
         src: Arc<dyn Dataset>,
-        transfer_options: ObjectTransferOptions,
+        transfer_options: TransferOptions,
     ) -> Result<(), SyncError> {
         let uploaded_files_counter = Arc::new(AtomicI32::new(0));
 
@@ -478,7 +487,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         dst: Option<Arc<dyn Dataset>>,
         dst_factory: Option<DatasetFactoryFn>,
         listener: Arc<dyn SyncListener>,
-        transfer_options: ObjectTransferOptions,
+        transfer_options: TransferOptions,
     ) -> Result<SyncResult, SyncError> {
         listener.begin();
 
@@ -521,13 +530,23 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         };
 
         let dataset_pull_result = match self
-            .pull_send_request(&mut ws_stream, dst_head.clone())
+            .pull_send_request(&mut ws_stream, dst_head.clone(), transfer_options.force)
             .await
         {
             Ok(dataset_pull_result) => dataset_pull_result,
             Err(e) => {
                 tracing::debug!("Pull process aborted with error: {}", e);
-                return Err(SyncError::Internal(e.int_err()));
+                let e = match e {
+                    PullClientError::InvalidInterval(e) => {
+                        SyncError::DatasetsDiverged(DatasetsDivergedError {
+                            src_head: e.head,
+                            dst_head: e.tail,
+                            detail: None,
+                        })
+                    }
+                    _ => SyncError::Internal(e.int_err()),
+                };
+                return Err(e);
             }
         };
 
@@ -606,12 +625,13 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     .await?;
             }
 
-            let response = dataset_append_metadata(dst.as_ref(), new_blocks)
-                .await
-                .map_err(|e| {
-                    tracing::debug!("Appending dataset metadata failed with error: {}", e);
-                    SyncError::Internal(e.int_err())
-                })?;
+            let response =
+                dataset_append_metadata(dst.as_ref(), new_blocks, transfer_options.force)
+                    .await
+                    .map_err(|e| {
+                        tracing::debug!("Appending dataset metadata failed with error: {}", e);
+                        SyncError::Internal(e.int_err())
+                    })?;
 
             // TODO: encapsulate this inside dataset/chain
             if !response.new_upstream_ids.is_empty() {
@@ -660,7 +680,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         http_dst_url: &Url,
         dst_head: Option<&Multihash>,
         listener: Arc<dyn SyncListener>,
-        transfer_options: ObjectTransferOptions,
+        transfer_options: TransferOptions,
     ) -> Result<SyncResult, SyncError> {
         listener.begin();
 
@@ -670,10 +690,14 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             .await
             .int_err()?;
 
-        let transfer_plan =
-            prepare_dataset_transfer_plan(src.as_metadata_chain(), &src_head, dst_head)
-                .await
-                .map_err(|e| SyncError::Internal(e.int_err()))?;
+        let transfer_plan = prepare_dataset_transfer_plan(
+            src.as_metadata_chain(),
+            &src_head,
+            dst_head,
+            transfer_options.force,
+        )
+        .await
+        .map_err(|e| SyncError::Internal(e.int_err()))?;
 
         let num_blocks = transfer_plan.num_blocks;
         if num_blocks == 0 {
@@ -715,7 +739,12 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         };
 
         match self
-            .push_send_request(&mut ws_stream, transfer_plan, dst_head)
+            .push_send_request(
+                &mut ws_stream,
+                transfer_plan,
+                dst_head,
+                transfer_options.force,
+            )
             .await
         {
             Ok(_) => {}
@@ -726,7 +755,13 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         };
 
         match self
-            .push_send_metadata_request(&mut ws_stream, src.as_ref(), &src_head, dst_head)
+            .push_send_metadata_request(
+                &mut ws_stream,
+                src.as_ref(),
+                &src_head,
+                dst_head,
+                transfer_options.force,
+            )
             .await
         {
             Ok(_) => {}
@@ -736,16 +771,21 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             }
         };
 
-        let missing_objects =
-            match collect_object_references_from_interval(src.as_ref(), &src_head, dst_head, false)
-                .await
-            {
-                Ok(object_references) => object_references,
-                Err(e) => {
-                    tracing::debug!("Push process aborted with error: {}", e);
-                    return Err(SyncError::Internal(e.int_err()));
-                }
-            };
+        let missing_objects = match collect_object_references_from_interval(
+            src.as_ref(),
+            &src_head,
+            dst_head,
+            transfer_options.force,
+            false,
+        )
+        .await
+        {
+            Ok(object_references) => object_references,
+            Err(e) => {
+                tracing::debug!("Push process aborted with error: {}", e);
+                return Err(SyncError::Internal(e.int_err()));
+            }
+        };
 
         let push_objects_response = match self
             .push_send_objects_request(&mut ws_stream, missing_objects)

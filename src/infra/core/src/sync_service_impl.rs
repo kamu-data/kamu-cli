@@ -19,7 +19,7 @@ use url::Url;
 use super::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use crate::utils::ipfs_wrapper::*;
 use crate::utils::simple_transfer_protocol::{DatasetFactoryFn, SimpleTransferProtocol};
-use crate::utils::smart_transfer_protocol::ObjectTransferOptions;
+use crate::utils::smart_transfer_protocol::TransferOptions;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -235,7 +235,10 @@ impl SyncServiceImpl {
                 dst_dataset,
                 dst_factory,
                 listener,
-                ObjectTransferOptions::default(),
+                TransferOptions {
+                    force: opts.force,
+                    ..Default::default()
+                },
             )
             .await
     }
@@ -244,6 +247,7 @@ impl SyncServiceImpl {
         &'a self,
         src: &SyncRef,
         dst_url: &Url,
+        force: bool,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
         let src_dataset = self.get_dataset_reader(src).await?;
@@ -276,7 +280,10 @@ impl SyncServiceImpl {
                 &http_dst_url,
                 maybe_dst_head.as_ref(),
                 listener,
-                ObjectTransferOptions::default(),
+                TransferOptions {
+                    force,
+                    ..Default::default()
+                },
             )
             .await
     }
@@ -405,8 +412,10 @@ impl SyncServiceImpl {
                     return Err(SyncError::DatasetsDiverged(DatasetsDivergedError {
                         src_head,
                         dst_head: dst_head.unwrap(),
-                        uncommon_blocks_in_dst: uncommon_blocks_in_rhs,
-                        uncommon_blocks_in_src: uncommon_blocks_in_lhs,
+                        detail: Some(DatasetsDivergedErrorDetail {
+                            uncommon_blocks_in_dst: uncommon_blocks_in_rhs,
+                            uncommon_blocks_in_src: uncommon_blocks_in_lhs,
+                        }),
                     }));
                 }
             }
@@ -581,7 +590,7 @@ impl SyncServiceImpl {
             }
             // * -> odf
             (_, SyncRef::Remote(dst_url)) if dst_url.is_odf_protocol() => {
-                self.sync_smart_push_transfer_protocol(&src, dst_url.as_ref(), listener)
+                self.sync_smart_push_transfer_protocol(&src, dst_url.as_ref(), opts.force, listener)
                     .await
             }
             // * -> *

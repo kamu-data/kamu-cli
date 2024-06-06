@@ -82,6 +82,7 @@ impl AxumServerPushProtocolInstance {
 
     async fn push_main_flow(mut self) -> Result<(), PushServerError> {
         let push_request = self.handle_push_request_initiation().await?;
+        let force = push_request.force;
 
         let mut new_blocks = self.try_handle_push_metadata_request(push_request).await?;
         if !new_blocks.is_empty() {
@@ -125,7 +126,7 @@ impl AxumServerPushProtocolInstance {
             }
         }
 
-        self.try_handle_push_complete(new_blocks).await?;
+        self.try_handle_push_complete(new_blocks, force).await?;
 
         Ok(())
     }
@@ -312,6 +313,7 @@ impl AxumServerPushProtocolInstance {
     async fn try_handle_push_complete(
         &mut self,
         new_blocks: VecDeque<HashedMetadataBlock>,
+        force: bool,
     ) -> Result<(), PushServerError> {
         axum_read_payload::<DatasetPushComplete>(&mut self.socket)
             .await
@@ -323,7 +325,7 @@ impl AxumServerPushProtocolInstance {
 
         if !new_blocks.is_empty() {
             let dataset = self.dataset.as_ref().unwrap().as_ref();
-            let response = dataset_append_metadata(dataset, new_blocks)
+            let response = dataset_append_metadata(dataset, new_blocks, force)
                 .await
                 .map_err(|e| {
                     tracing::debug!("Appending dataset metadata failed with error: {}", e);

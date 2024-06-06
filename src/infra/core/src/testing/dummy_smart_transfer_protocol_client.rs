@@ -14,7 +14,7 @@ use opendatafabric::Multihash;
 use url::Url;
 
 use crate::utils::simple_transfer_protocol::DatasetFactoryFn;
-use crate::utils::smart_transfer_protocol::{ObjectTransferOptions, SmartTransferProtocolClient};
+use crate::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};
 
 #[dill::component]
 #[dill::interface(dyn SmartTransferProtocolClient)]
@@ -34,7 +34,7 @@ impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
         _dst: Option<Arc<dyn Dataset>>,
         _dst_factory: Option<DatasetFactoryFn>,
         _listener: Arc<dyn SyncListener>,
-        _transfer_options: ObjectTransferOptions,
+        _transfer_options: TransferOptions,
     ) -> Result<SyncResult, SyncError> {
         unimplemented!("Not supported yet")
     }
@@ -45,7 +45,7 @@ impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
         _http_dst_url: &Url,
         _dst_head: Option<&Multihash>,
         _listener: Arc<dyn SyncListener>,
-        _transfer_options: ObjectTransferOptions,
+        _transfer_options: TransferOptions,
     ) -> Result<SyncResult, SyncError> {
         unimplemented!("Not supported yet")
     }

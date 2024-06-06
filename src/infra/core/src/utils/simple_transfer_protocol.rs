@@ -125,8 +125,10 @@ impl SimpleTransferProtocol {
                     return Err(SyncError::DatasetsDiverged(DatasetsDivergedError {
                         src_head,
                         dst_head: dst_head.unwrap(),
-                        uncommon_blocks_in_dst,
-                        uncommon_blocks_in_src,
+                        detail: Some(DatasetsDivergedErrorDetail {
+                            uncommon_blocks_in_src,
+                            uncommon_blocks_in_dst,
+                        }),
                     }));
                 }
             }
