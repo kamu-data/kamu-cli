@@ -542,7 +542,7 @@ fn get_simple_transfer_protocol_headers(
     if let Some(bearer) = maybe_bearer_header {
         vec![HeaderRow {
             name: http::header::AUTHORIZATION.to_string(),
-            value: bearer.0.token().to_string(),
+            value: format!("Bearer {}", bearer.0.token()),
         }]
     } else {
         vec![]

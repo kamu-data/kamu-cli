@@ -122,7 +122,7 @@ async fn test_object_url_local_fs() {
             download_from_headers == vec![
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
-                    value: DUMMY_ACCESS_TOKEN.to_string()
+                    value: format!("Bearer {DUMMY_ACCESS_TOKEN}")
                 }
             ]
     );
@@ -148,7 +148,7 @@ async fn test_object_url_local_fs() {
             download_from_headers == vec![
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
-                    value: DUMMY_ACCESS_TOKEN.to_string()
+                    value: format!("Bearer {DUMMY_ACCESS_TOKEN}", )
                 }
             ]
     );
@@ -197,7 +197,7 @@ async fn test_object_url_local_fs() {
             upload_to_headers == vec![
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
-                    value: DUMMY_ACCESS_TOKEN.to_string()
+                    value: format!("Bearer {DUMMY_ACCESS_TOKEN}", )
                 }
             ]
     );
@@ -222,7 +222,7 @@ async fn test_object_url_local_fs() {
             upload_to_headers == vec![
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
-                    value: DUMMY_ACCESS_TOKEN.to_string()
+                    value: format!("Bearer {DUMMY_ACCESS_TOKEN}", )
                 }
             ]
     );
