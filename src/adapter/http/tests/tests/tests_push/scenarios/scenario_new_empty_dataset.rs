@@ -24,7 +24,6 @@ pub(crate) struct SmartPushNewEmptyDatasetScenario<TServerHarness: ServerSideHar
     pub server_dataset_ref: DatasetRefRemote,
     pub client_dataset_ref: DatasetRef,
     pub client_create_result: CreateDatasetResult,
-    pub dataset_name: DatasetName,
 }
 
 impl<TServerHarness: ServerSideHarness> SmartPushNewEmptyDatasetScenario<TServerHarness> {
@@ -74,7 +73,6 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewEmptyDatasetScenario<TServer
             server_dataset_ref,
             client_dataset_ref,
             client_create_result,
-            dataset_name: foo_name,
         }
     }
 }
