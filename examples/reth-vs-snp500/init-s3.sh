@@ -7,7 +7,8 @@ S3_EXAMPLE_URL="https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/odf/v2/exam
 kamu init || true
 
 # Root
-kamu pull "${S3_CONTRIB_URL}net.rocketpool.reth.mint-burn"
+kamu pull "${S3_CONTRIB_URL}net.rocketpool.reth.tokens-minted"
+kamu pull "${S3_CONTRIB_URL}net.rocketpool.reth.tokens-burned"
 kamu pull "${S3_CONTRIB_URL}com.cryptocompare.ohlcv.eth-usd"
 kamu pull "${S3_CONTRIB_URL}co.alphavantage.tickers.daily.spy"
 

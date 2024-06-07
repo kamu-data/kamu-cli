@@ -197,10 +197,10 @@ debug = 1
 # Use this section to test or apply emergency ovverides to dependencies
 # See: https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html
 [patch.crates-io]
-datafusion = { git = 'https://github.com/apache/datafusion.git', branch = 'main' }
-datafusion-common = { git = 'https://github.com/apache/datafusion.git', branch = 'main' }
-datafusion-execution = { git = 'https://github.com/apache/datafusion.git', branch = 'main' }
-datafusion-expr = { git = 'https://github.com/apache/datafusion.git', branch = 'main' }
+datafusion = { git = 'https://github.com/apache/datafusion.git', rev = '8fcb3e4b8a8fe6c4c7f83922dd860c9fa78c0639' }
+datafusion-common = { git = 'https://github.com/apache/datafusion.git', rev = '8fcb3e4b8a8fe6c4c7f83922dd860c9fa78c0639' }
+datafusion-execution = { git = 'https://github.com/apache/datafusion.git', rev = '8fcb3e4b8a8fe6c4c7f83922dd860c9fa78c0639' }
+datafusion-expr = { git = 'https://github.com/apache/datafusion.git', rev = '8fcb3e4b8a8fe6c4c7f83922dd860c9fa78c0639' }
 datafusion-odata = { git = 'https://github.com/kamu-data/datafusion-odata.git', branch = 'axum-0.6' }
 # datafusion-ethers = { git = "https://github.com/kamu-data/datafusion-ethers.git", branch = "datafusion-39" }
 datafusion-functions-json = { git = 'https://github.com/kamu-data/datafusion-functions-json.git', branch = "datafusion-39" }
