@@ -11,9 +11,8 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use console::style as s;
-use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::ResultIntoInternal;
 use kamu_accounts::*;
 use kamu_accounts_services::PasswordLoginCredentials;
 use kamu_adapter_oauth::*;
@@ -82,7 +81,7 @@ impl APIServerRunCommand {
         Ok(())
     }
 
-    async fn get_access_token(&self) -> Result<String, InternalError> {
+    async fn get_access_token(&self) -> Result<String, CLIError> {
         let current_account_name = match self.account_subject.as_ref() {
             CurrentAccountSubject::Logged(l) => l.account_name.clone(),
             CurrentAccountSubject::Anonymous(_) => {
@@ -101,22 +100,20 @@ impl APIServerRunCommand {
             password: account_config.get_password(),
         };
 
-        let login_response = DatabaseTransactionRunner::run_transactional_with(
-            &self.base_catalog,
-            |auth_svc: Arc<dyn AuthenticationService>| async move {
-                auth_svc
-                    .login(
-                        PROVIDER_PASSWORD,
-                        serde_json::to_string::<PasswordLoginCredentials>(&login_credentials)
-                            .int_err()?,
-                    )
-                    .await
-                    .int_err()
-            },
-        )
-        .await?;
+        let auth_svc = self
+            .base_catalog
+            .get_one::<dyn AuthenticationService>()
+            .unwrap();
+        let access_token = auth_svc
+            .login(
+                PROVIDER_PASSWORD,
+                serde_json::to_string::<PasswordLoginCredentials>(&login_credentials).int_err()?,
+            )
+            .await
+            .int_err()?
+            .access_token;
 
-        Ok(login_response.access_token)
+        Ok(access_token)
     }
 }
 
