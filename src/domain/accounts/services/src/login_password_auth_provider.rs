@@ -88,10 +88,14 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
         &self,
         login_credentials_json: String,
     ) -> Result<ProviderLoginResponse, ProviderLoginError> {
+        dbg!("@@@ login 1", &login_credentials_json);
+
         // Decode credentials
         let password_login_credentials =
             serde_json::from_str::<PasswordLoginCredentials>(login_credentials_json.as_str())
                 .map_err(|e| {
+                    dbg!(&e);
+
                     ProviderLoginError::InvalidCredentials(InvalidCredentialsError::new(Box::new(
                         e,
                     )))
@@ -111,9 +115,11 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
 
             // Not found => error
             Ok(None) => {
+                dbg!("@@@ login 3");
+
                 return Err(ProviderLoginError::RejectedCredentials(
                     RejectedCredentialsError {},
-                ))
+                ));
             }
 
             // Internal issue => error
@@ -121,6 +127,8 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
                 FindPasswordHashError::Internal(e) => return Err(ProviderLoginError::Internal(e)),
             },
         };
+
+        dbg!("@@@ login 2", &password_hash);
 
         // Verify password hash: this is a compute-intensive operation,
         // so spawn a blocking task

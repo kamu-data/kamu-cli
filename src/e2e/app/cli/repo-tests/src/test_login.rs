@@ -11,9 +11,39 @@ use kamu_cli_e2e_common::KamuApiServerClient;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_login(kamu_api_server_client: KamuApiServerClient) {
-    // TODO: just for testing
-    kamu_api_server_client.ready().await.unwrap();
+pub async fn test_login_password_predefined_successful(
+    kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client
+        .api_call_assert(
+            indoc::indoc!(
+                r#"
+                mutation {
+                  auth {
+                    login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
+                      account {
+                        accountName
+                      }
+                    }
+                  }
+                }
+                "#,
+            ),
+            indoc::indoc!(
+                r#"
+                {
+                  "auth": {
+                    "login": {
+                      "account": {
+                        "accountName": "kamu"
+                      }
+                    }
+                  }
+                }
+                "#,
+            ),
+        )
+        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

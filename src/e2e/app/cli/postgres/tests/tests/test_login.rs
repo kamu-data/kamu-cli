@@ -15,7 +15,7 @@ use sqlx::PgPool;
 
 #[test_group::group(e2e, database, postgres)]
 #[test_log::test(sqlx::test(migrations = "../../../../../migrations/postgres"))]
-async fn test_login(pg_pool: PgPool) {
+async fn test_login_password_predefined_successful(pg_pool: PgPool) {
     let db = pg_pool.connect_options();
     let kamu = Kamu::new_workspace_tmp_with_kamu_config(
         format!(
@@ -42,7 +42,8 @@ async fn test_login(pg_pool: PgPool) {
     .await;
 
     postgres_e2e_test(pg_pool, kamu, |kamu_api_server_client| async {
-        kamu_cli_e2e_repo_tests::test_login(kamu_api_server_client).await;
+        kamu_cli_e2e_repo_tests::test_login_password_predefined_successful(kamu_api_server_client)
+            .await;
     })
     .await;
 }
