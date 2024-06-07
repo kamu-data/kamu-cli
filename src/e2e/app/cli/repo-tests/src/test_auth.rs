@@ -47,3 +47,33 @@ pub async fn test_login_password_predefined_successful(
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_enabled_methods(kamu_api_server_client: KamuApiServerClient) {
+    kamu_api_server_client
+        .api_call_assert(
+            indoc::indoc!(
+                r#"
+                query {
+                  auth {
+                    enabledLoginMethods
+                  }
+                }
+                "#,
+            ),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "auth": {
+                    "enabledLoginMethods": [
+                      "oauth_github",
+                      "password"
+                    ]
+                  }
+                }
+                "#,
+            )),
+        )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////

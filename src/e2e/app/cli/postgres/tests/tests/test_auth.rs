@@ -49,3 +49,39 @@ async fn test_login_password_predefined_successful(pg_pool: PgPool) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(e2e, database, postgres)]
+#[test_log::test(sqlx::test(migrations = "../../../../../migrations/postgres"))]
+async fn test_login_enabled_methods(pg_pool: PgPool) {
+    let db = pg_pool.connect_options();
+    let kamu = Kamu::new_workspace_tmp_with_kamu_config(
+        format!(
+            indoc::indoc!(
+                r#"
+                kind: CLIConfig
+                version: 1
+                content:
+                    database:
+                        provider: postgres
+                        host: {host}
+                        user: {user}
+                        password: {password}
+                        databaseName: {database}
+                "#
+            ),
+            host = db.get_host(),
+            user = db.get_username(),
+            password = db.get_username(), // It's intended: password is same as user for tests
+            database = db.get_database().unwrap(),
+        )
+        .as_str(),
+    )
+    .await;
+
+    postgres_e2e_test(pg_pool, kamu, |kamu_api_server_client| async {
+        kamu_cli_e2e_repo_tests::test_login_enabled_methods(kamu_api_server_client).await;
+    })
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////
