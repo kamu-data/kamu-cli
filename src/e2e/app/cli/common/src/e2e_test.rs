@@ -20,7 +20,7 @@ use crate::KamuApiServerClient;
 
 pub async fn e2e_test<F, Fut>(kamu: Kamu, fixture_callback: F)
 where
-    F: FnOnce(&KamuApiServerClient) -> Fut,
+    F: FnOnce(KamuApiServerClient) -> Fut,
     Fut: Future<Output = ()>,
 {
     let host = "127.0.0.1";
@@ -41,14 +41,14 @@ where
         .int_err()
     };
 
-    let test_fut = async {
+    let test_fut = async move {
         let base_url = Url::parse(&format!("http://{host}:{port}")).unwrap();
         let kamu_api_server_client = KamuApiServerClient::new(base_url);
 
         kamu_api_server_client.ready().await?;
-
-        fixture_callback(&kamu_api_server_client).await;
-
+        {
+            fixture_callback(kamu_api_server_client.clone()).await;
+        }
         kamu_api_server_client.shutdown().await?;
 
         Ok::<_, InternalError>(())

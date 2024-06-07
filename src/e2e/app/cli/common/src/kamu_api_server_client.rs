@@ -15,6 +15,8 @@ use tokio_retry::Retry;
 ////////////////////////////////////////////////////////////////////////////////
 
 // TODO: GQL-query method
+
+#[derive(Clone)]
 pub struct KamuApiServerClient {
     http_client: reqwest::Client,
     server_base_url: Url,

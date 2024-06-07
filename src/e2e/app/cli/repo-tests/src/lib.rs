@@ -7,10 +7,5 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(assert_matches)]
-
-mod e2e_test;
-mod kamu_api_server_client;
-
-pub use e2e_test::*;
-pub use kamu_api_server_client::*;
+mod test_login;
+pub use test_login::*;

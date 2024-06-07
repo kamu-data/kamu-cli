@@ -55,6 +55,7 @@ members = [
     "src/app/cli",
     # E2E
     "src/e2e/app/cli/common",
+    "src/e2e/app/cli/repo-tests",
     "src/e2e/app/cli/postgres",
 ]
 resolver = "2"
@@ -116,6 +117,10 @@ kamu-adapter-graphql = { version = "0.185.1", path = "src/adapter/graphql", defa
 kamu-adapter-http = { version = "0.185.1", path = "src/adapter/http", default-features = false }
 kamu-adapter-odata = { version = "0.185.1", path = "src/adapter/odata", defualt-features = false }
 kamu-adapter-oauth = { version = "0.185.1", path = "src/adapter/oauth", defualt-features = false }
+
+# E2E
+kamu-cli-e2e-common = { version = "0.184.0", path = "src/e2e/app/cli/common", defualt-features = false }
+kamu-cli-e2e-repo-tests = { version = "0.184.0", path = "src/e2e/app/cli/repo-tests", defualt-features = false }
 
 [workspace.package]
 version = "0.185.1"
