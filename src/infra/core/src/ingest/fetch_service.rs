@@ -943,13 +943,18 @@ impl FetchService {
         target_path: &Path,
         listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, PollingIngestError> {
+        use alloy::providers::{Provider, ProviderBuilder};
+        use alloy::rpc::types::eth::BlockTransactionsKind;
         use datafusion::prelude::*;
         use datafusion_ethers::convert::*;
         use datafusion_ethers::stream::*;
-        use ethers::prelude::*;
 
-        let mut coder: Box<dyn Transcoder + Send> = if let Some(signature) = &fetch.signature {
-            Box::new(EthRawAndDecodedLogsToArrow::new_from_signature(&signature).int_err()?)
+        // Alloy does not support newlines in log signatures, but it's nice for
+        // formatting
+        let signature = fetch.signature.as_ref().map(|s| s.replace("\n", " "));
+
+        let mut coder: Box<dyn Transcoder + Send> = if let Some(sig) = &signature {
+            Box::new(EthRawAndDecodedLogsToArrow::new_from_signature(sig).int_err()?)
         } else {
             Box::new(EthRawLogsToArrow::new())
         };
@@ -985,11 +990,15 @@ impl FetchService {
             .int_err())?
         };
 
-        let rpc_client = Arc::new(Provider::<Http>::connect(&node_url.to_string()).await);
-        let chain_id = rpc_client.get_chainid().await.int_err()?;
+        let rpc_client = ProviderBuilder::new()
+            .on_builtin(node_url.as_str())
+            .await
+            .int_err()?;
+
+        let chain_id = rpc_client.get_chain_id().await.int_err()?;
         tracing::info!(%node_url, %chain_id, "Connected to ETH node");
         if let Some(expected_chain_id) = fetch.chain_id
-            && expected_chain_id != chain_id.as_u64()
+            && expected_chain_id != chain_id
         {
             Err(EthereumRpcError::new(format!(
                 "Expected to connect to chain ID {expected_chain_id} but got {chain_id} instead"
@@ -998,7 +1007,10 @@ impl FetchService {
         }
 
         // Setup Datafusion context
-        let mut ctx = SessionContext::new();
+        let cfg = SessionConfig::new()
+            .with_target_partitions(1)
+            .with_coalesce_batches(false);
+        let mut ctx = SessionContext::new_with_config(cfg);
         datafusion_ethers::udf::register_all(&mut ctx).unwrap();
         ctx.register_catalog(
             "eth",
@@ -1009,8 +1021,8 @@ impl FetchService {
 
         // Prepare the query according to filters
         let sql = if let Some(filter) = &fetch.filter {
-            let filter = if let Some(signature) = &fetch.signature {
-                format!("({filter}) and topic0 = eth_event_selector('{signature}')")
+            let filter = if let Some(sig) = &signature {
+                format!("({filter}) and topic0 = eth_event_selector('{sig}')")
             } else {
                 filter.clone()
             };
@@ -1028,10 +1040,15 @@ impl FetchService {
 
         let Some(filter) = plan
             .as_any()
-            .downcast_ref::<datafusion_ethers::provider::EthGetLogs<Http>>()
+            .downcast_ref::<datafusion_ethers::provider::EthGetLogs>()
             .map(|i| i.filter().clone())
         else {
-            panic!("Could not downcast the plan to EthGetLogs");
+            Err(EthereumRpcError::new(format!(
+                "Filter is too complex and includes conditions that cannot be pushed down into \
+                 RPC request. Please move such expressions into the postprocessing stage. \
+                 Physical plan:\n{plan_str}"
+            ))
+            .int_err())?
         };
 
         // Resolve filter into a numeric block range
@@ -1110,7 +1127,7 @@ impl FetchService {
         // Record scanning state
         // TODO: Reorg tolerance
         let last_seen_block = rpc_client
-            .get_block(state.last_seen_block)
+            .get_block(state.last_seen_block.into(), BlockTransactionsKind::Hashes)
             .await
             .int_err()?
             .unwrap();
@@ -1144,8 +1161,8 @@ impl FetchService {
         Ok(FetchResult::Updated(FetchResultUpdated {
             source_state: Some(PollingSourceState::ETag(format!(
                 "{}@{:x}",
-                last_seen_block.number.unwrap(),
-                last_seen_block.hash.unwrap(),
+                last_seen_block.header.number.unwrap(),
+                last_seen_block.header.hash.unwrap(),
             ))),
             source_event_time: None,
             has_more,
