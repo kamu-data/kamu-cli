@@ -24,22 +24,27 @@ doctest = false
 [dependencies]
 opendatafabric = { workspace = true }
 
+async-trait = "0.1"
 arrow = { version = "51", default-features = false }
 arrow-json = { version = "51", default-features = false }
 arrow-digest = { version = "51", default-features = false }
-datafusion = { version = "38", default-features = false, features = ["parquet", "serde"] }
-tracing = { version = "0.1", default-features = false }
-
-async-trait = "0.1"
+datafusion = { version = "38", default-features = false, features = [
+    "parquet",
+    "serde",
+] }
 digest = "0.10"
+hex = "*"
 pretty_assertions = { version = "1" }
 sha3 = "0.10"
+tracing = { version = "0.1", default-features = false }
 thiserror = { version = "1", default-features = false }
 url = "2"
-serde = {version = "1", default-features = false }
-serde_json = {version = "1"}
+serde = { version = "1", default-features = false }
+serde_json = { version = "1" }
+
 
 [dev-dependencies]
+indoc = "2"
 test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features=["rt", "macros"] }
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

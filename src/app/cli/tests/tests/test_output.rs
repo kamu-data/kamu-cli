@@ -66,7 +66,7 @@ async fn test_records_format() {
             .with_style_spec("r")
             .with_value_fmt_t(humanize_quantity),
         ColumnFormat::new().with_style_spec("l").with_max_len(5),
-        ColumnFormat::default().with_max_len(5),
+        ColumnFormat::default().with_max_binary_len(5),
     ]);
 
     let mut buf = Vec::new();

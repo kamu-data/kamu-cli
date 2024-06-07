@@ -17,7 +17,7 @@ use datafusion::arrow::util::display::array_value_to_string;
 use kamu_data_utils::data::format::WriterError;
 pub use kamu_data_utils::data::format::{
     CsvWriter,
-    CsvWriterBuilder,
+    CsvWriterOptions,
     JsonArrayOfArraysWriter,
     JsonArrayOfStructsWriter,
     JsonLineDelimitedWriter,

@@ -101,6 +101,8 @@ impl ClientSideHarness {
 
         b.add::<DataFormatRegistryImpl>();
 
+        b.add_builder(FetchService::builder().with_run_info_dir(run_info_dir.clone()));
+
         b.add_builder(
             PollingIngestServiceImpl::builder()
                 .with_run_info_dir(run_info_dir.clone())

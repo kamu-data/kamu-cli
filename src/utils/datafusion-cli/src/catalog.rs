@@ -289,6 +289,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "kamu: we don't care about this test and it take too long"]
     async fn query_gs_location_test() -> Result<()> {
         let bucket = "examplegsbucket";
         let location = format!("gs://{bucket}/file.parquet");

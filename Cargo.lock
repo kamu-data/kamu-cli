@@ -5012,6 +5012,8 @@ dependencies = [
  "async-trait",
  "datafusion",
  "digest 0.10.7",
+ "hex",
+ "indoc 2.0.5",
  "opendatafabric",
  "pretty_assertions",
  "serde",

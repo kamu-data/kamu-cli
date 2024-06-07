@@ -747,13 +747,20 @@ type ExecuteTransformInput {
 	newOffset: Int
 }
 
-union FetchStep = FetchStepUrl | FetchStepFilesGlob | FetchStepContainer | FetchStepMqtt
+union FetchStep = FetchStepUrl | FetchStepFilesGlob | FetchStepContainer | FetchStepMqtt | FetchStepEthereumLogs
 
 type FetchStepContainer {
 	image: String!
 	command: [String!]
 	args: [String!]
 	env: [EnvVar!]
+}
+
+type FetchStepEthereumLogs {
+	chainId: Int
+	nodeUrl: String
+	filter: String
+	signature: String
 }
 
 type FetchStepFilesGlob {
