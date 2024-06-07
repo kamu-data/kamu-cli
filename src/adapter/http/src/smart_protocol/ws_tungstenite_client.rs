@@ -60,12 +60,12 @@ impl WsSmartTransferProtocolClient {
         &self,
         socket: &mut TungsteniteStream,
         dst_head: Option<Multihash>,
-        force: bool,
+        force_update_if_diverged: bool,
     ) -> Result<DatasetPullSuccessResponse, PullClientError> {
         let pull_request_message = DatasetPullRequest {
             begin_after: dst_head,
             stop_at: None,
-            force,
+            force_update_if_diverged,
         };
 
         tracing::debug!("Sending pull request: {:?}", pull_request_message);
@@ -195,12 +195,12 @@ impl WsSmartTransferProtocolClient {
         socket: &mut TungsteniteStream,
         transfer_plan: TransferPlan,
         dst_head: Option<&Multihash>,
-        force: bool,
+        force_update_if_diverged: bool,
     ) -> Result<DatasetPushRequestAccepted, PushClientError> {
         let push_request_message = DatasetPushRequest {
             current_head: dst_head.cloned(),
             transfer_plan,
-            force,
+            force_update_if_diverged,
         };
 
         tracing::debug!("Sending push request: {:?}", push_request_message);
@@ -244,7 +244,7 @@ impl WsSmartTransferProtocolClient {
         src_dataset: &dyn Dataset,
         src_head: &Multihash,
         dst_head: Option<&Multihash>,
-        force: bool,
+        force_update_if_diverged: bool,
     ) -> Result<DatasetPushMetadataAccepted, PushClientError> {
         tracing::debug!("Sending push metadata request");
 
@@ -252,7 +252,7 @@ impl WsSmartTransferProtocolClient {
             src_dataset.as_metadata_chain(),
             src_head,
             dst_head,
-            force,
+            force_update_if_diverged,
         )
         .await
         .int_err()?;
@@ -530,7 +530,11 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         };
 
         let dataset_pull_result = match self
-            .pull_send_request(&mut ws_stream, dst_head.clone(), transfer_options.force)
+            .pull_send_request(
+                &mut ws_stream,
+                dst_head.clone(),
+                transfer_options.force_update_if_diverged,
+            )
             .await
         {
             Ok(dataset_pull_result) => dataset_pull_result,
@@ -625,13 +629,16 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     .await?;
             }
 
-            let response =
-                dataset_append_metadata(dst.as_ref(), new_blocks, transfer_options.force)
-                    .await
-                    .map_err(|e| {
-                        tracing::debug!("Appending dataset metadata failed with error: {}", e);
-                        SyncError::Internal(e.int_err())
-                    })?;
+            let response = dataset_append_metadata(
+                dst.as_ref(),
+                new_blocks,
+                transfer_options.force_update_if_diverged,
+            )
+            .await
+            .map_err(|e| {
+                tracing::debug!("Appending dataset metadata failed with error: {}", e);
+                SyncError::Internal(e.int_err())
+            })?;
 
             // TODO: encapsulate this inside dataset/chain
             if !response.new_upstream_ids.is_empty() {
@@ -694,7 +701,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             src.as_metadata_chain(),
             &src_head,
             dst_head,
-            transfer_options.force,
+            transfer_options.force_update_if_diverged,
         )
         .await
         .map_err(|e| SyncError::Internal(e.int_err()))?;
@@ -743,7 +750,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 &mut ws_stream,
                 transfer_plan,
                 dst_head,
-                transfer_options.force,
+                transfer_options.force_update_if_diverged,
             )
             .await
         {
@@ -760,7 +767,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 src.as_ref(),
                 &src_head,
                 dst_head,
-                transfer_options.force,
+                transfer_options.force_update_if_diverged,
             )
             .await
         {
@@ -775,7 +782,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             src.as_ref(),
             &src_head,
             dst_head,
-            transfer_options.force,
+            transfer_options.force_update_if_diverged,
             false,
         )
         .await

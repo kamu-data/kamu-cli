@@ -61,9 +61,10 @@ pub async fn prepare_dataset_transfer_plan(
     metadata_chain: &dyn MetadataChain,
     stop_at: &Multihash,
     begin_after: Option<&Multihash>,
-    force: bool,
+    ignore_missing_tail: bool,
 ) -> Result<TransferPlan, PrepareDatasetTransferEstimateError> {
-    let mut block_stream = metadata_chain.iter_blocks_interval(stop_at, begin_after, force);
+    let mut block_stream =
+        metadata_chain.iter_blocks_interval(stop_at, begin_after, ignore_missing_tail);
 
     let mut blocks_count: u32 = 0;
     let mut bytes_in_blocks: u64 = 0;
@@ -136,14 +137,14 @@ pub async fn prepare_dataset_metadata_batch(
     metadata_chain: &dyn MetadataChain,
     stop_at: &Multihash,
     begin_after: Option<&Multihash>,
-    force: bool,
+    ignore_missing_tail: bool,
 ) -> Result<MetadataBlocksBatch, InternalError> {
     let mut num_blocks: u32 = 0;
     let encoder = flate2::write::GzEncoder::new(Vec::new(), Compression::default());
     let mut tarball_builder = tar::Builder::new(encoder);
 
     let blocks_for_transfer: Vec<HashedMetadataBlock> = metadata_chain
-        .iter_blocks_interval(stop_at, begin_after, force)
+        .iter_blocks_interval(stop_at, begin_after, ignore_missing_tail)
         .try_collect()
         .await
         .int_err()?;
@@ -210,7 +211,7 @@ pub struct AppendMetadataResponse {
 pub async fn dataset_append_metadata(
     dataset: &dyn Dataset,
     metadata: VecDeque<HashedMetadataBlock>,
-    force: bool,
+    force_update_if_diverged: bool,
 ) -> Result<AppendMetadataResponse, AppendError> {
     if metadata.is_empty() {
         return Ok(AppendMetadataResponse {
@@ -260,7 +261,11 @@ pub async fn dataset_append_metadata(
             &new_head,
             SetRefOpts {
                 validate_block_present: false,
-                check_ref_is: if force { None } else { Some(old_head.as_ref()) },
+                check_ref_is: if force_update_if_diverged {
+                    None
+                } else {
+                    Some(old_head.as_ref())
+                },
             },
         )
         .await?;
@@ -335,14 +340,15 @@ pub async fn collect_object_references_from_interval(
     dataset: &dyn Dataset,
     head: &Multihash,
     tail: Option<&Multihash>,
-    force: bool,
+    ignore_missing_tail: bool,
     missing_files_only: bool,
 ) -> Result<Vec<ObjectFileReference>, CollectMissingObjectReferencesFromIntervalError> {
     let mut res_references: Vec<ObjectFileReference> = Vec::new();
 
-    let mut block_stream = dataset
-        .as_metadata_chain()
-        .iter_blocks_interval(head, tail, force);
+    let mut block_stream =
+        dataset
+            .as_metadata_chain()
+            .iter_blocks_interval(head, tail, ignore_missing_tail);
     while let Some((_, block)) = block_stream.try_next().await? {
         collect_object_references_from_block(
             dataset,

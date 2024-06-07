@@ -90,7 +90,8 @@ impl AxumServerPullProtocolInstance {
             })?;
 
         tracing::debug!(
-            "Pull client sent a pull request: beginAfter={:?} stopAt={:?} force={}",
+            "Pull client sent a pull request: beginAfter={:?} stopAt={:?} \
+             force_update_if_diverged={}",
             pull_request
                 .begin_after
                 .as_ref()
@@ -101,7 +102,7 @@ impl AxumServerPullProtocolInstance {
                 .as_ref()
                 .map(ToString::to_string)
                 .ok_or("None"),
-            pull_request.force,
+            pull_request.force_update_if_diverged,
         );
 
         let metadata_chain = self.dataset.as_metadata_chain();
@@ -114,7 +115,7 @@ impl AxumServerPullProtocolInstance {
             metadata_chain,
             pull_request.stop_at.as_ref().unwrap_or(&head),
             pull_request.begin_after.as_ref(),
-            pull_request.force,
+            pull_request.force_update_if_diverged,
         )
         .await;
 
@@ -173,7 +174,7 @@ impl AxumServerPullProtocolInstance {
                     metadata_chain,
                     pull_request.stop_at.as_ref().unwrap_or(&head),
                     pull_request.begin_after.as_ref(),
-                    pull_request.force,
+                    pull_request.force_update_if_diverged,
                 )
                 .await
                 .int_err()?;

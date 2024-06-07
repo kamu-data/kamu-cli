@@ -19,7 +19,7 @@ use url::Url;
 pub struct DatasetPullRequest {
     pub begin_after: Option<Multihash>,
     pub stop_at: Option<Multihash>,
-    pub force: bool,
+    pub force_update_if_diverged: bool,
 }
 
 /// Response to initial dataset pull request message
@@ -86,7 +86,7 @@ pub enum ObjectPullStrategy {
 pub struct DatasetPushRequest {
     pub current_head: Option<Multihash>,
     pub transfer_plan: TransferPlan,
-    pub force: bool,
+    pub force_update_if_diverged: bool,
 }
 
 /// Response to initial dataset push request message

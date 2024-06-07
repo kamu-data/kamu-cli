@@ -20,7 +20,7 @@ pub use super::simple_transfer_protocol::DatasetFactoryFn;
 #[derive(Debug, Eq, PartialEq)]
 pub struct TransferOptions {
     pub max_parallel_transfers: usize,
-    pub force: bool,
+    pub force_update_if_diverged: bool,
 }
 
 impl Default for TransferOptions {
@@ -34,7 +34,7 @@ impl Default for TransferOptions {
 
         Self {
             max_parallel_transfers,
-            force: false,
+            force_update_if_diverged: false,
         }
     }
 }

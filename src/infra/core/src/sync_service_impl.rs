@@ -236,7 +236,7 @@ impl SyncServiceImpl {
                 dst_factory,
                 listener,
                 TransferOptions {
-                    force: opts.force,
+                    force_update_if_diverged: opts.force,
                     ..Default::default()
                 },
             )
@@ -281,7 +281,7 @@ impl SyncServiceImpl {
                 maybe_dst_head.as_ref(),
                 listener,
                 TransferOptions {
-                    force,
+                    force_update_if_diverged: force,
                     ..Default::default()
                 },
             )
