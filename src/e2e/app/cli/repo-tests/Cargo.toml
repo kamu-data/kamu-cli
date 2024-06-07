@@ -24,6 +24,7 @@ doctest = false
 [dependencies]
 kamu-cli-e2e-common = { workspace = true }
 
+indoc = "2"
 tokio = { version = "1", default-features = false, features = [] }
 
 

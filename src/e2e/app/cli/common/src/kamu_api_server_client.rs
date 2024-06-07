@@ -9,12 +9,11 @@
 
 use internal_error::{InternalError, ResultIntoInternal};
 use reqwest::{StatusCode, Url};
+use serde::Deserialize;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
 
 ////////////////////////////////////////////////////////////////////////////////
-
-// TODO: GQL-query method
 
 #[derive(Clone)]
 pub struct KamuApiServerClient {
@@ -60,6 +59,33 @@ impl KamuApiServerClient {
         }
 
         Ok(())
+    }
+
+    pub async fn api_call_assert(&self, query: &str, expected_response: &str) {
+        let endpoint = self.server_base_url.join("graphql").unwrap();
+        let request_data = serde_json::json!({
+           "query": query
+        });
+
+        #[derive(Debug, Deserialize)]
+        struct Response {
+            data: serde_json::Value,
+        }
+        let response = self
+            .http_client
+            .post(endpoint)
+            .json(&request_data)
+            .send()
+            .await
+            .unwrap()
+            .json::<Response>()
+            .await
+            .unwrap();
+
+        let actual_response = serde_json::to_string_pretty(&response.data).unwrap();
+
+        // Let's add \n for the sake of convenience of passing the expected result
+        assert_eq!(expected_response, format!("{actual_response}\n"));
     }
 }
 

@@ -8,4 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_login;
+mod test_selftest;
+
 pub use test_login::*;
+pub use test_selftest::*;
