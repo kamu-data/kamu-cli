@@ -14,6 +14,7 @@ use axum::body::Body;
 use axum::response::{IntoResponse, Response};
 use database_common::DatabaseTransactionRunner;
 use futures::Future;
+use kamu::domain::InternalError;
 use tower::{Layer, Service};
 
 use crate::api_error::IntoApiError;
@@ -69,19 +70,18 @@ where
                 .get::<dill::Catalog>()
                 .expect("Catalog not found in http server extensions")
                 .clone();
+            let transaction_runner = DatabaseTransactionRunner::new(base_catalog);
 
-            <DatabaseTransactionRunner>::run_transactional(
-                &base_catalog,
-                |updated_catalog| async move {
+            transaction_runner
+                .transactional(|updated_catalog| async move {
                     request.extensions_mut().insert(updated_catalog);
 
                     let inner_result = inner.call(request).await;
 
                     Ok(inner_result)
-                },
-            )
-            .await
-            .unwrap_or_else(|e| Ok(e.api_err().into_response()))
+                })
+                .await
+                .unwrap_or_else(|e: InternalError| Ok(e.api_err().into_response()))
         })
     }
 }
