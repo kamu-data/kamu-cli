@@ -54,6 +54,7 @@ members = [
     # Apps
     "src/app/cli",
     # E2E
+    "src/e2e/app/cli/common",
     "src/e2e/app/cli/postgres",
 ]
 resolver = "2"

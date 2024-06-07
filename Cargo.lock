@@ -4735,6 +4735,7 @@ dependencies = [
  "curl",
  "curl-sys",
  "dashmap",
+ "database-common",
  "datafusion",
  "datafusion-ethers",
  "datafusion-functions-json",
@@ -4889,6 +4890,7 @@ dependencies = [
  "argon2",
  "async-trait",
  "chrono",
+ "database-common",
  "dill",
  "internal-error",
  "jsonwebtoken",
@@ -5212,13 +5214,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-cli-e2e-common"
+version = "0.184.0"
+dependencies = [
+ "internal-error",
+ "reqwest",
+ "tokio",
+ "tokio-retry",
+]
+
+[[package]]
 name = "kamu-cli-e2e-postgres"
 version = "0.184.0"
 dependencies = [
+ "indoc 2.0.5",
+ "internal-error",
  "kamu-cli-wrapper",
+ "reqwest",
  "sqlx",
  "test-group",
  "test-log",
+ "tokio",
+ "tokio-retry",
 ]
 
 [[package]]
@@ -8894,6 +8911,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.66",
+]
+
+[[package]]
+name = "tokio-retry"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f57eb36ecbe0fc510036adff84824dd3c24bb781e21bfa67b69d556aa85214f"
+dependencies = [
+ "pin-project",
+ "rand",
+ "tokio",
 ]
 
 [[package]]
