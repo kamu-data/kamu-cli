@@ -141,7 +141,7 @@ pub async fn run(
         matches.subcommand(),
         Some(("login" | "add" | "delete" | "pull", _))
     );
-    let run_command = move |cli_catalog: Catalog| async move {
+    let run_command = |cli_catalog: Catalog| async move {
         match cli_commands::get_command(&base_catalog, &cli_catalog, &matches) {
             Ok(mut command) => {
                 if command.needs_workspace() && !workspace_svc.is_in_workspace() {
@@ -159,13 +159,13 @@ pub async fn run(
     };
     let is_database_used = maybe_db_configuration.is_some();
     let result = if is_database_used && need_to_wrap_with_transaction {
-        DatabaseTransactionRunner::run_transactional(
-            &cli_catalog,
-            |cli_catalog_with_transaction| async move {
-                run_command(cli_catalog_with_transaction).await
-            },
-        )
-        .await
+        let transaction_runner = DatabaseTransactionRunner::new(cli_catalog);
+
+        transaction_runner
+            .run_transactional(|transaction_cli_catalog| async move {
+                run_command(transaction_cli_catalog.into_inner()).await
+            })
+            .await
     } else {
         run_command(cli_catalog).await
     };
@@ -354,6 +354,8 @@ pub fn configure_base_catalog(
 
     b.add_builder(UploadServiceLocal::builder().with_cache_dir(workspace_layout.cache_dir.clone()));
     b.bind::<dyn UploadService, UploadServiceLocal>();
+
+    b.add::<DatabaseTransactionRunner>();
 
     b
 }
