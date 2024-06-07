@@ -42,8 +42,9 @@ To regenerate this schema from existing code, use the following command:
 * `-v` — Sets the level of verbosity (repeat for more)
 * `-q`, `--quiet` — Suppress all non-essential output
 * `--trace` — Record and visualize the command execution as perfetto.dev trace
-* `--system-time <T>` — Overrides system time clock with provided value
-* `-a`, `--account <ACCOUNT>`
+* `--system-time <T>` — Overrides system time clock with provided value (hidden)
+* `-a`, `--account <ACCOUNT>` (hidden)
+* `--e2e-testing` — Activates additional functions required for E2E testing (hidden)
 
 To get help for individual commands use:
   kamu <command> -h
@@ -306,8 +307,8 @@ Initialize an empty workspace in the current directory
 
 * `--exists-ok` — Don't return an error if workspace already exists
 * `--pull-images` — Only pull container images and exit
-* `--list-only` — List image names instead of pulling
-* `--multi-tenant` — Initialize a workspace for multiple tenants
+* `--list-only` — List image names instead of pulling (hidden)
+* `--multi-tenant` — Initialize a workspace for multiple tenants (hidden)
 
 A workspace is where kamu stores all the important information about datasets (metadata) and in some cases raw data.
 
@@ -400,7 +401,7 @@ Shows the dataset schema
 
   Possible values: `ddl`, `parquet`, `parquet-json`, `arrow-json`
 
-* `--from-data-file`
+* `--from-data-file` (hidden)
 
 Displays the schema of the dataset. Note that dataset schemas can evolve over time and by default the latest schema will be shown.
 
@@ -426,8 +427,8 @@ List all datasets in the workspace
 **Options:**
 
 * `-w`, `--wide` — Show more details (repeat for more)
-* `--target-account <TARGET-ACCOUNT>`
-* `--all-accounts`
+* `--target-account <TARGET-ACCOUNT>` (hidden)
+* `--all-accounts` (hidden)
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
   Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`, `json-aoa`
@@ -1048,7 +1049,7 @@ Run JDBC server only
 * `--port <PORT>` — Expose JDBC server on specific port
 
   Default value: `10000`
-* `--livy` — Run Livy server instead of Spark JDBC
+* `--livy` — Run Livy server instead of Spark JDBC (hidden)
 * `--flight-sql` — Run Flight SQL server instead of Spark JDBC
 
 

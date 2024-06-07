@@ -213,7 +213,11 @@ fn write_arg_markdown(buffer: &mut String, arg: &clap::Arg) -> fmt::Result {
     }
 
     if let Some(help) = arg.get_help() {
-        writeln!(buffer, " — {help}")?;
+        write!(buffer, " — {help}")?;
+    }
+
+    if arg.is_hide_set() {
+        writeln!(buffer, " (hidden)")?;
     } else {
         writeln!(buffer)?;
     }
