@@ -11,9 +11,11 @@ use std::any::Any;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use dill::{Catalog, CatalogBuilder};
+use dill::{component, Catalog, CatalogBuilder};
 use internal_error::{InternalError, ResultIntoInternal};
 use tokio::sync::Mutex;
+
+use crate::TransactionalCatalog;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,36 +36,45 @@ pub trait DatabaseTransactionManager: Send + Sync {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatabaseTransactionRunner<HFutResultE = InternalError> {
-    _phantom: PhantomData<HFutResultE>,
+pub struct DatabaseTransactionRunner {
+    catalog: Catalog,
 }
 
-impl<HFutResultE> DatabaseTransactionRunner<HFutResultE> {
-    pub async fn run_transactional<H, HFut, HFutResultT>(
-        base_catalog: &Catalog,
+#[component(pub)]
+impl DatabaseTransactionRunner {
+    pub fn new(catalog: Catalog) -> Self {
+        Self { catalog }
+    }
+
+    pub async fn transactional<H, HFut, HFutResultT, HFutResultE>(
+        &self,
         callback: H,
     ) -> Result<HFutResultT, HFutResultE>
     where
-        H: FnOnce(Catalog) -> HFut,
+        H: FnOnce(TransactionalCatalog) -> HFut,
         HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
         HFutResultE: From<InternalError>,
     {
         // Extract transaction manager, specific for the database
-        let db_transaction_manager = base_catalog
+        let db_transaction_manager = self
+            .catalog
             .get_one::<dyn DatabaseTransactionManager>()
             .unwrap();
 
         // Start transaction
         let transaction_ref = db_transaction_manager.make_transaction_ref().await?;
 
-        // Create a chained catalog for transaction-aware components,
-        // but keep a local copy of a transaction pointer
-        let chained_catalog = CatalogBuilder::new_chained(base_catalog)
-            .add_value(transaction_ref.clone())
-            .build();
+        // A catalog with a transaction must live for a limited time
+        let result = {
+            // Create a chained catalog for transaction-aware components,
+            // but keep a local copy of a transaction pointer
+            let catalog_with_transaction = CatalogBuilder::new_chained(&self.catalog)
+                .add_value(transaction_ref.clone())
+                .build();
+            let transactional_catalog = TransactionalCatalog::new(catalog_with_transaction.clone());
 
-        // Run transactional code in the callback
-        let result = callback(chained_catalog).await;
+            callback(transactional_catalog).await
+        };
 
         // Commit or rollback transaction depending on the result
         match result {
@@ -85,8 +96,8 @@ impl<HFutResultE> DatabaseTransactionRunner<HFutResultE> {
         }
     }
 
-    pub async fn run_transactional_with<Iface, H, HFut, HFutResultT>(
-        base_catalog: &Catalog,
+    pub async fn transactional_with<Iface, H, HFut, HFutResultT, HFutResultE>(
+        &self,
         callback: H,
     ) -> Result<HFutResultT, HFutResultE>
     where
@@ -95,8 +106,8 @@ impl<HFutResultE> DatabaseTransactionRunner<HFutResultE> {
         HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
         HFutResultE: From<InternalError>,
     {
-        Self::run_transactional(base_catalog, |catalog_with_transaction| async move {
-            let catalog_item = catalog_with_transaction.get_one().int_err()?;
+        self.transactional(|transactional_catalog| async move {
+            let catalog_item = transactional_catalog.get_one().int_err()?;
 
             callback(catalog_item).await
         })
