@@ -1,11 +1,11 @@
 [bans]
 # Forbid multiple versions of same dependency (with some exceptions)
 # TODO: Change to "deny" once we crack down on duplication
-multiple-versions = "warn"
+multiple-versions = "allow"
+
 # Avoid adding dependencies to this list as this slows down compilation.
 # Find another ways to avoid duplication.
-skip-tree = [
-]
+skip-tree = []
 
 # We should always specify version ranges
 wildcards = "deny"
@@ -13,9 +13,16 @@ wildcards = "deny"
 # We specify features explicitly to avoid bloat
 workspace-default-features = "deny"
 features = [
-    { name = "opendatafabric", allow = ["default", "sqlx"] },
-    { name = "kamu", allow = ["default"] },
-    { name = "kamu-cli", allow = ["default"] },
+    { name = "opendatafabric", allow = [
+        "default",
+        "sqlx",
+    ] },
+    { name = "kamu", allow = [
+        "default",
+    ] },
+    { name = "kamu-cli", allow = [
+        "default",
+    ] },
 ]
 
 deny = [
@@ -53,8 +60,8 @@ allow = [
     "MPL-2.0",
     "Zlib",
     "OpenSSL",
+    "Unlicense",
 ]
-copyleft = "deny"
 private = { ignore = true }
 
 [[licenses.exceptions]]
@@ -65,26 +72,15 @@ name = "unicode-ident"
 [[licenses.clarify]]
 name = "ring"
 expression = "MIT AND ISC AND OpenSSL"
-license-files = [
-    { path = "LICENSE", hash = 0xbd0eed23 }
-]
+license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 
 
 [sources]
 unknown-git = "deny"
 unknown-registry = "deny"
-allow-git = [
-    "https://github.com/apache/arrow-datafusion",
-    "https://github.com/kamu-data/datafusion-odata"
-]
+allow-org = { github = ["kamu-data", "apache", "alloy-rs"] }
 
 
 [advisories]
-vulnerability = "warn"
-unmaintained = "warn"
-unsound = "warn"
 yanked = "deny"
-notice = "warn"
-ignore = [
-]
-
+ignore = ["RUSTSEC-2023-0071"]

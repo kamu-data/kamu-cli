@@ -48,7 +48,7 @@ serde_with = "3"
 serde_yaml = "0.9"
 
 # Ingest
-alloy = { version = "0.1", git = "https://github.com/alloy-rs/alloy", branch = "main", default-features = false, features = [
+alloy = { version = "0.1", default-features = false, features = [
     "std",
     "provider-http",
     "provider-ws",
@@ -61,7 +61,7 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { version = "38", git = "https://github.com/kamu-data/datafusion-ethers", branch = "datafusion-39" }
+datafusion-ethers = { version = "38", default-features = false }
 datafusion-functions-json = { version = "0.1" }
 flate2 = "1" # GZip decoder
 reqwest = { version = "0.11", default-features = false, features = [

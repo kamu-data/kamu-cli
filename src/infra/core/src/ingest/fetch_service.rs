@@ -951,7 +951,7 @@ impl FetchService {
 
         // Alloy does not support newlines in log signatures, but it's nice for
         // formatting
-        let signature = fetch.signature.as_ref().map(|s| s.replace("\n", " "));
+        let signature = fetch.signature.as_ref().map(|s| s.replace('\n', " "));
 
         let mut coder: Box<dyn Transcoder + Send> = if let Some(sig) = &signature {
             Box::new(EthRawAndDecodedLogsToArrow::new_from_signature(sig).int_err()?)
@@ -964,7 +964,7 @@ impl FetchService {
             None => None,
             Some(PollingSourceState::ETag(s)) => {
                 let Some((num, _hash)) = s.split_once('@') else {
-                    panic!("Malformed ETag: {}", s);
+                    panic!("Malformed ETag: {s}");
                 };
                 Some(StreamState {
                     last_seen_block: num.parse().unwrap(),
@@ -1003,7 +1003,7 @@ impl FetchService {
             Err(EthereumRpcError::new(format!(
                 "Expected to connect to chain ID {expected_chain_id} but got {chain_id} instead"
             ))
-            .int_err())?
+            .int_err())?;
         }
 
         // Setup Datafusion context
@@ -1063,8 +1063,7 @@ impl FetchService {
         let block_range_unprocessed = (
             resume_from_state
                 .as_ref()
-                .map(|s| s.last_seen_block + 1)
-                .unwrap_or(block_range_all.0),
+                .map_or(block_range_all.0, |s| s.last_seen_block + 1),
             block_range_all.1,
         );
 

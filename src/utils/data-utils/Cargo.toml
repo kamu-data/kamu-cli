@@ -33,7 +33,7 @@ datafusion = { version = "38", default-features = false, features = [
     "serde",
 ] }
 digest = "0.10"
-hex = "*"
+hex = "0.4"
 pretty_assertions = { version = "1" }
 sha3 = "0.10"
 tracing = { version = "0.1", default-features = false }

@@ -671,12 +671,12 @@ impl<'a, E: Encoder> CsvEscapeStringEncoder<'a, E> {
 }
 
 impl CsvEscapeStringEncoder<'static, CsvNullEncoder> {
-    fn write_escaped<'a, 'b>(
+    fn write_escaped(
         buf: &mut dyn std::io::Write,
         s: &str,
         opts: &CsvWriterOptions,
     ) -> Result<(), WriterError> {
-        if !s.contains(&[
+        if !s.contains([
             char::from(opts.delimiter),
             char::from(opts.quote),
             '\n',
