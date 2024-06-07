@@ -15,7 +15,6 @@ use opendatafabric::*;
 use crate::harness::{
     commit_add_data_event,
     copy_dataset_files,
-    copy_folder_recursively,
     make_dataset_ref,
     write_dataset_alias,
     ClientSideHarness,
@@ -24,20 +23,18 @@ use crate::harness::{
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct SmartPushAbortedWriteOfUpdatedWriteSucceeds<TServerHarness: ServerSideHarness> {
+pub(crate) struct SmartPushExistingDivergedDatasetScenario<TServerHarness: ServerSideHarness> {
     pub client_harness: ClientSideHarness,
     pub server_harness: TServerHarness,
     pub server_dataset_layout: DatasetLayout,
     pub client_dataset_layout: DatasetLayout,
     pub server_dataset_ref: DatasetRefRemote,
     pub client_dataset_ref: DatasetRef,
-    pub client_create_result: CreateDatasetResult,
-    pub client_commit_result: CommitResult,
+    pub client_precompacting_result: CommitResult,
+    pub client_compacting_result: CompactingResult,
 }
 
-impl<TServerHarness: ServerSideHarness>
-    SmartPushAbortedWriteOfUpdatedWriteSucceeds<TServerHarness>
-{
+impl<TServerHarness: ServerSideHarness> SmartPushExistingDivergedDatasetScenario<TServerHarness> {
     pub async fn prepare(
         client_harness: ClientSideHarness,
         server_harness: TServerHarness,
@@ -65,6 +62,21 @@ impl<TServerHarness: ServerSideHarness>
         let client_dataset_layout =
             client_harness.dataset_layout(&client_create_result.dataset_handle.id, "foo");
 
+        let client_dataset_ref = make_dataset_ref(&client_account_name, "foo");
+
+        // Generate a few blocks of random data
+        let mut commit_result: Option<CommitResult> = None;
+        for _ in 0..3 {
+            commit_result = Some(
+                commit_add_data_event(
+                    client_repo.as_ref(),
+                    &client_dataset_ref,
+                    &client_dataset_layout,
+                    commit_result.map(|r| r.new_head),
+                )
+                .await,
+            );
+        }
         let foo_name = DatasetName::new_unchecked("foo");
 
         let server_dataset_layout = server_harness.dataset_layout(&DatasetHandle::new(
@@ -81,39 +93,16 @@ impl<TServerHarness: ServerSideHarness>
         )
         .await;
 
-        // Extend client-side dataset with new nodes
-        let client_dataset_ref = make_dataset_ref(&client_account_name, "foo");
-        client_repo
-            .get_dataset(&client_dataset_ref)
-            .await
-            .unwrap()
-            .commit_event(
-                MetadataEvent::SetInfo(
-                    MetadataFactory::set_info()
-                        .description("updated description")
-                        .build(),
-                ),
-                CommitOpts::default(),
+        // Compact at client side
+        let compacting_service = client_harness.compacting_service();
+        let client_compacting_result = compacting_service
+            .compact_dataset(
+                &client_create_result.dataset_handle,
+                CompactingOptions::default(),
+                None,
             )
             .await
             .unwrap();
-
-        let client_commit_result = commit_add_data_event(
-            client_repo.as_ref(),
-            &client_dataset_ref,
-            &client_dataset_layout,
-            None,
-        )
-        .await;
-
-        // Let's pretend that previous attempts uploaded new data files, but the commit
-        // did not succeed in general. To mimic this, artificially copy just the
-        // data folder, containing a data block
-        copy_folder_recursively(
-            &client_dataset_layout.data_dir,
-            &server_dataset_layout.data_dir,
-        )
-        .unwrap();
 
         let server_alias = DatasetAlias::new(server_account_name, foo_name);
         let server_odf_url = server_harness.dataset_url(&server_alias);
@@ -126,8 +115,8 @@ impl<TServerHarness: ServerSideHarness>
             client_dataset_layout,
             server_dataset_ref,
             client_dataset_ref,
-            client_create_result,
-            client_commit_result,
+            client_precompacting_result: commit_result.unwrap(),
+            client_compacting_result,
         }
     }
 }

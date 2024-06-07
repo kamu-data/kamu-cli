@@ -220,14 +220,37 @@ impl DatasetNotFoundError {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
-#[error(
-    "Source and destination datasets have diverged and have {uncommon_blocks_in_src} and \
-     {uncommon_blocks_in_dst} different blocks respectively, source head is {src_head}, \
-     destination head is {dst_head}"
-)]
 pub struct DatasetsDivergedError {
     pub src_head: Multihash,
     pub dst_head: Multihash,
+    pub detail: Option<DatasetsDivergedErrorDetail>,
+}
+
+impl std::fmt::Display for DatasetsDivergedError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(detail) = &self.detail {
+            write!(
+                f,
+                "Source and destination datasets have diverged and have {} and {} different \
+                 blocks respectively, source head is {}, destination head is {}",
+                detail.uncommon_blocks_in_src,
+                detail.uncommon_blocks_in_dst,
+                self.src_head,
+                self.dst_head,
+            )
+        } else {
+            write!(
+                f,
+                "Source and destination datasets have diverged, source head is {}, destination \
+                 head is {}",
+                self.src_head, self.dst_head,
+            )
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub struct DatasetsDivergedErrorDetail {
     pub uncommon_blocks_in_src: u64,
     pub uncommon_blocks_in_dst: u64,
 }

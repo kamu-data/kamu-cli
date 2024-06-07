@@ -26,7 +26,11 @@ pub(crate) async fn test_smart_push_new_dataset<TServerHarness: ServerSideHarnes
     let client_handle = async {
         let push_result = scenario
             .client_harness
-            .push_dataset_result(scenario.client_dataset_ref, scenario.server_dataset_ref)
+            .push_dataset_result(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+                false,
+            )
             .await;
 
         assert_eq!(
@@ -34,6 +38,45 @@ pub(crate) async fn test_smart_push_new_dataset<TServerHarness: ServerSideHarnes
                 old_head: None,
                 new_head: scenario.client_commit_result.new_head,
                 num_blocks: 4,
+            },
+            push_result
+        );
+
+        DatasetTestHelper::assert_datasets_in_sync(
+            &scenario.server_dataset_layout,
+            &scenario.client_dataset_layout,
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn test_smart_push_new_empty_dataset<TServerHarness: ServerSideHarness>(
+    a_client_harness: ClientSideHarness,
+    a_server_harness: TServerHarness,
+) {
+    let scenario =
+        SmartPushNewEmptyDatasetScenario::prepare(a_client_harness, a_server_harness).await;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let push_result = scenario
+            .client_harness
+            .push_dataset_result(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+                false,
+            )
+            .await;
+
+        assert_eq!(
+            SyncResult::Updated {
+                old_head: None,
+                new_head: scenario.client_create_result.head,
+                num_blocks: 1,
             },
             push_result
         );
@@ -62,7 +105,11 @@ pub(crate) async fn test_smart_push_existing_up_to_date_dataset<
     let client_handle = async {
         let push_result = scenario
             .client_harness
-            .push_dataset_result(scenario.client_dataset_ref, scenario.server_dataset_ref)
+            .push_dataset_result(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+                false,
+            )
             .await;
 
         assert_eq!(SyncResult::UpToDate {}, push_result);
@@ -90,7 +137,11 @@ pub(crate) async fn test_smart_push_existing_evolved_dataset<TServerHarness: Ser
     let client_handle = async {
         let push_result = scenario
             .client_harness
-            .push_dataset_result(scenario.client_dataset_ref, scenario.server_dataset_ref)
+            .push_dataset_result(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+                false,
+            )
             .await;
 
         assert_eq!(
@@ -98,6 +149,50 @@ pub(crate) async fn test_smart_push_existing_evolved_dataset<TServerHarness: Ser
                 old_head: Some(scenario.client_create_result.head),
                 new_head: scenario.client_commit_result.new_head,
                 num_blocks: 2,
+            },
+            push_result
+        );
+
+        DatasetTestHelper::assert_datasets_in_sync(
+            &scenario.server_dataset_layout,
+            &scenario.client_dataset_layout,
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn test_smart_push_existing_diverged_dataset<TServerHarness: ServerSideHarness>(
+    a_client_harness: ClientSideHarness,
+    a_server_harness: TServerHarness,
+) {
+    let scenario =
+        SmartPushExistingDivergedDatasetScenario::prepare(a_client_harness, a_server_harness).await;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let push_result = scenario
+            .client_harness
+            .push_dataset_result(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+                true, /* diverged! */
+            )
+            .await;
+
+        let new_head = match scenario.client_compacting_result {
+            CompactingResult::NothingToDo => panic!("unexpected compacting result"),
+            CompactingResult::Success { new_head, .. } => new_head,
+        };
+
+        assert_eq!(
+            SyncResult::Updated {
+                old_head: Some(scenario.client_precompacting_result.new_head),
+                new_head,
+                num_blocks: 4,
             },
             push_result
         );
@@ -129,7 +224,11 @@ pub(crate) async fn test_smart_push_existing_dataset_fails_as_server_advanced<
     let client_handle = async {
         let push_responses = scenario
             .client_harness
-            .push_dataset(scenario.client_dataset_ref, scenario.server_dataset_ref)
+            .push_dataset(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+                false,
+            )
             .await;
 
         // TODO: try expecting better error message
@@ -154,7 +253,11 @@ pub(crate) async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<
     let client_handle = async {
         let push_result = scenario
             .client_harness
-            .push_dataset_result(scenario.client_dataset_ref, scenario.server_dataset_ref)
+            .push_dataset_result(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+                false,
+            )
             .await;
 
         assert_eq!(
@@ -191,7 +294,11 @@ pub(crate) async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<
     let client_handle = async {
         let push_result = scenario
             .client_harness
-            .push_dataset_result(scenario.client_dataset_ref, scenario.server_dataset_ref)
+            .push_dataset_result(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+                false,
+            )
             .await;
 
         assert_eq!(
@@ -199,41 +306,6 @@ pub(crate) async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<
                 old_head: Some(scenario.client_create_result.head),
                 new_head: scenario.client_commit_result.new_head,
                 num_blocks: 2,
-            },
-            push_result
-        );
-
-        DatasetTestHelper::assert_datasets_in_sync(
-            &scenario.server_dataset_layout,
-            &scenario.client_dataset_layout,
-        );
-    };
-
-    await_client_server_flow!(api_server_handle, client_handle);
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn test_smart_push_new_empty_dataset<TServerHarness: ServerSideHarness>(
-    a_client_harness: ClientSideHarness,
-    a_server_harness: TServerHarness,
-) {
-    let scenario =
-        SmartPushNewEmptyDatasetScenario::prepare(a_client_harness, a_server_harness).await;
-
-    let api_server_handle = scenario.server_harness.api_server_run();
-
-    let client_handle = async {
-        let push_result = scenario
-            .client_harness
-            .push_dataset_result(scenario.client_dataset_ref, scenario.server_dataset_ref)
-            .await;
-
-        assert_eq!(
-            SyncResult::Updated {
-                old_head: None,
-                new_head: scenario.client_create_result.head,
-                num_blocks: 1,
             },
             push_result
         );

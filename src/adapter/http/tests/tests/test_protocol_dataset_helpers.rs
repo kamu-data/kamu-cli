@@ -122,7 +122,7 @@ async fn test_object_url_local_fs() {
             download_from_headers == vec![
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
-                    value: DUMMY_ACCESS_TOKEN.to_string()
+                    value: format!("Bearer {DUMMY_ACCESS_TOKEN}")
                 }
             ]
     );
@@ -148,7 +148,7 @@ async fn test_object_url_local_fs() {
             download_from_headers == vec![
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
-                    value: DUMMY_ACCESS_TOKEN.to_string()
+                    value: format!("Bearer {DUMMY_ACCESS_TOKEN}", )
                 }
             ]
     );
@@ -197,7 +197,7 @@ async fn test_object_url_local_fs() {
             upload_to_headers == vec![
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
-                    value: DUMMY_ACCESS_TOKEN.to_string()
+                    value: format!("Bearer {DUMMY_ACCESS_TOKEN}", )
                 }
             ]
     );
@@ -222,7 +222,7 @@ async fn test_object_url_local_fs() {
             upload_to_headers == vec![
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
-                    value: DUMMY_ACCESS_TOKEN.to_string()
+                    value: format!("Bearer {DUMMY_ACCESS_TOKEN}", )
                 }
             ]
     );
@@ -472,6 +472,7 @@ async fn create_test_case(server_harness: &dyn ServerSideHarness) -> TestCase {
         server_repo.as_ref(),
         &make_dataset_ref(&None, "foo"),
         &server_harness.dataset_layout(&create_result.dataset_handle),
+        None,
     )
     .await;
 
@@ -487,6 +488,7 @@ async fn create_test_case(server_harness: &dyn ServerSideHarness) -> TestCase {
         create_result.dataset.as_ref(),
         &commit_result.new_head,
         None,
+        false,
         false,
     )
     .await

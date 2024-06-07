@@ -55,7 +55,7 @@ async fn test_smart_pull_unauthenticated() {
     let client_handle = async {
         let pull_result = scenario
             .client_harness
-            .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref))
+            .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref), false)
             .await;
 
         assert_eq!(

@@ -40,8 +40,6 @@ impl Harness {
                     .with_run_info_dir(run_info_dir.path().to_path_buf()),
             )
             .bind::<dyn PushIngestService, PushIngestServiceImpl>()
-            .add::<ObjectStoreRegistryImpl>()
-            .add::<ObjectStoreBuilderLocalFs>()
             .add::<EngineProvisionerNull>()
             .build();
 

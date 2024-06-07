@@ -18,11 +18,12 @@ pub use super::simple_transfer_protocol::DatasetFactoryFn;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct ObjectTransferOptions {
+pub struct TransferOptions {
     pub max_parallel_transfers: usize,
+    pub force_update_if_diverged: bool,
 }
 
-impl Default for ObjectTransferOptions {
+impl Default for TransferOptions {
     fn default() -> Self {
         // Use number of allowed parallel threads on the target system.
         // Run single-threaded transfer as a fallback, if the parallelism grade cannot
@@ -33,6 +34,7 @@ impl Default for ObjectTransferOptions {
 
         Self {
             max_parallel_transfers,
+            force_update_if_diverged: false,
         }
     }
 }
@@ -47,7 +49,7 @@ pub trait SmartTransferProtocolClient: Sync + Send {
         dst: Option<Arc<dyn Dataset>>,
         dst_factory: Option<DatasetFactoryFn>,
         listener: Arc<dyn SyncListener>,
-        transfer_options: ObjectTransferOptions,
+        transfer_options: TransferOptions,
     ) -> Result<SyncResult, SyncError>;
 
     async fn push_protocol_client_flow(
@@ -56,7 +58,7 @@ pub trait SmartTransferProtocolClient: Sync + Send {
         http_dst_url: &Url,
         dst_head: Option<&Multihash>,
         listener: Arc<dyn SyncListener>,
-        transfer_options: ObjectTransferOptions,
+        transfer_options: TransferOptions,
     ) -> Result<SyncResult, SyncError>;
 }
 

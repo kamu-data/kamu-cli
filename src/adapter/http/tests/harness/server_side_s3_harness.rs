@@ -15,8 +15,10 @@ use std::sync::Arc;
 use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::{
+    CompactingService,
     DatasetRepository,
     InternalError,
+    ObjectStoreBuilder,
     ResultIntoInternal,
     ServerUrlConfig,
     SystemTimeSource,
@@ -24,7 +26,15 @@ use kamu::domain::{
 };
 use kamu::testing::LocalS3Server;
 use kamu::utils::s3_context::S3Context;
-use kamu::{DatasetLayout, DatasetRepositoryS3, DependencyGraphServiceInMemory};
+use kamu::{
+    CompactingServiceImpl,
+    DatasetLayout,
+    DatasetRepositoryS3,
+    DependencyGraphServiceInMemory,
+    ObjectStoreBuilderLocalFs,
+    ObjectStoreBuilderS3,
+    ObjectStoreRegistryImpl,
+};
 use kamu_accounts::{AuthenticationService, MockAuthenticationService};
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use url::Url;
@@ -48,10 +58,15 @@ pub(crate) struct ServerSideS3Harness {
     api_server: TestAPIServer,
     options: ServerSideHarnessOptions,
     time_source: SystemTimeSourceStub,
+    _temp_dir: tempfile::TempDir,
 }
 
 impl ServerSideS3Harness {
     pub async fn new(options: ServerSideHarnessOptions) -> Self {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let run_info_dir = temp_dir.path().join("run");
+        std::fs::create_dir(&run_info_dir).unwrap();
+
         let s3 = LocalS3Server::new().await;
         let s3_context = S3Context::from_url(&s3.url).await;
 
@@ -69,13 +84,19 @@ impl ServerSideS3Harness {
             .add::<DependencyGraphServiceInMemory>()
             .add_builder(
                 DatasetRepositoryS3::builder()
-                    .with_s3_context(s3_context)
+                    .with_s3_context(s3_context.clone())
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
             .add_value(server_authentication_mock())
             .bind::<dyn AuthenticationService, MockAuthenticationService>()
-            .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)));
+            .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
+            .add_builder(CompactingServiceImpl::builder().with_run_info_dir(run_info_dir.clone()))
+            .bind::<dyn CompactingService, CompactingServiceImpl>()
+            .add::<ObjectStoreRegistryImpl>()
+            .add::<ObjectStoreBuilderLocalFs>()
+            .add_value(ObjectStoreBuilderS3::new(s3_context, true))
+            .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>();
 
         let base_catalog = base_catalog_builder.build();
 
@@ -91,6 +112,7 @@ impl ServerSideS3Harness {
             api_server,
             options,
             time_source,
+            _temp_dir: temp_dir,
         }
     }
 
@@ -116,6 +138,11 @@ impl ServerSideHarness for ServerSideS3Harness {
     fn cli_dataset_repository(&self) -> Arc<dyn DatasetRepository> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog);
         cli_catalog.get_one::<dyn DatasetRepository>().unwrap()
+    }
+
+    fn cli_compacting_service(&self) -> Arc<dyn CompactingService> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        cli_catalog.get_one::<dyn CompactingService>().unwrap()
     }
 
     fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url {

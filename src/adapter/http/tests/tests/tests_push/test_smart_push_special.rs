@@ -46,7 +46,11 @@ async fn test_smart_push_new_dataset_unauthenticated() {
     let client_handle = async {
         let push_result = scenario
             .client_harness
-            .push_dataset(scenario.client_dataset_ref, scenario.server_dataset_ref)
+            .push_dataset(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+                false,
+            )
             .await;
 
         let dataset_result = &push_result.first().unwrap().result;
@@ -91,7 +95,7 @@ async fn test_smart_push_new_dataset_wrong_user() {
     let client_handle = async {
         let push_result = scenario
             .client_harness
-            .push_dataset(scenario.client_dataset_ref, wrong_server_dataset_ref)
+            .push_dataset(scenario.client_dataset_ref, wrong_server_dataset_ref, false)
             .await;
 
         let dataset_result = &push_result.first().unwrap().result;
@@ -129,7 +133,11 @@ async fn test_smart_push_existing_dataset_unauthenticated() {
     let client_handle = async {
         let push_result = scenario
             .client_harness
-            .push_dataset(scenario.client_dataset_ref, scenario.server_dataset_ref)
+            .push_dataset(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+                false,
+            )
             .await;
 
         let dataset_result = &push_result.first().unwrap().result;
@@ -167,7 +175,11 @@ async fn test_smart_push_existing_dataset_unauthorized() {
     let client_handle = async {
         let push_result = scenario
             .client_harness
-            .push_dataset(scenario.client_dataset_ref, scenario.server_dataset_ref)
+            .push_dataset(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+                false,
+            )
             .await;
 
         let dataset_result = &push_result.first().unwrap().result;

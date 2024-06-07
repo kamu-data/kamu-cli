@@ -60,6 +60,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingUpToDateDatasetScenario
             server_repo.as_ref(),
             &make_dataset_ref(&server_account_name, "foo"),
             &server_dataset_layout,
+            None,
         )
         .await;
 

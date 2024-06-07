@@ -99,6 +99,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingEvolvedDatasetScenario<
             client_repo.as_ref(),
             &client_dataset_ref,
             &client_dataset_layout,
+            None,
         )
         .await;
 
