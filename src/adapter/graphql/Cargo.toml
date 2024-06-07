@@ -60,6 +60,7 @@ url = { version = "2", default-features = false }
 [dev-dependencies]
 # TODO: Limit to mock or in-memory implementations only
 container-runtime = { workspace = true }
+database-common = { workspace = true }
 event-bus = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }

@@ -9,6 +9,7 @@
 
 use database_common::{DatabaseTransactionRunner, SqliteTransactionManager};
 use dill::{Catalog, CatalogBuilder};
+use kamu_task_system::InternalError;
 use kamu_task_system_sqlite::TaskSystemEventStoreSqlite;
 use sqlx::SqlitePool;
 
@@ -19,12 +20,13 @@ use sqlx::SqlitePool;
 async fn test_event_store_empty(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
-        kamu_task_system_repo_tests::test_event_store_empty(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_task_system_repo_tests::test_event_store_empty(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -34,12 +36,13 @@ async fn test_event_store_empty(sqlite_pool: SqlitePool) {
 async fn test_event_store_get_streams(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
-        kamu_task_system_repo_tests::test_event_store_get_streams(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_task_system_repo_tests::test_event_store_get_streams(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -49,12 +52,13 @@ async fn test_event_store_get_streams(sqlite_pool: SqlitePool) {
 async fn test_event_store_get_events_with_windowing(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
-        kamu_task_system_repo_tests::test_event_store_get_events_with_windowing(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_task_system_repo_tests::test_event_store_get_events_with_windowing(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -64,12 +68,13 @@ async fn test_event_store_get_events_with_windowing(sqlite_pool: SqlitePool) {
 async fn test_event_store_get_events_by_tasks(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
-        kamu_task_system_repo_tests::test_event_store_get_events_by_tasks(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_task_system_repo_tests::test_event_store_get_events_by_tasks(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -79,12 +84,13 @@ async fn test_event_store_get_events_by_tasks(sqlite_pool: SqlitePool) {
 async fn test_event_store_get_dataset_tasks(sqlite_pool: SqlitePool) {
     let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
-        kamu_task_system_repo_tests::test_event_store_get_dataset_tasks(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_task_system_repo_tests::test_event_store_get_dataset_tasks(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

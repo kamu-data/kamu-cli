@@ -10,6 +10,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use database_common::{DatabaseTransactionRunner, FakeDatabasePlugin};
 use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
@@ -42,26 +43,33 @@ fn create_catalog_with_local_workspace(tempdir: &Path, is_multitenant: bool) -> 
         panic!()
     }
 
-    let catalog = dill::CatalogBuilder::new()
-        .add::<EventBus>()
-        .add::<DependencyGraphServiceInMemory>()
-        .add_value(current_account_subject)
-        .add_value(predefined_accounts_config)
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(is_multitenant),
-        )
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .add::<SystemTimeSourceDefault>()
-        .add::<QueryServiceImpl>()
-        .add::<ObjectStoreRegistryImpl>()
-        .add::<ObjectStoreBuilderLocalFs>()
-        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .add::<AuthenticationServiceImpl>()
-        .add::<AccountRepositoryInMemory>()
-        .add_value(JwtAuthenticationConfig::default())
-        .build();
+    let catalog = {
+        let mut b = dill::CatalogBuilder::new();
+
+        b.add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add_value(current_account_subject)
+            .add_value(predefined_accounts_config)
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(datasets_dir)
+                    .with_multi_tenant(is_multitenant),
+            )
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add::<SystemTimeSourceDefault>()
+            .add::<QueryServiceImpl>()
+            .add::<ObjectStoreRegistryImpl>()
+            .add::<ObjectStoreBuilderLocalFs>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AuthenticationServiceImpl>()
+            .add::<AccountRepositoryInMemory>()
+            .add_value(JwtAuthenticationConfig::default())
+            .add::<DatabaseTransactionRunner>();
+
+        FakeDatabasePlugin::init_database_components(&mut b);
+
+        b.build()
+    };
 
     catalog
 }

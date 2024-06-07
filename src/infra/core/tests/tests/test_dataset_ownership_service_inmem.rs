@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use database_common::{DatabaseTransactionRunner, FakeDatabasePlugin};
 use dill::Component;
 use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
@@ -103,24 +104,31 @@ impl DatasetOwnershipHarness {
                 .push(AccountConfig::from_name(account_name));
         }
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<SystemTimeSourceDefault>()
-            .add::<EventBus>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(multi_tenant),
-            )
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add::<AuthenticationServiceImpl>()
-            .add_value(predefined_accounts_config.clone())
-            .add_value(JwtAuthenticationConfig::default())
-            .add::<AccountRepositoryInMemory>()
-            .add::<DatasetOwnershipServiceInMemory>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceInMemory>()
-            .build();
+        let catalog = {
+            let mut b = dill::CatalogBuilder::new();
+
+            b.add::<SystemTimeSourceDefault>()
+                .add::<EventBus>()
+                .add_builder(
+                    DatasetRepositoryLocalFs::builder()
+                        .with_root(datasets_dir)
+                        .with_multi_tenant(multi_tenant),
+                )
+                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .add_value(CurrentAccountSubject::new_test())
+                .add::<AuthenticationServiceImpl>()
+                .add_value(predefined_accounts_config.clone())
+                .add_value(JwtAuthenticationConfig::default())
+                .add::<AccountRepositoryInMemory>()
+                .add::<DatasetOwnershipServiceInMemory>()
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<DependencyGraphServiceInMemory>()
+                .add::<DatabaseTransactionRunner>();
+
+            FakeDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 

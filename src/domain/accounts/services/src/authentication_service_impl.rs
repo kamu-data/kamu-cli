@@ -195,7 +195,7 @@ impl AuthenticationServiceImpl {
         maybe_login_password_auth_provider: &Option<Arc<LoginPasswordAuthProvider>>,
     ) -> Result<Option<Account>, InternalError> {
         self.ensure_predefined_accounts_registration(
-            &account_repository,
+            account_repository,
             maybe_login_password_auth_provider,
         )
         .await?;
@@ -246,7 +246,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
                     .collect();
 
                 // Stable order for tests
-                login_methods.sort();
+                login_methods.sort_unstable();
 
                 Ok(login_methods)
             })

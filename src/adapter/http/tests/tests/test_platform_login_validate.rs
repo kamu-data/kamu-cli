@@ -11,6 +11,7 @@ use std::net::{SocketAddr, TcpListener};
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
+use database_common::{DatabaseTransactionRunner, FakeDatabasePlugin};
 use kamu::domain::{InternalError, ResultIntoInternal, SystemTimeSource, SystemTimeSourceStub};
 use kamu_accounts::*;
 use kamu_accounts_inmem::AccountRepositoryInMemory;
@@ -52,15 +53,22 @@ impl Harness {
                 USER_PETYA,
             )));
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<AuthenticationServiceImpl>()
-            .add_value(predefined_accounts_config)
-            .add::<AccountRepositoryInMemory>()
-            .add_value(SystemTimeSourceStub::new())
-            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
-            .add::<LoginPasswordAuthProvider>()
-            .add_value(JwtAuthenticationConfig::default())
-            .build();
+        let catalog = {
+            let mut b = dill::CatalogBuilder::new();
+
+            b.add::<AuthenticationServiceImpl>()
+                .add_value(predefined_accounts_config)
+                .add::<AccountRepositoryInMemory>()
+                .add_value(SystemTimeSourceStub::new())
+                .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+                .add::<LoginPasswordAuthProvider>()
+                .add_value(JwtAuthenticationConfig::default())
+                .add::<DatabaseTransactionRunner>();
+
+            FakeDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
 
         let system_time_source_stub = catalog.get_one::<SystemTimeSourceStub>().unwrap();
 

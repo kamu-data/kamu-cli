@@ -9,6 +9,7 @@
 
 use database_common::{DatabaseTransactionRunner, MySqlTransactionManager};
 use dill::{Catalog, CatalogBuilder};
+use internal_error::InternalError;
 use kamu_accounts_mysql::MySqlAccountRepository;
 use sqlx::MySqlPool;
 
@@ -19,12 +20,13 @@ use sqlx::MySqlPool;
 async fn test_no_password_stored(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
-        kamu_accounts_repo_tests::test_no_password_stored(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_no_password_stored(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -34,12 +36,13 @@ async fn test_no_password_stored(mysql_pool: MySqlPool) {
 async fn test_store_couple_account_passwords(mysql_pool: MySqlPool) {
     let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
-    <DatabaseTransactionRunner>::run_transactional(&harness.catalog, |catalog| async move {
-        kamu_accounts_repo_tests::test_store_couple_account_passwords(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_store_couple_account_passwords(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

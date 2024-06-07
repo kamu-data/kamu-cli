@@ -4979,6 +4979,7 @@ dependencies = [
  "chrono",
  "container-runtime",
  "cron",
+ "database-common",
  "datafusion",
  "dill",
  "event-bus",
@@ -5218,7 +5219,11 @@ name = "kamu-cli-e2e-common"
 version = "0.184.0"
 dependencies = [
  "internal-error",
+ "kamu-cli-wrapper",
  "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
  "tokio-retry",
 ]
 
@@ -5227,14 +5232,21 @@ name = "kamu-cli-e2e-postgres"
 version = "0.184.0"
 dependencies = [
  "indoc 2.0.5",
- "internal-error",
+ "kamu-cli-e2e-common",
+ "kamu-cli-e2e-repo-tests",
  "kamu-cli-wrapper",
- "reqwest",
  "sqlx",
  "test-group",
  "test-log",
+]
+
+[[package]]
+name = "kamu-cli-e2e-repo-tests"
+version = "0.184.0"
+dependencies = [
+ "indoc 2.0.5",
+ "kamu-cli-e2e-common",
  "tokio",
- "tokio-retry",
 ]
 
 [[package]]
@@ -5391,6 +5403,7 @@ dependencies = [
  "database-common",
  "dill",
  "futures",
+ "internal-error",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
  "opendatafabric",
@@ -5422,6 +5435,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "cron",
+ "database-common",
  "dill",
  "event-bus",
  "futures",
@@ -5461,6 +5475,7 @@ dependencies = [
  "database-common",
  "dill",
  "futures",
+ "internal-error",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
  "opendatafabric",
@@ -5563,6 +5578,7 @@ dependencies = [
  "database-common",
  "dill",
  "futures",
+ "internal-error",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
  "opendatafabric",

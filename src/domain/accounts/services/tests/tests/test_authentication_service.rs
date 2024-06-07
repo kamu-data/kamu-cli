@@ -9,6 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
+use database_common::{DatabaseTransactionRunner, FakeDatabasePlugin};
 use kamu_accounts::*;
 use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::AuthenticationServiceImpl;
@@ -22,8 +23,11 @@ async fn test_enabled_login_methods() {
     let catalog = make_catalog();
     let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
-    let mut supported_login_methods = authentication_service.supported_login_methods();
-    supported_login_methods.sort_unstable();
+    let supported_login_methods = authentication_service
+        .supported_login_methods()
+        .await
+        .unwrap();
+
     assert_eq!(supported_login_methods, vec!["method-A", "method-B"]);
 }
 
@@ -94,8 +98,9 @@ async fn test_use_bad_access_token() {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn make_catalog() -> dill::Catalog {
-    dill::CatalogBuilder::new()
-        .add::<DummyAuthenticationProviderA>()
+    let mut b = dill::CatalogBuilder::new();
+
+    b.add::<DummyAuthenticationProviderA>()
         .add::<DummyAuthenticationProviderB>()
         .add::<AuthenticationServiceImpl>()
         .add::<AccountRepositoryInMemory>()
@@ -103,7 +108,11 @@ fn make_catalog() -> dill::Catalog {
         .add_value(SystemTimeSourceStub::new())
         .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
         .add_value(JwtAuthenticationConfig::default())
-        .build()
+        .add::<DatabaseTransactionRunner>();
+
+    FakeDatabasePlugin::init_database_components(&mut b);
+
+    b.build()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
