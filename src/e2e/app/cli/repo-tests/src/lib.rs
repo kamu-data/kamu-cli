@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_login;
+mod test_auth;
 mod test_selftest;
 
-pub use test_login::*;
+pub use test_auth::*;
 pub use test_selftest::*;
