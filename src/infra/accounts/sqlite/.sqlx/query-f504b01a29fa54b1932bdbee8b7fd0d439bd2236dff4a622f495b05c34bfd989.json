@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT\n                    id as \"id: String\",\n                    token_name,\n                    token_hash,\n                    created_at,\n                    revoked_at,\n                    account_id as \"account_id: AccountID\"\n                FROM access_tokens\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "token_name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "token_hash",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 3,
+        "type_info": "Null"
+      },
+      {
+        "name": "revoked_at",
+        "ordinal": 4,
+        "type_info": "Null"
+      },
+      {
+        "name": "account_id: AccountID",
+        "ordinal": 5,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "f504b01a29fa54b1932bdbee8b7fd0d439bd2236dff4a622f495b05c34bfd989"
+}

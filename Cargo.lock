@@ -3713,6 +3713,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -3732,6 +3733,7 @@ dependencies = [
  "test-log",
  "thiserror",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -3751,6 +3753,7 @@ dependencies = [
  "test-log",
  "thiserror",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -3764,6 +3767,8 @@ dependencies = [
  "kamu-adapter-oauth",
  "opendatafabric",
  "password-hash 0.5.0",
+ "rand",
+ "uuid",
 ]
 
 [[package]]
@@ -3807,6 +3812,7 @@ dependencies = [
  "test-log",
  "thiserror",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

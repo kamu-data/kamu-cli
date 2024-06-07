@@ -7,8 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod access_token_repository_inmem;
-mod account_repository_inmem;
+///////////////////////////////////////////////////////////////////////////////
 
-pub use access_token_repository_inmem::*;
-pub use account_repository_inmem::*;
+use crate::{Account, GetAccountInfoError};
+
+#[async_trait::async_trait]
+pub trait AuthorizationService: Sync + Send {
+    async fn find_account_by_access_token(
+        &self,
+        access_token: String,
+    ) -> Result<Account, GetAccountInfoError>;
+}
