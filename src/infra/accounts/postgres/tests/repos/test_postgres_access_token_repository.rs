@@ -59,6 +59,36 @@ async fn test_insert_and_locate_multiple_access_tokens(pg_pool: PgPool) {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(database, postgres)]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
+async fn test_mark_existing_access_token_revorked(pg_pool: PgPool) {
+    let harness = PostgresAccessTokenRepositoryHarness::new(pg_pool);
+
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+        kamu_accounts_repo_tests::test_mark_existing_access_token_revorked(&catalog).await;
+        Ok(())
+    })
+    .await
+    .unwrap();
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(database, postgres)]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
+async fn test_mark_non_existing_access_token_revorked(pg_pool: PgPool) {
+    let harness = PostgresAccessTokenRepositoryHarness::new(pg_pool);
+
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+        kamu_accounts_repo_tests::test_mark_non_existing_access_token_revorked(&catalog).await;
+        Ok(())
+    })
+    .await
+    .unwrap();
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 struct PostgresAccessTokenRepositoryHarness {
     catalog: Catalog,
 }

@@ -59,6 +59,36 @@ async fn test_insert_and_locate_multiple_access_tokens(sqlite_pool: SqlitePool) 
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(database, sqlite)]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
+async fn test_mark_existing_access_token_revorked(sqlite_pool: SqlitePool) {
+    let harness = SqliteAccessTokenRepositoryHarness::new(sqlite_pool);
+
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+        kamu_accounts_repo_tests::test_mark_existing_access_token_revorked(&catalog).await;
+        Ok(())
+    })
+    .await
+    .unwrap();
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(database, sqlite)]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
+async fn test_mark_non_existing_access_token_revorked(sqlite_pool: SqlitePool) {
+    let harness = SqliteAccessTokenRepositoryHarness::new(sqlite_pool);
+
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+        kamu_accounts_repo_tests::test_mark_non_existing_access_token_revorked(&catalog).await;
+        Ok(())
+    })
+    .await
+    .unwrap();
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 struct SqliteAccessTokenRepositoryHarness {
     catalog: Catalog,
 }

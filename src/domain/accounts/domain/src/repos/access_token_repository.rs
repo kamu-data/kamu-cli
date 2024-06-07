@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use thiserror::Error;
 use uuid::Uuid;
@@ -25,6 +26,12 @@ pub trait AccessTokenRepository: Send + Sync {
     async fn get_token_by_id(&self, token_id: &Uuid) -> Result<AccessToken, GetAccessTokenError>;
 
     async fn get_access_tokens(&self) -> Result<Vec<AccessToken>, GetAccessTokenError>;
+
+    async fn mark_revoked(
+        &self,
+        token_id: &Uuid,
+        revoke_time: DateTime<Utc>,
+    ) -> Result<(), GetAccessTokenError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

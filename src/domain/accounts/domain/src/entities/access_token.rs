@@ -17,7 +17,7 @@ use uuid::Uuid;
 pub struct AccessToken {
     pub id: Uuid,
     pub token_name: String,
-    pub token_hash: [u8; 16],
+    pub token_hash: [u8; 32],
     pub created_at: DateTime<Utc>,
     pub revoked_at: Option<DateTime<Utc>>,
     pub account_id: AccountID,

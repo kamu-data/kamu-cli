@@ -9,6 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
+use chrono::Utc;
 use dill::Catalog;
 use kamu_accounts::*;
 use uuid::Uuid;
@@ -92,4 +93,56 @@ pub async fn test_insert_and_locate_multiple_access_tokens(catalog: &Catalog) {
 
     db_access_tokens.sort_by(|a, b| a.created_at.cmp(&b.created_at));
     assert_eq!(db_access_tokens, vec![foo_access_token, bar_access_token]);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_mark_existing_access_token_revorked(catalog: &Catalog) {
+    let access_token = make_test_access_token("foo", None, "wasya");
+    let account = make_test_account(
+        "wasya",
+        kamu_adapter_oauth::PROVIDER_GITHUB,
+        GITHUB_ACCOUNT_ID_WASYA,
+    );
+
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let access_token_repo = catalog.get_one::<dyn AccessTokenRepository>().unwrap();
+
+    account_repo.create_account(&account).await.unwrap();
+    access_token_repo
+        .create_access_token(&access_token)
+        .await
+        .unwrap();
+
+    let db_access_token = access_token_repo
+        .get_token_by_id(&access_token.id)
+        .await
+        .unwrap();
+    assert_eq!(db_access_token.revoked_at, None);
+
+    let revoke_time = Utc::now();
+    let revoke_result = access_token_repo
+        .mark_revoked(&access_token.id, revoke_time)
+        .await;
+    assert!(revoke_result.is_ok());
+
+    let db_access_token = access_token_repo
+        .get_token_by_id(&access_token.id)
+        .await
+        .unwrap();
+    assert_eq!(db_access_token.revoked_at, Some(revoke_time));
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_mark_non_existing_access_token_revorked(catalog: &Catalog) {
+    let access_token = make_test_access_token("foo", None, "wasya");
+
+    let access_token_repo = catalog.get_one::<dyn AccessTokenRepository>().unwrap();
+
+    let revoke_time = Utc::now();
+    let revoke_result = access_token_repo
+        .mark_revoked(&access_token.id, revoke_time)
+        .await;
+    assert_matches!(revoke_result, Err(GetAccessTokenError::NotFound(_)));
 }

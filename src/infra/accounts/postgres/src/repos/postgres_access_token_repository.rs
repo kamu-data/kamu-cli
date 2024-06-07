@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
@@ -101,7 +102,6 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
         .map_err(GetAccessTokenError::Internal)?;
 
         if let Some(access_token_row) = maybe_access_token_row {
-            println!("row_hash: {:?}", access_token_row.token_hash);
             Ok(AccessToken {
                 id: access_token_row.id,
                 token_name: access_token_row.token_name,
@@ -112,7 +112,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
             })
         } else {
             Err(GetAccessTokenError::NotFound(AccessTokenNotFoundError {
-                access_token_id: token_id.clone(),
+                access_token_id: *token_id,
             }))
         }
     }
@@ -153,5 +153,38 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
                 account_id: access_token_row.account_id,
             })
             .collect())
+    }
+
+    async fn mark_revoked(
+        &self,
+        token_id: &Uuid,
+        revoked_time: DateTime<Utc>,
+    ) -> Result<(), GetAccessTokenError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(GetAccessTokenError::Internal)?;
+
+        let update_result = sqlx::query!(
+            r#"
+                UPDATE access_tokens SET revoked_at = $1 where id = $2
+            "#,
+            revoked_time,
+            token_id,
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()
+        .map_err(GetAccessTokenError::Internal)?;
+
+        if update_result.rows_affected() == 0 {
+            return Err(GetAccessTokenError::NotFound(AccessTokenNotFoundError {
+                access_token_id: *token_id,
+            }));
+        }
+
+        Ok(())
     }
 }

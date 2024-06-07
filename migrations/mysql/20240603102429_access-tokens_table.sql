@@ -1,7 +1,7 @@
 CREATE TABLE access_tokens (
     id CHAR(36) DEFAULT (UUID()),
     token_name VARCHAR(100) NOT NULL,
-    token_hash BINARY(64) NOT NULL,
+    token_hash BINARY(32) NOT NULL,
     created_at TIMESTAMP NOT NULL,
     revoked_at TIMESTAMP NULL,
     account_id VARCHAR(100),

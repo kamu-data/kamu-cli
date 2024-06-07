@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 pub(crate) fn make_test_access_token(
     name: &str,
-    token_hash_maybe: Option<[u8; 16]>,
+    token_hash_maybe: Option<[u8; 32]>,
     account_name: &str,
 ) -> AccessToken {
     AccessToken {
@@ -30,8 +30,8 @@ pub(crate) fn make_test_access_token(
     }
 }
 
-pub(crate) fn generate_random_bytes() -> [u8; 16] {
-    let mut random_bytes = [0_u8; 16];
+pub(crate) fn generate_random_bytes() -> [u8; 32] {
+    let mut random_bytes = [0_u8; 32];
     rand::thread_rng().fill(&mut random_bytes);
     random_bytes
 }

@@ -45,7 +45,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
             .await
             .map_err(CreateAccessTokenError::Internal)?;
 
-        let token_id = access_token.id.clone();
+        let token_id = access_token.id;
         let token_name = access_token.token_name.clone();
         let token_hash = access_token.token_hash.as_slice();
         let crated_at = access_token.created_at;
@@ -87,7 +87,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
             .connection_mut()
             .await
             .map_err(GetAccessTokenError::Internal)?;
-        let token_id_search = token_id.clone();
+        let token_id_search = *token_id;
 
         let maybe_access_token_row = sqlx::query!(
             r#"
@@ -119,7 +119,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
             })
         } else {
             Err(GetAccessTokenError::NotFound(AccessTokenNotFoundError {
-                access_token_id: token_id.clone(),
+                access_token_id: *token_id,
             }))
         }
     }
@@ -160,5 +160,38 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
                 account_id: access_token_row.account_id,
             })
             .collect())
+    }
+
+    async fn mark_revoked(
+        &self,
+        token_id: &Uuid,
+        revoked_time: DateTime<Utc>,
+    ) -> Result<(), GetAccessTokenError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(GetAccessTokenError::Internal)?;
+
+        let update_result = sqlx::query!(
+            r#"
+                UPDATE access_tokens SET revoked_at = $1 where id = $2
+            "#,
+            revoked_time,
+            token_id,
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()
+        .map_err(GetAccessTokenError::Internal)?;
+
+        if update_result.rows_affected() == 0 {
+            return Err(GetAccessTokenError::NotFound(AccessTokenNotFoundError {
+                access_token_id: *token_id,
+            }));
+        }
+
+        Ok(())
     }
 }

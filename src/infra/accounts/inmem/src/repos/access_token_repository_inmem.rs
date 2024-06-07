@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use chrono::{DateTime, Utc};
 use dill::*;
 use kamu_accounts::AccessToken;
 use opendatafabric::AccountID;
@@ -82,13 +83,13 @@ impl AccessTokenRepository for AccessTokenRepositoryInMemory {
         }
         guard
             .tokens_by_id
-            .insert(access_token.id.clone(), access_token.clone());
+            .insert(access_token.id, access_token.clone());
         guard
             .token_ids_by_name
-            .insert(access_token.token_name.clone(), access_token.id.clone());
+            .insert(access_token.token_name.clone(), access_token.id);
         guard
             .token_hashes_by_account_id
-            .insert(access_token.account_id.clone(), access_token.id.clone());
+            .insert(access_token.account_id.clone(), access_token.id);
 
         Ok(())
     }
@@ -99,7 +100,7 @@ impl AccessTokenRepository for AccessTokenRepositoryInMemory {
             Ok(account_data.clone())
         } else {
             Err(GetAccessTokenError::NotFound(AccessTokenNotFoundError {
-                access_token_id: token_id.clone(),
+                access_token_id: *token_id,
             }))
         }
     }
@@ -107,12 +108,28 @@ impl AccessTokenRepository for AccessTokenRepositoryInMemory {
     async fn get_access_tokens(&self) -> Result<Vec<AccessToken>, GetAccessTokenError> {
         let guard = self.state.lock().unwrap();
 
-        let access_tokens: Vec<AccessToken> = guard
-            .tokens_by_id
-            .values()
-            .map(|access_token| access_token.clone())
-            .collect();
+        let access_tokens: Vec<AccessToken> = guard.tokens_by_id.values().cloned().collect();
 
         Ok(access_tokens)
+    }
+
+    async fn mark_revoked(
+        &self,
+        token_id: &Uuid,
+        revoked_time: DateTime<Utc>,
+    ) -> Result<(), GetAccessTokenError> {
+        let mut guard = self.state.lock().unwrap();
+        if let Some(existing_account) = guard.tokens_by_id.get(token_id) {
+            let revoked_access_token = AccessToken {
+                revoked_at: Some(revoked_time),
+                ..existing_account.clone()
+            };
+            guard.tokens_by_id.insert(*token_id, revoked_access_token);
+
+            return Ok(());
+        }
+        Err(GetAccessTokenError::NotFound(AccessTokenNotFoundError {
+            access_token_id: *token_id,
+        }))
     }
 }

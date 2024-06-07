@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::{Catalog, CatalogBuilder};
-use kamu_accounts_inmem::AccessTokenRepositoryInMemory;
+use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,6 +36,22 @@ async fn test_insert_and_locate_multiple_access_tokens() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_mark_existing_access_token_revorked() {
+    let harness = InmemAccessTokenRepositoryHarness::new();
+    kamu_accounts_repo_tests::test_mark_existing_access_token_revorked(&harness.catalog).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_mark_non_existing_access_token_revorked() {
+    let harness = InmemAccessTokenRepositoryHarness::new();
+    kamu_accounts_repo_tests::test_mark_non_existing_access_token_revorked(&harness.catalog).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 struct InmemAccessTokenRepositoryHarness {
     catalog: Catalog,
 }
@@ -44,6 +60,7 @@ impl InmemAccessTokenRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<AccessTokenRepositoryInMemory>();
+        catalog_builder.add::<AccountRepositoryInMemory>();
 
         Self {
             catalog: catalog_builder.build(),
