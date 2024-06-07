@@ -29,7 +29,7 @@ pub async fn test_login_password_predefined_successful(
                 }
                 "#,
             ),
-            indoc::indoc!(
+            Ok(indoc::indoc!(
                 r#"
                 {
                   "auth": {
@@ -41,7 +41,7 @@ pub async fn test_login_password_predefined_successful(
                   }
                 }
                 "#,
-            ),
+            )),
         )
         .await;
 }

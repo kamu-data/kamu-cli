@@ -15,13 +15,13 @@ pub async fn test_selftest(kamu_api_server_client: KamuApiServerClient) {
     kamu_api_server_client
         .api_call_assert(
             "{ apiVersion }",
-            indoc::indoc!(
+            Ok(indoc::indoc!(
                 r#"
                 {
                   "apiVersion": "0.1"
                 }
                 "#,
-            ),
+            )),
         )
         .await;
 }

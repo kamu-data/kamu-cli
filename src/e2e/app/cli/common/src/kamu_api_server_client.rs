@@ -61,31 +61,77 @@ impl KamuApiServerClient {
         Ok(())
     }
 
-    pub async fn api_call_assert(&self, query: &str, expected_response: &str) {
+    pub async fn api_call_assert(&self, query: &str, expected_response: Result<&str, &str>) {
         let endpoint = self.server_base_url.join("graphql").unwrap();
         let request_data = serde_json::json!({
            "query": query
         });
 
-        #[derive(Debug, Deserialize)]
-        struct Response {
-            data: serde_json::Value,
-        }
         let response = self
             .http_client
             .post(endpoint)
             .json(&request_data)
             .send()
             .await
-            .unwrap()
-            .json::<Response>()
-            .await
             .unwrap();
 
-        let actual_response = serde_json::to_string_pretty(&response.data).unwrap();
+        assert_eq!(StatusCode::OK, response.status());
 
-        // Let's add \n for the sake of convenience of passing the expected result
-        assert_eq!(expected_response, format!("{actual_response}\n"));
+        let response_body: ResponsePrettyBody =
+            response.json::<ResponseBody>().await.unwrap().into();
+
+        match (response_body.errors, response_body.data, expected_response) {
+            (Some(actual_error), None, Err(expected_error)) => {
+                assert_eq!(
+                    expected_error,
+                    // Let's add \n for the sake of convenience of passing the expected result
+                    format!("{actual_error}\n")
+                );
+            }
+            (None, Some(actual_response), Ok(expected_response)) => {
+                // Let's add \n for the sake of convenience of passing the expected result
+                assert_eq!(expected_response, format!("{actual_response}\n"));
+            }
+            (Some(actual_error), None, Ok(_)) => {
+                panic!(
+                    "An successful response was expected, but an erroneous one was \
+                     received:\n{actual_error}"
+                )
+            }
+            (None, Some(actual_response), Err(_)) => {
+                panic!(
+                    "An error response was expected, but a successful one was \
+                     received:\n{actual_response}"
+                )
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+struct ResponseBody {
+    data: Option<serde_json::Value>,
+    errors: Option<serde_json::Value>,
+}
+
+struct ResponsePrettyBody {
+    data: Option<String>,
+    errors: Option<String>,
+}
+
+impl From<ResponseBody> for ResponsePrettyBody {
+    fn from(value: ResponseBody) -> Self {
+        Self {
+            data: value
+                .data
+                .map(|v| serde_json::to_string_pretty(&v).unwrap()),
+            errors: value
+                .errors
+                .map(|v| serde_json::to_string_pretty(&v).unwrap()),
+        }
     }
 }
 
