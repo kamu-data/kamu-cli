@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::ffi::OsString;
+use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -17,6 +18,7 @@ use datafusion::prelude::*;
 use dill::Component;
 use event_bus::EventBus;
 use kamu::*;
+use kamu_cli::config::CONFIG_FILENAME;
 use kamu_cli::*;
 use kamu_core::*;
 use opendatafabric::serde::yaml::*;
@@ -55,8 +57,13 @@ impl Kamu {
         self.system_time = t;
     }
 
-    pub async fn new_workspace_tmp() -> Self {
+    async fn new_workspace_tmp_inner(maybe_kamu_config: Option<&str>) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
+
+        if let Some(config) = maybe_kamu_config {
+            fs::write(temp_dir.path().join(CONFIG_FILENAME), config).unwrap();
+        }
+
         let inst = Self::new(temp_dir.path());
         let inst = Self {
             _temp_dir: Some(temp_dir),
@@ -66,6 +73,14 @@ impl Kamu {
         inst.execute(["init"]).await.unwrap();
 
         inst
+    }
+
+    pub async fn new_workspace_tmp() -> Self {
+        Self::new_workspace_tmp_inner(None).await
+    }
+
+    pub async fn new_workspace_tmp_with_kamu_config(kamu_config: &str) -> Self {
+        Self::new_workspace_tmp_inner(Some(kamu_config)).await
     }
 
     pub fn workspace_path(&self) -> &Path {
