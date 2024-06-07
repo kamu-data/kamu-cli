@@ -18,7 +18,7 @@ use crate::Account;
 
 #[async_trait::async_trait]
 pub trait AuthenticationService: Sync + Send {
-    fn supported_login_methods(&self) -> Vec<&'static str>;
+    async fn supported_login_methods(&self) -> Result<SupportedLoginMethods, InternalError>;
 
     async fn login(
         &self,
@@ -51,6 +51,10 @@ pub trait AuthenticationService: Sync + Send {
         account_id: &AccountID,
     ) -> Result<Option<AccountName>, InternalError>;
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub type SupportedLoginMethods = Vec<&'static str>;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -124,6 +128,12 @@ pub enum AccessTokenError {
 
     #[error("Expired access token")]
     Expired,
+}
+
+impl From<InternalError> for GetAccountInfoError {
+    fn from(e: InternalError) -> Self {
+        Self::Internal(e)
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

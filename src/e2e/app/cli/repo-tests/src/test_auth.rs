@@ -65,7 +65,6 @@ pub async fn test_login_enabled_methods(kamu_api_server_client: KamuApiServerCli
                 {
                   "auth": {
                     "enabledLoginMethods": [
-                      "oauth_github",
                       "password"
                     ]
                   }
