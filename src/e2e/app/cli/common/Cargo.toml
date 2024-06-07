@@ -1,5 +1,6 @@
 [package]
 name = "kamu-cli-e2e-common"
+description = "Common code used in E2E tests"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -24,7 +25,6 @@ doctest = false
 internal-error = { workspace = true }
 
 reqwest = { version = "0.11", default-features = false, features = [] }
-tokio = { version = "1", default-features = false, features = [] }
 tokio-retry = "0.3"
 
 [dev-dependencies]

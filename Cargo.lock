@@ -5219,7 +5219,6 @@ version = "0.184.0"
 dependencies = [
  "internal-error",
  "reqwest",
- "tokio",
  "tokio-retry",
 ]
 
