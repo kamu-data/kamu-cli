@@ -97,6 +97,7 @@ impl ClientSideHarness {
         b.add::<EngineProvisionerNull>();
 
         b.add::<ObjectStoreRegistryImpl>();
+        b.add::<ObjectStoreBuilderLocalFs>();
 
         b.add::<DataFormatRegistryImpl>();
 
@@ -152,6 +153,10 @@ impl ClientSideHarness {
         self.catalog.get_one::<dyn DatasetRepository>().unwrap()
     }
 
+    pub fn compacting_service(&self) -> Arc<dyn CompactingService> {
+        self.catalog.get_one::<dyn CompactingService>().unwrap()
+    }
+
     // TODO: accept alias or handle
     pub fn dataset_layout(&self, dataset_id: &DatasetID, dataset_name: &str) -> DatasetLayout {
         let root_path = if self.options.multi_tenant {
@@ -201,6 +206,7 @@ impl ClientSideHarness {
         &self,
         dataset_local_ref: DatasetRef,
         dataset_remote_ref: DatasetRefRemote,
+        force: bool,
     ) -> Vec<PushResponse> {
         self.push_service
             .push_multi_ext(
@@ -211,6 +217,7 @@ impl ClientSideHarness {
                 PushMultiOptions {
                     sync_options: SyncOptions {
                         create_if_not_exists: true,
+                        force,
                         ..SyncOptions::default()
                     },
                     ..PushMultiOptions::default()
@@ -224,9 +231,10 @@ impl ClientSideHarness {
         &self,
         dataset_local_ref: DatasetRef,
         dataset_remote_ref: DatasetRefRemote,
+        force: bool,
     ) -> SyncResult {
         let results = self
-            .push_dataset(dataset_local_ref, dataset_remote_ref)
+            .push_dataset(dataset_local_ref, dataset_remote_ref, force)
             .await;
 
         match &(results.first().unwrap().result) {

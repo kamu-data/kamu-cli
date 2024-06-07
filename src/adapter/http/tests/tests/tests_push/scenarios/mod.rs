@@ -10,6 +10,7 @@
 mod scenario_aborted_write_of_new_rewrite_succeeds;
 mod scenario_aborted_write_of_updated_rewrite_succeeds;
 mod scenario_existing_dataset_fails_as_server_advanced;
+mod scenario_existing_diverged_dataset;
 mod scenario_existing_evolved_dataset;
 mod scenario_existing_up_to_date_dataset;
 mod scenario_new_dataset;
@@ -18,6 +19,7 @@ mod scenario_new_empty_dataset;
 pub(crate) use scenario_aborted_write_of_new_rewrite_succeeds::*;
 pub(crate) use scenario_aborted_write_of_updated_rewrite_succeeds::*;
 pub(crate) use scenario_existing_dataset_fails_as_server_advanced::*;
+pub(crate) use scenario_existing_diverged_dataset::*;
 pub(crate) use scenario_existing_evolved_dataset::*;
 pub(crate) use scenario_existing_up_to_date_dataset::*;
 pub(crate) use scenario_new_dataset::*;
