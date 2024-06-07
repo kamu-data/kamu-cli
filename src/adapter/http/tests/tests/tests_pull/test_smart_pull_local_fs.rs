@@ -27,6 +27,13 @@ test_client_server_local_fs_harness_permutations!(
 
 test_client_server_local_fs_harness_permutations!(
     test_smart_pull_shared,
+    test_smart_pull_new_empty_dataset
+);
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+test_client_server_local_fs_harness_permutations!(
+    test_smart_pull_shared,
     test_smart_pull_existing_up_to_date_dataset
 );
 
@@ -35,6 +42,13 @@ test_client_server_local_fs_harness_permutations!(
 test_client_server_local_fs_harness_permutations!(
     test_smart_pull_shared,
     test_smart_pull_existing_evolved_dataset
+);
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+test_client_server_local_fs_harness_permutations!(
+    test_smart_pull_shared,
+    test_smart_pull_existing_diverged_dataset
 );
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -56,13 +70,6 @@ test_client_server_local_fs_harness_permutations!(
 test_client_server_local_fs_harness_permutations!(
     test_smart_pull_shared,
     test_smart_pull_aborted_read_of_existing_evolved_dataset_reread_succeeds
-);
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-test_client_server_local_fs_harness_permutations!(
-    test_smart_pull_shared,
-    test_smart_pull_new_empty_dataset
 );
 
 /////////////////////////////////////////////////////////////////////////////////////////

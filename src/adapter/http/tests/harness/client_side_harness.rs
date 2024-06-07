@@ -164,13 +164,18 @@ impl ClientSideHarness {
         DatasetLayout::new(root_path.as_path())
     }
 
-    pub async fn pull_datasets(&self, dataset_ref: DatasetRefAny) -> Vec<PullResponse> {
+    pub async fn pull_datasets(
+        &self,
+        dataset_ref: DatasetRefAny,
+        force: bool,
+    ) -> Vec<PullResponse> {
         self.pull_service
             .pull_multi(
                 vec![dataset_ref],
                 PullMultiOptions {
                     sync_options: SyncOptions {
                         create_if_not_exists: true,
+                        force,
                         ..SyncOptions::default()
                     },
                     ..Default::default()
@@ -181,8 +186,8 @@ impl ClientSideHarness {
             .unwrap()
     }
 
-    pub async fn pull_dataset_result(&self, dataset_ref: DatasetRefAny) -> PullResult {
-        self.pull_datasets(dataset_ref)
+    pub async fn pull_dataset_result(&self, dataset_ref: DatasetRefAny, force: bool) -> PullResult {
+        self.pull_datasets(dataset_ref, force)
             .await
             .first()
             .unwrap()

@@ -472,6 +472,7 @@ async fn create_test_case(server_harness: &dyn ServerSideHarness) -> TestCase {
         server_repo.as_ref(),
         &make_dataset_ref(&None, "foo"),
         &server_harness.dataset_layout(&create_result.dataset_handle),
+        None,
     )
     .await;
 

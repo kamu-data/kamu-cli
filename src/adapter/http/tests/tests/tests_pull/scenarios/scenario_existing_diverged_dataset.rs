@@ -14,7 +14,7 @@ use opendatafabric::*;
 
 use crate::harness::{
     commit_add_data_event,
-    copy_folder_recursively,
+    copy_dataset_files,
     make_dataset_ref,
     write_dataset_alias,
     ClientSideHarness,
@@ -23,31 +23,29 @@ use crate::harness::{
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct SmartPushAbortedWriteOfNewWriteSucceeds<TServerHarness: ServerSideHarness> {
+pub(crate) struct SmartPullExistingDivergedDatasetScenario<TServerHarness: ServerSideHarness> {
     pub client_harness: ClientSideHarness,
     pub server_harness: TServerHarness,
     pub server_dataset_layout: DatasetLayout,
     pub client_dataset_layout: DatasetLayout,
     pub server_dataset_ref: DatasetRefRemote,
-    pub client_dataset_ref: DatasetRef,
-    pub client_commit_result: CommitResult,
+    pub server_precompacting_result: CommitResult,
+    pub server_compacting_result: CompactingResult,
 }
 
-impl<TServerHarness: ServerSideHarness> SmartPushAbortedWriteOfNewWriteSucceeds<TServerHarness> {
+impl<TServerHarness: ServerSideHarness> SmartPullExistingDivergedDatasetScenario<TServerHarness> {
     pub async fn prepare(
         client_harness: ClientSideHarness,
         server_harness: TServerHarness,
     ) -> Self {
-        let client_account_name = client_harness.operating_account_name();
         let server_account_name = server_harness.operating_account_name();
 
-        let client_repo = client_harness.dataset_repository();
-
-        let client_create_result = client_repo
+        let server_repo = server_harness.cli_dataset_repository();
+        let server_create_result = server_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
                     .name(DatasetAlias::new(
-                        client_account_name.clone(),
+                        server_account_name.clone(),
                         DatasetName::new_unchecked("foo"),
                     ))
                     .kind(DatasetKind::Root)
@@ -58,39 +56,47 @@ impl<TServerHarness: ServerSideHarness> SmartPushAbortedWriteOfNewWriteSucceeds<
             .await
             .unwrap();
 
+        let server_dataset_layout =
+            server_harness.dataset_layout(&server_create_result.dataset_handle);
+
+        let server_dataset_ref = make_dataset_ref(&server_account_name, "foo");
+
+        // Generate a few blocks of random data
+        let mut commit_result: Option<CommitResult> = None;
+        for _ in 0..3 {
+            commit_result = Some(
+                commit_add_data_event(
+                    server_repo.as_ref(),
+                    &server_dataset_ref,
+                    &server_dataset_layout,
+                    commit_result.map(|r| r.new_head),
+                )
+                .await,
+            );
+        }
+
         let client_dataset_layout =
-            client_harness.dataset_layout(&client_create_result.dataset_handle.id, "foo");
+            client_harness.dataset_layout(&server_create_result.dataset_handle.id, "foo");
+
+        // Hard folder synchronization
+        copy_dataset_files(&server_dataset_layout, &client_dataset_layout).unwrap();
 
         let foo_name = DatasetName::new_unchecked("foo");
-
-        let server_dataset_layout = server_harness.dataset_layout(&DatasetHandle::new(
-            client_create_result.dataset_handle.id.clone(),
-            DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
-        ));
-
-        let client_dataset_ref = make_dataset_ref(&client_account_name, "foo");
-        let client_commit_result = commit_add_data_event(
-            client_repo.as_ref(),
-            &client_dataset_ref,
-            &client_dataset_layout,
-            None,
-        )
-        .await;
-
-        // Let's pretend that previous attempts uploaded some data files, but the rest
-        // was discarded. To mimic this, artificially copy just the data folder,
-        // containing a data block
-        copy_folder_recursively(
-            &client_dataset_layout.data_dir,
-            &server_dataset_layout.data_dir,
-        )
-        .unwrap();
-
         write_dataset_alias(
-            &server_dataset_layout,
-            &DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
+            &client_dataset_layout,
+            &DatasetAlias::new(client_harness.operating_account_name(), foo_name.clone()),
         )
         .await;
+
+        let compacting_service = server_harness.cli_compacting_service();
+        let server_compacting_result = compacting_service
+            .compact_dataset(
+                &server_create_result.dataset_handle,
+                CompactingOptions::default(),
+                None,
+            )
+            .await
+            .unwrap();
 
         let server_alias = DatasetAlias::new(server_account_name, foo_name);
         let server_odf_url = server_harness.dataset_url(&server_alias);
@@ -102,8 +108,8 @@ impl<TServerHarness: ServerSideHarness> SmartPushAbortedWriteOfNewWriteSucceeds<
             server_dataset_layout,
             client_dataset_layout,
             server_dataset_ref,
-            client_dataset_ref,
-            client_commit_result,
+            server_precompacting_result: commit_result.unwrap(),
+            server_compacting_result,
         }
     }
 }

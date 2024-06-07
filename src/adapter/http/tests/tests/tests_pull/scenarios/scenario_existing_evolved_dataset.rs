@@ -95,6 +95,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingEvolvedDatasetScenario<
             server_repo.as_ref(),
             &server_dataset_ref,
             &server_dataset_layout,
+            None,
         )
         .await;
 

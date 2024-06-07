@@ -474,7 +474,8 @@ impl AddDataBuilder {
     }
 
     pub fn some_new_data(self) -> Self {
-        self.some_new_data_with_offset(0, 9)
+        let start_offset = self.v.prev_offset.map_or(0, |offset| offset + 1);
+        self.some_new_data_with_offset(start_offset, start_offset + 9)
     }
 
     pub fn some_new_data_with_offset(mut self, start: u64, end: u64) -> Self {
@@ -629,7 +630,8 @@ impl ExecuteTransformBuilder {
     }
 
     pub fn some_new_data(self) -> Self {
-        self.some_new_data_with_offset(0, 9)
+        let start_offset = self.v.prev_offset.map_or(0, |offset| offset + 1);
+        self.some_new_data_with_offset(start_offset, start_offset + 9)
     }
 
     pub fn some_new_data_with_offset(mut self, start: u64, end: u64) -> Self {

@@ -524,8 +524,6 @@ impl DataIngestHarness {
             .add::<DataFormatRegistryImpl>()
             .add_builder(PushIngestServiceImpl::builder().with_run_info_dir(run_info_dir))
             .bind::<dyn PushIngestService, PushIngestServiceImpl>()
-            .add::<ObjectStoreRegistryImpl>()
-            .add::<ObjectStoreBuilderLocalFs>()
             .add::<EngineProvisionerNull>()
             .add_builder(UploadServiceLocal::builder().with_cache_dir(cache_dir.clone()))
             .bind::<dyn UploadService, UploadServiceLocal>()
