@@ -7,11 +7,27 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::future::Future;
+
+use kamu_cli_e2e_common::{e2e_test, KamuApiServerClient};
+use kamu_cli_wrapper::Kamu;
 use sqlx::PgPool;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-pub async fn postgres_test_down(pg_pool: PgPool) {
+pub async fn postgres_e2e_test<F, Fut>(pg_pool: PgPool, kamu: Kamu, fixture_callback: F)
+where
+    F: FnOnce(KamuApiServerClient) -> Fut,
+    Fut: Future<Output = ()>,
+{
+    e2e_test(kamu, fixture_callback).await;
+
+    postgres_test_down(pg_pool).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+async fn postgres_test_down(pg_pool: PgPool) {
     let connect_options = pg_pool.connect_options();
     let database = connect_options.get_database().unwrap();
 
@@ -59,3 +75,5 @@ pub async fn postgres_test_down(pg_pool: PgPool) {
         "Stale transactions are present!"
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////

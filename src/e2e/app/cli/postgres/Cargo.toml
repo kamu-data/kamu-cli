@@ -1,5 +1,6 @@
 [package]
 name = "kamu-cli-e2e-postgres"
+description = "Postgres-specific E2E tests"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -21,14 +22,16 @@ doctest = false
 
 
 [dependencies]
+kamu-cli-e2e-common = { workspace = true }
+kamu-cli-wrapper = { workspace = true }
+
 sqlx = { version = "0.7", default-features = false, features = [
     "macros",
     "postgres",
 ] }
 
 [dev-dependencies]
-kamu-cli-e2e-common = { workspace = true }
-kamu-cli-wrapper = { workspace = true }
+kamu-cli-e2e-repo-tests = { workspace = true }
 
 indoc = "2"
 test-group = { version = "1" }
