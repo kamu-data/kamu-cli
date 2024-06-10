@@ -159,7 +159,7 @@ pub async fn run(
         }
     };
     let is_database_used = maybe_db_configuration.is_some();
-    let result = if is_database_used && need_to_wrap_with_transaction {
+    let command_result = if is_database_used && need_to_wrap_with_transaction {
         let transaction_runner = DatabaseTransactionRunner::new(cli_catalog);
 
         transaction_runner
@@ -171,7 +171,7 @@ pub async fn run(
         run_command(cli_catalog).await
     };
 
-    match &result {
+    match &command_result {
         Ok(()) => {
             tracing::info!("Command successful");
         }
@@ -196,7 +196,7 @@ pub async fn run(
         let _ = TraceServer::maybe_serve_in_browser(trace_file).await;
     }
 
-    result
+    command_result
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -364,7 +364,7 @@ pub fn configure_base_catalog(
 fn configure_database_components(
     catalog_builder: &mut CatalogBuilder,
     db_configuration: &DatabaseConfiguration,
-) -> Result<(), InternalError> {
+) -> Result<(), CLIError> {
     // TODO: Remove after adding implementation of FlowEventStore for databases
     catalog_builder.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
 
@@ -375,37 +375,61 @@ fn configure_database_components(
 
     match db_configuration.provider {
         DatabaseProvider::Postgres => {
-            database_common::PostgresPlugin::init_database_components(
-                catalog_builder,
-                db_configuration,
-            )
-            .int_err()?;
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "db-postgres")] {
+                    database_common::PostgresPlugin::init_database_components(
+                        catalog_builder,
+                        db_configuration,
+                    )
+                    .int_err()?;
 
-            catalog_builder.add::<kamu_accounts_postgres::PostgresAccountRepository>();
+                    catalog_builder.add::<kamu_accounts_postgres::PostgresAccountRepository>();
 
-            Ok(())
+                    Ok(())
+                } else {
+                    Err(CLIError::usage_error(
+                        "This version of kamu was compiled without the support PostgreSQL",
+                    ))
+                }
+            }
         }
         DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
-            database_common::MySqlPlugin::init_database_components(
-                catalog_builder,
-                db_configuration,
-            )
-            .int_err()?;
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "db-mysql")] {
+                    database_common::MySqlPlugin::init_database_components(
+                        catalog_builder,
+                        db_configuration,
+                    )
+                    .int_err()?;
 
-            catalog_builder.add::<kamu_accounts_mysql::MySqlAccountRepository>();
+                    catalog_builder.add::<kamu_accounts_mysql::MySqlAccountRepository>();
 
-            todo!("Task & Flow System MySQL versions");
+                    todo!("Task & Flow System MySQL versions");
+                } else {
+                    Err(CLIError::usage_error(
+                        "This version of kamu was compiled without the support MySQL",
+                    ))
+                }
+            }
         }
         DatabaseProvider::Sqlite => {
-            database_common::SqlitePlugin::init_database_components(
-                catalog_builder,
-                db_configuration,
-            )
-            .int_err()?;
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "db-mysql")] {
+                    database_common::SqlitePlugin::init_database_components(
+                        catalog_builder,
+                        db_configuration,
+                    )
+                    .int_err()?;
 
-            catalog_builder.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
+                    catalog_builder.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
 
-            Ok(())
+                    Ok(())
+                } else {
+                    Err(CLIError::usage_error(
+                        "This version of kamu was compiled without the support SQLite",
+                    ))
+                }
+            }
         }
     }
 }

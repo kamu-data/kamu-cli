@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli-wrapper"
-description = "Programmable version of kamu-cli used in tests"
+description = "Programmable version of kamu-cli used in E2E tests"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -21,8 +21,16 @@ workspace = true
 doctest = false
 
 
+[features]
+default = []
+
+db-postgres = ["kamu-cli/db-postgres"]
+db-mysql = ["kamu-cli/db-mysql"]
+db-sqlite = ["kamu-cli/db-sqlite"]
+
+
 [dependencies]
-kamu-cli = { path = "../../app/cli", version = "0" }
+kamu-cli = { path = "../../app/cli", version = "0", default-features = false }
 
 event-bus = { workspace = true }
 kamu = { workspace = true }
