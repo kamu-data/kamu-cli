@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli_e2e_postgres::postgres_e2e_test;
+use kamu_cli_e2e_common::e2e_test;
 use kamu_cli_wrapper::Kamu;
 use sqlx::PgPool;
 
@@ -41,7 +41,7 @@ async fn test_selftest(pg_pool: PgPool) {
     )
     .await;
 
-    postgres_e2e_test(pg_pool, kamu, |kamu_api_server_client| async {
+    e2e_test(kamu, |kamu_api_server_client| async {
         kamu_cli_e2e_repo_tests::test_selftest(kamu_api_server_client).await;
     })
     .await;

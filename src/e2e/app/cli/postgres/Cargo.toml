@@ -22,17 +22,17 @@ doctest = false
 
 
 [dependencies]
+# We have only tests in this crate
+
+[dev-dependencies]
 kamu-cli-e2e-common = { workspace = true }
+kamu-cli-e2e-repo-tests = { workspace = true }
 kamu-cli-wrapper = { workspace = true, default-features = false, features = ["db-postgres"] }
 
+indoc = "2"
 sqlx = { version = "0.7", default-features = false, features = [
     "macros",
     "postgres",
 ] }
-
-[dev-dependencies]
-kamu-cli-e2e-repo-tests = { workspace = true }
-
-indoc = "2"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
