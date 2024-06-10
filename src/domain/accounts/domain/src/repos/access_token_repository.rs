@@ -63,7 +63,7 @@ pub enum GetAccessTokenError {
 }
 
 #[derive(Error, Debug)]
-#[error("Access token not found : '{access_token_id}'")]
+#[error("Access token not found: '{access_token_id}'")]
 pub struct AccessTokenNotFoundError {
     pub access_token_id: Uuid,
 }

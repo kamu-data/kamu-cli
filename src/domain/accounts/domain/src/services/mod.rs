@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod access_token_service;
 mod authentication_config;
 mod authentication_errors;
 mod authentication_provider;
 mod authentication_service;
-mod authorization_service;
 
+pub use access_token_service::*;
 pub use authentication_config::*;
 pub use authentication_errors::*;
 pub use authentication_provider::*;
 pub use authentication_service::*;
-pub use authorization_service::*;

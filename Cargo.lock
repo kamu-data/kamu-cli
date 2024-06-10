@@ -1132,6 +1132,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "349a06037c7bf932dd7e7d1f653678b2038b9ad46a74102f1fc7bd7872678cce"
 
 [[package]]
+name = "base32"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1ce0365f4d5fb6646220bb52fe547afd51796d90f914d4063cb0b032ebee088"
+
+[[package]]
 name = "base64"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3777,7 +3783,9 @@ version = "0.185.1"
 dependencies = [
  "argon2",
  "async-trait",
+ "base32",
  "chrono",
+ "crc32fast",
  "dill",
  "internal-error",
  "jsonwebtoken",
@@ -3786,6 +3794,7 @@ dependencies = [
  "kamu-core",
  "opendatafabric",
  "password-hash 0.5.0",
+ "rand",
  "random-names",
  "serde",
  "serde_json",
@@ -3793,6 +3802,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

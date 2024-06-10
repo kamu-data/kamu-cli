@@ -10,8 +10,19 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 use chrono::{DateTime, Utc};
-use opendatafabric::AccountID;
+use opendatafabric::{AccountID, Multihash};
 use uuid::Uuid;
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct KamuAccessToken {
+    pub prefix: String,
+    pub id: Uuid,
+    pub random_bytes: [u8; 16],
+    pub random_bytes_hash: Multihash,
+    pub checksum: u32,
+    pub base32_token: String,
+    pub composed_token: String,
+}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct AccessToken {
