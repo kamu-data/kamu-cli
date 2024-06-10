@@ -18,6 +18,7 @@ use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
 use kamu_adapter_http::{FileUploadLimitConfig, UploadService, UploadServiceLocal};
+use kamu_accounts_services::PredefinedAccountsRegistrator;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
@@ -136,6 +137,20 @@ pub async fn run(
     if workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()? {
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
+
+    // TODO: Not for every command?
+    DatabaseTransactionRunner::new(base_catalog.clone())
+        .transactional(|transactional_catalog| async move {
+            let registrator = transactional_catalog
+                .get_one::<PredefinedAccountsRegistrator>()
+                .map_err(CLIError::critical)?;
+
+            registrator
+                .ensure_predefined_accounts_are_registered()
+                .await
+                .map_err(CLIError::critical)
+        })
+        .await?;
 
     // TODO: Extend Command trait with the corresponding property
     let need_to_wrap_with_transaction = matches!(
@@ -345,6 +360,7 @@ pub fn configure_base_catalog(
     }
 
     b.add::<kamu_accounts_services::AuthenticationServiceImpl>();
+    b.add::<PredefinedAccountsRegistrator>();
 
     // Give both CLI and server access to stored repo access tokens
     b.add::<odf_server::AccessTokenRegistryService>();

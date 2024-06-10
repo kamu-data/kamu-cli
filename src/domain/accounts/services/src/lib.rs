@@ -14,6 +14,8 @@ pub use kamu_accounts as domain;
 
 mod authentication_service_impl;
 mod login_password_auth_provider;
+mod predefined_accounts_registrator;
 
 pub use authentication_service_impl::*;
 pub use login_password_auth_provider::*;
+pub use predefined_accounts_registrator::*;
