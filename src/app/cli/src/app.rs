@@ -37,6 +37,7 @@ const VERBOSE_LOGGING_CONFIG: &str = "debug";
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Errors before commands are executed are not output anywhere -- log them
 pub async fn run(
     workspace_layout: WorkspaceLayout,
     matches: clap::ArgMatches,
