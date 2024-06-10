@@ -195,7 +195,7 @@ libc = "0.2" # For getting uid:gid
 
 
 [dev-dependencies]
-kamu-cli-wrapper = { workspace = true }
+kamu-cli-wrapper = { workspace = true, default-features = false, features = [] }
 
 assert_cmd = "2"
 pretty_assertions = { version = "1" }

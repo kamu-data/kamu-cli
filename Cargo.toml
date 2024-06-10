@@ -72,9 +72,9 @@ event-sourcing = { version = "0.185.1", path = "src/utils/event-sourcing", defau
 event-sourcing-macros = { version = "0.185.1", path = "src/utils/event-sourcing-macros", default-features = false }
 internal-error = { version = "0.185.1", path = "src/utils/internal-error", default-features = false }
 kamu-cli-wrapper = { version = "0.185.1", path = "src/utils/kamu-cli-wrapper", default-features = false }
-multiformats = { version = "0.185.1", path = "src/utils/multiformats", default-features = false }
 kamu-data-utils = { version = "0.185.1", path = "src/utils/data-utils", default-features = false }
 kamu-datafusion-cli = { version = "0.185.1", path = "src/utils/datafusion-cli", default-features = false }
+multiformats = { version = "0.185.1", path = "src/utils/multiformats", default-features = false }
 random-names = { version = "0.185.1", path = "src/utils/random-names", default-features = false }
 tracing-perfetto = { version = "0.185.1", path = "src/utils/tracing-perfetto", default-features = false }
 
