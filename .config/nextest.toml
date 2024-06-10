@@ -2,11 +2,15 @@
 fail-fast = false
 
 [test-groups]
+e2e = { max-threads = 1 }  # We do not support parallel running (as there is a hardcoded port present).
 setup = { max-threads = 1 }  # Serialize the setup steps
 containerized = { max-threads = 8 }  # Don't use too much memory
 engine = { max-threads = 2 }  # Engine tests are very memory-hungry
 database = { max-threads = 8 }  # Don't use too much memory
-e2e = { max-threads = 1 }  # We do not support parallel running (as there is a hardcoded port present).
+
+[[profile.default.overrides]]
+filter = "test(::e2e::)"
+test-group = "e2e"
 
 [[profile.default.overrides]]
 filter = "test(::setup::)"
@@ -27,7 +31,3 @@ test-group = "database"
 [[profile.default.overrides]]
 filter = "test(::flaky::)"
 retries = { count = 3, backoff = "exponential", delay = "3s" }
-
-[[profile.default.overrides]]
-filter = "test(::e2e::)"
-test-group = "e2e"
