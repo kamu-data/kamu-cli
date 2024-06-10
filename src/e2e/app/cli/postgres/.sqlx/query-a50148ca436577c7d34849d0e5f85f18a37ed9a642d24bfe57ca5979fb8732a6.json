@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT pg_terminate_backend(pid)\n        FROM pg_stat_activity\n        WHERE datname = $1\n          AND state = 'idle'\n          AND pid <> pg_backend_pid()   -- exclude the current connection\n          AND query = 'COMMIT'          -- last executed query\n          AND wait_event = 'ClientRead' -- awaiting new data\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "pg_terminate_backend",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Name"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a50148ca436577c7d34849d0e5f85f18a37ed9a642d24bfe57ca5979fb8732a6"
+}

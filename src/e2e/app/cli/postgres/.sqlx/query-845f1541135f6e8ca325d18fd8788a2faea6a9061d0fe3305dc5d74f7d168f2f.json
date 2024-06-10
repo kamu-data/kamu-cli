@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*) as count\n        FROM pg_stat_activity\n        WHERE datname = $1\n          AND state <> 'idle'\n          AND pid <> pg_backend_pid()   -- exclude the current connection\n          AND query <> 'COMMIT'          -- last executed query\n          AND wait_event <> 'ClientRead' -- awaiting new data\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Name"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "845f1541135f6e8ca325d18fd8788a2faea6a9061d0fe3305dc5d74f7d168f2f"
+}
