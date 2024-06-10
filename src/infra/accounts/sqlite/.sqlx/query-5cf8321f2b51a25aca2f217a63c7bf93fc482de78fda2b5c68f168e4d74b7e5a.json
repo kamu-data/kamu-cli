@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                SELECT\n                    id as \"id: Uuid\",\n                    token_name,\n                    token_hash,\n                    created_at as \"created_at: DateTime<Utc>\",\n                    revoked_at as \"revoked_at: DateTime<Utc>\",\n                    account_id as \"account_id: AccountID\"\n                FROM access_tokens\n                ",
+  "query": "\n                SELECT\n                    id as \"id: Uuid\",\n                    token_name,\n                    token_hash,\n                    created_at as \"created_at: DateTime<Utc>\",\n                    revoked_at as \"revoked_at: DateTime<Utc>\",\n                    account_id as \"account_id: AccountID\"\n                FROM access_tokens\n                LIMIT $1 OFFSET $2\n                ",
   "describe": {
     "columns": [
       {
@@ -35,7 +35,7 @@
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 2
     },
     "nullable": [
       false,
@@ -46,5 +46,5 @@
       false
     ]
   },
-  "hash": "1286b86fb6fb250ed8bf07906188a4f42fa87a716d8470d23905fedcdb6880d2"
+  "hash": "5cf8321f2b51a25aca2f217a63c7bf93fc482de78fda2b5c68f168e4d74b7e5a"
 }

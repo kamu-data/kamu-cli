@@ -89,7 +89,13 @@ pub async fn test_insert_and_locate_multiple_access_tokens(catalog: &Catalog) {
 
     assert_eq!(db_bar_access_token, bar_access_token);
 
-    let mut db_access_tokens = access_token_repo.get_access_tokens().await.unwrap();
+    let mut db_access_tokens = access_token_repo
+        .get_access_tokens(&AccessTokenPaginationOpts {
+            limit: 10,
+            offset: 0,
+        })
+        .await
+        .unwrap();
 
     db_access_tokens.sort_by(|a, b| a.created_at.cmp(&b.created_at));
     assert_eq!(db_access_tokens, vec![foo_access_token, bar_access_token]);

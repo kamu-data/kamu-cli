@@ -105,10 +105,19 @@ impl AccessTokenRepository for AccessTokenRepositoryInMemory {
         }
     }
 
-    async fn get_access_tokens(&self) -> Result<Vec<AccessToken>, GetAccessTokenError> {
+    async fn get_access_tokens(
+        &self,
+        pagination: &AccessTokenPaginationOpts,
+    ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
         let guard = self.state.lock().unwrap();
 
-        let access_tokens: Vec<AccessToken> = guard.tokens_by_id.values().cloned().collect();
+        let access_tokens: Vec<AccessToken> = guard
+            .tokens_by_id
+            .values()
+            .skip(usize::try_from(pagination.offset).unwrap())
+            .take(usize::try_from(pagination.limit).unwrap())
+            .cloned()
+            .collect();
 
         Ok(access_tokens)
     }

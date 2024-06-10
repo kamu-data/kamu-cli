@@ -117,7 +117,10 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
         }
     }
 
-    async fn get_access_tokens(&self) -> Result<Vec<AccessToken>, GetAccessTokenError> {
+    async fn get_access_tokens(
+        &self,
+        pagination: &AccessTokenPaginationOpts,
+    ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr
@@ -135,7 +138,10 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
                     revoked_at,
                     account_id as "account_id: AccountID"
                 FROM access_tokens
+                LIMIT $1 OFFSET $2
                 "#,
+            pagination.limit,
+            pagination.offset,
         )
         .fetch_all(connection_mut)
         .await

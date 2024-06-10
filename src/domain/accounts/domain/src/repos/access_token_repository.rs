@@ -25,13 +25,23 @@ pub trait AccessTokenRepository: Send + Sync {
 
     async fn get_token_by_id(&self, token_id: &Uuid) -> Result<AccessToken, GetAccessTokenError>;
 
-    async fn get_access_tokens(&self) -> Result<Vec<AccessToken>, GetAccessTokenError>;
+    async fn get_access_tokens(
+        &self,
+        pagination: &AccessTokenPaginationOpts,
+    ) -> Result<Vec<AccessToken>, GetAccessTokenError>;
 
     async fn mark_revoked(
         &self,
         token_id: &Uuid,
         revoke_time: DateTime<Utc>,
     ) -> Result<(), GetAccessTokenError>;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct AccessTokenPaginationOpts {
+    pub limit: i64,
+    pub offset: i64,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

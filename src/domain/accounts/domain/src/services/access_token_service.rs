@@ -14,6 +14,7 @@ use thiserror::Error;
 
 use crate::{
     AccessToken,
+    AccessTokenPaginationOpts,
     Account,
     CreateAccessTokenError,
     GetAccessTokenError,
@@ -41,7 +42,10 @@ pub trait AccessTokenService: Sync + Send {
         access_token: String,
     ) -> Result<Account, GetAccountInfoError>;
 
-    async fn get_access_tokens(&self) -> Result<Vec<AccessToken>, GetAccessTokenError>;
+    async fn get_access_tokens(
+        &self,
+        pagination: &AccessTokenPaginationOpts,
+    ) -> Result<Vec<AccessToken>, GetAccessTokenError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

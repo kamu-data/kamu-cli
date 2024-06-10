@@ -13,6 +13,7 @@ use chrono::Utc;
 use dill::*;
 use kamu_accounts::{
     AccessToken,
+    AccessTokenPaginationOpts,
     AccessTokenRepository,
     AccessTokenService,
     Account,
@@ -169,7 +170,12 @@ impl AccessTokenService for AccessTokenServiceImpl {
         self.generate_access_token_impl()
     }
 
-    async fn get_access_tokens(&self) -> Result<Vec<AccessToken>, GetAccessTokenError> {
-        unimplemented!()
+    async fn get_access_tokens(
+        &self,
+        pagination: &AccessTokenPaginationOpts,
+    ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
+        self.access_token_repository
+            .get_access_tokens(pagination)
+            .await
     }
 }

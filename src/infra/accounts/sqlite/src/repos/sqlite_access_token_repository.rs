@@ -124,13 +124,18 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         }
     }
 
-    async fn get_access_tokens(&self) -> Result<Vec<AccessToken>, GetAccessTokenError> {
+    async fn get_access_tokens(
+        &self,
+        pagination: &AccessTokenPaginationOpts,
+    ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr
             .connection_mut()
             .await
             .map_err(GetAccessTokenError::Internal)?;
+        let limit = pagination.limit;
+        let offset = pagination.offset;
 
         let access_token_rows = sqlx::query!(
             r#"
@@ -142,7 +147,10 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
                     revoked_at as "revoked_at: DateTime<Utc>",
                     account_id as "account_id: AccountID"
                 FROM access_tokens
+                LIMIT $1 OFFSET $2
                 "#,
+            limit,
+            offset,
         )
         .fetch_all(connection_mut)
         .await
