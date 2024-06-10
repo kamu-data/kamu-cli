@@ -37,20 +37,32 @@ async-trait = "0.1"
 base64 = "0.21"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
-datafusion = { version = "38", default-features = false } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
+datafusion = { version = "39", default-features = false } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 dill = "0.8"
-flate2 = "1"                                                           # GZip decoder
+flate2 = "1" # GZip decoder
 futures = "0.3"
 http = "0.2"
 hyper = "0.14"
-reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "multipart", "json", "stream", "gzip", "brotli", "deflate"] }
+reqwest = { version = "0.11", default-features = false, features = [
+    "rustls-tls",
+    "multipart",
+    "json",
+    "stream",
+    "gzip",
+    "brotli",
+    "deflate",
+] }
 serde = "1"
 serde_json = "1"
 tar = "0.4"
 thiserror = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false, features = [] }
 tokio-stream = "0.1"
-tokio-util = { version = "0.7", default-features = false, features = ["codec", "compat", "io"] }
+tokio-util = { version = "0.7", default-features = false, features = [
+    "codec",
+    "compat",
+    "io",
+] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-native-roots"] }
 tower = "0.4"
 tracing = "0.1"

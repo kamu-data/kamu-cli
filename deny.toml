@@ -1,7 +1,7 @@
 [bans]
 # Forbid multiple versions of same dependency (with some exceptions)
 # TODO: Change to "deny" once we crack down on duplication
-multiple-versions = "allow"
+multiple-versions = "warn"
 
 # Avoid adding dependencies to this list as this slows down compilation.
 # Find another ways to avoid duplication.
@@ -33,14 +33,17 @@ deny = [
 
     ### Creates we deny multiple versions of ###
     # This is a temporary approach until we deny by default with some exceptions
+    { name = "alloy", deny-multiple-versions = true },
     { name = "arrow", deny-multiple-versions = true },
     { name = "axum", deny-multiple-versions = true },
     { name = "aws-config", deny-multiple-versions = true },
     { name = "clap", deny-multiple-versions = true },
     { name = "datafusion", deny-multiple-versions = true },
+    # { name = "hyper", deny-multiple-versions = true },
     { name = "object_store", deny-multiple-versions = true },
     { name = "parquet", deny-multiple-versions = true },
     { name = "prost", deny-multiple-versions = true },
+    # { name = "reqwest", deny-multiple-versions = true },
     # { name = "rustls", deny-multiple-versions = true },
     { name = "tokio", deny-multiple-versions = true },
     { name = "tonic", deny-multiple-versions = true },
@@ -58,9 +61,10 @@ allow = [
     "ISC",
     "MIT",
     "MPL-2.0",
-    "Zlib",
     "OpenSSL",
+    "Unicode-3.0",
     "Unlicense",
+    "Zlib",
 ]
 private = { ignore = true }
 

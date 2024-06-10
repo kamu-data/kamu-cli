@@ -12,7 +12,7 @@ We decided to copy the code instead of using the existing `datafusion-cli` crate
 ## Upgrade procedure
 1. Clone or sync the upstream repo:
   
-  `git clone https://github.com/apache/arrow-datafusion.git`
+  `git clone https://github.com/apache/datafusion.git`
 
 2. Checkout the appropriate release tag:
     
@@ -22,10 +22,10 @@ We decided to copy the code instead of using the existing `datafusion-cli` crate
 
   ```
   rm -rf src/utils/datafusion-cli/src
-  cp ../arrow-datafusion/datafusion-cli/src src/utils/datafusion-cli/
+  cp -r ../datafusion/datafusion-cli/src src/utils/datafusion-cli/
   rm src/utils/datafusion-cli/src/main.rs
   ```
 
 4. Compare `Cargo.toml` files:
 
-  `diff ../arrow-datafusion/datafusion-cli/Cargo.toml src/utils/datafusion-cli/Cargo.toml`
+  `diff ../datafusion/datafusion-cli/Cargo.toml src/utils/datafusion-cli/Cargo.toml`

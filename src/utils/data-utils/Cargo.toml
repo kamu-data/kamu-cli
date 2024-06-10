@@ -25,10 +25,10 @@ doctest = false
 opendatafabric = { workspace = true }
 
 async-trait = "0.1"
-arrow = { version = "51", default-features = false }
-arrow-json = { version = "51", default-features = false }
-arrow-digest = { version = "51", default-features = false }
-datafusion = { version = "38", default-features = false, features = [
+arrow = { version = "52", default-features = false }
+arrow-json = { version = "52", default-features = false }
+arrow-digest = { version = "52", default-features = false }
+datafusion = { version = "39", default-features = false, features = [
     "parquet",
     "serde",
 ] }

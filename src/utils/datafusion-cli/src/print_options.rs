@@ -20,11 +20,12 @@ use std::io::Write;
 use std::pin::Pin;
 use std::str::FromStr;
 
+use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
+use datafusion::common::instant::Instant;
 use datafusion::common::DataFusionError;
 use datafusion::error::Result;
 use datafusion::physical_plan::RecordBatchStream;
-use datafusion_common::instant::Instant;
 use futures::StreamExt;
 
 use crate::print_format::PrintFormat;
@@ -99,12 +100,17 @@ fn get_execution_details_formatted(
 
 impl PrintOptions {
     /// Print the batches to stdout using the specified format
-    pub fn print_batches(&self, batches: &[RecordBatch], query_start_time: Instant) -> Result<()> {
+    pub fn print_batches(
+        &self,
+        schema: SchemaRef,
+        batches: &[RecordBatch],
+        query_start_time: Instant,
+    ) -> Result<()> {
         let stdout = std::io::stdout();
         let mut writer = stdout.lock();
 
         self.format
-            .print_batches(&mut writer, batches, self.maxrows, true)?;
+            .print_batches(&mut writer, schema, batches, self.maxrows, true)?;
 
         let row_count: usize = batches.iter().map(|b| b.num_rows()).sum();
         let formatted_exec_details = get_execution_details_formatted(
@@ -145,8 +151,13 @@ impl PrintOptions {
         while let Some(maybe_batch) = stream.next().await {
             let batch = maybe_batch?;
             row_count += batch.num_rows();
-            self.format
-                .print_batches(&mut writer, &[batch], MaxRows::Unlimited, with_header)?;
+            self.format.print_batches(
+                &mut writer,
+                batch.schema(),
+                &[batch],
+                MaxRows::Unlimited,
+                with_header,
+            )?;
             with_header = false;
         }
 

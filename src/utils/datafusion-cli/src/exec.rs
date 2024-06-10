@@ -21,17 +21,18 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
+use std::str::FromStr;
 
 use datafusion::common::instant::Instant;
-use datafusion::common::plan_datafusion_err;
+use datafusion::common::{plan_datafusion_err, FileType};
 use datafusion::datasource::listing::ListingTableUrl;
 use datafusion::error::{DataFusionError, Result};
 use datafusion::logical_expr::{DdlStatement, LogicalPlan};
 use datafusion::physical_plan::{collect, execute_stream, ExecutionPlanProperties};
 use datafusion::prelude::SessionContext;
 use datafusion::sql::parser::{DFParser, Statement};
+use datafusion::sql::sqlparser;
 use datafusion::sql::sqlparser::dialect::dialect_from_str;
-use datafusion_common::FileType;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use tokio::signal;
@@ -78,7 +79,7 @@ pub async fn exec_from_lines(
                         Ok(_) => {}
                         Err(err) => eprintln!("{err}"),
                     }
-                    query = "".to_owned();
+                    query = "".to_string();
                 } else {
                     query.push('\n');
                 }
@@ -89,7 +90,7 @@ pub async fn exec_from_lines(
         }
     }
 
-    // run the leftover query if the last statement doesn't contain ‘;’
+    // run the left over query if the last statement doesn't contain ‘;’
     // ignore if it only consists of '\n'
     if query.contains(|c| c != '\n') {
         exec_and_print(ctx, print_options, query).await?;
@@ -130,7 +131,7 @@ pub async fn exec_from_repl(
     rl.load_history(".history").ok();
 
     loop {
-        match rl.readline("❯ ") {
+        match rl.readline("> ") {
             Ok(line) if line.starts_with('\\') => {
                 rl.add_history_entry(line.trim_end())?;
                 let command = line.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -198,7 +199,7 @@ pub async fn exec_from_repl(
     rl.save_history(".history")
 }
 
-async fn exec_and_print(
+pub(super) async fn exec_and_print(
     ctx: &mut SessionContext,
     print_options: &PrintOptions,
     sql: String,
@@ -216,13 +217,11 @@ async fn exec_and_print(
 
     let statements = DFParser::parse_sql_with_dialect(&sql, dialect.as_ref())?;
     for statement in statements {
-        let plan = create_plan(ctx, statement).await?;
+        let adjusted = AdjustedPrintOptions::new(print_options.clone()).with_statement(&statement);
 
-        // For plans like `Explain` ignore `MaxRows` option and always display all rows
-        let should_ignore_maxrows = matches!(
-            plan,
-            LogicalPlan::Explain(_) | LogicalPlan::DescribeTable(_) | LogicalPlan::Analyze(_)
-        );
+        let plan = create_plan(ctx, statement).await?;
+        let adjusted = adjusted.with_plan(&plan);
+
         let df = ctx.execute_logical_plan(plan).await?;
         let physical_plan = df.create_physical_plan().await?;
 
@@ -230,19 +229,58 @@ async fn exec_and_print(
             let stream = execute_stream(physical_plan, task_ctx.clone())?;
             print_options.print_stream(stream, now).await?;
         } else {
-            let mut print_options = print_options.clone();
-            if should_ignore_maxrows {
-                print_options.maxrows = MaxRows::Unlimited;
-            }
-            if print_options.format == PrintFormat::Automatic {
-                print_options.format = PrintFormat::Table;
-            }
+            let schema = physical_plan.schema();
             let results = collect(physical_plan, task_ctx.clone()).await?;
-            print_options.print_batches(&results, now)?;
+            adjusted.into_inner().print_batches(schema, &results, now)?;
         }
     }
 
     Ok(())
+}
+
+/// Track adjustments to the print options based on the plan / statement being
+/// executed
+#[derive(Debug)]
+struct AdjustedPrintOptions {
+    inner: PrintOptions,
+}
+
+impl AdjustedPrintOptions {
+    fn new(inner: PrintOptions) -> Self {
+        Self { inner }
+    }
+    /// Adjust print options based on any statement specific requirements
+    fn with_statement(mut self, statement: &Statement) -> Self {
+        if let Statement::Statement(sql_stmt) = statement {
+            // SHOW / SHOW ALL
+            if let sqlparser::ast::Statement::ShowVariable { .. } = sql_stmt.as_ref() {
+                self.inner.maxrows = MaxRows::Unlimited
+            }
+        }
+        self
+    }
+
+    /// Adjust print options based on any plan specific requirements
+    fn with_plan(mut self, plan: &LogicalPlan) -> Self {
+        // For plans like `Explain` ignore `MaxRows` option and always display
+        // all rows
+        if matches!(
+            plan,
+            LogicalPlan::Explain(_) | LogicalPlan::DescribeTable(_) | LogicalPlan::Analyze(_)
+        ) {
+            self.inner.maxrows = MaxRows::Unlimited;
+        }
+        self
+    }
+
+    /// Finalize and return the inner `PrintOptions`
+    fn into_inner(mut self) -> PrintOptions {
+        if self.inner.format == PrintFormat::Automatic {
+            self.inner.format = PrintFormat::Table;
+        }
+
+        self.inner
+    }
 }
 
 async fn create_plan(
@@ -255,7 +293,10 @@ async fn create_plan(
     // can remove all datafusion-cli specific options before passing through to
     // datafusion. Otherwise, datafusion will raise Configuration errors.
     if let LogicalPlan::Ddl(DdlStatement::CreateExternalTable(cmd)) = &plan {
-        register_object_store_and_config_extensions(ctx, &cmd.location, &cmd.options, None).await?;
+        // To support custom formats, treat error as None
+        let format = FileType::from_str(&cmd.file_type).ok();
+        register_object_store_and_config_extensions(ctx, &cmd.location, &cmd.options, format)
+            .await?;
     }
 
     if let LogicalPlan::Copy(copy_to) = &mut plan {
@@ -332,15 +373,15 @@ pub(crate) async fn register_object_store_and_config_extensions(
 
     // Register the retrieved object store in the session context's runtime
     // environment
-    ctx.runtime_env().register_object_store(url, store);
+    ctx.register_object_store(url, store);
 
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use datafusion_common::config::FormatOptions;
-    use datafusion_common::plan_err;
+    use datafusion::common::config::FormatOptions;
+    use datafusion::common::plan_err;
     use url::Url;
 
     use super::*;
@@ -350,7 +391,8 @@ mod tests {
         let plan = ctx.state().create_logical_plan(sql).await?;
 
         if let LogicalPlan::Ddl(DdlStatement::CreateExternalTable(cmd)) = &plan {
-            register_object_store_and_config_extensions(&ctx, &cmd.location, &cmd.options, None)
+            let format = FileType::from_str(&cmd.file_type).ok();
+            register_object_store_and_config_extensions(&ctx, &cmd.location, &cmd.options, format)
                 .await?;
         } else {
             return plan_err!("LogicalPlan is not a CreateExternalTable");
@@ -566,6 +608,20 @@ mod tests {
 
         // Ensure that local files are also registered
         let sql = format!("CREATE EXTERNAL TABLE test STORED AS PARQUET LOCATION '{location}'");
+        create_external_table_test(location, &sql).await.unwrap();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_external_table_format_option() -> Result<()> {
+        let location = "path/to/file.cvs";
+
+        // Test with format options
+        let sql = format!(
+            "CREATE EXTERNAL TABLE test STORED AS CSV LOCATION '{location}' \
+             OPTIONS('format.has_header' 'true')"
+        );
         create_external_table_test(location, &sql).await.unwrap();
 
         Ok(())

@@ -40,7 +40,7 @@ kamu-ingest-datafusion = { workspace = true }
 random-names = { workspace = true }
 
 # Serialization
-flatbuffers = "23"
+flatbuffers = "24"
 hex = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -48,7 +48,8 @@ serde_with = "3"
 serde_yaml = "0.9"
 
 # Ingest
-alloy = { version = "0.1", default-features = false, features = [
+# TODO: Alloy is not yet regularly released on crates.io
+alloy = { version = "0.1", git = "https://github.com/alloy-rs/alloy", rev = "a81f9e1e80e677a8f78b592657ffba607a0098b9", default-features = false, features = [
     "std",
     "provider-http",
     "provider-ws",
@@ -61,8 +62,8 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { version = "38", default-features = false }
-datafusion-functions-json = { version = "0.1" }
+datafusion-ethers = { version = "39", git = 'https://github.com/kamu-data/datafusion-ethers.git', tag = "v39.0.0" }
+datafusion-functions-json = { version = "0.1", git = 'https://github.com/kamu-data/datafusion-functions-json.git', branch = "datafusion-39" }
 flate2 = "1" # GZip decoder
 reqwest = { version = "0.11", default-features = false, features = [
     "rustls-tls",
@@ -76,8 +77,8 @@ rumqttc = { version = "0.23" }
 zip = "0.6"
 
 # Data
-datafusion = { version = "38", default-features = false }
-object_store = { version = "0.9", features = ["aws"] }
+datafusion = { version = "39", default-features = false }
+object_store = { version = "0.10", features = ["aws"] }
 digest = "0.10"
 sha3 = "0.10"
 
