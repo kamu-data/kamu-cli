@@ -9,7 +9,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-use chrono::Utc;
+use chrono::{SubsecRound, Utc};
 use kamu_accounts::AccessToken;
 use opendatafabric::AccountID;
 use rand::Rng;
@@ -24,7 +24,7 @@ pub(crate) fn make_test_access_token(
         id: Uuid::new_v4(),
         token_name: name.to_string(),
         token_hash: token_hash_maybe.unwrap_or(generate_random_bytes()),
-        created_at: Utc::now(),
+        created_at: Utc::now().round_subsecs(6),
         revoked_at: None,
         account_id: AccountID::new_seeded_ed25519(account_name.as_bytes()),
     }

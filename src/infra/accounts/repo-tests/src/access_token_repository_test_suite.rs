@@ -9,7 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
-use chrono::Utc;
+use chrono::{SubsecRound, Utc};
 use dill::Catalog;
 use kamu_accounts::*;
 use uuid::Uuid;
@@ -120,7 +120,7 @@ pub async fn test_mark_existing_access_token_revorked(catalog: &Catalog) {
         .unwrap();
     assert_eq!(db_access_token.revoked_at, None);
 
-    let revoke_time = Utc::now();
+    let revoke_time = Utc::now().round_subsecs(6);
     let revoke_result = access_token_repo
         .mark_revoked(&access_token.id, revoke_time)
         .await;
