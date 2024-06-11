@@ -14,13 +14,13 @@ use crate::{DatabaseTransactionManager, TransactionRef};
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct NoOpDatabaseTransactionManager {
+pub struct NoOpTransactionManager {
     // Since the pool will never be connected, SqlitePool is used for simplicity
     // (in terms of typing)
     never_connected_pool: SqlitePool,
 }
 
-impl NoOpDatabaseTransactionManager {
+impl NoOpTransactionManager {
     pub fn new() -> Self {
         Self {
             never_connected_pool: SqlitePool::connect_lazy("").unwrap(),
@@ -29,7 +29,7 @@ impl NoOpDatabaseTransactionManager {
 }
 
 #[async_trait::async_trait]
-impl DatabaseTransactionManager for NoOpDatabaseTransactionManager {
+impl DatabaseTransactionManager for NoOpTransactionManager {
     async fn make_transaction_ref(&self) -> Result<TransactionRef, InternalError> {
         Ok(TransactionRef::new(self.never_connected_pool.clone()))
     }

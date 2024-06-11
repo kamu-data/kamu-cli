@@ -9,7 +9,7 @@
 
 use dill::CatalogBuilder;
 
-use crate::{DatabaseTransactionManager, NoOpDatabaseTransactionManager};
+use crate::{DatabaseTransactionManager, NoOpTransactionManager};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -18,8 +18,8 @@ pub struct NoOpDatabasePlugin {}
 impl NoOpDatabasePlugin {
     pub fn init_database_components(catalog_builder: &mut CatalogBuilder) {
         catalog_builder
-            .add_value(NoOpDatabaseTransactionManager::new())
-            .bind::<dyn DatabaseTransactionManager, NoOpDatabaseTransactionManager>();
+            .add_value(NoOpTransactionManager::new())
+            .bind::<dyn DatabaseTransactionManager, NoOpTransactionManager>();
     }
 }
 
