@@ -30,8 +30,6 @@ use kamu_core::SystemTimeSource;
 use opendatafabric::{AccountID, AccountName};
 use serde::{Deserialize, Serialize};
 
-use crate::LoginPasswordAuthProvider;
-
 ////////////////////////////////////////////////////////////////////////////////
 
 const KAMU_JWT_ISSUER: &str = "dev.kamu";
@@ -41,19 +39,11 @@ const EXPIRATION_TIME_SEC: usize = 24 * 60 * 60; // 1 day in seconds
 ////////////////////////////////////////////////////////////////////////////////
 
 pub struct AuthenticationServiceImpl {
-    predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     time_source: Arc<dyn SystemTimeSource>,
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
     authentication_providers_by_method: HashMap<&'static str, Arc<dyn AuthenticationProvider>>,
-    login_password_auth_provider: Option<Arc<LoginPasswordAuthProvider>>,
     account_repository: Arc<dyn AccountRepository>,
-    state: tokio::sync::Mutex<State>,
-}
-
-#[derive(Default)]
-struct State {
-    predefined_accounts_registered: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -63,9 +53,7 @@ struct State {
 impl AuthenticationServiceImpl {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(
-        predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         authentication_providers: Vec<Arc<dyn AuthenticationProvider>>,
-        login_password_auth_provider: Option<Arc<LoginPasswordAuthProvider>>,
         account_repository: Arc<dyn AccountRepository>,
         time_source: Arc<dyn SystemTimeSource>,
         config: Arc<JwtAuthenticationConfig>,
@@ -85,14 +73,11 @@ impl AuthenticationServiceImpl {
         }
 
         Self {
-            predefined_accounts_config,
             time_source,
             encoding_key: EncodingKey::from_secret(config.jwt_secret.as_bytes()),
             decoding_key: DecodingKey::from_secret(config.jwt_secret.as_bytes()),
             authentication_providers_by_method,
-            login_password_auth_provider,
             account_repository,
-            state: tokio::sync::Mutex::new(State::default()),
         }
     }
 
@@ -146,57 +131,6 @@ impl AuthenticationServiceImpl {
             },
         )
     }
-
-    async fn ensure_predefined_accounts_registration(&self) -> Result<(), InternalError> {
-        let mut guard = self.state.lock().await;
-        if !guard.predefined_accounts_registered {
-            // Register predefined accounts on first request
-            for account_config in &self.predefined_accounts_config.predefined {
-                let account_id = account_config.get_id();
-                let is_unknown = match self.account_repository.get_account_by_id(&account_id).await
-                {
-                    Ok(_) => Ok(false),
-                    Err(GetAccountByIdError::NotFound(_)) => Ok(true),
-                    Err(GetAccountByIdError::Internal(e)) => Err(e),
-                }?;
-
-                if is_unknown {
-                    let account = Account {
-                        id: account_config.get_id(),
-                        account_name: account_config.account_name.clone(),
-                        email: account_config.email.clone(),
-                        display_name: account_config.get_display_name(),
-                        account_type: account_config.account_type,
-                        avatar_url: account_config.avatar_url.clone(),
-                        registered_at: account_config.registered_at,
-                        is_admin: account_config.is_admin,
-                        provider: account_config.provider.clone(),
-                        provider_identity_key: account_config.account_name.to_string(),
-                    };
-
-                    self.account_repository
-                        .create_account(&account)
-                        .await
-                        .map_err(|e| match e {
-                            CreateAccountError::Duplicate(e) => e.int_err(),
-                            CreateAccountError::Internal(e) => e,
-                        })?;
-
-                    if let Some(login_password_auth_provider) =
-                        self.login_password_auth_provider.as_ref()
-                        && account_config.provider == PROVIDER_PASSWORD
-                    {
-                        login_password_auth_provider
-                            .save_password(&account.account_name, account_config.get_password())
-                            .await?;
-                    }
-                }
-            }
-
-            guard.predefined_accounts_registered = true;
-        }
-        Ok(())
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -215,8 +149,6 @@ impl AuthenticationService for AuthenticationServiceImpl {
         login_method: &str,
         login_credentials_json: String,
     ) -> Result<LoginResponse, LoginError> {
-        self.ensure_predefined_accounts_registration().await?;
-
         // Resolve provider via specified login method
         let provider = self.resolve_authentication_provider(login_method)?;
 
@@ -273,10 +205,6 @@ impl AuthenticationService for AuthenticationServiceImpl {
     }
 
     async fn account_by_token(&self, access_token: String) -> Result<Account, GetAccountInfoError> {
-        self.ensure_predefined_accounts_registration()
-            .await
-            .map_err(GetAccountInfoError::Internal)?;
-
         let decoded_access_token = self
             .decode_access_token(&access_token)
             .map_err(GetAccountInfoError::AccessToken)?;
@@ -295,8 +223,6 @@ impl AuthenticationService for AuthenticationServiceImpl {
         &self,
         account_id: &AccountID,
     ) -> Result<Option<Account>, InternalError> {
-        self.ensure_predefined_accounts_registration().await?;
-
         match self.account_repository.get_account_by_id(account_id).await {
             Ok(account) => Ok(Some(account.clone())),
             Err(GetAccountByIdError::NotFound(_)) => Ok(None),
@@ -308,8 +234,6 @@ impl AuthenticationService for AuthenticationServiceImpl {
         &self,
         account_ids: Vec<AccountID>,
     ) -> Result<Vec<Account>, InternalError> {
-        self.ensure_predefined_accounts_registration().await?;
-
         self.account_repository
             .get_accounts_by_ids(account_ids)
             .await
@@ -320,8 +244,6 @@ impl AuthenticationService for AuthenticationServiceImpl {
         &self,
         account_name: &AccountName,
     ) -> Result<Option<Account>, InternalError> {
-        self.ensure_predefined_accounts_registration().await?;
-
         match self
             .account_repository
             .get_account_by_name(account_name)
@@ -337,8 +259,6 @@ impl AuthenticationService for AuthenticationServiceImpl {
         &self,
         account_name: &AccountName,
     ) -> Result<Option<AccountID>, InternalError> {
-        self.ensure_predefined_accounts_registration().await?;
-
         match self
             .account_repository
             .find_account_id_by_name(account_name)
@@ -353,8 +273,6 @@ impl AuthenticationService for AuthenticationServiceImpl {
         &self,
         account_id: &AccountID,
     ) -> Result<Option<AccountName>, InternalError> {
-        self.ensure_predefined_accounts_registration().await?;
-
         match self.account_repository.get_account_by_id(account_id).await {
             Ok(account) => Ok(Some(account.account_name.clone())),
             Err(GetAccountByIdError::NotFound(_)) => Ok(None),
