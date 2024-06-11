@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use database_common::{DatabaseTransactionRunner, FakeDatabasePlugin};
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
 use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, MockDatasetChangesService};
@@ -138,7 +138,7 @@ impl FlowHarness {
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<DatabaseTransactionRunner>();
 
-            FakeDatabasePlugin::init_database_components(&mut b);
+            NoOpDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };

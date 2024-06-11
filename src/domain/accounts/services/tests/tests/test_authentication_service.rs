@@ -9,7 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
-use database_common::{DatabaseTransactionRunner, FakeDatabasePlugin};
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use kamu_accounts::*;
 use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::AuthenticationServiceImpl;
@@ -107,7 +107,7 @@ fn make_catalog() -> dill::Catalog {
         .add_value(JwtAuthenticationConfig::default())
         .add::<DatabaseTransactionRunner>();
 
-    FakeDatabasePlugin::init_database_components(&mut b);
+    NoOpDatabasePlugin::init_database_components(&mut b);
 
     b.build()
 }

@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use database_common::{DatabaseTransactionRunner, FakeDatabasePlugin};
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
@@ -126,7 +126,7 @@ impl DatasetOwnershipHarness {
                 .add::<DatabaseTransactionRunner>()
                 .add::<PredefinedAccountsRegistrator>();
 
-            FakeDatabasePlugin::init_database_components(&mut b);
+            NoOpDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };

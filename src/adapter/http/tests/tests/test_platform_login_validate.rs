@@ -11,7 +11,7 @@ use std::net::{SocketAddr, TcpListener};
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
-use database_common::{DatabaseTransactionRunner, FakeDatabasePlugin};
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use kamu::domain::{InternalError, ResultIntoInternal, SystemTimeSource, SystemTimeSourceStub};
 use kamu_accounts::*;
 use kamu_accounts_inmem::AccountRepositoryInMemory;
@@ -70,7 +70,7 @@ impl Harness {
                 .add::<DatabaseTransactionRunner>()
                 .add::<PredefinedAccountsRegistrator>();
 
-            FakeDatabasePlugin::init_database_components(&mut b);
+            NoOpDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
-use database_common::FakeDatabasePlugin;
+use database_common::NoOpDatabasePlugin;
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
@@ -687,7 +687,7 @@ impl GraphQLDatasetsHarness {
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
 
-            FakeDatabasePlugin::init_database_components(&mut b);
+            NoOpDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };

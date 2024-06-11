@@ -12,7 +12,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 
-use database_common::{DatabaseTransactionRunner, FakeDatabasePlugin};
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::{CatalogBuilder, Component};
 use event_bus::EventBus;
 use kamu::domain::auth::DatasetAction;
@@ -231,7 +231,7 @@ impl ServerHarness {
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .add::<DatabaseTransactionRunner>();
 
-            FakeDatabasePlugin::init_database_components(&mut b);
+            NoOpDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };

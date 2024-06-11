@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use async_graphql::value;
 use chrono::Duration;
-use database_common::{DatabaseTransactionRunner, FakeDatabasePlugin};
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
@@ -685,7 +685,7 @@ impl FlowConfigHarness {
                 .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
                 .add::<DatabaseTransactionRunner>();
 
-            FakeDatabasePlugin::init_database_components(&mut b);
+            NoOpDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };

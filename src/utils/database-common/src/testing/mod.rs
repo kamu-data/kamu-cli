@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod fake_database_plugin;
-mod fake_database_transaction_manager;
+mod no_op_database_plugin;
+mod no_op_database_transaction_manager;
 
-pub use fake_database_plugin::*;
-pub use fake_database_transaction_manager::*;
+pub use no_op_database_plugin::*;
+pub use no_op_database_transaction_manager::*;

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
-use database_common::FakeDatabasePlugin;
+use database_common::NoOpDatabasePlugin;
 use dill::*;
 use event_bus::EventBus;
 use indoc::indoc;
@@ -48,7 +48,7 @@ async fn test_current_push_sources() {
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>();
 
-        FakeDatabasePlugin::init_database_components(&mut b);
+        NoOpDatabasePlugin::init_database_components(&mut b);
 
         b.build()
     };

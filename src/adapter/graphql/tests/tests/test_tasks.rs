@@ -349,7 +349,7 @@ fn create_catalog(task_sched_mock: MockTaskScheduler) -> Catalog {
     b.add_value(task_sched_mock)
         .bind::<dyn TaskScheduler, MockTaskScheduler>();
 
-    database_common::FakeDatabasePlugin::init_database_components(&mut b);
+    database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
     b.build()
 }

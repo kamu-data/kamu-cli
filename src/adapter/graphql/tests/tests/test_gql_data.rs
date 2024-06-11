@@ -10,7 +10,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use database_common::{DatabaseTransactionRunner, FakeDatabasePlugin};
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
@@ -70,7 +70,7 @@ async fn create_catalog_with_local_workspace(
             .add::<PredefinedAccountsRegistrator>()
             .add::<DatabaseTransactionRunner>();
 
-        FakeDatabasePlugin::init_database_components(&mut b);
+        NoOpDatabasePlugin::init_database_components(&mut b);
 
         b.build()
     };
