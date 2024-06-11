@@ -147,7 +147,7 @@ impl DatasetOwnershipHarness {
 
     async fn eager_initialization(&self) {
         self.dataset_ownership_service
-            .eager_initialization()
+            .eager_initialization(&self.auth_svc)
             .await
             .unwrap();
     }

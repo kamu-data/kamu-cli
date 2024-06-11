@@ -344,6 +344,7 @@ pub fn configure_base_catalog(
     b.add::<DependencyGraphServiceInMemory>();
 
     b.add::<DatasetOwnershipServiceInMemory>();
+    b.add::<DatasetOwnershipServiceInMemoryStateInitializer>();
 
     b.add::<kamu_flow_system_services::FlowConfigurationServiceImpl>();
     b.add::<kamu_flow_system_services::FlowServiceImpl>();
