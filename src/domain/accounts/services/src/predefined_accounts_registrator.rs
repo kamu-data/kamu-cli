@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use database_common::DatabaseTransactionRunner;
 use dill::*;
 use internal_error::*;
 use kamu_accounts::*;
@@ -23,7 +22,6 @@ pub struct PredefinedAccountsRegistrator {
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     maybe_login_password_auth_provider: Option<Arc<LoginPasswordAuthProvider>>,
     account_repository: Arc<dyn AccountRepository>,
-    transaction_runner: Arc<DatabaseTransactionRunner>,
 }
 
 #[component(pub)]
@@ -32,13 +30,11 @@ impl PredefinedAccountsRegistrator {
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         maybe_login_password_auth_provider: Option<Arc<LoginPasswordAuthProvider>>,
         account_repository: Arc<dyn AccountRepository>,
-        transaction_runner: Arc<DatabaseTransactionRunner>,
     ) -> Self {
         Self {
             predefined_accounts_config,
             maybe_login_password_auth_provider,
             account_repository,
-            transaction_runner,
         }
     }
 
