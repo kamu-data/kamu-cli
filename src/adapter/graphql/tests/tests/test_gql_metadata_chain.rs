@@ -25,7 +25,7 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
 #[test_log::test(tokio::test)]
 async fn test_metadata_chain_events() {
-    let harness = GraphQLMetadataChainHarness::new(false);
+    let harness = GraphQLMetadataChainHarness::new(false).await;
 
     // Init dataset
     let dataset_repo = harness
@@ -165,7 +165,7 @@ async fn test_metadata_chain_events() {
 
 #[test_log::test(tokio::test)]
 async fn metadata_chain_append_event() {
-    let harness = GraphQLMetadataChainHarness::new(false);
+    let harness = GraphQLMetadataChainHarness::new(false).await;
 
     let dataset_repo = harness
         .catalog_authorized
@@ -248,7 +248,7 @@ async fn metadata_chain_append_event() {
 
 #[test_log::test(tokio::test)]
 async fn metadata_update_readme_new() {
-    let harness = GraphQLMetadataChainHarness::new(false);
+    let harness = GraphQLMetadataChainHarness::new(false).await;
 
     let dataset_repo = harness
         .catalog_authorized
@@ -505,25 +505,31 @@ struct GraphQLMetadataChainHarness {
 }
 
 impl GraphQLMetadataChainHarness {
-    fn new(is_multi_tenant: bool) -> Self {
+    async fn new(is_multi_tenant: bool) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let base_catalog = dill::CatalogBuilder::new()
-            .add::<SystemTimeSourceDefault>()
-            .add::<EventBus>()
-            .add::<DependencyGraphServiceInMemory>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(is_multi_tenant),
-            )
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .build();
+        let base_catalog = {
+            let mut b = dill::CatalogBuilder::new();
 
-        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog);
+            b.add::<SystemTimeSourceDefault>()
+                .add::<EventBus>()
+                .add::<DependencyGraphServiceInMemory>()
+                .add_builder(
+                    DatasetRepositoryLocalFs::builder()
+                        .with_root(datasets_dir)
+                        .with_multi_tenant(is_multi_tenant),
+                )
+                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
+
+            database_common::FakeDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
+
+        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog).await;
 
         Self {
             _tempdir: tempdir,

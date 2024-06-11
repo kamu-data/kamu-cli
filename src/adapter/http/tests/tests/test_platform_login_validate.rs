@@ -15,7 +15,11 @@ use database_common::{DatabaseTransactionRunner, FakeDatabasePlugin};
 use kamu::domain::{InternalError, ResultIntoInternal, SystemTimeSource, SystemTimeSourceStub};
 use kamu_accounts::*;
 use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::{AuthenticationServiceImpl, LoginPasswordAuthProvider};
+use kamu_accounts_services::{
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_adapter_http::{LoginRequestBody, LoginResponseBody};
 use opendatafabric::AccountName;
 use serde_json::json;
@@ -39,7 +43,7 @@ struct Harness {
 }
 
 impl Harness {
-    fn new() -> Self {
+    async fn new() -> Self {
         let run_info_dir = tempfile::tempdir().unwrap();
 
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
@@ -63,12 +67,26 @@ impl Harness {
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<LoginPasswordAuthProvider>()
                 .add_value(JwtAuthenticationConfig::default())
-                .add::<DatabaseTransactionRunner>();
+                .add::<DatabaseTransactionRunner>()
+                .add::<PredefinedAccountsRegistrator>();
 
             FakeDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };
+
+        DatabaseTransactionRunner::new(catalog.clone())
+            .transactional(|transactional_catalog| async move {
+                let registrator = transactional_catalog
+                    .get_one::<PredefinedAccountsRegistrator>()
+                    .unwrap();
+
+                registrator
+                    .ensure_predefined_accounts_are_registered()
+                    .await
+            })
+            .await
+            .unwrap();
 
         let system_time_source_stub = catalog.get_one::<SystemTimeSourceStub>().unwrap();
 
@@ -104,7 +122,7 @@ impl Harness {
 
 #[test_log::test(tokio::test)]
 async fn test_login_with_password_method_success() {
-    let harness = Harness::new();
+    let harness = Harness::new().await;
 
     let login_url = harness.login_url();
     let validate_url = harness.validate_url();
@@ -147,7 +165,7 @@ async fn test_login_with_password_method_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_login_with_password_method_invalid_credentials() {
-    let harness = Harness::new();
+    let harness = Harness::new().await;
 
     let login_url = harness.login_url();
 
@@ -185,7 +203,7 @@ async fn test_login_with_password_method_invalid_credentials() {
 
 #[test_log::test(tokio::test)]
 async fn test_login_with_password_method_expired_credentials() {
-    let harness = Harness::new();
+    let harness = Harness::new().await;
     let time_source_stub = harness.system_time_source_stub.clone();
 
     let login_url = harness.login_url();
@@ -235,7 +253,7 @@ async fn test_login_with_password_method_expired_credentials() {
 
 #[test_log::test(tokio::test)]
 async fn test_validate_invalid_token_fails() {
-    let harness = Harness::new();
+    let harness = Harness::new().await;
     let validate_url = harness.validate_url();
 
     let client = async move {
@@ -260,7 +278,7 @@ async fn test_validate_invalid_token_fails() {
 
 #[test_log::test(tokio::test)]
 async fn test_validate_without_token_fails() {
-    let harness = Harness::new();
+    let harness = Harness::new().await;
     let validate_url = harness.validate_url();
 
     let client = async move {

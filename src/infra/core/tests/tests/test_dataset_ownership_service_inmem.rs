@@ -28,7 +28,7 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::AuthenticationServiceImpl;
+use kamu_accounts_services::{AuthenticationServiceImpl, PredefinedAccountsRegistrator};
 use kamu_core::{auth, DatasetOwnershipService, DatasetRepository, SystemTimeSourceDefault};
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
 use tempfile::TempDir;
@@ -37,7 +37,7 @@ use tempfile::TempDir;
 
 #[test_log::test(tokio::test)]
 async fn test_multi_tenant_dataset_owners() {
-    let mut harness = DatasetOwnershipHarness::new(true);
+    let mut harness = DatasetOwnershipHarness::new(true).await;
 
     harness.create_multi_tenant_datasets().await;
     harness.eager_initialization().await;
@@ -88,7 +88,7 @@ struct DatasetOwnershipHarness {
 }
 
 impl DatasetOwnershipHarness {
-    fn new(multi_tenant: bool) -> Self {
+    async fn new(multi_tenant: bool) -> Self {
         let workdir = tempfile::tempdir().unwrap();
         let datasets_dir = workdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -123,12 +123,26 @@ impl DatasetOwnershipHarness {
                 .add::<DatasetOwnershipServiceInMemory>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<DependencyGraphServiceInMemory>()
-                .add::<DatabaseTransactionRunner>();
+                .add::<DatabaseTransactionRunner>()
+                .add::<PredefinedAccountsRegistrator>();
 
             FakeDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };
+
+        DatabaseTransactionRunner::new(catalog.clone())
+            .transactional(|transactional_catalog| async move {
+                let registrator = transactional_catalog
+                    .get_one::<PredefinedAccountsRegistrator>()
+                    .unwrap();
+
+                registrator
+                    .ensure_predefined_accounts_are_registered()
+                    .await
+            })
+            .await
+            .unwrap();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 

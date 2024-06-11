@@ -8,13 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
+use database_common::FakeDatabasePlugin;
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_core::*;
 use mockall::predicate::eq;
 use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
@@ -27,7 +27,7 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
 #[test_log::test(tokio::test)]
 async fn dataset_by_id_does_not_exist() {
-    let harness = GraphQLDatasetsHarness::new(false);
+    let harness = GraphQLDatasetsHarness::new(false).await;
     let res = harness.execute_anonymous_query(indoc!(
             r#"
             {
@@ -55,7 +55,7 @@ async fn dataset_by_id_does_not_exist() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_by_id() {
-    let harness = GraphQLDatasetsHarness::new(false);
+    let harness = GraphQLDatasetsHarness::new(false).await;
 
     let foo_result = harness
         .create_root_dataset(None, DatasetName::new_unchecked("foo"))
@@ -106,7 +106,7 @@ async fn dataset_by_account_and_name_case_insensitive() {
         .returning(|_| Ok(Some(Account::dummy())));
 
     let harness =
-        GraphQLDatasetsHarness::new_custom_authentication(mock_authentication_service, true);
+        GraphQLDatasetsHarness::new_custom_authentication(mock_authentication_service, true).await;
 
     harness
         .create_root_dataset(
@@ -159,7 +159,7 @@ async fn dataset_by_account_id() {
         .returning(|_| Ok(Some(DEFAULT_ACCOUNT_NAME.clone())));
 
     let harness =
-        GraphQLDatasetsHarness::new_custom_authentication(mock_authentication_service, false);
+        GraphQLDatasetsHarness::new_custom_authentication(mock_authentication_service, false).await;
     harness
         .create_root_dataset(None, DatasetName::new_unchecked("Foo"))
         .await;
@@ -208,7 +208,7 @@ async fn dataset_by_account_id() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_create_empty() {
-    let harness = GraphQLDatasetsHarness::new(false);
+    let harness = GraphQLDatasetsHarness::new(false).await;
 
     let request_code = indoc::indoc!(
         r#"
@@ -250,7 +250,7 @@ async fn dataset_create_empty() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_create_from_snapshot() {
-    let harness = GraphQLDatasetsHarness::new(true);
+    let harness = GraphQLDatasetsHarness::new(true).await;
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name("foo")
@@ -306,7 +306,7 @@ async fn dataset_create_from_snapshot() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_create_from_snapshot_malformed() {
-    let harness = GraphQLDatasetsHarness::new(false);
+    let harness = GraphQLDatasetsHarness::new(false).await;
 
     let res = harness
         .execute_authorized_query(indoc!(
@@ -340,7 +340,7 @@ async fn dataset_create_from_snapshot_malformed() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_rename_success() {
-    let harness = GraphQLDatasetsHarness::new(false);
+    let harness = GraphQLDatasetsHarness::new(false).await;
 
     let foo_result = harness
         .create_root_dataset(None, DatasetName::new_unchecked("foo"))
@@ -392,7 +392,7 @@ async fn dataset_rename_success() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_rename_no_changes() {
-    let harness = GraphQLDatasetsHarness::new(false);
+    let harness = GraphQLDatasetsHarness::new(false).await;
 
     let foo_result = harness
         .create_root_dataset(None, DatasetName::new_unchecked("foo"))
@@ -442,7 +442,7 @@ async fn dataset_rename_no_changes() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_rename_name_collision() {
-    let harness = GraphQLDatasetsHarness::new(false);
+    let harness = GraphQLDatasetsHarness::new(false).await;
 
     let foo_result = harness
         .create_root_dataset(None, DatasetName::new_unchecked("foo"))
@@ -495,7 +495,7 @@ async fn dataset_rename_name_collision() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_delete_success() {
-    let harness = GraphQLDatasetsHarness::new(false);
+    let harness = GraphQLDatasetsHarness::new(false).await;
     harness.init_dependencies_graph().await;
 
     let foo_result = harness
@@ -545,7 +545,7 @@ async fn dataset_delete_success() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_delete_dangling_ref() {
-    let harness = GraphQLDatasetsHarness::new(false);
+    let harness = GraphQLDatasetsHarness::new(false).await;
     harness.init_dependencies_graph().await;
 
     let foo_result = harness
@@ -603,7 +603,7 @@ async fn dataset_delete_dangling_ref() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_view_permissions() {
-    let harness = GraphQLDatasetsHarness::new(false);
+    let harness = GraphQLDatasetsHarness::new(false).await;
 
     let foo_result = harness
         .create_root_dataset(None, DatasetName::new_unchecked("foo"))
@@ -658,11 +658,12 @@ struct GraphQLDatasetsHarness {
 }
 
 impl GraphQLDatasetsHarness {
-    pub fn new(is_multi_tenant: bool) -> Self {
+    pub async fn new(is_multi_tenant: bool) -> Self {
         Self::new_custom_authentication(MockAuthenticationService::built_in(), is_multi_tenant)
+            .await
     }
 
-    pub fn new_custom_authentication(
+    pub async fn new_custom_authentication(
         mock_authentication_service: MockAuthenticationService,
         is_multi_tenant: bool,
     ) -> Self {
@@ -670,23 +671,28 @@ impl GraphQLDatasetsHarness {
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let base_catalog = dill::CatalogBuilder::new()
-            .add::<SystemTimeSourceDefault>()
-            .add::<EventBus>()
-            .add::<DependencyGraphServiceInMemory>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(is_multi_tenant),
-            )
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_value(mock_authentication_service)
-            .bind::<dyn AuthenticationService, MockAuthenticationService>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<AccountRepositoryInMemory>()
-            .build();
+        let base_catalog = {
+            let mut b = dill::CatalogBuilder::new();
 
-        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog);
+            b.add::<SystemTimeSourceDefault>()
+                .add::<EventBus>()
+                .add::<DependencyGraphServiceInMemory>()
+                .add_builder(
+                    DatasetRepositoryLocalFs::builder()
+                        .with_root(datasets_dir)
+                        .with_multi_tenant(is_multi_tenant),
+                )
+                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .add_value(mock_authentication_service)
+                .bind::<dyn AuthenticationService, MockAuthenticationService>()
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
+
+            FakeDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
+
+        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog).await;
 
         Self {
             _tempdir: tempdir,

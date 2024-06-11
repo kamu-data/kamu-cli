@@ -27,11 +27,11 @@ use kamu::testing::{
 };
 use kamu::{
     DatasetOwnershipServiceInMemory,
+    DatasetOwnershipServiceInMemoryStateInitializer,
     DatasetRepositoryLocalFs,
     DependencyGraphServiceInMemory,
 };
 use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::AuthenticationServiceImpl;
 use kamu_core::*;
 use kamu_flow_system::FlowServiceRunConfig;
@@ -57,7 +57,8 @@ async fn test_list_account_flows() {
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
-    });
+    })
+    .await;
 
     let create_result = harness.create_root_dataset(foo_dataset_alias).await;
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -138,7 +139,8 @@ async fn test_list_datasets_with_flow() {
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
-    });
+    })
+    .await;
     let foo_dataset_name = DatasetName::new_unchecked("foo");
     let foo_dataset_alias =
         DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
@@ -249,7 +251,8 @@ async fn test_pause_resume_account_flows() {
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
-    });
+    })
+    .await;
     let foo_create_result = harness.create_root_dataset(foo_dataset_alias).await;
 
     let request_code =
@@ -453,7 +456,8 @@ async fn test_account_configs_all_paused() {
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
-    });
+    })
+    .await;
     let foo_create_result = harness.create_root_dataset(foo_dataset_alias).await;
     let bar_create_result = harness.create_root_dataset(bar_dataset_alias).await;
 
@@ -631,7 +635,7 @@ struct FlowRunsHarnessOverrides {
 }
 
 impl FlowConfigHarness {
-    fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
+    async fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -658,7 +662,6 @@ impl FlowConfigHarness {
                 .add::<SystemTimeSourceDefault>()
                 .add_value(mock_dataset_action_authorizer)
                 .add::<AuthenticationServiceImpl>()
-                .add::<AccountRepositoryInMemory>()
                 .add_value(JwtAuthenticationConfig::default())
                 .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
                 .add::<DependencyGraphServiceInMemory>()
@@ -679,6 +682,7 @@ impl FlowConfigHarness {
                 .add_value(polling_service_mock)
                 .bind::<dyn PollingIngestService, MockPollingIngestService>()
                 .add::<DatasetOwnershipServiceInMemory>()
+                .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
                 .add::<DatabaseTransactionRunner>();
 
             FakeDatabasePlugin::init_database_components(&mut b);
@@ -687,7 +691,18 @@ impl FlowConfigHarness {
         };
 
         // Init dataset with no sources
-        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base);
+        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
+
+        DatabaseTransactionRunner::new(catalog_authorized.clone())
+            .transactional(|transactional_catalog| async move {
+                let initializer = transactional_catalog
+                    .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
+                    .unwrap();
+
+                initializer.eager_initialization().await
+            })
+            .await
+            .unwrap();
 
         let dataset_repo = catalog_authorized
             .get_one::<dyn DatasetRepository>()

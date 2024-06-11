@@ -23,7 +23,7 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
 };
 use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::AuthenticationServiceImpl;
+use kamu_accounts_services::{AuthenticationServiceImpl, PredefinedAccountsRegistrator};
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
@@ -68,11 +68,11 @@ pub(crate) struct FlowHarnessOverrides {
 }
 
 impl FlowHarness {
-    pub fn new() -> Self {
-        Self::with_overrides(FlowHarnessOverrides::default())
+    pub async fn new() -> Self {
+        Self::with_overrides(FlowHarnessOverrides::default()).await
     }
 
-    pub fn with_overrides(overrides: FlowHarnessOverrides) -> Self {
+    pub async fn with_overrides(overrides: FlowHarnessOverrides) -> Self {
         let tmp_dir = tempfile::tempdir().unwrap();
         let datasets_dir = tmp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -135,12 +135,26 @@ impl FlowHarness {
                 .add::<TaskSchedulerImpl>()
                 .add::<TaskSystemEventStoreInMemory>()
                 .add::<FlowSystemTestListener>()
+                .add::<PredefinedAccountsRegistrator>()
                 .add::<DatabaseTransactionRunner>();
 
             FakeDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };
+
+        DatabaseTransactionRunner::new(catalog.clone())
+            .transactional(|transactional_catalog| async move {
+                let registrator = transactional_catalog
+                    .get_one::<PredefinedAccountsRegistrator>()
+                    .unwrap();
+
+                registrator
+                    .ensure_predefined_accounts_are_registered()
+                    .await
+            })
+            .await
+            .unwrap();
 
         let flow_service = catalog.get_one::<dyn FlowService>().unwrap();
         let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();

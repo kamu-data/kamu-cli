@@ -36,7 +36,6 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME_STR,
 };
-use kamu_accounts_inmem::AccountRepositoryInMemory;
 use kamu_accounts_services::AuthenticationServiceImpl;
 use kamu_core::{
     auth,
@@ -84,7 +83,8 @@ async fn test_trigger_ingest_root_dataset() {
         )),
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
 
     let create_result = harness.create_root_dataset().await;
 
@@ -439,7 +439,8 @@ async fn test_trigger_execute_transform_derived_dataset() {
         )),
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
 
     harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
@@ -660,7 +661,8 @@ async fn test_trigger_compacting_root_dataset() {
         )),
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
 
     let create_result = harness.create_root_dataset().await;
 
@@ -1014,7 +1016,8 @@ async fn test_list_flows_with_filters_and_pagination() {
         dataset_changes_mock: None,
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
     let create_result = harness.create_root_dataset().await;
 
     let ingest_mutation_code =
@@ -1418,7 +1421,8 @@ async fn test_list_flow_initiators() {
         dataset_changes_mock: None,
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
     let create_result = harness.create_root_dataset().await;
 
     let ingest_mutation_code =
@@ -1510,7 +1514,8 @@ async fn test_conditions_not_met_for_flows() {
         dataset_changes_mock: None,
         transform_service_mock: Some(MockTransformService::without_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::without_active_polling_source()),
-    });
+    })
+    .await;
     let create_root_result = harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
 
@@ -1592,7 +1597,8 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         dataset_changes_mock: None,
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
 
     let create_root_result = harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
@@ -1708,7 +1714,8 @@ async fn test_cancel_ingest_root_dataset() {
         dataset_changes_mock: None,
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -1776,7 +1783,8 @@ async fn test_cancel_running_transform_derived_dataset() {
         dataset_changes_mock: None,
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
     harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
 
@@ -1849,7 +1857,8 @@ async fn test_cancel_hard_compacting_root_dataset() {
         dataset_changes_mock: None,
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -1917,7 +1926,8 @@ async fn test_cancel_wrong_flow_id_fails() {
         dataset_changes_mock: None,
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -1960,7 +1970,8 @@ async fn test_cancel_foreign_flow_fails() {
         dataset_changes_mock: None,
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
     let create_root_result = harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
 
@@ -2020,7 +2031,8 @@ async fn test_cancel_waiting_flow() {
         dataset_changes_mock: None,
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -2089,7 +2101,8 @@ async fn test_cancel_already_aborted_flow() {
         dataset_changes_mock: None,
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -2170,7 +2183,8 @@ async fn test_cancel_already_succeeded_flow() {
         dataset_changes_mock: None,
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
     let create_result: CreateDatasetResult = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -2245,7 +2259,8 @@ async fn test_history_of_completed_flow() {
         dataset_changes_mock: None,
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
 
     let create_result: CreateDatasetResult = harness.create_root_dataset().await;
 
@@ -2371,7 +2386,8 @@ async fn test_anonymous_operation_fails() {
         dataset_changes_mock: None,
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
 
     let create_root_result = harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
@@ -2416,7 +2432,8 @@ async fn test_config_snapshot_returned_correctly() {
         )),
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
-    });
+    })
+    .await;
 
     let create_result = harness.create_root_dataset().await;
 
@@ -2548,7 +2565,7 @@ struct FlowRunsHarnessOverrides {
 }
 
 impl FlowRunsHarness {
-    fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
+    async fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -2590,7 +2607,6 @@ impl FlowRunsHarness {
                 .add_value(polling_service_mock)
                 .bind::<dyn PollingIngestService, MockPollingIngestService>()
                 .add::<AuthenticationServiceImpl>()
-                .add::<AccountRepositoryInMemory>()
                 .add_value(JwtAuthenticationConfig::default())
                 .add::<DatasetOwnershipServiceInMemory>()
                 .add::<DatabaseTransactionRunner>();
@@ -2601,7 +2617,7 @@ impl FlowRunsHarness {
         };
 
         // Init dataset with no sources
-        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base);
+        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
 
         let dataset_repo = catalog_authorized
             .get_one::<dyn DatasetRepository>()
