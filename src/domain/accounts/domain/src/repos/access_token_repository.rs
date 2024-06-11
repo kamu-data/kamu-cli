@@ -12,7 +12,7 @@ use internal_error::InternalError;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::AccessToken;
+use crate::{AccessToken, Account};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -35,6 +35,11 @@ pub trait AccessTokenRepository: Send + Sync {
         token_id: &Uuid,
         revoke_time: DateTime<Utc>,
     ) -> Result<(), GetAccessTokenError>;
+
+    async fn find_account_by_active_token_id(
+        &self,
+        token_id: &Uuid,
+    ) -> Result<Account, GetAccessTokenError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

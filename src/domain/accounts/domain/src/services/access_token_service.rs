@@ -11,6 +11,7 @@
 
 use opendatafabric::AccountID;
 use thiserror::Error;
+use uuid::Uuid;
 
 use crate::{
     AccessToken,
@@ -18,7 +19,6 @@ use crate::{
     Account,
     CreateAccessTokenError,
     GetAccessTokenError,
-    GetAccountInfoError,
     KamuAccessToken,
 };
 
@@ -30,17 +30,17 @@ pub trait AccessTokenService: Sync + Send {
         account_id: &AccountID,
     ) -> Result<KamuAccessToken, CreateAccessTokenError>;
 
-    fn encode_access_token(
+    fn decode_access_token(
         &self,
         access_token_str: &str,
     ) -> Result<KamuAccessToken, EncodeTokenError>;
 
     fn generate_access_token(&self) -> KamuAccessToken;
 
-    async fn find_account_by_access_token(
+    async fn find_account_id_by_active_token_id(
         &self,
-        access_token: String,
-    ) -> Result<Account, GetAccountInfoError>;
+        token_id: &Uuid,
+    ) -> Result<Account, GetAccessTokenError>;
 
     async fn get_access_tokens(
         &self,

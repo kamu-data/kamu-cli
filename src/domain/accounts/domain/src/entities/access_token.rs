@@ -10,7 +10,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 use chrono::{DateTime, Utc};
+use jsonwebtoken::TokenData;
 use opendatafabric::{AccountID, Multihash};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -32,4 +34,24 @@ pub struct AccessToken {
     pub created_at: DateTime<Utc>,
     pub revoked_at: Option<DateTime<Utc>>,
     pub account_id: AccountID,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/// Our claims struct, it needs to derive `Serialize` and/or `Deserialize`
+#[derive(Debug, Serialize, Deserialize)]
+pub struct KamuAccessTokenClaims {
+    pub exp: usize,
+    pub iat: usize,
+    pub iss: String,
+    pub sub: String,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
+pub enum AccessTokenArg {
+    KamuAccessToken(KamuAccessToken),
+    JWTToken(TokenData<KamuAccessTokenClaims>),
 }

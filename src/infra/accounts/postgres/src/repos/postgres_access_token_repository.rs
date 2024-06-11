@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use opendatafabric::AccountID;
+use opendatafabric::{AccountID, AccountName};
 use uuid::Uuid;
 
 use crate::domain::*;
@@ -192,5 +192,60 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
         }
 
         Ok(())
+    }
+
+    async fn find_account_by_active_token_id(
+        &self,
+        token_id: &Uuid,
+    ) -> Result<Account, GetAccessTokenError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(GetAccessTokenError::Internal)?;
+
+        let maybe_account_row = sqlx::query!(
+            r#"
+                SELECT
+                    a.id as "id: AccountID",
+                    a.account_name,
+                    a.email as "email?",
+                    a.display_name,
+                    a.account_type as "account_type: AccountType",
+                    a.avatar_url,
+                    a.registered_at,
+                    a.is_admin,
+                    a.provider,
+                    a.provider_identity_key
+                FROM access_tokens at
+                LEFT JOIN accounts a ON a.id = account_id
+                WHERE at.id = $1 AND revoked_at IS null
+                "#,
+            token_id
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()
+        .map_err(GetAccessTokenError::Internal)?;
+
+        if let Some(account_row) = maybe_account_row {
+            Ok(Account {
+                id: account_row.id,
+                account_name: AccountName::new_unchecked(&account_row.account_name),
+                email: account_row.email,
+                display_name: account_row.display_name,
+                account_type: account_row.account_type,
+                avatar_url: account_row.avatar_url,
+                registered_at: account_row.registered_at,
+                is_admin: account_row.is_admin,
+                provider: account_row.provider,
+                provider_identity_key: account_row.provider_identity_key,
+            })
+        } else {
+            Err(GetAccessTokenError::NotFound(AccessTokenNotFoundError {
+                access_token_id: *token_id,
+            }))
+        }
     }
 }

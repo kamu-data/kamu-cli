@@ -202,4 +202,11 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
 
         Ok(())
     }
+
+    async fn find_account_by_active_token_id(
+        &self,
+        _token_id: &Uuid,
+    ) -> Result<Account, GetAccessTokenError> {
+        unimplemented!()
+    }
 }

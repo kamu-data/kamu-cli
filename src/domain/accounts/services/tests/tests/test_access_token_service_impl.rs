@@ -21,18 +21,18 @@ async fn test_generate_and_encode_access_token() {
 
     let generated_access_token = harness.access_token_svc.generate_access_token();
 
-    let encoded_access_token = harness
+    let decoded_access_token = harness
         .access_token_svc
-        .encode_access_token(&generated_access_token.composed_token)
+        .decode_access_token(&generated_access_token.composed_token)
         .unwrap();
 
-    assert_eq!(generated_access_token, encoded_access_token);
+    assert_eq!(generated_access_token, decoded_access_token);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_encode_invalid_tokens() {
+async fn test_decode_invalid_tokens() {
     let harness = AccessTokenServiceImplTestHarness::new();
 
     struct InvalidTokenCase {
@@ -60,12 +60,12 @@ async fn test_encode_invalid_tokens() {
     ];
 
     for test_case in test_cases {
-        let encoding_result = harness
+        let decoding_result = harness
             .access_token_svc
-            .encode_access_token(&test_case.token_str);
+            .decode_access_token(&test_case.token_str);
 
         assert!(AccessTokenServiceImplTestHarness::match_errors(
-            &encoding_result,
+            &decoding_result,
             &test_case.expected_error
         ));
     }

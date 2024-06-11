@@ -52,6 +52,14 @@ async fn test_mark_non_existing_access_token_revorked() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_find_account_by_active_token_id() {
+    let harness = InmemAccessTokenRepositoryHarness::new();
+    kamu_accounts_repo_tests::test_find_account_by_active_token_id(&harness.catalog).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 struct InmemAccessTokenRepositoryHarness {
     catalog: Catalog,
 }

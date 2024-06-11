@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
 use dill::*;
+use internal_error::ErrorIntoInternal;
 use kamu_accounts::AccessToken;
 use opendatafabric::AccountID;
 use uuid::Uuid;
@@ -22,6 +23,7 @@ use crate::domain::*;
 
 pub struct AccessTokenRepositoryInMemory {
     state: Arc<Mutex<State>>,
+    account_repository: Arc<dyn AccountRepository>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -49,8 +51,9 @@ impl State {
 #[interface(dyn AccessTokenRepository)]
 #[scope(Singleton)]
 impl AccessTokenRepositoryInMemory {
-    pub fn new() -> Self {
+    pub fn new(account_repository: Arc<dyn AccountRepository>) -> Self {
         Self {
+            account_repository,
             state: Arc::new(Mutex::new(State::new())),
         }
     }
@@ -96,8 +99,8 @@ impl AccessTokenRepository for AccessTokenRepositoryInMemory {
 
     async fn get_token_by_id(&self, token_id: &Uuid) -> Result<AccessToken, GetAccessTokenError> {
         let guard = self.state.lock().unwrap();
-        if let Some(account_data) = guard.tokens_by_id.get(token_id) {
-            Ok(account_data.clone())
+        if let Some(access_token_data) = guard.tokens_by_id.get(token_id) {
+            Ok(access_token_data.clone())
         } else {
             Err(GetAccessTokenError::NotFound(AccessTokenNotFoundError {
                 access_token_id: *token_id,
@@ -140,5 +143,25 @@ impl AccessTokenRepository for AccessTokenRepositoryInMemory {
         Err(GetAccessTokenError::NotFound(AccessTokenNotFoundError {
             access_token_id: *token_id,
         }))
+    }
+
+    async fn find_account_by_active_token_id(
+        &self,
+        token_id: &Uuid,
+    ) -> Result<Account, GetAccessTokenError> {
+        let access_token = self.get_token_by_id(token_id).await?;
+        if access_token.revoked_at.is_some() {
+            return Err(GetAccessTokenError::NotFound(AccessTokenNotFoundError {
+                access_token_id: *token_id,
+            }));
+        }
+
+        let account = self
+            .account_repository
+            .get_account_by_id(&access_token.account_id)
+            .await
+            .map_err(|err| GetAccessTokenError::Internal(err.int_err()))?;
+
+        Ok(account)
     }
 }

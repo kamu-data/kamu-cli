@@ -89,6 +89,20 @@ async fn test_mark_non_existing_access_token_revorked(pg_pool: PgPool) {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(database, postgres)]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
+async fn test_find_account_by_active_token_id(pg_pool: PgPool) {
+    let harness = PostgresAccessTokenRepositoryHarness::new(pg_pool);
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
+        kamu_accounts_repo_tests::test_find_account_by_active_token_id(&catalog).await;
+        Ok(())
+    })
+    .await
+    .unwrap();
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 struct PostgresAccessTokenRepositoryHarness {
     catalog: Catalog,
 }

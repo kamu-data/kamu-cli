@@ -1,0 +1,86 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT\n                    a.id as \"id: AccountID\",\n                    a.account_name,\n                    a.email as \"email?\",\n                    a.display_name,\n                    a.account_type as \"account_type: AccountType\",\n                    a.avatar_url,\n                    a.registered_at,\n                    a.is_admin,\n                    a.provider,\n                    a.provider_identity_key\n                FROM access_tokens at\n                LEFT JOIN accounts a ON a.id = account_id\n                WHERE at.id = $1 AND revoked_at IS null\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: AccountID",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "email?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "display_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "account_type: AccountType",
+        "type_info": {
+          "Custom": {
+            "name": "account_type",
+            "kind": {
+              "Enum": [
+                "user",
+                "organization"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "avatar_url",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "registered_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "is_admin",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "provider",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "provider_identity_key",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "22c5bbcde085fe6312eb403cda460d31fa35a25786ac5fb70ce63a8ec5453d97"
+}

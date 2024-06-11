@@ -3691,6 +3691,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "internal-error",
+ "jsonwebtoken",
  "lazy_static",
  "merge",
  "mockall",

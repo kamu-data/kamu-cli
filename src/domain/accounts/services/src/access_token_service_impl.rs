@@ -20,7 +20,6 @@ use kamu_accounts::{
     CreateAccessTokenError,
     EncodeTokenError,
     GetAccessTokenError,
-    GetAccountInfoError,
     KamuAccessToken,
 };
 use opendatafabric::{AccountID, Multihash};
@@ -77,7 +76,7 @@ impl AccessTokenServiceImpl {
         }
     }
 
-    pub fn encode_token_impl(
+    pub fn decode_token_impl(
         &self,
         access_token: String,
     ) -> Result<KamuAccessToken, EncodeTokenError> {
@@ -152,18 +151,20 @@ impl AccessTokenService for AccessTokenServiceImpl {
         Ok(kamu_access_token)
     }
 
-    async fn find_account_by_access_token(
+    async fn find_account_id_by_active_token_id(
         &self,
-        _access_token: String,
-    ) -> Result<Account, GetAccountInfoError> {
-        unimplemented!()
+        token_id: &Uuid,
+    ) -> Result<Account, GetAccessTokenError> {
+        self.access_token_repository
+            .find_account_by_active_token_id(token_id)
+            .await
     }
 
-    fn encode_access_token(
+    fn decode_access_token(
         &self,
         access_token_str: &str,
     ) -> Result<KamuAccessToken, EncodeTokenError> {
-        self.encode_token_impl(access_token_str.to_string())
+        self.decode_token_impl(access_token_str.to_string())
     }
 
     fn generate_access_token(&self) -> KamuAccessToken {
