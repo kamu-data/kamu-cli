@@ -148,6 +148,9 @@ test-full:
 test-fast:
 	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::spark::) | test(::flink::) | test(::database::))'
 
+.PHONY: test-e2e
+test-e2e:
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::e2e::)'
 
 ###############################################################################
 # Benchmarking
