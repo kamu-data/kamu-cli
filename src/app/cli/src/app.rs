@@ -254,6 +254,8 @@ pub fn configure_base_catalog(
 
     b.add::<DataFormatRegistryImpl>();
 
+    b.add_builder(FetchService::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()));
+
     b.add_builder(
         PollingIngestServiceImpl::builder()
             .with_run_info_dir(workspace_layout.run_info_dir.clone())
@@ -489,6 +491,28 @@ pub fn register_config_in_catalog(
             .clone()
             .unwrap(),
     });
+
+    catalog_builder.add_value(config.source.as_ref().unwrap().to_infra_cfg());
+    catalog_builder.add_value(
+        config
+            .source
+            .as_ref()
+            .unwrap()
+            .mqtt
+            .as_ref()
+            .unwrap()
+            .to_infra_cfg(),
+    );
+    catalog_builder.add_value(
+        config
+            .source
+            .as_ref()
+            .unwrap()
+            .ethereum
+            .as_ref()
+            .unwrap()
+            .to_infra_cfg(),
+    );
 
     let ipfs_conf = config.protocol.as_ref().unwrap().ipfs.as_ref().unwrap();
 

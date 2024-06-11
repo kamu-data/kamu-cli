@@ -289,6 +289,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "kamu: we don't care about this test and it take too long"]
     async fn query_gs_location_test() -> Result<()> {
         let bucket = "examplegsbucket";
         let location = format!("gs://{bucket}/file.parquet");
@@ -332,9 +333,9 @@ mod tests {
             if cfg!(windows) { "USERPROFILE" } else { "HOME" },
             test_home_path,
         );
-        let input = "~/Code/arrow-datafusion/benchmarks/data/tpch_sf1/part/part-0.parquet";
+        let input = "~/Code/datafusion/benchmarks/data/tpch_sf1/part/part-0.parquet";
         let expected = format!(
-            "{}{}Code{}arrow-datafusion{}benchmarks{}data{}tpch_sf1{}part{}part-0.parquet",
+            "{}{}Code{}datafusion{}benchmarks{}data{}tpch_sf1{}part{}part-0.parquet",
             test_home_path,
             MAIN_SEPARATOR,
             MAIN_SEPARATOR,

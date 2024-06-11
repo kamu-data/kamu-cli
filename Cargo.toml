@@ -197,6 +197,9 @@ debug = 1
 # Use this section to test or apply emergency ovverides to dependencies
 # See: https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html
 [patch.crates-io]
-# datafusion = { git = 'https://github.com/apache/arrow-datafusion.git', tag = '37.1.0-rc2' }
-# datafusion-common = { git = 'https://github.com/apache/arrow-datafusion.git', tag = '37.1.0-rc2' }
+# datafusion = { git = 'https://github.com/apache/datafusion.git', tag = '39.0.0-rc1' }
+# datafusion-common = { git = 'https://github.com/apache/datafusion.git', tag = '39.0.0-rc1' }
+# datafusion-execution = { git = 'https://github.com/apache/datafusion.git', tag = '39.0.0-rc1' }
+# datafusion-expr = { git = 'https://github.com/apache/datafusion.git', tag = '39.0.0-rc1' }
 datafusion-odata = { git = 'https://github.com/kamu-data/datafusion-odata.git', branch = 'axum-0.6' }
+# datafusion-ethers = { git = "https://github.com/kamu-data/datafusion-ethers.git", tag = "v39.0.0" }

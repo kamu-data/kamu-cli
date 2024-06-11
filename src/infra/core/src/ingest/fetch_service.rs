@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, SubsecRound, TimeZone, Utc};
 use container_runtime::*;
+use futures::TryStreamExt;
 use kamu_core::engine::ProcessError;
 use kamu_core::*;
 use opendatafabric::*;
@@ -24,29 +25,113 @@ use super::*;
 ////////////////////////////////////////////////////////////////////////////////
 
 pub const ODF_BATCH_SIZE: &str = "ODF_BATCH_SIZE";
-pub const ODF_BATCH_SIZE_DEFAULT: u64 = 10_000;
 
-pub const ODF_POLL_TIMEOUT_MS: &str = "ODF_POLL_TIMEOUT_MS";
-pub const ODF_POLL_TIMEOUT_MS_DEFAULT: u64 = 1000;
+////////////////////////////////////////////////////////////////////////////////
+// Configs
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct SourceConfig {
+    /// Target number of records after which we will stop consuming from the
+    /// resumable source and commit data, leaving the rest for the next
+    /// iteration. This ensures that one data slice doesn't become too big.
+    pub target_records_per_slice: u64,
+}
+
+impl Default for SourceConfig {
+    fn default() -> Self {
+        Self {
+            target_records_per_slice: 10_000,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct MqttSourceConfig {
+    /// Time in milliseconds to wait for MQTT broker to send us some data after
+    /// which we will consider that we have "caught up" and end the polling
+    /// loop.
+    pub broker_idle_timeout_ms: u64,
+}
+
+impl Default for MqttSourceConfig {
+    fn default() -> Self {
+        Self {
+            broker_idle_timeout_ms: 1_000,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct EthereumSourceConfig {
+    /// Default RPC endpoints to use if source does not specify one explicitly.
+    pub rpc_endpoints: Vec<EthRpcEndpoint>,
+    /// Default number of blocks to scan within one query to `eth_getLogs` RPC
+    /// endpoint.
+    pub get_logs_block_stride: u64,
+    // TODO: Consider replacing this with logic that upon encountering an error still commits the
+    // progress made before it
+    /// Forces iteration to stop after the specified number of blocks were
+    /// scanned even if we didn't reach the target record number. This is useful
+    /// to not lose a lot of scanning progress in case of an RPC error.
+    pub commit_after_blocks_scanned: u64,
+}
+
+impl Default for EthereumSourceConfig {
+    fn default() -> Self {
+        Self {
+            rpc_endpoints: Vec::new(),
+            get_logs_block_stride: 100_000,
+            commit_after_blocks_scanned: 1_000_000,
+        }
+    }
+}
+
+impl EthereumSourceConfig {
+    pub fn get_endpoint_by_chain_id(&self, chain_id: u64) -> Option<&EthRpcEndpoint> {
+        self.rpc_endpoints.iter().find(|e| e.chain_id == chain_id)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EthRpcEndpoint {
+    pub chain_id: u64,
+    pub chain_name: String,
+    pub node_url: Url,
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
 pub struct FetchService {
     container_runtime: Arc<ContainerRuntime>,
-    container_log_dir: PathBuf,
+    run_info_dir: PathBuf,
+    source_config: Arc<SourceConfig>,
+    mqtt_source_config: Arc<MqttSourceConfig>,
+    eth_source_config: Arc<EthereumSourceConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component(pub)]
 // TODO: Split this service apart into pluggable protocol implementations
 impl FetchService {
     pub fn new(
         container_runtime: Arc<ContainerRuntime>,
-        container_log_dir: impl Into<PathBuf>,
+        run_info_dir: PathBuf,
+        source_config: Option<Arc<SourceConfig>>,
+        mqtt_source_config: Option<Arc<MqttSourceConfig>>,
+        eth_source_config: Option<Arc<EthereumSourceConfig>>,
     ) -> Self {
         Self {
             container_runtime,
-            container_log_dir: container_log_dir.into(),
+            run_info_dir,
+            source_config: source_config.unwrap_or_default(),
+            mqtt_source_config: mqtt_source_config.unwrap_or_default(),
+            eth_source_config: eth_source_config.unwrap_or_default(),
         }
     }
 
@@ -114,7 +199,12 @@ impl FetchService {
                 &listener,
             ),
             FetchStep::Mqtt(fetch) => {
-                Self::fetch_mqtt(dataset_handle, fetch, target_path, &listener).await
+                self.fetch_mqtt(dataset_handle, fetch, target_path, &listener)
+                    .await
+            }
+            FetchStep::EthereumLogs(fetch) => {
+                self.fetch_ethereum_logs(fetch, prev_source_state, target_path, &listener)
+                    .await
             }
         }
     }
@@ -202,10 +292,10 @@ impl FetchService {
         });
 
         // Setup logging
-        let out_dir = self.container_log_dir.join(format!("fetch-{operation_id}"));
+        let out_dir = self.run_info_dir.join(format!("fetch-{operation_id}"));
         std::fs::create_dir_all(&out_dir).int_err()?;
 
-        let stderr_path = self.container_log_dir.join("fetch.err.txt");
+        let stderr_path = out_dir.join("fetch.err.txt");
 
         let mut target_file = tokio::fs::File::create(target_path).await.int_err()?;
         let stderr_file = std::fs::File::create(&stderr_path).int_err()?;
@@ -236,7 +326,7 @@ impl FetchService {
             container_builder = container_builder.entry_point(command.join(" "));
         }
 
-        let mut batch_size = ODF_BATCH_SIZE_DEFAULT;
+        let mut batch_size = self.source_config.target_records_per_slice;
 
         if let Some(env_vars) = &fetch.env {
             for EnvVar { name, value } in env_vars {
@@ -568,9 +658,11 @@ impl FetchService {
                 return Err(PollingIngestError::not_found(url.as_str(), None));
             }
             code => {
+                let body = response.text().await.ok();
+
                 return Err(PollingIngestError::unreachable(
                     url.as_str(),
-                    Some(HttpStatusError::new(u32::from(code.as_u16())).into()),
+                    Some(HttpStatusError::new(u32::from(code.as_u16()), body).into()),
                 ));
             }
         }
@@ -730,6 +822,7 @@ impl FetchService {
     }
 
     async fn fetch_mqtt(
+        &self,
         dataset_handle: &DatasetHandle,
         fetch: &FetchStepMqtt,
         target_path: &Path,
@@ -773,22 +866,9 @@ impl FetchService {
         let mut fetched_records = 0;
         let mut file = std::fs::File::create(target_path).int_err()?;
 
-        // TODO: Reading from env vars is temporary - should be replaced by vars
-        // provider
-        let max_records: u64 = std::env::var(ODF_BATCH_SIZE)
-            .ok()
-            .map(|s| s.parse())
-            .transpose()
-            .int_err()?
-            .unwrap_or(ODF_BATCH_SIZE_DEFAULT);
-
-        let poll_timeout: u64 = std::env::var(ODF_POLL_TIMEOUT_MS)
-            .ok()
-            .map(|s| s.parse())
-            .transpose()
-            .int_err()?
-            .unwrap_or(ODF_POLL_TIMEOUT_MS_DEFAULT);
-        let poll_timeout = std::time::Duration::from_millis(poll_timeout);
+        let max_records = self.source_config.target_records_per_slice;
+        let poll_timeout =
+            std::time::Duration::from_millis(self.mqtt_source_config.broker_idle_timeout_ms);
 
         loop {
             // Limit number of records read if they keep flowing faster that we timeout
@@ -841,6 +921,252 @@ impl FetchService {
                 zero_copy_path: None,
             }))
         }
+    }
+
+    // TODO: FIXME: This implementation is overly complex due to DataFusion's poor
+    // support of streaming / unbounded sources.
+    //
+    // In future datafusion-ethers should implement queries as unbounded source and
+    // `DataFrame::execute_stream()` should not only yield data batches, but also
+    // provide access to the state of the underlying stream for us to know how
+    // far in the block range we have scanned. Since currently we can't access
+    // the state of streaming - we can't interrupt the stream to resume later.
+    // The implementation therefore uses DataFusion only to analyze SQL and
+    // convert the WHERE clause into a filter, and then calls ETH RPC directly
+    // to scan through block ranges.
+    //
+    // TODO: Account for re-orgs
+    async fn fetch_ethereum_logs(
+        &self,
+        fetch: &FetchStepEthereumLogs,
+        prev_source_state: Option<&PollingSourceState>,
+        target_path: &Path,
+        listener: &Arc<dyn FetchProgressListener>,
+    ) -> Result<FetchResult, PollingIngestError> {
+        use alloy::providers::{Provider, ProviderBuilder};
+        use alloy::rpc::types::eth::BlockTransactionsKind;
+        use datafusion::prelude::*;
+        use datafusion_ethers::convert::*;
+        use datafusion_ethers::stream::*;
+
+        // Alloy does not support newlines in log signatures, but it's nice for
+        // formatting
+        let signature = fetch.signature.as_ref().map(|s| s.replace('\n', " "));
+
+        let mut coder: Box<dyn Transcoder + Send> = if let Some(sig) = &signature {
+            Box::new(EthRawAndDecodedLogsToArrow::new_from_signature(sig).int_err()?)
+        } else {
+            Box::new(EthRawLogsToArrow::new())
+        };
+
+        // Get last state
+        let resume_from_state = match prev_source_state {
+            None => None,
+            Some(PollingSourceState::ETag(s)) => {
+                let Some((num, _hash)) = s.split_once('@') else {
+                    panic!("Malformed ETag: {s}");
+                };
+                Some(StreamState {
+                    last_seen_block: num.parse().unwrap(),
+                })
+            }
+            _ => panic!("EthereumLogs should only use ETag state"),
+        };
+
+        // Setup node RPC client
+        let node_url = if let Some(url) = &fetch.node_url {
+            Self::template_url(url)?
+        } else if let Some(ep) = self
+            .eth_source_config
+            .get_endpoint_by_chain_id(fetch.chain_id.unwrap())
+        {
+            ep.node_url.clone()
+        } else {
+            Err(EthereumRpcError::new(format!(
+                "Ethereum node RPC URL is not provided in the source manifest and no default node \
+                 configured for chain ID {}",
+                fetch.chain_id.unwrap()
+            ))
+            .int_err())?
+        };
+
+        let rpc_client = ProviderBuilder::new()
+            .on_builtin(node_url.as_str())
+            .await
+            .int_err()?;
+
+        let chain_id = rpc_client.get_chain_id().await.int_err()?;
+        tracing::info!(%node_url, %chain_id, "Connected to ETH node");
+        if let Some(expected_chain_id) = fetch.chain_id
+            && expected_chain_id != chain_id
+        {
+            Err(EthereumRpcError::new(format!(
+                "Expected to connect to chain ID {expected_chain_id} but got {chain_id} instead"
+            ))
+            .int_err())?;
+        }
+
+        // Setup Datafusion context
+        let cfg = SessionConfig::new()
+            .with_target_partitions(1)
+            .with_coalesce_batches(false);
+        let mut ctx = SessionContext::new_with_config(cfg);
+        datafusion_ethers::udf::register_all(&mut ctx).unwrap();
+        ctx.register_catalog(
+            "eth",
+            Arc::new(datafusion_ethers::provider::EthCatalog::new(
+                rpc_client.clone(),
+            )),
+        );
+
+        // Prepare the query according to filters
+        let sql = if let Some(filter) = &fetch.filter {
+            let filter = if let Some(sig) = &signature {
+                format!("({filter}) and topic0 = eth_event_selector('{sig}')")
+            } else {
+                filter.clone()
+            };
+            format!("select * from eth.eth.logs where {filter}")
+        } else {
+            "select * from eth.eth.logs".to_string()
+        };
+
+        // Extract the filter out of the plan
+        let df = ctx.sql(&sql).await.int_err()?;
+        let plan = df.create_physical_plan().await.int_err()?;
+
+        let plan_str = datafusion::physical_plan::get_plan_string(&plan).join("\n");
+        tracing::info!(sql, plan = plan_str, "Original plan");
+
+        let Some(filter) = plan
+            .as_any()
+            .downcast_ref::<datafusion_ethers::provider::EthGetLogs>()
+            .map(|i| i.filter().clone())
+        else {
+            Err(EthereumRpcError::new(format!(
+                "Filter is too complex and includes conditions that cannot be pushed down into \
+                 RPC request. Please move such expressions into the postprocessing stage. \
+                 Physical plan:\n{plan_str}"
+            ))
+            .int_err())?
+        };
+
+        // Resolve filter into a numeric block range
+        let block_range_all = datafusion_ethers::stream::RawLogsStream::filter_to_block_range(
+            &rpc_client,
+            &filter.block_option,
+        )
+        .await
+        .int_err()?;
+
+        // Block interval that will be considered during this iteration
+        let block_range_unprocessed = (
+            resume_from_state
+                .as_ref()
+                .map_or(block_range_all.0, |s| s.last_seen_block + 1),
+            block_range_all.1,
+        );
+
+        let mut state = resume_from_state.clone();
+
+        let stream = datafusion_ethers::stream::RawLogsStream::paginate(
+            rpc_client.clone(),
+            filter,
+            StreamOptions {
+                block_stride: self.eth_source_config.get_logs_block_stride,
+            },
+            resume_from_state.clone(),
+        );
+        futures::pin_mut!(stream);
+
+        while let Some(batch) = stream.try_next().await.int_err()? {
+            let blocks_processed = batch.state.last_seen_block + 1 - block_range_unprocessed.0;
+
+            // TODO: Design a better listener API that can reflect scanned input range,
+            // number of records, and data volume transferred
+            listener.on_progress(&FetchProgress {
+                fetched_bytes: blocks_processed,
+                total_bytes: TotalBytes::Exact(
+                    block_range_unprocessed.1 + 1 - block_range_unprocessed.0,
+                ),
+            });
+
+            if !batch.logs.is_empty() {
+                coder.append(&batch.logs).int_err()?;
+            }
+
+            state = Some(batch.state);
+
+            if coder.len() as u64 >= self.source_config.target_records_per_slice {
+                tracing::info!(
+                    target_records_per_slice = self.source_config.target_records_per_slice,
+                    num_logs = coder.len(),
+                    "Interrupting the stream after reaching the target batch size",
+                );
+                break;
+            }
+            if blocks_processed >= self.eth_source_config.commit_after_blocks_scanned {
+                tracing::info!(
+                    commit_after_blocks_scanned =
+                        self.eth_source_config.commit_after_blocks_scanned,
+                    blocks_processed,
+                    "Interrupting the stream to commit progress",
+                );
+                break;
+            }
+        }
+
+        // Have we made any progress?
+        if resume_from_state == state {
+            return Ok(FetchResult::UpToDate);
+        }
+
+        let state = state.unwrap();
+
+        // Record scanning state
+        // TODO: Reorg tolerance
+        let last_seen_block = rpc_client
+            .get_block(state.last_seen_block.into(), BlockTransactionsKind::Hashes)
+            .await
+            .int_err()?
+            .unwrap();
+
+        tracing::info!(
+            blocks_scanned = state.last_seen_block - block_range_unprocessed.0 + 1,
+            block_range_scanned = ?(block_range_unprocessed.0, state.last_seen_block),
+            block_range_ramaining = ?(state.last_seen_block + 1, block_range_unprocessed.1),
+            num_logs = coder.len(),
+            "Finished block scan cycle",
+        );
+
+        // Did we exhaust the source? (not accounting for new transactions)
+        let has_more = state.last_seen_block < block_range_unprocessed.1;
+
+        // Write data, if any, to parquet file
+        if coder.len() > 0 {
+            let batch = coder.finish();
+            {
+                let mut writer = datafusion::parquet::arrow::ArrowWriter::try_new(
+                    std::fs::File::create_new(target_path).int_err()?,
+                    batch.schema(),
+                    None,
+                )
+                .int_err()?;
+                writer.write(&batch).int_err()?;
+                writer.finish().int_err()?;
+            }
+        }
+
+        Ok(FetchResult::Updated(FetchResultUpdated {
+            source_state: Some(PollingSourceState::ETag(format!(
+                "{}@{:x}",
+                last_seen_block.header.number.unwrap(),
+                last_seen_block.header.hash.unwrap(),
+            ))),
+            source_event_time: None,
+            has_more,
+            zero_copy_path: None,
+        }))
     }
 
     fn parse_http_date_time(val: &str) -> DateTime<Utc> {
@@ -936,14 +1262,24 @@ impl FetchProgressListener for NullFetchProgressListener {}
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-#[error("HTTP request failed with status code {code}")]
 struct HttpStatusError {
     pub code: u32,
+    pub body: Option<String>,
 }
 
 impl HttpStatusError {
-    fn new(code: u32) -> Self {
-        Self { code }
+    fn new(code: u32, body: Option<String>) -> Self {
+        Self { code, body }
+    }
+}
+
+impl std::fmt::Display for HttpStatusError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "HTTP request failed with status code {}", self.code)?;
+        if let Some(body) = &self.body {
+            write!(f, ", message: {body}")?;
+        }
+        Ok(())
     }
 }
 
@@ -998,6 +1334,20 @@ struct EventTimeSourceExtractError {
 impl std::convert::From<EventTimeSourceError> for PollingIngestError {
     fn from(e: EventTimeSourceError) -> Self {
         Self::Internal(e.int_err())
+    }
+}
+
+#[derive(Error, Debug)]
+#[error("Ethereum RPC error: {message}")]
+struct EthereumRpcError {
+    pub message: String,
+}
+
+impl EthereumRpcError {
+    fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
     }
 }
 

@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use container_runtime::ContainerRuntime;
 use datafusion::prelude::{DataFrame, SessionContext};
 use dill::*;
 use kamu_core::ingest::*;
@@ -28,10 +27,10 @@ use super::*;
 pub struct PollingIngestServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
+    fetch_service: Arc<FetchService>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     data_format_registry: Arc<dyn DataFormatRegistry>,
-    container_runtime: Arc<ContainerRuntime>,
     run_info_dir: PathBuf,
     cache_dir: PathBuf,
     time_source: Arc<dyn SystemTimeSource>,
@@ -44,10 +43,10 @@ impl PollingIngestServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
+        fetch_service: Arc<FetchService>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
         data_format_registry: Arc<dyn DataFormatRegistry>,
-        container_runtime: Arc<ContainerRuntime>,
         run_info_dir: PathBuf,
         cache_dir: PathBuf,
         time_source: Arc<dyn SystemTimeSource>,
@@ -55,10 +54,10 @@ impl PollingIngestServiceImpl {
         Self {
             dataset_repo,
             dataset_action_authorizer,
+            fetch_service,
             engine_provisioner,
             object_store_registry,
             data_format_registry,
-            container_runtime,
             run_info_dir,
             cache_dir,
             time_source,
@@ -247,6 +246,8 @@ impl PollingIngestServiceImpl {
             .on_stage_progress(PollingIngestStage::Read, 0, TotalSteps::Exact(1));
 
         let df = if let Some(df) = self.read(&args, &prepare_result).await? {
+            tracing::info!(schema = ?df.schema(), "Read the input data frame");
+
             if let Some(transform) = &args.polling_source.preprocess {
                 args.listener.on_stage_progress(
                     PollingIngestStage::Preprocess,
@@ -365,9 +366,8 @@ impl PollingIngestServiceImpl {
         let data_cache_key = get_random_name(Some("fetch-"), 10);
         let target_path = self.cache_dir.join(&data_cache_key);
 
-        let fetch_service = FetchService::new(self.container_runtime.clone(), &self.run_info_dir);
-
-        let fetch_result = fetch_service
+        let fetch_result = self
+            .fetch_service
             .fetch(
                 &args.dataset_handle,
                 &args.operation_id,
@@ -517,7 +517,7 @@ impl PollingIngestServiceImpl {
     ) -> Result<Option<DataFrame>, PollingIngestError> {
         let input_data_path = prep_result.data.path(&self.cache_dir);
 
-        if input_data_path.metadata().int_err()?.len() == 0 {
+        if !input_data_path.exists() || input_data_path.metadata().int_err()?.len() == 0 {
             tracing::info!(path = ?input_data_path, "Early return due to an empty file");
             return Ok(None);
         }

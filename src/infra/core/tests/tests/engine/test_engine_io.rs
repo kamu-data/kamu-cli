@@ -42,10 +42,16 @@ async fn test_engine_io_common(
     let ingest_svc = PollingIngestServiceImpl::new(
         dataset_repo.clone(),
         dataset_action_authorizer.clone(),
+        Arc::new(FetchService::new(
+            Arc::new(ContainerRuntime::default()),
+            run_info_dir.to_path_buf(),
+            None,
+            None,
+            None,
+        )),
         engine_provisioner.clone(),
         object_store_registry.clone(),
         Arc::new(DataFormatRegistryImpl::new()),
-        Arc::new(ContainerRuntime::default()),
         run_info_dir.to_path_buf(),
         cache_dir.to_path_buf(),
         time_source.clone(),

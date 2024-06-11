@@ -44,12 +44,16 @@ sha3 = "0.10"
 url = "2"
 
 # Crypto
-ed25519-dalek = { version = "2", default-features = false, features = ["std", "fast", "rand_core"] }
+ed25519-dalek = { version = "2", default-features = false, features = [
+    "std",
+    "fast",
+    "rand_core",
+] }
 rand = "0.8"
 
 # Serialization
 base64 = "0.21"
-flatbuffers = "23"
+flatbuffers = "24"
 hex = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_with = "3"
@@ -60,8 +64,10 @@ prost = "0.12"
 tonic = "0.11"
 
 # Optional
-arrow = { optional = true, version = "51", default-features = false, features = ["ipc"] }
-sqlx = { optional = true, version = "0.7", default_features = false}
+arrow = { optional = true, version = "52", default-features = false, features = [
+    "ipc",
+] }
+sqlx = { optional = true, version = "0.7", default_features = false }
 
 [dev-dependencies]
 indoc = "2"

@@ -576,6 +576,7 @@ pub enum FetchStep<'a> {
     FilesGlob(&'a dyn FetchStepFilesGlob),
     Container(&'a dyn FetchStepContainer),
     Mqtt(&'a dyn FetchStepMqtt),
+    EthereumLogs(&'a dyn FetchStepEthereumLogs),
 }
 
 impl<'a> From<&'a dtos::FetchStep> for FetchStep<'a> {
@@ -585,6 +586,7 @@ impl<'a> From<&'a dtos::FetchStep> for FetchStep<'a> {
             dtos::FetchStep::FilesGlob(v) => FetchStep::FilesGlob(v),
             dtos::FetchStep::Container(v) => FetchStep::Container(v),
             dtos::FetchStep::Mqtt(v) => FetchStep::Mqtt(v),
+            dtos::FetchStep::EthereumLogs(v) => FetchStep::EthereumLogs(v),
         }
     }
 }
@@ -596,6 +598,7 @@ impl Into<dtos::FetchStep> for FetchStep<'_> {
             FetchStep::FilesGlob(v) => dtos::FetchStep::FilesGlob(v.into()),
             FetchStep::Container(v) => dtos::FetchStep::Container(v.into()),
             FetchStep::Mqtt(v) => dtos::FetchStep::Mqtt(v.into()),
+            FetchStep::EthereumLogs(v) => dtos::FetchStep::EthereumLogs(v.into()),
         }
     }
 }
@@ -627,6 +630,13 @@ pub trait FetchStepMqtt {
     fn username(&self) -> Option<&str>;
     fn password(&self) -> Option<&str>;
     fn topics(&self) -> Box<dyn Iterator<Item = &dyn MqttTopicSubscription> + '_>;
+}
+
+pub trait FetchStepEthereumLogs {
+    fn chain_id(&self) -> Option<u64>;
+    fn node_url(&self) -> Option<&str>;
+    fn filter(&self) -> Option<&str>;
+    fn signature(&self) -> Option<&str>;
 }
 
 impl FetchStepUrl for dtos::FetchStepUrl {
@@ -716,6 +726,21 @@ impl FetchStepMqtt for dtos::FetchStepMqtt {
     }
 }
 
+impl FetchStepEthereumLogs for dtos::FetchStepEthereumLogs {
+    fn chain_id(&self) -> Option<u64> {
+        self.chain_id.as_ref().map(|v| -> u64 { *v })
+    }
+    fn node_url(&self) -> Option<&str> {
+        self.node_url.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+    fn filter(&self) -> Option<&str> {
+        self.filter.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+    fn signature(&self) -> Option<&str> {
+        self.signature.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+}
+
 impl Into<dtos::FetchStepUrl> for &dyn FetchStepUrl {
     fn into(self) -> dtos::FetchStepUrl {
         dtos::FetchStepUrl {
@@ -757,6 +782,17 @@ impl Into<dtos::FetchStepMqtt> for &dyn FetchStepMqtt {
             username: self.username().map(|v| v.to_owned()),
             password: self.password().map(|v| v.to_owned()),
             topics: self.topics().map(|i| i.into()).collect(),
+        }
+    }
+}
+
+impl Into<dtos::FetchStepEthereumLogs> for &dyn FetchStepEthereumLogs {
+    fn into(self) -> dtos::FetchStepEthereumLogs {
+        dtos::FetchStepEthereumLogs {
+            chain_id: self.chain_id().map(|v| v),
+            node_url: self.node_url().map(|v| v.to_owned()),
+            filter: self.filter().map(|v| v.to_owned()),
+            signature: self.signature().map(|v| v.to_owned()),
         }
     }
 }

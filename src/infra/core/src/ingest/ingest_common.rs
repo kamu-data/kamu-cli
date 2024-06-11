@@ -62,5 +62,12 @@ pub fn new_session_context(object_store_registry: Arc<dyn ObjectStoreRegistry>) 
 
     let runtime = Arc::new(RuntimeEnv::new(runtime_config).unwrap());
 
-    SessionContext::new_with_config_rt(config, runtime)
+    let mut ctx = SessionContext::new_with_config_rt(config, runtime);
+
+    // TODO: As part of the ODF spec we should let people opt-in into various
+    // SQL extensions on per-transform basis
+    datafusion_ethers::udf::register_all(&mut ctx).unwrap();
+    datafusion_functions_json::register_all(&mut ctx).unwrap();
+
+    ctx
 }

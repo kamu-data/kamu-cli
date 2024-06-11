@@ -45,6 +45,7 @@ use arrow_flight::sql::{
     CommandStatementQuery,
     CommandStatementSubstraitPlan,
     CommandStatementUpdate,
+    DoPutPreparedStatementResult,
     ProstMessageExt,
     SqlInfo,
     TicketStatementQuery,
@@ -1054,7 +1055,7 @@ impl FlightSqlService for KamuFlightSqlService {
         &self,
         query: CommandPreparedStatementQuery,
         _request: Request<PeekableFlightDataStream>,
-    ) -> Result<Response<<Self as FlightService>::DoPutStream>, Status> {
+    ) -> Result<DoPutPreparedStatementResult, Status> {
         Err(Status::unimplemented(
             "Implement do_put_prepared_statement_query",
         ))

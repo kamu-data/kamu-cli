@@ -26,15 +26,23 @@ pub struct CLIConfig {
     /// Engine configuration
     #[merge(strategy = merge_recursive)]
     pub engine: Option<EngineConfig>,
+
+    /// Source configuration
+    #[merge(strategy = merge_recursive)]
+    pub source: Option<SourceConfig>,
+
     /// Network protocols configuration
     #[merge(strategy = merge_recursive)]
     pub protocol: Option<ProtocolConfig>,
+
     /// Data access and visualization configuration
     #[merge(strategy = merge_recursive)]
     pub frontend: Option<FrontendConfig>,
+
     /// Users configuration
     #[merge(strategy = merge_recursive)]
     pub users: Option<PredefinedAccountsConfig>,
+
     /// Database connection configuration
     pub database: Option<DatabaseConfig>,
     /// Uploads configuration
@@ -46,6 +54,7 @@ impl CLIConfig {
     pub fn new() -> Self {
         Self {
             engine: None,
+            source: None,
             protocol: None,
             frontend: None,
             users: None,
@@ -61,6 +70,7 @@ impl CLIConfig {
     pub fn sample() -> Self {
         Self {
             engine: Some(EngineConfig::sample()),
+            source: Some(SourceConfig::sample()),
             protocol: Some(ProtocolConfig::sample()),
             frontend: Some(FrontendConfig::sample()),
             users: Some(PredefinedAccountsConfig::sample()),
@@ -74,6 +84,7 @@ impl Default for CLIConfig {
     fn default() -> Self {
         Self {
             engine: Some(EngineConfig::default()),
+            source: Some(SourceConfig::default()),
             protocol: Some(ProtocolConfig::default()),
             frontend: Some(FrontendConfig::default()),
             users: Some(PredefinedAccountsConfig::default()),
@@ -83,6 +94,8 @@ impl Default for CLIConfig {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+// Engine
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
@@ -182,6 +195,176 @@ impl Default for EngineImagesConfig {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
+// Source
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SourceConfig {
+    /// Target number of records after which we will stop consuming from the
+    /// resumable source and commit data, leaving the rest for the next
+    /// iteration. This ensures that one data slice doesn't become too big.
+    pub target_records_per_slice: Option<u64>,
+    /// MQTT-specific configuration
+    #[merge(strategy = merge_recursive)]
+    pub mqtt: Option<MqttSourceConfig>,
+    /// Ethereum-specific configuration
+    #[merge(strategy = merge_recursive)]
+    pub ethereum: Option<EthereumSourceConfig>,
+}
+
+impl SourceConfig {
+    pub fn new() -> Self {
+        Self {
+            target_records_per_slice: None,
+            mqtt: None,
+            ethereum: None,
+        }
+    }
+
+    fn sample() -> Self {
+        Self {
+            mqtt: Some(MqttSourceConfig::sample()),
+            ethereum: Some(EthereumSourceConfig::sample()),
+            ..Self::default()
+        }
+    }
+
+    pub fn to_infra_cfg(&self) -> kamu::ingest::SourceConfig {
+        kamu::ingest::SourceConfig {
+            target_records_per_slice: self.target_records_per_slice.unwrap(),
+        }
+    }
+}
+
+impl Default for SourceConfig {
+    fn default() -> Self {
+        let infra_cfg = kamu::ingest::SourceConfig::default();
+        Self {
+            target_records_per_slice: Some(infra_cfg.target_records_per_slice),
+            mqtt: Some(MqttSourceConfig::default()),
+            ethereum: Some(EthereumSourceConfig::default()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct MqttSourceConfig {
+    /// Time in milliseconds to wait for MQTT broker to send us some data after
+    /// which we will consider that we have "caught up" and end the polling
+    /// loop.
+    pub broker_idle_timeout_ms: Option<u64>,
+}
+
+impl MqttSourceConfig {
+    pub fn new() -> Self {
+        Self {
+            broker_idle_timeout_ms: None,
+        }
+    }
+
+    fn sample() -> Self {
+        Self { ..Self::default() }
+    }
+
+    pub fn to_infra_cfg(&self) -> kamu::ingest::MqttSourceConfig {
+        kamu::ingest::MqttSourceConfig {
+            broker_idle_timeout_ms: self.broker_idle_timeout_ms.unwrap(),
+        }
+    }
+}
+
+impl Default for MqttSourceConfig {
+    fn default() -> Self {
+        let infra_cfg = kamu::ingest::MqttSourceConfig::default();
+        Self {
+            broker_idle_timeout_ms: Some(infra_cfg.broker_idle_timeout_ms),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct EthereumSourceConfig {
+    /// Default RPC endpoints to use if source does not specify one explicitly.
+    #[merge(strategy = merge::vec::append)]
+    pub rpc_endpoints: Vec<EthRpcEndpoint>,
+    /// Default number of blocks to scan within one query to `eth_getLogs` RPC
+    /// endpoint.
+    pub get_logs_block_stride: Option<u64>,
+    /// Forces iteration to stop after the specified number of blocks were
+    /// scanned even if we didn't reach the target record number. This is useful
+    /// to not lose a lot of scanning progress in case of an RPC error.
+    pub commit_after_blocks_scanned: Option<u64>,
+}
+
+impl EthereumSourceConfig {
+    pub fn new() -> Self {
+        Self {
+            rpc_endpoints: Vec::new(),
+            get_logs_block_stride: None,
+            commit_after_blocks_scanned: None,
+        }
+    }
+
+    fn sample() -> Self {
+        Self { ..Self::default() }
+    }
+
+    pub fn to_infra_cfg(&self) -> kamu::ingest::EthereumSourceConfig {
+        kamu::ingest::EthereumSourceConfig {
+            rpc_endpoints: self
+                .rpc_endpoints
+                .iter()
+                .map(EthRpcEndpoint::to_infra_cfg)
+                .collect(),
+            get_logs_block_stride: self.get_logs_block_stride.unwrap(),
+            commit_after_blocks_scanned: self.commit_after_blocks_scanned.unwrap(),
+        }
+    }
+}
+
+impl Default for EthereumSourceConfig {
+    fn default() -> Self {
+        let infra_cfg = kamu::ingest::EthereumSourceConfig::default();
+        Self {
+            rpc_endpoints: Vec::new(),
+            get_logs_block_stride: Some(infra_cfg.get_logs_block_stride),
+            commit_after_blocks_scanned: Some(infra_cfg.commit_after_blocks_scanned),
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct EthRpcEndpoint {
+    pub chain_id: u64,
+    pub chain_name: String,
+    pub node_url: Url,
+}
+
+impl EthRpcEndpoint {
+    pub fn to_infra_cfg(&self) -> kamu::ingest::EthRpcEndpoint {
+        kamu::ingest::EthRpcEndpoint {
+            chain_id: self.chain_id,
+            chain_name: self.chain_name.clone(),
+            node_url: self.node_url.clone(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+// Protocol
+////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
@@ -253,6 +436,8 @@ impl Default for IpfsConfig {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
+// Frontend
+////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
@@ -320,6 +505,8 @@ impl Default for JupyterConfig {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
+// Database
+////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -365,6 +552,8 @@ pub struct RemoteDatabaseConfig {
     pub port: Option<u32>,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+// Misc
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]

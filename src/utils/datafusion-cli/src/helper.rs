@@ -21,7 +21,7 @@
 
 use std::borrow::Cow;
 
-use datafusion::common::sql_err;
+use datafusion::common::sql_datafusion_err;
 use datafusion::error::DataFusionError;
 use datafusion::sql::parser::{DFParser, Statement};
 use datafusion::sql::sqlparser::dialect::dialect_from_str;
@@ -185,10 +185,10 @@ pub fn unescape_input(input: &str) -> datafusion::error::Result<String> {
                     't' => '\t',
                     '\\' => '\\',
                     _ => {
-                        return sql_err!(ParserError::TokenizerError(format!(
+                        return Err(sql_datafusion_err!(ParserError::TokenizerError(format!(
                             "unsupported escape char: '\\{}'",
                             next_char
-                        ),))
+                        ))))
                     }
                 });
             }
@@ -254,78 +254,71 @@ mod tests {
     fn unescape_readline_input() -> Result<()> {
         let validator = CliHelper::default();
 
-        // should be valid
+        // shoule be valid
         let result = readline_direct(
-            Cursor::new(
-                r"create external table test stored as csv location 'data.csv' delimiter ',';"
-                    .as_bytes(),
-            ),
-            &validator,
-        )?;
+             Cursor::new(
+                 r"create external table test stored as csv location 'data.csv' options ('format.delimiter' ',');"
+                     .as_bytes(),
+             ),
+             &validator,
+         )?;
         assert!(matches!(result, ValidationResult::Valid(None)));
 
         let result = readline_direct(
-            Cursor::new(
-                r"create external table test stored as csv location 'data.csv' delimiter '\0';"
-                    .as_bytes(),
-            ),
-            &validator,
-        )?;
+             Cursor::new(
+                 r"create external table test stored as csv location 'data.csv' options ('format.delimiter' '\0');"
+                     .as_bytes()),
+             &validator,
+         )?;
         assert!(matches!(result, ValidationResult::Valid(None)));
 
         let result = readline_direct(
-            Cursor::new(
-                r"create external table test stored as csv location 'data.csv' delimiter '\n';"
-                    .as_bytes(),
-            ),
-            &validator,
-        )?;
+             Cursor::new(
+                 r"create external table test stored as csv location 'data.csv' options ('format.delimiter' '\n');"
+                     .as_bytes()),
+             &validator,
+         )?;
         assert!(matches!(result, ValidationResult::Valid(None)));
 
         let result = readline_direct(
-            Cursor::new(
-                r"create external table test stored as csv location 'data.csv' delimiter '\r';"
-                    .as_bytes(),
-            ),
-            &validator,
-        )?;
+             Cursor::new(
+                 r"create external table test stored as csv location 'data.csv' options ('format.delimiter' '\r');"
+                     .as_bytes()),
+             &validator,
+         )?;
         assert!(matches!(result, ValidationResult::Valid(None)));
 
         let result = readline_direct(
-            Cursor::new(
-                r"create external table test stored as csv location 'data.csv' delimiter '\t';"
-                    .as_bytes(),
-            ),
-            &validator,
-        )?;
+             Cursor::new(
+                 r"create external table test stored as csv location 'data.csv' options ('format.delimiter' '\t');"
+                     .as_bytes()),
+             &validator,
+         )?;
         assert!(matches!(result, ValidationResult::Valid(None)));
 
         let result = readline_direct(
-            Cursor::new(
-                r"create external table test stored as csv location 'data.csv' delimiter '\\';"
-                    .as_bytes(),
-            ),
-            &validator,
-        )?;
+             Cursor::new(
+                 r"create external table test stored as csv location 'data.csv' options ('format.delimiter' '\\');"
+                     .as_bytes()),
+             &validator,
+         )?;
+        assert!(matches!(result, ValidationResult::Valid(None)));
+
+        let result = readline_direct(
+             Cursor::new(
+                 r"create external table test stored as csv location 'data.csv' options ('format.delimiter' ',,');"
+                     .as_bytes()),
+             &validator,
+         )?;
         assert!(matches!(result, ValidationResult::Valid(None)));
 
         // should be invalid
         let result = readline_direct(
-            Cursor::new(
-                r"create external table test stored as csv location 'data.csv' delimiter ',,';"
-                    .as_bytes(),
-            ),
-            &validator,
-        )?;
-        assert!(matches!(result, ValidationResult::Invalid(Some(_))));
-
-        let result = readline_direct(
-            Cursor::new(
-                r"create external table test stored as csv location 'data.csv' delimiter '\u{07}';"
-                    .as_bytes(),
-            ),
-            &validator,
-        )?;
+             Cursor::new(
+                 r"create external table test stored as csv location 'data.csv' options ('format.delimiter' '\u{07}');"
+                     .as_bytes()),
+             &validator,
+         )?;
         assert!(matches!(result, ValidationResult::Invalid(Some(_))));
 
         Ok(())
@@ -335,7 +328,7 @@ mod tests {
     fn sql_dialect() -> Result<()> {
         let mut validator = CliHelper::default();
 
-        // should be invalid in generic dialect
+        // shoule be invalid in generic dialect
         let result = readline_direct(Cursor::new(r"select 1 # 2;".as_bytes()), &validator)?;
         assert!(
             matches!(result, ValidationResult::Invalid(Some(e)) if e.contains("Invalid statement"))

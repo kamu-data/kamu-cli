@@ -911,18 +911,19 @@ pub const ENUM_MIN_FETCH_STEP: u8 = 0;
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MAX_FETCH_STEP: u8 = 4;
+pub const ENUM_MAX_FETCH_STEP: u8 = 5;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_FETCH_STEP: [FetchStep; 5] = [
+pub const ENUM_VALUES_FETCH_STEP: [FetchStep; 6] = [
     FetchStep::NONE,
     FetchStep::FetchStepUrl,
     FetchStep::FetchStepFilesGlob,
     FetchStep::FetchStepContainer,
     FetchStep::FetchStepMqtt,
+    FetchStep::FetchStepEthereumLogs,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -935,15 +936,17 @@ impl FetchStep {
     pub const FetchStepFilesGlob: Self = Self(2);
     pub const FetchStepContainer: Self = Self(3);
     pub const FetchStepMqtt: Self = Self(4);
+    pub const FetchStepEthereumLogs: Self = Self(5);
 
     pub const ENUM_MIN: u8 = 0;
-    pub const ENUM_MAX: u8 = 4;
+    pub const ENUM_MAX: u8 = 5;
     pub const ENUM_VALUES: &'static [Self] = &[
         Self::NONE,
         Self::FetchStepUrl,
         Self::FetchStepFilesGlob,
         Self::FetchStepContainer,
         Self::FetchStepMqtt,
+        Self::FetchStepEthereumLogs,
     ];
     /// Returns the variant's name or "" if unknown.
     pub fn variant_name(self) -> Option<&'static str> {
@@ -953,6 +956,7 @@ impl FetchStep {
             Self::FetchStepFilesGlob => Some("FetchStepFilesGlob"),
             Self::FetchStepContainer => Some("FetchStepContainer"),
             Self::FetchStepMqtt => Some("FetchStepMqtt"),
+            Self::FetchStepEthereumLogs => Some("FetchStepEthereumLogs"),
             _ => None,
         }
     }
@@ -8130,6 +8134,198 @@ impl core::fmt::Debug for FetchStepMqtt<'_> {
         ds.finish()
     }
 }
+pub enum FetchStepEthereumLogsOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct FetchStepEthereumLogs<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for FetchStepEthereumLogs<'a> {
+    type Inner = FetchStepEthereumLogs<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> FetchStepEthereumLogs<'a> {
+    pub const VT_CHAIN_ID: flatbuffers::VOffsetT = 4;
+    pub const VT_NODE_URL: flatbuffers::VOffsetT = 6;
+    pub const VT_FILTER: flatbuffers::VOffsetT = 8;
+    pub const VT_SIGNATURE: flatbuffers::VOffsetT = 10;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        FetchStepEthereumLogs { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args FetchStepEthereumLogsArgs<'args>,
+    ) -> flatbuffers::WIPOffset<FetchStepEthereumLogs<'bldr>> {
+        let mut builder = FetchStepEthereumLogsBuilder::new(_fbb);
+        if let Some(x) = args.chain_id {
+            builder.add_chain_id(x);
+        }
+        if let Some(x) = args.signature {
+            builder.add_signature(x);
+        }
+        if let Some(x) = args.filter {
+            builder.add_filter(x);
+        }
+        if let Some(x) = args.node_url {
+            builder.add_node_url(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn chain_id(&self) -> Option<u64> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<u64>(FetchStepEthereumLogs::VT_CHAIN_ID, None)
+        }
+    }
+    #[inline]
+    pub fn node_url(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(FetchStepEthereumLogs::VT_NODE_URL, None)
+        }
+    }
+    #[inline]
+    pub fn filter(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(FetchStepEthereumLogs::VT_FILTER, None)
+        }
+    }
+    #[inline]
+    pub fn signature(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                FetchStepEthereumLogs::VT_SIGNATURE,
+                None,
+            )
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for FetchStepEthereumLogs<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<u64>("chain_id", Self::VT_CHAIN_ID, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "node_url",
+                Self::VT_NODE_URL,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("filter", Self::VT_FILTER, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "signature",
+                Self::VT_SIGNATURE,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct FetchStepEthereumLogsArgs<'a> {
+    pub chain_id: Option<u64>,
+    pub node_url: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub filter: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub signature: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for FetchStepEthereumLogsArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        FetchStepEthereumLogsArgs {
+            chain_id: None,
+            node_url: None,
+            filter: None,
+            signature: None,
+        }
+    }
+}
+
+pub struct FetchStepEthereumLogsBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> FetchStepEthereumLogsBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_chain_id(&mut self, chain_id: u64) {
+        self.fbb_
+            .push_slot_always::<u64>(FetchStepEthereumLogs::VT_CHAIN_ID, chain_id);
+    }
+    #[inline]
+    pub fn add_node_url(&mut self, node_url: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            FetchStepEthereumLogs::VT_NODE_URL,
+            node_url,
+        );
+    }
+    #[inline]
+    pub fn add_filter(&mut self, filter: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            FetchStepEthereumLogs::VT_FILTER,
+            filter,
+        );
+    }
+    #[inline]
+    pub fn add_signature(&mut self, signature: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            FetchStepEthereumLogs::VT_SIGNATURE,
+            signature,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> FetchStepEthereumLogsBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        FetchStepEthereumLogsBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<FetchStepEthereumLogs<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for FetchStepEthereumLogs<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("FetchStepEthereumLogs");
+        ds.field("chain_id", &self.chain_id());
+        ds.field("node_url", &self.node_url());
+        ds.field("filter", &self.filter());
+        ds.field("signature", &self.signature());
+        ds.finish()
+    }
+}
 pub enum PrepStepDecompressOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -8820,6 +9016,21 @@ impl<'a> SetPollingSource<'a> {
 
     #[inline]
     #[allow(non_snake_case)]
+    pub fn fetch_as_fetch_step_ethereum_logs(&self) -> Option<FetchStepEthereumLogs<'a>> {
+        if self.fetch_type() == FetchStep::FetchStepEthereumLogs {
+            self.fetch().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { FetchStepEthereumLogs::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
     pub fn read_as_read_step_csv(&self) -> Option<ReadStepCsv<'a>> {
         if self.read_type() == ReadStep::ReadStepCsv {
             self.read().map(|t| {
@@ -8998,6 +9209,7 @@ impl flatbuffers::Verifiable for SetPollingSource<'_> {
           FetchStep::FetchStepFilesGlob => v.verify_union_variant::<flatbuffers::ForwardsUOffset<FetchStepFilesGlob>>("FetchStep::FetchStepFilesGlob", pos),
           FetchStep::FetchStepContainer => v.verify_union_variant::<flatbuffers::ForwardsUOffset<FetchStepContainer>>("FetchStep::FetchStepContainer", pos),
           FetchStep::FetchStepMqtt => v.verify_union_variant::<flatbuffers::ForwardsUOffset<FetchStepMqtt>>("FetchStep::FetchStepMqtt", pos),
+          FetchStep::FetchStepEthereumLogs => v.verify_union_variant::<flatbuffers::ForwardsUOffset<FetchStepEthereumLogs>>("FetchStep::FetchStepEthereumLogs", pos),
           _ => Ok(()),
         }
      })?
@@ -9187,6 +9399,16 @@ impl core::fmt::Debug for SetPollingSource<'_> {
             }
             FetchStep::FetchStepMqtt => {
                 if let Some(x) = self.fetch_as_fetch_step_mqtt() {
+                    ds.field("fetch", &x)
+                } else {
+                    ds.field(
+                        "fetch",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            FetchStep::FetchStepEthereumLogs => {
+                if let Some(x) = self.fetch_as_fetch_step_ethereum_logs() {
                     ds.field("fetch", &x)
                 } else {
                     ds.field(
