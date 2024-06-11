@@ -12,13 +12,13 @@ use opendatafabric::{AccountID, AccountName};
 use thiserror::Error;
 
 use super::{InvalidCredentialsError, RejectedCredentialsError};
-use crate::Account;
+use crate::{Account, FindAccountIdByProviderIdentityKeyError, ProviderLoginError};
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait AuthenticationService: Sync + Send {
-    async fn supported_login_methods(&self) -> Result<SupportedLoginMethods, InternalError>;
+    fn supported_login_methods(&self) -> Vec<&'static str>;
 
     async fn login(
         &self,
@@ -51,10 +51,6 @@ pub trait AuthenticationService: Sync + Send {
         account_id: &AccountID,
     ) -> Result<Option<AccountName>, InternalError>;
 }
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub type SupportedLoginMethods = Vec<&'static str>;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -107,6 +103,24 @@ pub struct UnsupportedLoginMethodError {
     pub method: String,
 }
 
+impl From<ProviderLoginError> for LoginError {
+    fn from(value: ProviderLoginError) -> Self {
+        match value {
+            ProviderLoginError::InvalidCredentials(e) => Self::InvalidCredentials(e),
+            ProviderLoginError::RejectedCredentials(e) => Self::RejectedCredentials(e),
+            ProviderLoginError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<FindAccountIdByProviderIdentityKeyError> for LoginError {
+    fn from(value: FindAccountIdByProviderIdentityKeyError) -> Self {
+        match value {
+            FindAccountIdByProviderIdentityKeyError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
@@ -128,12 +142,6 @@ pub enum AccessTokenError {
 
     #[error("Expired access token")]
     Expired,
-}
-
-impl From<InternalError> for GetAccountInfoError {
-    fn from(e: InternalError) -> Self {
-        Self::Internal(e)
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

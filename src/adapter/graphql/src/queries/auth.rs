@@ -18,10 +18,7 @@ impl Auth {
     async fn enabled_login_methods(&self, ctx: &Context<'_>) -> Result<Vec<&'static str>> {
         let authentication_service =
             from_catalog::<dyn kamu_accounts::AuthenticationService>(ctx).unwrap();
-
-        let login_methods = authentication_service.supported_login_methods().await?;
-
-        Ok(login_methods)
+        Ok(authentication_service.supported_login_methods())
     }
 }
 

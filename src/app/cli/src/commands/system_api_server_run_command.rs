@@ -11,6 +11,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use console::style as s;
+use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::*;
@@ -100,20 +101,22 @@ impl APIServerRunCommand {
             password: account_config.get_password(),
         };
 
-        let auth_svc = self
-            .base_catalog
-            .get_one::<dyn AuthenticationService>()
-            .unwrap();
-        let access_token = auth_svc
-            .login(
-                PROVIDER_PASSWORD,
-                serde_json::to_string::<PasswordLoginCredentials>(&login_credentials).int_err()?,
-            )
-            .await
-            .int_err()?
-            .access_token;
+        let login_response = DatabaseTransactionRunner::new(self.base_catalog.clone())
+            .transactional_with(|auth_svc: Arc<dyn AuthenticationService>| async move {
+                auth_svc
+                    .login(
+                        PROVIDER_PASSWORD,
+                        serde_json::to_string::<PasswordLoginCredentials>(&login_credentials)
+                            .int_err()
+                            .map_err(CLIError::critical)?,
+                    )
+                    .await
+                    .int_err()
+                    .map_err(CLIError::critical)
+            })
+            .await?;
 
-        Ok(access_token)
+        Ok(login_response.access_token)
     }
 }
 

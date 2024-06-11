@@ -12,7 +12,6 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use chrono::Utc;
-use database_common::{DatabaseTransactionRunner, TransactionalCatalog};
 use dill::*;
 use internal_error::*;
 use jsonwebtoken::errors::ErrorKind;
@@ -46,7 +45,9 @@ pub struct AuthenticationServiceImpl {
     time_source: Arc<dyn SystemTimeSource>,
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
-    transaction_runner: Arc<DatabaseTransactionRunner>,
+    authentication_providers_by_method: HashMap<&'static str, Arc<dyn AuthenticationProvider>>,
+    login_password_auth_provider: Option<Arc<LoginPasswordAuthProvider>>,
+    account_repository: Arc<dyn AccountRepository>,
     state: tokio::sync::Mutex<State>,
 }
 
@@ -58,22 +59,39 @@ struct State {
 ////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[scope(Singleton)]
 #[interface(dyn AuthenticationService)]
 impl AuthenticationServiceImpl {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
-        transaction_runner: Arc<DatabaseTransactionRunner>,
+        authentication_providers: Vec<Arc<dyn AuthenticationProvider>>,
+        login_password_auth_provider: Option<Arc<LoginPasswordAuthProvider>>,
+        account_repository: Arc<dyn AccountRepository>,
         time_source: Arc<dyn SystemTimeSource>,
         config: Arc<JwtAuthenticationConfig>,
     ) -> Self {
+        let mut authentication_providers_by_method = HashMap::new();
+
+        for authentication_provider in authentication_providers {
+            let login_method = authentication_provider.provider_name();
+
+            let insert_result = authentication_providers_by_method
+                .insert(login_method, authentication_provider.clone());
+
+            assert!(
+                insert_result.is_none(),
+                "Duplicate authentication provider for method {login_method}"
+            );
+        }
+
         Self {
             predefined_accounts_config,
             time_source,
             encoding_key: EncodingKey::from_secret(config.jwt_secret.as_bytes()),
             decoding_key: DecodingKey::from_secret(config.jwt_secret.as_bytes()),
-            transaction_runner,
+            authentication_providers_by_method,
+            login_password_auth_provider,
+            account_repository,
             state: tokio::sync::Mutex::new(State::default()),
         }
     }
@@ -81,17 +99,12 @@ impl AuthenticationServiceImpl {
     fn resolve_authentication_provider(
         &self,
         login_method: &str,
-        transactional_catalog: &TransactionalCatalog,
-    ) -> Result<Arc<dyn AuthenticationProvider>, LoginError> {
-        let authentication_providers =
-            self.get_authentication_providers_by_method(transactional_catalog);
-
-        match authentication_providers.get(login_method) {
+    ) -> Result<Arc<dyn AuthenticationProvider>, UnsupportedLoginMethodError> {
+        match self.authentication_providers_by_method.get(login_method) {
             Some(provider) => Ok(provider.clone()),
             None => Err(UnsupportedLoginMethodError {
                 method: login_method.into(),
-            }
-            .into()),
+            }),
         }
     }
 
@@ -134,17 +147,14 @@ impl AuthenticationServiceImpl {
         )
     }
 
-    async fn ensure_predefined_accounts_registration(
-        &self,
-        account_repository: &Arc<dyn AccountRepository>,
-        maybe_login_password_auth_provider: &Option<Arc<LoginPasswordAuthProvider>>,
-    ) -> Result<(), InternalError> {
+    async fn ensure_predefined_accounts_registration(&self) -> Result<(), InternalError> {
         let mut guard = self.state.lock().await;
         if !guard.predefined_accounts_registered {
             // Register predefined accounts on first request
             for account_config in &self.predefined_accounts_config.predefined {
                 let account_id = account_config.get_id();
-                let is_unknown = match account_repository.get_account_by_id(&account_id).await {
+                let is_unknown = match self.account_repository.get_account_by_id(&account_id).await
+                {
                     Ok(_) => Ok(false),
                     Err(GetAccountByIdError::NotFound(_)) => Ok(true),
                     Err(GetAccountByIdError::Internal(e)) => Err(e),
@@ -164,7 +174,7 @@ impl AuthenticationServiceImpl {
                         provider_identity_key: account_config.account_name.to_string(),
                     };
 
-                    account_repository
+                    self.account_repository
                         .create_account(&account)
                         .await
                         .map_err(|e| match e {
@@ -173,7 +183,7 @@ impl AuthenticationServiceImpl {
                         })?;
 
                     if let Some(login_password_auth_provider) =
-                        maybe_login_password_auth_provider.as_ref()
+                        self.login_password_auth_provider.as_ref()
                         && account_config.provider == PROVIDER_PASSWORD
                     {
                         login_password_auth_provider
@@ -187,70 +197,17 @@ impl AuthenticationServiceImpl {
         }
         Ok(())
     }
-
-    async fn account_by_id_impl(
-        &self,
-        account_id: &AccountID,
-        account_repository: &Arc<dyn AccountRepository>,
-        maybe_login_password_auth_provider: &Option<Arc<LoginPasswordAuthProvider>>,
-    ) -> Result<Option<Account>, InternalError> {
-        self.ensure_predefined_accounts_registration(
-            account_repository,
-            maybe_login_password_auth_provider,
-        )
-        .await?;
-
-        match account_repository.get_account_by_id(account_id).await {
-            Ok(account) => Ok(Some(account.clone())),
-            Err(GetAccountByIdError::NotFound(_)) => Ok(None),
-            Err(GetAccountByIdError::Internal(e)) => Err(e),
-        }
-    }
-
-    fn get_authentication_providers_by_method(
-        &self,
-        transactional_catalog: &TransactionalCatalog,
-    ) -> HashMap<&'static str, Arc<dyn AuthenticationProvider>> {
-        let authentication_providers = transactional_catalog
-            .get::<AllOf<dyn AuthenticationProvider>>()
-            .unwrap();
-        let mut authentication_providers_by_method = HashMap::new();
-
-        for authentication_provider in authentication_providers {
-            let login_method = authentication_provider.provider_name();
-
-            let insert_result = authentication_providers_by_method
-                .insert(login_method, authentication_provider.clone());
-
-            assert!(
-                insert_result.is_none(),
-                "Duplicate authentication provider for method {login_method}"
-            );
-        }
-
-        authentication_providers_by_method
-    }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl AuthenticationService for AuthenticationServiceImpl {
-    async fn supported_login_methods(&self) -> Result<SupportedLoginMethods, InternalError> {
-        self.transaction_runner
-            .transactional(|transactional_catalog| async move {
-                let mut login_methods: Vec<_> = self
-                    .get_authentication_providers_by_method(&transactional_catalog)
-                    .keys()
-                    .copied()
-                    .collect();
-
-                // Stable order for tests
-                login_methods.sort_unstable();
-
-                Ok(login_methods)
-            })
-            .await
+    fn supported_login_methods(&self) -> Vec<&'static str> {
+        self.authentication_providers_by_method
+            .keys()
+            .copied()
+            .collect()
     }
 
     async fn login(
@@ -258,282 +215,155 @@ impl AuthenticationService for AuthenticationServiceImpl {
         login_method: &str,
         login_credentials_json: String,
     ) -> Result<LoginResponse, LoginError> {
-        self.transaction_runner
-            .transactional(|transactional_catalog| async move {
-                let account_repository = transactional_catalog
-                    .get_one::<dyn AccountRepository>()
-                    .unwrap();
-                let maybe_login_password_auth_provider = transactional_catalog
-                    .get::<Maybe<OneOf<LoginPasswordAuthProvider>>>()
-                    .unwrap();
+        self.ensure_predefined_accounts_registration().await?;
 
-                self.ensure_predefined_accounts_registration(
-                    &account_repository,
-                    &maybe_login_password_auth_provider,
-                )
-                .await?;
+        // Resolve provider via specified login method
+        let provider = self.resolve_authentication_provider(login_method)?;
 
-                // Resolve provider via specified login method
-                let provider =
-                    self.resolve_authentication_provider(login_method, &transactional_catalog)?;
+        // Attempt to login via provider
+        let provider_response = provider.login(login_credentials_json).await?;
 
-                // Attempt to login via provider
-                let provider_response = provider.login(login_credentials_json).await.map_err(
-                    |e: ProviderLoginError| match e {
-                        ProviderLoginError::RejectedCredentials(e) => {
-                            LoginError::RejectedCredentials(e)
-                        }
-                        ProviderLoginError::InvalidCredentials(e) => {
-                            LoginError::InvalidCredentials(e)
-                        }
-                        ProviderLoginError::Internal(e) => LoginError::Internal(e),
-                    },
-                )?;
+        // Try to resolve existing account via provider's identity key
+        let maybe_account_id = self
+            .account_repository
+            .find_account_id_by_provider_identity_key(&provider_response.provider_identity_key)
+            .await?;
 
-                // Try to resolve existing account via provider's identity key
-                let maybe_account_id = account_repository
-                    .find_account_id_by_provider_identity_key(
-                        &provider_response.provider_identity_key,
-                    )
-                    .await
-                    .map_err(|e| match e {
-                        FindAccountIdByProviderIdentityKeyError::Internal(e) => {
-                            LoginError::Internal(e)
-                        }
-                    })?;
+        let account_id = match maybe_account_id {
+            // Account already exists
+            Some(account_id) => account_id,
 
-                let account_id = match maybe_account_id {
-                    // Account already exists
-                    Some(account_id) => account_id,
+            // Account does not exist and needs to be created
+            None => {
+                // Generate identity: temporarily we do this via provider, but revise in future
+                let account_id = provider.generate_id(&provider_response.account_name);
 
-                    // Account does not exist and needs to be created
-                    None => {
-                        // Generate identity: temporarily we do this via provider, but revise in
-                        // future
-                        let account_id = provider.generate_id(&provider_response.account_name);
-
-                        // Create a new account
-                        let new_account = Account {
-                            id: account_id,
-                            account_name: provider_response.account_name.clone(),
-                            email: provider_response.email,
-                            display_name: provider_response.display_name,
-                            account_type: provider_response.account_type,
-                            avatar_url: provider_response.avatar_url,
-                            registered_at: Utc::now(),
-                            is_admin: false,
-                            provider: String::from(login_method),
-                            provider_identity_key: provider_response.provider_identity_key,
-                        };
-
-                        // Register account in the repository
-                        account_repository
-                            .create_account(&new_account)
-                            .await
-                            .map_err(|e| match e {
-                                CreateAccountError::Duplicate(_) => {
-                                    LoginError::DuplicateCredentials
-                                }
-                                CreateAccountError::Internal(e) => LoginError::Internal(e),
-                            })?;
-                        new_account.id
-                    }
+                // Create a new account
+                let new_account = Account {
+                    id: account_id,
+                    account_name: provider_response.account_name.clone(),
+                    email: provider_response.email,
+                    display_name: provider_response.display_name,
+                    account_type: provider_response.account_type,
+                    avatar_url: provider_response.avatar_url,
+                    registered_at: Utc::now(),
+                    is_admin: false,
+                    provider: String::from(login_method),
+                    provider_identity_key: provider_response.provider_identity_key,
                 };
 
-                // Create access token and attach basic identity properties
-                Ok(LoginResponse {
-                    access_token: self.make_access_token(&account_id, EXPIRATION_TIME_SEC)?,
-                    account_id,
-                    account_name: provider_response.account_name,
-                })
-            })
-            .await
+                // Register account in the repository
+                self.account_repository
+                    .create_account(&new_account)
+                    .await
+                    .map_err(|e| match e {
+                        CreateAccountError::Duplicate(_) => LoginError::DuplicateCredentials,
+                        CreateAccountError::Internal(e) => LoginError::Internal(e),
+                    })?;
+                new_account.id
+            }
+        };
+
+        // Create access token and attach basic identity properties
+        Ok(LoginResponse {
+            access_token: self.make_access_token(&account_id, EXPIRATION_TIME_SEC)?,
+            account_id,
+            account_name: provider_response.account_name,
+        })
     }
 
     async fn account_by_token(&self, access_token: String) -> Result<Account, GetAccountInfoError> {
-        self.transaction_runner
-            .transactional(|transactional_catalog| async move {
-                let account_repository = transactional_catalog
-                    .get_one::<dyn AccountRepository>()
-                    .unwrap();
-                let maybe_login_password_auth_provider = transactional_catalog
-                    .get::<Maybe<OneOf<LoginPasswordAuthProvider>>>()
-                    .unwrap();
-
-                self.ensure_predefined_accounts_registration(
-                    &account_repository,
-                    &maybe_login_password_auth_provider,
-                )
-                .await
-                .map_err(GetAccountInfoError::Internal)?;
-
-                let decoded_access_token = self
-                    .decode_access_token(&access_token)
-                    .map_err(GetAccountInfoError::AccessToken)?;
-
-                let account_id = AccountID::from_did_str(&decoded_access_token.claims.sub)
-                    .map_err(|e| GetAccountInfoError::Internal(e.int_err()))?;
-
-                match self
-                    .account_by_id_impl(
-                        &account_id,
-                        &account_repository,
-                        &maybe_login_password_auth_provider,
-                    )
-                    .await
-                {
-                    Ok(Some(account)) => Ok(account),
-                    Ok(None) => Err(GetAccountInfoError::AccountUnresolved),
-                    Err(e) => Err(GetAccountInfoError::Internal(e)),
-                }
-            })
+        self.ensure_predefined_accounts_registration()
             .await
+            .map_err(GetAccountInfoError::Internal)?;
+
+        let decoded_access_token = self
+            .decode_access_token(&access_token)
+            .map_err(GetAccountInfoError::AccessToken)?;
+
+        let account_id = AccountID::from_did_str(&decoded_access_token.claims.sub)
+            .map_err(|e| GetAccountInfoError::Internal(e.int_err()))?;
+
+        match self.account_by_id(&account_id).await {
+            Ok(Some(account)) => Ok(account),
+            Ok(None) => Err(GetAccountInfoError::AccountUnresolved),
+            Err(e) => Err(GetAccountInfoError::Internal(e)),
+        }
     }
 
     async fn account_by_id(
         &self,
         account_id: &AccountID,
     ) -> Result<Option<Account>, InternalError> {
-        self.transaction_runner
-            .transactional(|transactional_catalog| async move {
-                let account_repository = transactional_catalog
-                    .get_one::<dyn AccountRepository>()
-                    .unwrap();
-                let maybe_login_password_auth_provider = transactional_catalog
-                    .get::<Maybe<OneOf<LoginPasswordAuthProvider>>>()
-                    .unwrap();
+        self.ensure_predefined_accounts_registration().await?;
 
-                self.ensure_predefined_accounts_registration(
-                    &account_repository,
-                    &maybe_login_password_auth_provider,
-                )
-                .await?;
-
-                self.account_by_id_impl(
-                    account_id,
-                    &account_repository,
-                    &maybe_login_password_auth_provider,
-                )
-                .await
-            })
-            .await
+        match self.account_repository.get_account_by_id(account_id).await {
+            Ok(account) => Ok(Some(account.clone())),
+            Err(GetAccountByIdError::NotFound(_)) => Ok(None),
+            Err(GetAccountByIdError::Internal(e)) => Err(e),
+        }
     }
 
     async fn accounts_by_ids(
         &self,
         account_ids: Vec<AccountID>,
     ) -> Result<Vec<Account>, InternalError> {
-        self.transaction_runner
-            .transactional(|transactional_catalog| async move {
-                let account_repository = transactional_catalog
-                    .get_one::<dyn AccountRepository>()
-                    .unwrap();
-                let maybe_login_password_auth_provider = transactional_catalog
-                    .get::<Maybe<OneOf<LoginPasswordAuthProvider>>>()
-                    .unwrap();
+        self.ensure_predefined_accounts_registration().await?;
 
-                self.ensure_predefined_accounts_registration(
-                    &account_repository,
-                    &maybe_login_password_auth_provider,
-                )
-                .await?;
-
-                account_repository
-                    .get_accounts_by_ids(account_ids)
-                    .await
-                    .int_err()
-            })
+        self.account_repository
+            .get_accounts_by_ids(account_ids)
             .await
+            .int_err()
     }
 
     async fn account_by_name(
         &self,
         account_name: &AccountName,
     ) -> Result<Option<Account>, InternalError> {
-        self.transaction_runner
-            .transactional(|transactional_catalog| async move {
-                let account_repository = transactional_catalog
-                    .get_one::<dyn AccountRepository>()
-                    .unwrap();
-                let maybe_login_password_auth_provider = transactional_catalog
-                    .get::<Maybe<OneOf<LoginPasswordAuthProvider>>>()
-                    .unwrap();
+        self.ensure_predefined_accounts_registration().await?;
 
-                self.ensure_predefined_accounts_registration(
-                    &account_repository,
-                    &maybe_login_password_auth_provider,
-                )
-                .await?;
-
-                match account_repository.get_account_by_name(account_name).await {
-                    Ok(account) => Ok(Some(account.clone())),
-                    Err(GetAccountByNameError::NotFound(_)) => Ok(None),
-                    Err(GetAccountByNameError::Internal(e)) => Err(e),
-                }
-            })
+        match self
+            .account_repository
+            .get_account_by_name(account_name)
             .await
+        {
+            Ok(account) => Ok(Some(account.clone())),
+            Err(GetAccountByNameError::NotFound(_)) => Ok(None),
+            Err(GetAccountByNameError::Internal(e)) => Err(e),
+        }
     }
 
     async fn find_account_id_by_name(
         &self,
         account_name: &AccountName,
     ) -> Result<Option<AccountID>, InternalError> {
-        self.transaction_runner
-            .transactional(|transactional_catalog| async move {
-                let account_repository = transactional_catalog
-                    .get_one::<dyn AccountRepository>()
-                    .unwrap();
-                let maybe_login_password_auth_provider = transactional_catalog
-                    .get::<Maybe<OneOf<LoginPasswordAuthProvider>>>()
-                    .unwrap();
+        self.ensure_predefined_accounts_registration().await?;
 
-                self.ensure_predefined_accounts_registration(
-                    &account_repository,
-                    &maybe_login_password_auth_provider,
-                )
-                .await?;
-
-                match account_repository
-                    .find_account_id_by_name(account_name)
-                    .await
-                {
-                    Ok(maybe_account_id) => Ok(maybe_account_id),
-                    Err(FindAccountIdByNameError::Internal(e)) => Err(e),
-                }
-            })
+        match self
+            .account_repository
+            .find_account_id_by_name(account_name)
             .await
+        {
+            Ok(maybe_account_id) => Ok(maybe_account_id),
+            Err(FindAccountIdByNameError::Internal(e)) => Err(e),
+        }
     }
 
     async fn find_account_name_by_id(
         &self,
         account_id: &AccountID,
     ) -> Result<Option<AccountName>, InternalError> {
-        self.transaction_runner
-            .transactional(|transactional_catalog| async move {
-                let account_repository = transactional_catalog
-                    .get_one::<dyn AccountRepository>()
-                    .unwrap();
-                let maybe_login_password_auth_provider = transactional_catalog
-                    .get::<Maybe<OneOf<LoginPasswordAuthProvider>>>()
-                    .unwrap();
+        self.ensure_predefined_accounts_registration().await?;
 
-                self.ensure_predefined_accounts_registration(
-                    &account_repository,
-                    &maybe_login_password_auth_provider,
-                )
-                .await?;
-
-                match account_repository.get_account_by_id(account_id).await {
-                    Ok(account) => Ok(Some(account.account_name.clone())),
-                    Err(GetAccountByIdError::NotFound(_)) => Ok(None),
-                    Err(GetAccountByIdError::Internal(e)) => Err(e),
-                }
-            })
-            .await
+        match self.account_repository.get_account_by_id(account_id).await {
+            Ok(account) => Ok(Some(account.account_name.clone())),
+            Err(GetAccountByIdError::NotFound(_)) => Ok(None),
+            Err(GetAccountByIdError::Internal(e)) => Err(e),
+        }
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 /// Our claims struct, it needs to derive `Serialize` and/or `Deserialize`
 #[derive(Debug, Serialize, Deserialize)]
@@ -544,4 +374,4 @@ pub struct KamuAccessTokenClaims {
     sub: String,
 }
 
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////

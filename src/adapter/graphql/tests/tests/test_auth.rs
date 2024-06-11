@@ -58,7 +58,7 @@ async fn test_enabled_login_methods() {
     let mut mock_authentication_service = MockAuthenticationService::new();
     mock_authentication_service
         .expect_supported_login_methods()
-        .return_once(|| Ok(vec![DUMMY_LOGIN_METHOD]));
+        .return_once(|| vec![DUMMY_LOGIN_METHOD]);
 
     let cat = dill::CatalogBuilder::new()
         .add_value(mock_authentication_service)

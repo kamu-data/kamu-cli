@@ -21,7 +21,6 @@ use crate::{
     GetAccountInfoError,
     LoginError,
     LoginResponse,
-    SupportedLoginMethods,
     UnsupportedLoginMethodError,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
@@ -39,7 +38,7 @@ mockall::mock! {
     pub AuthenticationService {}
     #[async_trait::async_trait]
     impl AuthenticationService for AuthenticationService {
-        async fn supported_login_methods(&self) -> Result<SupportedLoginMethods, InternalError>;
+        fn supported_login_methods(&self) -> Vec<&'static str>;
 
         async fn login(
             &self,
