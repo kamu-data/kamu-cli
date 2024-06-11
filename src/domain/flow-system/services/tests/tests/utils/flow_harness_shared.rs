@@ -204,6 +204,7 @@ impl FlowHarness {
             .unwrap();
         let dependency_graph_repository =
             DependencyGraphRepositoryInMemory::new(self.dataset_repo.clone());
+
         dependency_graph_service
             .eager_initialization(&dependency_graph_repository)
             .await
@@ -213,8 +214,10 @@ impl FlowHarness {
             .catalog
             .get_one::<dyn DatasetOwnershipService>()
             .unwrap();
+        let authentication_service = self.catalog.get_one::<dyn AuthenticationService>().unwrap();
+
         dataset_ownership_service
-            .eager_initialization()
+            .eager_initialization(&authentication_service)
             .await
             .unwrap();
     }

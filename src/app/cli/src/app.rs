@@ -139,7 +139,7 @@ pub async fn run(
     }
 
     // TODO: Not for every command?
-    DatabaseTransactionRunner::new(base_catalog.clone())
+    DatabaseTransactionRunner::new(cli_catalog.clone())
         .transactional(|transactional_catalog| async move {
             let registrator = transactional_catalog
                 .get_one::<PredefinedAccountsRegistrator>()
@@ -147,6 +147,18 @@ pub async fn run(
 
             registrator
                 .ensure_predefined_accounts_are_registered()
+                .await
+                .map_err(CLIError::critical)
+        })
+        .await?;
+    DatabaseTransactionRunner::new(cli_catalog.clone())
+        .transactional(|transactional_catalog| async move {
+            let initializer = transactional_catalog
+                .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
+                .map_err(CLIError::critical)?;
+
+            initializer
+                .eager_initialization()
                 .await
                 .map_err(CLIError::critical)
         })
