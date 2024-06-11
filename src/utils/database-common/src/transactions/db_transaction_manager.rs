@@ -15,8 +15,6 @@ use dill::{component, Catalog, CatalogBuilder};
 use internal_error::{InternalError, ResultIntoInternal};
 use tokio::sync::Mutex;
 
-use crate::TransactionalCatalog;
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -51,7 +49,7 @@ impl DatabaseTransactionRunner {
         callback: H,
     ) -> Result<HFutResultT, HFutResultE>
     where
-        H: FnOnce(TransactionalCatalog) -> HFut,
+        H: FnOnce(Catalog) -> HFut,
         HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
         HFutResultE: From<InternalError>,
     {
@@ -71,9 +69,8 @@ impl DatabaseTransactionRunner {
             let catalog_with_transaction = CatalogBuilder::new_chained(&self.catalog)
                 .add_value(transaction_ref.clone())
                 .build();
-            let transactional_catalog = TransactionalCatalog::new(catalog_with_transaction.clone());
 
-            callback(transactional_catalog).await
+            callback(catalog_with_transaction).await
         };
 
         // Commit or rollback transaction depending on the result

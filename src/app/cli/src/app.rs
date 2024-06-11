@@ -190,8 +190,8 @@ pub async fn run(
         let transaction_runner = DatabaseTransactionRunner::new(cli_catalog);
 
         transaction_runner
-            .transactional(|transaction_cli_catalog| async move {
-                run_command(transaction_cli_catalog.into_inner()).await
+            .transactional(|transactional_catalog| async move {
+                run_command(transactional_catalog).await
             })
             .await
     } else {
