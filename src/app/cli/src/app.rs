@@ -469,6 +469,8 @@ pub fn configure_in_memory_components(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
     catalog_builder.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
     catalog_builder.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
+
+    database_common::NoOpDatabasePlugin::init_database_components(catalog_builder);
 }
 
 // Public only for tests
