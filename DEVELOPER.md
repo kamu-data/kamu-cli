@@ -185,7 +185,7 @@ If testing with databases is required (including E2E tests), use:
 ```sh
 make sqlx-local-setup # Start database-related containers 
 
-make test-full
+make test-full # or `make test-e2e` for E2E only
 
 make sqlx-local-clean
 ```
