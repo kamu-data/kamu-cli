@@ -20,7 +20,8 @@ use crate::{e2e_test, KamuApiServerClient};
 
 #[derive(Default)]
 pub struct KamuCliApiServerHarnessOptions {
-    is_multi_tenant: bool,
+    pub is_multi_tenant: bool,
+    pub env_vars: Option<Vec<(String, String)>>,
 }
 
 pub struct KamuCliApiServerHarness<Fixture, FixtureFut>
@@ -143,11 +144,15 @@ where
     }
 
     pub async fn run(self) {
-        let KamuCliApiServerHarnessOptions { is_multi_tenant } = self.options.unwrap_or_default();
-        let kamu = Kamu::new_workspace_tmp_with(NewWorkspaceOptions::new(
+        let KamuCliApiServerHarnessOptions {
             is_multi_tenant,
-            Some(self.kamu_config),
-        ))
+            env_vars,
+        } = self.options.unwrap_or_default();
+        let kamu = Kamu::new_workspace_tmp_with(NewWorkspaceOptions {
+            is_multi_tenant,
+            kamu_config: Some(self.kamu_config),
+            env_vars,
+        })
         .await;
 
         // TODO: Random port support -- this unlocks parallel running

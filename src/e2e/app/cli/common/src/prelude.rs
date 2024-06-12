@@ -7,5 +7,5 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub use crate::e2e_hartness::{KamuCliApiServerHarness, KamuCliApiServerHarnessOptions};
+pub use crate::e2e_hartness::{KamuCliApiServerHarness, KamuCliApiServerHarnessOptions as Options};
 pub use crate::kamu_cli_e2e_test;
