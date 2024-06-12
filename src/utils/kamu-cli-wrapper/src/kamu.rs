@@ -270,7 +270,7 @@ impl Kamu {
 
     pub fn catalog(&self) -> dill::Catalog {
         let base_catalog =
-            kamu_cli::configure_base_catalog(&self.workspace_layout, false, self.system_time)
+            kamu_cli::configure_base_catalog(&self.workspace_layout, false, self.system_time, true)
                 .build();
 
         let multi_tenant_workspace = true;

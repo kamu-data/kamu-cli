@@ -76,3 +76,93 @@ pub async fn test_login_enabled_methods(kamu_api_server_client: KamuApiServerCli
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_dummy_github(kamu_api_server_client: KamuApiServerClient) {
+    // 1. No user
+    kamu_api_server_client
+        .api_call_assert(
+            indoc::indoc!(
+                r#"
+                query {
+                  accounts {
+                    byName(name: "e2e-user") {
+                      accountName
+                    }
+                  }
+                }
+                "#,
+            ),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "accounts": {
+                    "byName": null
+                  }
+                }
+                "#,
+            )),
+        )
+        .await;
+
+    // 2. Create a user
+    kamu_api_server_client
+        .api_call_assert(
+            indoc::indoc!(
+                r#"
+                mutation {
+                  auth {
+                    login(loginMethod: "oauth_github", loginCredentialsJson: "{\"login\":\"e2e-user\"}") {
+                      account {
+                        accountName
+                      }
+                    }
+                  }
+                }
+                "#,
+            ),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "auth": {
+                    "login": {
+                      "account": {
+                        "accountName": "e2e-user"
+                      }
+                    }
+                  }
+                }
+                "#,
+            )),
+        )
+        .await;
+
+    // 3. Verify that the user has been created
+    kamu_api_server_client
+        .api_call_assert(
+            indoc::indoc!(
+                r#"
+                query {
+                  accounts {
+                    byName(name: "e2e-user") {
+                      accountName
+                    }
+                  }
+                }
+                "#,
+            ),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "accounts": {
+                    "byName": {
+                      "accountName": "e2e-user"
+                    }
+                  }
+                }
+                "#,
+            )),
+        )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////

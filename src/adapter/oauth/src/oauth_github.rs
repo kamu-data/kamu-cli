@@ -231,3 +231,37 @@ impl GithubAuthenticationConfig {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+#[component(pub)]
+#[interface(dyn AuthenticationProvider)]
+pub struct DummyOAuthGithub {}
+
+#[async_trait::async_trait]
+impl AuthenticationProvider for DummyOAuthGithub {
+    fn provider_name(&self) -> &'static str {
+        PROVIDER_GITHUB
+    }
+
+    fn generate_id(&self, _account_name: &AccountName) -> AccountID {
+        // Random
+        AccountID::new_generated_ed25519().1
+    }
+
+    async fn login(
+        &self,
+        _login_credentials_json: String,
+    ) -> Result<ProviderLoginResponse, ProviderLoginError> {
+        let account = "e2e-user".to_string();
+
+        Ok(ProviderLoginResponse {
+            account_name: AccountName::new_unchecked(&account),
+            account_type: AccountType::User,
+            email: Some("e2e-user@example.com".into()),
+            display_name: account.clone(),
+            avatar_url: None,
+            provider_identity_key: account,
+        })
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////

@@ -22,3 +22,18 @@ kamu_cli_e2e_test!(
 kamu_cli_e2e_test!(mysql, kamu_cli_e2e_repo_tests, test_login_enabled_methods);
 
 ////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_e2e_test!(
+    mysql,
+    kamu_cli_e2e_repo_tests,
+    test_login_dummy_github,
+    Options {
+        is_multi_tenant: true,
+        env_vars: Some(vec![
+            ("KAMU_AUTH_GITHUB_CLIENT_ID".into(), "1".into()),
+            ("KAMU_AUTH_GITHUB_CLIENT_SECRET".into(), "2".into())
+        ]),
+    }
+);
+
+////////////////////////////////////////////////////////////////////////////////

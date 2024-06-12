@@ -73,6 +73,7 @@ pub async fn run(
         .transpose()
         .map_err(CLIError::usage_error_from)?
         .map(Into::into);
+    let is_e2e_testing = matches.get_flag("e2e-testing");
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
@@ -88,8 +89,12 @@ pub async fn run(
             current_account.to_current_account_subject(),
         );
 
-        let mut base_catalog_builder =
-            configure_base_catalog(&workspace_layout, is_multi_tenant_workspace, system_time);
+        let mut base_catalog_builder = configure_base_catalog(
+            &workspace_layout,
+            is_multi_tenant_workspace,
+            system_time,
+            is_e2e_testing,
+        );
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
@@ -263,6 +268,7 @@ pub fn configure_base_catalog(
     workspace_layout: &WorkspaceLayout,
     multi_tenant_workspace: bool,
     system_time: Option<DateTime<Utc>>,
+    is_e2e_testing: bool,
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
@@ -369,7 +375,11 @@ pub fn configure_base_catalog(
 
     // No GitHub login possible for single-tenant workspace
     if multi_tenant_workspace {
-        b.add::<kamu_adapter_oauth::OAuthGithub>();
+        if is_e2e_testing {
+            b.add::<kamu_adapter_oauth::DummyOAuthGithub>();
+        } else {
+            b.add::<kamu_adapter_oauth::OAuthGithub>();
+        }
     }
 
     b.add::<kamu_accounts_services::AuthenticationServiceImpl>();
