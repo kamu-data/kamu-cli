@@ -32,7 +32,7 @@ pub struct KamuCliApiServerHarness {
 }
 
 impl KamuCliApiServerHarness {
-    pub fn postgres(pg_pool: PgPool, options: Option<KamuCliApiServerHarnessOptions>) -> Self {
+    pub fn postgres(pg_pool: &PgPool, options: Option<KamuCliApiServerHarnessOptions>) -> Self {
         let db = pg_pool.connect_options();
         let kamu_config = format!(
             indoc::indoc!(
@@ -57,7 +57,7 @@ impl KamuCliApiServerHarness {
         Self::new(kamu_config, options)
     }
 
-    pub fn mysql(mysql_pool: MySqlPool, options: Option<KamuCliApiServerHarnessOptions>) -> Self {
+    pub fn mysql(mysql_pool: &MySqlPool, options: Option<KamuCliApiServerHarnessOptions>) -> Self {
         let db = mysql_pool.connect_options();
         let kamu_config = format!(
             indoc::indoc!(
@@ -83,7 +83,7 @@ impl KamuCliApiServerHarness {
     }
 
     pub fn sqlite(
-        sqlite_pool: SqlitePool,
+        sqlite_pool: &SqlitePool,
         options: Option<KamuCliApiServerHarnessOptions>,
     ) -> Self {
         // Ugly way to get the path as the settings have a not-so-good signature:

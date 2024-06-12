@@ -28,7 +28,7 @@ macro_rules! kamu_cli_run_api_server_e2e_test {
             #[test_group::group(e2e, database, postgres)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/postgres"))]
             async fn [<$test_name>] (pg_pool: sqlx::PgPool) {
-                KamuCliApiServerHarness::postgres(pg_pool, None)
+                KamuCliApiServerHarness::postgres(&pg_pool, None)
                     .run_api_server($test_package::$test_name)
                     .await;
             }
@@ -39,7 +39,7 @@ macro_rules! kamu_cli_run_api_server_e2e_test {
             #[test_group::group(e2e, database, postgres)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/postgres"))]
             async fn [<$test_name>] (pg_pool: sqlx::PgPool) {
-                KamuCliApiServerHarness::postgres(pg_pool, Some($test_options))
+                KamuCliApiServerHarness::postgres(&pg_pool, Some($test_options))
                     .run_api_server($test_package::$test_name)
                     .await;
             }
@@ -50,7 +50,7 @@ macro_rules! kamu_cli_run_api_server_e2e_test {
             #[test_group::group(e2e, database, mysql)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/mysql"))]
             async fn [<$test_name>] (mysql_pool: sqlx::MySqlPool) {
-                KamuCliApiServerHarness::mysql(mysql_pool, None)
+                KamuCliApiServerHarness::mysql(&mysql_pool, None)
                     .run_api_server($test_package::$test_name)
                     .await;
             }
@@ -61,7 +61,7 @@ macro_rules! kamu_cli_run_api_server_e2e_test {
             #[test_group::group(e2e, database, mysql)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/mysql"))]
             async fn [<$test_name>] (mysql_pool: sqlx::MySqlPool) {
-                KamuCliApiServerHarness::mysql(mysql_pool, Some($test_options))
+                KamuCliApiServerHarness::mysql(&mysql_pool, Some($test_options))
                     .run_api_server($test_package::$test_name)
                     .await;
             }
@@ -72,7 +72,7 @@ macro_rules! kamu_cli_run_api_server_e2e_test {
             #[test_group::group(e2e, database, sqlite)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/sqlite"))]
             async fn [<$test_name>] (sqlite_pool: sqlx::SqlitePool) {
-                KamuCliApiServerHarness::sqlite(sqlite_pool, None)
+                KamuCliApiServerHarness::sqlite(&sqlite_pool, None)
                     .run_api_server($test_package::$test_name)
                     .await;
             }
@@ -83,7 +83,7 @@ macro_rules! kamu_cli_run_api_server_e2e_test {
             #[test_group::group(e2e, database, sqlite)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/sqlite"))]
             async fn [<$test_name>] (sqlite_pool: sqlx::SqlitePool) {
-                KamuCliApiServerHarness::sqlite(sqlite_pool, Some($test_options))
+                KamuCliApiServerHarness::sqlite(&sqlite_pool, Some($test_options))
                     .run_api_server($test_package::$test_name)
                     .await;
             }
@@ -100,7 +100,7 @@ macro_rules! kamu_cli_execute_command_e2e_test {
             #[test_group::group(e2e, database, postgres)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/postgres"))]
             async fn [<$test_name>] (pg_pool: sqlx::PgPool) {
-                KamuCliApiServerHarness::postgres(pg_pool, None)
+                KamuCliApiServerHarness::postgres(&pg_pool, None)
                     .execute_command($test_package::$test_name)
                     .await;
             }
@@ -111,7 +111,7 @@ macro_rules! kamu_cli_execute_command_e2e_test {
             #[test_group::group(e2e, database, postgres)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/postgres"))]
             async fn [<$test_name>] (pg_pool: sqlx::PgPool) {
-                KamuCliApiServerHarness::postgres(pg_pool, Some($test_options))
+                KamuCliApiServerHarness::postgres(&pg_pool, Some($test_options))
                     .execute_command($test_package::$test_name)
                     .await;
             }
@@ -122,7 +122,7 @@ macro_rules! kamu_cli_execute_command_e2e_test {
             #[test_group::group(e2e, database, mysql)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/mysql"))]
             async fn [<$test_name>] (mysql_pool: sqlx::MySqlPool) {
-                KamuCliApiServerHarness::mysql(mysql_pool, None)
+                KamuCliApiServerHarness::mysql(&mysql_pool, None)
                     .execute_command($test_package::$test_name)
                     .await;
             }
@@ -133,7 +133,7 @@ macro_rules! kamu_cli_execute_command_e2e_test {
             #[test_group::group(e2e, database, mysql)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/mysql"))]
             async fn [<$test_name>] (mysql_pool: sqlx::MySqlPool) {
-                KamuCliApiServerHarness::mysql(mysql_pool, Some($test_options))
+                KamuCliApiServerHarness::mysql(&mysql_pool, Some($test_options))
                     .execute_command($test_package::$test_name)
                     .await;
             }
@@ -144,7 +144,7 @@ macro_rules! kamu_cli_execute_command_e2e_test {
             #[test_group::group(e2e, database, sqlite)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/sqlite"))]
             async fn [<$test_name>] (sqlite_pool: sqlx::SqlitePool) {
-                KamuCliApiServerHarness::sqlite(sqlite_pool, None)
+                KamuCliApiServerHarness::sqlite(&sqlite_pool, None)
                     .execute_command($test_package::$test_name)
                     .await;
             }
@@ -155,7 +155,7 @@ macro_rules! kamu_cli_execute_command_e2e_test {
             #[test_group::group(e2e, database, sqlite)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/sqlite"))]
             async fn [<$test_name>] (sqlite_pool: sqlx::SqlitePool) {
-                KamuCliApiServerHarness::sqlite(sqlite_pool, Some($test_options))
+                KamuCliApiServerHarness::sqlite(&sqlite_pool, Some($test_options))
                     .execute_command($test_package::$test_name)
                     .await;
             }
