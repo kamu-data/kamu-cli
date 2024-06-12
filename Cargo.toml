@@ -58,6 +58,7 @@ members = [
     "src/e2e/app/cli/repo-tests",
     "src/e2e/app/cli/postgres",
     "src/e2e/app/cli/mysql",
+    "src/e2e/app/cli/sqlite",
 ]
 resolver = "2"
 

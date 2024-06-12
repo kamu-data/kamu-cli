@@ -5221,6 +5221,7 @@ dependencies = [
  "indoc 2.0.5",
  "internal-error",
  "kamu-cli-wrapper",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
@@ -5264,6 +5265,20 @@ dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
  "tokio",
+]
+
+[[package]]
+name = "kamu-cli-e2e-sqlite"
+version = "0.184.0"
+dependencies = [
+ "indoc 2.0.5",
+ "kamu-cli-e2e-common",
+ "kamu-cli-e2e-repo-tests",
+ "kamu-cli-wrapper",
+ "paste",
+ "sqlx",
+ "test-group",
+ "test-log",
 ]
 
 [[package]]
