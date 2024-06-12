@@ -10,6 +10,7 @@
 use std::ffi::OsString;
 use std::fs;
 use std::io::Write;
+use std::net::SocketAddrV4;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -179,6 +180,23 @@ impl Kamu {
                 cmd: full_cmd,
                 error: e,
             })
+    }
+
+    pub async fn start_api_server(self, addr: SocketAddrV4) -> Result<(), InternalError> {
+        let host = addr.ip().to_string();
+        let port = addr.port().to_string();
+
+        self.execute([
+            "--e2e-testing",
+            "system",
+            "api-server",
+            "--address",
+            host.as_str(),
+            "--http-port",
+            port.as_str(),
+        ])
+        .await
+        .int_err()
     }
 
     // TODO: Generalize into execute with overridden STDOUT/ERR/IN
