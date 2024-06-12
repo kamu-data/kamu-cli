@@ -181,10 +181,16 @@ In most cases, you can skip tests involving very heavy Spark and Flink engines a
 make test-fast
 ```
 
-If testing with databases is required, use:
+If testing with databases is required (including E2E tests), use:
 ```sh
+make sqlx-local-setup # Start database-related containers 
+
 make test-full
+
+make sqlx-local-clean
 ```
+
+---
 
 These are just wrappers on top of [Nextest](https://nexte.st/) that [control](/.config/nextest.toml) test concurrency and retries.
 
