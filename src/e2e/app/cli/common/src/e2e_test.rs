@@ -14,7 +14,7 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 use internal_error::InternalError;
 use kamu_cli_wrapper::Kamu;
 use reqwest::Url;
-use sqlx::PgPool;
+use sqlx::{MySqlPool, PgPool};
 
 use crate::KamuApiServerClient;
 
@@ -86,15 +86,67 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////
 
+pub async fn mysql_kamu_cli_e2e_test<F, Fut>(mysql_pool: MySqlPool, fixture: F)
+where
+    F: FnOnce(KamuApiServerClient) -> Fut,
+    Fut: Future<Output = ()>,
+{
+    let db = mysql_pool.connect_options();
+    let kamu = Kamu::new_workspace_tmp_with_kamu_config(
+        format!(
+            indoc::indoc!(
+                r#"
+                kind: CLIConfig
+                version: 1
+                content:
+                    database:
+                        provider: mySql
+                        host: {host}
+                        user: {user}
+                        password: {password}
+                        databaseName: {database}
+                "#
+            ),
+            host = db.get_host(),
+            user = db.get_username(),
+            password = db.get_username(), // It's intended: password is same as user for tests
+            database = db.get_database().unwrap(),
+        )
+        .as_str(),
+    )
+    .await;
+
+    // TODO: Random port support -- this unlocks parallel running
+    let server_addr = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 4000);
+    let server_run_fut = kamu.start_api_server(server_addr);
+
+    e2e_test(server_addr, server_run_fut, fixture).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 #[macro_export]
 macro_rules! kamu_cli_e2e_test {
     (postgres_kamu_cli_e2e_test, $test_package: expr, $test_name: expr) => {
         paste::paste! {
             #[test_group::group(e2e, database, postgres)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/postgres"))]
-            async fn [<$test_name>] (pool: sqlx::PgPool) {
+            async fn [<$test_name>] (pg_pool: sqlx::PgPool) {
                 postgres_kamu_cli_e2e_test (
-                    pool,
+                    pg_pool,
+                    $test_package::$test_name,
+                )
+                .await;
+            }
+        }
+    };
+    (mysql_kamu_cli_e2e_test, $test_package: expr, $test_name: expr) => {
+        paste::paste! {
+            #[test_group::group(e2e, database, mysql)]
+            #[test_log::test(sqlx::test(migrations = "../../../../../migrations/mysql"))]
+            async fn [<$test_name>] (mysql_pool: sqlx::MySqlPool) {
+                mysql_kamu_cli_e2e_test (
+                    mysql_pool,
                     $test_package::$test_name,
                 )
                 .await;

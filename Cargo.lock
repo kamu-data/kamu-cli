@@ -5230,6 +5230,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-cli-e2e-mysql"
+version = "0.184.0"
+dependencies = [
+ "indoc 2.0.5",
+ "kamu-cli-e2e-common",
+ "kamu-cli-e2e-repo-tests",
+ "kamu-cli-wrapper",
+ "paste",
+ "sqlx",
+ "test-group",
+ "test-log",
+]
+
+[[package]]
 name = "kamu-cli-e2e-postgres"
 version = "0.184.0"
 dependencies = [
