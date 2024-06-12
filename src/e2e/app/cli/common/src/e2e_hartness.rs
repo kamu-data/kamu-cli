@@ -7,9 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
 use std::future::Future;
 use std::net::{Ipv4Addr, SocketAddrV4};
 
+use internal_error::InternalError;
 use kamu_cli_wrapper::{Kamu, NewWorkspaceOptions};
 use regex::Regex;
 use sqlx::{MySqlPool, PgPool, SqlitePool};
@@ -24,26 +26,13 @@ pub struct KamuCliApiServerHarnessOptions {
     pub env_vars: Option<Vec<(String, String)>>,
 }
 
-pub struct KamuCliApiServerHarness<Fixture, FixtureFut>
-where
-    Fixture: FnOnce(KamuApiServerClient) -> FixtureFut,
-    FixtureFut: Future<Output = ()>,
-{
+pub struct KamuCliApiServerHarness {
     kamu_config: String,
-    fixture: Fixture,
     options: Option<KamuCliApiServerHarnessOptions>,
 }
 
-impl<Fixture, FixtureFut> KamuCliApiServerHarness<Fixture, FixtureFut>
-where
-    Fixture: FnOnce(KamuApiServerClient) -> FixtureFut,
-    FixtureFut: Future<Output = ()>,
-{
-    pub fn postgres(
-        pg_pool: PgPool,
-        fixture: Fixture,
-        options: Option<KamuCliApiServerHarnessOptions>,
-    ) -> Self {
+impl KamuCliApiServerHarness {
+    pub fn postgres(pg_pool: PgPool, options: Option<KamuCliApiServerHarnessOptions>) -> Self {
         let db = pg_pool.connect_options();
         let kamu_config = format!(
             indoc::indoc!(
@@ -65,14 +54,10 @@ where
             database = db.get_database().unwrap(),
         );
 
-        Self::new(kamu_config, fixture, options)
+        Self::new(kamu_config, options)
     }
 
-    pub fn mysql(
-        mysql_pool: MySqlPool,
-        fixture: Fixture,
-        options: Option<KamuCliApiServerHarnessOptions>,
-    ) -> Self {
+    pub fn mysql(mysql_pool: MySqlPool, options: Option<KamuCliApiServerHarnessOptions>) -> Self {
         let db = mysql_pool.connect_options();
         let kamu_config = format!(
             indoc::indoc!(
@@ -94,12 +79,11 @@ where
             database = db.get_database().unwrap(),
         );
 
-        Self::new(kamu_config, fixture, options)
+        Self::new(kamu_config, options)
     }
 
     pub fn sqlite(
         sqlite_pool: SqlitePool,
-        fixture: Fixture,
         options: Option<KamuCliApiServerHarnessOptions>,
     ) -> Self {
         // Ugly way to get the path as the settings have a not-so-good signature:
@@ -128,22 +112,21 @@ where
             path = database_path
         );
 
-        Self::new(kamu_config, fixture, options)
+        Self::new(kamu_config, options)
     }
 
-    fn new(
-        kamu_config: String,
-        fixture: Fixture,
-        options: Option<KamuCliApiServerHarnessOptions>,
-    ) -> Self {
+    fn new(kamu_config: String, options: Option<KamuCliApiServerHarnessOptions>) -> Self {
         Self {
             kamu_config,
-            fixture,
             options,
         }
     }
 
-    pub async fn run(self) {
+    pub async fn run_api_server<Fixture, FixtureResult>(self, fixture: Fixture)
+    where
+        Fixture: FnOnce(KamuApiServerClient) -> FixtureResult,
+        FixtureResult: Future<Output = ()>,
+    {
         let KamuCliApiServerHarnessOptions {
             is_multi_tenant,
             env_vars,
@@ -159,7 +142,28 @@ where
         let server_addr = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 4000);
         let server_run_fut = kamu.start_api_server(server_addr);
 
-        e2e_test(server_addr, server_run_fut, self.fixture).await;
+        e2e_test(server_addr, server_run_fut, fixture).await;
+    }
+
+    pub async fn execute_command<Fixture, FixtureResult>(self, fixture: Fixture)
+    where
+        Fixture: FnOnce(Kamu) -> FixtureResult,
+        FixtureResult: Future<Output = Result<(), InternalError>>,
+    {
+        let KamuCliApiServerHarnessOptions {
+            is_multi_tenant,
+            env_vars,
+        } = self.options.unwrap_or_default();
+        let kamu = Kamu::new_workspace_tmp_with(NewWorkspaceOptions {
+            is_multi_tenant,
+            kamu_config: Some(self.kamu_config),
+            env_vars,
+        })
+        .await;
+
+        let execute_result = fixture(kamu).await;
+
+        assert_matches!(execute_result, Ok(()));
     }
 }
 
