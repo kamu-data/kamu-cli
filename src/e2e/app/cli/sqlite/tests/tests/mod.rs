@@ -9,3 +9,4 @@
 
 mod test_auth;
 mod test_selftest;
+mod test_system_generate_token;

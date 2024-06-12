@@ -9,6 +9,8 @@
 
 mod test_auth;
 mod test_selftest;
+mod test_system_generate_token;
 
 pub use test_auth::*;
 pub use test_selftest::*;
+pub use test_system_generate_token::*;

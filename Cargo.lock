@@ -5263,7 +5263,9 @@ name = "kamu-cli-e2e-repo-tests"
 version = "0.184.0"
 dependencies = [
  "indoc 2.0.5",
+ "internal-error",
  "kamu-cli-e2e-common",
+ "kamu-cli-wrapper",
  "tokio",
 ]
 

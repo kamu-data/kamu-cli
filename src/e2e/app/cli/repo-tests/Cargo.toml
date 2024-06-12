@@ -22,7 +22,9 @@ doctest = false
 
 
 [dependencies]
+internal-error = { workspace = true }
 kamu-cli-e2e-common = { workspace = true }
+kamu-cli-wrapper = { workspace = true }
 
 indoc = "2"
 tokio = { version = "1", default-features = false, features = [] }
