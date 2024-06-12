@@ -98,7 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.178.0] - 2024-05-04
 ### Added
-- Flow system: implemented persistent repositories (PostgresSQL, SQLite) for flow configuration events
+- Flow system: implemented persistent repositories (PostgreSQL, SQLite) for flow configuration events
 - Support for persistent accounts:
   - supports Postgres, MySQL/MariaDB, SQLite database targets
   - accounts have a fully functional DID-identifier:

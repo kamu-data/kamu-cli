@@ -5218,11 +5218,13 @@ dependencies = [
 name = "kamu-cli-e2e-common"
 version = "0.184.0"
 dependencies = [
+ "indoc 2.0.5",
  "internal-error",
  "kamu-cli-wrapper",
  "reqwest",
  "serde",
  "serde_json",
+ "sqlx",
  "tokio",
  "tokio-retry",
 ]
@@ -5235,6 +5237,7 @@ dependencies = [
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
  "kamu-cli-wrapper",
+ "paste",
  "sqlx",
  "test-group",
  "test-log",
