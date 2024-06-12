@@ -23,7 +23,7 @@ doctest = false
 
 [dependencies]
 internal-error = { workspace = true }
-kamu-cli-wrapper = { workspace = true, default-features = false, features = [] }
+kamu-cli-wrapper = { workspace = true }
 
 indoc = "2"
 regex = "1"
@@ -32,6 +32,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sqlx = { version = "0.7", default-features = false, features = [
     "postgres",
+    "mysql",
+    "sqlite",
 ] }
 tokio = { version = "1", default-features = false, features = [] }
 tokio-retry = "0.3"

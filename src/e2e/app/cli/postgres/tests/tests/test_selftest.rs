@@ -7,14 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli_e2e_common::{kamu_cli_e2e_test, postgres_kamu_cli_e2e_test};
+use kamu_cli_e2e_common::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-kamu_cli_e2e_test!(
-    postgres_kamu_cli_e2e_test,
-    kamu_cli_e2e_repo_tests,
-    test_selftest
-);
+kamu_cli_e2e_test!(postgres, kamu_cli_e2e_repo_tests, test_selftest);
 
 ////////////////////////////////////////////////////////////////////////////////

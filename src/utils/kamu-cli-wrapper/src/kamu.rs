@@ -58,10 +58,10 @@ impl Kamu {
         self.system_time = t;
     }
 
-    async fn new_workspace_tmp_inner(maybe_kamu_config: Option<&str>) -> Self {
+    async fn new_workspace_tmp_inner(options: NewWorkspaceOptions) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
 
-        if let Some(config) = maybe_kamu_config {
+        if let Some(config) = options.kamu_config {
             fs::write(temp_dir.path().join(CONFIG_FILENAME), config).unwrap();
         }
 
@@ -71,17 +71,23 @@ impl Kamu {
             ..inst
         };
 
-        inst.execute(["init"]).await.unwrap();
+        let arguments = if options.is_multi_tenant {
+            vec!["init", "--multi-tenant"]
+        } else {
+            vec!["init"]
+        };
+
+        inst.execute(arguments).await.unwrap();
 
         inst
     }
 
     pub async fn new_workspace_tmp() -> Self {
-        Self::new_workspace_tmp_inner(None).await
+        Self::new_workspace_tmp_inner(NewWorkspaceOptions::default()).await
     }
 
-    pub async fn new_workspace_tmp_with_kamu_config(kamu_config: &str) -> Self {
-        Self::new_workspace_tmp_inner(Some(kamu_config)).await
+    pub async fn new_workspace_tmp_with(options: NewWorkspaceOptions) -> Self {
+        Self::new_workspace_tmp_inner(options).await
     }
 
     pub fn workspace_path(&self) -> &Path {
@@ -303,6 +309,23 @@ impl Kamu {
             .collect();
 
         (pull_aliases, push_aliases)
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+pub struct NewWorkspaceOptions {
+    is_multi_tenant: bool,
+    kamu_config: Option<String>,
+}
+
+impl NewWorkspaceOptions {
+    pub fn new(is_multi_tenant: bool, kamu_config: Option<String>) -> Self {
+        Self {
+            is_multi_tenant,
+            kamu_config,
+        }
     }
 }
 
