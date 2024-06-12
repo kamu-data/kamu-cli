@@ -11,7 +11,7 @@ use kamu_cli_e2e_common::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-kamu_cli_e2e_test!(
+kamu_cli_run_api_server_e2e_test!(
     sqlite,
     kamu_cli_e2e_repo_tests,
     test_login_password_predefined_successful
@@ -19,11 +19,11 @@ kamu_cli_e2e_test!(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-kamu_cli_e2e_test!(sqlite, kamu_cli_e2e_repo_tests, test_login_enabled_methods);
+kamu_cli_run_api_server_e2e_test!(sqlite, kamu_cli_e2e_repo_tests, test_login_enabled_methods);
 
 ////////////////////////////////////////////////////////////////////////////////
 
-kamu_cli_e2e_test!(
+kamu_cli_run_api_server_e2e_test!(
     sqlite,
     kamu_cli_e2e_repo_tests,
     test_login_dummy_github,

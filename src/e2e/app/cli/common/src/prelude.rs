@@ -8,4 +8,4 @@
 // by the Apache License, Version 2.0.
 
 pub use crate::e2e_hartness::{KamuCliApiServerHarness, KamuCliApiServerHarnessOptions as Options};
-pub use crate::kamu_cli_e2e_test;
+pub use crate::kamu_cli_run_api_server_e2e_test;

@@ -22,7 +22,7 @@ pub mod prelude;
 ////////////////////////////////////////////////////////////////////////////////
 
 #[macro_export]
-macro_rules! kamu_cli_e2e_test {
+macro_rules! kamu_cli_run_api_server_e2e_test {
     (postgres, $test_package: expr, $test_name: expr) => {
         paste::paste! {
             #[test_group::group(e2e, database, postgres)]
