@@ -144,6 +144,7 @@ pub async fn run(
     }
 
     // TODO: Not for every command?
+    // TODO: For some reason, we if we do in a single transaction, there is a hangup
     DatabaseTransactionRunner::new(cli_catalog.clone())
         .transactional(|transactional_catalog| async move {
             let registrator = transactional_catalog
@@ -169,11 +170,7 @@ pub async fn run(
         })
         .await?;
 
-    // TODO: Extend Command trait with the corresponding property
-    let need_to_wrap_with_transaction = matches!(
-        matches.subcommand(),
-        Some(("login" | "add" | "delete" | "pull", _))
-    );
+    let need_to_wrap_with_transaction = cli_commands::command_needs_transaction(&matches)?;
     let run_command = |cli_catalog: Catalog| async move {
         match cli_commands::get_command(&base_catalog, &cli_catalog, &matches) {
             Ok(mut command) => {

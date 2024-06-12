@@ -583,6 +583,18 @@ pub fn get_command(
     Ok(command)
 }
 
+pub fn command_needs_transaction(arg_matches: &clap::ArgMatches) -> Result<bool, CLIError> {
+    match arg_matches.subcommand() {
+        Some(("system", system_matches)) => match system_matches.subcommand() {
+            Some(("generate-token", _)) => Ok(true),
+            Some(_) => Ok(false),
+            None => Err(CommandInterpretationFailed.into()),
+        },
+        Some(_) => Ok(false),
+        None => Err(CommandInterpretationFailed.into()),
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Dataset reference validation
 ////////////////////////////////////////////////////////////////////////////////
