@@ -29,33 +29,10 @@ doctest = false
 
 
 [features]
-default = [
-    "db-postgres",
-    "db-mysql",
-    "db-sqlite"
-]
+default = []
 
 web-ui = ["rust-embed"]
 ftp = ["kamu/ftp"]
-
-# Problem
-# -------
-# When importing kamu-cli (via kamu-cli-wrapper) in E2E tests, sqlx tries to
-# generate cached queries (.sqlx) from other database crates
-# in the E2E tests working environment.
-#
-# Mixing between syntaxes of different databases causes errors.
-#
-# Solution
-# --------
-# We have a need to lock the code to work
-# with different databases behind conditional compilation.
-
-# This way we solve the problem of generating cached sqlx queries
-# that are outside the E2E tests.
-db-postgres = ["dep:kamu-accounts-postgres"]
-db-mysql = ["dep:kamu-accounts-mysql"]
-db-sqlite = ["dep:kamu-accounts-sqlite"]
 
 
 [dependencies]
@@ -80,8 +57,8 @@ random-names = { workspace = true }
 kamu-flow-system-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 # TODO: Activate after preparing services for transactional work
-# kamu-flow-system-postgres = { workspace = true, optional = true }
-# kamu-flow-system-sqlite = { workspace = true, optional = true }
+# kamu-flow-system-postgres = { workspace = true }
+# kamu-flow-system-sqlite = { workspace = true }
 
 kamu-task-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
@@ -92,9 +69,9 @@ kamu-task-system-inmem = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
-kamu-accounts-postgres = { workspace = true, optional = true }
-kamu-accounts-mysql = { workspace = true, optional = true }
-kamu-accounts-sqlite = { workspace = true, optional = true }
+kamu-accounts-postgres = { workspace = true }
+kamu-accounts-mysql = { workspace = true }
+kamu-accounts-sqlite = { workspace = true }
 
 # CLI
 chrono-humanize = "0.2"                                           # Human readable durations

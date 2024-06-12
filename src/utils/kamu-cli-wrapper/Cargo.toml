@@ -21,16 +21,8 @@ workspace = true
 doctest = false
 
 
-[features]
-default = []
-
-db-postgres = ["kamu-cli/db-postgres"]
-db-mysql = ["kamu-cli/db-mysql"]
-db-sqlite = ["kamu-cli/db-sqlite"]
-
-
 [dependencies]
-kamu-cli = { path = "../../app/cli", version = "0", default-features = false }
+kamu-cli = { path = "../../app/cli", version = "0" }
 
 event-bus = { workspace = true }
 kamu = { workspace = true }

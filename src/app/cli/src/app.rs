@@ -404,61 +404,39 @@ fn configure_database_components(
 
     match db_configuration.provider {
         DatabaseProvider::Postgres => {
-            cfg_if::cfg_if! {
-                if #[cfg(feature = "db-postgres")] {
-                    database_common::PostgresPlugin::init_database_components(
-                        catalog_builder,
-                        db_configuration,
-                    )
-                    .int_err()?;
+            database_common::PostgresPlugin::init_database_components(
+                catalog_builder,
+                db_configuration,
+            )
+            .int_err()?;
 
-                    catalog_builder.add::<kamu_accounts_postgres::PostgresAccountRepository>();
+            catalog_builder.add::<kamu_accounts_postgres::PostgresAccountRepository>();
 
-                    Ok(())
-                } else {
-                    Err(CLIError::usage_error(
-                        "This version of kamu was compiled without the support PostgreSQL",
-                    ))
-                }
-            }
+            Ok(())
         }
         DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
-            cfg_if::cfg_if! {
-                if #[cfg(feature = "db-mysql")] {
-                    database_common::MySqlPlugin::init_database_components(
-                        catalog_builder,
-                        db_configuration,
-                    )
-                    .int_err()?;
+            database_common::MySqlPlugin::init_database_components(
+                catalog_builder,
+                db_configuration,
+            )
+            .int_err()?;
 
-                    catalog_builder.add::<kamu_accounts_mysql::MySqlAccountRepository>();
+            catalog_builder.add::<kamu_accounts_mysql::MySqlAccountRepository>();
 
-                    todo!("Task & Flow System MySQL versions");
-                } else {
-                    Err(CLIError::usage_error(
-                        "This version of kamu was compiled without the support MySQL",
-                    ))
-                }
-            }
+            // TODO: Task & Flow System MySQL versions
+
+            Ok(())
         }
         DatabaseProvider::Sqlite => {
-            cfg_if::cfg_if! {
-                if #[cfg(feature = "db-mysql")] {
-                    database_common::SqlitePlugin::init_database_components(
-                        catalog_builder,
-                        db_configuration,
-                    )
-                    .int_err()?;
+            database_common::SqlitePlugin::init_database_components(
+                catalog_builder,
+                db_configuration,
+            )
+            .int_err()?;
 
-                    catalog_builder.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
+            catalog_builder.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
 
-                    Ok(())
-                } else {
-                    Err(CLIError::usage_error(
-                        "This version of kamu was compiled without the support SQLite",
-                    ))
-                }
-            }
+            Ok(())
         }
     }
 }
