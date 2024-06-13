@@ -9,12 +9,29 @@
 
 use std::path::Path;
 
+use arrow::array::RecordBatch;
+use arrow::datatypes::Schema;
 use datafusion::arrow::record_batch::RecordBatchReader;
 use opendatafabric::{Multicodec, Multihash};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 const LOGICAL_HASH_BATCH_SIZE: usize = 10_000;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[tracing::instrument(level = "debug")]
+pub fn get_batches_logical_hash(schema: &Schema, record_batches: &[RecordBatch]) -> Multihash {
+    use arrow_digest::{RecordDigest, RecordDigestV0};
+
+    let mut hasher = RecordDigestV0::<sha3::Sha3_256>::new(schema);
+    for batch in record_batches {
+        hasher.update(batch);
+    }
+
+    let digest = hasher.finalize();
+    Multihash::new(Multicodec::Arrow0_Sha3_256, &digest).unwrap()
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

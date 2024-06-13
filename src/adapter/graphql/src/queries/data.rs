@@ -44,7 +44,7 @@ impl DataQueries {
                     .sql_statement(&query, domain::QueryOptions::default())
                     .await;
                 match sql_result {
-                    Ok(r) => r,
+                    Ok(r) => r.df,
                     Err(e) => return Ok(e.into()),
                 }
             }

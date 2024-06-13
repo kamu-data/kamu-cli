@@ -5041,6 +5041,7 @@ dependencies = [
  "kamu-accounts-inmem",
  "kamu-accounts-services",
  "kamu-data-utils",
+ "kamu-ingest-datafusion",
  "mockall",
  "opendatafabric",
  "paste",

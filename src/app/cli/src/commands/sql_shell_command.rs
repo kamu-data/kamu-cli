@@ -113,13 +113,13 @@ impl SqlShellCommand {
     }
 
     async fn run_datafusion_command(&self) -> Result<(), CLIError> {
-        let df = self
+        let res = self
             .query_svc
             .sql_statement(self.command.as_ref().unwrap(), QueryOptions::default())
             .await
             .map_err(CLIError::failure)?;
 
-        let records = df.collect().await.map_err(CLIError::failure)?;
+        let records = res.df.collect().await.map_err(CLIError::failure)?;
 
         let mut writer = self
             .output_config

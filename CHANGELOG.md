@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+## Added
+- The `/query` REST API endpoint now supports:
+  - POST requests with all parameters being passed via body
+  - Specifying schema format
+  - Specifying `aliases` to associate table names with specific dataset IDs
+  - Returning and providing state information to achieve full reproducibility of queries
+
 ## [0.186.0] - 2024-06-13
 ## Added
 - New `EthereumLogs` polling source allows to stream and decode log data directly from any ETH-compatible blockchain node
