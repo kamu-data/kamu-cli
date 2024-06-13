@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use opendatafabric::AccountID;
+use opendatafabric::{AccountID, AccountName};
 use uuid::Uuid;
 
 use crate::domain::*;
@@ -214,9 +214,64 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
 
     async fn find_account_by_active_token_id(
         &self,
-        _token_id: &Uuid,
-        _token_hash: [u8; 32],
+        token_id: &Uuid,
+        token_hash: [u8; 32],
     ) -> Result<Account, FindAccountByTokenError> {
-        unimplemented!()
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(FindAccountByTokenError::Internal)?;
+        let token_id_search = *token_id;
+
+        let maybe_account_row = sqlx::query!(
+            r#"
+                SELECT
+                    at.token_hash,
+                    a.id as "id: AccountID",
+                    a.account_name,
+                    a.email as "email?",
+                    a.display_name,
+                    a.account_type as "account_type: AccountType",
+                    registered_at as "registered_at: DateTime<Utc>",
+                    a.avatar_url,
+                    a.is_admin,
+                    a.provider,
+                    a.provider_identity_key
+                FROM access_tokens at
+                JOIN accounts a ON at.account_id = a.id
+                WHERE at.id = $1
+                "#,
+            token_id_search
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()
+        .map_err(FindAccountByTokenError::Internal)?;
+
+        if let Some(account_row) = maybe_account_row {
+            if token_hash != account_row.token_hash.as_slice() {
+                return Err(FindAccountByTokenError::InvalidTokenHash);
+            }
+            Ok(Account {
+                id: account_row.id,
+                account_name: AccountName::new_unchecked(&account_row.account_name),
+                email: account_row.email,
+                display_name: account_row.display_name,
+                account_type: account_row.account_type,
+                avatar_url: account_row.avatar_url,
+                registered_at: account_row.registered_at,
+                is_admin: account_row.is_admin != 0,
+                provider: account_row.provider,
+                provider_identity_key: account_row.provider_identity_key,
+            })
+        } else {
+            Err(FindAccountByTokenError::NotFound(
+                AccessTokenNotFoundError {
+                    access_token_id: *token_id,
+                },
+            ))
+        }
     }
 }
