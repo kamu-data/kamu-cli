@@ -87,4 +87,6 @@ allow-org = { github = ["kamu-data", "apache", "alloy-rs"] }
 
 [advisories]
 yanked = "deny"
+# TODO: Remove when patches are available
+#       See more: https://rustsec.org/advisories/RUSTSEC-2023-0071.html
 ignore = ["RUSTSEC-2023-0071"]
