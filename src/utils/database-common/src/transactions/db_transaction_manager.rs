@@ -135,9 +135,9 @@ impl TransactionRef {
     pub fn into_maybe_transaction<DB: sqlx::Database>(
         self,
     ) -> Option<sqlx::Transaction<'static, DB>> {
-        Arc::try_unwrap(self.inner)
-            .ok()
-            .and_then(|m| m.into_inner().maybe_transaction)
+        let m = Arc::try_unwrap(self.inner).unwrap().into_inner();
+
+        m.maybe_transaction
             .map(|t| *t.downcast::<sqlx::Transaction<'static, DB>>().unwrap())
     }
 }
