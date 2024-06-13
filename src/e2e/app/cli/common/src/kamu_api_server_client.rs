@@ -32,7 +32,7 @@ impl KamuApiServerClient {
     }
 
     pub async fn ready(&self) -> Result<(), InternalError> {
-        let retry_strategy = FixedInterval::from_millis(1_000).take(3);
+        let retry_strategy = FixedInterval::from_millis(1_000).take(10);
         let response = Retry::spawn(retry_strategy, || async {
             let endpoint = self.server_base_url.join("e2e/health").unwrap();
             let response = self.http_client.get(endpoint).send().await.int_err()?;
