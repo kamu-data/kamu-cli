@@ -138,16 +138,18 @@ libc = "0.2" # For getting uid:gid
 
 
 [dev-dependencies]
+database-common = { workspace = true }
+kamu-accounts-inmem = { workspace = true }
+kamu-accounts-services = { workspace = true }
+
 criterion = { version = "0.5", features = ["async_tokio"] }
 filetime = "0.2"
 indoc = "2"
-tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
+nanoid = "0.4.0"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-nanoid = "0.4.0"
-kamu-accounts-inmem = { workspace = true }
-kamu-accounts-services = { workspace = true }
 
 [[bench]]
 name = "parallel_simple_transfer_protocol"

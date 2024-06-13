@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
+use database_common::NoOpDatabasePlugin;
 use dill::*;
 use event_bus::EventBus;
 use indoc::indoc;
@@ -26,26 +27,34 @@ async fn test_current_push_sources() {
     let datasets_dir = tempdir.path().join("datasets");
     std::fs::create_dir(&datasets_dir).unwrap();
 
-    let base_catalog = CatalogBuilder::new()
-        .add::<EventBus>()
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(false),
-        )
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .add_builder(PushIngestServiceImpl::builder().with_run_info_dir(tempdir.path().join("run")))
-        .bind::<dyn PushIngestService, PushIngestServiceImpl>()
-        .add::<SystemTimeSourceDefault>()
-        .add::<EngineProvisionerNull>()
-        .add::<ObjectStoreRegistryImpl>()
-        .add::<DataFormatRegistryImpl>()
-        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .add::<DependencyGraphServiceInMemory>()
-        .build();
+    let base_catalog = {
+        let mut b = CatalogBuilder::new();
+
+        b.add::<EventBus>()
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(datasets_dir)
+                    .with_multi_tenant(false),
+            )
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add_builder(
+                PushIngestServiceImpl::builder().with_run_info_dir(tempdir.path().join("run")),
+            )
+            .bind::<dyn PushIngestService, PushIngestServiceImpl>()
+            .add::<SystemTimeSourceDefault>()
+            .add::<EngineProvisionerNull>()
+            .add::<ObjectStoreRegistryImpl>()
+            .add::<DataFormatRegistryImpl>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<DependencyGraphServiceInMemory>();
+
+        NoOpDatabasePlugin::init_database_components(&mut b);
+
+        b.build()
+    };
 
     // Init dataset with no sources
-    let (_, catalog_authorized) = authentication_catalogs(&base_catalog);
+    let (_, catalog_authorized) = authentication_catalogs(&base_catalog).await;
     let dataset_repo = catalog_authorized
         .get_one::<dyn DatasetRepository>()
         .unwrap();

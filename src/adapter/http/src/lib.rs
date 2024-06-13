@@ -19,6 +19,7 @@ pub use access_token::*;
 pub mod api_error;
 mod axum_utils;
 pub mod data;
+pub mod e2e;
 mod simple_protocol;
 pub mod smart_protocol;
 mod upload;

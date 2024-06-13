@@ -43,7 +43,7 @@ impl Task {
     }
 
     /// Task is queued or running and cancellation was not already requested
-    pub fn can_cancel(&mut self) -> bool {
+    pub fn can_cancel(&self) -> bool {
         match self.status {
             TaskStatus::Queued if !self.cancellation_requested => true,
             TaskStatus::Running if !self.cancellation_requested => true,

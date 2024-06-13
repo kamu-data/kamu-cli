@@ -7,12 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::DatabaseTransactionRunner;
 use kamu_accounts::*;
+use kamu_accounts_inmem::AccountRepositoryInMemory;
+use kamu_accounts_services::{LoginPasswordAuthProvider, PredefinedAccountsRegistrator};
 use kamu_adapter_graphql::ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn authentication_catalogs(base_catalog: &dill::Catalog) -> (dill::Catalog, dill::Catalog) {
+pub async fn authentication_catalogs(
+    base_catalog: &dill::Catalog,
+) -> (dill::Catalog, dill::Catalog) {
     let catalog_anonymous = dill::CatalogBuilder::new_chained(base_catalog)
         .add_value(CurrentAccountSubject::anonymous(
             AnonymousAccountReason::NoAuthenticationProvided,
@@ -33,9 +38,25 @@ pub fn authentication_catalogs(base_catalog: &dill::Catalog) -> (dill::Catalog, 
     }
 
     let catalog_authorized = dill::CatalogBuilder::new_chained(base_catalog)
+        .add::<LoginPasswordAuthProvider>()
+        .add::<PredefinedAccountsRegistrator>()
+        .add::<AccountRepositoryInMemory>()
         .add_value(current_account_subject)
         .add_value(predefined_accounts_config)
         .build();
+
+    DatabaseTransactionRunner::new(catalog_authorized.clone())
+        .transactional(|transactional_catalog| async move {
+            let registrator = transactional_catalog
+                .get_one::<PredefinedAccountsRegistrator>()
+                .unwrap();
+
+            registrator
+                .ensure_predefined_accounts_are_registered()
+                .await
+        })
+        .await
+        .unwrap();
 
     (catalog_anonymous, catalog_authorized)
 }

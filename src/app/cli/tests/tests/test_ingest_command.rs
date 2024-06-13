@@ -11,9 +11,10 @@ use std::path::Path;
 
 use chrono::{TimeZone, Utc};
 use indoc::indoc;
+use kamu_cli_wrapper::Kamu;
 use opendatafabric::*;
 
-use crate::utils::Kamu;
+////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized, engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
@@ -186,6 +187,10 @@ async fn test_push_ingest_from_file_snapshot_with_event_time() {
     .await;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 fn path(p: &Path) -> &str {
     p.as_os_str().to_str().unwrap()
 }
+
+////////////////////////////////////////////////////////////////////////////////

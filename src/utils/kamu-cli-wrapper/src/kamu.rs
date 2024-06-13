@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use std::ffi::OsString;
+use std::fs;
 use std::io::Write;
+use std::net::SocketAddrV4;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -16,12 +18,15 @@ use chrono::{DateTime, Utc};
 use datafusion::prelude::*;
 use dill::Component;
 use event_bus::EventBus;
-use kamu::domain::*;
 use kamu::*;
+use kamu_cli::config::CONFIG_FILENAME;
 use kamu_cli::*;
+use kamu_core::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 use thiserror::Error;
+
+////////////////////////////////////////////////////////////////////////////////
 
 // Test wrapper on top of CLI library
 pub struct Kamu {
@@ -53,22 +58,42 @@ impl Kamu {
         self.system_time = t;
     }
 
-    pub async fn new_workspace_tmp() -> Self {
+    async fn new_workspace_tmp_inner(options: NewWorkspaceOptions) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
+
+        if let Some(config) = options.kamu_config {
+            fs::write(temp_dir.path().join(CONFIG_FILENAME), config).unwrap();
+        }
+
         let inst = Self::new(temp_dir.path());
         let inst = Self {
             _temp_dir: Some(temp_dir),
             ..inst
         };
 
-        inst.execute(["init"]).await.unwrap();
+        let arguments = if options.is_multi_tenant {
+            vec!["init", "--multi-tenant"]
+        } else {
+            vec!["init"]
+        };
 
-        // TODO: Remove when podman is the default
-        inst.execute(["config", "set", "engine.runtime", "podman"])
-            .await
-            .unwrap();
+        if let Some(env_vars) = options.env_vars {
+            for (env_name, env_value) in env_vars {
+                std::env::set_var(env_name, env_value);
+            }
+        }
+
+        inst.execute(arguments).await.unwrap();
 
         inst
+    }
+
+    pub async fn new_workspace_tmp() -> Self {
+        Self::new_workspace_tmp_inner(NewWorkspaceOptions::default()).await
+    }
+
+    pub async fn new_workspace_tmp_with(options: NewWorkspaceOptions) -> Self {
+        Self::new_workspace_tmp_inner(options).await
     }
 
     pub fn workspace_path(&self) -> &Path {
@@ -86,7 +111,7 @@ impl Kamu {
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(self.current_account.to_current_account_subject())
-            .add::<domain::auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(self.workspace_layout.datasets_dir.clone())
@@ -169,6 +194,23 @@ impl Kamu {
             })
     }
 
+    pub async fn start_api_server(self, addr: SocketAddrV4) -> Result<(), InternalError> {
+        let host = addr.ip().to_string();
+        let port = addr.port().to_string();
+
+        self.execute([
+            "--e2e-testing",
+            "system",
+            "api-server",
+            "--address",
+            host.as_str(),
+            "--http-port",
+            port.as_str(),
+        ])
+        .await
+        .int_err()
+    }
+
     // TODO: Generalize into execute with overridden STDOUT/ERR/IN
     pub async fn complete<S>(&self, input: S, current: usize) -> Result<Vec<String>, CLIError>
     where
@@ -181,7 +223,7 @@ impl Kamu {
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(self.current_account.to_current_account_subject())
-            .add::<domain::auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(self.workspace_layout.datasets_dir.clone())
@@ -227,9 +269,14 @@ impl Kamu {
     }
 
     pub fn catalog(&self) -> dill::Catalog {
-        let base_catalog =
-            kamu_cli::configure_base_catalog(&self.workspace_layout, false, self.system_time)
-                .build();
+        let is_e2e_testing = true;
+        let base_catalog = kamu_cli::configure_base_catalog(
+            &self.workspace_layout,
+            false,
+            self.system_time,
+            is_e2e_testing,
+        )
+        .build();
 
         let multi_tenant_workspace = true;
         let mut cli_catalog_builder =
@@ -247,7 +294,7 @@ impl Kamu {
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(self.current_account.to_current_account_subject())
-            .add::<domain::auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(self.workspace_layout.datasets_dir.clone())
@@ -278,9 +325,20 @@ impl Kamu {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Default)]
+pub struct NewWorkspaceOptions {
+    pub is_multi_tenant: bool,
+    pub kamu_config: Option<String>,
+    pub env_vars: Option<Vec<(String, String)>>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Error)]
 #[error("Command {cmd:?} failed: {error}")]
 pub struct CommandError {
     pub cmd: Vec<OsString>,
     pub error: CLIError,
 }
+
+////////////////////////////////////////////////////////////////////////////////

@@ -9,6 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use kamu_accounts::*;
 use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
 use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
@@ -94,8 +95,9 @@ async fn test_use_bad_access_token() {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn make_catalog() -> dill::Catalog {
-    dill::CatalogBuilder::new()
-        .add::<DummyAuthenticationProviderA>()
+    let mut b = dill::CatalogBuilder::new();
+
+    b.add::<DummyAuthenticationProviderA>()
         .add::<DummyAuthenticationProviderB>()
         .add::<AuthenticationServiceImpl>()
         .add::<AccountRepositoryInMemory>()
@@ -105,7 +107,11 @@ fn make_catalog() -> dill::Catalog {
         .add_value(SystemTimeSourceStub::new())
         .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
         .add_value(JwtAuthenticationConfig::default())
-        .build()
+        .add::<DatabaseTransactionRunner>();
+
+    NoOpDatabasePlugin::init_database_components(&mut b);
+
+    b.build()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

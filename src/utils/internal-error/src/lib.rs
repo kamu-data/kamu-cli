@@ -40,6 +40,26 @@ impl InternalError {
 
         Self { source, backtrace }
     }
+
+    pub fn bail<T>(reason: impl Into<String>) -> Result<T, Self> {
+        Err(Self::new(InternalErrorBail::new(reason)))
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("Error: {reason}")]
+struct InternalErrorBail {
+    reason: String,
+}
+
+impl InternalErrorBail {
+    pub fn new(reason: impl Into<String>) -> Self {
+        Self {
+            reason: reason.into(),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -11,7 +11,7 @@ use std::any::Any;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use dill::{Catalog, CatalogBuilder};
+use dill::{component, Catalog, CatalogBuilder};
 use internal_error::{InternalError, ResultIntoInternal};
 use tokio::sync::Mutex;
 
@@ -34,52 +34,85 @@ pub trait DatabaseTransactionManager: Send + Sync {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn run_transactional<H, HFut>(
-    base_catalog: &Catalog,
-    callback: H,
-) -> Result<(), InternalError>
-where
-    H: FnOnce(Catalog) -> HFut + Send + Sync + 'static,
-    HFut: std::future::Future<Output = Result<(), InternalError>> + Send + 'static,
-{
-    // Extract transaction manager, specific for the database
-    let db_transaction_manager = base_catalog
-        .get_one::<dyn DatabaseTransactionManager>()
-        .unwrap();
+pub struct DatabaseTransactionRunner {
+    catalog: Catalog,
+}
 
-    // Start transaction
-    let transaction_ref = db_transaction_manager.make_transaction_ref().await?;
+#[component(pub)]
+impl DatabaseTransactionRunner {
+    pub fn new(catalog: Catalog) -> Self {
+        Self { catalog }
+    }
 
-    // Create a chained catalog for transaction-aware components,
-    // but keep a local copy of a transaction pointer
-    let chained_catalog = CatalogBuilder::new_chained(base_catalog)
-        .add_value(transaction_ref.clone())
-        .build();
+    pub async fn transactional<H, HFut, HFutResultT, HFutResultE>(
+        &self,
+        callback: H,
+    ) -> Result<HFutResultT, HFutResultE>
+    where
+        H: FnOnce(Catalog) -> HFut,
+        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
+        HFutResultE: From<InternalError>,
+    {
+        // Extract transaction manager, specific for the database
+        let db_transaction_manager = self
+            .catalog
+            .get_one::<dyn DatabaseTransactionManager>()
+            .unwrap();
 
-    // Run transactional code in the callback
-    let result = callback(chained_catalog).await;
+        // Start transaction
+        let transaction_ref = db_transaction_manager.make_transaction_ref().await?;
 
-    // Commit or rollback transaction depending on the result
-    match result {
-        // In case everything succeeded, commit the transaction
-        Ok(_) => {
-            db_transaction_manager
-                .commit_transaction(transaction_ref)
-                .await?;
-            Ok(())
+        // A catalog with a transaction must live for a limited time
+        let result = {
+            // Create a chained catalog for transaction-aware components,
+            // but keep a local copy of a transaction pointer
+            let catalog_with_transaction = CatalogBuilder::new_chained(&self.catalog)
+                .add_value(transaction_ref.clone())
+                .build();
+
+            callback(catalog_with_transaction).await
+        };
+
+        // Commit or rollback transaction depending on the result
+        match result {
+            // In case everything succeeded, commit the transaction
+            Ok(res) => {
+                db_transaction_manager
+                    .commit_transaction(transaction_ref)
+                    .await?;
+                Ok(res)
+            }
+
+            // Otherwise, do an explicit rollback
+            Err(e) => {
+                db_transaction_manager
+                    .rollback_transaction(transaction_ref)
+                    .await?;
+                Err(e)
+            }
         }
+    }
 
-        // Otherwise, do an explicit rollback
-        Err(e) => {
-            db_transaction_manager
-                .rollback_transaction(transaction_ref)
-                .await?;
-            Err(e)
-        }
+    pub async fn transactional_with<Iface, H, HFut, HFutResultT, HFutResultE>(
+        &self,
+        callback: H,
+    ) -> Result<HFutResultT, HFutResultE>
+    where
+        Iface: 'static + ?Sized + Send + Sync,
+        H: FnOnce(Arc<Iface>) -> HFut,
+        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
+        HFutResultE: From<InternalError>,
+    {
+        self.transactional(|transactional_catalog| async move {
+            let catalog_item = transactional_catalog.get_one().int_err()?;
+
+            callback(catalog_item).await
+        })
+        .await
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 /// Represents a shared reference to [`sqlx::Transaction`] that unifies how we
 /// propagate transactions across different database implementations. This
@@ -102,8 +135,9 @@ impl TransactionRef {
     pub fn into_maybe_transaction<DB: sqlx::Database>(
         self,
     ) -> Option<sqlx::Transaction<'static, DB>> {
-        let m = Arc::try_unwrap(self.inner).unwrap().into_inner();
-        m.maybe_transaction
+        Arc::try_unwrap(self.inner)
+            .ok()
+            .and_then(|m| m.into_inner().maybe_transaction)
             .map(|t| *t.downcast::<sqlx::Transaction<'static, DB>>().unwrap())
     }
 }

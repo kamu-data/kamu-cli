@@ -10,6 +10,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
@@ -19,13 +20,21 @@ use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
 use kamu_accounts::*;
 use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
-use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
+use kamu_accounts_services::{
+    AccessTokenServiceImpl,
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_core::*;
 use opendatafabric::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn create_catalog_with_local_workspace(tempdir: &Path, is_multitenant: bool) -> dill::Catalog {
+async fn create_catalog_with_local_workspace(
+    tempdir: &Path,
+    is_multitenant: bool,
+) -> dill::Catalog {
     let datasets_dir = tempdir.join("datasets");
     std::fs::create_dir(&datasets_dir).unwrap();
 
@@ -42,28 +51,50 @@ fn create_catalog_with_local_workspace(tempdir: &Path, is_multitenant: bool) -> 
         panic!()
     }
 
-    let catalog = dill::CatalogBuilder::new()
-        .add::<EventBus>()
-        .add::<DependencyGraphServiceInMemory>()
-        .add_value(current_account_subject)
-        .add_value(predefined_accounts_config)
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(is_multitenant),
-        )
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .add::<SystemTimeSourceDefault>()
-        .add::<QueryServiceImpl>()
-        .add::<ObjectStoreRegistryImpl>()
-        .add::<ObjectStoreBuilderLocalFs>()
-        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .add::<AuthenticationServiceImpl>()
-        .add::<AccountRepositoryInMemory>()
-        .add::<AccessTokenServiceImpl>()
-        .add::<AccessTokenRepositoryInMemory>()
-        .add_value(JwtAuthenticationConfig::default())
-        .build();
+    let catalog = {
+        let mut b = dill::CatalogBuilder::new();
+
+        b.add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add_value(current_account_subject)
+            .add_value(predefined_accounts_config)
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(datasets_dir)
+                    .with_multi_tenant(is_multitenant),
+            )
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add::<SystemTimeSourceDefault>()
+            .add::<QueryServiceImpl>()
+            .add::<ObjectStoreRegistryImpl>()
+            .add::<ObjectStoreBuilderLocalFs>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AuthenticationServiceImpl>()
+            .add::<AccessTokenServiceImpl>()
+            .add::<AccessTokenRepositoryInMemory>()
+            .add::<AccountRepositoryInMemory>()
+            .add_value(JwtAuthenticationConfig::default())
+            .add::<LoginPasswordAuthProvider>()
+            .add::<PredefinedAccountsRegistrator>()
+            .add::<DatabaseTransactionRunner>();
+
+        NoOpDatabasePlugin::init_database_components(&mut b);
+
+        b.build()
+    };
+
+    DatabaseTransactionRunner::new(catalog.clone())
+        .transactional(|transactional_catalog| async move {
+            let registrator = transactional_catalog
+                .get_one::<PredefinedAccountsRegistrator>()
+                .unwrap();
+
+            registrator
+                .ensure_predefined_accounts_are_registered()
+                .await
+        })
+        .await
+        .unwrap();
 
     catalog
 }
@@ -135,7 +166,7 @@ async fn create_test_dataset(
 #[test_log::test(tokio::test)]
 async fn test_dataset_schema_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(tempdir.path(), true);
+    let catalog = create_catalog_with_local_workspace(tempdir.path(), true).await;
     create_test_dataset(&catalog, tempdir.path(), None).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -194,7 +225,7 @@ async fn test_dataset_schema_local_fs() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_tail_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(tempdir.path(), true);
+    let catalog = create_catalog_with_local_workspace(tempdir.path(), true).await;
     create_test_dataset(&catalog, tempdir.path(), None).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -235,7 +266,7 @@ async fn test_dataset_tail_local_fs() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_tail_empty_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(tempdir.path(), true);
+    let catalog = create_catalog_with_local_workspace(tempdir.path(), true).await;
     create_test_dataset(&catalog, tempdir.path(), None).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();

@@ -12,7 +12,7 @@ use opendatafabric::{AccountID, AccountName};
 use thiserror::Error;
 
 use super::{InvalidCredentialsError, RejectedCredentialsError};
-use crate::Account;
+use crate::{Account, FindAccountIdByProviderIdentityKeyError, ProviderLoginError};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -101,6 +101,24 @@ pub enum LoginError {
 #[error("Unsupported login method '{method}'")]
 pub struct UnsupportedLoginMethodError {
     pub method: String,
+}
+
+impl From<ProviderLoginError> for LoginError {
+    fn from(value: ProviderLoginError) -> Self {
+        match value {
+            ProviderLoginError::InvalidCredentials(e) => Self::InvalidCredentials(e),
+            ProviderLoginError::RejectedCredentials(e) => Self::RejectedCredentials(e),
+            ProviderLoginError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<FindAccountIdByProviderIdentityKeyError> for LoginError {
+    fn from(value: FindAccountIdByProviderIdentityKeyError) -> Self {
+        match value {
+            FindAccountIdByProviderIdentityKeyError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

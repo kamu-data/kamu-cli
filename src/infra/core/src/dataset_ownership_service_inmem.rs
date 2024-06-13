@@ -22,8 +22,6 @@ use opendatafabric::{AccountID, AccountName, DatasetID};
 pub struct DatasetOwnershipServiceInMemory {
     current_account_subject: Arc<CurrentAccountSubject>,
     dataset_repo: Arc<dyn DatasetRepository>,
-    authentication_service: Arc<dyn AuthenticationService>,
-
     state: Arc<tokio::sync::RwLock<State>>,
 }
 
@@ -45,12 +43,10 @@ impl DatasetOwnershipServiceInMemory {
     pub fn new(
         current_account_subject: Arc<CurrentAccountSubject>,
         dataset_repo: Arc<dyn DatasetRepository>,
-        authentication_service: Arc<dyn AuthenticationService>,
     ) -> Self {
         Self {
             current_account_subject,
             dataset_repo,
-            authentication_service,
             state: Default::default(),
         }
     }
@@ -77,6 +73,16 @@ impl DatasetOwnershipServiceInMemory {
                 dataset_ids
             });
     }
+
+    async fn check_has_initialized(&self) -> Result<(), InternalError> {
+        let has_initially_scanned = self.state.read().await.initially_scanned;
+
+        if has_initially_scanned {
+            Ok(())
+        } else {
+            InternalError::bail("The service was not previously initialized!")
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -84,9 +90,14 @@ impl DatasetOwnershipServiceInMemory {
 #[async_trait::async_trait]
 impl DatasetOwnershipService for DatasetOwnershipServiceInMemory {
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn eager_initialization(&self) -> Result<(), InternalError> {
+    async fn eager_initialization(
+        &self,
+        authentication_service: &Arc<dyn AuthenticationService>,
+    ) -> Result<(), InternalError> {
         let mut guard = self.state.write().await;
         if guard.initially_scanned {
+            tracing::warn!("The service has already initialized");
+
             return Ok(());
         }
 
@@ -112,8 +123,7 @@ impl DatasetOwnershipService for DatasetOwnershipServiceInMemory {
             {
                 Some(account_id.clone())
             } else {
-                let maybe_account_id = self
-                    .authentication_service
+                let maybe_account_id = authentication_service
                     .find_account_id_by_name(&account_name)
                     .await?;
                 if let Some(account_id) = maybe_account_id {
@@ -141,7 +151,7 @@ impl DatasetOwnershipService for DatasetOwnershipServiceInMemory {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<Vec<AccountID>, InternalError> {
-        self.eager_initialization().await?;
+        self.check_has_initialized().await?;
 
         let guard = self.state.read().await;
         let maybe_account_ids = guard.account_ids_by_dataset_id.get(dataset_id);
@@ -157,7 +167,7 @@ impl DatasetOwnershipService for DatasetOwnershipServiceInMemory {
         &self,
         account_id: &AccountID,
     ) -> Result<Vec<DatasetID>, InternalError> {
-        self.eager_initialization().await?;
+        self.check_has_initialized().await?;
 
         let guard = self.state.read().await;
         let maybe_dataset_ids = guard.dataset_ids_by_account_id.get(account_id);
@@ -174,7 +184,7 @@ impl DatasetOwnershipService for DatasetOwnershipServiceInMemory {
         dataset_id: &DatasetID,
         account_id: &AccountID,
     ) -> Result<bool, InternalError> {
-        self.eager_initialization().await?;
+        self.check_has_initialized().await?;
 
         let guard = self.state.read().await;
 

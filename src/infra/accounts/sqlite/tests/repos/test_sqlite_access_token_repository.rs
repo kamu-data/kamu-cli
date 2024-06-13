@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{run_transactional, SqliteTransactionManager};
+use database_common::{DatabaseTransactionRunner, SqliteTransactionManager};
 use dill::{Catalog, CatalogBuilder};
+use internal_error::InternalError;
 use kamu_accounts_sqlite::{SqliteAccessTokenRepository, SqliteAccountRepository};
 use sqlx::SqlitePool;
 
@@ -19,12 +20,13 @@ use sqlx::SqlitePool;
 async fn test_missing_access_token_not_found(sqlite_pool: SqlitePool) {
     let harness = SqliteAccessTokenRepositoryHarness::new(sqlite_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_accounts_repo_tests::test_missing_access_token_not_found(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_missing_access_token_not_found(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -34,12 +36,13 @@ async fn test_missing_access_token_not_found(sqlite_pool: SqlitePool) {
 async fn test_insert_and_locate_access_token(sqlite_pool: SqlitePool) {
     let harness = SqliteAccessTokenRepositoryHarness::new(sqlite_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_accounts_repo_tests::test_insert_and_locate_access_token(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_insert_and_locate_access_token(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -49,12 +52,13 @@ async fn test_insert_and_locate_access_token(sqlite_pool: SqlitePool) {
 async fn test_insert_and_locate_multiple_access_tokens(sqlite_pool: SqlitePool) {
     let harness = SqliteAccessTokenRepositoryHarness::new(sqlite_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_accounts_repo_tests::test_insert_and_locate_multiple_access_tokens(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_insert_and_locate_multiple_access_tokens(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -64,12 +68,13 @@ async fn test_insert_and_locate_multiple_access_tokens(sqlite_pool: SqlitePool) 
 async fn test_mark_existing_access_token_revorked(sqlite_pool: SqlitePool) {
     let harness = SqliteAccessTokenRepositoryHarness::new(sqlite_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_accounts_repo_tests::test_mark_existing_access_token_revorked(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_mark_existing_access_token_revorked(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -79,12 +84,13 @@ async fn test_mark_existing_access_token_revorked(sqlite_pool: SqlitePool) {
 async fn test_mark_non_existing_access_token_revorked(sqlite_pool: SqlitePool) {
     let harness = SqliteAccessTokenRepositoryHarness::new(sqlite_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_accounts_repo_tests::test_mark_non_existing_access_token_revorked(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_mark_non_existing_access_token_revorked(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

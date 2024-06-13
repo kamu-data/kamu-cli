@@ -8,9 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod mysql_plugin;
+mod no_op_plugin;
 mod postgres_plugin;
 mod sqlite_plugin;
 
 pub use mysql_plugin::*;
+pub use no_op_plugin::*;
 pub use postgres_plugin::*;
 pub use sqlite_plugin::*;

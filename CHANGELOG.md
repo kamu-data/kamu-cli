@@ -10,12 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - See the updated `examples/reth-vs-snp500` example
   - See the new [`datafusion-ethers`](https://github.com/kamu-data/datafusion-ethers) crate for implementation details
 - New repository `AccessTokenRepository` to work with new access tokens
+- Added E2E test infrastructure
+  - Added necessary components for managed run -- for startup, operations, and shutdown
 ## Changed
 - Upgraded to `arrow 52` and `datafusion 39`
 - Improved binary data formatting in CLI table output - instead of the `<binary>` placeholder it will display an abbreviated hex values e.g. `c47cf6…7e3755`
 - JSON and CSV formatters can now output binary data - it will be `hex`-encoded by default
+- Hidden arguments and options are excluded from [the CLI reference](resources/cli-reference.md)
 ## Fixed
 - JSON formatter now properly supports `Decimal` types
+- Stabilized startup using connection to databases
+  - Added HTTP middleware that wraps each request into a separate transaction 
+  - Also added wrapping for some commands, in particular `kamu system generate-token`
+  - The structure of services that required lazy access to databases was reorganized:
+     - Extracted `PredefinedAccountsRegistrator` & `DatasetOwnershipServiceInMemoryStateInitializer` 
+- Fixed potential crash when attempting to rollback a transaction if the connection fails to establish
 
 ## [0.185.1] - 2024-06-07
 ### Fixed
@@ -27,8 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compaction for derived dataset if transformation fails due to root dataset compaction and retry transformation
 - Initial support for ingestion via file uploads, with local FS and S3-based storage for temporary files  
 ### Changed
-- `AddPushSource` event may omit specifying a schema. In this case, the very first push ingestion invokation 
-  would try to make a best-effort auto-inferrence of the data schema.
+- `AddPushSource` event may omit specifying a schema. In this case, the very first push ingestion invocation 
+  would try to make a best-effort auto-inference of the data schema.
 ### Fixed
 - Fixed issue with smart protocol transfer operations upon empty datasets  
 
@@ -39,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded to `datafusion v38`
 ### Added
 - Added a public image with [sqlx-cli](/images/sqlx-cli)
-- Added a [configuration](/images/persistence-storage) of running a `kamu` API server along with a database,
+- Added a [configuration](/images/persistent-storage) of running a `kamu` API server along with a database,
   for persistent storage of data
 - New `listFlowInitiators` api to fetch all initiators of flows
 - New `allPaused` method in `AccountFlowConfigs` API
@@ -54,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `HardCompacting` configuration now is one of `Full` or `KeepMetadataOnly` variants. In case of 
   `KeepMetadataOnly` variant required to provide `recursive` value which will trigger downstream
-  dependecnies compacting
+  dependencies compacting
 
 ## [0.182.0] - 2024-05-20
 ### Added
@@ -99,7 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.178.0] - 2024-05-04
 ### Added
-- Flow system: implemented persistent repositories (PostgresSQL, SQLite) for flow configuration events
+- Flow system: implemented persistent repositories (PostgreSQL, SQLite) for flow configuration events
 - Support for persistent accounts:
   - supports Postgres, MySQL/MariaDB, SQLite database targets
   - accounts have a fully functional DID-identifier:

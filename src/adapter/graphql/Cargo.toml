@@ -61,12 +61,13 @@ uuid = { version = "1", default_features = false }
 [dev-dependencies]
 # TODO: Limit to mock or in-memory implementations only
 container-runtime = { workspace = true }
+database-common = { workspace = true }
 event-bus = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
-kamu-task-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
+kamu-task-system-services = { workspace = true }
 
 
 indoc = "2"

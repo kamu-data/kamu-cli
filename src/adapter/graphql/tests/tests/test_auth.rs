@@ -67,7 +67,7 @@ async fn test_enabled_login_methods() {
         .expect_supported_login_methods()
         .return_once(|| vec![DUMMY_LOGIN_METHOD]);
 
-    let harness = AuthGQLHarness::new(mock_authentication_service);
+    let harness = AuthGQLHarness::new(mock_authentication_service).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -100,7 +100,7 @@ async fn test_enabled_login_methods() {
 
 #[test_log::test(tokio::test)]
 async fn test_login() {
-    let harness = AuthGQLHarness::new(MockAuthenticationService::built_in());
+    let harness = AuthGQLHarness::new(MockAuthenticationService::built_in()).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -127,7 +127,7 @@ async fn test_login() {
 
 #[test_log::test(tokio::test)]
 async fn test_login_bad_method() {
-    let harness = AuthGQLHarness::new(MockAuthenticationService::unsupported_login_method());
+    let harness = AuthGQLHarness::new(MockAuthenticationService::unsupported_login_method()).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -146,7 +146,7 @@ async fn test_login_bad_method() {
 
 #[test_log::test(tokio::test)]
 async fn test_account_details() {
-    let harness = AuthGQLHarness::new(MockAuthenticationService::built_in());
+    let harness = AuthGQLHarness::new(MockAuthenticationService::built_in()).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -170,7 +170,7 @@ async fn test_account_details() {
 
 #[test_log::test(tokio::test)]
 async fn test_account_details_expired_token() {
-    let harness = AuthGQLHarness::new(MockAuthenticationService::expired_token());
+    let harness = AuthGQLHarness::new(MockAuthenticationService::expired_token()).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -186,7 +186,7 @@ async fn test_account_details_expired_token() {
 
 #[test_log::test(tokio::test)]
 async fn test_create_and_get_access_token() {
-    let harness = AuthGQLHarness::new(MockAuthenticationService::expired_token());
+    let harness = AuthGQLHarness::new(MockAuthenticationService::expired_token()).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let mutation_code = AuthGQLHarness::create_access_token(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
@@ -240,7 +240,7 @@ async fn test_create_and_get_access_token() {
 
 #[test_log::test(tokio::test)]
 async fn test_revoke_access_token() {
-    let harness = AuthGQLHarness::new(MockAuthenticationService::expired_token());
+    let harness = AuthGQLHarness::new(MockAuthenticationService::expired_token()).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let mutation_code = AuthGQLHarness::create_access_token(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
@@ -316,7 +316,7 @@ struct AuthGQLHarness {
 }
 
 impl AuthGQLHarness {
-    fn new(mock_authentication_service: MockAuthenticationService) -> Self {
+    async fn new(mock_authentication_service: MockAuthenticationService) -> Self {
         let catalog_base = dill::CatalogBuilder::new()
             .add_value(mock_authentication_service)
             .bind::<dyn AuthenticationService, MockAuthenticationService>()
@@ -326,7 +326,7 @@ impl AuthGQLHarness {
             .add::<AccessTokenRepositoryInMemory>()
             .build();
 
-        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base);
+        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
 
         Self {
             catalog_anonymous,

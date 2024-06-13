@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{run_transactional, PostgresTransactionManager};
+use database_common::{DatabaseTransactionRunner, PostgresTransactionManager};
 use dill::{Catalog, CatalogBuilder};
+use internal_error::InternalError;
 use kamu_accounts_postgres::{PostgresAccessTokenRepository, PostgresAccountRepository};
 use sqlx::PgPool;
 
@@ -19,12 +20,13 @@ use sqlx::PgPool;
 async fn test_missing_access_token_not_found(pg_pool: PgPool) {
     let harness = PostgresAccessTokenRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_accounts_repo_tests::test_missing_access_token_not_found(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_missing_account_not_found(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -34,12 +36,13 @@ async fn test_missing_access_token_not_found(pg_pool: PgPool) {
 async fn test_insert_and_locate_access_token(pg_pool: PgPool) {
     let harness = PostgresAccessTokenRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_accounts_repo_tests::test_insert_and_locate_access_token(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_insert_and_locate_access_token(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -49,12 +52,13 @@ async fn test_insert_and_locate_access_token(pg_pool: PgPool) {
 async fn test_insert_and_locate_multiple_access_tokens(pg_pool: PgPool) {
     let harness = PostgresAccessTokenRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_accounts_repo_tests::test_insert_and_locate_multiple_access_tokens(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_insert_and_locate_multiple_access_tokens(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -64,12 +68,13 @@ async fn test_insert_and_locate_multiple_access_tokens(pg_pool: PgPool) {
 async fn test_mark_existing_access_token_revorked(pg_pool: PgPool) {
     let harness = PostgresAccessTokenRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_accounts_repo_tests::test_mark_existing_access_token_revorked(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_mark_existing_access_token_revorked(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -79,12 +84,13 @@ async fn test_mark_existing_access_token_revorked(pg_pool: PgPool) {
 async fn test_mark_non_existing_access_token_revorked(pg_pool: PgPool) {
     let harness = PostgresAccessTokenRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_accounts_repo_tests::test_mark_non_existing_access_token_revorked(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_mark_non_existing_access_token_revorked(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -93,12 +99,14 @@ async fn test_mark_non_existing_access_token_revorked(pg_pool: PgPool) {
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_find_account_by_active_token_id(pg_pool: PgPool) {
     let harness = PostgresAccessTokenRepositoryHarness::new(pg_pool);
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_accounts_repo_tests::test_find_account_by_active_token_id(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_find_account_by_active_token_id(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

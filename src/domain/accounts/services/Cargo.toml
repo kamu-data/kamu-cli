@@ -22,15 +22,16 @@ doctest = false
 
 
 [dependencies]
+database-common = { workspace = true }
 internal-error = { workspace = true }
-opendatafabric = { workspace = true }
-random-names = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
+opendatafabric = { workspace = true }
+random-names = { workspace = true }
 
 argon2 = { version = "0.5" }
 async-trait = { version = "0.1", default-features = false }
-chrono = { version="0.4", default-features = false }
+chrono = { version = "0.4", default-features = false }
 dill = "0.8"
 jsonwebtoken = "9"
 thiserror = { version = "1", default-features = false }
