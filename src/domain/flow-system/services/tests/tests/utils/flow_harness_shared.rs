@@ -22,7 +22,7 @@ use kamu_accounts::{
     JwtAuthenticationConfig,
     PredefinedAccountsConfig,
 };
-use kamu_accounts_inmem::AccountRepositoryInMemory;
+use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
@@ -136,6 +136,7 @@ impl FlowHarness {
                 .add_value(JwtAuthenticationConfig::default())
                 .add::<AccountRepositoryInMemory>()
                 .add::<AccessTokenServiceImpl>()
+                .add::<AccessTokenRepositoryInMemory>()
                 .add::<DependencyGraphServiceInMemory>()
                 .add::<DatasetOwnershipServiceInMemory>()
                 .add::<TaskSchedulerImpl>()

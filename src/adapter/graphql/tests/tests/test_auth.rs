@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::value;
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use indoc::indoc;
 use kamu_accounts::{
     AuthenticationService,
@@ -16,7 +17,7 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME_STR,
     DUMMY_LOGIN_METHOD,
 };
-use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
+use kamu_accounts_inmem::AccessTokenRepositoryInMemory;
 use kamu_accounts_services::AccessTokenServiceImpl;
 use kamu_core::SystemTimeSourceDefault;
 
@@ -317,14 +318,20 @@ struct AuthGQLHarness {
 
 impl AuthGQLHarness {
     async fn new(mock_authentication_service: MockAuthenticationService) -> Self {
-        let catalog_base = dill::CatalogBuilder::new()
-            .add_value(mock_authentication_service)
-            .bind::<dyn AuthenticationService, MockAuthenticationService>()
-            .add::<SystemTimeSourceDefault>()
-            .add::<AccessTokenServiceImpl>()
-            .add::<AccountRepositoryInMemory>()
-            .add::<AccessTokenRepositoryInMemory>()
-            .build();
+        let catalog_base = {
+            let mut b = dill::CatalogBuilder::new();
+
+            b.add_value(mock_authentication_service)
+                .bind::<dyn AuthenticationService, MockAuthenticationService>()
+                .add::<SystemTimeSourceDefault>()
+                .add::<AccessTokenServiceImpl>()
+                .add::<AccessTokenRepositoryInMemory>()
+                .add::<DatabaseTransactionRunner>();
+
+            NoOpDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
 
         let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
 

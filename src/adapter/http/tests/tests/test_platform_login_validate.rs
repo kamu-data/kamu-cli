@@ -14,7 +14,7 @@ use chrono::{Duration, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use kamu::domain::{InternalError, ResultIntoInternal, SystemTimeSource, SystemTimeSourceStub};
 use kamu_accounts::*;
-use kamu_accounts_inmem::AccountRepositoryInMemory;
+use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
@@ -70,6 +70,7 @@ impl Harness {
                 .add_value(JwtAuthenticationConfig::default())
                 .add::<DatabaseTransactionRunner>()
                 .add::<AccessTokenServiceImpl>()
+                .add::<AccessTokenRepositoryInMemory>()
                 .add::<PredefinedAccountsRegistrator>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
