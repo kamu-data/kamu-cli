@@ -143,32 +143,7 @@ pub async fn run(
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
-    // TODO: Not for every command?
-    // TODO: For some reason, we if we do in a single transaction, there is a hangup
-    DatabaseTransactionRunner::new(cli_catalog.clone())
-        .transactional(|transactional_catalog| async move {
-            let registrator = transactional_catalog
-                .get_one::<PredefinedAccountsRegistrator>()
-                .map_err(CLIError::critical)?;
-
-            registrator
-                .ensure_predefined_accounts_are_registered()
-                .await
-                .map_err(CLIError::critical)
-        })
-        .await?;
-    DatabaseTransactionRunner::new(cli_catalog.clone())
-        .transactional(|transactional_catalog| async move {
-            let initializer = transactional_catalog
-                .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
-                .map_err(CLIError::critical)?;
-
-            initializer
-                .eager_initialization()
-                .await
-                .map_err(CLIError::critical)
-        })
-        .await?;
+    initialize_components(&cli_catalog).await?;
 
     let need_to_wrap_with_transaction = cli_commands::command_needs_transaction(&matches)?;
     let run_command = |cli_catalog: Catalog| async move {
@@ -471,6 +446,36 @@ pub fn configure_cli_catalog(
     b.add::<odf_server::LoginService>();
 
     b
+}
+
+async fn initialize_components(cli_catalog: &Catalog) -> Result<(), CLIError> {
+    // TODO: For some reason, we if we do in a single transaction, there is a hangup
+    DatabaseTransactionRunner::new(cli_catalog.clone())
+        .transactional(|transactional_catalog| async move {
+            let registrator = transactional_catalog
+                .get_one::<PredefinedAccountsRegistrator>()
+                .map_err(CLIError::critical)?;
+
+            registrator
+                .ensure_predefined_accounts_are_registered()
+                .await
+                .map_err(CLIError::critical)
+        })
+        .await?;
+    DatabaseTransactionRunner::new(cli_catalog.clone())
+        .transactional(|transactional_catalog| async move {
+            let initializer = transactional_catalog
+                .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
+                .map_err(CLIError::critical)?;
+
+            initializer
+                .eager_initialization()
+                .await
+                .map_err(CLIError::critical)
+        })
+        .await?;
+
+    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -831,6 +836,8 @@ fn get_output_format_recursive<'a>(
         None
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(dead_code)]
 #[derive(Default)]
