@@ -35,8 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compaction for derived dataset if transformation fails due to root dataset compaction and retry transformation
 - Initial support for ingestion via file uploads, with local FS and S3-based storage for temporary files  
 ### Changed
-- `AddPushSource` event may omit specifying a schema. In this case, the very first push ingestion invokation 
-  would try to make a best-effort auto-inferrence of the data schema.
+- `AddPushSource` event may omit specifying a schema. In this case, the very first push ingestion invocation 
+  would try to make a best-effort auto-inference of the data schema.
 ### Fixed
 - Fixed issue with smart protocol transfer operations upon empty datasets  
 
