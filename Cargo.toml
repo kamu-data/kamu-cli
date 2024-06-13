@@ -10,6 +10,7 @@ members = [
     "src/utils/event-sourcing",
     "src/utils/event-sourcing-macros",
     "src/utils/internal-error",
+    "src/utils/kamu-cli-wrapper",
     "src/utils/multiformats",
     "src/utils/random-names",
     "src/utils/repo-tools",
@@ -52,6 +53,13 @@ members = [
     "src/adapter/odata",
     # Apps
     "src/app/cli",
+    # E2E
+    "src/e2e/app/cli/common",
+    "src/e2e/app/cli/repo-tests",
+    "src/e2e/app/cli/inmem",
+    "src/e2e/app/cli/postgres",
+    "src/e2e/app/cli/mysql",
+    "src/e2e/app/cli/sqlite",
 ]
 resolver = "2"
 
@@ -66,9 +74,10 @@ event-bus = { version = "0.185.1", path = "src/utils/event-bus", default-feature
 event-sourcing = { version = "0.185.1", path = "src/utils/event-sourcing", default-features = false }
 event-sourcing-macros = { version = "0.185.1", path = "src/utils/event-sourcing-macros", default-features = false }
 internal-error = { version = "0.185.1", path = "src/utils/internal-error", default-features = false }
-multiformats = { version = "0.185.1", path = "src/utils/multiformats", default-features = false }
+kamu-cli-wrapper = { version = "0.185.1", path = "src/utils/kamu-cli-wrapper", default-features = false }
 kamu-data-utils = { version = "0.185.1", path = "src/utils/data-utils", default-features = false }
 kamu-datafusion-cli = { version = "0.185.1", path = "src/utils/datafusion-cli", default-features = false }
+multiformats = { version = "0.185.1", path = "src/utils/multiformats", default-features = false }
 random-names = { version = "0.185.1", path = "src/utils/random-names", default-features = false }
 tracing-perfetto = { version = "0.185.1", path = "src/utils/tracing-perfetto", default-features = false }
 
@@ -111,6 +120,10 @@ kamu-adapter-graphql = { version = "0.185.1", path = "src/adapter/graphql", defa
 kamu-adapter-http = { version = "0.185.1", path = "src/adapter/http", default-features = false }
 kamu-adapter-odata = { version = "0.185.1", path = "src/adapter/odata", defualt-features = false }
 kamu-adapter-oauth = { version = "0.185.1", path = "src/adapter/oauth", defualt-features = false }
+
+# E2E
+kamu-cli-e2e-common = { version = "0.185.1", path = "src/e2e/app/cli/common", defualt-features = false }
+kamu-cli-e2e-repo-tests = { version = "0.185.1", path = "src/e2e/app/cli/repo-tests", defualt-features = false }
 
 [workspace.package]
 version = "0.185.1"

@@ -12,11 +12,12 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
-use database_common::{DatabaseConfiguration, DatabaseProvider};
+use database_common::{DatabaseConfiguration, DatabaseProvider, DatabaseTransactionRunner};
 use dill::*;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
+use kamu_accounts_services::PredefinedAccountsRegistrator;
 use kamu_adapter_http::{FileUploadLimitConfig, UploadService, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
@@ -37,6 +38,7 @@ const VERBOSE_LOGGING_CONFIG: &str = "debug";
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Errors before commands are executed are not output anywhere -- log them
 pub async fn run(
     workspace_layout: WorkspaceLayout,
     matches: clap::ArgMatches,
@@ -71,9 +73,14 @@ pub async fn run(
         .transpose()
         .map_err(CLIError::usage_error_from)?
         .map(Into::into);
+    let is_e2e_testing = matches.get_flag("e2e-testing");
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
+    let maybe_db_configuration = config
+        .database
+        .clone()
+        .and_then(try_convert_into_db_configuration);
     // Configure application
     let (guards, base_catalog, cli_catalog, output_config) = {
         let dependencies_graph_repository = prepare_dependencies_graph_repository(
@@ -82,23 +89,23 @@ pub async fn run(
             current_account.to_current_account_subject(),
         );
 
-        let mut base_catalog_builder =
-            configure_base_catalog(&workspace_layout, is_multi_tenant_workspace, system_time);
+        let mut base_catalog_builder = configure_base_catalog(
+            &workspace_layout,
+            is_multi_tenant_workspace,
+            system_time,
+            is_e2e_testing,
+        );
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
 
         base_catalog_builder.add_value(ServerUrlConfig::load_from_env()?);
 
-        if let Some(db_configuration) = config
-            .database
-            .clone()
-            .and_then(try_convert_into_db_configuration)
-        {
-            configure_database_components(&mut base_catalog_builder, &db_configuration)?;
+        if let Some(db_configuration) = maybe_db_configuration.as_ref() {
+            configure_database_components(&mut base_catalog_builder, db_configuration)?;
         } else {
             configure_in_memory_components(&mut base_catalog_builder);
-        }
+        };
 
         base_catalog_builder
             .add_value(dependencies_graph_repository)
@@ -136,22 +143,39 @@ pub async fn run(
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
-    let result = match cli_commands::get_command(&base_catalog, &cli_catalog, &matches) {
-        Ok(mut command) => {
-            if command.needs_workspace() && !workspace_svc.is_in_workspace() {
-                Err(CLIError::usage_error_from(NotInWorkspace))
-            } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
-                Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-            } else if current_account.is_explicit() && !is_multi_tenant_workspace {
-                Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
-            } else {
-                command.run().await
+    initialize_components(&cli_catalog).await?;
+
+    let need_to_wrap_with_transaction = cli_commands::command_needs_transaction(&matches)?;
+    let run_command = |cli_catalog: Catalog| async move {
+        match cli_commands::get_command(&base_catalog, &cli_catalog, &matches) {
+            Ok(mut command) => {
+                if command.needs_workspace() && !workspace_svc.is_in_workspace() {
+                    Err(CLIError::usage_error_from(NotInWorkspace))
+                } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
+                    Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
+                } else if current_account.is_explicit() && !is_multi_tenant_workspace {
+                    Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
+                } else {
+                    command.run().await
+                }
             }
+            Err(e) => Err(e),
         }
-        Err(e) => Err(e),
+    };
+    let is_database_used = maybe_db_configuration.is_some();
+    let command_result = if is_database_used && need_to_wrap_with_transaction {
+        let transaction_runner = DatabaseTransactionRunner::new(cli_catalog);
+
+        transaction_runner
+            .transactional(|transactional_catalog| async move {
+                run_command(transactional_catalog).await
+            })
+            .await
+    } else {
+        run_command(cli_catalog).await
     };
 
-    match &result {
+    match &command_result {
         Ok(()) => {
             tracing::info!("Command successful");
         }
@@ -176,7 +200,7 @@ pub async fn run(
         let _ = TraceServer::maybe_serve_in_browser(trace_file).await;
     }
 
-    result
+    command_result
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -216,6 +240,7 @@ pub fn configure_base_catalog(
     workspace_layout: &WorkspaceLayout,
     multi_tenant_workspace: bool,
     system_time: Option<DateTime<Utc>>,
+    is_e2e_testing: bool,
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
@@ -309,6 +334,7 @@ pub fn configure_base_catalog(
     b.add::<DependencyGraphServiceInMemory>();
 
     b.add::<DatasetOwnershipServiceInMemory>();
+    b.add::<DatasetOwnershipServiceInMemoryStateInitializer>();
 
     b.add::<kamu_flow_system_services::FlowConfigurationServiceImpl>();
     b.add::<kamu_flow_system_services::FlowServiceImpl>();
@@ -321,10 +347,15 @@ pub fn configure_base_catalog(
 
     // No GitHub login possible for single-tenant workspace
     if multi_tenant_workspace {
-        b.add::<kamu_adapter_oauth::OAuthGithub>();
+        if is_e2e_testing {
+            b.add::<kamu_adapter_oauth::DummyOAuthGithub>();
+        } else {
+            b.add::<kamu_adapter_oauth::OAuthGithub>();
+        }
     }
 
     b.add::<kamu_accounts_services::AuthenticationServiceImpl>();
+    b.add::<PredefinedAccountsRegistrator>();
 
     // Give both CLI and server access to stored repo access tokens
     b.add::<odf_server::AccessTokenRegistryService>();
@@ -336,13 +367,23 @@ pub fn configure_base_catalog(
     b.add_builder(UploadServiceLocal::builder().with_cache_dir(workspace_layout.cache_dir.clone()));
     b.bind::<dyn UploadService, UploadServiceLocal>();
 
+    b.add::<DatabaseTransactionRunner>();
+
     b
 }
 
 fn configure_database_components(
     catalog_builder: &mut CatalogBuilder,
     db_configuration: &DatabaseConfiguration,
-) -> Result<(), InternalError> {
+) -> Result<(), CLIError> {
+    // TODO: Remove after adding implementation of FlowEventStore for databases
+    catalog_builder.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
+
+    // TODO: Delete after preparing services for transactional work and replace with
+    //       permanent storage options
+    catalog_builder.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
+    catalog_builder.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
+
     match db_configuration.provider {
         DatabaseProvider::Postgres => {
             database_common::PostgresPlugin::init_database_components(
@@ -352,8 +393,6 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_postgres::PostgresAccountRepository>();
-            catalog_builder.add::<kamu_flow_system_postgres::FlowSystemEventStorePostgres>();
-            catalog_builder.add::<kamu_task_system_postgres::TaskSystemEventStorePostgres>();
 
             Ok(())
         }
@@ -366,7 +405,9 @@ fn configure_database_components(
 
             catalog_builder.add::<kamu_accounts_mysql::MySqlAccountRepository>();
 
-            todo!("Task & Flow System MySQL versions");
+            // TODO: Task & Flow System MySQL versions
+
+            Ok(())
         }
         DatabaseProvider::Sqlite => {
             database_common::SqlitePlugin::init_database_components(
@@ -376,8 +417,6 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
-            catalog_builder.add::<kamu_flow_system_sqlite::FlowSystemEventStoreSqlite>();
-            catalog_builder.add::<kamu_task_system_sqlite::TaskSystemEventStoreSqlite>();
 
             Ok(())
         }
@@ -390,6 +429,8 @@ pub fn configure_in_memory_components(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
     catalog_builder.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
     catalog_builder.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
+
+    database_common::NoOpDatabasePlugin::init_database_components(catalog_builder);
 }
 
 // Public only for tests
@@ -405,6 +446,36 @@ pub fn configure_cli_catalog(
     b.add::<odf_server::LoginService>();
 
     b
+}
+
+async fn initialize_components(cli_catalog: &Catalog) -> Result<(), CLIError> {
+    // TODO: For some reason, we if we do in a single transaction, there is a hangup
+    DatabaseTransactionRunner::new(cli_catalog.clone())
+        .transactional(|transactional_catalog| async move {
+            let registrator = transactional_catalog
+                .get_one::<PredefinedAccountsRegistrator>()
+                .map_err(CLIError::critical)?;
+
+            registrator
+                .ensure_predefined_accounts_are_registered()
+                .await
+                .map_err(CLIError::critical)
+        })
+        .await?;
+    DatabaseTransactionRunner::new(cli_catalog.clone())
+        .transactional(|transactional_catalog| async move {
+            let initializer = transactional_catalog
+                .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
+                .map_err(CLIError::critical)?;
+
+            initializer
+                .eager_initialization()
+                .await
+                .map_err(CLIError::critical)
+        })
+        .await?;
+
+    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -765,6 +836,8 @@ fn get_output_format_recursive<'a>(
         None
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(dead_code)]
 #[derive(Default)]

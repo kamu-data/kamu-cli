@@ -127,7 +127,9 @@ fn build_command_markdown(
         writeln!(buffer, "**Arguments:**\n")?;
 
         for pos_arg in command.get_positionals() {
-            write_arg_markdown(buffer, pos_arg)?;
+            if !pos_arg.is_hide_set() {
+                write_arg_markdown(buffer, pos_arg)?;
+            }
         }
 
         writeln!(buffer)?;
@@ -144,7 +146,9 @@ fn build_command_markdown(
         writeln!(buffer, "**Options:**\n")?;
 
         for arg in non_pos {
-            write_arg_markdown(buffer, arg)?;
+            if !arg.is_hide_set() {
+                write_arg_markdown(buffer, arg)?;
+            }
         }
 
         writeln!(buffer)?;

@@ -7,14 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use internal_error::InternalError;
+use kamu_accounts::AuthenticationService;
 use opendatafabric::{AccountID, DatasetID};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DatasetOwnershipService: Sync + Send {
-    async fn eager_initialization(&self) -> Result<(), InternalError>;
+    async fn eager_initialization(
+        &self,
+        authentication_service: &Arc<dyn AuthenticationService>,
+    ) -> Result<(), InternalError>;
 
     async fn get_dataset_owners(
         &self,

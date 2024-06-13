@@ -16,10 +16,64 @@ use kamu::domain::*;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
 use kamu_cli::*;
+use kamu_cli_wrapper::{CommandError, Kamu};
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
 
-use crate::utils::{CommandError, Kamu};
+////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_workspace_upgrade() {
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    let kamu = Kamu::new(temp_dir.path());
+    let workspace_svc = kamu.catalog().get_one::<WorkspaceService>().unwrap();
+    assert_eq!(workspace_svc.workspace_version().unwrap(), None);
+
+    init_v0_workspace(temp_dir.path()).await;
+
+    assert!(!temp_dir.path().join(".kamu/version").is_file());
+    assert!(temp_dir.path().join(".kamu/datasets/foo/cache").is_dir());
+    assert!(temp_dir.path().join(".kamu/datasets/foo/config").is_file());
+    assert!(!temp_dir
+        .path()
+        .join(".kamu/datasets/foo/info/config")
+        .is_file());
+    assert_eq!(
+        workspace_svc.workspace_version().unwrap(),
+        Some(WorkspaceVersion::V0_Initial)
+    );
+
+    assert_matches!(
+        kamu.execute(["list"]).await,
+        Err(CommandError {
+            error: CLIError::UsageError(err),
+            ..
+        }) if err.source().unwrap().is::<WorkspaceUpgradeRequired>()
+    );
+
+    // TODO: Restore this test upon the first upgrade post V5 breaking changes
+    /*
+    kamu.execute(["system", "upgrade-workspace"]).await.unwrap();
+
+    assert_eq!(
+        workspace_svc.workspace_version().unwrap(),
+        Some(WorkspaceVersion::LATEST)
+    );
+
+    assert!(temp_dir.path().join(".kamu/version").is_file());
+    assert!(!temp_dir.path().join(".kamu/datasets/foo/cache").is_dir());
+    assert!(!temp_dir.path().join(".kamu/datasets/foo/config").is_file());
+    assert!(temp_dir
+        .path()
+        .join(".kamu/datasets/foo/info/config")
+        .is_file());
+
+    kamu.execute(["list"]).await.unwrap();
+    */
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 async fn init_v0_workspace(workspace_path: &Path) {
     let workspace_root = workspace_path.join(".kamu");
@@ -102,53 +156,4 @@ async fn init_v0_workspace(workspace_path: &Path) {
     serde_yaml::to_writer(file, &manifest).unwrap();
 }
 
-#[test_log::test(tokio::test)]
-async fn test_workspace_upgrade() {
-    let temp_dir = tempfile::tempdir().unwrap();
-
-    let kamu = Kamu::new(temp_dir.path());
-    let workspace_svc = kamu.catalog().get_one::<WorkspaceService>().unwrap();
-    assert_eq!(workspace_svc.workspace_version().unwrap(), None);
-
-    init_v0_workspace(temp_dir.path()).await;
-
-    assert!(!temp_dir.path().join(".kamu/version").is_file());
-    assert!(temp_dir.path().join(".kamu/datasets/foo/cache").is_dir());
-    assert!(temp_dir.path().join(".kamu/datasets/foo/config").is_file());
-    assert!(!temp_dir
-        .path()
-        .join(".kamu/datasets/foo/info/config")
-        .is_file());
-    assert_eq!(
-        workspace_svc.workspace_version().unwrap(),
-        Some(WorkspaceVersion::V0_Initial)
-    );
-
-    assert_matches!(
-        kamu.execute(["list"]).await,
-        Err(CommandError {
-            error: CLIError::UsageError(err),
-            ..
-        }) if err.source().unwrap().is::<WorkspaceUpgradeRequired>()
-    );
-
-    // TODO: Restore this test upon the first upgrade post V5 breaking changes
-    /*
-    kamu.execute(["system", "upgrade-workspace"]).await.unwrap();
-
-    assert_eq!(
-        workspace_svc.workspace_version().unwrap(),
-        Some(WorkspaceVersion::LATEST)
-    );
-
-    assert!(temp_dir.path().join(".kamu/version").is_file());
-    assert!(!temp_dir.path().join(".kamu/datasets/foo/cache").is_dir());
-    assert!(!temp_dir.path().join(".kamu/datasets/foo/config").is_file());
-    assert!(temp_dir
-        .path()
-        .join(".kamu/datasets/foo/info/config")
-        .is_file());
-
-    kamu.execute(["list"]).await.unwrap();
-    */
-}
+////////////////////////////////////////////////////////////////////////////////

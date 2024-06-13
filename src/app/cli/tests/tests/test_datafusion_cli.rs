@@ -7,12 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-/////////////////////////////////////////////////////////////////////////////////////////
-
 use assert_cmd::Command;
 use indoc::indoc;
+use kamu_cli_wrapper::Kamu;
 
-use crate::utils::Kamu;
+////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
@@ -57,3 +56,5 @@ async fn test_datafusion_cli_not_launched_in_root_ws() {
         .assert()
         .failure();
 }
+
+////////////////////////////////////////////////////////////////////////////////

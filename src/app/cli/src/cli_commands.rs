@@ -14,6 +14,8 @@ use url::Url;
 use crate::commands::*;
 use crate::{accounts, odf_server, CommandInterpretationFailed, WorkspaceService};
 
+////////////////////////////////////////////////////////////////////////////////
+
 pub fn get_command(
     base_catalog: &dill::Catalog,
     cli_catalog: &dill::Catalog,
@@ -465,6 +467,7 @@ pub fn get_command(
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,
+                        arg_matches.get_flag("e2e-testing"),
                     ))
                 }
                 Some(("gql-query", query_matches)) => Box::new(APIServerGqlQueryCommand::new(
@@ -580,6 +583,22 @@ pub fn get_command(
     Ok(command)
 }
 
+pub fn command_needs_transaction(arg_matches: &clap::ArgMatches) -> Result<bool, CLIError> {
+    match arg_matches.subcommand() {
+        Some(("system", system_matches)) => match system_matches.subcommand() {
+            Some(("generate-token", _)) => Ok(true),
+            Some(_) => Ok(false),
+            None => Err(CommandInterpretationFailed.into()),
+        },
+        Some(_) => Ok(false),
+        None => Err(CommandInterpretationFailed.into()),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Dataset reference validation
+////////////////////////////////////////////////////////////////////////////////
+
 fn validate_dataset_ref(
     catalog: &dill::Catalog,
     dataset_ref: DatasetRef,
@@ -645,3 +664,5 @@ where
         .map(|p| validate_dataset_ref_pattern(catalog, p))
         .collect()
 }
+
+////////////////////////////////////////////////////////////////////////////////

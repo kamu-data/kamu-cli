@@ -30,7 +30,7 @@ use super::{
 
 #[test_log::test(tokio::test)]
 async fn test_read_initial_config_and_queue_without_waiting() {
-    let harness = FlowHarness::new();
+    let harness = FlowHarness::new().await;
 
     // Create a "foo" root dataset, and configure ingestion schedule every 60ms
     let foo_id = harness
@@ -152,7 +152,8 @@ async fn test_cron_config() {
         awaiting_step: Some(Duration::try_seconds(1).unwrap()),
         mandatory_throttling_period: Some(Duration::try_seconds(1).unwrap()),
         ..Default::default()
-    });
+    })
+    .await;
 
     // Create a "foo" root dataset, and configure ingestion cron schedule of every
     // 5s
@@ -245,7 +246,7 @@ async fn test_cron_config() {
 
 #[test_log::test(tokio::test)]
 async fn test_manual_trigger() {
-    let harness = FlowHarness::new();
+    let harness = FlowHarness::new().await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -450,7 +451,7 @@ async fn test_manual_trigger() {
 
 #[test_log::test(tokio::test)]
 async fn test_manual_trigger_compacting() {
-    let harness = FlowHarness::new();
+    let harness = FlowHarness::new().await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -600,7 +601,7 @@ async fn test_manual_trigger_compacting() {
 async fn test_manual_trigger_compacting_with_config() {
     let max_slice_size = 1_000_000u64;
     let max_slice_records = 1000u64;
-    let harness = FlowHarness::new();
+    let harness = FlowHarness::new().await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -701,7 +702,7 @@ async fn test_manual_trigger_compacting_with_config() {
 
 #[test_log::test(tokio::test)]
 async fn test_manual_trigger_keep_metadata_only_with_recursive_compacting() {
-    let harness = FlowHarness::new();
+    let harness = FlowHarness::new().await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -932,7 +933,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compacting() {
 
 #[test_log::test(tokio::test)]
 async fn test_manual_trigger_keep_metadata_only_without_recursive_compacting() {
-    let harness = FlowHarness::new();
+    let harness = FlowHarness::new().await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -1070,7 +1071,8 @@ async fn test_manual_trigger_keep_metadata_only_compacting_multiple_accounts() {
         is_multi_tenant: true,
         custom_account_names: vec![wasya_account_name.clone(), petya_account_name.clone()],
         ..Default::default()
-    });
+    })
+    .await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -1237,7 +1239,7 @@ async fn test_manual_trigger_keep_metadata_only_compacting_multiple_accounts() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_flow_configuration_paused_resumed_modified() {
-    let harness = FlowHarness::new();
+    let harness = FlowHarness::new().await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -1443,7 +1445,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
 
 #[test_log::test(tokio::test)]
 async fn test_respect_last_success_time_when_schedule_resumes() {
-    let harness = FlowHarness::new();
+    let harness = FlowHarness::new().await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -1656,7 +1658,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_deleted() {
-    let harness = FlowHarness::new();
+    let harness = FlowHarness::new().await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -1841,7 +1843,7 @@ async fn test_dataset_deleted() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_completions_trigger_next_loop_on_success() {
-    let harness = FlowHarness::new();
+    let harness = FlowHarness::new().await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -2057,7 +2059,8 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
             },
         )),
         ..Default::default()
-    });
+    })
+    .await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -2303,7 +2306,8 @@ async fn test_throttling_manual_triggers() {
             Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS * 10).unwrap(),
         ),
         ..Default::default()
-    });
+    })
+    .await;
 
     // Foo Flow
     let foo_id = harness
@@ -2434,7 +2438,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             },
         )),
         ..Default::default()
-    });
+    })
+    .await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -2905,7 +2910,8 @@ async fn test_batching_condition_records_reached() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_dataset_changes: Some(mock_dataset_changes),
         ..Default::default()
-    });
+    })
+    .await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -3218,7 +3224,8 @@ async fn test_batching_condition_timeout() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_dataset_changes: Some(mock_dataset_changes),
         ..Default::default()
-    });
+    })
+    .await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -3484,7 +3491,8 @@ async fn test_batching_condition_watermark() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_dataset_changes: Some(mock_dataset_changes),
         ..Default::default()
-    });
+    })
+    .await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -3799,7 +3807,8 @@ async fn test_batching_condition_with_2_inputs() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_dataset_changes: Some(mock_dataset_changes),
         ..Default::default()
-    });
+    })
+    .await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -4272,7 +4281,8 @@ async fn test_list_all_flow_initiators() {
         custom_account_names: vec![foo_account_name.clone(), bar_account_name.clone()],
         is_multi_tenant: true,
         ..Default::default()
-    });
+    })
+    .await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {
@@ -4420,7 +4430,8 @@ async fn test_list_all_datasets_with_flow() {
         custom_account_names: vec![foo_account_name.clone(), bar_account_name.clone()],
         is_multi_tenant: true,
         ..Default::default()
-    });
+    })
+    .await;
 
     let foo_id = harness
         .create_root_dataset(DatasetAlias {

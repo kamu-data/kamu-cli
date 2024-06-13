@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_cli_wrapper::Kamu;
 use opendatafabric::*;
 
-use crate::utils::Kamu;
+////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_repository_pull_aliases_commands() {
@@ -135,3 +136,5 @@ async fn test_repository_push_aliases_commands() {
         .await;
     assert!(push_aliases.is_empty());
 }
+
+////////////////////////////////////////////////////////////////////////////////

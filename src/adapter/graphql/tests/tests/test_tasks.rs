@@ -9,10 +9,13 @@
 
 use async_graphql::*;
 use chrono::Utc;
+use dill::*;
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
+
+////////////////////////////////////////////////////////////////////////////////
 
 mockall::mock! {
     TaskScheduler {}
@@ -26,6 +29,8 @@ mockall::mock! {
         async fn try_take(&self) -> Result<Option<TaskID>, TakeTaskError>;
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_task_get_non_existing() {
@@ -235,12 +240,8 @@ async fn test_task_create_update_dataset() {
         .withf(move |logical_plan| *logical_plan == expected_logical_plan)
         .return_once(move |_| Ok(returned_task));
 
-    let base_cat = dill::CatalogBuilder::new()
-        .add_value(task_sched_mock)
-        .bind::<dyn TaskScheduler, MockTaskScheduler>()
-        .build();
-
-    let (cat_anonymous, cat_authorized) = authentication_catalogs(&base_cat);
+    let base_cat = create_catalog(task_sched_mock);
+    let (cat_anonymous, cat_authorized) = authentication_catalogs(&base_cat).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -304,12 +305,8 @@ async fn test_task_create_probe() {
         .withf(move |logical_plan| *logical_plan == expected_logical_plan)
         .return_once(move |_| Ok(returned_task));
 
-    let base_cat = dill::CatalogBuilder::new()
-        .add_value(task_sched_mock)
-        .bind::<dyn TaskScheduler, MockTaskScheduler>()
-        .build();
-
-    let (cat_anonymous, cat_authorized) = authentication_catalogs(&base_cat);
+    let base_cat = create_catalog(task_sched_mock);
+    let (cat_anonymous, cat_authorized) = authentication_catalogs(&base_cat).await;
 
     let request_code = format!(
         r#"mutation {{
@@ -343,3 +340,18 @@ async fn test_task_create_probe() {
         })
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+fn create_catalog(task_sched_mock: MockTaskScheduler) -> Catalog {
+    let mut b = CatalogBuilder::new();
+
+    b.add_value(task_sched_mock)
+        .bind::<dyn TaskScheduler, MockTaskScheduler>();
+
+    database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
+    b.build()
+}
+
+////////////////////////////////////////////////////////////////////////////////

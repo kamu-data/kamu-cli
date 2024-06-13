@@ -4125,9 +4125,9 @@ checksum = "add0ab9360ddbd88cfeb3bd9574a1d85cfdfa14db10b3e21d3700dbc4328758f"
 
 [[package]]
 name = "httparse"
-version = "1.9.2"
+version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f3935c160d00ac752e09787e6e6bfc26494c2183cc922f1bc678a60d4733bc2"
+checksum = "d0e7a4dd27b9476dc40cb050d3632d3bba3a70ddbff012285f7f8559a1e7e545"
 
 [[package]]
 name = "httpdate"
@@ -4735,6 +4735,7 @@ dependencies = [
  "curl",
  "curl-sys",
  "dashmap",
+ "database-common",
  "datafusion",
  "datafusion-ethers",
  "datafusion-functions-json",
@@ -4889,6 +4890,7 @@ dependencies = [
  "argon2",
  "async-trait",
  "chrono",
+ "database-common",
  "dill",
  "internal-error",
  "jsonwebtoken",
@@ -4977,6 +4979,7 @@ dependencies = [
  "chrono",
  "container-runtime",
  "cron",
+ "database-common",
  "datafusion",
  "dill",
  "event-bus",
@@ -5023,6 +5026,7 @@ dependencies = [
  "bytes",
  "chrono",
  "container-runtime",
+ "database-common",
  "datafusion",
  "dill",
  "event-bus",
@@ -5161,16 +5165,13 @@ dependencies = [
  "kamu-adapter-http",
  "kamu-adapter-oauth",
  "kamu-adapter-odata",
+ "kamu-cli-wrapper",
  "kamu-data-utils",
  "kamu-datafusion-cli",
  "kamu-flow-system-inmem",
- "kamu-flow-system-postgres",
  "kamu-flow-system-services",
- "kamu-flow-system-sqlite",
  "kamu-task-system-inmem",
- "kamu-task-system-postgres",
  "kamu-task-system-services",
- "kamu-task-system-sqlite",
  "libc",
  "merge",
  "mime",
@@ -5212,6 +5213,105 @@ dependencies = [
  "vergen",
  "webbrowser",
  "whoami",
+]
+
+[[package]]
+name = "kamu-cli-e2e-common"
+version = "0.185.1"
+dependencies = [
+ "indoc 2.0.5",
+ "internal-error",
+ "kamu-cli-wrapper",
+ "regex",
+ "reqwest 0.11.27",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tokio-retry",
+]
+
+[[package]]
+name = "kamu-cli-e2e-inmem"
+version = "0.185.1"
+dependencies = [
+ "indoc 2.0.5",
+ "kamu-cli-e2e-common",
+ "kamu-cli-e2e-repo-tests",
+ "kamu-cli-wrapper",
+ "paste",
+ "test-group",
+ "tokio",
+]
+
+[[package]]
+name = "kamu-cli-e2e-mysql"
+version = "0.185.1"
+dependencies = [
+ "indoc 2.0.5",
+ "kamu-cli-e2e-common",
+ "kamu-cli-e2e-repo-tests",
+ "kamu-cli-wrapper",
+ "paste",
+ "sqlx",
+ "test-group",
+ "test-log",
+]
+
+[[package]]
+name = "kamu-cli-e2e-postgres"
+version = "0.185.1"
+dependencies = [
+ "indoc 2.0.5",
+ "kamu-cli-e2e-common",
+ "kamu-cli-e2e-repo-tests",
+ "kamu-cli-wrapper",
+ "paste",
+ "sqlx",
+ "test-group",
+ "test-log",
+]
+
+[[package]]
+name = "kamu-cli-e2e-repo-tests"
+version = "0.185.1"
+dependencies = [
+ "indoc 2.0.5",
+ "internal-error",
+ "kamu-cli-e2e-common",
+ "kamu-cli-wrapper",
+ "tokio",
+]
+
+[[package]]
+name = "kamu-cli-e2e-sqlite"
+version = "0.185.1"
+dependencies = [
+ "indoc 2.0.5",
+ "kamu-cli-e2e-common",
+ "kamu-cli-e2e-repo-tests",
+ "kamu-cli-wrapper",
+ "paste",
+ "sqlx",
+ "test-group",
+ "test-log",
+]
+
+[[package]]
+name = "kamu-cli-wrapper"
+version = "0.185.1"
+dependencies = [
+ "chrono",
+ "datafusion",
+ "dill",
+ "event-bus",
+ "kamu",
+ "kamu-cli",
+ "kamu-core",
+ "kamu-data-utils",
+ "opendatafabric",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]
@@ -5351,6 +5451,7 @@ dependencies = [
  "database-common",
  "dill",
  "futures",
+ "internal-error",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
  "opendatafabric",
@@ -5382,6 +5483,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "cron",
+ "database-common",
  "dill",
  "event-bus",
  "futures",
@@ -5421,6 +5523,7 @@ dependencies = [
  "database-common",
  "dill",
  "futures",
+ "internal-error",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
  "opendatafabric",
@@ -5523,6 +5626,7 @@ dependencies = [
  "database-common",
  "dill",
  "futures",
+ "internal-error",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
  "opendatafabric",
@@ -8870,6 +8974,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.66",
+]
+
+[[package]]
+name = "tokio-retry"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f57eb36ecbe0fc510036adff84824dd3c24bb781e21bfa67b69d556aa85214f"
+dependencies = [
+ "pin-project",
+ "rand",
+ "tokio",
 ]
 
 [[package]]

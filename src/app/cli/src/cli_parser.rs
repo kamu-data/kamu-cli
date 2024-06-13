@@ -103,7 +103,12 @@ pub fn cli() -> Command {
                 .long("account")
                 .short('a')
                 .action(ArgAction::Set)
-                .hide(true)
+                .hide(true),
+            Arg::new("e2e-testing")
+                .long("e2e-testing")
+                .action(ArgAction::SetTrue)
+                .help("Activates additional functions required for E2E testing")
+                .hide(true),
         ])
         .after_help(indoc::indoc!(
             r#"

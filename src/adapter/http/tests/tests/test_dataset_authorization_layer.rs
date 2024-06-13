@@ -12,6 +12,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::{CatalogBuilder, Component};
 use event_bus::EventBus;
 use kamu::domain::auth::DatasetAction;
@@ -209,28 +210,31 @@ impl ServerHarness {
         let datasets_dir = temp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let mut base_catalog_builder = dill::CatalogBuilder::new();
-        base_catalog_builder.add::<SystemTimeSourceDefault>();
-        base_catalog_builder.add::<EventBus>();
-        base_catalog_builder.add::<DependencyGraphServiceInMemory>();
-        base_catalog_builder
-            .add_value(MockAuthenticationService::resolving_token(
-                DUMMY_ACCESS_TOKEN,
-                Account::dummy(),
-            ))
-            .bind::<dyn AuthenticationService, MockAuthenticationService>();
-        base_catalog_builder
-            .add_value(dataset_action_authorizer)
-            .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
-        base_catalog_builder
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_multi_tenant(false)
-                    .with_root(datasets_dir),
-            )
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
+        let base_catalog = {
+            let mut b = dill::CatalogBuilder::new();
 
-        let base_catalog = base_catalog_builder.build();
+            b.add::<SystemTimeSourceDefault>()
+                .add::<EventBus>()
+                .add::<DependencyGraphServiceInMemory>()
+                .add_value(MockAuthenticationService::resolving_token(
+                    DUMMY_ACCESS_TOKEN,
+                    Account::dummy(),
+                ))
+                .bind::<dyn AuthenticationService, MockAuthenticationService>()
+                .add_value(dataset_action_authorizer)
+                .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
+                .add_builder(
+                    DatasetRepositoryLocalFs::builder()
+                        .with_multi_tenant(false)
+                        .with_root(datasets_dir),
+                )
+                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .add::<DatabaseTransactionRunner>();
+
+            NoOpDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
 
         let catalog_system = CatalogBuilder::new_chained(&base_catalog)
             .add_value(CurrentAccountSubject::new_test())
