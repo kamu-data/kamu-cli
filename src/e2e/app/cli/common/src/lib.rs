@@ -23,6 +23,28 @@ pub mod prelude;
 
 #[macro_export]
 macro_rules! kamu_cli_run_api_server_e2e_test {
+    (inmem, $test_package: expr, $test_name: expr) => {
+        paste::paste! {
+            #[test_group::group(e2e)]
+            #[tokio::test]
+            async fn [<$test_name>] () {
+                KamuCliApiServerHarness::inmem(None)
+                    .run_api_server($test_package::$test_name)
+                    .await;
+            }
+        }
+    };
+    (inmem, $test_package: expr, $test_name: expr, $test_options: expr) => {
+        paste::paste! {
+            #[test_group::group(e2e)]
+            #[tokio::test]
+            async fn [<$test_name>] () {
+                KamuCliApiServerHarness::inmem(Some($test_options))
+                    .run_api_server($test_package::$test_name)
+                    .await;
+            }
+        }
+    };
     (postgres, $test_package: expr, $test_name: expr) => {
         paste::paste! {
             #[test_group::group(e2e, database, postgres)]
@@ -95,6 +117,28 @@ macro_rules! kamu_cli_run_api_server_e2e_test {
 
 #[macro_export]
 macro_rules! kamu_cli_execute_command_e2e_test {
+    (inmem, $test_package: expr, $test_name: expr) => {
+        paste::paste! {
+            #[test_group::group(e2e)]
+            #[tokio::test]
+            async fn [<$test_name>] () {
+                KamuCliApiServerHarness::inmem(None)
+                    .execute_command($test_package::$test_name)
+                    .await;
+            }
+        }
+    };
+    (inmem, $test_package: expr, $test_name: expr, $test_options: expr) => {
+        paste::paste! {
+            #[test_group::group(e2e)]
+            #[tokio::test]
+            async fn [<$test_name>] () {
+                KamuCliApiServerHarness::inmem(Some($test_options))
+                    .execute_command($test_package::$test_name)
+                    .await;
+            }
+        }
+    };
     (postgres, $test_package: expr, $test_name: expr) => {
         paste::paste! {
             #[test_group::group(e2e, database, postgres)]

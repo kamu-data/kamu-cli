@@ -27,11 +27,15 @@ pub struct KamuCliApiServerHarnessOptions {
 }
 
 pub struct KamuCliApiServerHarness {
-    kamu_config: String,
+    kamu_config: Option<String>,
     options: Option<KamuCliApiServerHarnessOptions>,
 }
 
 impl KamuCliApiServerHarness {
+    pub fn inmem(options: Option<KamuCliApiServerHarnessOptions>) -> Self {
+        Self::new(None, options)
+    }
+
     pub fn postgres(pg_pool: &PgPool, options: Option<KamuCliApiServerHarnessOptions>) -> Self {
         let db = pg_pool.connect_options();
         let kamu_config = format!(
@@ -54,7 +58,7 @@ impl KamuCliApiServerHarness {
             database = db.get_database().unwrap(),
         );
 
-        Self::new(kamu_config, options)
+        Self::new(Some(kamu_config), options)
     }
 
     pub fn mysql(mysql_pool: &MySqlPool, options: Option<KamuCliApiServerHarnessOptions>) -> Self {
@@ -79,7 +83,7 @@ impl KamuCliApiServerHarness {
             database = db.get_database().unwrap(),
         );
 
-        Self::new(kamu_config, options)
+        Self::new(Some(kamu_config), options)
     }
 
     pub fn sqlite(
@@ -112,10 +116,10 @@ impl KamuCliApiServerHarness {
             path = database_path
         );
 
-        Self::new(kamu_config, options)
+        Self::new(Some(kamu_config), options)
     }
 
-    fn new(kamu_config: String, options: Option<KamuCliApiServerHarnessOptions>) -> Self {
+    fn new(kamu_config: Option<String>, options: Option<KamuCliApiServerHarnessOptions>) -> Self {
         Self {
             kamu_config,
             options,
@@ -133,7 +137,7 @@ impl KamuCliApiServerHarness {
         } = self.options.unwrap_or_default();
         let kamu = Kamu::new_workspace_tmp_with(NewWorkspaceOptions {
             is_multi_tenant,
-            kamu_config: Some(self.kamu_config),
+            kamu_config: self.kamu_config,
             env_vars,
         })
         .await;
@@ -156,7 +160,7 @@ impl KamuCliApiServerHarness {
         } = self.options.unwrap_or_default();
         let kamu = Kamu::new_workspace_tmp_with(NewWorkspaceOptions {
             is_multi_tenant,
-            kamu_config: Some(self.kamu_config),
+            kamu_config: self.kamu_config,
             env_vars,
         })
         .await;
