@@ -15,8 +15,12 @@ use kamu::domain::{InternalError, ResultIntoInternal, ServerUrlConfig, SystemTim
 use kamu::testing::LocalS3Server;
 use kamu::utils::s3_context::S3Context;
 use kamu_accounts::{JwtAuthenticationConfig, PredefinedAccountsConfig, DEFAULT_ACCOUNT_ID};
-use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::{AuthenticationServiceImpl, LoginPasswordAuthProvider};
+use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
+use kamu_accounts_services::{
+    AccessTokenServiceImpl,
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+};
 use kamu_adapter_http::{
     decode_upload_token_payload,
     FileUploadLimitConfig,
@@ -53,6 +57,8 @@ impl Harness {
             .add_value(PredefinedAccountsConfig::single_tenant())
             .add::<AuthenticationServiceImpl>()
             .add::<AccountRepositoryInMemory>()
+            .add::<AccessTokenServiceImpl>()
+            .add::<AccessTokenRepositoryInMemory>()
             .add::<SystemTimeSourceDefault>()
             .add::<LoginPasswordAuthProvider>()
             .add_value(JwtAuthenticationConfig::default())

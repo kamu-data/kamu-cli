@@ -13,8 +13,12 @@ use std::sync::Arc;
 use chrono::{Duration, Utc};
 use kamu::domain::{InternalError, ResultIntoInternal, SystemTimeSource, SystemTimeSourceStub};
 use kamu_accounts::*;
-use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::{AuthenticationServiceImpl, LoginPasswordAuthProvider};
+use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
+use kamu_accounts_services::{
+    AccessTokenServiceImpl,
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+};
 use kamu_adapter_http::{LoginRequestBody, LoginResponseBody};
 use opendatafabric::AccountName;
 use serde_json::json;
@@ -56,6 +60,8 @@ impl Harness {
             .add::<AuthenticationServiceImpl>()
             .add_value(predefined_accounts_config)
             .add::<AccountRepositoryInMemory>()
+            .add::<AccessTokenServiceImpl>()
+            .add::<AccessTokenRepositoryInMemory>()
             .add_value(SystemTimeSourceStub::new())
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<LoginPasswordAuthProvider>()

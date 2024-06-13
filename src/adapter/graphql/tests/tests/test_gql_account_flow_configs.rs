@@ -30,8 +30,8 @@ use kamu::{
     DependencyGraphServiceInMemory,
 };
 use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::AuthenticationServiceImpl;
+use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
+use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
 use kamu_flow_system::FlowServiceRunConfig;
 use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
@@ -671,6 +671,8 @@ impl FlowConfigHarness {
             ))
             .add::<TaskSchedulerImpl>()
             .add::<TaskSystemEventStoreInMemory>()
+            .add::<AccessTokenServiceImpl>()
+            .add::<AccessTokenRepositoryInMemory>()
             .add_value(transform_service_mock)
             .bind::<dyn TransformService, MockTransformService>()
             .add_value(polling_service_mock)

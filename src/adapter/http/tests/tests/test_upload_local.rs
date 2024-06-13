@@ -14,8 +14,12 @@ use std::path::{Path, PathBuf};
 use dill::Component;
 use kamu::domain::{InternalError, ResultIntoInternal, ServerUrlConfig, SystemTimeSourceDefault};
 use kamu_accounts::{JwtAuthenticationConfig, PredefinedAccountsConfig, DEFAULT_ACCOUNT_ID};
-use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::{AuthenticationServiceImpl, LoginPasswordAuthProvider};
+use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
+use kamu_accounts_services::{
+    AccessTokenServiceImpl,
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+};
 use kamu_adapter_http::{
     decode_upload_token_payload,
     FileUploadLimitConfig,
@@ -53,6 +57,8 @@ impl Harness {
             .add::<AccountRepositoryInMemory>()
             .add::<SystemTimeSourceDefault>()
             .add::<LoginPasswordAuthProvider>()
+            .add::<AccessTokenServiceImpl>()
+            .add::<AccessTokenRepositoryInMemory>()
             .add_value(JwtAuthenticationConfig::default())
             .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
             .add_value(FileUploadLimitConfig {

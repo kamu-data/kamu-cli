@@ -26,8 +26,8 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
     DEFAULT_ACCOUNT_ID,
 };
-use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::AuthenticationServiceImpl;
+use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
+use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::{auth, DatasetOwnershipService, DatasetRepository, SystemTimeSourceDefault};
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
 use tempfile::TempDir;
@@ -116,6 +116,8 @@ impl DatasetOwnershipHarness {
             .add::<AuthenticationServiceImpl>()
             .add_value(predefined_accounts_config.clone())
             .add_value(JwtAuthenticationConfig::default())
+            .add::<AccessTokenServiceImpl>()
+            .add::<AccessTokenRepositoryInMemory>()
             .add::<AccountRepositoryInMemory>()
             .add::<DatasetOwnershipServiceInMemory>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()

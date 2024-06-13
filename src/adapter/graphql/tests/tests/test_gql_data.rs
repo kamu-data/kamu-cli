@@ -18,8 +18,8 @@ use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::AuthenticationServiceImpl;
+use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
+use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
 use opendatafabric::*;
 
@@ -60,6 +60,8 @@ fn create_catalog_with_local_workspace(tempdir: &Path, is_multitenant: bool) -> 
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<AuthenticationServiceImpl>()
         .add::<AccountRepositoryInMemory>()
+        .add::<AccessTokenServiceImpl>()
+        .add::<AccessTokenRepositoryInMemory>()
         .add_value(JwtAuthenticationConfig::default())
         .build();
 
@@ -129,7 +131,7 @@ async fn create_test_dataset(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(engine, datafusion)]
+// #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_schema_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();

@@ -10,8 +10,8 @@
 use std::assert_matches::assert_matches;
 
 use kamu_accounts::*;
-use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::AuthenticationServiceImpl;
+use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
+use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::{SystemTimeSource, SystemTimeSourceStub};
 use opendatafabric::{AccountID, AccountName};
 
@@ -99,6 +99,8 @@ fn make_catalog() -> dill::Catalog {
         .add::<DummyAuthenticationProviderB>()
         .add::<AuthenticationServiceImpl>()
         .add::<AccountRepositoryInMemory>()
+        .add::<AccessTokenServiceImpl>()
+        .add::<AccessTokenRepositoryInMemory>()
         .add_value(PredefinedAccountsConfig::single_tenant())
         .add_value(SystemTimeSourceStub::new())
         .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
