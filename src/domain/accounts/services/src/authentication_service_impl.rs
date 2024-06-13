@@ -111,7 +111,7 @@ impl AuthenticationServiceImpl {
         let iat = usize::try_from(current_time.timestamp()).unwrap();
         let exp = iat + expiration_time_sec;
 
-        let claims = KamuAccessTokenClaims {
+        let claims = JWTClaims {
             iat,
             exp,
             iss: String::from(KAMU_JWT_ISSUER),
@@ -129,23 +129,21 @@ impl AuthenticationServiceImpl {
     pub fn decode_access_token(
         &self,
         access_token: &str,
-    ) -> Result<AccessTokenArg, AccessTokenError> {
+    ) -> Result<AccessTokenType, AccessTokenError> {
         if &access_token[..2] == ACCESS_TOKEN_PREFIX {
-            return self
-                .access_token_svc
-                .decode_access_token(access_token)
+            return KamuAccessToken::decode(access_token)
                 .map_err(|err| AccessTokenError::Invalid(Box::new(err)))
-                .map(AccessTokenArg::KamuAccessToken);
+                .map(AccessTokenType::KamuAccessToken);
         }
         let mut validation = Validation::new(KAMU_JWT_ALGORITHM);
         validation.set_issuer(&[KAMU_JWT_ISSUER]);
 
-        decode::<KamuAccessTokenClaims>(access_token, &self.decoding_key, &validation)
+        decode::<JWTClaims>(access_token, &self.decoding_key, &validation)
             .map_err(|e| match *e.kind() {
                 ErrorKind::ExpiredSignature => AccessTokenError::Expired,
                 _ => AccessTokenError::Invalid(Box::new(e)),
             })
-            .map(AccessTokenArg::JWTToken)
+            .map(AccessTokenType::JWTToken)
     }
 
     pub async fn account_by_token_impl(
@@ -157,7 +155,7 @@ impl AuthenticationServiceImpl {
             .map_err(GetAccountInfoError::AccessToken)?;
 
         match decoded_access_token {
-            AccessTokenArg::JWTToken(token_data) => {
+            AccessTokenType::JWTToken(token_data) => {
                 let account_id = AccountID::from_did_str(&token_data.claims.sub)
                     .map_err(|e| GetAccountInfoError::Internal(e.int_err()))?;
 
@@ -167,9 +165,12 @@ impl AuthenticationServiceImpl {
                     Err(e) => Err(GetAccountInfoError::Internal(e)),
                 }
             }
-            AccessTokenArg::KamuAccessToken(kamu_access_token) => self
+            AccessTokenType::KamuAccessToken(kamu_access_token) => self
                 .access_token_svc
-                .find_account_id_by_active_token_id(&kamu_access_token.id)
+                .find_account_by_active_token_id(
+                    &kamu_access_token.id,
+                    kamu_access_token.random_bytes_hash,
+                )
                 .await
                 .map_err(|err| GetAccountInfoError::Internal(err.int_err())),
         }

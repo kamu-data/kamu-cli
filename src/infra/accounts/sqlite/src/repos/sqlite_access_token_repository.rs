@@ -34,7 +34,7 @@ impl SqliteAccessTokenRepository {
 
 #[async_trait::async_trait]
 impl AccessTokenRepository for SqliteAccessTokenRepository {
-    async fn create_access_token(
+    async fn save_access_token(
         &self,
         access_token: &AccessToken,
     ) -> Result<(), CreateAccessTokenError> {
@@ -124,8 +124,9 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         }
     }
 
-    async fn get_access_tokens(
+    async fn get_access_tokens_by_account_id(
         &self,
+        account_id: &AccountID,
         pagination: &AccessTokenPaginationOpts,
     ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
         let mut tr = self.transaction.lock().await;
@@ -136,6 +137,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
             .map_err(GetAccessTokenError::Internal)?;
         let limit = pagination.limit;
         let offset = pagination.offset;
+        let account_id_string = account_id.to_string();
 
         let access_token_rows = sqlx::query!(
             r#"
@@ -147,8 +149,10 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
                     revoked_at as "revoked_at: DateTime<Utc>",
                     account_id as "account_id: AccountID"
                 FROM access_tokens
-                LIMIT $1 OFFSET $2
+                WHERE account_id = $1
+                LIMIT $2 OFFSET $3
                 "#,
+            account_id_string,
             limit,
             offset,
         )
@@ -174,15 +178,26 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         &self,
         token_id: &Uuid,
         revoked_time: DateTime<Utc>,
-    ) -> Result<(), GetAccessTokenError> {
+    ) -> Result<(), RevokeTokenError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr
             .connection_mut()
             .await
-            .map_err(GetAccessTokenError::Internal)?;
+            .map_err(RevokeTokenError::Internal)?;
 
-        let update_result = sqlx::query!(
+        let existing_access_token =
+            self.get_token_by_id(token_id)
+                .await
+                .map_err(|err| match err {
+                    GetAccessTokenError::NotFound(e) => RevokeTokenError::NotFound(e),
+                    GetAccessTokenError::Internal(e) => RevokeTokenError::Internal(e),
+                })?;
+        if existing_access_token.revoked_at.is_some() {
+            return Err(RevokeTokenError::AlreadyRevoked);
+        }
+
+        sqlx::query!(
             r#"
                 UPDATE access_tokens SET revoked_at = $1 where id = $2
             "#,
@@ -192,13 +207,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         .execute(connection_mut)
         .await
         .int_err()
-        .map_err(GetAccessTokenError::Internal)?;
-
-        if update_result.rows_affected() == 0 {
-            return Err(GetAccessTokenError::NotFound(AccessTokenNotFoundError {
-                access_token_id: *token_id,
-            }));
-        }
+        .map_err(RevokeTokenError::Internal)?;
 
         Ok(())
     }
@@ -206,7 +215,8 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
     async fn find_account_by_active_token_id(
         &self,
         _token_id: &Uuid,
-    ) -> Result<Account, GetAccessTokenError> {
+        _token_hash: [u8; 32],
+    ) -> Result<Account, FindAccountByTokenError> {
         unimplemented!()
     }
 }

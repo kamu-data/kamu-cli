@@ -39,7 +39,7 @@ pub async fn test_insert_and_locate_access_token(catalog: &Catalog) {
 
     account_repo.create_account(&account).await.unwrap();
     access_token_repo
-        .create_access_token(&access_token)
+        .save_access_token(&access_token)
         .await
         .unwrap();
 
@@ -67,11 +67,11 @@ pub async fn test_insert_and_locate_multiple_access_tokens(catalog: &Catalog) {
 
     account_repo.create_account(&account).await.unwrap();
     access_token_repo
-        .create_access_token(&foo_access_token)
+        .save_access_token(&foo_access_token)
         .await
         .unwrap();
     access_token_repo
-        .create_access_token(&bar_access_token)
+        .save_access_token(&bar_access_token)
         .await
         .unwrap();
 
@@ -90,10 +90,13 @@ pub async fn test_insert_and_locate_multiple_access_tokens(catalog: &Catalog) {
     assert_eq!(db_bar_access_token, bar_access_token);
 
     let mut db_access_tokens = access_token_repo
-        .get_access_tokens(&AccessTokenPaginationOpts {
-            limit: 10,
-            offset: 0,
-        })
+        .get_access_tokens_by_account_id(
+            &account.id,
+            &AccessTokenPaginationOpts {
+                limit: 10,
+                offset: 0,
+            },
+        )
         .await
         .unwrap();
 
@@ -116,7 +119,7 @@ pub async fn test_mark_existing_access_token_revorked(catalog: &Catalog) {
 
     account_repo.create_account(&account).await.unwrap();
     access_token_repo
-        .create_access_token(&access_token)
+        .save_access_token(&access_token)
         .await
         .unwrap();
 
@@ -150,13 +153,14 @@ pub async fn test_mark_non_existing_access_token_revorked(catalog: &Catalog) {
     let revoke_result = access_token_repo
         .mark_revoked(&access_token.id, revoke_time)
         .await;
-    assert_matches!(revoke_result, Err(GetAccessTokenError::NotFound(_)));
+    assert_matches!(revoke_result, Err(RevokeTokenError::NotFound(_)));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_find_account_by_active_token_id(catalog: &Catalog) {
     let access_token = make_test_access_token("foo", None, "wasya");
+    let fake_access_token = make_test_access_token("bar", None, "wasya");
     let account = make_test_account(
         "wasya",
         kamu_adapter_oauth::PROVIDER_GITHUB,
@@ -168,15 +172,20 @@ pub async fn test_find_account_by_active_token_id(catalog: &Catalog) {
 
     account_repo.create_account(&account).await.unwrap();
     access_token_repo
-        .create_access_token(&access_token)
+        .save_access_token(&access_token)
         .await
         .unwrap();
 
     let db_account = access_token_repo
-        .find_account_by_active_token_id(&access_token.id)
+        .find_account_by_active_token_id(&access_token.id, access_token.token_hash)
         .await
         .unwrap();
     assert_eq!(db_account, account);
+
+    let db_account = access_token_repo
+        .find_account_by_active_token_id(&access_token.id, fake_access_token.token_hash)
+        .await;
+    assert_matches!(db_account, Err(FindAccountByTokenError::InvalidTokenHash));
 
     let revoke_time = Utc::now().round_subsecs(6);
     let revoke_result = access_token_repo
@@ -185,7 +194,7 @@ pub async fn test_find_account_by_active_token_id(catalog: &Catalog) {
     assert!(revoke_result.is_ok());
 
     let db_account = access_token_repo
-        .find_account_by_active_token_id(&access_token.id)
+        .find_account_by_active_token_id(&access_token.id, access_token.token_hash)
         .await;
-    assert_matches!(db_account, Err(GetAccessTokenError::NotFound(_)));
+    assert_matches!(db_account, Err(FindAccountByTokenError::NotFound(_)));
 }

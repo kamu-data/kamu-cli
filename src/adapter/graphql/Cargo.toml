@@ -55,6 +55,7 @@ tokio-stream = { version = "0.1", default-features = false }
 tracing = "0.1"
 thiserror = { version = "1", default-features = false }
 url = { version = "2", default-features = false }
+uuid = { version = "1", default_features = false }
 
 
 [dev-dependencies]

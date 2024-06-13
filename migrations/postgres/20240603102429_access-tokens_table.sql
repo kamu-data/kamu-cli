@@ -2,7 +2,7 @@ CREATE TABLE access_tokens(
     id uuid NOT NULL PRIMARY KEY,
     token_name VARCHAR(100) NOT NULL,
     token_hash BYTEA NOT NULL,
-    created_at timestamptz NOT NULL DEFAULT now(),
+    created_at timestamptz NOT NULL,
     revoked_at timestamptz,
     last_used_at timestamptz,
     account_id VARCHAR(100) NOT NULL REFERENCES accounts(id)

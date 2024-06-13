@@ -27,16 +27,19 @@ opendatafabric = { workspace = true, default-features = true, features = ["sqlx"
 random-names = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
+base32 = { version = "0.5.0" }
 chrono = { version = "0.4", default-features = false }
+crc32fast = { version="1.4.2" }
 jsonwebtoken = "9"
 lazy_static = { version = "1" }
 merge = "0.1"
 mockall = "0.11"
+rand = "0.8"
 serde = "1"
 serde_with = { version = "3", default-features = false }
 sqlx = { version = "0.7", default_features = false, features=["macros"]}
 thiserror = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }
-uuid = "1"
+uuid = { version = "1", default_features = false, features = ["v4"] }
 
 [dev-dependencies]

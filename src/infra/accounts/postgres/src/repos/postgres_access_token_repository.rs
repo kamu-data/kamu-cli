@@ -34,7 +34,7 @@ impl PostgresAccessTokenRepository {
 
 #[async_trait::async_trait]
 impl AccessTokenRepository for PostgresAccessTokenRepository {
-    async fn create_access_token(
+    async fn save_access_token(
         &self,
         access_token: &AccessToken,
     ) -> Result<(), CreateAccessTokenError> {
@@ -117,8 +117,9 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
         }
     }
 
-    async fn get_access_tokens(
+    async fn get_access_tokens_by_account_id(
         &self,
+        account_id: &AccountID,
         pagination: &AccessTokenPaginationOpts,
     ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
         let mut tr = self.transaction.lock().await;
@@ -138,8 +139,10 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
                     revoked_at,
                     account_id as "account_id: AccountID"
                 FROM access_tokens
-                LIMIT $1 OFFSET $2
+                WHERE account_id = $1
+                LIMIT $2 OFFSET $3
                 "#,
+            account_id.to_string(),
             pagination.limit,
             pagination.offset,
         )
@@ -165,15 +168,26 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
         &self,
         token_id: &Uuid,
         revoked_time: DateTime<Utc>,
-    ) -> Result<(), GetAccessTokenError> {
+    ) -> Result<(), RevokeTokenError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr
             .connection_mut()
             .await
-            .map_err(GetAccessTokenError::Internal)?;
+            .map_err(RevokeTokenError::Internal)?;
 
-        let update_result = sqlx::query!(
+        let existing_access_token =
+            self.get_token_by_id(token_id)
+                .await
+                .map_err(|err| match err {
+                    GetAccessTokenError::NotFound(e) => RevokeTokenError::NotFound(e),
+                    GetAccessTokenError::Internal(e) => RevokeTokenError::Internal(e),
+                })?;
+        if existing_access_token.revoked_at.is_some() {
+            return Err(RevokeTokenError::AlreadyRevoked);
+        }
+
+        sqlx::query!(
             r#"
                 UPDATE access_tokens SET revoked_at = $1 where id = $2
             "#,
@@ -183,13 +197,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
         .execute(connection_mut)
         .await
         .int_err()
-        .map_err(GetAccessTokenError::Internal)?;
-
-        if update_result.rows_affected() == 0 {
-            return Err(GetAccessTokenError::NotFound(AccessTokenNotFoundError {
-                access_token_id: *token_id,
-            }));
-        }
+        .map_err(RevokeTokenError::Internal)?;
 
         Ok(())
     }
@@ -197,17 +205,19 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
     async fn find_account_by_active_token_id(
         &self,
         token_id: &Uuid,
-    ) -> Result<Account, GetAccessTokenError> {
+        token_hash: [u8; 32],
+    ) -> Result<Account, FindAccountByTokenError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr
             .connection_mut()
             .await
-            .map_err(GetAccessTokenError::Internal)?;
+            .map_err(FindAccountByTokenError::Internal)?;
 
         let maybe_account_row = sqlx::query!(
             r#"
                 SELECT
+                    at.token_hash,
                     a.id as "id: AccountID",
                     a.account_name,
                     a.email as "email?",
@@ -227,9 +237,12 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
         .fetch_optional(connection_mut)
         .await
         .int_err()
-        .map_err(GetAccessTokenError::Internal)?;
+        .map_err(FindAccountByTokenError::Internal)?;
 
         if let Some(account_row) = maybe_account_row {
+            if token_hash != account_row.token_hash.as_slice() {
+                return Err(FindAccountByTokenError::InvalidTokenHash);
+            }
             Ok(Account {
                 id: account_row.id,
                 account_name: AccountName::new_unchecked(&account_row.account_name),
@@ -243,9 +256,11 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
                 provider_identity_key: account_row.provider_identity_key,
             })
         } else {
-            Err(GetAccessTokenError::NotFound(AccessTokenNotFoundError {
-                access_token_id: *token_id,
-            }))
+            Err(FindAccountByTokenError::NotFound(
+                AccessTokenNotFoundError {
+                    access_token_id: *token_id,
+                },
+            ))
         }
     }
 }

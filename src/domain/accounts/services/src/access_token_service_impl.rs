@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
 use dill::*;
 use kamu_accounts::{
     AccessToken,
@@ -18,12 +17,13 @@ use kamu_accounts::{
     AccessTokenService,
     Account,
     CreateAccessTokenError,
-    EncodeTokenError,
+    FindAccountByTokenError,
     GetAccessTokenError,
     KamuAccessToken,
+    RevokeTokenError,
 };
-use opendatafabric::{AccountID, Multihash};
-use rand::{self, Rng};
+use kamu_core::SystemTimeSource;
+use opendatafabric::AccountID;
 use uuid::Uuid;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -36,89 +36,23 @@ pub const ENCODED_ACCESS_TOKEN_LENGTH: usize = 61;
 
 pub struct AccessTokenServiceImpl {
     access_token_repository: Arc<dyn AccessTokenRepository>,
+    time_source: Arc<dyn SystemTimeSource>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[scope(Singleton)]
 #[interface(dyn AccessTokenService)]
 impl AccessTokenServiceImpl {
     #[allow(clippy::needless_pass_by_value)]
-    pub fn new(access_token_repository: Arc<dyn AccessTokenRepository>) -> Self {
+    pub fn new(
+        access_token_repository: Arc<dyn AccessTokenRepository>,
+        time_source: Arc<dyn SystemTimeSource>,
+    ) -> Self {
         Self {
             access_token_repository,
+            time_source,
         }
-    }
-
-    pub fn generate_access_token_impl(&self) -> KamuAccessToken {
-        let mut random_token_bytes = [0_u8; ACCESS_TOKEN_BYTES_LENGTH];
-        rand::thread_rng().fill(&mut random_token_bytes);
-
-        let token_checksum = crc32fast::hash(&random_token_bytes);
-        let token_id = Uuid::new_v4();
-        let full_token_bytes = [
-            token_id.as_bytes(),
-            random_token_bytes.as_slice(),
-            token_checksum.to_be_bytes().as_slice(),
-        ]
-        .concat();
-        let base32_token = base32::encode(base32::Alphabet::Crockford, &full_token_bytes);
-
-        KamuAccessToken {
-            prefix: ACCESS_TOKEN_PREFIX.to_string(),
-            id: token_id,
-            random_bytes: random_token_bytes,
-            random_bytes_hash: Multihash::from_digest_sha3_256(&random_token_bytes),
-            checksum: token_checksum,
-            composed_token: format!("{ACCESS_TOKEN_PREFIX}_{}", &base32_token),
-            base32_token,
-        }
-    }
-
-    pub fn decode_token_impl(
-        &self,
-        access_token: String,
-    ) -> Result<KamuAccessToken, EncodeTokenError> {
-        if access_token.len() != ENCODED_ACCESS_TOKEN_LENGTH {
-            return Err(EncodeTokenError::InvalidTokenLength);
-        }
-        if let Some((token_prefix, encoded_token)) = access_token.split_once('_') {
-            if token_prefix != ACCESS_TOKEN_PREFIX {
-                return Err(EncodeTokenError::InvalidTokenPrefix);
-            }
-
-            if let Some(decoded_token_bytes) =
-                base32::decode(base32::Alphabet::Crockford, encoded_token)
-            {
-                let token_id = Uuid::from_bytes(
-                    decoded_token_bytes[0..16]
-                        .try_into()
-                        .expect("Invalid uuid length"),
-                );
-                let token_body: [u8; 16] = decoded_token_bytes[16..32]
-                    .try_into()
-                    .expect("Invalid token_bytes_length");
-                let token_checksum: [u8; 4] = decoded_token_bytes[32..36]
-                    .try_into()
-                    .expect("Invalid checksum length");
-                let calculated_checksum = crc32fast::hash(&token_body);
-                if calculated_checksum.to_be_bytes() != token_checksum {
-                    return Err(EncodeTokenError::InvalidTokenChecksum);
-                }
-
-                return Ok(KamuAccessToken {
-                    id: token_id,
-                    prefix: token_prefix.to_string(),
-                    random_bytes: token_body,
-                    random_bytes_hash: Multihash::from_digest_sha3_256(&token_body),
-                    checksum: calculated_checksum,
-                    base32_token: encoded_token.to_string(),
-                    composed_token: access_token,
-                });
-            }
-        }
-        Err(EncodeTokenError::InvalidTokenFormat)
     }
 }
 
@@ -131,18 +65,14 @@ impl AccessTokenService for AccessTokenServiceImpl {
         token_name: &str,
         account_id: &AccountID,
     ) -> Result<KamuAccessToken, CreateAccessTokenError> {
-        let kamu_access_token = self.generate_access_token_impl();
+        let kamu_access_token = KamuAccessToken::new();
 
         self.access_token_repository
-            .create_access_token(&AccessToken {
+            .save_access_token(&AccessToken {
                 id: kamu_access_token.id,
                 token_name: token_name.to_string(),
-                token_hash: kamu_access_token
-                    .random_bytes_hash
-                    .digest()
-                    .try_into()
-                    .unwrap(),
-                created_at: Utc::now(),
+                token_hash: kamu_access_token.random_bytes_hash,
+                created_at: self.time_source.now(),
                 revoked_at: None,
                 account_id: account_id.clone(),
             })
@@ -151,32 +81,33 @@ impl AccessTokenService for AccessTokenServiceImpl {
         Ok(kamu_access_token)
     }
 
-    async fn find_account_id_by_active_token_id(
+    async fn find_account_by_active_token_id(
         &self,
         token_id: &Uuid,
-    ) -> Result<Account, GetAccessTokenError> {
+        token_hash: [u8; 32],
+    ) -> Result<Account, FindAccountByTokenError> {
         self.access_token_repository
-            .find_account_by_active_token_id(token_id)
+            .find_account_by_active_token_id(token_id, token_hash)
             .await
     }
 
-    fn decode_access_token(
+    async fn get_access_tokens_by_account_id(
         &self,
-        access_token_str: &str,
-    ) -> Result<KamuAccessToken, EncodeTokenError> {
-        self.decode_token_impl(access_token_str.to_string())
-    }
-
-    fn generate_access_token(&self) -> KamuAccessToken {
-        self.generate_access_token_impl()
-    }
-
-    async fn get_access_tokens(
-        &self,
+        account_id: &AccountID,
         pagination: &AccessTokenPaginationOpts,
     ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
         self.access_token_repository
-            .get_access_tokens(pagination)
+            .get_access_tokens_by_account_id(account_id, pagination)
             .await
+    }
+
+    async fn revoke_access_token(&self, token_id: &Uuid) -> Result<(), RevokeTokenError> {
+        self.access_token_repository
+            .mark_revoked(token_id, self.time_source.now())
+            .await
+    }
+
+    async fn get_token_by_id(&self, token_id: &Uuid) -> Result<AccessToken, GetAccessTokenError> {
+        self.access_token_repository.get_token_by_id(token_id).await
     }
 }

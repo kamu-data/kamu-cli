@@ -10,7 +10,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 use opendatafabric::AccountID;
-use thiserror::Error;
 use uuid::Uuid;
 
 use crate::{
@@ -18,8 +17,10 @@ use crate::{
     AccessTokenPaginationOpts,
     Account,
     CreateAccessTokenError,
+    FindAccountByTokenError,
     GetAccessTokenError,
     KamuAccessToken,
+    RevokeTokenError,
 };
 
 #[async_trait::async_trait]
@@ -30,34 +31,19 @@ pub trait AccessTokenService: Sync + Send {
         account_id: &AccountID,
     ) -> Result<KamuAccessToken, CreateAccessTokenError>;
 
-    fn decode_access_token(
-        &self,
-        access_token_str: &str,
-    ) -> Result<KamuAccessToken, EncodeTokenError>;
-
-    fn generate_access_token(&self) -> KamuAccessToken;
-
-    async fn find_account_id_by_active_token_id(
+    async fn find_account_by_active_token_id(
         &self,
         token_id: &Uuid,
-    ) -> Result<Account, GetAccessTokenError>;
+        token_hash: [u8; 32],
+    ) -> Result<Account, FindAccountByTokenError>;
 
-    async fn get_access_tokens(
+    async fn get_token_by_id(&self, token_id: &Uuid) -> Result<AccessToken, GetAccessTokenError>;
+
+    async fn get_access_tokens_by_account_id(
         &self,
+        account_id: &AccountID,
         pagination: &AccessTokenPaginationOpts,
     ) -> Result<Vec<AccessToken>, GetAccessTokenError>;
-}
 
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug, Eq, PartialEq)]
-pub enum EncodeTokenError {
-    #[error("Invalid access token prefix")]
-    InvalidTokenPrefix,
-    #[error("Invalid access token length")]
-    InvalidTokenLength,
-    #[error("Invalid access token checksum")]
-    InvalidTokenChecksum,
-    #[error("Invalid access token format")]
-    InvalidTokenFormat,
+    async fn revoke_access_token(&self, token_id: &Uuid) -> Result<(), RevokeTokenError>;
 }

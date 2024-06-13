@@ -4805,13 +4805,16 @@ name = "kamu-accounts"
 version = "0.185.1"
 dependencies = [
  "async-trait",
+ "base32",
  "chrono",
+ "crc32fast",
  "internal-error",
  "jsonwebtoken",
  "lazy_static",
  "merge",
  "mockall",
  "opendatafabric",
+ "rand",
  "random-names",
  "serde",
  "serde_with",
@@ -4900,9 +4903,7 @@ version = "0.185.1"
 dependencies = [
  "argon2",
  "async-trait",
- "base32",
  "chrono",
- "crc32fast",
  "dill",
  "internal-error",
  "jsonwebtoken",
@@ -4911,7 +4912,6 @@ dependencies = [
  "kamu-core",
  "opendatafabric",
  "password-hash 0.5.0",
- "rand",
  "random-names",
  "serde",
  "serde_json",
@@ -5026,6 +5026,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "uuid",
 ]
 
 [[package]]
