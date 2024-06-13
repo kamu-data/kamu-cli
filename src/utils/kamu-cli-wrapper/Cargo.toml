@@ -31,7 +31,7 @@ kamu-data-utils = { workspace = true }
 opendatafabric = { workspace = true }
 
 chrono = "0.4"
-datafusion = { version = "38", default-features = false, features = [
+datafusion = { version = "39", default-features = false, features = [
     "crypto_expressions",
     "encoding_expressions",
     "parquet",

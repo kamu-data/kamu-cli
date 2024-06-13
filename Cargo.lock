@@ -5026,6 +5026,7 @@ dependencies = [
  "bytes",
  "chrono",
  "container-runtime",
+ "database-common",
  "datafusion",
  "dill",
  "event-bus",
@@ -5216,13 +5217,13 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-common"
-version = "0.184.0"
+version = "0.185.1"
 dependencies = [
  "indoc 2.0.5",
  "internal-error",
  "kamu-cli-wrapper",
  "regex",
- "reqwest",
+ "reqwest 0.11.27",
  "serde",
  "serde_json",
  "sqlx",
@@ -5232,7 +5233,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-mysql"
-version = "0.184.0"
+version = "0.185.1"
 dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
@@ -5246,7 +5247,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-postgres"
-version = "0.184.0"
+version = "0.185.1"
 dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
@@ -5260,7 +5261,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-repo-tests"
-version = "0.184.0"
+version = "0.185.1"
 dependencies = [
  "indoc 2.0.5",
  "internal-error",
@@ -5271,7 +5272,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-sqlite"
-version = "0.184.0"
+version = "0.185.1"
 dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
@@ -5285,7 +5286,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-wrapper"
-version = "0.184.0"
+version = "0.185.1"
 dependencies = [
  "chrono",
  "datafusion",
