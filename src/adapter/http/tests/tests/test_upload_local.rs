@@ -11,11 +11,16 @@ use std::net::{SocketAddr, TcpListener};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
 
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use kamu::domain::{InternalError, ResultIntoInternal, ServerUrlConfig, SystemTimeSourceDefault};
 use kamu_accounts::{JwtAuthenticationConfig, PredefinedAccountsConfig, DEFAULT_ACCOUNT_ID};
 use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::{AuthenticationServiceImpl, LoginPasswordAuthProvider};
+use kamu_accounts_services::{
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_adapter_http::{
     decode_upload_token_payload,
     FileUploadLimitConfig,
@@ -36,7 +41,7 @@ struct Harness {
 }
 
 impl Harness {
-    fn new() -> Self {
+    async fn new() -> Self {
         let addr = SocketAddr::from(([127, 0, 0, 1], 0));
         let bind_socket = TcpListener::bind(addr).unwrap();
         let api_server_address = format!(
@@ -47,20 +52,40 @@ impl Harness {
         let tempdir = tempfile::tempdir().unwrap();
         let cache_dir = tempdir.path().join("cache");
 
-        let catalog = dill::CatalogBuilder::new()
-            .add_value(PredefinedAccountsConfig::single_tenant())
-            .add::<AuthenticationServiceImpl>()
-            .add::<AccountRepositoryInMemory>()
-            .add::<SystemTimeSourceDefault>()
-            .add::<LoginPasswordAuthProvider>()
-            .add_value(JwtAuthenticationConfig::default())
-            .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
-            .add_value(FileUploadLimitConfig {
-                max_file_size_in_bytes: 100,
+        let catalog = {
+            let mut b = dill::CatalogBuilder::new();
+
+            b.add_value(PredefinedAccountsConfig::single_tenant())
+                .add::<AuthenticationServiceImpl>()
+                .add::<AccountRepositoryInMemory>()
+                .add::<SystemTimeSourceDefault>()
+                .add::<LoginPasswordAuthProvider>()
+                .add_value(JwtAuthenticationConfig::default())
+                .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
+                .add_value(FileUploadLimitConfig {
+                    max_file_size_in_bytes: 100,
+                })
+                .add_builder(UploadServiceLocal::builder().with_cache_dir(cache_dir.clone()))
+                .bind::<dyn UploadService, UploadServiceLocal>()
+                .add::<PredefinedAccountsRegistrator>();
+
+            NoOpDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
+
+        DatabaseTransactionRunner::new(catalog.clone())
+            .transactional(|transactional_catalog| async move {
+                let registrator = transactional_catalog
+                    .get_one::<PredefinedAccountsRegistrator>()
+                    .unwrap();
+
+                registrator
+                    .ensure_predefined_accounts_are_registered()
+                    .await
             })
-            .add_builder(UploadServiceLocal::builder().with_cache_dir(cache_dir.clone()))
-            .bind::<dyn UploadService, UploadServiceLocal>()
-            .build();
+            .await
+            .unwrap();
 
         let authentication_service = catalog.get_one::<AuthenticationServiceImpl>().unwrap();
         let access_token = authentication_service
@@ -118,7 +143,7 @@ impl Harness {
 
 #[test_log::test(tokio::test)]
 async fn test_attempt_upload_file_unauthorized() {
-    let harness = Harness::new();
+    let harness = Harness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", 100);
     let upload_main_url = harness.upload_main_url();
 
@@ -166,7 +191,7 @@ async fn test_attempt_upload_file_unauthorized() {
 async fn test_attempt_upload_file_authorized() {
     const FILE_BODY: &str = "a-test-file-body";
 
-    let harness = Harness::new();
+    let harness = Harness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
     let access_token = harness.access_token.clone();
     let cache_dir = harness.cache_dir.clone();
@@ -232,7 +257,7 @@ async fn test_attempt_upload_file_that_is_too_large() {
          Letraset sheets containing Lorem Ipsum passages, and more recently with desktop \
          publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
 
-    let harness = Harness::new();
+    let harness = Harness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
     let upload_main_url = harness.upload_main_url();
     let access_token = harness.access_token.clone();
@@ -284,7 +309,7 @@ async fn test_attempt_upload_file_that_is_too_large() {
 async fn test_attempt_upload_file_that_has_different_length_than_declared() {
     const FILE_BODY: &str = "Some text";
 
-    let harness = Harness::new();
+    let harness = Harness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
     let access_token = harness.access_token.clone();
 

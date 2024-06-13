@@ -9,6 +9,7 @@
 
 use std::net::{SocketAddr, TcpListener};
 
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use http::{HeaderMap, HeaderName, HeaderValue};
 use kamu::domain::{InternalError, ResultIntoInternal, ServerUrlConfig, SystemTimeSourceDefault};
@@ -16,7 +17,11 @@ use kamu::testing::LocalS3Server;
 use kamu::utils::s3_context::S3Context;
 use kamu_accounts::{JwtAuthenticationConfig, PredefinedAccountsConfig, DEFAULT_ACCOUNT_ID};
 use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::{AuthenticationServiceImpl, LoginPasswordAuthProvider};
+use kamu_accounts_services::{
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_adapter_http::{
     decode_upload_token_payload,
     FileUploadLimitConfig,
@@ -49,22 +54,42 @@ impl Harness {
             bind_socket.local_addr().unwrap().port()
         );
 
-        let catalog = dill::CatalogBuilder::new()
-            .add_value(PredefinedAccountsConfig::single_tenant())
-            .add::<AuthenticationServiceImpl>()
-            .add::<AccountRepositoryInMemory>()
-            .add::<SystemTimeSourceDefault>()
-            .add::<LoginPasswordAuthProvider>()
-            .add_value(JwtAuthenticationConfig::default())
-            .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
-            .add_value(FileUploadLimitConfig {
-                max_file_size_in_bytes: 100,
+        let catalog = {
+            let mut b = dill::CatalogBuilder::new();
+
+            b.add_value(PredefinedAccountsConfig::single_tenant())
+                .add::<AuthenticationServiceImpl>()
+                .add::<AccountRepositoryInMemory>()
+                .add::<SystemTimeSourceDefault>()
+                .add::<LoginPasswordAuthProvider>()
+                .add_value(JwtAuthenticationConfig::default())
+                .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
+                .add_value(FileUploadLimitConfig {
+                    max_file_size_in_bytes: 100,
+                })
+                .add_builder(
+                    UploadServiceS3::builder().with_s3_upload_context(s3_upload_context.clone()),
+                )
+                .bind::<dyn UploadService, UploadServiceS3>()
+                .add::<PredefinedAccountsRegistrator>();
+
+            NoOpDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
+
+        DatabaseTransactionRunner::new(catalog.clone())
+            .transactional(|transactional_catalog| async move {
+                let registrator = transactional_catalog
+                    .get_one::<PredefinedAccountsRegistrator>()
+                    .unwrap();
+
+                registrator
+                    .ensure_predefined_accounts_are_registered()
+                    .await
             })
-            .add_builder(
-                UploadServiceS3::builder().with_s3_upload_context(s3_upload_context.clone()),
-            )
-            .bind::<dyn UploadService, UploadServiceS3>()
-            .build();
+            .await
+            .unwrap();
 
         let authentication_service = catalog.get_one::<AuthenticationServiceImpl>().unwrap();
         let access_token = authentication_service

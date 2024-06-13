@@ -17,8 +17,8 @@ use dill::*;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_adapter_http::{FileUploadLimitConfig, UploadService, UploadServiceLocal};
 use kamu_accounts_services::PredefinedAccountsRegistrator;
+use kamu_adapter_http::{FileUploadLimitConfig, UploadService, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
