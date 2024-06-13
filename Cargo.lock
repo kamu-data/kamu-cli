@@ -5241,7 +5241,6 @@ dependencies = [
  "kamu-cli-wrapper",
  "paste",
  "test-group",
- "test-log",
  "tokio",
 ]
 

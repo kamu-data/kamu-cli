@@ -32,5 +32,4 @@ kamu-cli-wrapper = { workspace = true }
 indoc = "2"
 paste = "1"
 test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = [] }
