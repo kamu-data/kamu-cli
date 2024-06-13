@@ -20,7 +20,7 @@ use crate::LoginPasswordAuthProvider;
 /// A service that aims to register accounts on a one-time basis
 pub struct PredefinedAccountsRegistrator {
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
-    maybe_login_password_auth_provider: Option<Arc<LoginPasswordAuthProvider>>,
+    login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
     account_repository: Arc<dyn AccountRepository>,
 }
 
@@ -28,12 +28,12 @@ pub struct PredefinedAccountsRegistrator {
 impl PredefinedAccountsRegistrator {
     pub fn new(
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
-        maybe_login_password_auth_provider: Option<Arc<LoginPasswordAuthProvider>>,
+        login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
         account_repository: Arc<dyn AccountRepository>,
     ) -> Self {
         Self {
             predefined_accounts_config,
-            maybe_login_password_auth_provider,
+            login_password_auth_provider,
             account_repository,
         }
     }
@@ -81,11 +81,8 @@ impl PredefinedAccountsRegistrator {
                 CreateAccountError::Internal(e) => e,
             })?;
 
-        if account_config.provider == PROVIDER_PASSWORD
-            && let Some(login_password_auth_provider) =
-                self.maybe_login_password_auth_provider.as_ref()
-        {
-            login_password_auth_provider
+        if account_config.provider == PROVIDER_PASSWORD {
+            self.login_password_auth_provider
                 .save_password(&account.account_name, account_config.get_password())
                 .await?;
         }

@@ -10,7 +10,7 @@
 use database_common::DatabaseTransactionRunner;
 use kamu_accounts::*;
 use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::PredefinedAccountsRegistrator;
+use kamu_accounts_services::{LoginPasswordAuthProvider, PredefinedAccountsRegistrator};
 use kamu_adapter_graphql::ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -38,6 +38,7 @@ pub async fn authentication_catalogs(
     }
 
     let catalog_authorized = dill::CatalogBuilder::new_chained(base_catalog)
+        .add::<LoginPasswordAuthProvider>()
         .add::<PredefinedAccountsRegistrator>()
         .add::<AccountRepositoryInMemory>()
         .add_value(current_account_subject)

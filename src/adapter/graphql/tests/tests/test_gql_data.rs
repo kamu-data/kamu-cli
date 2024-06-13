@@ -20,7 +20,11 @@ use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
 use kamu_accounts::*;
 use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::{AuthenticationServiceImpl, PredefinedAccountsRegistrator};
+use kamu_accounts_services::{
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_core::*;
 use opendatafabric::*;
 
@@ -67,6 +71,7 @@ async fn create_catalog_with_local_workspace(
             .add::<AuthenticationServiceImpl>()
             .add::<AccountRepositoryInMemory>()
             .add_value(JwtAuthenticationConfig::default())
+            .add::<LoginPasswordAuthProvider>()
             .add::<PredefinedAccountsRegistrator>()
             .add::<DatabaseTransactionRunner>();
 

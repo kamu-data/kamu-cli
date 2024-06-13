@@ -23,7 +23,11 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
 };
 use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::{AuthenticationServiceImpl, PredefinedAccountsRegistrator};
+use kamu_accounts_services::{
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
@@ -135,6 +139,7 @@ impl FlowHarness {
                 .add::<TaskSchedulerImpl>()
                 .add::<TaskSystemEventStoreInMemory>()
                 .add::<FlowSystemTestListener>()
+                .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<DatabaseTransactionRunner>();
 
