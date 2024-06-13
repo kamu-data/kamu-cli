@@ -9,12 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `EthereumLogs` polling source allows to stream and decode log data directly from any ETH-compatible blockchain node
   - See the updated `examples/reth-vs-snp500` example
   - See the new [`datafusion-ethers`](https://github.com/kamu-data/datafusion-ethers) crate for implementation details
+- Added E2E test infrastructure
+  - Added necessary components for managed run -- for startup, operations, and shutdown
 ## Changed
 - Upgraded to `arrow 52` and `datafusion 39`
 - Improved binary data formatting in CLI table output - instead of the `<binary>` placeholder it will display an abbreviated hex values e.g. `c47cf6…7e3755`
 - JSON and CSV formatters can now output binary data - it will be `hex`-encoded by default
+- Hidden arguments and options are excluded from [the CLI reference](resources/cli-reference.md)
 ## Fixed
 - JSON formatter now properly supports `Decimal` types
+- Stabilized startup using connection to databases
+  - Added HTTP middleware that wraps each request into a separate transaction 
+  - Also added wrapping for some commands, in particular `kamu system generate-token`
+  - The structure of services that required lazy access to databases was reorganized:
+     - Extracted `PredefinedAccountsRegistrator` & `DatasetOwnershipServiceInMemoryStateInitializer` 
+- Fixed potential crash when attempting to rollback a transaction if the connection fails to establish
 
 ## [0.185.1] - 2024-06-07
 ### Fixed
