@@ -455,6 +455,7 @@ pub fn configure_cli_catalog(
     b
 }
 
+#[tracing::instrument(level = "info", skip_all)]
 async fn initialize_components(cli_catalog: &Catalog) -> Result<(), CLIError> {
     // TODO: For some reason, we if we do in a single transaction, there is a hangup
     DatabaseTransactionRunner::new(cli_catalog.clone())
