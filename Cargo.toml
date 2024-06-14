@@ -204,7 +204,7 @@ inherits = "dev"
 incremental = false
 # Line info is enough to get good backtraces in CI - we don't need the
 # full debugging symbols that are only useful when attaching a debugger.
-debug = 1
+debug = "line-tables-only"
 
 
 # Use this section to test or apply emergency ovverides to dependencies
