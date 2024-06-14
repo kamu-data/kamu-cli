@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE access_tokens SET revoked_at = $1 where id = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "66923d2274d972fe68f9fadb9e06e36120a2e8cd49d35456c66eb3d357532a72"
+}

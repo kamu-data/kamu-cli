@@ -355,6 +355,7 @@ pub fn configure_base_catalog(
     }
 
     b.add::<kamu_accounts_services::AuthenticationServiceImpl>();
+    b.add::<kamu_accounts_services::AccessTokenServiceImpl>();
     b.add::<PredefinedAccountsRegistrator>();
 
     // Give both CLI and server access to stored repo access tokens
@@ -393,6 +394,7 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_postgres::PostgresAccountRepository>();
+            catalog_builder.add::<kamu_accounts_postgres::PostgresAccessTokenRepository>();
 
             Ok(())
         }
@@ -404,6 +406,9 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_mysql::MySqlAccountRepository>();
+
+            // TODO: Replace by Mysql implementation
+            catalog_builder.add::<kamu_accounts_inmem::AccessTokenRepositoryInMemory>();
 
             // TODO: Task & Flow System MySQL versions
 
@@ -417,6 +422,7 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
+            catalog_builder.add::<kamu_accounts_sqlite::SqliteAccessTokenRepository>();
 
             Ok(())
         }
@@ -426,6 +432,7 @@ fn configure_database_components(
 // Public only for tests
 pub fn configure_in_memory_components(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<kamu_accounts_inmem::AccountRepositoryInMemory>();
+    catalog_builder.add::<kamu_accounts_inmem::AccessTokenRepositoryInMemory>();
     catalog_builder.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
     catalog_builder.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
     catalog_builder.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();

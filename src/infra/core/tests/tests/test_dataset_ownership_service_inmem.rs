@@ -27,8 +27,9 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
     DEFAULT_ACCOUNT_ID,
 };
-use kamu_accounts_inmem::AccountRepositoryInMemory;
+use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
 use kamu_accounts_services::{
+    AccessTokenServiceImpl,
     AuthenticationServiceImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
@@ -120,10 +121,12 @@ impl DatasetOwnershipHarness {
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .add_value(CurrentAccountSubject::new_test())
+                .add::<AccessTokenServiceImpl>()
                 .add::<AuthenticationServiceImpl>()
                 .add_value(predefined_accounts_config.clone())
                 .add_value(JwtAuthenticationConfig::default())
                 .add::<AccountRepositoryInMemory>()
+                .add::<AccessTokenRepositoryInMemory>()
                 .add::<DatasetOwnershipServiceInMemory>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<DependencyGraphServiceInMemory>()

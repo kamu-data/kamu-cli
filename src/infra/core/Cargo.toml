@@ -66,6 +66,7 @@ datafusion-ethers = { version = "39", git = 'https://github.com/kamu-data/datafu
 datafusion-functions-json = { version = "0.1", git = 'https://github.com/kamu-data/datafusion-functions-json.git', branch = "datafusion-39" }
 flate2 = "1" # GZip decoder
 reqwest = { version = "0.11", default-features = false, features = [
+    "json",
     "rustls-tls",
     "stream",
     "gzip",

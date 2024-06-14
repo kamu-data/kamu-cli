@@ -36,7 +36,8 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME_STR,
 };
-use kamu_accounts_services::AuthenticationServiceImpl;
+use kamu_accounts_inmem::AccessTokenRepositoryInMemory;
+use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::{
     auth,
     CompactingResult,
@@ -2607,6 +2608,8 @@ impl FlowRunsHarness {
                 .add_value(polling_service_mock)
                 .bind::<dyn PollingIngestService, MockPollingIngestService>()
                 .add::<AuthenticationServiceImpl>()
+                .add::<AccessTokenServiceImpl>()
+                .add::<AccessTokenRepositoryInMemory>()
                 .add_value(JwtAuthenticationConfig::default())
                 .add::<DatasetOwnershipServiceInMemory>()
                 .add::<DatabaseTransactionRunner>();

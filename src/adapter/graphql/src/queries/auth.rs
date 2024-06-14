@@ -7,7 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_accounts::AccessTokenPaginationOpts;
+
+use super::ViewAccessToken;
 use crate::prelude::*;
+use crate::utils::check_logged_account_id_match;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -15,6 +19,8 @@ pub struct Auth;
 
 #[Object]
 impl Auth {
+    const DEFAULT_PER_PAGE: i64 = 15;
+
     #[allow(clippy::unused_async)]
     async fn enabled_login_methods(&self, ctx: &Context<'_>) -> Result<Vec<&'static str>> {
         let authentication_service =
@@ -22,6 +28,45 @@ impl Auth {
 
         Ok(authentication_service.supported_login_methods())
     }
+
+    async fn list_access_tokens(
+        &self,
+        ctx: &Context<'_>,
+        account_id: AccountID,
+        page: Option<i64>,
+        per_page: Option<i64>,
+    ) -> Result<AccessTokenConnection> {
+        check_logged_account_id_match(ctx, &account_id)?;
+
+        let access_token_service =
+            from_catalog::<dyn kamu_accounts::AccessTokenService>(ctx).unwrap();
+
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+
+        let access_tokens: Vec<_> = access_token_service
+            .get_access_tokens_by_account_id(
+                &account_id,
+                &AccessTokenPaginationOpts {
+                    offset: page * per_page,
+                    limit: per_page,
+                },
+            )
+            .await
+            .int_err()?
+            .into_iter()
+            .map(ViewAccessToken::new)
+            .collect();
+
+        Ok(AccessTokenConnection::new(
+            access_tokens,
+            0,
+            usize::try_from(per_page).unwrap(),
+            usize::try_from(per_page).unwrap(),
+        ))
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+page_based_connection!(ViewAccessToken, AccessTokenConnection, AccessTokenEdge);

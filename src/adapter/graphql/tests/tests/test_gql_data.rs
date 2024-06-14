@@ -19,8 +19,9 @@ use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_inmem::AccountRepositoryInMemory;
+use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
 use kamu_accounts_services::{
+    AccessTokenServiceImpl,
     AuthenticationServiceImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
@@ -69,6 +70,8 @@ async fn create_catalog_with_local_workspace(
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<AuthenticationServiceImpl>()
+            .add::<AccessTokenServiceImpl>()
+            .add::<AccessTokenRepositoryInMemory>()
             .add::<AccountRepositoryInMemory>()
             .add_value(JwtAuthenticationConfig::default())
             .add::<LoginPasswordAuthProvider>()

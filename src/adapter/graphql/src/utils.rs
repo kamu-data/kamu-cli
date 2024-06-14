@@ -11,13 +11,13 @@ use std::sync::Arc;
 
 use async_graphql::{Context, ErrorExtensions};
 use internal_error::*;
-use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
+use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
 use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{Dataset, DatasetRepository};
 use kamu_task_system as ts;
 use opendatafabric::{AccountName as OdfAccountName, DatasetHandle};
 
-use crate::prelude::{AccountID, AccountName};
+use crate::prelude::{AccessTokenID, AccountID, AccountName};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -124,8 +124,39 @@ pub(crate) fn check_logged_account_id_match(
         }
     };
     Err(GqlError::Gql(
-        async_graphql::Error::new("Account datasets access error")
+        async_graphql::Error::new("Account access error")
             .extend_with(|_, eev| eev.set("account_id", account_id.to_string())),
+    ))
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn check_access_token_valid(
+    ctx: &Context<'_>,
+    token_id: &AccessTokenID,
+) -> Result<(), GqlError> {
+    let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
+    let access_token_service = from_catalog::<dyn kamu_accounts::AccessTokenService>(ctx).unwrap();
+
+    let existing_access_token = access_token_service
+        .get_token_by_id(token_id)
+        .await
+        .map_err(|err| match err {
+            GetAccessTokenError::NotFound(_) => {
+                GqlError::Gql(async_graphql::Error::new("Access token not found"))
+            }
+            GetAccessTokenError::Internal(e) => GqlError::Internal(e),
+        })?;
+
+    if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
+        if logged_account.account_id == existing_access_token.account_id.clone() {
+            return Ok(());
+        }
+    };
+    Err(GqlError::Gql(
+        async_graphql::Error::new("Access token access error").extend_with(|_, eev| {
+            eev.set("account_id", existing_access_token.account_id.to_string());
+        }),
     ))
 }
 
@@ -143,7 +174,7 @@ pub(crate) fn check_logged_account_name_match(
         }
     };
     Err(GqlError::Gql(
-        async_graphql::Error::new("Account datasets access error")
+        async_graphql::Error::new("Account access error")
             .extend_with(|_, eev| eev.set("account_name", account_name.to_string())),
     ))
 }

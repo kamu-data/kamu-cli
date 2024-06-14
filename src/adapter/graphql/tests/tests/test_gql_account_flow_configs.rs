@@ -32,7 +32,8 @@ use kamu::{
     DependencyGraphServiceInMemory,
 };
 use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_accounts_services::AuthenticationServiceImpl;
+use kamu_accounts_inmem::AccessTokenRepositoryInMemory;
+use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
 use kamu_flow_system::FlowServiceRunConfig;
 use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
@@ -662,6 +663,8 @@ impl FlowConfigHarness {
                 .add::<SystemTimeSourceDefault>()
                 .add_value(mock_dataset_action_authorizer)
                 .add::<AuthenticationServiceImpl>()
+                .add::<AccessTokenServiceImpl>()
+                .add::<AccessTokenRepositoryInMemory>()
                 .add_value(JwtAuthenticationConfig::default())
                 .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
                 .add::<DependencyGraphServiceInMemory>()

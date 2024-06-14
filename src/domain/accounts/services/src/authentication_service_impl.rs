@@ -15,20 +15,10 @@ use chrono::Utc;
 use dill::*;
 use internal_error::*;
 use jsonwebtoken::errors::ErrorKind;
-use jsonwebtoken::{
-    decode,
-    encode,
-    Algorithm,
-    DecodingKey,
-    EncodingKey,
-    Header,
-    TokenData,
-    Validation,
-};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use kamu_accounts::*;
 use kamu_core::SystemTimeSource;
 use opendatafabric::{AccountID, AccountName};
-use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -44,6 +34,7 @@ pub struct AuthenticationServiceImpl {
     decoding_key: DecodingKey,
     authentication_providers_by_method: HashMap<&'static str, Arc<dyn AuthenticationProvider>>,
     account_repository: Arc<dyn AccountRepository>,
+    access_token_svc: Arc<dyn AccessTokenService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -55,6 +46,7 @@ impl AuthenticationServiceImpl {
     pub fn new(
         authentication_providers: Vec<Arc<dyn AuthenticationProvider>>,
         account_repository: Arc<dyn AccountRepository>,
+        access_token_svc: Arc<dyn AccessTokenService>,
         time_source: Arc<dyn SystemTimeSource>,
         config: Arc<JwtAuthenticationConfig>,
     ) -> Self {
@@ -78,6 +70,7 @@ impl AuthenticationServiceImpl {
             decoding_key: DecodingKey::from_secret(config.jwt_secret.as_bytes()),
             authentication_providers_by_method,
             account_repository,
+            access_token_svc,
         }
     }
 
@@ -102,7 +95,7 @@ impl AuthenticationServiceImpl {
         let iat = usize::try_from(current_time.timestamp()).unwrap();
         let exp = iat + expiration_time_sec;
 
-        let claims = KamuAccessTokenClaims {
+        let claims = JWTClaims {
             iat,
             exp,
             iss: String::from(KAMU_JWT_ISSUER),
@@ -120,16 +113,51 @@ impl AuthenticationServiceImpl {
     pub fn decode_access_token(
         &self,
         access_token: &str,
-    ) -> Result<TokenData<KamuAccessTokenClaims>, AccessTokenError> {
+    ) -> Result<AccessTokenType, AccessTokenError> {
+        if &access_token[..2] == ACCESS_TOKEN_PREFIX {
+            return KamuAccessToken::decode(access_token)
+                .map_err(|err| AccessTokenError::Invalid(Box::new(err)))
+                .map(AccessTokenType::KamuAccessToken);
+        }
         let mut validation = Validation::new(KAMU_JWT_ALGORITHM);
         validation.set_issuer(&[KAMU_JWT_ISSUER]);
 
-        decode::<KamuAccessTokenClaims>(access_token, &self.decoding_key, &validation).map_err(
-            |e| match *e.kind() {
+        decode::<JWTClaims>(access_token, &self.decoding_key, &validation)
+            .map_err(|e| match *e.kind() {
                 ErrorKind::ExpiredSignature => AccessTokenError::Expired,
                 _ => AccessTokenError::Invalid(Box::new(e)),
-            },
-        )
+            })
+            .map(AccessTokenType::JWTToken)
+    }
+
+    pub async fn account_by_token_impl(
+        &self,
+        access_token: &str,
+    ) -> Result<Account, GetAccountInfoError> {
+        let decoded_access_token = self
+            .decode_access_token(access_token)
+            .map_err(GetAccountInfoError::AccessToken)?;
+
+        match decoded_access_token {
+            AccessTokenType::JWTToken(token_data) => {
+                let account_id = AccountID::from_did_str(&token_data.claims.sub)
+                    .map_err(|e| GetAccountInfoError::Internal(e.int_err()))?;
+
+                match self.account_by_id(&account_id).await {
+                    Ok(Some(account)) => Ok(account),
+                    Ok(None) => Err(GetAccountInfoError::AccountUnresolved),
+                    Err(e) => Err(GetAccountInfoError::Internal(e)),
+                }
+            }
+            AccessTokenType::KamuAccessToken(kamu_access_token) => self
+                .access_token_svc
+                .find_account_by_active_token_id(
+                    &kamu_access_token.id,
+                    kamu_access_token.random_bytes_hash,
+                )
+                .await
+                .map_err(|err| GetAccountInfoError::Internal(err.int_err())),
+        }
     }
 }
 
@@ -205,18 +233,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
     }
 
     async fn account_by_token(&self, access_token: String) -> Result<Account, GetAccountInfoError> {
-        let decoded_access_token = self
-            .decode_access_token(&access_token)
-            .map_err(GetAccountInfoError::AccessToken)?;
-
-        let account_id = AccountID::from_did_str(&decoded_access_token.claims.sub)
-            .map_err(|e| GetAccountInfoError::Internal(e.int_err()))?;
-
-        match self.account_by_id(&account_id).await {
-            Ok(Some(account)) => Ok(account),
-            Ok(None) => Err(GetAccountInfoError::AccountUnresolved),
-            Err(e) => Err(GetAccountInfoError::Internal(e)),
-        }
+        self.account_by_token_impl(&access_token).await
     }
 
     async fn account_by_id(
@@ -280,16 +297,3 @@ impl AuthenticationService for AuthenticationServiceImpl {
         }
     }
 }
-
-///////////////////////////////////////////////////////////////////////////////
-
-/// Our claims struct, it needs to derive `Serialize` and/or `Deserialize`
-#[derive(Debug, Serialize, Deserialize)]
-pub struct KamuAccessTokenClaims {
-    exp: usize,
-    iat: usize,
-    iss: String,
-    sub: String,
-}
-
-///////////////////////////////////////////////////////////////////////////////

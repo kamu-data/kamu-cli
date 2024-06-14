@@ -7,8 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_accounts::RevokeTokenError;
+
 use crate::prelude::*;
-use crate::queries::Account;
+use crate::queries::{Account, CreatedAccessToken};
+use crate::utils::{check_access_token_valid, check_logged_account_id_match};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -42,6 +45,52 @@ impl AuthMut {
         match authentication_service.account_by_token(access_token).await {
             Ok(a) => Ok(Account::from_account(a)),
             Err(e) => Err(e.into()),
+        }
+    }
+
+    async fn create_access_token(
+        &self,
+        ctx: &Context<'_>,
+        account_id: AccountID,
+        token_name: String,
+    ) -> Result<CreatedAccessToken> {
+        check_logged_account_id_match(ctx, &account_id)?;
+
+        let access_token_service =
+            from_catalog::<dyn kamu_accounts::AccessTokenService>(ctx).unwrap();
+
+        let created_token = access_token_service
+            .create_access_token(&token_name, &account_id)
+            .await
+            .int_err()?;
+
+        Ok(CreatedAccessToken::new(
+            created_token,
+            &account_id,
+            &token_name,
+        ))
+    }
+
+    async fn revoke_access_token(
+        &self,
+        ctx: &Context<'_>,
+        token_id: AccessTokenID,
+    ) -> Result<RevokeResult> {
+        check_access_token_valid(ctx, &token_id).await?;
+
+        let access_token_service =
+            from_catalog::<dyn kamu_accounts::AccessTokenService>(ctx).unwrap();
+
+        match access_token_service
+            .revoke_access_token(&token_id.into())
+            .await
+        {
+            Ok(_) => Ok(RevokeResult::Success),
+            Err(RevokeTokenError::AlreadyRevoked) => Ok(RevokeResult::AlreadyRevoked),
+            Err(RevokeTokenError::NotFound(_)) => Err(GqlError::Gql(async_graphql::Error::new(
+                "Access token not found",
+            ))),
+            Err(RevokeTokenError::Internal(e)) => Err(e.into()),
         }
     }
 }
@@ -101,3 +150,10 @@ impl From<kamu_accounts::LoginResponse> for LoginResponse {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum RevokeResult {
+    Success,
+    AlreadyRevoked,
+    NotFound,
+}

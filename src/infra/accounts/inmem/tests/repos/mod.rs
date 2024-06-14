@@ -7,5 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_access_token_repository_inmem;
 mod test_account_repository_inmem;
 mod test_password_hash_repository_inmem;

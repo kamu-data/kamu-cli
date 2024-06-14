@@ -77,3 +77,35 @@ impl Account {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct AccountWithTokenRowModel {
+    pub id: AccountID,
+    pub account_name: String,
+    pub email: Option<String>,
+    pub display_name: String,
+    pub account_type: AccountType,
+    pub avatar_url: Option<String>,
+    pub registered_at: DateTime<Utc>,
+    pub is_admin: bool,
+    pub provider: String,
+    pub provider_identity_key: String,
+    pub token_hash: Vec<u8>,
+}
+
+impl From<AccountWithTokenRowModel> for Account {
+    fn from(value: AccountWithTokenRowModel) -> Self {
+        Account {
+            id: value.id,
+            account_name: AccountName::new_unchecked(&value.account_name),
+            email: value.email,
+            display_name: value.display_name,
+            account_type: value.account_type,
+            avatar_url: value.avatar_url,
+            registered_at: value.registered_at,
+            is_admin: value.is_admin,
+            provider: value.provider,
+            provider_identity_key: value.provider_identity_key,
+        }
+    }
+}

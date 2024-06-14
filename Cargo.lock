@@ -1731,6 +1731,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c7f02d4ea65f2c1853089ffd8d2787bdbc63de2f0d29dedbcf8ccdfa0ccd4cf"
 
 [[package]]
+name = "base32"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1ce0365f4d5fb6646220bb52fe547afd51796d90f914d4063cb0b032ebee088"
+
+[[package]]
 name = "base64"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4800,12 +4806,16 @@ name = "kamu-accounts"
 version = "0.187.0"
 dependencies = [
  "async-trait",
+ "base32",
  "chrono",
+ "crc32fast",
  "internal-error",
+ "jsonwebtoken",
  "lazy_static",
  "merge",
  "mockall",
  "opendatafabric",
+ "rand",
  "random-names",
  "serde",
  "serde_with",
@@ -4830,6 +4840,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -4849,6 +4860,7 @@ dependencies = [
  "test-log",
  "thiserror",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -4868,6 +4880,7 @@ dependencies = [
  "test-log",
  "thiserror",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -4881,6 +4894,8 @@ dependencies = [
  "kamu-adapter-oauth",
  "opendatafabric",
  "password-hash 0.5.0",
+ "rand",
+ "uuid",
 ]
 
 [[package]]
@@ -4906,6 +4921,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -4925,6 +4941,7 @@ dependencies = [
  "test-log",
  "thiserror",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -5012,6 +5029,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "uuid",
 ]
 
 [[package]]
