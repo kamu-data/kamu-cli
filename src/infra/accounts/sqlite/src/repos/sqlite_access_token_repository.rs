@@ -120,7 +120,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
             .map_err(GetAccessTokenError::Internal)?;
 
         let maybe_access_token = self
-            .query_token_by_id(&token_id, connection_mut)
+            .query_token_by_id(token_id, connection_mut)
             .await
             .map_err(GetAccessTokenError::Internal)?;
 
@@ -187,13 +187,13 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
             .map_err(RevokeTokenError::Internal)?;
 
         let maybe_existing_token = self
-            .query_token_by_id(&token_id, connection_mut)
+            .query_token_by_id(token_id, connection_mut)
             .await
             .map_err(RevokeTokenError::Internal)?;
 
         if maybe_existing_token.is_none() {
             return Err(RevokeTokenError::NotFound(AccessTokenNotFoundError {
-                access_token_id: token_id.clone(),
+                access_token_id: *token_id,
             }));
         } else if let Some(existing_access_token) = maybe_existing_token
             && existing_access_token.revoked_at.is_some()

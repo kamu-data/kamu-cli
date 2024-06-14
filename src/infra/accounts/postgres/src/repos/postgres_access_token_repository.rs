@@ -183,7 +183,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
 
         if maybe_existing_token.is_none() {
             return Err(RevokeTokenError::NotFound(AccessTokenNotFoundError {
-                access_token_id: token_id.clone(),
+                access_token_id: *token_id,
             }));
         } else if let Some(existing_access_token) = maybe_existing_token
             && existing_access_token.revoked_at.is_some()
