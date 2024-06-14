@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n              UPDATE access_tokens SET revoked_at = ? where id = ?\n          ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "62c6ddd5b89f0beea3bdd41060aaca61e6fe56635f140c74215a12c61808c4aa"
+}

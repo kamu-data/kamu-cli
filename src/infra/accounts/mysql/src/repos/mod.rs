@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod mysql_access_token_repository;
 mod mysql_account_repository;
 
+pub use mysql_access_token_repository::*;
 pub use mysql_account_repository::*;

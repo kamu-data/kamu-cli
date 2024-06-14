@@ -406,9 +406,7 @@ fn configure_database_components(
             .int_err()?;
 
             catalog_builder.add::<kamu_accounts_mysql::MySqlAccountRepository>();
-
-            // TODO: Replace by Mysql implementation
-            catalog_builder.add::<kamu_accounts_inmem::AccessTokenRepositoryInMemory>();
+            catalog_builder.add::<kamu_accounts_mysql::MysqlAccessTokenRepository>();
 
             // TODO: Task & Flow System MySQL versions
 

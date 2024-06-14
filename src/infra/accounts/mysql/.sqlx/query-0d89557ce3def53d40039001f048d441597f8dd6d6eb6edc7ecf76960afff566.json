@@ -1,0 +1,80 @@
+{
+  "db_name": "MySQL",
+  "query": "\n              SELECT\n                  id as \"id: Uuid\",\n                  token_name,\n                  token_hash as \"token_hash: Vec<u8>\",\n                  created_at as \"created_at: DateTime<Utc>\",\n                  revoked_at as \"revoked_at: DateTime<Utc>\",\n                  account_id as \"account_id: AccountID\"\n              FROM access_tokens\n              WHERE id = ?\n              ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: Uuid",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | PRIMARY_KEY | NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 144
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "token_name",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 400
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "token_hash: Vec<u8>",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 32
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at: DateTime<Utc>",
+        "type_info": {
+          "type": "Timestamp",
+          "flags": "NOT_NULL | UNSIGNED | BINARY | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 26
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "revoked_at: DateTime<Utc>",
+        "type_info": {
+          "type": "Timestamp",
+          "flags": "UNSIGNED | BINARY",
+          "char_set": 63,
+          "max_size": 26
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "account_id: AccountID",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 400
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "0d89557ce3def53d40039001f048d441597f8dd6d6eb6edc7ecf76960afff566"
+}

@@ -204,11 +204,14 @@ async fn test_create_and_get_access_token() {
     let json = serde_json::to_string(&res.data).unwrap();
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
 
-    let created_token_id = json["auth"]["createAccessToken"]["id"].clone();
+    let created_token_id = json["auth"]["createAccessToken"]["token"]["id"].clone();
 
     let query_code = AuthGQLHarness::get_access_tokens(&DEFAULT_ACCOUNT_ID.to_string());
     let res = schema
-        .execute(async_graphql::Request::new(query_code.clone()).data(harness.catalog_authorized))
+        .execute(
+            async_graphql::Request::new(query_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
         .await;
 
     assert_eq!(
@@ -235,6 +238,24 @@ async fn test_create_and_get_access_token() {
     assert!(res.is_err());
     assert_eq!(res.errors.len(), 1);
     assert_eq!(res.errors[0].message, "Account access error".to_string());
+
+    let mutation_code = AuthGQLHarness::create_access_token(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
+
+    let res = schema
+        .execute(async_graphql::Request::new(mutation_code).data(harness.catalog_authorized))
+        .await;
+
+    assert_eq!(
+        res.data,
+        value!({
+            "auth": {
+                "createAccessToken": {
+                    "__typename": "CreateResultDuplicate",
+                    "message": "Access token with foo name already exist"
+                }
+            }
+        })
+    );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -348,9 +369,15 @@ impl AuthGQLHarness {
             mutation {
                 auth {
                     createAccessToken (accountId: "<account_id>", tokenName: "<token_name>") {
-                        id,
-                        name,
-                        composed
+                        __typename
+                        message
+                        ... on CreateAccessTokenResultSuccess {
+                            token {
+                                id,
+                                name,
+                                composed
+                            }
+                        }
                     }
                 }
             }

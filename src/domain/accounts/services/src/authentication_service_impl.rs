@@ -156,7 +156,13 @@ impl AuthenticationServiceImpl {
                     kamu_access_token.random_bytes_hash,
                 )
                 .await
-                .map_err(|err| GetAccountInfoError::Internal(err.int_err())),
+                .map_err(|err| match err {
+                    FindAccountByTokenError::NotFound(_) => GetAccountInfoError::AccountUnresolved,
+                    FindAccountByTokenError::InvalidTokenHash => {
+                        GetAccountInfoError::AccessToken(AccessTokenError::Invalid(Box::new(err)))
+                    }
+                    FindAccountByTokenError::Internal(err) => GetAccountInfoError::Internal(err),
+                }),
         }
     }
 }
