@@ -8,8 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
@@ -85,7 +83,7 @@ struct KamuSchemaImpl {
 
 #[derive(Default)]
 struct SchemaCache {
-    tables: Option<HashMap<DatasetAlias, Arc<KamuTable>>>,
+    tables: Option<HashMap<String, Arc<KamuTable>>>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -112,8 +110,68 @@ impl KamuSchema {
     async fn init_schema_cache(&self) -> Result<SchemaCache, InternalError> {
         let mut tables = HashMap::new();
 
-        if self.inner.options.datasets.is_empty() {
+        if let Some(aliases) = &self.inner.options.aliases {
+            for (alias, id) in aliases {
+                let hdl = self
+                    .inner
+                    .dataset_repo
+                    .resolve_dataset_ref(&id.into())
+                    .await
+                    .int_err()?;
+
+                self.inner
+                    .dataset_action_authorizer
+                    .check_action_allowed(&hdl, auth::DatasetAction::Read)
+                    .await
+                    .int_err()?;
+
+                let dataset = self
+                    .inner
+                    .dataset_repo
+                    .get_dataset(&hdl.as_local_ref())
+                    .await
+                    .unwrap();
+
+                let as_of = self
+                    .inner
+                    .options
+                    .as_of_state
+                    .as_ref()
+                    .and_then(|s| s.inputs.get(id))
+                    .cloned();
+
+                let hints = self
+                    .inner
+                    .options
+                    .hints
+                    .as_ref()
+                    .and_then(|h| h.get(id))
+                    .cloned();
+
+                tables.insert(
+                    alias.clone(),
+                    Arc::new(KamuTable::new(
+                        self.inner.session_context.clone(),
+                        hdl,
+                        dataset,
+                        as_of,
+                        hints,
+                    )),
+                );
+            }
+        } else {
+            // TODO: PERF: Scanning all datasets is not just super expensive - it may not be
+            // possible at the public node scale. We need to patch DataFusion to support
+            // unbounded catalogs.
             let mut dataset_handles = self.inner.dataset_repo.get_all_datasets();
+            let inputs_state = self
+                .inner
+                .options
+                .as_of_state
+                .as_ref()
+                .map(|s| &s.inputs)
+                .cloned()
+                .unwrap_or_default();
 
             while let Some(hdl) = dataset_handles.try_next().await.int_err()? {
                 if self
@@ -130,42 +188,27 @@ impl KamuSchema {
                         .await
                         .unwrap();
 
+                    let as_of = inputs_state.get(&hdl.id).cloned();
+
+                    let hints = self
+                        .inner
+                        .options
+                        .hints
+                        .as_ref()
+                        .and_then(|h| h.get(&hdl.id))
+                        .cloned();
+
                     tables.insert(
-                        hdl.alias.clone(),
+                        hdl.alias.to_string(),
                         Arc::new(KamuTable::new(
                             self.inner.session_context.clone(),
                             hdl,
                             dataset,
-                            None,
+                            as_of,
+                            hints,
                         )),
                     );
                 }
-            }
-        } else {
-            for options in &self.inner.options.datasets {
-                let hdl = self
-                    .inner
-                    .dataset_repo
-                    .resolve_dataset_ref(&options.dataset_ref)
-                    .await
-                    .int_err()?;
-
-                let dataset = self
-                    .inner
-                    .dataset_repo
-                    .get_dataset(&hdl.as_local_ref())
-                    .await
-                    .unwrap();
-
-                tables.insert(
-                    hdl.alias.clone(),
-                    Arc::new(KamuTable::new(
-                        self.inner.session_context.clone(),
-                        hdl,
-                        dataset,
-                        Some(options.clone()),
-                    )),
-                );
             }
         }
 
@@ -193,19 +236,12 @@ impl KamuSchema {
 
     async fn table_names_impl(&self) -> Result<Vec<String>, InternalError> {
         let cache = self.ensure_cache().await?;
-        Ok(cache
-            .tables
-            .as_ref()
-            .unwrap()
-            .keys()
-            .map(DatasetAlias::to_string)
-            .collect())
+        Ok(cache.tables.as_ref().unwrap().keys().cloned().collect())
     }
 
     async fn table_exist_impl(&self, name: &str) -> Result<bool, InternalError> {
-        let alias = DatasetAlias::from_str(name).int_err()?;
         let cache = self.ensure_cache().await?;
-        Ok(cache.tables.as_ref().unwrap().contains_key(&alias))
+        Ok(cache.tables.as_ref().unwrap().contains_key(name))
     }
 }
 
@@ -244,17 +280,13 @@ impl SchemaProvider for KamuSchema {
     }
 
     async fn table(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>, DataFusionError> {
-        let Ok(alias) = DatasetAlias::try_from(name) else {
-            return Ok(None);
-        };
-
         let table = {
             let cache = self
                 .ensure_cache()
                 .await
                 .map_err(|e| DataFusionError::External(e.into()))?;
 
-            cache.tables.as_ref().unwrap().get(&alias).cloned()
+            cache.tables.as_ref().unwrap().get(name).cloned()
         };
 
         if let Some(table) = table {
@@ -280,7 +312,8 @@ pub(crate) struct KamuTable {
     session_context: SessionContext,
     dataset_handle: DatasetHandle,
     dataset: Arc<dyn Dataset>,
-    options: Option<DatasetQueryOptions>,
+    as_of: Option<Multihash>,
+    hints: Option<DatasetQueryHints>,
     cache: Mutex<TableCache>,
 }
 
@@ -295,13 +328,15 @@ impl KamuTable {
         session_context: SessionContext,
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
-        options: Option<DatasetQueryOptions>,
+        as_of: Option<Multihash>,
+        hints: Option<DatasetQueryHints>,
     ) -> Self {
         Self {
             session_context,
             dataset_handle,
             dataset,
-            options,
+            as_of,
+            hints,
             cache: Mutex::new(TableCache::default()),
         }
     }
@@ -347,7 +382,7 @@ impl KamuTable {
         &self,
         schema: SchemaRef,
     ) -> Result<Arc<dyn TableProvider>, InternalError> {
-        let files = self.collect_data_file_hashes().await?;
+        let files = self.collect_data_file_hashes(self.as_of.as_ref()).await?;
 
         if files.is_empty() {
             return Ok(Arc::new(EmptyTable::new(schema)));
@@ -411,11 +446,23 @@ impl KamuTable {
         }
     }
 
-    async fn collect_data_file_hashes(&self) -> Result<Vec<Multihash>, InternalError> {
-        let last_records_to_consider = self
-            .options
-            .as_ref()
-            .and_then(|o| o.last_records_to_consider);
+    async fn collect_data_file_hashes(
+        &self,
+        as_of: Option<&Multihash>,
+    ) -> Result<Vec<Multihash>, InternalError> {
+        let hash = if let Some(hash) = as_of {
+            hash.clone()
+        } else {
+            self.dataset
+                .as_metadata_chain()
+                .resolve_ref(&BlockRef::Head)
+                .await
+                .int_err()?
+        };
+
+        tracing::debug!(?as_of, "Collecting data slices");
+
+        let last_records_to_consider = self.hints.as_ref().and_then(|o| o.last_records_to_consider);
 
         type Flag = MetadataEventTypeFlags;
         type Decision = MetadataVisitorDecision;
@@ -429,7 +476,8 @@ impl KamuTable {
         let final_state = self
             .dataset
             .as_metadata_chain()
-            .reduce(
+            .reduce_by_hash(
+                &hash,
                 DataSliceCollectorVisitorState {
                     files: Vec::new(),
                     num_records: 0,
@@ -461,6 +509,7 @@ impl KamuTable {
             .await
             .int_err()?;
 
+        tracing::debug!(num_slices = final_state.files.len(), "Slices collected");
         Ok(final_state.files)
     }
 }

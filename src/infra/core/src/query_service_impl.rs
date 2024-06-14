@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
@@ -72,6 +73,102 @@ impl QueryServiceImpl {
         session_context
     }
 
+    /// Unless state is already provided in the options this will attempt to
+    /// parse the SQL, extract the names of all datasets mentioned in the
+    /// query and affix their states in the query options to specific blocks.
+    async fn resolve_query_state(
+        &self,
+        sql: &str,
+        options: QueryOptions,
+    ) -> Result<QueryOptions, QueryError> {
+        use datafusion::sql::parser::Statement;
+
+        // If options already specify state - use it
+        if options.as_of_state.is_some() {
+            return Ok(options);
+        }
+
+        // If options specify aliases - resolve state just for those datasets
+        if let Some(aliases) = &options.aliases {
+            let mut as_of_state = QueryState {
+                inputs: BTreeMap::new(),
+            };
+            for id in aliases.values() {
+                let dataset = self.dataset_repo.get_dataset(&id.into()).await?;
+
+                // TODO: Do we leak any info by not checking read permissions here?
+                let hash = dataset
+                    .as_metadata_chain()
+                    .resolve_ref(&BlockRef::Head)
+                    .await
+                    .int_err()?;
+
+                as_of_state.inputs.insert(id.clone(), hash);
+            }
+            return Ok(QueryOptions {
+                as_of_state: Some(as_of_state),
+                ..options
+            });
+        }
+
+        // Since neither state nor aliases are present - we have to inspect SQL to
+        // understand which datasets the query is using and populate the state and
+        // aliases for them
+        let mut table_refs = Vec::new();
+        for stmt in datafusion::sql::parser::DFParser::parse_sql(sql).int_err()? {
+            match stmt {
+                Statement::Statement(stmt) => {
+                    table_refs.append(&mut extract_table_refs(&stmt)?);
+                }
+                Statement::CreateExternalTable(_)
+                | Statement::CopyTo(_)
+                | Statement::Explain(_) => {}
+            }
+        }
+
+        // Resolve table references into datasets.
+        // We simply ignore unresolvable, letting query to fail at the execution stage.
+        let mut aliases = BTreeMap::new();
+        let mut as_of_state = QueryState {
+            inputs: BTreeMap::new(),
+        };
+        for mut table in table_refs {
+            // Strip possible `kamu.kamu.` prefix
+            while table.0.len() > 1 && table.0[0].value == "kamu" {
+                table.0.remove(0);
+            }
+            if table.0.len() == 1 {
+                let alias = table.0.pop().unwrap().value;
+                let Ok(dataset_ref) = DatasetRef::try_from(&alias) else {
+                    tracing::warn!(alias, "Ignoring table with invalid alias");
+                    continue;
+                };
+                let Ok(hdl) = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await else {
+                    tracing::warn!(?dataset_ref, "Ignoring table with unresolvable alias");
+                    continue;
+                };
+                let dataset = self
+                    .dataset_repo
+                    .get_dataset(&hdl.as_local_ref())
+                    .await
+                    .int_err()?;
+                let hash = dataset
+                    .as_metadata_chain()
+                    .resolve_ref(&BlockRef::Head)
+                    .await
+                    .int_err()?;
+                aliases.insert(alias, hdl.id.clone());
+                as_of_state.inputs.insert(hdl.id, hash);
+            }
+        }
+
+        Ok(QueryOptions {
+            aliases: Some(aliases),
+            as_of_state: Some(as_of_state),
+            hints: options.hints,
+        })
+    }
+
     async fn single_dataset(
         &self,
         dataset_ref: &DatasetRef,
@@ -101,10 +198,17 @@ impl QueryServiceImpl {
         }
 
         let ctx = self.session_context(QueryOptions {
-            datasets: vec![DatasetQueryOptions {
-                dataset_ref: dataset_handle.as_local_ref(),
-                last_records_to_consider,
-            }],
+            aliases: Some(BTreeMap::from([(
+                dataset_handle.alias.to_string(),
+                dataset_handle.id.clone(),
+            )])),
+            as_of_state: None,
+            hints: Some(BTreeMap::from([(
+                dataset_handle.id,
+                DatasetQueryHints {
+                    last_records_to_consider,
+                },
+            )])),
         });
 
         let df = ctx
@@ -244,14 +348,27 @@ impl QueryService for QueryServiceImpl {
         Ok(df)
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(statement))]
+    #[tracing::instrument(level = "info", skip_all)]
     async fn sql_statement(
         &self,
         statement: &str,
         options: QueryOptions,
-    ) -> Result<DataFrame, QueryError> {
+    ) -> Result<QueryResponse, QueryError> {
+        tracing::info!(statement, "Executing SQL query");
+
+        let resolved_options = self.resolve_query_state(statement, options.clone()).await?;
+
+        tracing::info!(
+            original_options = ?options,
+            ?resolved_options,
+            "Resolved SQL query",
+        );
+
+        let state = resolved_options.as_of_state.clone().unwrap();
         let ctx = self.session_context(options);
-        Ok(ctx.sql(statement).await?)
+        let df = ctx.sql(statement).await?;
+
+        Ok(QueryResponse { df, state })
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]
@@ -342,3 +459,82 @@ async fn read_data_slice_metadata(
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: This is too complex - we should explore better ways to associate a
+// query with a certain state
+fn extract_table_refs(
+    stmt: &datafusion::sql::sqlparser::ast::Statement,
+) -> Result<Vec<datafusion::sql::sqlparser::ast::ObjectName>, QueryError> {
+    use datafusion::sql::sqlparser::ast::Statement;
+
+    let mut tables = Vec::new();
+    if let Statement::Query(query) = stmt {
+        extract_table_refs_rec(query, &mut tables)?;
+    }
+
+    Ok(tables)
+}
+
+fn extract_table_refs_rec(
+    query: &datafusion::sql::sqlparser::ast::Query,
+    tables: &mut Vec<datafusion::sql::sqlparser::ast::ObjectName>,
+) -> Result<(), QueryError> {
+    if let Some(with) = &query.with {
+        for cte in &with.cte_tables {
+            extract_table_refs_rec(&cte.query, tables)?;
+        }
+    }
+    extract_table_refs_rec_set_expr(&query.body, tables)?;
+
+    // Another pass to remove CTEs from table refs
+    // TODO: This may fail in some tricky cases like nested CTEs
+    if let Some(with) = &query.with {
+        for cte in &with.cte_tables {
+            tables.retain(|tn| tn.0.len() != 1 || tn.0[0] != cte.alias.name);
+        }
+    }
+
+    Ok(())
+}
+
+fn extract_table_refs_rec_set_expr(
+    expr: &datafusion::sql::sqlparser::ast::SetExpr,
+    tables: &mut Vec<datafusion::sql::sqlparser::ast::ObjectName>,
+) -> Result<(), QueryError> {
+    use datafusion::sql::sqlparser::ast::SetExpr;
+
+    match expr {
+        SetExpr::Select(select) => {
+            for twj in &select.from {
+                extract_table_refs_rec_table_factor(&twj.relation, tables)?;
+                for join in &twj.joins {
+                    extract_table_refs_rec_table_factor(&join.relation, tables)?;
+                }
+            }
+            Ok(())
+        }
+        SetExpr::Query(query) => extract_table_refs_rec(query, tables),
+        SetExpr::SetOperation { left, right, .. } => {
+            extract_table_refs_rec_set_expr(left, tables)?;
+            extract_table_refs_rec_set_expr(right, tables)?;
+            Ok(())
+        }
+        SetExpr::Table(_) | SetExpr::Values(_) | SetExpr::Insert(_) | SetExpr::Update(_) => Ok(()),
+    }
+}
+
+fn extract_table_refs_rec_table_factor(
+    expr: &datafusion::sql::sqlparser::ast::TableFactor,
+    tables: &mut Vec<datafusion::sql::sqlparser::ast::ObjectName>,
+) -> Result<(), QueryError> {
+    use datafusion::sql::sqlparser::ast::TableFactor;
+
+    match expr {
+        TableFactor::Table { name, .. } => {
+            tables.push(name.clone());
+            Ok(())
+        }
+        TableFactor::Derived { subquery, .. } => extract_table_refs_rec(subquery, tables),
+        _ => Ok(()),
+    }
+}

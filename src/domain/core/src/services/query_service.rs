@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
+
 use datafusion::arrow;
 use datafusion::error::DataFusionError;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::{DataFrame, SessionContext};
-use opendatafabric::DatasetRef;
+use opendatafabric::*;
 use thiserror::Error;
 
 use crate::auth::DatasetActionUnauthorizedError;
@@ -45,12 +47,13 @@ pub trait QueryService: Send + Sync {
     ) -> Result<DataFrame, QueryError>;
 
     /// Prepares an execution plan for the SQL statement and returns a
-    /// [DataFrame] that can be used to execute it and get the result.
+    /// [DataFrame] that can be used to get schema and data, and the state
+    /// information that can be used for reproducibility.
     async fn sql_statement(
         &self,
         statement: &str,
         options: QueryOptions,
-    ) -> Result<DataFrame, QueryError>;
+    ) -> Result<QueryResponse, QueryError>;
 
     /// Returns a reference-counted arrow schema of the given dataset, if it is
     /// already defined by this moment, `None` otherwise
@@ -80,18 +83,51 @@ pub trait QueryService: Send + Sync {
 
 #[derive(Debug, Clone, Default)]
 pub struct QueryOptions {
-    pub datasets: Vec<DatasetQueryOptions>,
+    /// Maps the table names used in a query to globally unique dataset
+    /// identifiers. If aliases are not provided - the table names will be
+    /// treated as dataset references and resolved as normally in the context of
+    /// the calling user. If at least one alias is specified - the name
+    /// resolution will be disabled, thus you should either provide all aliases
+    /// or none.
+    pub aliases: Option<BTreeMap<String, DatasetID>>,
+    /// Provides state information that should be used for query execution. This
+    /// is used to achieve full reproducibility of queries as no matter what
+    /// updates happen in the datasets - the query will only consider a specific
+    /// subset of the data ledger.
+    pub as_of_state: Option<QueryState>,
+    /// Hints that can help the system to minimize metadata scanning. Be extra
+    /// careful that your hints don't influence the actual result of the
+    /// query, as they are not inlcuded in the [QueryState] and thus can
+    /// ruin reproducibility if misused.
+    pub hints: Option<BTreeMap<DatasetID, DatasetQueryHints>>,
 }
 
-#[derive(Debug, Clone)]
-pub struct DatasetQueryOptions {
-    pub dataset_ref: DatasetRef,
+#[derive(Debug, Clone, Default)]
+pub struct DatasetQueryHints {
     /// Number of records that will be considered for this dataset (starting
     /// from latest entries) Setting this value allows engine to limit the
     /// number of part files examined, e.g. if limit is 100 and last data part
     /// file contains 150 records - only this file will be considered for the
     /// query and the rest of data will be completely ignored.
     pub last_records_to_consider: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct QueryResponse {
+    /// A [DataFrame] that can be used to read schema and access the data. Note
+    /// that the data frames are "lazy". They are a representation of a logical
+    /// query plan. The actual query is executed only when you pull the
+    /// resulting data from it.
+    pub df: DataFrame,
+    ///  The query state information that can be used for reproducibility.
+    pub state: QueryState,
+}
+
+#[derive(Debug, Clone)]
+pub struct QueryState {
+    /// Last block hases of input datasets that were considered during the query
+    /// planning
+    pub inputs: BTreeMap<DatasetID, Multihash>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
