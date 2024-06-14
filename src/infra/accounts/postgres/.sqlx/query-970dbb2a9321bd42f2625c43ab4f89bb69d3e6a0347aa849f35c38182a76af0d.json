@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT\n                    id,\n                    token_name,\n                    token_hash,\n                    created_at,\n                    revoked_at,\n                    account_id as \"account_id: AccountID\"\n                FROM access_tokens\n                WHERE id = $1\n                ",
+  "query": "\n                SELECT\n                    id as \"id: Uuid\",\n                    token_name,\n                    token_hash,\n                    created_at as \"created_at: DateTime<Utc>\",\n                    revoked_at as \"revoked_at: DateTime<Utc>\",\n                    account_id as \"account_id: AccountID\"\n                FROM access_tokens\n                WHERE id = $1\n                ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
+        "name": "id: Uuid",
         "type_info": "Uuid"
       },
       {
@@ -20,12 +20,12 @@
       },
       {
         "ordinal": 3,
-        "name": "created_at",
+        "name": "created_at: DateTime<Utc>",
         "type_info": "Timestamptz"
       },
       {
         "ordinal": 4,
-        "name": "revoked_at",
+        "name": "revoked_at: DateTime<Utc>",
         "type_info": "Timestamptz"
       },
       {
@@ -48,5 +48,5 @@
       false
     ]
   },
-  "hash": "cdc6484937dd3d77eb4d4cd3e7a9af737279b83c2ca97b74cc23ece19d19fb14"
+  "hash": "970dbb2a9321bd42f2625c43ab4f89bb69d3e6a0347aa849f35c38182a76af0d"
 }

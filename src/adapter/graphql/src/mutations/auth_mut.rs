@@ -11,7 +11,7 @@ use kamu_accounts::RevokeTokenError;
 
 use crate::prelude::*;
 use crate::queries::{Account, CreatedAccessToken};
-use crate::utils::{check_access_token_access, check_logged_account_id_match};
+use crate::utils::{check_access_token_valid, check_logged_account_id_match};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -76,7 +76,7 @@ impl AuthMut {
         ctx: &Context<'_>,
         token_id: AccessTokenID,
     ) -> Result<RevokeResult> {
-        check_access_token_access(ctx, &token_id).await?;
+        check_access_token_valid(ctx, &token_id).await?;
 
         let access_token_service =
             from_catalog::<dyn kamu_accounts::AccessTokenService>(ctx).unwrap();

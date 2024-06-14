@@ -131,7 +131,7 @@ pub(crate) fn check_logged_account_id_match(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn check_access_token_access(
+pub(crate) async fn check_access_token_valid(
     ctx: &Context<'_>,
     token_id: &AccessTokenID,
 ) -> Result<(), GqlError> {

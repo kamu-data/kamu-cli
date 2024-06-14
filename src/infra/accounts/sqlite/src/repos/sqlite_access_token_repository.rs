@@ -10,8 +10,9 @@
 use chrono::{DateTime, Utc};
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use opendatafabric::{AccountID, AccountName};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use opendatafabric::AccountID;
+use sqlx::SqliteConnection;
 use uuid::Uuid;
 
 use crate::domain::*;
@@ -29,6 +30,35 @@ impl SqliteAccessTokenRepository {
         Self {
             transaction: transaction.into(),
         }
+    }
+
+    async fn query_token_by_id(
+        &self,
+        token_id: &Uuid,
+        connection: &mut SqliteConnection,
+    ) -> Result<Option<AccessToken>, InternalError> {
+        let token_id_search = *token_id;
+
+        let access_token_row_maybe = sqlx::query_as!(
+            AccessTokenRowModel,
+            r#"
+                SELECT
+                    id as "id: Uuid",
+                    token_name,
+                    token_hash,
+                    created_at as "created_at: DateTime<Utc>",
+                    revoked_at as "revoked_at: DateTime<Utc>",
+                    account_id as "account_id: AccountID"
+                FROM access_tokens
+                WHERE id = $1
+                "#,
+            token_id_search
+        )
+        .fetch_optional(&mut *connection)
+        .await
+        .int_err()?;
+
+        Ok(access_token_row_maybe.map(Into::into))
     }
 }
 
@@ -50,6 +80,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         let token_hash = access_token.token_hash.as_slice();
         let crated_at = access_token.created_at;
         let account_id = access_token.account_id.to_string();
+        println!("token_id: {:?}", token_id);
 
         sqlx::query!(
             r#"
@@ -87,36 +118,14 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
             .connection_mut()
             .await
             .map_err(GetAccessTokenError::Internal)?;
-        let token_id_search = *token_id;
 
-        let maybe_access_token_row = sqlx::query!(
-            r#"
-                SELECT
-                    id as "id: Uuid",
-                    token_name,
-                    token_hash,
-                    created_at as "created_at: DateTime<Utc>",
-                    revoked_at as "revoked_at: DateTime<Utc>",
-                    account_id as "account_id: AccountID"
-                FROM access_tokens
-                WHERE id = $1
-                "#,
-            token_id_search
-        )
-        .fetch_optional(connection_mut)
-        .await
-        .int_err()
-        .map_err(GetAccessTokenError::Internal)?;
+        let maybe_access_token = self
+            .query_token_by_id(&token_id, connection_mut)
+            .await
+            .map_err(GetAccessTokenError::Internal)?;
 
-        if let Some(access_token_row) = maybe_access_token_row {
-            Ok(AccessToken {
-                id: access_token_row.id,
-                token_name: access_token_row.token_name,
-                token_hash: access_token_row.token_hash.try_into().unwrap(),
-                created_at: access_token_row.created_at,
-                revoked_at: access_token_row.revoked_at,
-                account_id: access_token_row.account_id,
-            })
+        if let Some(access_token) = maybe_access_token {
+            Ok(access_token)
         } else {
             Err(GetAccessTokenError::NotFound(AccessTokenNotFoundError {
                 access_token_id: *token_id,
@@ -139,7 +148,8 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         let offset = pagination.offset;
         let account_id_string = account_id.to_string();
 
-        let access_token_rows = sqlx::query!(
+        let access_token_rows = sqlx::query_as!(
+            AccessTokenRowModel,
             r#"
                 SELECT
                     id as "id: Uuid",
@@ -161,17 +171,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         .int_err()
         .map_err(GetAccessTokenError::Internal)?;
 
-        Ok(access_token_rows
-            .into_iter()
-            .map(|access_token_row| AccessToken {
-                id: access_token_row.id,
-                token_name: access_token_row.token_name,
-                token_hash: access_token_row.token_hash.try_into().unwrap(),
-                created_at: access_token_row.created_at,
-                revoked_at: access_token_row.revoked_at,
-                account_id: access_token_row.account_id,
-            })
-            .collect())
+        Ok(access_token_rows.into_iter().map(Into::into).collect())
     }
 
     async fn mark_revoked(
@@ -186,14 +186,18 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
             .await
             .map_err(RevokeTokenError::Internal)?;
 
-        let existing_access_token =
-            self.get_token_by_id(token_id)
-                .await
-                .map_err(|err| match err {
-                    GetAccessTokenError::NotFound(e) => RevokeTokenError::NotFound(e),
-                    GetAccessTokenError::Internal(e) => RevokeTokenError::Internal(e),
-                })?;
-        if existing_access_token.revoked_at.is_some() {
+        let maybe_existing_token = self
+            .query_token_by_id(&token_id, connection_mut)
+            .await
+            .map_err(RevokeTokenError::Internal)?;
+
+        if maybe_existing_token.is_none() {
+            return Err(RevokeTokenError::NotFound(AccessTokenNotFoundError {
+                access_token_id: token_id.clone(),
+            }));
+        } else if let Some(existing_access_token) = maybe_existing_token
+            && existing_access_token.revoked_at.is_some()
+        {
             return Err(RevokeTokenError::AlreadyRevoked);
         }
 
@@ -204,7 +208,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
             revoked_time,
             token_id,
         )
-        .execute(connection_mut)
+        .execute(&mut *connection_mut)
         .await
         .int_err()
         .map_err(RevokeTokenError::Internal)?;
@@ -225,7 +229,8 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
             .map_err(FindAccountByTokenError::Internal)?;
         let token_id_search = *token_id;
 
-        let maybe_account_row = sqlx::query!(
+        let maybe_account_row = sqlx::query_as!(
+            AccountWithTokenRowModel,
             r#"
                 SELECT
                     at.token_hash,
@@ -236,12 +241,12 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
                     a.account_type as "account_type: AccountType",
                     registered_at as "registered_at: DateTime<Utc>",
                     a.avatar_url,
-                    a.is_admin,
+                    a.is_admin as "is_admin: bool",
                     a.provider,
                     a.provider_identity_key
                 FROM access_tokens at
                 JOIN accounts a ON at.account_id = a.id
-                WHERE at.id = $1
+                WHERE at.id = $1 and at.revoked_at IS null
                 "#,
             token_id_search
         )
@@ -254,18 +259,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
             if token_hash != account_row.token_hash.as_slice() {
                 return Err(FindAccountByTokenError::InvalidTokenHash);
             }
-            Ok(Account {
-                id: account_row.id,
-                account_name: AccountName::new_unchecked(&account_row.account_name),
-                email: account_row.email,
-                display_name: account_row.display_name,
-                account_type: account_row.account_type,
-                avatar_url: account_row.avatar_url,
-                registered_at: account_row.registered_at,
-                is_admin: account_row.is_admin != 0,
-                provider: account_row.provider,
-                provider_identity_key: account_row.provider_identity_key,
-            })
+            Ok(account_row.into())
         } else {
             Err(FindAccountByTokenError::NotFound(
                 AccessTokenNotFoundError {

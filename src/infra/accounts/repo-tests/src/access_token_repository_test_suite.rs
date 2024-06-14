@@ -127,12 +127,14 @@ pub async fn test_mark_existing_access_token_revorked(catalog: &Catalog) {
         .get_token_by_id(&access_token.id)
         .await
         .unwrap();
+
     assert_eq!(db_access_token.revoked_at, None);
 
     let revoke_time = Utc::now().round_subsecs(6);
     let revoke_result = access_token_repo
         .mark_revoked(&access_token.id, revoke_time)
         .await;
+
     assert!(revoke_result.is_ok());
 
     let db_access_token = access_token_repo

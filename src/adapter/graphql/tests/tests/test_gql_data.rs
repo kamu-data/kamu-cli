@@ -162,7 +162,7 @@ async fn create_test_dataset(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// #[test_group::group(engine, datafusion)]
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_schema_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();

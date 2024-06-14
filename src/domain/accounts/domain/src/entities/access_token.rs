@@ -158,3 +158,28 @@ pub enum DecodeTokenError {
     #[error("Invalid access token format")]
     InvalidTokenFormat,
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct AccessTokenRowModel {
+    pub id: Uuid,
+    pub token_name: String,
+    pub token_hash: Vec<u8>,
+    pub created_at: DateTime<Utc>,
+    pub revoked_at: Option<DateTime<Utc>>,
+    pub account_id: AccountID,
+}
+
+impl From<AccessTokenRowModel> for AccessToken {
+    fn from(value: AccessTokenRowModel) -> Self {
+        AccessToken {
+            id: value.id,
+            token_name: value.token_name,
+            token_hash: value.token_hash.try_into().unwrap(),
+            created_at: value.created_at,
+            revoked_at: value.revoked_at,
+            account_id: value.account_id,
+        }
+    }
+}
