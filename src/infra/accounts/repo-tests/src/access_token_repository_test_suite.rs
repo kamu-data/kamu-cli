@@ -178,16 +178,19 @@ pub async fn test_find_account_by_active_token_id(catalog: &Catalog) {
         .await
         .unwrap();
 
-    let db_account = access_token_repo
-        .find_account_by_active_token_id(&access_token.id, access_token.token_hash)
+    let db_account_id = access_token_repo
+        .find_account_id_by_active_token_id(&access_token.id, access_token.token_hash)
         .await
         .unwrap();
-    assert_eq!(db_account, account);
+    assert_eq!(db_account_id, account.id);
 
-    let db_account = access_token_repo
-        .find_account_by_active_token_id(&access_token.id, fake_access_token.token_hash)
+    let db_account_res = access_token_repo
+        .find_account_id_by_active_token_id(&access_token.id, fake_access_token.token_hash)
         .await;
-    assert_matches!(db_account, Err(FindAccountByTokenError::InvalidTokenHash));
+    assert_matches!(
+        db_account_res,
+        Err(FindAccountByTokenError::InvalidTokenHash)
+    );
 
     let revoke_time = Utc::now().round_subsecs(6);
     let revoke_result = access_token_repo
@@ -195,8 +198,8 @@ pub async fn test_find_account_by_active_token_id(catalog: &Catalog) {
         .await;
     assert!(revoke_result.is_ok());
 
-    let db_account = access_token_repo
-        .find_account_by_active_token_id(&access_token.id, access_token.token_hash)
+    let db_account_res = access_token_repo
+        .find_account_id_by_active_token_id(&access_token.id, access_token.token_hash)
         .await;
-    assert_matches!(db_account, Err(FindAccountByTokenError::NotFound(_)));
+    assert_matches!(db_account_res, Err(FindAccountByTokenError::NotFound(_)));
 }

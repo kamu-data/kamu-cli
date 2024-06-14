@@ -206,11 +206,11 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
         Ok(())
     }
 
-    async fn find_account_by_active_token_id(
+    async fn find_account_id_by_active_token_id(
         &self,
         token_id: &Uuid,
         token_hash: [u8; 32],
-    ) -> Result<Account, FindAccountByTokenError> {
+    ) -> Result<AccountID, FindAccountByTokenError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr
@@ -218,24 +218,13 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
             .await
             .map_err(FindAccountByTokenError::Internal)?;
 
-        let maybe_account_row = sqlx::query_as!(
-            AccountWithTokenRowModel,
+        let maybe_account_row = sqlx::query!(
             r#"
                 SELECT
                     at.token_hash,
-                    a.id as "id: AccountID",
-                    a.account_name,
-                    a.email as "email?",
-                    a.display_name,
-                    a.account_type as "account_type: AccountType",
-                    a.avatar_url,
-                    a.registered_at,
-                    a.is_admin,
-                    a.provider,
-                    a.provider_identity_key
+                    at.account_id
                 FROM access_tokens at
-                LEFT JOIN accounts a ON a.id = account_id
-                WHERE at.id = $1 AND revoked_at IS null
+                WHERE at.id = $1 AND at.revoked_at IS null
                 "#,
             token_id
         )
@@ -248,7 +237,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
             if token_hash != account_row.token_hash.as_slice() {
                 return Err(FindAccountByTokenError::InvalidTokenHash);
             }
-            Ok(account_row.into())
+            Ok(AccountID::from_did_str(&account_row.account_id).unwrap())
         } else {
             Err(FindAccountByTokenError::NotFound(
                 AccessTokenNotFoundError {

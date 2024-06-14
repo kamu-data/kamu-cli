@@ -15,7 +15,6 @@ use uuid::Uuid;
 use crate::{
     AccessToken,
     AccessTokenPaginationOpts,
-    Account,
     CreateAccessTokenError,
     FindAccountByTokenError,
     GetAccessTokenError,
@@ -31,11 +30,11 @@ pub trait AccessTokenService: Sync + Send {
         account_id: &AccountID,
     ) -> Result<KamuAccessToken, CreateAccessTokenError>;
 
-    async fn find_account_by_active_token_id(
+    async fn find_account_id_by_active_token_id(
         &self,
         token_id: &Uuid,
         token_hash: [u8; 32],
-    ) -> Result<Account, FindAccountByTokenError>;
+    ) -> Result<AccountID, FindAccountByTokenError>;
 
     async fn get_token_by_id(&self, token_id: &Uuid) -> Result<AccessToken, GetAccessTokenError>;
 
