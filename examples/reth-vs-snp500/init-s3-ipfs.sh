@@ -7,8 +7,11 @@ S3_EXAMPLE_URL="https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/odf/v2/exam
 kamu init || true
 
 # Pull from S3 for speed but then alias to IPFS
-kamu pull "${S3_CONTRIB_URL}net.rocketpool.reth.mint-burn" --no-alias
-kamu repo alias add --pull net.rocketpool.reth.mint-burn "ipns://net.rocketpool.reth.mint-burn.ipns.kamu.dev"
+kamu pull "${S3_CONTRIB_URL}net.rocketpool.reth.tokens-minted" --no-alias
+kamu repo alias add --pull net.rocketpool.reth.tokens-minted "ipns://net.rocketpool.reth.tokens-minted.ipns.kamu.dev"
+
+kamu pull "${S3_CONTRIB_URL}net.rocketpool.reth.tokens-burned" --no-alias
+kamu repo alias add --pull net.rocketpool.reth.tokens-burned "ipns://net.rocketpool.reth.tokens-burned.ipns.kamu.dev"
 
 kamu pull "${S3_CONTRIB_URL}com.cryptocompare.ohlcv.eth-usd" --no-alias
 kamu repo alias add --pull com.cryptocompare.ohlcv.eth-usd "ipns://com.cryptocompare.ohlcv.eth-usd.ipns.kamu.dev"

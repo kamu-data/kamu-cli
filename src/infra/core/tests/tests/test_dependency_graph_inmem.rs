@@ -39,7 +39,7 @@ use opendatafabric::{
 };
 use tempfile::TempDir;
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_single_tenant_repository() {
@@ -68,7 +68,7 @@ async fn test_single_tenant_repository() {
     );
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_multi_tenant_repository() {
@@ -97,7 +97,7 @@ async fn test_multi_tenant_repository() {
     );
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_service_queries() {
@@ -136,7 +136,7 @@ async fn test_service_queries() {
     );
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_service_new_datasets() {
@@ -180,7 +180,7 @@ async fn test_service_new_datasets() {
     );
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_service_derived_dataset_modifies_links() {
@@ -272,7 +272,7 @@ async fn test_service_derived_dataset_modifies_links() {
     );
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_service_dataset_deleted() {
@@ -448,7 +448,7 @@ async fn test_get_recursive_downstream_dependencies() {
     assert_eq!(result, expected_result);
 
     // Request downstream dependencies for 2 elements with 2 dependencies
-    // and one element which is included in chain of dependencies from previos
+    // and one element which is included in chain of dependencies from previous
     // should return dependencies(from last to first) and requested dataset
     // at the end of each chain without duplicates
     let request_datasets = vec![
@@ -482,7 +482,7 @@ async fn test_get_recursive_downstream_dependencies() {
         )
         .await;
 
-    // Request dependencies for 2 root nodes with dupicate dependencies
+    // Request dependencies for 2 root nodes with duplicate dependencies
     // duplicate should be in result only once in the first chain
     let request_datasets = vec!["test-root-bar", "test-root-baz"];
     let result = harness
@@ -536,8 +536,8 @@ async fn test_get_recursive_upstream_dependencies() {
 
     assert_eq!(result, request_datasets);
 
-    // Should correclty return result for root dataset and
-    // one of outcoming node
+    // Should correctly return result for root dataset and
+    // one of coming node
     let request_datasets = vec!["test-root-foo", "test-derive-foo-foo"];
     let result = harness
         .get_recursive_upstream_dependencies(request_datasets.clone())
@@ -571,7 +571,7 @@ async fn test_get_recursive_upstream_dependencies() {
     assert_eq!(result, expected_result);
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 struct DependencyGraphHarness {
     _workdir: TempDir,
@@ -942,7 +942,7 @@ impl DependencyGraphHarness {
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 async fn create_large_dataset_graph() -> DependencyGraphHarness {
     let dependency_harness = DependencyGraphHarness::new(false);

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod postgres_access_token_repository;
 mod postgres_account_repository;
 
+pub use postgres_access_token_repository::*;
 pub use postgres_account_repository::*;

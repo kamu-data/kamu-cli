@@ -368,7 +368,14 @@ async fn do_test_sync(
 
     assert_matches!(
         sync_svc.sync(&dataset_alias_2.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
-        Err(SyncError::DatasetsDiverged(DatasetsDivergedError { src_head, dst_head, uncommon_blocks_in_src, uncommon_blocks_in_dst }))
+        Err(SyncError::DatasetsDiverged(DatasetsDivergedError {
+            src_head,
+            dst_head,
+            detail: Some(DatasetsDivergedErrorDetail {
+                uncommon_blocks_in_src,
+                uncommon_blocks_in_dst
+            })
+        }))
         if src_head == b4_alt && dst_head == b5 && uncommon_blocks_in_src == 1 && uncommon_blocks_in_dst == 2
     );
 

@@ -70,9 +70,13 @@ impl DataBatch {
         let mut buf = Vec::new();
         {
             let mut writer: Box<dyn RecordsWriter> = match format {
-                DataBatchFormat::Csv => {
-                    Box::new(CsvWriterBuilder::new().with_header(true).build(&mut buf))
-                }
+                DataBatchFormat::Csv => Box::new(CsvWriter::new(
+                    &mut buf,
+                    CsvWriterOptions {
+                        header: true,
+                        ..Default::default()
+                    },
+                )),
                 DataBatchFormat::Json => Box::new(JsonArrayOfStructsWriter::new(&mut buf)),
                 DataBatchFormat::JsonSOA => {
                     Box::new(JsonStructOfArraysWriter::new(&mut buf, MAX_SOA_BUFFER_SIZE))

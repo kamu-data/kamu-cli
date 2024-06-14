@@ -19,6 +19,7 @@ use kamu_core::{
 use opendatafabric::{
     AddData,
     ExecuteTransform,
+    FetchStep,
     IntoDataStreamBlock,
     IntoDataStreamEvent,
     MetadataBlock,
@@ -344,14 +345,6 @@ impl ValidateAddPushSourceVisitor {
     pub fn new(block: &MetadataBlock) -> Result<Self, AppendValidationError> {
         let is_push_source_appended = match &block.event {
             MetadataEvent::AddPushSource(e) => {
-                // Ensure specifies the schema
-                if e.read.schema().is_none() {
-                    invalid_event!(
-                        e.clone(),
-                        "Push sources must specify the read schema explicitly",
-                    );
-                }
-
                 // Queries must be normalized
                 if let Some(transform) = &e.preprocess {
                     validate_transform(&block.event, transform)?;
@@ -404,6 +397,13 @@ impl ValidateSetPollingSourceVisitor {
                 // Queries must be normalized
                 if let Some(transform) = &e.preprocess {
                     validate_transform(&block.event, transform)?;
+                }
+
+                // Eth source must identify the chain
+                if let FetchStep::EthereumLogs(f) = &e.fetch {
+                    if f.chain_id.is_none() && f.node_url.is_none() {
+                        invalid_event!(e.clone(), "Eth source must specify chainId or nodeUrl")
+                    }
                 }
 
                 true

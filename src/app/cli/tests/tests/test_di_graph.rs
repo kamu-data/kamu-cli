@@ -8,14 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
+use kamu::domain::ServerUrlConfig;
 use kamu_accounts::{CurrentAccountSubject, JwtAuthenticationConfig};
+use kamu_adapter_http::AccessToken;
 use kamu_cli::{self, OutputConfig, WorkspaceLayout};
 
 #[test_log::test(tokio::test)]
 async fn test_di_graph_validates() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = WorkspaceLayout::new(tempdir.path());
-    let mut base_catalog_builder = kamu_cli::configure_base_catalog(&workspace_layout, false, None);
+    let mut base_catalog_builder =
+        kamu_cli::configure_base_catalog(&workspace_layout, false, None, false);
     kamu_cli::configure_in_memory_components(&mut base_catalog_builder);
     base_catalog_builder.add_value(OutputConfig::default());
 
@@ -31,6 +34,8 @@ async fn test_di_graph_validates() {
         kamu_cli::configure_cli_catalog(&base_catalog, multi_tenant_workspace);
     cli_catalog_builder.add_value(CurrentAccountSubject::new_test());
     cli_catalog_builder.add_value(JwtAuthenticationConfig::default());
+    cli_catalog_builder.add_value(ServerUrlConfig::new_test(None));
+    cli_catalog_builder.add_value(AccessToken::new("some-test-token"));
 
     // TODO: We should ensure this test covers parameters requested by commands and
     // types needed for GQL/HTTP adapter that are currently being constructed

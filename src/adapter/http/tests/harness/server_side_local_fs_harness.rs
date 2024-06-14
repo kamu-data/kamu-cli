@@ -15,6 +15,7 @@ use std::sync::Arc;
 use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::{
+    CompactionService,
     DatasetRepository,
     InternalError,
     ResultIntoInternal,
@@ -22,7 +23,14 @@ use kamu::domain::{
     SystemTimeSource,
     SystemTimeSourceStub,
 };
-use kamu::{DatasetLayout, DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu::{
+    CompactionServiceImpl,
+    DatasetLayout,
+    DatasetRepositoryLocalFs,
+    DependencyGraphServiceInMemory,
+    ObjectStoreBuilderLocalFs,
+    ObjectStoreRegistryImpl,
+};
 use kamu_accounts::{AuthenticationService, MockAuthenticationService};
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use tempfile::TempDir;
@@ -52,8 +60,12 @@ pub(crate) struct ServerSideLocalFsHarness {
 impl ServerSideLocalFsHarness {
     pub fn new(options: ServerSideHarnessOptions) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
+
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
+
+        let run_info_dir = tempdir.path().join("run");
+        std::fs::create_dir(&run_info_dir).unwrap();
 
         let mut base_catalog_builder = match &options.base_catalog {
             None => dill::CatalogBuilder::new(),
@@ -79,7 +91,11 @@ impl ServerSideLocalFsHarness {
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .add_value(server_authentication_mock())
             .bind::<dyn AuthenticationService, MockAuthenticationService>()
-            .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)));
+            .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
+            .add_builder(CompactionServiceImpl::builder().with_run_info_dir(run_info_dir.clone()))
+            .bind::<dyn CompactionService, CompactionServiceImpl>()
+            .add::<ObjectStoreRegistryImpl>()
+            .add::<ObjectStoreBuilderLocalFs>();
 
         let base_catalog = base_catalog_builder.build();
 
@@ -120,6 +136,11 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
     fn cli_dataset_repository(&self) -> Arc<dyn DatasetRepository> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog);
         cli_catalog.get_one::<dyn DatasetRepository>().unwrap()
+    }
+
+    fn cli_compaction_service(&self) -> Arc<dyn CompactionService> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        cli_catalog.get_one::<dyn CompactionService>().unwrap()
     }
 
     fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url {

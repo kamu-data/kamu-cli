@@ -11,10 +11,16 @@ use std::net::{SocketAddr, TcpListener};
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use kamu::domain::{InternalError, ResultIntoInternal, SystemTimeSource, SystemTimeSourceStub};
 use kamu_accounts::*;
-use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::{AuthenticationServiceImpl, LoginPasswordAuthProvider};
+use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
+use kamu_accounts_services::{
+    AccessTokenServiceImpl,
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_adapter_http::{LoginRequestBody, LoginResponseBody};
 use opendatafabric::AccountName;
 use serde_json::json;
@@ -38,7 +44,7 @@ struct Harness {
 }
 
 impl Harness {
-    fn new() -> Self {
+    async fn new() -> Self {
         let run_info_dir = tempfile::tempdir().unwrap();
 
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
@@ -52,15 +58,38 @@ impl Harness {
                 USER_PETYA,
             )));
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<AuthenticationServiceImpl>()
-            .add_value(predefined_accounts_config)
-            .add::<AccountRepositoryInMemory>()
-            .add_value(SystemTimeSourceStub::new())
-            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
-            .add::<LoginPasswordAuthProvider>()
-            .add_value(JwtAuthenticationConfig::default())
-            .build();
+        let catalog = {
+            let mut b = dill::CatalogBuilder::new();
+
+            b.add::<AuthenticationServiceImpl>()
+                .add_value(predefined_accounts_config)
+                .add::<AccountRepositoryInMemory>()
+                .add_value(SystemTimeSourceStub::new())
+                .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+                .add::<LoginPasswordAuthProvider>()
+                .add_value(JwtAuthenticationConfig::default())
+                .add::<DatabaseTransactionRunner>()
+                .add::<AccessTokenServiceImpl>()
+                .add::<AccessTokenRepositoryInMemory>()
+                .add::<PredefinedAccountsRegistrator>();
+
+            NoOpDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
+
+        DatabaseTransactionRunner::new(catalog.clone())
+            .transactional(|transactional_catalog| async move {
+                let registrator = transactional_catalog
+                    .get_one::<PredefinedAccountsRegistrator>()
+                    .unwrap();
+
+                registrator
+                    .ensure_predefined_accounts_are_registered()
+                    .await
+            })
+            .await
+            .unwrap();
 
         let system_time_source_stub = catalog.get_one::<SystemTimeSourceStub>().unwrap();
 
@@ -96,7 +125,7 @@ impl Harness {
 
 #[test_log::test(tokio::test)]
 async fn test_login_with_password_method_success() {
-    let harness = Harness::new();
+    let harness = Harness::new().await;
 
     let login_url = harness.login_url();
     let validate_url = harness.validate_url();
@@ -139,7 +168,7 @@ async fn test_login_with_password_method_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_login_with_password_method_invalid_credentials() {
-    let harness = Harness::new();
+    let harness = Harness::new().await;
 
     let login_url = harness.login_url();
 
@@ -177,7 +206,7 @@ async fn test_login_with_password_method_invalid_credentials() {
 
 #[test_log::test(tokio::test)]
 async fn test_login_with_password_method_expired_credentials() {
-    let harness = Harness::new();
+    let harness = Harness::new().await;
     let time_source_stub = harness.system_time_source_stub.clone();
 
     let login_url = harness.login_url();
@@ -227,7 +256,7 @@ async fn test_login_with_password_method_expired_credentials() {
 
 #[test_log::test(tokio::test)]
 async fn test_validate_invalid_token_fails() {
-    let harness = Harness::new();
+    let harness = Harness::new().await;
     let validate_url = harness.validate_url();
 
     let client = async move {
@@ -239,7 +268,7 @@ async fn test_validate_invalid_token_fails() {
             .send()
             .await
             .unwrap();
-        assert_eq!(400, validate_response.status());
+        assert_eq!(401, validate_response.status());
 
         let validate_response_error = validate_response.text().await.unwrap();
         assert_eq!(validate_response_error, "Authentication token invalid");
@@ -252,14 +281,14 @@ async fn test_validate_invalid_token_fails() {
 
 #[test_log::test(tokio::test)]
 async fn test_validate_without_token_fails() {
-    let harness = Harness::new();
+    let harness = Harness::new().await;
     let validate_url = harness.validate_url();
 
     let client = async move {
         let client = reqwest::Client::new();
 
         let validate_response = client.get(validate_url).send().await.unwrap();
-        assert_eq!(400, validate_response.status());
+        assert_eq!(401, validate_response.status());
 
         let validate_response_error = validate_response.text().await.unwrap();
         assert_eq!(validate_response_error, "No authentication token provided");

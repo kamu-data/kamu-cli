@@ -7,12 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use chrono::{TimeZone, Utc};
+use datafusion::arrow::array::{RecordBatch, StringArray, UInt64Array};
+use datafusion::arrow::datatypes::*;
+use datafusion::prelude::*;
 use dill::Component;
 use kamu::domain::*;
 use kamu::*;
-use opendatafabric::{MergeStrategy, *};
+use kamu_ingest_datafusion::DataWriterDataFusion;
+use opendatafabric::*;
 use serde_json::json;
+use testing::MetadataFactory;
 
 use crate::harness::*;
 
@@ -40,8 +47,6 @@ impl Harness {
                     .with_run_info_dir(run_info_dir.path().to_path_buf()),
             )
             .bind::<dyn PushIngestService, PushIngestServiceImpl>()
-            .add::<ObjectStoreRegistryImpl>()
-            .add::<ObjectStoreBuilderLocalFs>()
             .add::<EngineProvisionerNull>()
             .build();
 
@@ -54,32 +59,54 @@ impl Harness {
         let system_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
         server_harness.system_time_source().set(system_time);
 
+        let alias = DatasetAlias::new(
+            server_harness.operating_account_name(),
+            DatasetName::new_unchecked("population"),
+        );
         let create_result = server_harness
             .cli_dataset_repository()
-            .create_dataset_from_snapshot(DatasetSnapshot {
-                name: DatasetAlias::new(
-                    server_harness.operating_account_name(),
-                    DatasetName::new_unchecked("population"),
+            .create_dataset(
+                &alias,
+                MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+                    .system_time(system_time)
+                    .build_typed(),
+            )
+            .await
+            .unwrap();
+
+        let ctx = SessionContext::new();
+        let mut writer = DataWriterDataFusion::builder(create_result.dataset.clone(), ctx.clone())
+            .with_metadata_state_scanned(None)
+            .await
+            .unwrap()
+            .build();
+
+        writer
+            .write(
+                Some(
+                    ctx.read_batch(
+                        RecordBatch::try_new(
+                            Arc::new(Schema::new(vec![
+                                Field::new("city", DataType::Utf8, false),
+                                Field::new("population", DataType::UInt64, false),
+                            ])),
+                            vec![
+                                Arc::new(StringArray::from(vec!["A", "B"])),
+                                Arc::new(UInt64Array::from(vec![100, 200])),
+                            ],
+                        )
+                        .unwrap(),
+                    )
+                    .unwrap(),
                 ),
-                kind: DatasetKind::Root,
-                metadata: vec![AddPushSource {
-                    source_name: "source1".to_string(),
-                    read: ReadStepNdJson {
-                        schema: Some(vec![
-                            "event_time TIMESTAMP".to_owned(),
-                            "city STRING".to_owned(),
-                            "population BIGINT".to_owned(),
-                        ]),
-                        ..Default::default()
-                    }
-                    .into(),
-                    preprocess: None,
-                    merge: MergeStrategy::Ledger(MergeStrategyLedger {
-                        primary_key: vec!["event_time".to_owned(), "city".to_owned()],
-                    }),
-                }
-                .into()],
-            })
+                WriteDataOpts {
+                    system_time,
+                    source_event_time: system_time,
+                    new_watermark: None,
+                    new_source_state: None,
+                    data_staging_path: run_info_dir.path().join(".temp-data"),
+                },
+            )
             .await
             .unwrap();
 
@@ -103,34 +130,6 @@ impl Harness {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Replace with initialization using DF writer
-async fn add_example_data(cl: &reqwest::Client, dataset_url: &url::Url) {
-    let ingest_url = format!("{dataset_url}/ingest");
-
-    cl.post(&ingest_url)
-        .json(&json!(
-            [
-                {
-                    "event_time": "2020-01-01T00:00:00",
-                    "city": "A",
-                    "population": 100,
-                },
-                {
-                    "event_time": "2020-01-02T00:00:00",
-                    "city": "B",
-                    "population": 200,
-                }
-            ]
-        ))
-        .send()
-        .await
-        .unwrap()
-        .error_for_status()
-        .unwrap();
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_tail_handler() {
@@ -138,13 +137,12 @@ async fn test_data_tail_handler() {
 
     let client = async move {
         let cl = reqwest::Client::new();
-        add_example_data(&cl, &harness.dataset_url).await;
 
         // All points
         let tail_url = format!("{}/tail", harness.dataset_url);
         let res = cl
             .get(&tail_url)
-            .query(&[("schema", "false")])
+            .query(&[("includeSchema", "false")])
             .send()
             .await
             .unwrap();
@@ -154,14 +152,14 @@ async fn test_data_tail_handler() {
             res.json::<serde_json::Value>().await.unwrap(),
             json!({"data": [{
                 "city": "A",
-                "event_time": "2020-01-01T00:00:00Z",
+                "event_time": "2050-01-01T12:00:00Z",
                 "offset": 0,
                 "op": 0,
                 "population": 100,
                 "system_time": "2050-01-01T12:00:00Z"
             }, {
                 "city": "B",
-                "event_time": "2020-01-02T00:00:00Z",
+                "event_time": "2050-01-01T12:00:00Z",
                 "offset": 1,
                 "op": 0,
                 "population": 200,
@@ -172,7 +170,7 @@ async fn test_data_tail_handler() {
         // Limit
         let res = cl
             .get(&tail_url)
-            .query(&[("limit", "1"), ("schema", "false")])
+            .query(&[("limit", "1"), ("includeSchema", "false")])
             .send()
             .await
             .unwrap()
@@ -183,7 +181,7 @@ async fn test_data_tail_handler() {
             res.json::<serde_json::Value>().await.unwrap(),
             json!({"data": [{
                 "city": "B",
-                "event_time": "2020-01-02T00:00:00Z",
+                "event_time": "2050-01-01T12:00:00Z",
                 "offset": 1,
                 "op": 0,
                 "population": 200,
@@ -194,7 +192,7 @@ async fn test_data_tail_handler() {
         // Skip
         let res = cl
             .get(&tail_url)
-            .query(&[("skip", "1"), ("schema", "false")])
+            .query(&[("skip", "1"), ("includeSchema", "false")])
             .send()
             .await
             .unwrap()
@@ -205,7 +203,7 @@ async fn test_data_tail_handler() {
             res.json::<serde_json::Value>().await.unwrap(),
             json!({"data": [{
                 "city": "A",
-                "event_time": "2020-01-01T00:00:00Z",
+                "event_time": "2050-01-01T12:00:00Z",
                 "offset": 0,
                 "op": 0,
                 "population": 100,
@@ -221,12 +219,11 @@ async fn test_data_tail_handler() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_data_query_handler() {
+async fn test_data_query_handler_full() {
     let harness = Harness::new().await;
 
     let client = async move {
         let cl = reqwest::Client::new();
-        add_example_data(&cl, &harness.dataset_url).await;
 
         let query = format!(
             "select offset, city, population from \"{}\" order by offset desc",
@@ -235,7 +232,7 @@ async fn test_data_query_handler() {
         let query_url = format!("{}query", harness.root_url);
         let res = cl
             .get(&query_url)
-            .query(&[("query", query.as_str()), ("schema", "true")])
+            .query(&[("query", query.as_str())])
             .send()
             .await
             .unwrap()
@@ -254,30 +251,13 @@ async fn test_data_query_handler() {
                     "offset": 0,
                     "population": 100,
                 }],
-                "schema": {
-                    "fields": [{
-                        "data_type": "Int64",
-                        "dict_id": 0,
-                        "dict_is_ordered": false,
-                        "metadata": {},
-                        "name": "offset",
-                        "nullable": true
-                    }, {
-                        "data_type": "Utf8",
-                        "dict_id": 0,
-                        "dict_is_ordered": false,
-                        "metadata": {},
-                        "name": "city",
-                        "nullable": true
-                    }, {
-                        "data_type": "Int64",
-                        "dict_id": 0,
-                        "dict_is_ordered": false,
-                        "metadata": {},
-                        "name": "population",
-                        "nullable": true
-                    }],
-                    "metadata": {}
+                "schema": "{\"fields\":[{\"name\":\"offset\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"city\",\"data_type\":\"Utf8\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"population\",\"data_type\":\"UInt64\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}}],\"metadata\":{}}",
+                "resultHash": "f9680c001200b3483eecc3d5c6b50ee6b8cba11b51c08f89ea1f53d3a334c743199f5fe656e",
+                "state": {
+                    "inputs": [{
+                        "id": "did:odf:fed01df230b49615d175307d580c33d6fda61fc7b9aec91df0f5c1a5ebe3b8cbfee02",
+                        "blockHash": "f16204cec6245fadfbf0663b0e9e9a01c73268cc13e29087b33ce3454af08eb4d3e0b",
+                    }]
                 }
             })
         );
@@ -295,7 +275,6 @@ async fn test_data_query_handler_ranges() {
 
     let client = async move {
         let cl = reqwest::Client::new();
-        add_example_data(&cl, &harness.dataset_url).await;
 
         let query = format!(
             "select offset, city, population from \"{}\" order by offset desc",
@@ -309,7 +288,9 @@ async fn test_data_query_handler_ranges() {
             .query(&[
                 ("query", query.as_str()),
                 ("limit", "1"),
-                ("schema", "false"),
+                ("includeSchema", "false"),
+                ("includeState", "false"),
+                ("includeResultHash", "false"),
             ])
             .send()
             .await
@@ -332,7 +313,9 @@ async fn test_data_query_handler_ranges() {
             .query(&[
                 ("query", query.as_str()),
                 ("skip", "1"),
-                ("schema", "false"),
+                ("includeSchema", "false"),
+                ("includeState", "false"),
+                ("includeResultHash", "false"),
             ])
             .send()
             .await
@@ -357,12 +340,11 @@ async fn test_data_query_handler_ranges() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_data_query_handler_formats() {
+async fn test_data_query_handler_data_formats() {
     let harness = Harness::new().await;
 
     let client = async move {
         let cl = reqwest::Client::new();
-        add_example_data(&cl, &harness.dataset_url).await;
 
         let query = format!(
             "select offset, city, population from \"{}\" order by offset desc",
@@ -373,8 +355,10 @@ async fn test_data_query_handler_formats() {
             .get(&query_url)
             .query(&[
                 ("query", query.as_str()),
-                ("format", "json-aos"),
-                ("schema", "false"),
+                ("dataFormat", "json-aos"),
+                ("includeSchema", "false"),
+                ("includeState", "false"),
+                ("includeResultHash", "false"),
             ])
             .send()
             .await
@@ -399,8 +383,10 @@ async fn test_data_query_handler_formats() {
             .get(&query_url)
             .query(&[
                 ("query", query.as_str()),
-                ("format", "json-soa"),
-                ("schema", "false"),
+                ("dataFormat", "json-soa"),
+                ("includeSchema", "false"),
+                ("includeState", "false"),
+                ("includeResultHash", "false"),
             ])
             .send()
             .await
@@ -421,8 +407,10 @@ async fn test_data_query_handler_formats() {
             .get(&query_url)
             .query(&[
                 ("query", query.as_str()),
-                ("format", "json-aoa"),
-                ("schema", "false"),
+                ("dataFormat", "json-aoa"),
+                ("includeSchema", "false"),
+                ("includeState", "false"),
+                ("includeResultHash", "false"),
             ])
             .send()
             .await
@@ -436,6 +424,120 @@ async fn test_data_query_handler_formats() {
                 [1, "B", 200],
                 [0, "A", 100],
             ]})
+        );
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_query_handler_schema_formats() {
+    let harness = Harness::new().await;
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+
+        let query = format!(
+            "select offset, city, population from \"{}\"",
+            harness.dataset_alias
+        );
+        let query_url = format!("{}query", harness.root_url);
+        let res = cl
+            .get(&query_url)
+            .query(&[
+                ("query", query.as_str()),
+                ("schemaFormat", "arrow-json"),
+                ("includeSchema", "true"),
+                ("includeState", "false"),
+                ("includeResultHash", "false"),
+            ])
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap()["schema"]
+                .as_str()
+                .unwrap(),
+            r#"{"fields":[{"name":"offset","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"city","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"population","data_type":"UInt64","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}}],"metadata":{}}"#
+        );
+
+        let res = cl
+            .get(&query_url)
+            .query(&[
+                ("query", query.as_str()),
+                ("schemaFormat", "ArrowJson"),
+                ("includeSchema", "true"),
+                ("includeState", "false"),
+                ("includeResultHash", "false"),
+            ])
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap()["schema"]
+                .as_str()
+                .unwrap(),
+            r#"{"fields":[{"name":"offset","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"city","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"population","data_type":"UInt64","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}}],"metadata":{}}"#
+        );
+
+        let res = cl
+            .get(&query_url)
+            .query(&[
+                ("query", query.as_str()),
+                ("schemaFormat", "parquet"),
+                ("includeSchema", "true"),
+                ("includeState", "false"),
+                ("includeResultHash", "false"),
+            ])
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap()["schema"]
+                .as_str()
+                .unwrap(),
+            indoc::indoc!(
+                r#"message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population (INTEGER(64,false));
+                }
+                "#
+            )
+        );
+
+        let res = cl
+            .get(&query_url)
+            .query(&[
+                ("query", query.as_str()),
+                ("schemaFormat", "parquet-json"),
+                ("includeSchema", "true"),
+                ("includeState", "false"),
+                ("includeResultHash", "false"),
+            ])
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap()["schema"]
+                .as_str()
+                .unwrap(),
+            r#"{"name": "arrow_schema", "type": "struct", "fields": [{"name": "offset", "repetition": "OPTIONAL", "type": "INT64"}, {"name": "city", "repetition": "REQUIRED", "type": "BYTE_ARRAY", "logicalType": "STRING"}, {"name": "population", "repetition": "REQUIRED", "type": "INT64", "logicalType": "INTEGER(64,false)"}]}"#
         );
     };
 

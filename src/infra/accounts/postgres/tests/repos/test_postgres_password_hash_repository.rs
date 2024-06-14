@@ -7,42 +7,45 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{run_transactional, PostgresTransactionManager};
+use database_common::{DatabaseTransactionRunner, PostgresTransactionManager};
 use dill::{Catalog, CatalogBuilder};
+use internal_error::InternalError;
 use kamu_accounts_postgres::PostgresAccountRepository;
 use sqlx::PgPool;
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, postgres)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_no_password_stored(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_accounts_repo_tests::test_no_password_stored(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_no_password_stored(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, postgres)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_store_couple_account_passwords(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_accounts_repo_tests::test_store_couple_account_passwords(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_store_couple_account_passwords(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 struct PostgresAccountRepositoryHarness {
     catalog: Catalog,
@@ -62,4 +65,4 @@ impl PostgresAccountRepositoryHarness {
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////

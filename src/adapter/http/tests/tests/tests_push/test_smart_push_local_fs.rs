@@ -27,6 +27,13 @@ test_client_server_local_fs_harness_permutations!(
 
 test_client_server_local_fs_harness_permutations!(
     test_smart_push_shared,
+    test_smart_push_new_empty_dataset
+);
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+test_client_server_local_fs_harness_permutations!(
+    test_smart_push_shared,
     test_smart_push_existing_up_to_date_dataset
 );
 
@@ -35,6 +42,13 @@ test_client_server_local_fs_harness_permutations!(
 test_client_server_local_fs_harness_permutations!(
     test_smart_push_shared,
     test_smart_push_existing_evolved_dataset
+);
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+test_client_server_local_fs_harness_permutations!(
+    test_smart_push_shared,
+    test_smart_push_existing_diverged_dataset
 );
 
 /////////////////////////////////////////////////////////////////////////////////////////

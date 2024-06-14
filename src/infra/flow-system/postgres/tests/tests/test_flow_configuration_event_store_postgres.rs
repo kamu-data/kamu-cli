@@ -7,59 +7,63 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{run_transactional, PostgresTransactionManager};
+use database_common::{DatabaseTransactionRunner, PostgresTransactionManager};
 use dill::{Catalog, CatalogBuilder};
-use kamu_flow_system_postgres::FlowSystemEventStorePostgres;
+use internal_error::InternalError;
+use kamu_flow_system_postgres::FlowConfigurationEventStorePostgres;
 use sqlx::PgPool;
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, postgres)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_event_store_empty(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_flow_system_repo_tests::test_event_store_empty(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_flow_system_repo_tests::test_event_store_empty(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, postgres)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_event_store_get_streams(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_flow_system_repo_tests::test_event_store_get_streams(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_flow_system_repo_tests::test_event_store_get_streams(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(database, postgres)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_event_store_get_events_with_windowing(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, |catalog: Catalog| async move {
-        kamu_flow_system_repo_tests::test_event_store_get_events_with_windowing(&catalog).await;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_flow_system_repo_tests::test_event_store_get_events_with_windowing(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 // Harness
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 struct PostgresAccountRepositoryHarness {
     catalog: Catalog,
@@ -71,7 +75,7 @@ impl PostgresAccountRepositoryHarness {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add_value(pg_pool);
         catalog_builder.add::<PostgresTransactionManager>();
-        catalog_builder.add::<FlowSystemEventStorePostgres>();
+        catalog_builder.add::<FlowConfigurationEventStorePostgres>();
 
         Self {
             catalog: catalog_builder.build(),
@@ -79,4 +83,4 @@ impl PostgresAccountRepositoryHarness {
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////

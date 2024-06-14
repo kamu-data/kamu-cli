@@ -422,6 +422,7 @@ pub enum FetchStep {
     FilesGlob(FetchStepFilesGlob),
     Container(FetchStepContainer),
     Mqtt(FetchStepMqtt),
+    EthereumLogs(FetchStepEthereumLogs),
 }
 
 impl From<odf::FetchStep> for FetchStep {
@@ -431,6 +432,7 @@ impl From<odf::FetchStep> for FetchStep {
             odf::FetchStep::FilesGlob(v) => Self::FilesGlob(v.into()),
             odf::FetchStep::Container(v) => Self::Container(v.into()),
             odf::FetchStep::Mqtt(v) => Self::Mqtt(v.into()),
+            odf::FetchStep::EthereumLogs(v) => Self::EthereumLogs(v.into()),
         }
     }
 }
@@ -509,6 +511,25 @@ impl From<odf::FetchStepMqtt> for FetchStepMqtt {
             username: v.username.map(Into::into),
             password: v.password.map(Into::into),
             topics: v.topics.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct FetchStepEthereumLogs {
+    pub chain_id: Option<u64>,
+    pub node_url: Option<String>,
+    pub filter: Option<String>,
+    pub signature: Option<String>,
+}
+
+impl From<odf::FetchStepEthereumLogs> for FetchStepEthereumLogs {
+    fn from(v: odf::FetchStepEthereumLogs) -> Self {
+        Self {
+            chain_id: v.chain_id.map(Into::into),
+            node_url: v.node_url.map(Into::into),
+            filter: v.filter.map(Into::into),
+            signature: v.signature.map(Into::into),
         }
     }
 }

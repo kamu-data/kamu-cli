@@ -202,6 +202,7 @@ impl Command for IngestCommand {
                     PushIngestOpts {
                         media_type: self.get_media_type()?,
                         source_event_time,
+                        auto_create_push_source: false,
                     },
                     listener.clone(),
                 )

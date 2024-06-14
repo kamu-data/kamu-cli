@@ -6,12 +6,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Added
-- New `--reset-derivatives-on-diverged-input` flag to `kamu pull` command, which will trigger
-  compaction for derived dataset if transformation fails due to root dataset compaction and retry transformation
-
-## Unreleased
+- New repository `AccessTokenRepository` to work with new access tokens
+- Middleware now accept new token format `Bearer ka_*`
+- New Gql APIs to manage new access tokens
+  - `listAccessTokens` to fetch access tokens by account
+  - `createAccessToken` to create new access token for account
+  - `revokeAccessToken` to revoke existing access token
 ### Changed
 - Renamed all places compacting -> compacting
+
+## [0.187.0] - 2024-06-14
+## Added
+- The `/query` REST API endpoint now supports:
+  - POST requests with all parameters being passed via body
+  - Specifying schema format
+  - Specifying `aliases` to associate table names with specific dataset IDs
+  - Returning and providing state information to achieve full reproducibility of queries
+
+## [0.186.0] - 2024-06-13
+## Added
+- New `EthereumLogs` polling source allows to stream and decode log data directly from any ETH-compatible blockchain node
+  - See the updated `examples/reth-vs-snp500` example
+  - See the new [`datafusion-ethers`](https://github.com/kamu-data/datafusion-ethers) crate for implementation details
+- Added E2E test infrastructure
+  - Added necessary components for managed run -- for startup, operations, and shutdown
+## Changed
+- Upgraded to `arrow 52` and `datafusion 39`
+- Improved binary data formatting in CLI table output - instead of the `<binary>` placeholder it will display an abbreviated hex values e.g. `c47cf6…7e3755`
+- JSON and CSV formatters can now output binary data - it will be `hex`-encoded by default
+- Hidden arguments and options are excluded from [the CLI reference](resources/cli-reference.md)
+## Fixed
+- JSON formatter now properly supports `Decimal` types
+- Stabilized startup using connection to databases
+  - Added HTTP middleware that wraps each request into a separate transaction 
+  - Also added wrapping for some commands, in particular `kamu system generate-token`
+  - The structure of services that required lazy access to databases was reorganized:
+     - Extracted `PredefinedAccountsRegistrator` & `DatasetOwnershipServiceInMemoryStateInitializer` 
+- Fixed potential crash when attempting to rollback a transaction if the connection fails to establish
+
+## [0.185.1] - 2024-06-07
+### Fixed
+- Fixed support of `--force` mode for pull/push actions using Smart Transfer Protocol
+
+## [0.185.0] - 2024-06-06
+### Added
+- New `--reset-derivatives-on-diverged-input` flag to `kamu pull` command, which will trigger
+  compaction for derived dataset if transformation fails due to root dataset compaction and retry transformation
+- Initial support for ingestion via file uploads, with local FS and S3-based storage for temporary files  
+### Changed
+- `AddPushSource` event may omit specifying a schema. In this case, the very first push ingestion invocation 
+  would try to make a best-effort auto-inference of the data schema.
+### Fixed
+- Fixed issue with smart protocol transfer operations upon empty datasets  
 
 ## [0.184.0] - 2024-05-28
 ### Changed
@@ -20,7 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded to `datafusion v38`
 ### Added
 - Added a public image with [sqlx-cli](/images/sqlx-cli)
-- Added a [configuration](/images/persistence-storage) of running a `kamu` API server along with a database,
+- Added a [configuration](/images/persistent-storage) of running a `kamu` API server along with a database,
   for persistent storage of data
 - New `listFlowInitiators` api to fetch all initiators of flows
 - New `allPaused` method in `AccountFlowConfigs` API
@@ -35,7 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `HardCompaction` configuration now is one of `Full` or `KeepMetadataOnly` variants. In case of 
   `KeepMetadataOnly` variant required to provide `recursive` value which will trigger downstream
-  dependecnies compaction
+  dependencies compaction
 
 ## [0.182.0] - 2024-05-20
 ### Added
@@ -80,7 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.178.0] - 2024-05-04
 ### Added
-- Flow system: implemented persistent repositories (PostgresSQL, SQLite) for flow configuration events
+- Flow system: implemented persistent repositories (PostgreSQL, SQLite) for flow configuration events
 - Support for persistent accounts:
   - supports Postgres, MySQL/MariaDB, SQLite database targets
   - accounts have a fully functional DID-identifier:

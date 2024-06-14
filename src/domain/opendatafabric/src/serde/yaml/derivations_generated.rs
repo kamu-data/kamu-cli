@@ -433,6 +433,8 @@ pub enum FetchStepDef {
     Container(#[serde_as(as = "FetchStepContainerDef")] FetchStepContainer),
     #[serde(alias = "mqtt")]
     Mqtt(#[serde_as(as = "FetchStepMqttDef")] FetchStepMqtt),
+    #[serde(alias = "ethereumLogs", alias = "ethereumlogs")]
+    EthereumLogs(#[serde_as(as = "FetchStepEthereumLogsDef")] FetchStepEthereumLogs),
 }
 
 implement_serde_as!(FetchStep, FetchStepDef, "FetchStepDef");
@@ -448,6 +450,11 @@ implement_serde_as!(
     "FetchStepContainerDef"
 );
 implement_serde_as!(FetchStepMqtt, FetchStepMqttDef, "FetchStepMqttDef");
+implement_serde_as!(
+    FetchStepEthereumLogs,
+    FetchStepEthereumLogsDef,
+    "FetchStepEthereumLogsDef"
+);
 
 #[serde_as]
 #[skip_serializing_none]
@@ -511,6 +518,18 @@ pub struct FetchStepMqttDef {
     pub password: Option<String>,
     #[serde_as(as = "Vec<MqttTopicSubscriptionDef>")]
     pub topics: Vec<MqttTopicSubscription>,
+}
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "FetchStepEthereumLogs")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct FetchStepEthereumLogsDef {
+    pub chain_id: Option<u64>,
+    pub node_url: Option<String>,
+    pub filter: Option<String>,
+    pub signature: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

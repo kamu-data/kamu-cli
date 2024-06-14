@@ -19,7 +19,7 @@ macro_rules! invalid_event {
     ($e:expr, $msg:expr $(,)?) => {
         return Err(kamu_core::AppendValidationError::InvalidEvent(
             kamu_core::InvalidEventError::new($e, $msg),
-        ));
+        ))
     };
 }
 

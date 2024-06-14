@@ -8,9 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 
+use chrono::Utc;
 use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
@@ -26,6 +28,7 @@ use kamu::testing::{
 use kamu::utils::s3_context::S3Context;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::*;
 use tempfile::TempDir;
 
@@ -449,13 +452,13 @@ async fn test_dataset_sql_authorized_common(catalog: dill::Catalog, tempdir: &Te
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let statement = format!("SELECT COUNT(*) AS num_records FROM {dataset_alias}");
-    let df = query_svc
+    let res = query_svc
         .sql_statement(statement.as_str(), QueryOptions::default())
         .await
         .unwrap();
 
     kamu_data_utils::testing::assert_data_eq(
-        df,
+        res.df,
         indoc::indoc!(
             r#"
             +-------------+
@@ -527,6 +530,582 @@ async fn test_dataset_sql_unauthorized_s3() {
     let catalog =
         create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::denying()).await;
     test_dataset_sql_unauthorized_common(catalog, &s3.tmp_dir).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_sql_statement_with_state_simple() {
+    use ::datafusion::prelude::*;
+
+    let tempdir = tempfile::tempdir().unwrap();
+    let catalog = create_catalog_with_local_workspace(
+        tempdir.path(),
+        MockDatasetActionAuthorizer::allowing(),
+    );
+
+    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let ctx = SessionContext::new();
+
+    // Dataset init
+    let foo_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let foo_create = dataset_repo
+        .create_dataset(
+            &foo_alias,
+            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+                .build_typed(),
+        )
+        .await
+        .unwrap();
+    let foo_id = foo_create.dataset_handle.id;
+    let foo_dataset = foo_create.dataset;
+
+    let mut writer = DataWriterDataFusion::builder(foo_dataset.clone(), ctx.clone())
+        .with_metadata_state_scanned(None)
+        .await
+        .unwrap()
+        .build();
+
+    writer
+        .write(
+            Some(
+                ctx.read_batch(
+                    RecordBatch::try_new(
+                        Arc::new(Schema::new(vec![
+                            Field::new("cat", DataType::Utf8, false),
+                            Field::new("num", DataType::UInt64, false),
+                        ])),
+                        vec![
+                            Arc::new(StringArray::from(vec!["a", "b"])),
+                            Arc::new(UInt64Array::from(vec![1, 2])),
+                        ],
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+            ),
+            WriteDataOpts {
+                system_time: Utc::now(),
+                source_event_time: Utc::now(),
+                new_watermark: None,
+                new_source_state: None,
+                data_staging_path: tempdir.path().join(".temp-data"),
+            },
+        )
+        .await
+        .unwrap();
+
+    // Query: initial
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let res = query_svc
+        .sql_statement(
+            &format!(
+                r#"
+                select
+                    cat,
+                    sum(num) as sum
+                from {foo_alias}
+                group by cat
+                order by 1
+                "#
+            ),
+            QueryOptions::default(),
+        )
+        .await
+        .unwrap();
+
+    kamu_data_utils::testing::assert_data_eq(
+        res.df,
+        indoc::indoc!(
+            r#"
+            +-----+-----+
+            | cat | sum |
+            +-----+-----+
+            | a   | 1   |
+            | b   | 2   |
+            +-----+-----+
+            "#
+        ),
+    )
+    .await;
+
+    assert_eq!(
+        res.state.inputs,
+        BTreeMap::from([(
+            foo_id.clone(),
+            foo_dataset
+                .as_metadata_chain()
+                .resolve_ref(&BlockRef::Head)
+                .await
+                .unwrap()
+        )])
+    );
+
+    // Add more data
+    writer
+        .write(
+            Some(
+                ctx.read_batch(
+                    RecordBatch::try_new(
+                        Arc::new(Schema::new(vec![
+                            Field::new("cat", DataType::Utf8, false),
+                            Field::new("num", DataType::UInt64, false),
+                        ])),
+                        vec![
+                            Arc::new(StringArray::from(vec!["a", "b"])),
+                            Arc::new(UInt64Array::from(vec![2, 4])),
+                        ],
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+            ),
+            WriteDataOpts {
+                system_time: Utc::now(),
+                source_event_time: Utc::now(),
+                new_watermark: None,
+                new_source_state: None,
+                data_staging_path: tempdir.path().join(".temp-data"),
+            },
+        )
+        .await
+        .unwrap();
+
+    // Query: again with previous state info
+    let res = query_svc
+        .sql_statement(
+            &format!(
+                r#"
+                select
+                    cat,
+                    sum(num) as sum
+                from {foo_alias}
+                group by cat
+                order by 1
+                "#
+            ),
+            QueryOptions {
+                as_of_state: Some(res.state),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    kamu_data_utils::testing::assert_data_eq(
+        res.df,
+        indoc::indoc!(
+            r#"
+            +-----+-----+
+            | cat | sum |
+            +-----+-----+
+            | a   | 1   |
+            | b   | 2   |
+            +-----+-----+
+            "#
+        ),
+    )
+    .await;
+
+    // Query: again without state info
+    let res = query_svc
+        .sql_statement(
+            &format!(
+                r#"
+                select
+                    cat,
+                    sum(num) as sum
+                from {foo_alias}
+                group by cat
+                order by 1
+                "#
+            ),
+            QueryOptions::default(),
+        )
+        .await
+        .unwrap();
+
+    kamu_data_utils::testing::assert_data_eq(
+        res.df,
+        indoc::indoc!(
+            r#"
+            +-----+-----+
+            | cat | sum |
+            +-----+-----+
+            | a   | 3   |
+            | b   | 6   |
+            +-----+-----+
+            "#
+        ),
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_sql_statement_with_state_cte() {
+    use ::datafusion::prelude::*;
+
+    let tempdir = tempfile::tempdir().unwrap();
+    let catalog = create_catalog_with_local_workspace(
+        tempdir.path(),
+        MockDatasetActionAuthorizer::allowing(),
+    );
+
+    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let ctx = SessionContext::new();
+
+    // Dataset `foo`
+    let foo_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let foo_create = dataset_repo
+        .create_dataset(
+            &foo_alias,
+            MetadataFactory::metadata_block(
+                MetadataFactory::seed(DatasetKind::Root).id_random().build(),
+            )
+            .build_typed(),
+        )
+        .await
+        .unwrap();
+    let foo_id = foo_create.dataset_handle.id;
+    let foo_dataset = foo_create.dataset;
+
+    let mut writer_foo = DataWriterDataFusion::builder(foo_dataset.clone(), ctx.clone())
+        .with_metadata_state_scanned(None)
+        .await
+        .unwrap()
+        .build();
+
+    writer_foo
+        .write(
+            Some(
+                ctx.read_batch(
+                    RecordBatch::try_new(
+                        Arc::new(Schema::new(vec![
+                            Field::new("cat", DataType::Utf8, false),
+                            Field::new("num", DataType::UInt64, false),
+                        ])),
+                        vec![
+                            Arc::new(StringArray::from(vec!["a", "b"])),
+                            Arc::new(UInt64Array::from(vec![1, 2])),
+                        ],
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+            ),
+            WriteDataOpts {
+                system_time: Utc::now(),
+                source_event_time: Utc::now(),
+                new_watermark: None,
+                new_source_state: None,
+                data_staging_path: tempdir.path().join(".temp-data"),
+            },
+        )
+        .await
+        .unwrap();
+
+    // Dataset `bar`
+    let bar_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let bar_create = dataset_repo
+        .create_dataset(
+            &bar_alias,
+            MetadataFactory::metadata_block(
+                MetadataFactory::seed(DatasetKind::Root).id_random().build(),
+            )
+            .build_typed(),
+        )
+        .await
+        .unwrap();
+    let bar_id = bar_create.dataset_handle.id;
+    let bar_dataset = bar_create.dataset;
+
+    let mut writer_bar = DataWriterDataFusion::builder(bar_dataset.clone(), ctx.clone())
+        .with_metadata_state_scanned(None)
+        .await
+        .unwrap()
+        .build();
+
+    writer_bar
+        .write(
+            Some(
+                ctx.read_batch(
+                    RecordBatch::try_new(
+                        Arc::new(Schema::new(vec![
+                            Field::new("cat", DataType::Utf8, false),
+                            Field::new("num", DataType::UInt64, false),
+                        ])),
+                        vec![
+                            Arc::new(StringArray::from(vec!["b", "c"])),
+                            Arc::new(UInt64Array::from(vec![1, 2])),
+                        ],
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+            ),
+            WriteDataOpts {
+                system_time: Utc::now(),
+                source_event_time: Utc::now(),
+                new_watermark: None,
+                new_source_state: None,
+                data_staging_path: tempdir.path().join(".temp-data"),
+            },
+        )
+        .await
+        .unwrap();
+
+    // Query: initial
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let res = query_svc
+        .sql_statement(
+            &format!(
+                r#"
+                with concat as (
+                    select * from {foo_alias}
+                    union all
+                    select * from {bar_alias}
+                )
+                select
+                    cat,
+                    sum(num) as sum
+                from concat
+                group by cat
+                order by 1
+                "#
+            ),
+            QueryOptions::default(),
+        )
+        .await
+        .unwrap();
+
+    kamu_data_utils::testing::assert_data_eq(
+        res.df,
+        indoc::indoc!(
+            r#"
+            +-----+-----+
+            | cat | sum |
+            +-----+-----+
+            | a   | 1   |
+            | b   | 3   |
+            | c   | 2   |
+            +-----+-----+
+            "#
+        ),
+    )
+    .await;
+
+    assert_eq!(
+        res.state.inputs,
+        BTreeMap::from([
+            (
+                foo_id.clone(),
+                foo_dataset
+                    .as_metadata_chain()
+                    .resolve_ref(&BlockRef::Head)
+                    .await
+                    .unwrap()
+            ),
+            (
+                bar_id.clone(),
+                bar_dataset
+                    .as_metadata_chain()
+                    .resolve_ref(&BlockRef::Head)
+                    .await
+                    .unwrap()
+            )
+        ])
+    );
+
+    // Add more data
+    writer_foo
+        .write(
+            Some(
+                ctx.read_batch(
+                    RecordBatch::try_new(
+                        Arc::new(Schema::new(vec![
+                            Field::new("cat", DataType::Utf8, false),
+                            Field::new("num", DataType::UInt64, false),
+                        ])),
+                        vec![
+                            Arc::new(StringArray::from(vec!["a", "b"])),
+                            Arc::new(UInt64Array::from(vec![1, 2])),
+                        ],
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+            ),
+            WriteDataOpts {
+                system_time: Utc::now(),
+                source_event_time: Utc::now(),
+                new_watermark: None,
+                new_source_state: None,
+                data_staging_path: tempdir.path().join(".temp-data"),
+            },
+        )
+        .await
+        .unwrap();
+
+    writer_bar
+        .write(
+            Some(
+                ctx.read_batch(
+                    RecordBatch::try_new(
+                        Arc::new(Schema::new(vec![
+                            Field::new("cat", DataType::Utf8, false),
+                            Field::new("num", DataType::UInt64, false),
+                        ])),
+                        vec![
+                            Arc::new(StringArray::from(vec!["b", "c"])),
+                            Arc::new(UInt64Array::from(vec![1, 2])),
+                        ],
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+            ),
+            WriteDataOpts {
+                system_time: Utc::now(),
+                source_event_time: Utc::now(),
+                new_watermark: None,
+                new_source_state: None,
+                data_staging_path: tempdir.path().join(".temp-data"),
+            },
+        )
+        .await
+        .unwrap();
+
+    // Query: new data
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let res2 = query_svc
+        .sql_statement(
+            &format!(
+                r#"
+                with concat as (
+                    select * from {foo_alias}
+                    union all
+                    select * from {bar_alias}
+                )
+                select
+                    cat,
+                    sum(num) as sum
+                from concat
+                group by cat
+                order by 1
+                "#
+            ),
+            QueryOptions::default(),
+        )
+        .await
+        .unwrap();
+
+    kamu_data_utils::testing::assert_data_eq(
+        res2.df,
+        indoc::indoc!(
+            r#"
+            +-----+-----+
+            | cat | sum |
+            +-----+-----+
+            | a   | 2   |
+            | b   | 6   |
+            | c   | 4   |
+            +-----+-----+
+            "#
+        ),
+    )
+    .await;
+
+    // Query: new data again but with original state
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let res2 = query_svc
+        .sql_statement(
+            &format!(
+                r#"
+                with concat as (
+                    select * from {foo_alias}
+                    union all
+                    select * from {bar_alias}
+                )
+                select
+                    cat,
+                    sum(num) as sum
+                from concat
+                group by cat
+                order by 1
+                "#
+            ),
+            QueryOptions {
+                as_of_state: Some(res.state.clone()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    kamu_data_utils::testing::assert_data_eq(
+        res2.df,
+        indoc::indoc!(
+            r#"
+            +-----+-----+
+            | cat | sum |
+            +-----+-----+
+            | a   | 1   |
+            | b   | 3   |
+            | c   | 2   |
+            +-----+-----+
+            "#
+        ),
+    )
+    .await;
+
+    // Query: query with prev state again, but now also with aliases
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let res2 = query_svc
+        .sql_statement(
+            r#"
+            with concat as (
+                select * from fooz
+                union all
+                select * from barz
+            )
+            select
+                cat,
+                sum(num) as sum
+            from concat
+            group by cat
+            order by 1
+            "#,
+            QueryOptions {
+                aliases: Some(BTreeMap::from([
+                    ("fooz".to_string(), foo_id.clone()),
+                    ("barz".to_string(), bar_id.clone()),
+                ])),
+                as_of_state: Some(res.state),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    kamu_data_utils::testing::assert_data_eq(
+        res2.df,
+        indoc::indoc!(
+            r#"
+            +-----+-----+
+            | cat | sum |
+            +-----+-----+
+            | a   | 1   |
+            | b   | 3   |
+            | c   | 2   |
+            +-----+-----+
+            "#
+        ),
+    )
+    .await;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

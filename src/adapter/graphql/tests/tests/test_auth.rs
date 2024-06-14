@@ -8,12 +8,20 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::value;
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
+use indoc::indoc;
 use kamu_accounts::{
     AuthenticationService,
     MockAuthenticationService,
+    DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME_STR,
     DUMMY_LOGIN_METHOD,
 };
+use kamu_accounts_inmem::AccessTokenRepositoryInMemory;
+use kamu_accounts_services::AccessTokenServiceImpl;
+use kamu_core::SystemTimeSourceDefault;
+
+use crate::utils::authentication_catalogs;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -60,10 +68,7 @@ async fn test_enabled_login_methods() {
         .expect_supported_login_methods()
         .return_once(|| vec![DUMMY_LOGIN_METHOD]);
 
-    let cat = dill::CatalogBuilder::new()
-        .add_value(mock_authentication_service)
-        .bind::<dyn AuthenticationService, MockAuthenticationService>()
-        .build();
+    let harness = AuthGQLHarness::new(mock_authentication_service).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -77,7 +82,7 @@ async fn test_enabled_login_methods() {
                 }
                 "#,
             )
-            .data(cat),
+            .data(harness.catalog_base),
         )
         .await;
 
@@ -96,13 +101,12 @@ async fn test_enabled_login_methods() {
 
 #[test_log::test(tokio::test)]
 async fn test_login() {
-    let cat = dill::CatalogBuilder::new()
-        .add_value(MockAuthenticationService::built_in())
-        .bind::<dyn AuthenticationService, MockAuthenticationService>()
-        .build();
+    let harness = AuthGQLHarness::new(MockAuthenticationService::built_in()).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema.execute(make_login_request().data(cat)).await;
+    let res = schema
+        .execute(make_login_request().data(harness.catalog_base))
+        .await;
 
     assert!(res.is_ok(), "{res:?}");
     assert_eq!(
@@ -124,13 +128,12 @@ async fn test_login() {
 
 #[test_log::test(tokio::test)]
 async fn test_login_bad_method() {
-    let cat = dill::CatalogBuilder::new()
-        .add_value(MockAuthenticationService::unsupported_login_method())
-        .bind::<dyn AuthenticationService, MockAuthenticationService>()
-        .build();
+    let harness = AuthGQLHarness::new(MockAuthenticationService::unsupported_login_method()).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema.execute(make_login_request().data(cat)).await;
+    let res = schema
+        .execute(make_login_request().data(harness.catalog_base))
+        .await;
 
     assert!(res.is_err());
     assert_eq!(res.errors.len(), 1);
@@ -144,14 +147,11 @@ async fn test_login_bad_method() {
 
 #[test_log::test(tokio::test)]
 async fn test_account_details() {
-    let cat = dill::CatalogBuilder::new()
-        .add_value(MockAuthenticationService::built_in())
-        .bind::<dyn AuthenticationService, MockAuthenticationService>()
-        .build();
+    let harness = AuthGQLHarness::new(MockAuthenticationService::built_in()).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
-        .execute(make_account_details_request().data(cat))
+        .execute(make_account_details_request().data(harness.catalog_base))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -171,14 +171,11 @@ async fn test_account_details() {
 
 #[test_log::test(tokio::test)]
 async fn test_account_details_expired_token() {
-    let cat = dill::CatalogBuilder::new()
-        .add_value(MockAuthenticationService::expired_token())
-        .bind::<dyn AuthenticationService, MockAuthenticationService>()
-        .build();
+    let harness = AuthGQLHarness::new(MockAuthenticationService::expired_token()).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
-        .execute(make_account_details_request().data(cat))
+        .execute(make_account_details_request().data(harness.catalog_base))
         .await;
 
     assert!(res.is_err());
@@ -186,4 +183,212 @@ async fn test_account_details_expired_token() {
     assert_eq!(res.errors[0].message, "Access token error".to_string());
 }
 
+///////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_create_and_get_access_token() {
+    let harness = AuthGQLHarness::new(MockAuthenticationService::expired_token()).await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let mutation_code = AuthGQLHarness::create_access_token(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok());
+
+    let json = serde_json::to_string(&res.data).unwrap();
+    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+
+    let created_token_id = json["auth"]["createAccessToken"]["id"].clone();
+
+    let query_code = AuthGQLHarness::get_access_tokens(&DEFAULT_ACCOUNT_ID.to_string());
+    let res = schema
+        .execute(async_graphql::Request::new(query_code.clone()).data(harness.catalog_authorized))
+        .await;
+
+    assert_eq!(
+        res.data,
+        value!({
+            "auth": {
+                "listAccessTokens": {
+                    "nodes": [{
+                        "id": created_token_id,
+                        "name": "foo",
+                        "revokedAt": null
+                    }]
+                }
+            }
+        })
+    );
+
+    let mutation_code = AuthGQLHarness::create_access_token(&DEFAULT_ACCOUNT_ID.to_string(), "bar");
+
+    let res = schema
+        .execute(async_graphql::Request::new(mutation_code.clone()).data(harness.catalog_anonymous))
+        .await;
+
+    assert!(res.is_err());
+    assert_eq!(res.errors.len(), 1);
+    assert_eq!(res.errors[0].message, "Account access error".to_string());
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_revoke_access_token() {
+    let harness = AuthGQLHarness::new(MockAuthenticationService::expired_token()).await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let mutation_code = AuthGQLHarness::create_access_token(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok());
+
+    let json = serde_json::to_string(&res.data).unwrap();
+    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+
+    let created_token_id = json["auth"]["createAccessToken"]["id"].clone();
+
+    let mutation_code = AuthGQLHarness::revoke_access_token(&created_token_id.to_string());
+
+    let res = schema
+        .execute(async_graphql::Request::new(mutation_code.clone()).data(harness.catalog_anonymous))
+        .await;
+
+    assert!(res.is_err());
+    assert_eq!(res.errors.len(), 1);
+    assert_eq!(
+        res.errors[0].message,
+        "Access token access error".to_string()
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok());
+    assert_eq!(
+        res.data,
+        value!({
+            "auth": {
+                "revokeAccessToken": "SUCCESS"
+            }
+        })
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok());
+    assert_eq!(
+        res.data,
+        value!({
+            "auth": {
+                "revokeAccessToken": "ALREADY_REVOKED"
+            }
+        })
+    );
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////
+
+struct AuthGQLHarness {
+    catalog_anonymous: dill::Catalog,
+    catalog_authorized: dill::Catalog,
+    catalog_base: dill::Catalog,
+}
+
+impl AuthGQLHarness {
+    async fn new(mock_authentication_service: MockAuthenticationService) -> Self {
+        let catalog_base = {
+            let mut b = dill::CatalogBuilder::new();
+
+            b.add_value(mock_authentication_service)
+                .bind::<dyn AuthenticationService, MockAuthenticationService>()
+                .add::<SystemTimeSourceDefault>()
+                .add::<AccessTokenServiceImpl>()
+                .add::<AccessTokenRepositoryInMemory>()
+                .add::<DatabaseTransactionRunner>();
+
+            NoOpDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
+
+        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
+
+        Self {
+            catalog_anonymous,
+            catalog_authorized,
+            catalog_base,
+        }
+    }
+
+    fn create_access_token(account_id: &str, token_name: &str) -> String {
+        indoc!(
+            r#"
+            mutation {
+                auth {
+                    createAccessToken (accountId: "<account_id>", tokenName: "<token_name>") {
+                        id,
+                        name,
+                        composed
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<account_id>", account_id)
+        .replace("<token_name>", token_name)
+    }
+
+    fn revoke_access_token(token_id: &str) -> String {
+        indoc!(
+            r#"
+            mutation {
+                auth {
+                    revokeAccessToken (tokenId: <token_id>)
+                }
+            }
+            "#
+        )
+        .replace("<token_id>", token_id)
+    }
+
+    fn get_access_tokens(account_id: &str) -> String {
+        indoc!(
+            r#"
+            query {
+                auth {
+                    listAccessTokens (accountId: "<account_id>", perPage: 10, page: 0) {
+                        nodes {
+                            id,
+                            name,
+                            revokedAt
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<account_id>", account_id)
+    }
+}

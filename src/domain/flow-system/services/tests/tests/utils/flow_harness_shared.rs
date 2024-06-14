@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
 use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, MockDatasetChangesService};
@@ -21,8 +22,13 @@ use kamu_accounts::{
     JwtAuthenticationConfig,
     PredefinedAccountsConfig,
 };
-use kamu_accounts_inmem::AccountRepositoryInMemory;
-use kamu_accounts_services::AuthenticationServiceImpl;
+use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
+use kamu_accounts_services::{
+    AccessTokenServiceImpl,
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
@@ -67,11 +73,11 @@ pub(crate) struct FlowHarnessOverrides {
 }
 
 impl FlowHarness {
-    pub fn new() -> Self {
-        Self::with_overrides(FlowHarnessOverrides::default())
+    pub async fn new() -> Self {
+        Self::with_overrides(FlowHarnessOverrides::default()).await
     }
 
-    pub fn with_overrides(overrides: FlowHarnessOverrides) -> Self {
+    pub async fn with_overrides(overrides: FlowHarnessOverrides) -> Self {
         let tmp_dir = tempfile::tempdir().unwrap();
         let datasets_dir = tmp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -101,38 +107,62 @@ impl FlowHarness {
             predefined_accounts_config
         };
 
-        let catalog = CatalogBuilder::new()
-            .add::<EventBus>()
-            .add_value(FlowServiceRunConfig::new(
-                awaiting_step,
-                mandatory_throttling_period,
-            ))
-            .add::<FlowServiceImpl>()
-            .add::<FlowEventStoreInMem>()
-            .add::<FlowConfigurationServiceImpl>()
-            .add::<FlowConfigurationEventStoreInMem>()
-            .add_value(fake_system_time_source.clone())
-            .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(overrides.is_multi_tenant),
-            )
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_value(mock_dataset_changes)
-            .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<AuthenticationServiceImpl>()
-            .add_value(predefined_accounts_config)
-            .add_value(JwtAuthenticationConfig::default())
-            .add::<AccountRepositoryInMemory>()
-            .add::<DependencyGraphServiceInMemory>()
-            .add::<DatasetOwnershipServiceInMemory>()
-            .add::<TaskSchedulerImpl>()
-            .add::<TaskSystemEventStoreInMemory>()
-            .add::<FlowSystemTestListener>()
-            .build();
+        let catalog = {
+            let mut b = dill::CatalogBuilder::new();
+
+            b.add::<EventBus>()
+                .add_value(FlowServiceRunConfig::new(
+                    awaiting_step,
+                    mandatory_throttling_period,
+                ))
+                .add::<FlowServiceImpl>()
+                .add::<FlowEventStoreInMem>()
+                .add::<FlowConfigurationServiceImpl>()
+                .add::<FlowConfigurationEventStoreInMem>()
+                .add_value(fake_system_time_source.clone())
+                .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
+                .add_builder(
+                    DatasetRepositoryLocalFs::builder()
+                        .with_root(datasets_dir)
+                        .with_multi_tenant(overrides.is_multi_tenant),
+                )
+                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .add_value(mock_dataset_changes)
+                .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
+                .add_value(CurrentAccountSubject::new_test())
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<AuthenticationServiceImpl>()
+                .add_value(predefined_accounts_config)
+                .add_value(JwtAuthenticationConfig::default())
+                .add::<AccountRepositoryInMemory>()
+                .add::<AccessTokenServiceImpl>()
+                .add::<AccessTokenRepositoryInMemory>()
+                .add::<DependencyGraphServiceInMemory>()
+                .add::<DatasetOwnershipServiceInMemory>()
+                .add::<TaskSchedulerImpl>()
+                .add::<TaskSystemEventStoreInMemory>()
+                .add::<FlowSystemTestListener>()
+                .add::<LoginPasswordAuthProvider>()
+                .add::<PredefinedAccountsRegistrator>()
+                .add::<DatabaseTransactionRunner>();
+
+            NoOpDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
+
+        DatabaseTransactionRunner::new(catalog.clone())
+            .transactional(|transactional_catalog| async move {
+                let registrator = transactional_catalog
+                    .get_one::<PredefinedAccountsRegistrator>()
+                    .unwrap();
+
+                registrator
+                    .ensure_predefined_accounts_are_registered()
+                    .await
+            })
+            .await
+            .unwrap();
 
         let flow_service = catalog.get_one::<dyn FlowService>().unwrap();
         let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
@@ -196,6 +226,7 @@ impl FlowHarness {
             .unwrap();
         let dependency_graph_repository =
             DependencyGraphRepositoryInMemory::new(self.dataset_repo.clone());
+
         dependency_graph_service
             .eager_initialization(&dependency_graph_repository)
             .await
@@ -205,8 +236,10 @@ impl FlowHarness {
             .catalog
             .get_one::<dyn DatasetOwnershipService>()
             .unwrap();
+        let authentication_service = self.catalog.get_one::<dyn AuthenticationService>().unwrap();
+
         dataset_ownership_service
-            .eager_initialization()
+            .eager_initialization(&authentication_service)
             .await
             .unwrap();
     }

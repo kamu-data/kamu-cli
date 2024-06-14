@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use datafusion::arrow::array::{ArrayRef, Int32Array, UInt8Array};
+use datafusion::arrow::array::{Int32Array, UInt8Array};
 use datafusion::arrow::datatypes::DataType;
 use kamu::domain::QueryService;
 use opendatafabric::*;
@@ -60,7 +60,7 @@ impl Command for TailCommand {
                     // TODO: `RecordsFormat` should allow specifying column formats by name, not
                     // only positionally
                     ColumnFormat::default(),
-                    ColumnFormat::default().with_value_fmt(|array: &ArrayRef, row: usize| {
+                    ColumnFormat::default().with_value_fmt(|array, row, _| {
                         let err = Err(InvalidOperationType(0));
                         let op = match array.data_type() {
                             DataType::UInt8 => array

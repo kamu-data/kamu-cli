@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod access_token;
 mod account;
 mod data_batch;
 mod data_query;
@@ -25,6 +26,7 @@ mod pagination;
 mod task_id;
 mod task_status_outcome;
 
+pub(crate) use access_token::*;
 pub(crate) use account::*;
 pub(crate) use data_batch::*;
 pub(crate) use data_query::*;

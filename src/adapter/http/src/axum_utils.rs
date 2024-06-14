@@ -11,6 +11,15 @@
 // Errors
 /////////////////////////////////////////////////////////////////////////////////
 
+use dill::Catalog;
+use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
+use opendatafabric::AccountID;
+use thiserror::Error;
+
+use crate::api_error::{ApiError, IntoApiError};
+
+/////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn bad_request_response() -> axum::response::Response {
     error_response(http::status::StatusCode::BAD_REQUEST)
 }
@@ -62,6 +71,41 @@ pub(crate) fn body_into_async_read(
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
         .into_async_read()
         .compat()
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error("{reason}")]
+pub struct AnonymousAccessError {
+    pub reason: &'static str,
+}
+
+impl IntoApiError for AnonymousAccessError {
+    fn api_err(self) -> ApiError {
+        ApiError::new_unauthorized_from(self)
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+pub fn ensure_authenticated_account(catalog: &Catalog) -> Result<AccountID, AnonymousAccessError> {
+    let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
+
+    match current_account_subject.as_ref() {
+        CurrentAccountSubject::Logged(l) => Ok(l.account_id.clone()),
+        CurrentAccountSubject::Anonymous(reason) => Err(match reason {
+            AnonymousAccountReason::AuthenticationExpired => AnonymousAccessError {
+                reason: "Authentication token expired",
+            },
+            AnonymousAccountReason::AuthenticationInvalid => AnonymousAccessError {
+                reason: "Authentication token invalid",
+            },
+            AnonymousAccountReason::NoAuthenticationProvided => AnonymousAccessError {
+                reason: "No authentication token provided",
+            },
+        }),
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////

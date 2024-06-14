@@ -35,12 +35,14 @@ sqlx = { version = "0.7", default-features = false, features = [
     "macros",
     "sqlite",
     "chrono"
-]}
+] }
 thiserror = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }
+uuid = "1"
 
 
 [dev-dependencies]
+internal-error = { workspace = true }
 kamu-accounts-repo-tests = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }

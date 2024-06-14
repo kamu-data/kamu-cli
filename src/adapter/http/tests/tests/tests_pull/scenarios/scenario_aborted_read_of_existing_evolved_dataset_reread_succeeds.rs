@@ -100,6 +100,7 @@ impl<TServerHarness: ServerSideHarness>
             server_repo.as_ref(),
             &server_dataset_ref,
             &server_dataset_layout,
+            None,
         )
         .await;
 

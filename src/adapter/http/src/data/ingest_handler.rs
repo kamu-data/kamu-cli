@@ -18,18 +18,28 @@
 
 use axum::extract::{Extension, Query};
 use chrono::{DateTime, Utc};
+use dill::Catalog;
 use http::HeaderMap;
 use kamu::domain::*;
 use opendatafabric::DatasetRef;
+use tokio::io::AsyncRead;
 
 use crate::api_error::*;
+use crate::axum_utils::ensure_authenticated_account;
+use crate::{upload_token_into_stream, UploadService, UploadTokenIntoStreamError};
 
 /////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct IngestParams {
+pub struct IngestQueryParams {
     source_name: Option<String>,
+    upload_token: Option<String>,
+}
+
+struct IngestTaskArguments {
+    data_stream: Box<dyn AsyncRead + Send + Unpin>,
+    media_type: Option<MediaType>,
 }
 
 // TODO: SEC: Enforce a size limit on payload
@@ -44,29 +54,44 @@ pub struct IngestParams {
 pub async fn dataset_ingest_handler(
     Extension(catalog): Extension<dill::Catalog>,
     Extension(dataset_ref): Extension<DatasetRef>,
-    Query(params): Query<IngestParams>,
+    Query(params): Query<IngestQueryParams>,
     headers: HeaderMap,
     body_stream: axum::extract::BodyStream,
 ) -> Result<(), ApiError> {
-    let data = Box::new(crate::axum_utils::body_into_async_read(body_stream));
-    let ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
+    let arguments = if params.upload_token.is_some() {
+        resolve_ready_upload_arguments(&catalog, &params).await?
+    } else {
+        let media_type = headers
+            .get(http::header::CONTENT_TYPE)
+            .map(|h| MediaType(h.to_str().unwrap().to_string()));
 
-    let media_type = headers
-        .get(http::header::CONTENT_TYPE)
-        .map(|h| MediaType(h.to_str().unwrap().to_string()));
+        let data = Box::new(crate::axum_utils::body_into_async_read(body_stream));
+
+        IngestTaskArguments {
+            data_stream: data,
+            media_type,
+        }
+    };
 
     // TODO: Settle on the header name and document it
     let source_event_time: Option<DateTime<Utc>> =
-        get_header(&headers, "odf-event-time", DateTime::parse_from_rfc3339)?.map(Into::into);
+        get_header(&headers, "odf-event-time", DateTime::parse_from_rfc3339)?
+            .map(Into::into)
+            .or_else(|| {
+                let time_source = catalog.get_one::<dyn SystemTimeSource>().unwrap();
+                Some(time_source.now())
+            });
 
+    let ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
     match ingest_svc
         .ingest_from_file_stream(
             &dataset_ref,
             params.source_name.as_deref(),
-            data,
+            arguments.data_stream,
             PushIngestOpts {
-                media_type,
+                media_type: arguments.media_type,
                 source_event_time,
+                auto_create_push_source: params.upload_token.is_some(),
             },
             None,
         )
@@ -86,6 +111,35 @@ pub async fn dataset_ingest_handler(
 
 /////////////////////////////////////////////////////////////////////////////////
 
+async fn resolve_ready_upload_arguments(
+    catalog: &Catalog,
+    params: &IngestQueryParams,
+) -> Result<IngestTaskArguments, ApiError> {
+    let upload_token = params
+        .upload_token
+        .as_ref()
+        .expect("Upload token must be present");
+
+    let account_id = ensure_authenticated_account(catalog).api_err()?;
+
+    let upload_svc = catalog.get_one::<dyn UploadService>().unwrap();
+
+    let (data_stream, media_type) =
+        upload_token_into_stream(upload_svc.as_ref(), &account_id, upload_token)
+            .await
+            .map_err(|e| match e {
+                UploadTokenIntoStreamError::ContentLengthMismatch(e) => ApiError::bad_request(e),
+                UploadTokenIntoStreamError::Internal(e) => e.api_err(),
+            })?;
+
+    Ok(IngestTaskArguments {
+        data_stream,
+        media_type: Some(media_type),
+    })
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
 fn get_header<T, E: std::error::Error + Send + Sync + 'static>(
     headers: &HeaderMap,
     key: &str,
@@ -99,3 +153,5 @@ fn get_header<T, E: std::error::Error + Send + Sync + 'static>(
 
     parse(v).map(Some).map_err(ApiError::bad_request)
 }
+
+/////////////////////////////////////////////////////////////////////////////////

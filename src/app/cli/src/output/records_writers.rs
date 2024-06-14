@@ -17,7 +17,7 @@ use datafusion::arrow::util::display::array_value_to_string;
 use kamu_data_utils::data::format::WriterError;
 pub use kamu_data_utils::data::format::{
     CsvWriter,
-    CsvWriterBuilder,
+    CsvWriterOptions,
     JsonArrayOfArraysWriter,
     JsonArrayOfStructsWriter,
     JsonLineDelimitedWriter,
@@ -70,60 +70,61 @@ impl RecordsFormat {
         }
     }
 
-    pub fn get_style_spec(&self, _row: usize, column: usize, _array: &ArrayRef) -> &str {
-        self.column_formats
-            .get(column)
-            .and_then(|cf| cf.style_spec.as_ref())
-            .or(self.default_column_format.style_spec.as_ref())
-            .map(String::as_str)
-            .unwrap()
+    pub fn get_column_format(&self, col: usize) -> ColumnFormatRef {
+        let cfmt = self.column_formats.get(col);
+
+        ColumnFormatRef {
+            style_spec: cfmt
+                .and_then(|f| f.style_spec.as_ref())
+                .or(self.default_column_format.style_spec.as_ref()),
+            null_value: cfmt
+                .and_then(|f| f.null_value.as_ref())
+                .or(self.default_column_format.null_value.as_ref()),
+            max_len: cfmt
+                .and_then(|f| f.max_len)
+                .or(self.default_column_format.max_len),
+            max_bin_len: cfmt
+                .and_then(|f| f.max_bin_len)
+                .or(self.default_column_format.max_bin_len),
+            value_fmt: cfmt
+                .and_then(|f| f.value_fmt.as_ref())
+                .or(self.default_column_format.value_fmt.as_ref()),
+        }
     }
 
     // TODO: PERF: Rethink into a columnar approach
     pub fn format(&self, row: usize, col: usize, array: &ArrayRef) -> String {
         use datafusion::arrow::array::*;
 
+        let column_fmt = self.get_column_format(col);
+
         // Check for null
-        let null_value = self
-            .column_formats
-            .get(col)
-            .and_then(|cf| cf.null_value.as_ref())
-            .or(self.default_column_format.null_value.as_ref())
-            .unwrap();
-
         if array.is_null(row) {
-            return null_value.clone();
-        }
-
-        // Check for binary data
-        match array.data_type() {
-            DataType::Binary
-            | DataType::LargeBinary
-            | DataType::List(_)
-            | DataType::LargeList(_) => {
-                let binary_placeholder = self
-                    .column_formats
-                    .get(col)
-                    .and_then(|cf| cf.binary_placeholder.as_ref())
-                    .or(self.default_column_format.binary_placeholder.as_ref());
-
-                if let Some(binary_placeholder) = binary_placeholder {
-                    return binary_placeholder.clone();
-                }
-            }
-            _ => (),
+            return column_fmt.null_value.unwrap().clone();
         }
 
         // Format value
-        let mut value = if let Some(value_fmt) = self
-            .column_formats
-            .get(col)
-            .and_then(|cf| cf.value_fmt.as_ref())
-            .or(self.default_column_format.value_fmt.as_ref())
-        {
-            value_fmt(array, row)
+        let mut value = if let Some(value_fmt) = column_fmt.value_fmt {
+            (*value_fmt)(array, row, &column_fmt)
         } else {
-            array_value_to_string(array, row).unwrap()
+            match array.data_type() {
+                DataType::Utf8 => {
+                    Self::format_str(downcast_array::<StringArray>(array).value(row), &column_fmt)
+                }
+                DataType::LargeUtf8 => Self::format_str(
+                    downcast_array::<LargeStringArray>(array).value(row),
+                    &column_fmt,
+                ),
+                DataType::Binary => Self::format_binary(
+                    downcast_array::<BinaryArray>(array).value(row),
+                    &column_fmt,
+                ),
+                DataType::LargeBinary => Self::format_binary(
+                    downcast_array::<LargeBinaryArray>(array).value(row),
+                    &column_fmt,
+                ),
+                _ => array_value_to_string(array, row).unwrap(),
+            }
         };
 
         // Truncate to limit
@@ -138,12 +139,39 @@ impl RecordsFormat {
             if value.len() > max_len {
                 if let Some((byte_index, _)) = value.char_indices().nth(max_len) {
                     value.truncate(byte_index);
-                    value.push_str("...");
+                    value.push('…');
                 }
             }
         }
 
         value
+    }
+
+    fn format_str(v: &str, fmt: &ColumnFormatRef) -> String {
+        let max_len = fmt.max_len.unwrap_or(usize::MAX);
+
+        if v.len() <= max_len {
+            v.to_string()
+        } else {
+            // TODO: Account for UTF
+            let half_len = max_len / 2;
+            let head = &v[..half_len];
+            let tail = &v[usize::max(half_len, v.len() - half_len)..];
+            format!("{head}…{tail}")
+        }
+    }
+
+    fn format_binary(v: &[u8], fmt: &ColumnFormatRef) -> String {
+        let max_len = fmt.max_bin_len.or(fmt.max_len).unwrap_or(usize::MAX);
+        let max_len_bin = max_len / 2;
+        if v.len() <= max_len_bin {
+            hex::encode(v)
+        } else {
+            let half_len_bin = max_len_bin / 2;
+            let head = &v[..half_len_bin];
+            let tail = &v[usize::max(half_len_bin, v.len() - half_len_bin)..];
+            format!("{}…{}", hex::encode(head), hex::encode(tail))
+        }
     }
 }
 
@@ -154,22 +182,22 @@ impl Default for RecordsFormat {
             default_column_format: ColumnFormat::new()
                 .with_style_spec("r")
                 .with_null_value("")
-                .with_binary_placeholder("<binary>")
-                .with_max_len(90),
+                .with_max_len(90)
+                .with_max_binary_len(13),
         }
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-type ValueFormatterCallback = Box<dyn Fn(&ArrayRef, usize) -> String>;
+type ValueFormatterCallback = Box<dyn Fn(&ArrayRef, usize, &ColumnFormatRef) -> String>;
 
 #[derive(Default)]
 pub struct ColumnFormat {
     style_spec: Option<String>,
     null_value: Option<String>,
-    binary_placeholder: Option<String>,
     max_len: Option<usize>,
+    max_bin_len: Option<usize>,
     value_fmt: Option<ValueFormatterCallback>,
 }
 
@@ -192,13 +220,8 @@ impl ColumnFormat {
         }
     }
 
-    pub fn with_binary_placeholder(self, binary_placeholder: impl Into<String>) -> Self {
-        Self {
-            binary_placeholder: Some(binary_placeholder.into()),
-            ..self
-        }
-    }
-
+    /// Determines maximum length of the formatted value in its textual
+    /// representation
     pub fn with_max_len(self, max_len: usize) -> Self {
         Self {
             max_len: Some(max_len),
@@ -206,9 +229,18 @@ impl ColumnFormat {
         }
     }
 
+    /// Specialization of max length for binary fields (length given is still in
+    /// textual hex representation)
+    pub fn with_max_binary_len(self, max_bin_len: usize) -> Self {
+        Self {
+            max_bin_len: Some(max_bin_len),
+            ..self
+        }
+    }
+
     pub fn with_value_fmt<F>(self, value_fmt: F) -> Self
     where
-        F: Fn(&ArrayRef, usize) -> String + 'static,
+        F: Fn(&ArrayRef, usize, &ColumnFormatRef) -> String + 'static,
     {
         Self {
             value_fmt: Some(Box::new(value_fmt)),
@@ -219,15 +251,11 @@ impl ColumnFormat {
     pub fn with_value_fmt_t<T: 'static>(self, value_fmt_t: fn(T) -> String) -> Self {
         let value_fmt_t: Box<dyn Any> = Box::new(value_fmt_t);
         Self {
-            value_fmt: Some(Box::new(move |array, row| {
+            value_fmt: Some(Box::new(move |array, row, _| {
                 Self::value_fmt_t(array, row, value_fmt_t.as_ref(), std::any::type_name::<T>())
             })),
             ..self
         }
-    }
-
-    pub fn get_style_spec(&self) -> Option<&str> {
-        self.style_spec.as_deref()
     }
 
     fn value_fmt_t(
@@ -270,9 +298,25 @@ impl ColumnFormat {
                 }
                 _ => unimplemented!(),
             },
+            DataType::Utf8 => format_typed!(StringArray, &str, type_name, array, value_fmt, row),
+            DataType::LargeUtf8 => {
+                format_typed!(LargeStringArray, &str, type_name, array, value_fmt, row)
+            }
+            DataType::Binary => format_typed!(BinaryArray, &[u8], type_name, array, value_fmt, row),
+            DataType::LargeBinary => {
+                format_typed!(BinaryArray, &[u8], type_name, array, value_fmt, row)
+            }
             _ => unimplemented!(),
         }
     }
+}
+
+pub struct ColumnFormatRef<'a> {
+    style_spec: Option<&'a String>,
+    null_value: Option<&'a String>,
+    max_len: Option<usize>,
+    max_bin_len: Option<usize>,
+    value_fmt: Option<&'a ValueFormatterCallback>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -343,7 +387,7 @@ where
             for col in 0..records.num_columns() {
                 let array = records.column(col);
 
-                let style_spec = self.format.get_style_spec(row, col, array);
+                let style_spec = self.format.get_column_format(col).style_spec.unwrap();
                 let value = self.format.format(row, col, array);
                 cells.push(Cell::new(&value).style_spec(style_spec));
             }

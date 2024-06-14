@@ -27,11 +27,13 @@ pub struct OutputConfig {
 impl OutputConfig {
     pub fn get_records_writer(&self, fmt: RecordsFormat) -> Box<dyn RecordsWriter> {
         match self.format {
-            OutputFormat::Csv => Box::new(
-                CsvWriterBuilder::new()
-                    .with_header(true)
-                    .build(std::io::stdout()),
-            ),
+            OutputFormat::Csv => Box::new(CsvWriter::new(
+                std::io::stdout(),
+                CsvWriterOptions {
+                    header: true,
+                    ..Default::default()
+                },
+            )),
             OutputFormat::Json => Box::new(JsonArrayOfStructsWriter::new(std::io::stdout())),
             OutputFormat::JsonSoA => {
                 Box::new(JsonStructOfArraysWriter::new(std::io::stdout(), usize::MAX))

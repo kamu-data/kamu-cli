@@ -113,7 +113,7 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             Ok(None) => {
                 return Err(ProviderLoginError::RejectedCredentials(
                     RejectedCredentialsError {},
-                ))
+                ));
             }
 
             // Internal issue => error

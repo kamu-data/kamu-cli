@@ -666,6 +666,10 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::FetchStep> for odf::FetchStep {
                 fb::FetchStep::FetchStepMqtt,
                 v.serialize(fb).as_union_value(),
             ),
+            odf::FetchStep::EthereumLogs(v) => (
+                fb::FetchStep::FetchStepEthereumLogs,
+                v.serialize(fb).as_union_value(),
+            ),
         }
     }
 }
@@ -691,6 +695,11 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::FetchStep> for odf::FetchStep {
             fb::FetchStep::FetchStepMqtt => {
                 odf::FetchStep::Mqtt(odf::FetchStepMqtt::deserialize(unsafe {
                     fb::FetchStepMqtt::init_from_table(table)
+                }))
+            }
+            fb::FetchStep::FetchStepEthereumLogs => {
+                odf::FetchStep::EthereumLogs(odf::FetchStepEthereumLogs::deserialize(unsafe {
+                    fb::FetchStepEthereumLogs::init_from_table(table)
                 }))
             }
             _ => panic!("Invalid enum value: {}", t.0),
@@ -859,6 +868,33 @@ impl<'fb> FlatbuffersDeserializable<fb::FetchStepMqtt<'fb>> for odf::FetchStepMq
                         .collect()
                 })
                 .unwrap(),
+        }
+    }
+}
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::FetchStepEthereumLogs {
+    type OffsetT = WIPOffset<fb::FetchStepEthereumLogs<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let node_url_offset = self.node_url.as_ref().map(|v| fb.create_string(&v));
+        let filter_offset = self.filter.as_ref().map(|v| fb.create_string(&v));
+        let signature_offset = self.signature.as_ref().map(|v| fb.create_string(&v));
+        let mut builder = fb::FetchStepEthereumLogsBuilder::new(fb);
+        self.chain_id.map(|v| builder.add_chain_id(v));
+        node_url_offset.map(|off| builder.add_node_url(off));
+        filter_offset.map(|off| builder.add_filter(off));
+        signature_offset.map(|off| builder.add_signature(off));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::FetchStepEthereumLogs<'fb>> for odf::FetchStepEthereumLogs {
+    fn deserialize(proxy: fb::FetchStepEthereumLogs<'fb>) -> Self {
+        odf::FetchStepEthereumLogs {
+            chain_id: proxy.chain_id().map(|v| v),
+            node_url: proxy.node_url().map(|v| v.to_owned()),
+            filter: proxy.filter().map(|v| v.to_owned()),
+            signature: proxy.signature().map(|v| v.to_owned()),
         }
     }
 }

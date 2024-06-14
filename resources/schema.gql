@@ -7,6 +7,28 @@
 
 directive @oneOf on INPUT_OBJECT
 
+type AccessTokenConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [ViewAccessToken!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [AccessTokenEdge!]!
+}
+
+type AccessTokenEdge {
+	node: ViewAccessToken!
+}
+
+scalar AccessTokenID
+
 type Account {
 	"""
 	Unique and stable identifier of this account
@@ -170,11 +192,14 @@ type AttachmentsEmbedded {
 
 type Auth {
 	enabledLoginMethods: [String!]!
+	listAccessTokens(accountId: AccountID!, page: Int, perPage: Int): AccessTokenConnection!
 }
 
 type AuthMut {
 	login(loginMethod: String!, loginCredentialsJson: String!): LoginResponse!
 	accountDetails(accessToken: String!): Account!
+	createAccessToken(accountId: AccountID!, tokenName: String!): CreatedAccessToken!
+	revokeAccessToken(tokenId: AccessTokenID!): RevokeResult!
 }
 
 input BatchingConditionInput {
@@ -275,6 +300,25 @@ type CreateDatasetResultNameCollision implements CreateDatasetResult & CreateDat
 type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFromSnapshotResult {
 	dataset: Dataset!
 	message: String!
+}
+
+type CreatedAccessToken {
+	"""
+	Unique identifier of the access token
+	"""
+	id: AccessTokenID!
+	"""
+	Name of the access token
+	"""
+	name: String!
+	"""
+	Composed original token
+	"""
+	composed: String!
+	"""
+	Access token account owner
+	"""
+	account: Account!
 }
 
 type Cron5ComponentExpression {
@@ -747,13 +791,20 @@ type ExecuteTransformInput {
 	newOffset: Int
 }
 
-union FetchStep = FetchStepUrl | FetchStepFilesGlob | FetchStepContainer | FetchStepMqtt
+union FetchStep = FetchStepUrl | FetchStepFilesGlob | FetchStepContainer | FetchStepMqtt | FetchStepEthereumLogs
 
 type FetchStepContainer {
 	image: String!
 	command: [String!]
 	args: [String!]
 	env: [EnvVar!]
+}
+
+type FetchStepEthereumLogs {
+	chainId: Int
+	nodeUrl: String
+	filter: String
+	signature: String
 }
 
 type FetchStepFilesGlob {
@@ -1430,6 +1481,12 @@ type RestProtocolDesc {
 	pushUrl: String!
 }
 
+enum RevokeResult {
+	SUCCESS
+	ALREADY_REVOKED
+	NOT_FOUND
+}
+
 input ScheduleInput @oneOf {
 	timeDelta: TimeDeltaInput
 	cron5ComponentExpression: String
@@ -1738,6 +1795,29 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 
 interface UpdateReadmeResult {
 	message: String!
+}
+
+type ViewAccessToken {
+	"""
+	Unique identifier of the access token
+	"""
+	id: AccessTokenID!
+	"""
+	Name of the access token
+	"""
+	name: String!
+	"""
+	Date of token creation
+	"""
+	createdAt: DateTime!
+	"""
+	Date of token revokation
+	"""
+	revokedAt: DateTime
+	"""
+	Access token account owner
+	"""
+	account: Account!
 }
 
 type WebSocketProtocolDesc {

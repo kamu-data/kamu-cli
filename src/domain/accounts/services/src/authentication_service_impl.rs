@@ -15,59 +15,38 @@ use chrono::Utc;
 use dill::*;
 use internal_error::*;
 use jsonwebtoken::errors::ErrorKind;
-use jsonwebtoken::{
-    decode,
-    encode,
-    Algorithm,
-    DecodingKey,
-    EncodingKey,
-    Header,
-    TokenData,
-    Validation,
-};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use kamu_accounts::*;
 use kamu_core::SystemTimeSource;
 use opendatafabric::{AccountID, AccountName};
-use serde::{Deserialize, Serialize};
 
-use crate::LoginPasswordAuthProvider;
-
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 const KAMU_JWT_ISSUER: &str = "dev.kamu";
 const KAMU_JWT_ALGORITHM: Algorithm = Algorithm::HS384;
 const EXPIRATION_TIME_SEC: usize = 24 * 60 * 60; // 1 day in seconds
 
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 pub struct AuthenticationServiceImpl {
-    predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     time_source: Arc<dyn SystemTimeSource>,
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
     authentication_providers_by_method: HashMap<&'static str, Arc<dyn AuthenticationProvider>>,
-    login_password_auth_provider: Option<Arc<LoginPasswordAuthProvider>>,
     account_repository: Arc<dyn AccountRepository>,
-    state: tokio::sync::Mutex<State>,
+    access_token_svc: Arc<dyn AccessTokenService>,
 }
 
-#[derive(Default)]
-struct State {
-    predefined_accounts_registered: bool,
-}
-
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[scope(Singleton)]
 #[interface(dyn AuthenticationService)]
 impl AuthenticationServiceImpl {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(
-        predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         authentication_providers: Vec<Arc<dyn AuthenticationProvider>>,
-        login_password_auth_provider: Option<Arc<LoginPasswordAuthProvider>>,
         account_repository: Arc<dyn AccountRepository>,
+        access_token_svc: Arc<dyn AccessTokenService>,
         time_source: Arc<dyn SystemTimeSource>,
         config: Arc<JwtAuthenticationConfig>,
     ) -> Self {
@@ -86,14 +65,12 @@ impl AuthenticationServiceImpl {
         }
 
         Self {
-            predefined_accounts_config,
             time_source,
             encoding_key: EncodingKey::from_secret(config.jwt_secret.as_bytes()),
             decoding_key: DecodingKey::from_secret(config.jwt_secret.as_bytes()),
             authentication_providers_by_method,
-            login_password_auth_provider,
             account_repository,
-            state: tokio::sync::Mutex::new(State::default()),
+            access_token_svc,
         }
     }
 
@@ -118,7 +95,7 @@ impl AuthenticationServiceImpl {
         let iat = usize::try_from(current_time.timestamp()).unwrap();
         let exp = iat + expiration_time_sec;
 
-        let claims = KamuAccessTokenClaims {
+        let claims = JWTClaims {
             iat,
             exp,
             iss: String::from(KAMU_JWT_ISSUER),
@@ -136,67 +113,51 @@ impl AuthenticationServiceImpl {
     pub fn decode_access_token(
         &self,
         access_token: &str,
-    ) -> Result<TokenData<KamuAccessTokenClaims>, AccessTokenError> {
+    ) -> Result<AccessTokenType, AccessTokenError> {
+        if &access_token[..2] == ACCESS_TOKEN_PREFIX {
+            return KamuAccessToken::decode(access_token)
+                .map_err(|err| AccessTokenError::Invalid(Box::new(err)))
+                .map(AccessTokenType::KamuAccessToken);
+        }
         let mut validation = Validation::new(KAMU_JWT_ALGORITHM);
         validation.set_issuer(&[KAMU_JWT_ISSUER]);
 
-        decode::<KamuAccessTokenClaims>(access_token, &self.decoding_key, &validation).map_err(
-            |e| match *e.kind() {
+        decode::<JWTClaims>(access_token, &self.decoding_key, &validation)
+            .map_err(|e| match *e.kind() {
                 ErrorKind::ExpiredSignature => AccessTokenError::Expired,
                 _ => AccessTokenError::Invalid(Box::new(e)),
-            },
-        )
+            })
+            .map(AccessTokenType::JWTToken)
     }
 
-    async fn ensure_predefined_accounts_registration(&self) -> Result<(), InternalError> {
-        let mut guard = self.state.lock().await;
-        if !guard.predefined_accounts_registered {
-            // Register predefined accounts on first request
-            for account_config in &self.predefined_accounts_config.predefined {
-                let account_id = account_config.get_id();
-                let is_unknown = match self.account_repository.get_account_by_id(&account_id).await
-                {
-                    Ok(_) => Ok(false),
-                    Err(GetAccountByIdError::NotFound(_)) => Ok(true),
-                    Err(GetAccountByIdError::Internal(e)) => Err(e),
-                }?;
+    pub async fn account_by_token_impl(
+        &self,
+        access_token: &str,
+    ) -> Result<Account, GetAccountInfoError> {
+        let decoded_access_token = self
+            .decode_access_token(access_token)
+            .map_err(GetAccountInfoError::AccessToken)?;
 
-                if is_unknown {
-                    let account = Account {
-                        id: account_config.get_id(),
-                        account_name: account_config.account_name.clone(),
-                        email: account_config.email.clone(),
-                        display_name: account_config.get_display_name(),
-                        account_type: account_config.account_type,
-                        avatar_url: account_config.avatar_url.clone(),
-                        registered_at: account_config.registered_at,
-                        is_admin: account_config.is_admin,
-                        provider: account_config.provider.clone(),
-                        provider_identity_key: account_config.account_name.to_string(),
-                    };
+        match decoded_access_token {
+            AccessTokenType::JWTToken(token_data) => {
+                let account_id = AccountID::from_did_str(&token_data.claims.sub)
+                    .map_err(|e| GetAccountInfoError::Internal(e.int_err()))?;
 
-                    self.account_repository
-                        .create_account(&account)
-                        .await
-                        .map_err(|e| match e {
-                            CreateAccountError::Duplicate(e) => e.int_err(),
-                            CreateAccountError::Internal(e) => e,
-                        })?;
-
-                    if let Some(login_password_auth_provider) =
-                        self.login_password_auth_provider.as_ref()
-                        && account_config.provider == PROVIDER_PASSWORD
-                    {
-                        login_password_auth_provider
-                            .save_password(&account.account_name, account_config.get_password())
-                            .await?;
-                    }
+                match self.account_by_id(&account_id).await {
+                    Ok(Some(account)) => Ok(account),
+                    Ok(None) => Err(GetAccountInfoError::AccountUnresolved),
+                    Err(e) => Err(GetAccountInfoError::Internal(e)),
                 }
             }
-
-            guard.predefined_accounts_registered = true;
+            AccessTokenType::KamuAccessToken(kamu_access_token) => self
+                .access_token_svc
+                .find_account_by_active_token_id(
+                    &kamu_access_token.id,
+                    kamu_access_token.random_bytes_hash,
+                )
+                .await
+                .map_err(|err| GetAccountInfoError::Internal(err.int_err())),
         }
-        Ok(())
     }
 }
 
@@ -216,28 +177,17 @@ impl AuthenticationService for AuthenticationServiceImpl {
         login_method: &str,
         login_credentials_json: String,
     ) -> Result<LoginResponse, LoginError> {
-        self.ensure_predefined_accounts_registration().await?;
-
         // Resolve provider via specified login method
         let provider = self.resolve_authentication_provider(login_method)?;
 
         // Attempt to login via provider
-        let provider_response = provider.login(login_credentials_json).await.map_err(
-            |e: ProviderLoginError| match e {
-                ProviderLoginError::RejectedCredentials(e) => LoginError::RejectedCredentials(e),
-                ProviderLoginError::InvalidCredentials(e) => LoginError::InvalidCredentials(e),
-                ProviderLoginError::Internal(e) => LoginError::Internal(e),
-            },
-        )?;
+        let provider_response = provider.login(login_credentials_json).await?;
 
         // Try to resolve existing account via provider's identity key
         let maybe_account_id = self
             .account_repository
             .find_account_id_by_provider_identity_key(&provider_response.provider_identity_key)
-            .await
-            .map_err(|e| match e {
-                FindAccountIdByProviderIdentityKeyError::Internal(e) => LoginError::Internal(e),
-            })?;
+            .await?;
 
         let account_id = match maybe_account_id {
             // Account already exists
@@ -283,30 +233,13 @@ impl AuthenticationService for AuthenticationServiceImpl {
     }
 
     async fn account_by_token(&self, access_token: String) -> Result<Account, GetAccountInfoError> {
-        self.ensure_predefined_accounts_registration()
-            .await
-            .map_err(GetAccountInfoError::Internal)?;
-
-        let decoded_access_token = self
-            .decode_access_token(&access_token)
-            .map_err(GetAccountInfoError::AccessToken)?;
-
-        let account_id = AccountID::from_did_str(&decoded_access_token.claims.sub)
-            .map_err(|e| GetAccountInfoError::Internal(e.int_err()))?;
-
-        match self.account_by_id(&account_id).await {
-            Ok(Some(account)) => Ok(account),
-            Ok(None) => Err(GetAccountInfoError::AccountUnresolved),
-            Err(e) => Err(GetAccountInfoError::Internal(e)),
-        }
+        self.account_by_token_impl(&access_token).await
     }
 
     async fn account_by_id(
         &self,
         account_id: &AccountID,
     ) -> Result<Option<Account>, InternalError> {
-        self.ensure_predefined_accounts_registration().await?;
-
         match self.account_repository.get_account_by_id(account_id).await {
             Ok(account) => Ok(Some(account.clone())),
             Err(GetAccountByIdError::NotFound(_)) => Ok(None),
@@ -318,8 +251,6 @@ impl AuthenticationService for AuthenticationServiceImpl {
         &self,
         account_ids: Vec<AccountID>,
     ) -> Result<Vec<Account>, InternalError> {
-        self.ensure_predefined_accounts_registration().await?;
-
         self.account_repository
             .get_accounts_by_ids(account_ids)
             .await
@@ -330,8 +261,6 @@ impl AuthenticationService for AuthenticationServiceImpl {
         &self,
         account_name: &AccountName,
     ) -> Result<Option<Account>, InternalError> {
-        self.ensure_predefined_accounts_registration().await?;
-
         match self
             .account_repository
             .get_account_by_name(account_name)
@@ -347,8 +276,6 @@ impl AuthenticationService for AuthenticationServiceImpl {
         &self,
         account_name: &AccountName,
     ) -> Result<Option<AccountID>, InternalError> {
-        self.ensure_predefined_accounts_registration().await?;
-
         match self
             .account_repository
             .find_account_id_by_name(account_name)
@@ -363,8 +290,6 @@ impl AuthenticationService for AuthenticationServiceImpl {
         &self,
         account_id: &AccountID,
     ) -> Result<Option<AccountName>, InternalError> {
-        self.ensure_predefined_accounts_registration().await?;
-
         match self.account_repository.get_account_by_id(account_id).await {
             Ok(account) => Ok(Some(account.account_name.clone())),
             Err(GetAccountByIdError::NotFound(_)) => Ok(None),
@@ -372,16 +297,3 @@ impl AuthenticationService for AuthenticationServiceImpl {
         }
     }
 }
-
-///////////////////////////////////////////////////////////////////////////////
-
-/// Our claims struct, it needs to derive `Serialize` and/or `Deserialize`
-#[derive(Debug, Serialize, Deserialize)]
-pub struct KamuAccessTokenClaims {
-    exp: usize,
-    iat: usize,
-    iss: String,
-    sub: String,
-}
-
-///////////////////////////////////////////////////////////////////////////////

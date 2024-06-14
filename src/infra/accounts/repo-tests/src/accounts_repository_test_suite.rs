@@ -15,6 +15,9 @@ use opendatafabric::{AccountID, AccountName};
 
 use crate::make_test_account;
 
+pub(crate) const GITHUB_ACCOUNT_ID_WASYA: &str = "8875907";
+pub(crate) const GITHUB_ACCOUNT_ID_PETYA: &str = "8875908";
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_missing_account_not_found(catalog: &Catalog) {
@@ -140,9 +143,6 @@ pub async fn test_insert_and_locate_github_account(catalog: &Catalog) {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_insert_and_locate_multiple_github_account(catalog: &Catalog) {
-    const GITHUB_ACCOUNT_ID_WASYA: &str = "8875907";
-    const GITHUB_ACCOUNT_ID_PETYA: &str = "8875908";
-
     let account_wasya = Account {
         email: Some(String::from("wasya_test@example.com")),
         display_name: String::from("Wasya Pupkin"),

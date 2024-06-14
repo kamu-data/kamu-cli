@@ -292,10 +292,12 @@ where
                 .int_err()?;
         }
 
-        if let Some(checkpoint_meta) = checkpoint_meta {
+        if let Some(checkpoint_meta) = checkpoint_meta
+            && let Some(checkpoint) = checkpoint
+        {
             self.as_checkpoint_repo()
                 .insert_file_move(
-                    &checkpoint.unwrap().into_inner(),
+                    &checkpoint.into_inner(),
                     InsertOpts {
                         precomputed_hash: Some(&checkpoint_meta.physical_hash),
                         expected_hash: None,

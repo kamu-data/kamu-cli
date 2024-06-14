@@ -11,6 +11,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use console::style as s;
+use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::*;
@@ -19,6 +20,8 @@ use kamu_adapter_oauth::*;
 
 use super::{CLIError, Command};
 use crate::OutputConfig;
+
+///////////////////////////////////////////////////////////////////////////////
 
 pub struct APIServerRunCommand {
     base_catalog: Catalog,
@@ -31,6 +34,7 @@ pub struct APIServerRunCommand {
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     account_subject: Arc<CurrentAccountSubject>,
     github_auth_config: Arc<GithubAuthenticationConfig>,
+    is_e2e_testing: bool,
 }
 
 impl APIServerRunCommand {
@@ -45,6 +49,7 @@ impl APIServerRunCommand {
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         account_subject: Arc<CurrentAccountSubject>,
         github_auth_config: Arc<GithubAuthenticationConfig>,
+        is_e2e_testing: bool,
     ) -> Self {
         Self {
             base_catalog,
@@ -57,6 +62,7 @@ impl APIServerRunCommand {
             predefined_accounts_config,
             account_subject,
             github_auth_config,
+            is_e2e_testing,
         }
     }
 
@@ -95,20 +101,22 @@ impl APIServerRunCommand {
             password: account_config.get_password(),
         };
 
-        let auth_svc = self
-            .base_catalog
-            .get_one::<dyn AuthenticationService>()
-            .unwrap();
-        let access_token = auth_svc
-            .login(
-                PROVIDER_PASSWORD,
-                serde_json::to_string::<PasswordLoginCredentials>(&login_credentials).int_err()?,
-            )
-            .await
-            .int_err()?
-            .access_token;
+        let login_response = DatabaseTransactionRunner::new(self.base_catalog.clone())
+            .transactional_with(|auth_svc: Arc<dyn AuthenticationService>| async move {
+                auth_svc
+                    .login(
+                        PROVIDER_PASSWORD,
+                        serde_json::to_string::<PasswordLoginCredentials>(&login_credentials)
+                            .int_err()
+                            .map_err(CLIError::critical)?,
+                    )
+                    .await
+                    .int_err()
+                    .map_err(CLIError::critical)
+            })
+            .await?;
 
-        Ok(access_token)
+        Ok(login_response.access_token)
     }
 }
 
@@ -119,13 +127,13 @@ impl Command for APIServerRunCommand {
 
         let access_token = self.get_access_token().await?;
 
-        // TODO: Cloning catalog is too expensive currently
         let api_server = crate::explore::APIServer::new(
             self.base_catalog.clone(),
             &self.cli_catalog,
             self.multi_tenant_workspace,
             self.address,
             self.port,
+            self.is_e2e_testing,
         );
 
         tracing::info!(
@@ -158,3 +166,5 @@ impl Command for APIServerRunCommand {
         Ok(())
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////

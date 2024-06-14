@@ -97,8 +97,11 @@ impl ClientSideHarness {
         b.add::<EngineProvisionerNull>();
 
         b.add::<ObjectStoreRegistryImpl>();
+        b.add::<ObjectStoreBuilderLocalFs>();
 
         b.add::<DataFormatRegistryImpl>();
+
+        b.add_builder(FetchService::builder().with_run_info_dir(run_info_dir.clone()));
 
         b.add_builder(
             PollingIngestServiceImpl::builder()
@@ -152,6 +155,10 @@ impl ClientSideHarness {
         self.catalog.get_one::<dyn DatasetRepository>().unwrap()
     }
 
+    pub fn compaction_service(&self) -> Arc<dyn CompactionService> {
+        self.catalog.get_one::<dyn CompactionService>().unwrap()
+    }
+
     // TODO: accept alias or handle
     pub fn dataset_layout(&self, dataset_id: &DatasetID, dataset_name: &str) -> DatasetLayout {
         let root_path = if self.options.multi_tenant {
@@ -164,13 +171,18 @@ impl ClientSideHarness {
         DatasetLayout::new(root_path.as_path())
     }
 
-    pub async fn pull_datasets(&self, dataset_ref: DatasetRefAny) -> Vec<PullResponse> {
+    pub async fn pull_datasets(
+        &self,
+        dataset_ref: DatasetRefAny,
+        force: bool,
+    ) -> Vec<PullResponse> {
         self.pull_service
             .pull_multi(
                 vec![dataset_ref],
                 PullMultiOptions {
                     sync_options: SyncOptions {
                         create_if_not_exists: true,
+                        force,
                         ..SyncOptions::default()
                     },
                     ..Default::default()
@@ -181,8 +193,8 @@ impl ClientSideHarness {
             .unwrap()
     }
 
-    pub async fn pull_dataset_result(&self, dataset_ref: DatasetRefAny) -> PullResult {
-        self.pull_datasets(dataset_ref)
+    pub async fn pull_dataset_result(&self, dataset_ref: DatasetRefAny, force: bool) -> PullResult {
+        self.pull_datasets(dataset_ref, force)
             .await
             .first()
             .unwrap()
@@ -196,6 +208,7 @@ impl ClientSideHarness {
         &self,
         dataset_local_ref: DatasetRef,
         dataset_remote_ref: DatasetRefRemote,
+        force: bool,
     ) -> Vec<PushResponse> {
         self.push_service
             .push_multi_ext(
@@ -206,6 +219,7 @@ impl ClientSideHarness {
                 PushMultiOptions {
                     sync_options: SyncOptions {
                         create_if_not_exists: true,
+                        force,
                         ..SyncOptions::default()
                     },
                     ..PushMultiOptions::default()
@@ -219,9 +233,10 @@ impl ClientSideHarness {
         &self,
         dataset_local_ref: DatasetRef,
         dataset_remote_ref: DatasetRefRemote,
+        force: bool,
     ) -> SyncResult {
         let results = self
-            .push_dataset(dataset_local_ref, dataset_remote_ref)
+            .push_dataset(dataset_local_ref, dataset_remote_ref, force)
             .await;
 
         match &(results.first().unwrap().result) {

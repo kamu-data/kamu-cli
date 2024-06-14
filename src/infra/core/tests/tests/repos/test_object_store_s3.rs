@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use bytes::Bytes;
 use datafusion::execution::object_store::ObjectStoreRegistry;
 use kamu::testing::LocalS3Server;
 use kamu::utils::s3_context::S3Context;
@@ -27,7 +26,10 @@ async fn test_auth_explicit_endpoint() {
     let store = reg.get_store(&store_url).unwrap();
 
     let path = object_store::path::Path::parse("asdf").unwrap();
-    store.put(&path, Bytes::from_static(b"test")).await.unwrap();
+    store
+        .put(&path, object_store::PutPayload::from_static(b"test"))
+        .await
+        .unwrap();
 
     let store = reg.get_store(&store_url).unwrap();
     let res = store.get(&path).await.unwrap();

@@ -243,6 +243,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         )]))
         .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
         .add::<DataFormatRegistryImpl>()
+        .add_builder(FetchService::builder().with_run_info_dir(run_info_dir.clone()))
         .add_builder(
             PollingIngestServiceImpl::builder()
                 .with_cache_dir(cache_dir)

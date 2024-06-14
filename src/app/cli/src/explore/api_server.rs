@@ -7,14 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::pin::Pin;
 use std::sync::Arc;
 
 use dill::Catalog;
+use indoc::indoc;
 use internal_error::*;
 use kamu::domain::SystemTimeSource;
+use kamu_adapter_http::e2e::e2e_router;
 use kamu_flow_system_inmem::domain::FlowService;
 use kamu_task_system_inmem::domain::TaskExecutor;
+use tokio::sync::Notify;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,6 +31,7 @@ pub struct APIServer {
     task_executor: Arc<dyn TaskExecutor>,
     flow_service: Arc<dyn FlowService>,
     time_source: Arc<dyn SystemTimeSource>,
+    maybe_shutdown_notify: Option<Arc<Notify>>,
 }
 
 impl APIServer {
@@ -35,6 +41,7 @@ impl APIServer {
         multi_tenant_workspace: bool,
         address: Option<IpAddr>,
         port: Option<u16>,
+        is_e2e_testing: bool,
     ) -> Self {
         use axum::extract::Extension;
 
@@ -48,7 +55,7 @@ impl APIServer {
 
         let gql_schema = kamu_adapter_graphql::schema();
 
-        let app = axum::Router::new()
+        let mut app = axum::Router::new()
             .route("/", axum::routing::get(root))
             .route(
                 "/graphql",
@@ -61,6 +68,14 @@ impl APIServer {
             .route(
                 "/platform/token/validate",
                 axum::routing::get(kamu_adapter_http::platform_token_validate_handler),
+            )
+            .route(
+                "/platform/file/upload/prepare",
+                axum::routing::post(kamu_adapter_http::platform_file_upload_prepare_post_handler),
+            )
+            .route(
+                "/platform/file/upload/:upload_token",
+                axum::routing::post(kamu_adapter_http::platform_file_upload_post_handler),
             )
             .nest("/", kamu_adapter_http::data::root_router())
             .nest(
@@ -95,8 +110,21 @@ impl APIServer {
                     )
                     .layer(Extension(base_catalog))
                     .layer(Extension(gql_schema))
+                    // TODO: Use a more subtle application of this middleware,
+                    //       since not for every request, we need a transaction
+                    .layer(kamu_adapter_http::RunInDatabaseTransactionLayer::new())
                     .layer(kamu_adapter_http::AuthenticationLayer::new()),
             );
+
+        let maybe_shutdown_notify = if is_e2e_testing {
+            let shutdown_notify = Arc::new(Notify::new());
+
+            app = app.nest("/e2e", e2e_router(shutdown_notify.clone()));
+
+            Some(shutdown_notify)
+        } else {
+            None
+        };
 
         let addr = SocketAddr::from((
             address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
@@ -110,6 +138,7 @@ impl APIServer {
             task_executor,
             flow_service,
             time_source,
+            maybe_shutdown_notify,
         }
     }
 
@@ -118,8 +147,21 @@ impl APIServer {
     }
 
     pub async fn run(self) -> Result<(), InternalError> {
+        let server_run_fut: Pin<Box<dyn Future<Output = _>>> =
+            if let Some(shutdown_notify) = self.maybe_shutdown_notify {
+                Box::pin(async move {
+                    let server_with_graceful_shutdown = self.server.with_graceful_shutdown(async {
+                        shutdown_notify.notified().await;
+                    });
+
+                    server_with_graceful_shutdown.await
+                })
+            } else {
+                Box::pin(self.server)
+            };
+
         tokio::select! {
-            res = self.server => { res.int_err() },
+            res = server_run_fut => { res.int_err() },
             res = self.task_executor.run() => { res.int_err() },
             res = self.flow_service.run(self.time_source.now()) => { res.int_err() }
         }
@@ -129,14 +171,14 @@ impl APIServer {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn root() -> impl axum::response::IntoResponse {
-    axum::response::Html(
+    axum::response::Html(indoc!(
         r#"
-<h1>Kamu HTTP Server</h1>
-<ul>
-    <li><a href="/graphql">GraphQL Playground</li>
-</ul>
-"#,
-    )
+        <h1>Kamu HTTP Server</h1>
+        <ul>
+            <li><a href="/graphql">GraphQL Playground</li>
+        </ul>
+        "#
+    ))
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

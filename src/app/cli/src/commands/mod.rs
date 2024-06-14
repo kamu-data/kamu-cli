@@ -108,6 +108,8 @@ pub use verify_command::*;
 
 pub use super::error::*;
 
+////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait(?Send)]
 pub trait Command {
     fn needs_workspace(&self) -> bool {
@@ -117,6 +119,8 @@ pub trait Command {
     async fn run(&mut self) -> Result<(), CLIError>;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 pub struct NoOpCommand;
 
 #[async_trait::async_trait(?Send)]
@@ -125,3 +129,5 @@ impl Command for NoOpCommand {
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////

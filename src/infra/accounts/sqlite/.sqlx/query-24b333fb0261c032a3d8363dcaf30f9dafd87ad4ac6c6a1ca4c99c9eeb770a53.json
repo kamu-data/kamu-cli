@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO access_tokens (id, token_name, token_hash, created_at, account_id)\n                    VALUES ($1, $2, $3, $4, $5)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "24b333fb0261c032a3d8363dcaf30f9dafd87ad4ac6c6a1ca4c99c9eeb770a53"
+}

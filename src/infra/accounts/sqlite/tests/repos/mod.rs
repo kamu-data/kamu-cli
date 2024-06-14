@@ -7,5 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_sqlite_access_token_repository;
 mod test_sqlite_account_repository;
 mod test_sqlite_password_hash_repository;

@@ -340,6 +340,7 @@ pub enum FetchStep {
     FilesGlob(FetchStepFilesGlob),
     Container(FetchStepContainer),
     Mqtt(FetchStepMqtt),
+    EthereumLogs(FetchStepEthereumLogs),
 }
 
 impl_enum_with_variants!(FetchStep);
@@ -409,6 +410,25 @@ pub struct FetchStepMqtt {
 }
 
 impl_enum_variant!(FetchStep::Mqtt(FetchStepMqtt));
+
+/// Connects to an Ethereum node to stream transaction logs.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct FetchStepEthereumLogs {
+    /// Identifier of the chain to scan logs from. This parameter may be used
+    /// for RPC endpoint lookup as well as asserting that provided `nodeUrl`
+    /// corresponds to the expected chain.
+    pub chain_id: Option<u64>,
+    /// Url of the node.
+    pub node_url: Option<String>,
+    /// An SQL WHERE clause that can be used to pre-filter the logs before
+    /// fetching them from the ETH node.
+    pub filter: Option<String>,
+    /// Solidity log event signature to use for decoding. Using this field adds
+    /// `event` to the output containing decoded log as JSON.
+    pub signature: Option<String>,
+}
+
+impl_enum_variant!(FetchStep::EthereumLogs(FetchStepEthereumLogs));
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SourceOrdering {

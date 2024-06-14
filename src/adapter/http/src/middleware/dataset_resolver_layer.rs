@@ -120,7 +120,7 @@ where
     }
 
     fn call(&mut self, mut request: http::Request<Body>) -> Self::Future {
-        // Inspired by https://github.com/maxcountryman/axum-login/blob/main/axum-login/src/auth.rs
+        // Inspired by https://github.com/maxcountryman/axum-login/blob/5239b38b2698a3db3f92075b6ad430aea79c215a/axum-login/src/auth.rs
         // TODO: PERF: Is cloning a performance concern?
         let mut inner = self.inner.clone();
         let layer = self.layer.clone();

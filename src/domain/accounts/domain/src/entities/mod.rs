@@ -7,10 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod access_token;
 mod account;
 mod current_account_subject;
 mod predefined_accounts_config;
 
+pub use access_token::*;
 pub use account::*;
 pub use current_account_subject::*;
 pub use predefined_accounts_config::*;
