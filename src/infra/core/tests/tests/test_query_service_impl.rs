@@ -399,7 +399,7 @@ async fn test_dataset_tail_empty_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(2),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
     );
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();

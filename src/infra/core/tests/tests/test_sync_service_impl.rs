@@ -75,7 +75,7 @@ async fn do_test_sync(
 
     let dataset_authorizer = construct_authorizer(
         &AuthorizationExpectations {
-            d1_reads: 8,
+            d1_reads: 7,
             d2_reads: 2,
             d1_writes: 1,
             d2_writes: 4,

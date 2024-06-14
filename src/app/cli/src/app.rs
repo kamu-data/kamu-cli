@@ -457,7 +457,7 @@ pub fn configure_cli_catalog(
 
 #[tracing::instrument(level = "info", skip_all)]
 async fn initialize_components(cli_catalog: &Catalog) -> Result<(), CLIError> {
-    // TODO: For some reason, we if we do in a single transaction, there is a hangup
+    // TODO: Generalize on-startup initialization into a trait
     DatabaseTransactionRunner::new(cli_catalog.clone())
         .transactional(|transactional_catalog| async move {
             let registrator = transactional_catalog
@@ -467,11 +467,8 @@ async fn initialize_components(cli_catalog: &Catalog) -> Result<(), CLIError> {
             registrator
                 .ensure_predefined_accounts_are_registered()
                 .await
-                .map_err(CLIError::critical)
-        })
-        .await?;
-    DatabaseTransactionRunner::new(cli_catalog.clone())
-        .transactional(|transactional_catalog| async move {
+                .map_err(CLIError::critical)?;
+
             let initializer = transactional_catalog
                 .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
                 .map_err(CLIError::critical)?;

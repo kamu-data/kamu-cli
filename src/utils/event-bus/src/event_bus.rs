@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use dill::{component, Catalog};
+use dill::{Builder, Catalog};
 use internal_error::InternalError;
 
 use crate::{AsyncEventHandler, EventHandler};
@@ -20,7 +20,7 @@ pub struct EventBus {
     catalog: Arc<Catalog>,
 }
 
-#[component(pub)]
+#[dill::component(pub)]
 impl EventBus {
     pub fn new(catalog: Arc<Catalog>) -> EventBus {
         Self { catalog }
@@ -37,13 +37,16 @@ impl EventBus {
     }
 
     fn sync_dispatch<TEvent: 'static + Clone>(&self, event: &TEvent) -> Result<(), InternalError> {
-        let sync_handlers = self
-            .catalog
-            .get::<dill::AllOf<dyn EventHandler<TEvent>>>()
-            .unwrap();
+        let builders = self.catalog.builders_for::<dyn EventHandler<TEvent>>();
 
-        for sync_handler in sync_handlers {
-            sync_handler.handle(event)?;
+        for b in builders {
+            tracing::debug!(
+                handler = b.instance_type_name(),
+                event = std::any::type_name::<TEvent>(),
+                "Dispatching event to sync handler"
+            );
+            let inst = b.get(&self.catalog).unwrap();
+            inst.handle(event)?;
         }
 
         Ok(())
@@ -53,17 +56,25 @@ impl EventBus {
         &self,
         event: &TEvent,
     ) -> Result<(), InternalError> {
-        let async_handlers = self
-            .catalog
-            .get::<dill::AllOf<dyn AsyncEventHandler<TEvent>>>()
-            .unwrap();
+        let builders = self.catalog.builders_for::<dyn AsyncEventHandler<TEvent>>();
 
-        let async_handler_futures: Vec<_> = async_handlers
+        let mut handlers = Vec::new();
+        for b in builders {
+            tracing::debug!(
+                handler = b.instance_type_name(),
+                event = std::any::type_name::<TEvent>(),
+                "Dispatching event to async handler"
+            );
+            let handler = b.get(&self.catalog).unwrap();
+            handlers.push(handler);
+        }
+
+        let futures: Vec<_> = handlers
             .iter()
             .map(|handler| handler.handle(event))
             .collect();
 
-        let results = futures::future::join_all(async_handler_futures).await;
+        let results = futures::future::join_all(futures).await;
         results.into_iter().try_for_each(|res| res)?;
 
         Ok(())
