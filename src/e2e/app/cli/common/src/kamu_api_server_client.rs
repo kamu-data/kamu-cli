@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{InternalError, ResultIntoInternal};
-use reqwest::{StatusCode, Url};
+use reqwest::{Method, Response, StatusCode, Url};
 use serde::Deserialize;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
@@ -61,26 +61,108 @@ impl KamuApiServerClient {
         Ok(())
     }
 
-    pub async fn api_call_assert(&self, query: &str, expected_response: Result<&str, &str>) {
+    pub async fn rest_api_call_assert(
+        &self,
+        method: Method,
+        endpoint: &str,
+        request_body: Option<serde_json::Value>,
+        expected_status: StatusCode,
+        expected_response_body: Option<serde_json::Value>,
+    ) {
+        let endpoint = self.server_base_url.join(endpoint).unwrap();
+        let mut request_builder = match method {
+            Method::GET => self.http_client.get(endpoint),
+            Method::POST => self.http_client.post(endpoint),
+            Method::PUT => self.http_client.put(endpoint),
+            _ => {
+                unimplemented!()
+            }
+        };
+
+        if let Some(request_body) = request_body {
+            request_builder = request_builder.json(&request_body);
+        };
+
+        let response = request_builder.send().await.unwrap();
+
+        assert_eq!(expected_status, response.status());
+
+        if let Some(expected_response_body) = expected_response_body {
+            let actual_response_body: serde_json::Value = response.json().await.unwrap();
+            let pretty_actual_response_body =
+                serde_json::to_string_pretty(&actual_response_body).unwrap();
+
+            assert_eq!(
+                expected_response_body,
+                // Let's add \n for the sake of convenience of passing the expected result
+                format!("{pretty_actual_response_body}\n")
+            );
+        };
+    }
+
+    pub async fn graphql_api_call(
+        &self,
+        query: &str,
+        maybe_token: Option<String>,
+    ) -> serde_json::Value {
+        let response = self.graphql_api_call_impl(query, maybe_token).await;
+        let response_body = response.json::<GraphQLResponseBody>().await.unwrap();
+
+        response_body.data.unwrap()
+    }
+
+    pub async fn graphql_api_call_assert(
+        &self,
+        query: &str,
+        expected_response: Result<&str, &str>,
+    ) {
+        self.graphql_api_call_assert_impl(query, expected_response, None)
+            .await;
+    }
+
+    pub async fn graphql_api_call_assert_with_token(
+        &self,
+        token: String,
+        query: &str,
+        expected_response: Result<&str, &str>,
+    ) {
+        self.graphql_api_call_assert_impl(query, expected_response, Some(token))
+            .await;
+    }
+
+    async fn graphql_api_call_impl(&self, query: &str, maybe_token: Option<String>) -> Response {
         let endpoint = self.server_base_url.join("graphql").unwrap();
         let request_data = serde_json::json!({
            "query": query
         });
 
-        let response = self
-            .http_client
-            .post(endpoint)
-            .json(&request_data)
-            .send()
-            .await
-            .unwrap();
+        let mut request_builder = self.http_client.post(endpoint).json(&request_data);
+
+        if let Some(token) = maybe_token {
+            request_builder = request_builder.bearer_auth(token);
+        }
+
+        request_builder.send().await.unwrap()
+    }
+
+    async fn graphql_api_call_assert_impl(
+        &self,
+        query: &str,
+        expected_response: Result<&str, &str>,
+        maybe_token: Option<String>,
+    ) {
+        let response = self.graphql_api_call_impl(query, maybe_token).await;
 
         assert_eq!(StatusCode::OK, response.status());
 
-        let response_body: ResponsePrettyBody =
-            response.json::<ResponseBody>().await.unwrap().into();
+        let pretty_response_body: GraphQLPrettyResponseBody =
+            response.json::<GraphQLResponseBody>().await.unwrap().into();
 
-        match (response_body.errors, response_body.data, expected_response) {
+        match (
+            pretty_response_body.errors,
+            pretty_response_body.data,
+            expected_response,
+        ) {
             (Some(actual_error), None, Err(expected_error)) => {
                 assert_eq!(
                     expected_error,
@@ -112,18 +194,18 @@ impl KamuApiServerClient {
 ////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Deserialize)]
-struct ResponseBody {
+struct GraphQLResponseBody {
     data: Option<serde_json::Value>,
     errors: Option<serde_json::Value>,
 }
 
-struct ResponsePrettyBody {
+struct GraphQLPrettyResponseBody {
     data: Option<String>,
     errors: Option<String>,
 }
 
-impl From<ResponseBody> for ResponsePrettyBody {
-    fn from(value: ResponseBody) -> Self {
+impl From<GraphQLResponseBody> for GraphQLPrettyResponseBody {
+    fn from(value: GraphQLResponseBody) -> Self {
         Self {
             data: value
                 .data

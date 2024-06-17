@@ -7,7 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_auth;
-mod test_rest_api;
-mod test_selftest;
-mod test_system_generate_token;
+use kamu_cli_e2e_common::prelude::*;
+
+////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    inmem,
+    kamu_cli_e2e_repo_tests,
+    test_rest_api_request_dataset_tail
+);
+
+////////////////////////////////////////////////////////////////////////////////
