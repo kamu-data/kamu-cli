@@ -235,7 +235,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
                     a.provider_identity_key
                 FROM access_tokens at
                 LEFT JOIN accounts a ON a.id = account_id
-                WHERE at.id = $1 AND revoked_at IS null
+                WHERE at.id = $1 AND at.revoked_at IS null
                 "#,
             token_id
         )

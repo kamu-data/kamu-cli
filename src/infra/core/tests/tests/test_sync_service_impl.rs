@@ -46,6 +46,17 @@ struct AuthorizationExpectations {
     pub d2_writes: usize,
 }
 
+impl Default for AuthorizationExpectations {
+    fn default() -> Self {
+        Self {
+            d1_reads: 8,
+            d2_reads: 2,
+            d1_writes: 1,
+            d2_writes: 4,
+        }
+    }
+}
+
 fn construct_authorizer(
     authorization_expectations: &AuthorizationExpectations,
     d1_alias: &DatasetAlias,
@@ -65,6 +76,7 @@ async fn do_test_sync(
     push_ref: &DatasetRefRemote,
     pull_ref: &DatasetRefRemote,
     ipfs: Option<(IpfsGateway, IpfsClient)>,
+    auth_expectations: AuthorizationExpectations,
 ) {
     // Tests sync between "foo" -> remote -> "bar"
     let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
@@ -73,16 +85,8 @@ async fn do_test_sync(
 
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
-    let dataset_authorizer = construct_authorizer(
-        &AuthorizationExpectations {
-            d1_reads: 8,
-            d2_reads: 2,
-            d1_writes: 1,
-            d2_writes: 4,
-        },
-        &dataset_alias,
-        &dataset_alias_2,
-    );
+    let dataset_authorizer =
+        construct_authorizer(&auth_expectations, &dataset_alias, &dataset_alias_2);
 
     let datasets_dir = tmp_workspace_dir.join("datasets");
     std::fs::create_dir(&datasets_dir).unwrap();
@@ -433,6 +437,7 @@ async fn test_sync_to_from_local_fs() {
         &DatasetRefRemote::from(&repo_url),
         &DatasetRefRemote::from(&repo_url),
         None,
+        AuthorizationExpectations::default(),
     )
     .await;
 }
@@ -450,6 +455,7 @@ async fn test_sync_to_from_s3() {
         &DatasetRefRemote::from(&s3.url),
         &DatasetRefRemote::from(&s3.url),
         None,
+        AuthorizationExpectations::default(),
     )
     .await;
 }
@@ -472,6 +478,7 @@ async fn test_sync_from_http() {
         &DatasetRefRemote::from(push_repo_url),
         &DatasetRefRemote::from(pull_repo_url),
         None,
+        AuthorizationExpectations::default(),
     )
     .await;
 }
@@ -499,6 +506,10 @@ async fn test_sync_to_from_ipfs() {
             },
             ipfs_client,
         )),
+        AuthorizationExpectations {
+            d1_reads: 7,
+            ..Default::default()
+        },
     )
     .await;
 }

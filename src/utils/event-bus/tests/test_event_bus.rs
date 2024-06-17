@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use dill::*;
 use event_bus::{AsyncEventHandler, EventBus, EventHandler};
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -103,27 +103,6 @@ async fn test_bus_async_handler() {
 
     let handler = catalog.get_one::<TestAsyncHandler>().unwrap();
     assert!(handler.was_invoked());
-}
-
-////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_bus_async_closure() {
-    let catalog = dill::CatalogBuilder::new().add::<EventBus>().build();
-
-    let event_bus = catalog.get_one::<EventBus>().unwrap();
-
-    #[derive(thiserror::Error, Debug)]
-    #[error("Test error")]
-    struct TestError {}
-
-    event_bus.subscribe_async_closure(|_: Arc<Event>| async move {
-        let error = TestError {};
-        Err(error.int_err())
-    });
-
-    let res = event_bus.dispatch_event(Event {}).await;
-    assert!(res.is_err());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

@@ -7,13 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::any::{Any, TypeId};
-use std::collections::HashMap;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use dill::{component, scope, Catalog, Singleton};
+use dill::{Builder, Catalog};
 use internal_error::InternalError;
 
 use crate::{AsyncEventHandler, EventHandler};
@@ -22,37 +18,12 @@ use crate::{AsyncEventHandler, EventHandler};
 
 pub struct EventBus {
     catalog: Arc<Catalog>,
-    state: Mutex<State>,
 }
 
-#[component(pub)]
-#[scope(Singleton)]
+#[dill::component(pub)]
 impl EventBus {
     pub fn new(catalog: Arc<Catalog>) -> EventBus {
-        Self {
-            catalog,
-            state: Mutex::new(State::new()),
-        }
-    }
-
-    pub fn subscribe_async_closure<TEvent, H, HFut>(&self, callback: H)
-    where
-        TEvent: 'static + Clone,
-        H: Fn(Arc<TEvent>) -> HFut + Send + Sync + 'static,
-        HFut: std::future::Future<Output = Result<(), InternalError>> + Send + 'static,
-    {
-        let mut state = self.state.lock().unwrap();
-
-        let event_handlers = state.take_closure_handlers_for::<TEvent>();
-
-        let async_closure_handler = Arc::new(
-            move |event: Arc<TEvent>|
-                  -> Pin<Box<dyn Future<Output = Result<(), InternalError>> + Send>> {
-                Box::pin(callback(event))
-            },
-        );
-
-        event_handlers.0.push(async_closure_handler);
+        Self { catalog }
     }
 
     pub async fn dispatch_event<TEvent>(&self, event: TEvent) -> Result<(), InternalError>
@@ -61,19 +32,21 @@ impl EventBus {
     {
         self.sync_dispatch(&event)?;
         self.async_dispatch(&event).await?;
-        self.async_closures_dispatch(&event).await?;
 
         Ok(())
     }
 
     fn sync_dispatch<TEvent: 'static + Clone>(&self, event: &TEvent) -> Result<(), InternalError> {
-        let sync_handlers = self
-            .catalog
-            .get::<dill::AllOf<dyn EventHandler<TEvent>>>()
-            .unwrap();
+        let builders = self.catalog.builders_for::<dyn EventHandler<TEvent>>();
 
-        for sync_handler in sync_handlers {
-            sync_handler.handle(event)?;
+        for b in builders {
+            tracing::debug!(
+                handler = b.instance_type_name(),
+                event = std::any::type_name::<TEvent>(),
+                "Dispatching event to sync handler"
+            );
+            let inst = b.get(&self.catalog).unwrap();
+            inst.handle(event)?;
         }
 
         Ok(())
@@ -83,106 +56,27 @@ impl EventBus {
         &self,
         event: &TEvent,
     ) -> Result<(), InternalError> {
-        let async_handlers = self
-            .catalog
-            .get::<dill::AllOf<dyn AsyncEventHandler<TEvent>>>()
-            .unwrap();
+        let builders = self.catalog.builders_for::<dyn AsyncEventHandler<TEvent>>();
 
-        let async_handler_futures: Vec<_> = async_handlers
+        let mut handlers = Vec::new();
+        for b in builders {
+            tracing::debug!(
+                handler = b.instance_type_name(),
+                event = std::any::type_name::<TEvent>(),
+                "Dispatching event to async handler"
+            );
+            let handler = b.get(&self.catalog).unwrap();
+            handlers.push(handler);
+        }
+
+        let futures: Vec<_> = handlers
             .iter()
             .map(|handler| handler.handle(event))
             .collect();
 
-        let results = futures::future::join_all(async_handler_futures).await;
+        let results = futures::future::join_all(futures).await;
         results.into_iter().try_for_each(|res| res)?;
 
         Ok(())
     }
-
-    async fn async_closures_dispatch<TEvent: 'static + Clone>(
-        &self,
-        event: &TEvent,
-    ) -> Result<(), InternalError> {
-        let maybe_closure_handlers: Option<EventClosureHandlers<TEvent>> = {
-            let state = self.state.lock().unwrap();
-            let maybe_event_handlers = state.get_closure_handlers_for::<TEvent>();
-            maybe_event_handlers.cloned()
-        };
-
-        if let Some(closure_handlers) = maybe_closure_handlers {
-            let event_arc = Arc::new(event.clone());
-            let closure_handler_futures: Vec<_> = closure_handlers
-                .0
-                .iter()
-                .map(|handler| (*handler).call((event_arc.clone(),)))
-                .collect();
-
-            let results = futures::future::join_all(closure_handler_futures).await;
-            results.into_iter().try_for_each(|res| res)?;
-        }
-
-        Ok(())
-    }
 }
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-struct State {
-    closure_handlers_by_event_type: HashMap<TypeId, Box<dyn Any + Send + Sync + 'static>>,
-}
-
-impl State {
-    pub fn new() -> Self {
-        Self {
-            closure_handlers_by_event_type: HashMap::new(),
-        }
-    }
-
-    pub fn get_closure_handlers_for<TEvent: 'static + Clone>(
-        &self,
-    ) -> Option<&EventClosureHandlers<TEvent>> {
-        if let Some(event_handlers) = self
-            .closure_handlers_by_event_type
-            .get(&TypeId::of::<TEvent>())
-        {
-            let event_handlers = event_handlers
-                .downcast_ref::<EventClosureHandlers<TEvent>>()
-                .unwrap();
-            Some(event_handlers)
-        } else {
-            None
-        }
-    }
-
-    #[allow(clippy::unwrap_or_default)]
-    pub fn take_closure_handlers_for<TEvent: 'static + Clone>(
-        &mut self,
-    ) -> &mut EventClosureHandlers<TEvent> {
-        self.closure_handlers_by_event_type
-            .entry(TypeId::of::<TEvent>())
-            .or_insert(Box::<EventClosureHandlers<TEvent>>::default())
-            .downcast_mut::<EventClosureHandlers<TEvent>>()
-            .unwrap()
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-type AsyncEventClosure<TEvent> = Arc<
-    dyn Fn(Arc<TEvent>) -> Pin<Box<dyn Future<Output = Result<(), InternalError>> + Send>>
-        + Send
-        + Sync,
->;
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone)]
-struct EventClosureHandlers<TEvent>(Vec<AsyncEventClosure<TEvent>>);
-
-impl<TEvent> Default for EventClosureHandlers<TEvent> {
-    fn default() -> Self {
-        Self(vec![])
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
