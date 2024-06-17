@@ -252,7 +252,7 @@ async fn test_data_query_handler_full() {
                     "population": 100,
                 }],
                 "schema": "{\"fields\":[{\"name\":\"offset\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"city\",\"data_type\":\"Utf8\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"population\",\"data_type\":\"UInt64\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}}],\"metadata\":{}}",
-                "resultHash": "f9680c001200b3483eecc3d5c6b50ee6b8cba11b51c08f89ea1f53d3a334c743199f5fe656e",
+                "dataHash": "f9680c001200b3483eecc3d5c6b50ee6b8cba11b51c08f89ea1f53d3a334c743199f5fe656e",
                 "state": {
                     "inputs": [{
                         "id": "did:odf:fed01df230b49615d175307d580c33d6fda61fc7b9aec91df0f5c1a5ebe3b8cbfee02",
@@ -260,6 +260,114 @@ async fn test_data_query_handler_full() {
                     }]
                 }
             })
+        );
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_query_handler_invalid_sql() {
+    let harness = Harness::new().await;
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+
+        let query = format!("select foobar(offset) from \"{}\"", harness.dataset_alias);
+
+        let query_url = format!("{}query", harness.root_url);
+        let res = cl
+            .post(&query_url)
+            .json(&json!({
+                "query": query
+            }))
+            .send()
+            .await
+            .unwrap();
+
+        let status = res.status();
+        let body = res.text().await.unwrap();
+        assert_eq!(status, 400, "Unexpected response: {status} {body}");
+        assert_eq!(
+            body,
+            "Error during planning: Invalid function 'foobar'.\nDid you mean 'floor'?"
+        );
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_query_handler_dataset_does_not_exist() {
+    let harness = Harness::new().await;
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+
+        let query_url = format!("{}query", harness.root_url);
+        let res = cl
+            .post(&query_url)
+            .json(&json!({
+                "query": "select offset, city, population from does_not_exist"
+            }))
+            .send()
+            .await
+            .unwrap();
+
+        let status = res.status();
+        let body = res.text().await.unwrap();
+        assert_eq!(status, 400, "Unexpected response: {status} {body}");
+        assert_eq!(
+            body,
+            "Error during planning: table 'kamu.kamu.does_not_exist' not found"
+        );
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_query_handler_dataset_does_not_exist_bad_alias() {
+    let harness = Harness::new().await;
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+
+        let query = format!(
+            "select offset, city, population from \"{}\"",
+            harness.dataset_alias
+        );
+
+        let query_url = format!("{}query", harness.root_url);
+        let res = cl
+            .post(&query_url)
+            .json(&json!({
+                "query": query,
+                "aliases": [{
+                    "alias": harness.dataset_alias,
+                    "id": DatasetID::new_seeded_ed25519(b"does-not-exist"),
+                }]
+            }))
+            .send()
+            .await
+            .unwrap();
+
+        let status = res.status();
+        let body = res.text().await.unwrap();
+        assert_eq!(status, 404, "Unexpected response: {status} {body}");
+        assert_eq!(
+            body,
+            "Dataset not found: \
+             did:odf:fed011ba79f25e520298ba6945dd6197083a366364bef178d5899b100c434748d88e5"
         );
     };
 
@@ -290,7 +398,7 @@ async fn test_data_query_handler_ranges() {
                 ("limit", "1"),
                 ("includeSchema", "false"),
                 ("includeState", "false"),
-                ("includeResultHash", "false"),
+                ("includeDataHash", "false"),
             ])
             .send()
             .await
@@ -315,7 +423,7 @@ async fn test_data_query_handler_ranges() {
                 ("skip", "1"),
                 ("includeSchema", "false"),
                 ("includeState", "false"),
-                ("includeResultHash", "false"),
+                ("includeDataHash", "false"),
             ])
             .send()
             .await
@@ -358,7 +466,7 @@ async fn test_data_query_handler_data_formats() {
                 ("dataFormat", "json-aos"),
                 ("includeSchema", "false"),
                 ("includeState", "false"),
-                ("includeResultHash", "false"),
+                ("includeDataHash", "false"),
             ])
             .send()
             .await
@@ -386,7 +494,7 @@ async fn test_data_query_handler_data_formats() {
                 ("dataFormat", "json-soa"),
                 ("includeSchema", "false"),
                 ("includeState", "false"),
-                ("includeResultHash", "false"),
+                ("includeDataHash", "false"),
             ])
             .send()
             .await
@@ -410,7 +518,7 @@ async fn test_data_query_handler_data_formats() {
                 ("dataFormat", "json-aoa"),
                 ("includeSchema", "false"),
                 ("includeState", "false"),
-                ("includeResultHash", "false"),
+                ("includeDataHash", "false"),
             ])
             .send()
             .await
@@ -452,7 +560,7 @@ async fn test_data_query_handler_schema_formats() {
                 ("schemaFormat", "arrow-json"),
                 ("includeSchema", "true"),
                 ("includeState", "false"),
-                ("includeResultHash", "false"),
+                ("includeDataHash", "false"),
             ])
             .send()
             .await
@@ -474,7 +582,7 @@ async fn test_data_query_handler_schema_formats() {
                 ("schemaFormat", "ArrowJson"),
                 ("includeSchema", "true"),
                 ("includeState", "false"),
-                ("includeResultHash", "false"),
+                ("includeDataHash", "false"),
             ])
             .send()
             .await
@@ -496,7 +604,7 @@ async fn test_data_query_handler_schema_formats() {
                 ("schemaFormat", "parquet"),
                 ("includeSchema", "true"),
                 ("includeState", "false"),
-                ("includeResultHash", "false"),
+                ("includeDataHash", "false"),
             ])
             .send()
             .await
@@ -525,7 +633,7 @@ async fn test_data_query_handler_schema_formats() {
                 ("schemaFormat", "parquet-json"),
                 ("includeSchema", "true"),
                 ("includeState", "false"),
-                ("includeResultHash", "false"),
+                ("includeDataHash", "false"),
             ])
             .send()
             .await
