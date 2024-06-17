@@ -15,7 +15,7 @@ pub async fn test_login_password_predefined_successful(
     kamu_api_server_client: KamuApiServerClient,
 ) {
     kamu_api_server_client
-        .api_call_assert(
+        .graphql_api_call_assert(
             indoc::indoc!(
                 r#"
                 mutation {
@@ -50,7 +50,7 @@ pub async fn test_login_password_predefined_successful(
 
 pub async fn test_login_enabled_methods(kamu_api_server_client: KamuApiServerClient) {
     kamu_api_server_client
-        .api_call_assert(
+        .graphql_api_call_assert(
             indoc::indoc!(
                 r#"
                 query {
@@ -80,7 +80,7 @@ pub async fn test_login_enabled_methods(kamu_api_server_client: KamuApiServerCli
 pub async fn test_login_dummy_github(kamu_api_server_client: KamuApiServerClient) {
     // 1. No user
     kamu_api_server_client
-        .api_call_assert(
+        .graphql_api_call_assert(
             indoc::indoc!(
                 r#"
                 query {
@@ -106,7 +106,7 @@ pub async fn test_login_dummy_github(kamu_api_server_client: KamuApiServerClient
 
     // 2. Create a user
     kamu_api_server_client
-        .api_call_assert(
+        .graphql_api_call_assert(
             indoc::indoc!(
                 r#"
                 mutation {
@@ -138,7 +138,7 @@ pub async fn test_login_dummy_github(kamu_api_server_client: KamuApiServerClient
 
     // 3. Verify that the user has been created
     kamu_api_server_client
-        .api_call_assert(
+        .graphql_api_call_assert(
             indoc::indoc!(
                 r#"
                 query {
