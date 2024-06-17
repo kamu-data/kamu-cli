@@ -15,7 +15,7 @@ use kamu_cli_wrapper::{Kamu, NewWorkspaceOptions};
 use regex::Regex;
 use sqlx::{MySqlPool, PgPool, SqlitePool};
 
-use crate::{e2e_test, KamuApiServerClient};
+use crate::{api_server_e2e_test, KamuApiServerClient};
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -144,7 +144,7 @@ impl KamuCliApiServerHarness {
         let server_addr = kamu.get_server_address();
         let server_run_fut = kamu.start_api_server(server_addr);
 
-        e2e_test(server_addr, server_run_fut, fixture).await;
+        api_server_e2e_test(server_addr, server_run_fut, fixture).await;
     }
 
     pub async fn execute_command<Fixture, FixtureResult>(self, fixture: Fixture)

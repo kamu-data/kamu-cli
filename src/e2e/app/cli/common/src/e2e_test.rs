@@ -18,7 +18,7 @@ use crate::KamuApiServerClient;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-pub async fn e2e_test<ServerRunFut, Fixture, FixtureFut>(
+pub async fn api_server_e2e_test<ServerRunFut, Fixture, FixtureFut>(
     server_addr: SocketAddrV4,
     server_run_fut: ServerRunFut,
     fixture: Fixture,
