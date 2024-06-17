@@ -10,7 +10,7 @@
 use std::ffi::OsString;
 use std::fs;
 use std::io::Write;
-use std::net::SocketAddrV4;
+use std::net::{Ipv4Addr, SocketAddrV4};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -209,6 +209,11 @@ impl Kamu {
         ])
         .await
         .int_err()
+    }
+
+    pub fn get_server_address(&self) -> SocketAddrV4 {
+        // TODO: Random port support -- this unlocks parallel running
+        SocketAddrV4::new(Ipv4Addr::LOCALHOST, 4000)
     }
 
     // TODO: Generalize into execute with overridden STDOUT/ERR/IN

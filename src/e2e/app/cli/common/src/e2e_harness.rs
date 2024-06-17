@@ -9,7 +9,6 @@
 
 use std::assert_matches::assert_matches;
 use std::future::Future;
-use std::net::{Ipv4Addr, SocketAddrV4};
 
 use internal_error::InternalError;
 use kamu_cli_wrapper::{Kamu, NewWorkspaceOptions};
@@ -142,8 +141,7 @@ impl KamuCliApiServerHarness {
         })
         .await;
 
-        // TODO: Random port support -- this unlocks parallel running
-        let server_addr = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 4000);
+        let server_addr = kamu.get_server_address();
         let server_run_fut = kamu.start_api_server(server_addr);
 
         e2e_test(server_addr, server_run_fut, fixture).await;
