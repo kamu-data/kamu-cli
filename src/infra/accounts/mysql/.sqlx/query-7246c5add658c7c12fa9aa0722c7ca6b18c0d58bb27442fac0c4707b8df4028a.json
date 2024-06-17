@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n              SELECT\n                  at.token_hash as \"token_hash: Vec<u8>\",\n                  a.id as \"id?: AccountID\",\n                  a.account_name,\n                  a.email as \"email?\",\n                  a.display_name,\n                  a.account_type as \"account_type: AccountType\",\n                  a.avatar_url,\n                  a.registered_at,\n                  a.is_admin,\n                  a.provider,\n                  a.provider_identity_key\n              FROM access_tokens at\n              RIGHT JOIN accounts a ON a.id = account_id\n              WHERE at.id = ? AND revoked_at IS null\n              ",
+  "query": "\n              SELECT\n                  at.token_hash as \"token_hash: Vec<u8>\",\n                  a.id as \"id?: AccountID\",\n                  a.account_name,\n                  a.email as \"email?\",\n                  a.display_name,\n                  a.account_type as \"account_type: AccountType\",\n                  a.avatar_url,\n                  a.registered_at,\n                  a.is_admin,\n                  a.provider,\n                  a.provider_identity_key\n              FROM access_tokens at\n              LEFT JOIN accounts a ON a.id = account_id\n              WHERE at.id = ? AND revoked_at IS null\n              ",
   "describe": {
     "columns": [
       {
@@ -8,7 +8,7 @@
         "name": "token_hash: Vec<u8>",
         "type_info": {
           "type": "String",
-          "flags": "BINARY | NO_DEFAULT_VALUE",
+          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
           "char_set": 63,
           "max_size": 32
         }
@@ -18,7 +18,7 @@
         "name": "id?: AccountID",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL | PRIMARY_KEY | NO_DEFAULT_VALUE",
+          "flags": "PRIMARY_KEY | NO_DEFAULT_VALUE",
           "char_set": 224,
           "max_size": 400
         }
@@ -28,7 +28,7 @@
         "name": "account_name",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
+          "flags": "UNIQUE_KEY | NO_DEFAULT_VALUE",
           "char_set": 224,
           "max_size": 400
         }
@@ -48,7 +48,7 @@
         "name": "display_name",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "flags": "NO_DEFAULT_VALUE",
           "char_set": 224,
           "max_size": 800
         }
@@ -58,7 +58,7 @@
         "name": "account_type: AccountType",
         "type_info": {
           "type": "String",
-          "flags": "NOT_NULL | ENUM | NO_DEFAULT_VALUE",
+          "flags": "ENUM | NO_DEFAULT_VALUE",
           "char_set": 224,
           "max_size": 48
         }
@@ -78,7 +78,7 @@
         "name": "registered_at",
         "type_info": {
           "type": "Timestamp",
-          "flags": "NOT_NULL | UNSIGNED | BINARY | NO_DEFAULT_VALUE",
+          "flags": "UNSIGNED | BINARY | NO_DEFAULT_VALUE",
           "char_set": 63,
           "max_size": 26
         }
@@ -88,7 +88,7 @@
         "name": "is_admin",
         "type_info": {
           "type": "Tiny",
-          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "flags": "NO_DEFAULT_VALUE",
           "char_set": 63,
           "max_size": 4
         }
@@ -98,7 +98,7 @@
         "name": "provider",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "flags": "NO_DEFAULT_VALUE",
           "char_set": 224,
           "max_size": 100
         }
@@ -108,7 +108,7 @@
         "name": "provider_identity_key",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
+          "flags": "UNIQUE_KEY | NO_DEFAULT_VALUE",
           "char_set": 224,
           "max_size": 400
         }
@@ -118,18 +118,18 @@
       "Right": 1
     },
     "nullable": [
-      true,
-      false,
       false,
       true,
-      false,
-      false,
       true,
-      false,
-      false,
-      false,
-      false
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
     ]
   },
-  "hash": "d851eeb70ced113454e079d49dc7ff37f75d975849340b02549463d01d21e91c"
+  "hash": "7246c5add658c7c12fa9aa0722c7ca6b18c0d58bb27442fac0c4707b8df4028a"
 }

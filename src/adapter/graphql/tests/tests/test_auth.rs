@@ -279,7 +279,7 @@ async fn test_revoke_access_token() {
     let json = serde_json::to_string(&res.data).unwrap();
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
 
-    let created_token_id = json["auth"]["createAccessToken"]["id"].clone();
+    let created_token_id = json["auth"]["createAccessToken"]["token"]["id"].clone();
 
     let mutation_code = AuthGQLHarness::revoke_access_token(&created_token_id.to_string());
 
