@@ -58,7 +58,8 @@ members = [
     "src/e2e/app/cli/repo-tests",
     "src/e2e/app/cli/inmem",
     "src/e2e/app/cli/postgres",
-    "src/e2e/app/cli/mysql",
+    # NOTE: MySQL does not have the first tier support
+    # "src/e2e/app/cli/mysql",
     "src/e2e/app/cli/sqlite",
 ]
 resolver = "2"
