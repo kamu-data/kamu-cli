@@ -93,7 +93,19 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
         )
         .await;
 
-    // 3. Ingest data
+    // 3. Try to get the dataset tail
+    kamu_api_server_client
+        .rest_api_call_assert(
+            None,
+            Method::GET,
+            "player-scores/tail?limit=10",
+            None,
+            StatusCode::NO_CONTENT,
+            None,
+        )
+        .await;
+
+    // 4. Ingest data
     kamu_api_server_client
         .rest_api_call_assert(
             Some(token),
@@ -113,7 +125,7 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
         )
         .await;
 
-    // 4. Get dataset tail
+    // 5. Get the dataset tail
     kamu_api_server_client
         .rest_api_call_assert(
             None,
