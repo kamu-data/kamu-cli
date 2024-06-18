@@ -12,7 +12,6 @@ use reqwest::{Method, StatusCode};
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// TODO: add for DBs after fixes
 pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiServerClient) {
     // 1. Grub a token
     let login_response = kamu_api_server_client
