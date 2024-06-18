@@ -85,18 +85,14 @@ impl KamuApiServerClient {
 
         let response = request_builder.send().await.unwrap();
 
-        assert_eq!(expected_status, response.status());
+        pretty_assertions::assert_eq!(expected_status, response.status());
 
         if let Some(expected_response_body) = expected_response_body {
             let actual_response_body: serde_json::Value = response.json().await.unwrap();
             let pretty_actual_response_body =
                 serde_json::to_string_pretty(&actual_response_body).unwrap();
 
-            assert_eq!(
-                expected_response_body,
-                // Let's add \n for the sake of convenience of passing the expected result
-                format!("{pretty_actual_response_body}\n")
-            );
+            pretty_assertions::assert_eq!(expected_response_body, actual_response_body);
         };
     }
 
@@ -153,7 +149,7 @@ impl KamuApiServerClient {
     ) {
         let response = self.graphql_api_call_impl(query, maybe_token).await;
 
-        assert_eq!(StatusCode::OK, response.status());
+        pretty_assertions::assert_eq!(StatusCode::OK, response.status());
 
         let pretty_response_body: GraphQLPrettyResponseBody =
             response.json::<GraphQLResponseBody>().await.unwrap().into();
@@ -164,7 +160,7 @@ impl KamuApiServerClient {
             expected_response,
         ) {
             (Some(actual_error), None, Err(expected_error)) => {
-                assert_eq!(
+                pretty_assertions::assert_eq!(
                     expected_error,
                     // Let's add \n for the sake of convenience of passing the expected result
                     format!("{actual_error}\n")
@@ -172,7 +168,7 @@ impl KamuApiServerClient {
             }
             (None, Some(actual_response), Ok(expected_response)) => {
                 // Let's add \n for the sake of convenience of passing the expected result
-                assert_eq!(expected_response, format!("{actual_response}\n"));
+                pretty_assertions::assert_eq!(expected_response, format!("{actual_response}\n"));
             }
             (Some(actual_error), None, Ok(_)) => {
                 panic!(

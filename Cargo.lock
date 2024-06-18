@@ -5241,6 +5241,8 @@ dependencies = [
  "indoc 2.0.5",
  "internal-error",
  "kamu-cli-wrapper",
+ "kamu-core",
+ "pretty_assertions",
  "regex",
  "reqwest 0.11.27",
  "serde",
@@ -5300,6 +5302,7 @@ dependencies = [
  "kamu-cli-e2e-common",
  "kamu-cli-wrapper",
  "reqwest 0.11.27",
+ "serde_json",
  "tokio",
 ]
 
