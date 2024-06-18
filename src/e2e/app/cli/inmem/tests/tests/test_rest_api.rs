@@ -14,7 +14,8 @@ use kamu_cli_e2e_common::prelude::*;
 kamu_cli_run_api_server_e2e_test!(
     inmem,
     kamu_cli_e2e_repo_tests,
-    test_rest_api_request_dataset_tail
+    test_rest_api_request_dataset_tail,
+    Options::freeze_set_system_time()
 );
 
 ////////////////////////////////////////////////////////////////////////////////

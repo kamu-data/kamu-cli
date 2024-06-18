@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli_e2e_common::KamuApiServerClient;
+use kamu_cli_e2e_common::{KamuApiServerClient, RequestBody};
 use reqwest::{Method, StatusCode};
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +33,36 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
         .map(ToOwned::to_owned)
         .unwrap();
 
-    // 2. Create an empty dataset
+    // 2. Create a dataset
+    let snapshot = indoc::indoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: player-scores
+          kind: Root
+          metadata:
+            - kind: AddPushSource
+              sourceName: default
+              read:
+                kind: NdJson
+                schema:
+                  - "match_time TIMESTAMP"
+                  - "match_id BIGINT"
+                  - "player_id STRING"
+                  - "score BIGINT"
+              merge:
+                kind: Ledger
+                primaryKey:
+                  - match_id
+                  - player_id
+            - kind: SetVocab
+              eventTimeColumn: match_time
+        "#
+    )
+    .escape_default()
+    .to_string();
+
     kamu_api_server_client
         .graphql_api_call_assert_with_token(
             token.clone(),
@@ -41,18 +70,20 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
                 r#"
                 mutation {
                   datasets {
-                    createEmpty(datasetKind: ROOT, datasetAlias: "empty-root-dataset") {
+                    createFromSnapshot(snapshot: "<snapshot>", snapshotFormat: YAML) {
                       message
                     }
                   }
                 }
                 "#,
-            ),
+            )
+            .replace("<snapshot>", snapshot.as_str())
+            .as_str(),
             Ok(indoc::indoc!(
                 r#"
                 {
                   "datasets": {
-                    "createEmpty": {
+                    "createFromSnapshot": {
                       "message": "Success"
                     }
                   }
@@ -62,15 +93,35 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
         )
         .await;
 
-    // 3. Get dataset tail
+    // 3. Ingest data
     kamu_api_server_client
         .rest_api_call_assert(
+            Some(token),
+            Method::POST,
+            "player-scores/ingest",
+            Some(RequestBody::NDJSON(
+                indoc::indoc!(
+                    r#"
+                    {"match_time": "2000-01-01", "match_id": 1, "player_id": "Alice", "score": 100}
+                    {"match_time": "2000-01-01", "match_id": 1, "player_id": "Bob", "score": 80}
+                    "#,
+                )
+                .into(),
+            )),
+            StatusCode::OK,
+            None,
+        )
+        .await;
+
+    // 4. Get dataset tail
+    kamu_api_server_client
+        .rest_api_call_assert(
+            None,
             Method::GET,
-            "empty-root-dataset/tail?limit=10",
+            "player-scores/tail?limit=10",
             None,
             StatusCode::OK,
-            // TODO: add expected body
-            None,
+            Some(r#"{"data":[{"offset":0,"op":0,"system_time":"2024-06-18T15:00:00Z","match_time":"2000-01-01T00:00:00Z","match_id":1,"player_id":"Alice","score":100},{"offset":1,"op":0,"system_time":"2024-06-18T15:00:00Z","match_time":"2000-01-01T00:00:00Z","match_id":1,"player_id":"Bob","score":80}],"schema":"{\"fields\":[{\"name\":\"offset\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"op\",\"data_type\":\"Int32\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"system_time\",\"data_type\":{\"Timestamp\":[\"Millisecond\",\"UTC\"]},\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"match_time\",\"data_type\":{\"Timestamp\":[\"Millisecond\",\"UTC\"]},\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"match_id\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"player_id\",\"data_type\":\"Utf8\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"score\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}}],\"metadata\":{}}"}"#),
         )
         .await;
 }
