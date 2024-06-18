@@ -24,6 +24,7 @@ doctest = false
 [dependencies]
 internal-error = { workspace = true }
 kamu-cli-wrapper = { workspace = true }
+kamu-core = { workspace = true }
 
 indoc = "2"
 pretty_assertions = "1"

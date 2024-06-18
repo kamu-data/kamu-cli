@@ -5302,7 +5302,6 @@ dependencies = [
  "kamu-cli-e2e-common",
  "kamu-cli-wrapper",
  "reqwest 0.11.27",
- "serde_json",
  "tokio",
 ]
 

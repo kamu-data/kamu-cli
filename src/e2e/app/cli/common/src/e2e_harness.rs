@@ -38,6 +38,13 @@ impl KamuCliApiServerHarnessOptions {
             ..Default::default()
         }
     }
+
+    pub fn freeze_set_system_time() -> Self {
+        Self {
+            freeze_set_system_time: true,
+            ..Default::default()
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -150,13 +157,20 @@ impl KamuCliApiServerHarness {
         let KamuCliApiServerHarnessOptions {
             is_multi_tenant,
             env_vars,
+            freeze_set_system_time,
         } = self.options.unwrap_or_default();
-        let kamu = Kamu::new_workspace_tmp_with(NewWorkspaceOptions {
+        let mut kamu = Kamu::new_workspace_tmp_with(NewWorkspaceOptions {
             is_multi_tenant,
             kamu_config: self.kamu_config,
             env_vars,
         })
         .await;
+
+        if freeze_set_system_time {
+            let value = Utc.with_ymd_and_hms(2024, 6, 18, 15, 0, 0).unwrap();
+
+            kamu.set_system_time(Some(value));
+        }
 
         let server_addr = kamu.get_server_address();
         let server_run_fut = kamu.start_api_server(server_addr);
@@ -172,6 +186,7 @@ impl KamuCliApiServerHarness {
         let KamuCliApiServerHarnessOptions {
             is_multi_tenant,
             env_vars,
+            ..
         } = self.options.unwrap_or_default();
         let kamu = Kamu::new_workspace_tmp_with(NewWorkspaceOptions {
             is_multi_tenant,
