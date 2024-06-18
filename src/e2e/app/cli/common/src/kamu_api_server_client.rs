@@ -8,10 +8,18 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_core::MediaType;
 use reqwest::{Method, Response, StatusCode, Url};
 use serde::Deserialize;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
+
+////////////////////////////////////////////////////////////////////////////////
+
+pub enum RequestBody {
+    JSON(serde_json::Value),
+    NDJSON(String),
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -63,11 +71,12 @@ impl KamuApiServerClient {
 
     pub async fn rest_api_call_assert(
         &self,
+        token: Option<String>,
         method: Method,
         endpoint: &str,
-        request_body: Option<serde_json::Value>,
+        request_body: Option<RequestBody>,
         expected_status: StatusCode,
-        expected_response_body: Option<serde_json::Value>,
+        expected_response_body: Option<&str>,
     ) {
         let endpoint = self.server_base_url.join(endpoint).unwrap();
         let mut request_builder = match method {
@@ -79,8 +88,17 @@ impl KamuApiServerClient {
             }
         };
 
+        if let Some(token) = token {
+            request_builder = request_builder.bearer_auth(token);
+        }
+
         if let Some(request_body) = request_body {
-            request_builder = request_builder.json(&request_body);
+            request_builder = match request_body {
+                RequestBody::JSON(value) => request_builder.json(&value),
+                RequestBody::NDJSON(value) => request_builder
+                    .header("Content-Type", MediaType::NDJSON.0)
+                    .body(value),
+            }
         };
 
         let response = request_builder.send().await.unwrap();
@@ -88,9 +106,8 @@ impl KamuApiServerClient {
         pretty_assertions::assert_eq!(expected_status, response.status());
 
         if let Some(expected_response_body) = expected_response_body {
-            let actual_response_body: serde_json::Value = response.json().await.unwrap();
-            let pretty_actual_response_body =
-                serde_json::to_string_pretty(&actual_response_body).unwrap();
+            let actual_response_body =
+                String::from_utf8(response.bytes().await.unwrap().into()).unwrap();
 
             pretty_assertions::assert_eq!(expected_response_body, actual_response_body);
         };
