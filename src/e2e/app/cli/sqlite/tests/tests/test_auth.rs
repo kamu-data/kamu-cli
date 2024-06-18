@@ -27,13 +27,7 @@ kamu_cli_run_api_server_e2e_test!(
     sqlite,
     kamu_cli_e2e_repo_tests,
     test_login_dummy_github,
-    Options {
-        is_multi_tenant: true,
-        env_vars: Some(vec![
-            ("KAMU_AUTH_GITHUB_CLIENT_ID".into(), "1".into()),
-            ("KAMU_AUTH_GITHUB_CLIENT_SECRET".into(), "2".into())
-        ]),
-    }
+    Options::simple_multi_tenant()
 );
 
 ////////////////////////////////////////////////////////////////////////////////

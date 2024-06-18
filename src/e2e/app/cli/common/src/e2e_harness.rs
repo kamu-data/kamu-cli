@@ -13,6 +13,7 @@ use std::future::Future;
 use internal_error::InternalError;
 use kamu_cli_wrapper::{Kamu, NewWorkspaceOptions};
 use regex::Regex;
+use sqlx::types::chrono::{TimeZone, Utc};
 use sqlx::{MySqlPool, PgPool, SqlitePool};
 
 use crate::{api_server_e2e_test, KamuApiServerClient};
@@ -23,7 +24,23 @@ use crate::{api_server_e2e_test, KamuApiServerClient};
 pub struct KamuCliApiServerHarnessOptions {
     pub is_multi_tenant: bool,
     pub env_vars: Option<Vec<(String, String)>>,
+    pub freeze_set_system_time: bool,
 }
+
+impl KamuCliApiServerHarnessOptions {
+    pub fn simple_multi_tenant() -> Self {
+        Self {
+            is_multi_tenant: true,
+            env_vars: Some(vec![
+                ("KAMU_AUTH_GITHUB_CLIENT_ID".into(), "1".into()),
+                ("KAMU_AUTH_GITHUB_CLIENT_SECRET".into(), "2".into()),
+            ]),
+            ..Default::default()
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 pub struct KamuCliApiServerHarness {
     kamu_config: Option<String>,
