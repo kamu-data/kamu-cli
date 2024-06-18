@@ -22,6 +22,7 @@ use axum::extract::{self, Extension, Query};
 use axum::response::Json;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::common::DFSchema;
+use datafusion::error::DataFusionError;
 use kamu::domain::*;
 use kamu_data_utils::data::format::*;
 use opendatafabric::{DatasetID, Multihash};
@@ -41,11 +42,17 @@ pub async fn dataset_query_handler_post(
 ) -> Result<Json<QueryResponseBody>, ApiError> {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
 
-    let res = query_svc
+    let res = match query_svc
         .sql_statement(&body.query, body.to_options())
         .await
-        .int_err()
-        .api_err()?;
+    {
+        Ok(res) => res,
+        Err(QueryError::DatasetNotFound(err)) => Err(ApiError::not_found(err))?,
+        Err(QueryError::DataFusionError(err @ DataFusionError::Plan(_))) => {
+            Err(ApiError::bad_request(err))?
+        }
+        Err(e) => Err(e.int_err().api_err())?,
+    };
 
     // Apply pagination limits
     let df = res
@@ -80,7 +87,7 @@ pub async fn dataset_query_handler_post(
     let json = serialize_data(&record_batches, body.data_format).api_err()?;
     let data = serde_json::value::RawValue::from_string(json).unwrap();
 
-    let result_hash = if body.include_result_hash {
+    let data_hash = if body.include_data_hash {
         Some(kamu_data_utils::data::hash::get_batches_logical_hash(
             &arrow_schema,
             &record_batches,
@@ -93,7 +100,7 @@ pub async fn dataset_query_handler_post(
         data,
         schema,
         state,
-        result_hash,
+        data_hash,
     }))
 }
 
@@ -110,7 +117,7 @@ pub async fn dataset_query_handler(
 
 // TODO: Sanity limits
 #[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct QueryRequestBody {
     /// SQL query
     query: String,
@@ -140,8 +147,8 @@ pub struct QueryRequestBody {
 
     /// Whether to include a logical hash of the resulting data batch.
     /// See: https://docs.kamu.dev/odf/spec/#physical-and-logical-hashes
-    #[serde(default = "QueryRequestBody::default_include_result_hash")]
-    include_result_hash: bool,
+    #[serde(default = "QueryRequestBody::default_include_data_hash")]
+    include_data_hash: bool,
 
     /// Pagination: skips first N records
     #[serde(default)]
@@ -164,7 +171,7 @@ impl QueryRequestBody {
         true
     }
 
-    fn default_include_result_hash() -> bool {
+    fn default_include_data_hash() -> bool {
         true
     }
 
@@ -183,7 +190,7 @@ impl QueryRequestBody {
 /////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct QueryRequestParams {
     query: String,
     #[serde(default)]
@@ -200,8 +207,8 @@ pub struct QueryRequestParams {
     include_schema: bool,
     #[serde(default = "QueryRequestBody::default_include_state")]
     include_state: bool,
-    #[serde(default = "QueryRequestBody::default_include_result_hash")]
-    include_result_hash: bool,
+    #[serde(default = "QueryRequestBody::default_include_data_hash")]
+    include_data_hash: bool,
 }
 
 impl From<QueryRequestParams> for QueryRequestBody {
@@ -214,7 +221,7 @@ impl From<QueryRequestParams> for QueryRequestBody {
             as_of_state: None,
             include_schema: v.include_schema,
             include_state: v.include_state,
-            include_result_hash: v.include_result_hash,
+            include_data_hash: v.include_data_hash,
             skip: v.skip,
             limit: v.limit,
         }
@@ -232,13 +239,13 @@ pub struct QueryResponseBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     state: Option<QueryState>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    result_hash: Option<Multihash>,
+    data_hash: Option<Multihash>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct QueryDatasetAlias {
     pub alias: String,
     pub id: DatasetID,
@@ -247,13 +254,13 @@ pub struct QueryDatasetAlias {
 /////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct QueryState {
     pub inputs: Vec<QueryDatasetState>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct QueryDatasetState {
     pub id: DatasetID,
     pub block_hash: Multihash,

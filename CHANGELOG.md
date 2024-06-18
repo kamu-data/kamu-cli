@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.188.1] - 2024-06-17
+### Changed
+- The `/query` REST API endpoint will:
+  - return `404 Not Found` on not found datasets
+  - return `400 Bad Request` on invalid SQL
+  - return `422 Unprocessable Content` on unrecognized request body fields
+
 ## [0.188.0] - 2024-06-14
 ## Added
 - New repository `AccessTokenRepository` to work with new access tokens

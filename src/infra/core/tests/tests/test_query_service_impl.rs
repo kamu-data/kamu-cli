@@ -34,19 +34,20 @@ use tempfile::TempDir;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> DatasetAlias {
+async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> CreateDatasetResult {
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
     let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
-    let dataset = dataset_repo
+    let create_result = dataset_repo
         .create_dataset(
             &dataset_alias,
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                 .build_typed(),
         )
         .await
-        .unwrap()
-        .dataset;
+        .unwrap();
+
+    let dataset = create_result.dataset.clone();
 
     // Write schema
     let tmp_data_path = tempdir.join("data");
@@ -110,7 +111,7 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> Dataset
         prev_offset = Some(end_offset);
     }
 
-    dataset_alias
+    create_result
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -174,7 +175,10 @@ async fn create_catalog_with_s3_workspace(
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_dataset_parquet_schema(catalog: &Catalog, tempdir: &TempDir) {
-    let dataset_alias = create_test_dataset(catalog, tempdir.path()).await;
+    let dataset_alias = create_test_dataset(catalog, tempdir.path())
+        .await
+        .dataset_handle
+        .alias;
     let dataset_ref = DatasetRef::from(dataset_alias);
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
@@ -210,7 +214,10 @@ async fn test_dataset_parquet_schema(catalog: &Catalog, tempdir: &TempDir) {
     );
 }
 async fn test_dataset_arrow_schema(catalog: &Catalog, tempdir: &TempDir) {
-    let dataset_alias = create_test_dataset(catalog, tempdir.path()).await;
+    let dataset_alias = create_test_dataset(catalog, tempdir.path())
+        .await
+        .dataset_handle
+        .alias;
     let dataset_ref = DatasetRef::from(dataset_alias);
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
@@ -300,7 +307,10 @@ async fn test_dataset_arrow_schema_s3() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_dataset_schema_unauthorized_common(catalog: dill::Catalog, tempdir: &TempDir) {
-    let dataset_alias = create_test_dataset(&catalog, tempdir.path()).await;
+    let dataset_alias = create_test_dataset(&catalog, tempdir.path())
+        .await
+        .dataset_handle
+        .alias;
     let dataset_ref = DatasetRef::from(dataset_alias);
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
@@ -329,7 +339,10 @@ async fn test_dataset_schema_unauthorized_s3() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
-    let dataset_alias = create_test_dataset(&catalog, tempdir.path()).await;
+    let dataset_alias = create_test_dataset(&catalog, tempdir.path())
+        .await
+        .dataset_handle
+        .alias;
     let dataset_ref = DatasetRef::from(dataset_alias);
 
     // Within last block
@@ -419,11 +432,13 @@ async fn test_dataset_tail_empty_dataset() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_dataset_tail_unauthorized_common(catalog: dill::Catalog, tempdir: &TempDir) {
-    let dataset_alias = create_test_dataset(&catalog, tempdir.path()).await;
-    let dataset_ref = DatasetRef::from(dataset_alias);
+    let dataset_alias = create_test_dataset(&catalog, tempdir.path())
+        .await
+        .dataset_handle
+        .alias;
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let result = query_svc.tail(&dataset_ref, 1, 1).await;
+    let result = query_svc.tail(&dataset_alias.as_local_ref(), 1, 1).await;
     assert_matches!(result, Err(QueryError::Access(_)));
 }
 
@@ -448,7 +463,10 @@ async fn test_dataset_tail_unauthorized_s3() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_dataset_sql_authorized_common(catalog: dill::Catalog, tempdir: &TempDir) {
-    let dataset_alias = create_test_dataset(&catalog, tempdir.path()).await;
+    let dataset_alias = create_test_dataset(&catalog, tempdir.path())
+        .await
+        .dataset_handle
+        .alias;
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let statement = format!("SELECT COUNT(*) AS num_records FROM {dataset_alias}");
@@ -498,7 +516,10 @@ async fn test_dataset_sql_authorized_s3() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_dataset_sql_unauthorized_common(catalog: dill::Catalog, tempdir: &TempDir) {
-    let dataset_alias = create_test_dataset(&catalog, tempdir.path()).await;
+    let dataset_alias = create_test_dataset(&catalog, tempdir.path())
+        .await
+        .dataset_handle
+        .alias;
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let statement = format!("SELECT COUNT(*) FROM {dataset_alias}");
@@ -530,6 +551,119 @@ async fn test_dataset_sql_unauthorized_s3() {
     let catalog =
         create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::denying()).await;
     test_dataset_sql_unauthorized_common(catalog, &s3.tmp_dir).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_sql_statement_not_found() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let catalog = create_catalog_with_local_workspace(
+        tempdir.path(),
+        MockDatasetActionAuthorizer::allowing(),
+    );
+
+    let _ = create_test_dataset(&catalog, tempdir.path()).await;
+
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let statement = "select count(*) from does_not_exist";
+    let result = query_svc
+        .sql_statement(statement, QueryOptions::default())
+        .await;
+
+    assert_matches!(
+        result,
+        Err(QueryError::DataFusionError(
+            ::datafusion::common::DataFusionError::Plan(s)
+        ))  if s.contains("table 'kamu.kamu.does_not_exist' not found")
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_sql_statement_by_alias() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let catalog = create_catalog_with_local_workspace(
+        tempdir.path(),
+        MockDatasetActionAuthorizer::allowing(),
+    );
+
+    let dataset = create_test_dataset(&catalog, tempdir.path()).await;
+
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let statement = "select count(*) as num_records from foobar";
+    let result = query_svc
+        .sql_statement(
+            statement,
+            QueryOptions {
+                aliases: Some(BTreeMap::from([(
+                    "foobar".to_string(),
+                    dataset.dataset_handle.id,
+                )])),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    kamu_data_utils::testing::assert_data_eq(
+        result.df,
+        indoc::indoc!(
+            r#"
+            +-------------+
+            | num_records |
+            +-------------+
+            | 4           |
+            +-------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_sql_statement_alias_not_found() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let catalog = create_catalog_with_local_workspace(
+        tempdir.path(),
+        MockDatasetActionAuthorizer::allowing(),
+    );
+
+    let dataset_alias = create_test_dataset(&catalog, tempdir.path())
+        .await
+        .dataset_handle
+        .alias;
+
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+
+    // Note that we use an alias on top of existing dataset name - alias must take
+    // precedence
+    let statement = format!("select count(*) as num_records from {dataset_alias}");
+    let result = query_svc
+        .sql_statement(
+            statement.as_str(),
+            QueryOptions {
+                aliases: Some(BTreeMap::from([(
+                    dataset_alias.to_string(),
+                    DatasetID::new_seeded_ed25519(b"does-not-exist"),
+                )])),
+                ..Default::default()
+            },
+        )
+        .await;
+
+    assert_matches!(
+        result,
+        Err(QueryError::DatasetNotFound(DatasetNotFoundError {
+            dataset_ref,
+        })) if dataset_ref == DatasetID::new_seeded_ed25519(b"does-not-exist").as_local_ref()
+    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
