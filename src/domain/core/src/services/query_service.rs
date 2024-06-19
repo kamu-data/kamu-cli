@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::BTreeMap;
+use std::fmt::{Debug, Formatter};
 
 use datafusion::arrow;
 use datafusion::error::DataFusionError;
@@ -18,6 +19,8 @@ use thiserror::Error;
 
 use crate::auth::DatasetActionUnauthorizedError;
 use crate::*;
+
+////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Support different engines and query dialects
 #[async_trait::async_trait]
@@ -44,7 +47,7 @@ pub trait QueryService: Send + Sync {
         dataset_ref: &DatasetRef,
         skip: u64,
         limit: u64,
-    ) -> Result<DataFrame, QueryError>;
+    ) -> Result<DataFrameWithContext, QueryError>;
 
     /// Prepares an execution plan for the SQL statement and returns a
     /// [DataFrame] that can be used to get schema and data, and the state
@@ -73,13 +76,29 @@ pub trait QueryService: Send + Sync {
     // number of files we collect to construct the dataframe.
     //
     /// Returns a [DataFrame] representing the contents of an entire dataset
-    async fn get_data(&self, dataset_ref: &DatasetRef) -> Result<DataFrame, QueryError>;
+    async fn get_data(&self, dataset_ref: &DatasetRef) -> Result<DataFrameWithContext, QueryError>;
 
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;
 }
 
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+/// Dataframe and its context. Without context, we cannot perform operations on
+/// the dataframe
+#[derive(Clone)]
+pub struct DataFrameWithContext {
+    pub ctx: SessionContext,
+    pub df: DataFrame,
+}
+
+impl Debug for DataFrameWithContext {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DataFrameWithContext({:?})", self.df)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Default)]
 pub struct QueryOptions {
@@ -102,6 +121,8 @@ pub struct QueryOptions {
     pub hints: Option<BTreeMap<DatasetID, DatasetQueryHints>>,
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, Default)]
 pub struct DatasetQueryHints {
     /// Number of records that will be considered for this dataset (starting
@@ -112,16 +133,26 @@ pub struct DatasetQueryHints {
     pub last_records_to_consider: Option<u64>,
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone)]
 pub struct QueryResponse {
     /// A [DataFrame] that can be used to read schema and access the data. Note
     /// that the data frames are "lazy". They are a representation of a logical
     /// query plan. The actual query is executed only when you pull the
     /// resulting data from it.
-    pub df: DataFrame,
+    pub df_with_ctx: DataFrameWithContext,
     ///  The query state information that can be used for reproducibility.
     pub state: QueryState,
 }
+
+impl QueryResponse {
+    pub fn new(df_with_ctx: DataFrameWithContext, state: QueryState) -> Self {
+        Self { df_with_ctx, state }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct QueryState {
@@ -130,7 +161,7 @@ pub struct QueryState {
     pub inputs: BTreeMap<DatasetID, Multihash>,
 }
 
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EngineDesc {
@@ -153,9 +184,9 @@ pub enum QueryDialect {
     SqlRisingWave,
 }
 
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // Errors
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
 pub enum CreateSessionError {
@@ -207,7 +238,7 @@ pub enum QueryError {
     ),
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Dataset schema is not yet available: {dataset_ref}")]
@@ -215,7 +246,7 @@ pub struct DatasetSchemaNotAvailableError {
     pub dataset_ref: DatasetRef,
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 impl From<GetDatasetError> for QueryError {
     fn from(v: GetDatasetError) -> Self {
@@ -226,7 +257,7 @@ impl From<GetDatasetError> for QueryError {
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 impl From<DatasetActionUnauthorizedError> for QueryError {
     fn from(v: DatasetActionUnauthorizedError) -> Self {
@@ -237,4 +268,4 @@ impl From<DatasetActionUnauthorizedError> for QueryError {
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////

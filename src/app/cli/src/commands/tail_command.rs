@@ -46,13 +46,17 @@ impl TailCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for TailCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let df = self
+        let tail_response = self
             .query_svc
             .tail(&self.dataset_ref, self.skip, self.limit)
             .await
             .map_err(CLIError::failure)?;
 
-        let record_batches = df.collect().await.map_err(CLIError::failure)?;
+        let record_batches = tail_response
+            .df
+            .collect()
+            .await
+            .map_err(CLIError::failure)?;
 
         let mut writer =
             self.output_cfg

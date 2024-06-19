@@ -89,7 +89,7 @@ impl DatasetData {
                 limit,
             )
             .await;
-        let df = match tail_result {
+        let df_with_ctx = match tail_result {
             Ok(r) => r,
             Err(err) => {
                 return if let QueryError::DatasetSchemaNotAvailable(_) = err {
@@ -101,8 +101,8 @@ impl DatasetData {
             }
         };
 
-        let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;
-        let record_batches = match df.collect().await {
+        let schema = DataSchema::from_data_frame_schema(df_with_ctx.df.schema(), schema_format)?;
+        let record_batches = match df_with_ctx.df.collect().await {
             Ok(rb) => rb,
             Err(e) => return Ok(e.into()),
         };

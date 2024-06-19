@@ -56,6 +56,7 @@ pub async fn dataset_query_handler_post(
 
     // Apply pagination limits
     let df = res
+        .df_with_ctx
         .df
         .limit(
             usize::try_from(body.skip).unwrap(),
@@ -64,15 +65,10 @@ pub async fn dataset_query_handler_post(
         .int_err()
         .api_err()?;
 
-    let res = QueryResponse {
-        df,
-        state: res.state,
-    };
-
-    let arrow_schema = res.df.schema().inner().clone();
+    let arrow_schema = df.schema().inner().clone();
 
     let schema = if body.include_schema {
-        Some(serialize_schema(res.df.schema(), body.schema_format).api_err()?)
+        Some(serialize_schema(df.schema(), body.schema_format).api_err()?)
     } else {
         None
     };
@@ -83,7 +79,7 @@ pub async fn dataset_query_handler_post(
         None
     };
 
-    let record_batches = res.df.collect().await.int_err().api_err()?;
+    let record_batches = df.collect().await.int_err().api_err()?;
     let json = serialize_data(&record_batches, body.data_format).api_err()?;
     let data = serde_json::value::RawValue::from_string(json).unwrap();
 
