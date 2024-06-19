@@ -64,7 +64,7 @@ impl QueryServiceImpl {
         session_context.register_catalog(
             "kamu",
             Arc::new(KamuCatalog::new(Arc::new(KamuSchema::new(
-                session_context.clone(),
+                &session_context,
                 self.dataset_repo.clone(),
                 self.dataset_action_authorizer.clone(),
                 options,

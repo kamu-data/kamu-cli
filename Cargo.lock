@@ -4771,6 +4771,7 @@ dependencies = [
  "nanoid",
  "object_store",
  "opendatafabric",
+ "parking_lot",
  "petgraph",
  "pin-project",
  "rand",

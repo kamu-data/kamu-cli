@@ -80,8 +80,9 @@ zip = "0.6"
 
 # Data
 datafusion = { version = "39", default-features = false }
-object_store = { version = "0.10", features = ["aws"] }
 digest = "0.10"
+object_store = { version = "0.10", features = ["aws"] }
+parking_lot = { version = "0.12" }
 sha3 = "0.10"
 
 # Repositories
