@@ -13,7 +13,7 @@ use std::future::Future;
 use internal_error::InternalError;
 use kamu_cli_wrapper::{Kamu, NewWorkspaceOptions};
 use regex::Regex;
-use sqlx::types::chrono::{TimeZone, Utc};
+use sqlx::types::chrono::{DateTime, NaiveTime, Utc};
 use sqlx::{MySqlPool, PgPool, SqlitePool};
 
 use crate::{api_server_e2e_test, KamuApiServerClient};
@@ -24,7 +24,7 @@ use crate::{api_server_e2e_test, KamuApiServerClient};
 pub struct KamuCliApiServerHarnessOptions {
     pub is_multi_tenant: bool,
     pub env_vars: Option<Vec<(String, String)>>,
-    pub freeze_set_system_time: bool,
+    pub frozen_system_time: Option<DateTime<Utc>>,
 }
 
 impl KamuCliApiServerHarnessOptions {
@@ -39,11 +39,22 @@ impl KamuCliApiServerHarnessOptions {
         }
     }
 
-    pub fn freeze_set_system_time() -> Self {
+    pub fn freeze_system_time_with(date_time: DateTime<Utc>) -> Self {
         Self {
-            freeze_set_system_time: true,
+            frozen_system_time: Some(date_time),
             ..Default::default()
         }
+    }
+
+    pub fn freeze_system_time_with_today() -> Self {
+        let today = {
+            let now = Utc::now();
+
+            now.with_time(NaiveTime::from_hms_micro_opt(0, 0, 0, 0).unwrap())
+                .unwrap()
+        };
+
+        Self::freeze_system_time_with(today)
     }
 }
 
@@ -157,7 +168,7 @@ impl KamuCliApiServerHarness {
         let KamuCliApiServerHarnessOptions {
             is_multi_tenant,
             env_vars,
-            freeze_set_system_time,
+            frozen_system_time: freeze_system_time,
         } = self.options.unwrap_or_default();
         let mut kamu = Kamu::new_workspace_tmp_with(NewWorkspaceOptions {
             is_multi_tenant,
@@ -166,11 +177,7 @@ impl KamuCliApiServerHarness {
         })
         .await;
 
-        if freeze_set_system_time {
-            let value = Utc.with_ymd_and_hms(2024, 6, 18, 15, 0, 0).unwrap();
-
-            kamu.set_system_time(Some(value));
-        }
+        kamu.set_system_time(freeze_system_time);
 
         let server_addr = kamu.get_server_address();
         let server_run_fut = kamu.start_api_server(server_addr);

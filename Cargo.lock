@@ -5283,6 +5283,7 @@ dependencies = [
 name = "kamu-cli-e2e-repo-tests"
 version = "0.188.1"
 dependencies = [
+ "chrono",
  "indoc 2.0.5",
  "internal-error",
  "kamu-cli-e2e-common",

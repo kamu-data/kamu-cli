@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{NaiveTime, SecondsFormat, Utc};
 use kamu_cli_e2e_common::{KamuApiServerClient, RequestBody};
 use reqwest::{Method, StatusCode};
 
@@ -124,6 +125,17 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
         )
         .await;
 
+    let today = {
+        let now = Utc::now();
+
+        now.with_time(NaiveTime::from_hms_micro_opt(0, 0, 0, 0).unwrap())
+            .unwrap()
+            .to_rfc3339_opts(SecondsFormat::Secs, true)
+    };
+    let expected_response = r#"{"data":[{"offset":0,"op":0,"system_time":"<SYSTEM_TIME>","match_time":"2000-01-01T00:00:00Z","match_id":1,"player_id":"Alice","score":100},{"offset":1,"op":0,"system_time":"<SYSTEM_TIME>","match_time":"2000-01-01T00:00:00Z","match_id":1,"player_id":"Bob","score":80}],"schema":"{\"fields\":[{\"name\":\"offset\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"op\",\"data_type\":\"Int32\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"system_time\",\"data_type\":{\"Timestamp\":[\"Millisecond\",\"UTC\"]},\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"match_time\",\"data_type\":{\"Timestamp\":[\"Millisecond\",\"UTC\"]},\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"match_id\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"player_id\",\"data_type\":\"Utf8\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"score\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}}],\"metadata\":{}}"}"#
+        .to_string()
+        .replace("<SYSTEM_TIME>", today.as_str());
+
     // 5. Get the dataset tail
     kamu_api_server_client
         .rest_api_call_assert(
@@ -132,7 +144,7 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
             "player-scores/tail?limit=10",
             None,
             StatusCode::OK,
-            Some(r#"{"data":[{"offset":0,"op":0,"system_time":"2024-06-18T15:00:00Z","match_time":"2000-01-01T00:00:00Z","match_id":1,"player_id":"Alice","score":100},{"offset":1,"op":0,"system_time":"2024-06-18T15:00:00Z","match_time":"2000-01-01T00:00:00Z","match_id":1,"player_id":"Bob","score":80}],"schema":"{\"fields\":[{\"name\":\"offset\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"op\",\"data_type\":\"Int32\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"system_time\",\"data_type\":{\"Timestamp\":[\"Millisecond\",\"UTC\"]},\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"match_time\",\"data_type\":{\"Timestamp\":[\"Millisecond\",\"UTC\"]},\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"match_id\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"player_id\",\"data_type\":\"Utf8\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"score\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}}],\"metadata\":{}}"}"#),
+            Some(expected_response.as_str()),
         )
         .await;
 }

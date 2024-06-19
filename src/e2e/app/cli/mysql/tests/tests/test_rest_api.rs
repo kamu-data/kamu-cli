@@ -15,7 +15,10 @@ kamu_cli_run_api_server_e2e_test!(
     mysql,
     kamu_cli_e2e_repo_tests,
     test_rest_api_request_dataset_tail,
-    Options::freeze_set_system_time()
+    // We need synthetic time for the tests, but the third-party JWT code
+    // uses the current time. Assuming that the token lifetime is 24 hours, we will
+    // use the projected date (the current day) as a workaround.
+    Options::freeze_system_time_with_today()
 );
 
 ////////////////////////////////////////////////////////////////////////////////
