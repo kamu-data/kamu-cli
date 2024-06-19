@@ -258,7 +258,11 @@ impl SchemaProvider for KamuSchema {
         let this = self.clone();
 
         std::thread::spawn(move || {
-            let runtime = tokio::runtime::Runtime::new().unwrap();
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+
             runtime.block_on(this.table_names_impl())
         })
         .join()
@@ -271,7 +275,11 @@ impl SchemaProvider for KamuSchema {
         let name = name.to_owned();
 
         std::thread::spawn(move || {
-            let runtime = tokio::runtime::Runtime::new().unwrap();
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+
             runtime.block_on(this.table_exist_impl(&name))
         })
         .join()
