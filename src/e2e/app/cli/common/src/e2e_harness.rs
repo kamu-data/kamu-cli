@@ -165,6 +165,27 @@ impl KamuCliApiServerHarness {
         Fixture: FnOnce(KamuApiServerClient) -> FixtureResult,
         FixtureResult: Future<Output = ()>,
     {
+        let kamu = self.into_kamu().await;
+
+        let server_addr = kamu.get_server_address();
+        let server_run_fut = kamu.start_api_server(server_addr);
+
+        api_server_e2e_test(server_addr, server_run_fut, fixture).await;
+    }
+
+    pub async fn execute_command<Fixture, FixtureResult>(self, fixture: Fixture)
+    where
+        Fixture: FnOnce(Kamu) -> FixtureResult,
+        FixtureResult: Future<Output = Result<(), InternalError>>,
+    {
+        let kamu = self.into_kamu().await;
+
+        let execute_result = fixture(kamu).await;
+
+        assert_matches!(execute_result, Ok(()));
+    }
+
+    async fn into_kamu(self) -> Kamu {
         let KamuCliApiServerHarnessOptions {
             is_multi_tenant,
             env_vars,
@@ -179,32 +200,7 @@ impl KamuCliApiServerHarness {
 
         kamu.set_system_time(freeze_system_time);
 
-        let server_addr = kamu.get_server_address();
-        let server_run_fut = kamu.start_api_server(server_addr);
-
-        api_server_e2e_test(server_addr, server_run_fut, fixture).await;
-    }
-
-    pub async fn execute_command<Fixture, FixtureResult>(self, fixture: Fixture)
-    where
-        Fixture: FnOnce(Kamu) -> FixtureResult,
-        FixtureResult: Future<Output = Result<(), InternalError>>,
-    {
-        let KamuCliApiServerHarnessOptions {
-            is_multi_tenant,
-            env_vars,
-            ..
-        } = self.options.unwrap_or_default();
-        let kamu = Kamu::new_workspace_tmp_with(NewWorkspaceOptions {
-            is_multi_tenant,
-            kamu_config: self.kamu_config,
-            env_vars,
-        })
-        .await;
-
-        let execute_result = fixture(kamu).await;
-
-        assert_matches!(execute_result, Ok(()));
+        kamu
     }
 }
 
