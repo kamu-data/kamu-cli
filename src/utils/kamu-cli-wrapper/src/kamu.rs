@@ -275,9 +275,10 @@ impl Kamu {
 
     pub fn catalog(&self) -> dill::Catalog {
         let is_e2e_testing = true;
+        let multi_tenant_workspace = false;
         let base_catalog = kamu_cli::configure_base_catalog(
             &self.workspace_layout,
-            false,
+            multi_tenant_workspace,
             self.system_time,
             is_e2e_testing,
         )
