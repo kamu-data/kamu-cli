@@ -1284,7 +1284,7 @@ pub fn cli() -> Command {
                                     .required(true)
                                     .value_parser(value_parse_dataset_ref_local)
                                     .help("Dataset reference")])]),
-                        Command::new("check-token")
+                        Command::new("debug-token")
                             .about("Validate a Kamu token")
                             .args([
                                 Arg::new("token")

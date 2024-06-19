@@ -490,7 +490,7 @@ pub fn get_command(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
             )),
-            Some(("check-token", matches)) => Box::new(CheckTokenCommand::new(
+            Some(("debug-token", matches)) => Box::new(DebugTokenCommand::new(
                 cli_catalog.get_one()?,
                 matches.get_one("token").cloned().unwrap(),
             )),
