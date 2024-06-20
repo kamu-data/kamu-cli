@@ -23,6 +23,13 @@ pub enum RequestBody {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+pub enum ExpectedResponseBody {
+    JSON(String),
+    PLAIN(String),
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Clone)]
 pub struct KamuApiServerClient {
     http_client: reqwest::Client,
@@ -76,7 +83,7 @@ impl KamuApiServerClient {
         endpoint: &str,
         request_body: Option<RequestBody>,
         expected_status: StatusCode,
-        expected_response_body: Option<&str>,
+        expected_response_body: Option<ExpectedResponseBody>,
     ) {
         let endpoint = self.server_base_url.join(endpoint).unwrap();
         let mut request_builder = match method {
@@ -106,10 +113,8 @@ impl KamuApiServerClient {
         pretty_assertions::assert_eq!(expected_status, response.status());
 
         if let Some(expected_response_body) = expected_response_body {
-            let actual_response_body =
-                String::from_utf8(response.bytes().await.unwrap().into()).unwrap();
-
-            pretty_assertions::assert_eq!(expected_response_body, actual_response_body);
+            self.rest_api_call_response_body_assert(response, expected_response_body)
+                .await;
         };
     }
 
@@ -141,6 +146,34 @@ impl KamuApiServerClient {
     ) {
         self.graphql_api_call_assert_impl(query, expected_response, Some(token))
             .await;
+    }
+
+    pub async fn rest_api_call_response_body_assert(
+        &self,
+        response: Response,
+        expected_response_body: ExpectedResponseBody,
+    ) {
+        match expected_response_body {
+            ExpectedResponseBody::JSON(expected_pretty_json_response_body) => {
+                let pretty_actual_response = {
+                    let actual_response_body: serde_json::Value = response.json().await.unwrap();
+
+                    serde_json::to_string_pretty(&actual_response_body).unwrap()
+                };
+
+                // Let's add \n for the sake of convenience of passing the expected result
+                pretty_assertions::assert_eq!(
+                    expected_pretty_json_response_body,
+                    format!("{pretty_actual_response}\n"),
+                );
+            }
+            ExpectedResponseBody::PLAIN(expected_plain_response_body) => {
+                let actual_response_body =
+                    String::from_utf8(response.bytes().await.unwrap().into()).unwrap();
+
+                pretty_assertions::assert_eq!(expected_plain_response_body, actual_response_body);
+            }
+        };
     }
 
     async fn graphql_api_call_impl(&self, query: &str, maybe_token: Option<String>) -> Response {

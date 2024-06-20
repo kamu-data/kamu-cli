@@ -8,9 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{NaiveTime, SecondsFormat, Utc};
-use kamu_cli_e2e_common::{KamuApiServerClient, RequestBody};
+use kamu_cli_e2e_common::{ExpectedResponseBody, KamuApiServerClient, RequestBody};
 use reqwest::{Method, StatusCode};
-use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -126,37 +125,12 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
         )
         .await;
 
-    let expected_response = {
-        let today = {
-            let now = Utc::now();
+    let today = {
+        let now = Utc::now();
 
-            now.with_time(NaiveTime::from_hms_micro_opt(0, 0, 0, 0).unwrap())
-                .unwrap()
-                .to_rfc3339_opts(SecondsFormat::Secs, true)
-        };
-
-        serde_json::to_string(&json!({
-            "data": [
-                {
-                    "offset": 0,
-                    "op": 0,
-                    "system_time": today.as_str(),
-                    "match_time": "2000-01-01T00:00:00Z",
-                    "match_id": 1,
-                    "player_id": "Alice",
-                    "score": 100
-                },
-                {
-                    "offset": 1,
-                    "op": 0,
-                    "system_time": today.as_str(),
-                    "match_time": "2000-01-01T00:00:00Z",
-                    "match_id": 1,
-                    "player_id": "Bob",
-                    "score": 80}
-            ]
-        }))
-        .unwrap()
+        now.with_time(NaiveTime::from_hms_micro_opt(0, 0, 0, 0).unwrap())
+            .unwrap()
+            .to_rfc3339_opts(SecondsFormat::Secs, true)
     };
 
     // 5. Get the dataset tail
@@ -167,7 +141,36 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
             "player-scores/tail?includeSchema=false",
             None,
             StatusCode::OK,
-            Some(expected_response.as_str()),
+            Some(ExpectedResponseBody::JSON(
+                indoc::indoc!(
+                    r#"
+                    {
+                      "data": [
+                        {
+                          "match_id": 1,
+                          "match_time": "2000-01-01T00:00:00Z",
+                          "offset": 0,
+                          "op": 0,
+                          "player_id": "Alice",
+                          "score": 100,
+                          "system_time": "<SYSTEM_TIME>"
+                        },
+                        {
+                          "match_id": 1,
+                          "match_time": "2000-01-01T00:00:00Z",
+                          "offset": 1,
+                          "op": 0,
+                          "player_id": "Bob",
+                          "score": 80,
+                          "system_time": "<SYSTEM_TIME>"
+                        }
+                      ]
+                    }
+                    "#
+                )
+                .to_string()
+                .replace("<SYSTEM_TIME>", today.as_str()),
+            )),
         )
         .await;
 }
