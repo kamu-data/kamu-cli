@@ -13,7 +13,7 @@ use kamu_cli_e2e_common::KamuApiServerClient;
 
 pub async fn test_selftest(kamu_api_server_client: KamuApiServerClient) {
     kamu_api_server_client
-        .api_call_assert(
+        .graphql_api_call_assert(
             "{ apiVersion }",
             Ok(indoc::indoc!(
                 r#"

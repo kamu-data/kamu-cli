@@ -103,6 +103,7 @@ pub fn cli() -> Command {
                 .long("account")
                 .short('a')
                 .action(ArgAction::Set)
+                .help("Specifies account for multi-tenant Workspace")
                 .hide(true),
             Arg::new("e2e-testing")
                 .long("e2e-testing")

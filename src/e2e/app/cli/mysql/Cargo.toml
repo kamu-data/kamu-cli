@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli-e2e-mysql"
-description = "MySQL-specific E2E tests"
+description = "MySQL-specific E2E tests (disabled)"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }

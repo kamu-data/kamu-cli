@@ -12,22 +12,13 @@ use kamu_cli_e2e_common::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
-    sqlite,
+    postgres,
     kamu_cli_e2e_repo_tests,
-    test_login_password_predefined_successful
-);
-
-////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_run_api_server_e2e_test!(sqlite, kamu_cli_e2e_repo_tests, test_login_enabled_methods);
-
-////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_run_api_server_e2e_test!(
-    sqlite,
-    kamu_cli_e2e_repo_tests,
-    test_login_dummy_github,
-    Options::default().with_multi_tenant(true)
+    test_rest_api_request_dataset_tail,
+    // We need synthetic time for the tests, but the third-party JWT code
+    // uses the current time. Assuming that the token lifetime is 24 hours, we will
+    // use the projected date (the current day) as a workaround.
+    Options::default().with_today_as_frozen_system_time()
 );
 
 ////////////////////////////////////////////////////////////////////////////////

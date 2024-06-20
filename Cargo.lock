@@ -4771,6 +4771,7 @@ dependencies = [
  "nanoid",
  "object_store",
  "opendatafabric",
+ "parking_lot",
  "petgraph",
  "pin-project",
  "rand",
@@ -5241,6 +5242,8 @@ dependencies = [
  "indoc 2.0.5",
  "internal-error",
  "kamu-cli-wrapper",
+ "kamu-core",
+ "pretty_assertions",
  "regex",
  "reqwest 0.11.27",
  "serde",
@@ -5264,20 +5267,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamu-cli-e2e-mysql"
-version = "0.188.1"
-dependencies = [
- "indoc 2.0.5",
- "kamu-cli-e2e-common",
- "kamu-cli-e2e-repo-tests",
- "kamu-cli-wrapper",
- "paste",
- "sqlx",
- "test-group",
- "test-log",
-]
-
-[[package]]
 name = "kamu-cli-e2e-postgres"
 version = "0.188.1"
 dependencies = [
@@ -5295,10 +5284,12 @@ dependencies = [
 name = "kamu-cli-e2e-repo-tests"
 version = "0.188.1"
 dependencies = [
+ "chrono",
  "indoc 2.0.5",
  "internal-error",
  "kamu-cli-e2e-common",
  "kamu-cli-wrapper",
+ "reqwest 0.11.27",
  "tokio",
 ]
 

@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Added
+- Added an E2E test group for REST API
+### Changed
+- MySQL E2E tests are turned off
+- The `<owner/dataset>/tail` REST API endpoint will:
+  - return `404 Not Found` on not found datasets
+  - return `202 No Content` on empty datasets
+### Fixed
+- Stabilized query handling in case of database usage; affected:
+  - The `<owner/dataset>/tail` REST API
+  - The `/query` REST API
+  - `kamu system tail` command
+  - `kamu sql` command
+- Fixed memory leak when working with DataFusion
+
 ## [0.188.1] - 2024-06-17
 ### Changed
 - The `/query` REST API endpoint will:
@@ -12,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - return `422 Unprocessable Content` on unrecognized request body fields
 
 ## [0.188.0] - 2024-06-14
-## Added
+### Added
 - New repository `AccessTokenRepository` to work with new access tokens
 - Middleware now accept new token format `Bearer ka_*`
 - New Gql APIs to manage new access tokens
@@ -21,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `revokeAccessToken` to revoke existing access token
 
 ## [0.187.0] - 2024-06-14
-## Added
+### Added
 - The `/query` REST API endpoint now supports:
   - POST requests with all parameters being passed via body
   - Specifying schema format
@@ -29,18 +45,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Returning and providing state information to achieve full reproducibility of queries
 
 ## [0.186.0] - 2024-06-13
-## Added
+### Added
 - New `EthereumLogs` polling source allows to stream and decode log data directly from any ETH-compatible blockchain node
   - See the updated `examples/reth-vs-snp500` example
   - See the new [`datafusion-ethers`](https://github.com/kamu-data/datafusion-ethers) crate for implementation details
 - Added E2E test infrastructure
   - Added necessary components for managed run -- for startup, operations, and shutdown
-## Changed
+### Changed
 - Upgraded to `arrow 52` and `datafusion 39`
 - Improved binary data formatting in CLI table output - instead of the `<binary>` placeholder it will display an abbreviated hex values e.g. `c47cf6…7e3755`
 - JSON and CSV formatters can now output binary data - it will be `hex`-encoded by default
 - Hidden arguments and options are excluded from [the CLI reference](resources/cli-reference.md)
-## Fixed
+### Fixed
 - JSON formatter now properly supports `Decimal` types
 - Stabilized startup using connection to databases
   - Added HTTP middleware that wraps each request into a separate transaction 

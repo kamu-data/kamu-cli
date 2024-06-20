@@ -39,8 +39,13 @@ pub async fn dataset_tail_handler(
     let df = query_svc
         .tail(&dataset_ref, params.skip, params.limit)
         .await
-        .int_err()
-        .api_err()?;
+        .map_err(|e| match e {
+            QueryError::DatasetNotFound(e) => ApiError::not_found(e),
+            QueryError::DatasetSchemaNotAvailable(e) => ApiError::no_content(e),
+            QueryError::DataFusionError(e) => e.int_err().api_err(),
+            QueryError::Access(e) => e.api_err(),
+            QueryError::Internal(e) => e.api_err(),
+        })?;
 
     let schema = if params.include_schema {
         Some(super::query_handler::serialize_schema(df.schema(), params.schema_format).api_err()?)

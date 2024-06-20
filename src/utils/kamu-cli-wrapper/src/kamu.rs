@@ -10,7 +10,7 @@
 use std::ffi::OsString;
 use std::fs;
 use std::io::Write;
-use std::net::SocketAddrV4;
+use std::net::{Ipv4Addr, SocketAddrV4};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -77,10 +77,8 @@ impl Kamu {
             vec!["init"]
         };
 
-        if let Some(env_vars) = options.env_vars {
-            for (env_name, env_value) in env_vars {
-                std::env::set_var(env_name, env_value);
-            }
+        for (env_name, env_value) in options.env_vars {
+            std::env::set_var(env_name, env_value);
         }
 
         inst.execute(arguments).await.unwrap();
@@ -211,6 +209,11 @@ impl Kamu {
         .int_err()
     }
 
+    pub fn get_server_address(&self) -> SocketAddrV4 {
+        // TODO: Random port support -- this unlocks parallel running
+        SocketAddrV4::new(Ipv4Addr::LOCALHOST, 4000)
+    }
+
     // TODO: Generalize into execute with overridden STDOUT/ERR/IN
     pub async fn complete<S>(&self, input: S, current: usize) -> Result<Vec<String>, CLIError>
     where
@@ -270,9 +273,10 @@ impl Kamu {
 
     pub fn catalog(&self) -> dill::Catalog {
         let is_e2e_testing = true;
+        let multi_tenant_workspace = false;
         let base_catalog = kamu_cli::configure_base_catalog(
             &self.workspace_layout,
-            false,
+            multi_tenant_workspace,
             self.system_time,
             is_e2e_testing,
         )
@@ -329,7 +333,7 @@ impl Kamu {
 pub struct NewWorkspaceOptions {
     pub is_multi_tenant: bool,
     pub kamu_config: Option<String>,
-    pub env_vars: Option<Vec<(String, String)>>,
+    pub env_vars: Vec<(String, String)>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
