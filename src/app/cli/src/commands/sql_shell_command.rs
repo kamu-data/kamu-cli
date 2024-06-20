@@ -119,12 +119,7 @@ impl SqlShellCommand {
             .await
             .map_err(CLIError::failure)?;
 
-        let records = res
-            .df_with_ctx
-            .df
-            .collect()
-            .await
-            .map_err(CLIError::failure)?;
+        let records = res.df.collect().await.map_err(CLIError::failure)?;
 
         let mut writer = self
             .output_config

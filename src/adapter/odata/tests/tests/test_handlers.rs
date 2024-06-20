@@ -134,7 +134,6 @@ async fn test_metadata_handler() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, datafusion)]
-#[ignore = "Enable after migration of ODataCollectionContext to DataFrameWithContext"]
 #[test_log::test(tokio::test)]
 async fn test_collection_handler() {
     let harness = TestHarness::new();
@@ -231,7 +230,6 @@ async fn test_collection_handler() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, datafusion)]
-#[ignore = "Enable after migration of ODataCollectionContext to DataFrameWithContext"]
 #[test_log::test(tokio::test)]
 async fn test_collection_handler_by_id() {
     let harness = TestHarness::new();
@@ -289,7 +287,6 @@ async fn test_collection_handler_by_id() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, datafusion)]
-#[ignore = "Enable after migration of ODataCollectionContext to DataFrameWithContext"]
 #[test_log::test(tokio::test)]
 async fn test_collection_handler_by_id_not_found() {
     let harness = TestHarness::new();

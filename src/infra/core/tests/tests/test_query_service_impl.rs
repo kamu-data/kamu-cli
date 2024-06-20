@@ -347,10 +347,10 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
 
     // Within last block
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let df_with_ctx = query_svc.tail(&dataset_ref, 1, 1).await.unwrap();
+    let df = query_svc.tail(&dataset_ref, 1, 1).await.unwrap();
 
     kamu_data_utils::testing::assert_data_eq(
-        df_with_ctx.df,
+        df,
         indoc::indoc!(
             r#"
             +--------+------+
@@ -364,10 +364,10 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
     .await;
 
     // Crosses block boundary
-    let df_with_ctx = query_svc.tail(&dataset_ref, 1, 2).await.unwrap();
+    let df = query_svc.tail(&dataset_ref, 1, 2).await.unwrap();
 
     kamu_data_utils::testing::assert_data_eq(
-        df_with_ctx.df,
+        df,
         indoc::indoc!(
             r#"
             +--------+------+
@@ -476,7 +476,7 @@ async fn test_dataset_sql_authorized_common(catalog: dill::Catalog, tempdir: &Te
         .unwrap();
 
     kamu_data_utils::testing::assert_data_eq(
-        res.df_with_ctx.df,
+        res.df,
         indoc::indoc!(
             r#"
             +-------------+
@@ -610,7 +610,7 @@ async fn test_sql_statement_by_alias() {
         .unwrap();
 
     kamu_data_utils::testing::assert_data_eq(
-        result.df_with_ctx.df,
+        result.df,
         indoc::indoc!(
             r#"
             +-------------+
@@ -750,7 +750,7 @@ async fn test_sql_statement_with_state_simple() {
         .unwrap();
 
     kamu_data_utils::testing::assert_data_eq(
-        res.df_with_ctx.df,
+        res.df,
         indoc::indoc!(
             r#"
             +-----+-----+
@@ -828,7 +828,7 @@ async fn test_sql_statement_with_state_simple() {
         .unwrap();
 
     kamu_data_utils::testing::assert_data_eq(
-        res.df_with_ctx.df,
+        res.df,
         indoc::indoc!(
             r#"
             +-----+-----+
@@ -861,7 +861,7 @@ async fn test_sql_statement_with_state_simple() {
         .unwrap();
 
     kamu_data_utils::testing::assert_data_eq(
-        res.df_with_ctx.df,
+        res.df,
         indoc::indoc!(
             r#"
             +-----+-----+
@@ -1017,7 +1017,7 @@ async fn test_sql_statement_with_state_cte() {
         .unwrap();
 
     kamu_data_utils::testing::assert_data_eq(
-        res.df_with_ctx.df,
+        res.df,
         indoc::indoc!(
             r#"
             +-----+-----+
@@ -1138,7 +1138,7 @@ async fn test_sql_statement_with_state_cte() {
         .unwrap();
 
     kamu_data_utils::testing::assert_data_eq(
-        res2.df_with_ctx.df,
+        res2.df,
         indoc::indoc!(
             r#"
             +-----+-----+
@@ -1181,7 +1181,7 @@ async fn test_sql_statement_with_state_cte() {
         .unwrap();
 
     kamu_data_utils::testing::assert_data_eq(
-        res2.df_with_ctx.df,
+        res2.df,
         indoc::indoc!(
             r#"
             +-----+-----+
@@ -1226,7 +1226,7 @@ async fn test_sql_statement_with_state_cte() {
         .unwrap();
 
     kamu_data_utils::testing::assert_data_eq(
-        res2.df_with_ctx.df,
+        res2.df,
         indoc::indoc!(
             r#"
             +-----+-----+

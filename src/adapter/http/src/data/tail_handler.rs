@@ -36,7 +36,7 @@ pub async fn dataset_tail_handler(
 ) -> Result<Json<TailResponseBody>, ApiError> {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
 
-    let df_with_ctx = query_svc
+    let df = query_svc
         .tail(&dataset_ref, params.skip, params.limit)
         .await
         .map_err(|e| match e {
@@ -48,15 +48,12 @@ pub async fn dataset_tail_handler(
         })?;
 
     let schema = if params.include_schema {
-        Some(
-            super::query_handler::serialize_schema(df_with_ctx.df.schema(), params.schema_format)
-                .api_err()?,
-        )
+        Some(super::query_handler::serialize_schema(df.schema(), params.schema_format).api_err()?)
     } else {
         None
     };
 
-    let record_batches = df_with_ctx.df.collect().await.int_err().api_err()?;
+    let record_batches = df.collect().await.int_err().api_err()?;
     let json =
         super::query_handler::serialize_data(&record_batches, params.data_format).api_err()?;
     let data = serde_json::value::RawValue::from_string(json).unwrap();

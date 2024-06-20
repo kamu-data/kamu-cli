@@ -173,7 +173,7 @@ impl QueryServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
         last_records_to_consider: Option<u64>,
-    ) -> Result<(Arc<dyn Dataset>, DataFrame, SessionContext), QueryError> {
+    ) -> Result<(Arc<dyn Dataset>, DataFrame), QueryError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
 
         self.dataset_action_authorizer
@@ -215,7 +215,7 @@ impl QueryServiceImpl {
             .table(TableReference::bare(dataset_handle.alias.to_string()))
             .await?;
 
-        Ok((dataset, df, ctx))
+        Ok((dataset, df))
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
@@ -325,8 +325,8 @@ impl QueryService for QueryServiceImpl {
         dataset_ref: &DatasetRef,
         skip: u64,
         limit: u64,
-    ) -> Result<DataFrameWithContext, QueryError> {
-        let (dataset, df, ctx) = self.single_dataset(dataset_ref, Some(skip + limit)).await?;
+    ) -> Result<DataFrame, QueryError> {
+        let (dataset, df) = self.single_dataset(dataset_ref, Some(skip + limit)).await?;
 
         let vocab: DatasetVocabulary = dataset
             .as_metadata_chain()
@@ -345,7 +345,7 @@ impl QueryService for QueryServiceImpl {
             )?
             .sort(vec![col(&vocab.offset_column).sort(true, false)])?;
 
-        Ok(DataFrameWithContext { ctx, df })
+        Ok(df)
     }
 
     #[tracing::instrument(level = "info", skip_all)]
@@ -368,7 +368,7 @@ impl QueryService for QueryServiceImpl {
         let ctx = self.session_context(options);
         let df = ctx.sql(statement).await?;
 
-        Ok(QueryResponse::new(DataFrameWithContext { ctx, df }, state))
+        Ok(QueryResponse { df, state })
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]
@@ -385,16 +385,14 @@ impl QueryService for QueryServiceImpl {
         dataset_ref: &DatasetRef,
     ) -> Result<Option<Type>, QueryError> {
         let ctx = self.session_context(QueryOptions::default());
-
         self.get_schema_parquet_impl(&ctx, dataset_ref).await
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]
-    async fn get_data(&self, dataset_ref: &DatasetRef) -> Result<DataFrameWithContext, QueryError> {
+    async fn get_data(&self, dataset_ref: &DatasetRef) -> Result<DataFrame, QueryError> {
         // TODO: PERF: Limit push-down opportunity
-        let (_dataset, df, ctx) = self.single_dataset(dataset_ref, None).await?;
-
-        Ok(DataFrameWithContext { ctx, df })
+        let (_dataset, df) = self.single_dataset(dataset_ref, None).await?;
+        Ok(df)
     }
 
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError> {
