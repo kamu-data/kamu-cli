@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
 
@@ -28,7 +28,7 @@ pub struct ODFEngine {
     container_runtime: Arc<ContainerRuntime>,
     engine_config: ODFEngineConfig,
     image: String,
-    run_info_dir: Arc<Path>,
+    run_info_dir: Arc<RunInfoDir>,
     dataset_repo: Arc<dyn DatasetRepository>,
 }
 
@@ -37,7 +37,7 @@ impl ODFEngine {
         container_runtime: Arc<ContainerRuntime>,
         engine_config: ODFEngineConfig,
         image: &str,
-        run_info_dir: Arc<Path>,
+        run_info_dir: Arc<RunInfoDir>,
         dataset_repo: Arc<dyn DatasetRepository>,
     ) -> Self {
         Self {

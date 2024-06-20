@@ -108,10 +108,10 @@ pub struct EthRpcEndpoint {
 
 pub struct FetchService {
     container_runtime: Arc<ContainerRuntime>,
-    run_info_dir: PathBuf,
     source_config: Arc<SourceConfig>,
     mqtt_source_config: Arc<MqttSourceConfig>,
     eth_source_config: Arc<EthereumSourceConfig>,
+    run_info_dir: Arc<RunInfoDir>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -121,17 +121,17 @@ pub struct FetchService {
 impl FetchService {
     pub fn new(
         container_runtime: Arc<ContainerRuntime>,
-        run_info_dir: PathBuf,
         source_config: Option<Arc<SourceConfig>>,
         mqtt_source_config: Option<Arc<MqttSourceConfig>>,
         eth_source_config: Option<Arc<EthereumSourceConfig>>,
+        run_info_dir: Arc<RunInfoDir>,
     ) -> Self {
         Self {
             container_runtime,
-            run_info_dir,
             source_config: source_config.unwrap_or_default(),
             mqtt_source_config: mqtt_source_config.unwrap_or_default(),
             eth_source_config: eth_source_config.unwrap_or_default(),
+            run_info_dir,
         }
     }
 

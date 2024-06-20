@@ -18,7 +18,7 @@ use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
 use kamu_accounts_services::PredefinedAccountsRegistrator;
-use kamu_adapter_http::{FileUploadLimitConfig, UploadService, UploadServiceLocal};
+use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
@@ -245,6 +245,9 @@ pub fn configure_base_catalog(
     let mut b = CatalogBuilder::new();
 
     b.add_value(workspace_layout.clone());
+    b.add_value(RunInfoDir::new(&workspace_layout.run_info_dir));
+    b.add_value(CacheDir::new(&workspace_layout.cache_dir));
+    b.add_value(RemoteReposDir::new(&workspace_layout.repos_dir));
 
     b.add::<ContainerRuntime>();
 
@@ -268,10 +271,7 @@ pub fn configure_base_catalog(
 
     b.add::<DatasetChangesServiceImpl>();
 
-    b.add_builder(
-        RemoteRepositoryRegistryImpl::builder().with_repos_dir(workspace_layout.repos_dir.clone()),
-    );
-    b.bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
+    b.add::<RemoteRepositoryRegistryImpl>();
 
     b.add::<RemoteAliasesRegistryImpl>();
 
@@ -279,28 +279,17 @@ pub fn configure_base_catalog(
 
     b.add::<DataFormatRegistryImpl>();
 
-    b.add_builder(FetchService::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()));
+    b.add::<FetchService>();
 
-    b.add_builder(
-        PollingIngestServiceImpl::builder()
-            .with_run_info_dir(workspace_layout.run_info_dir.clone())
-            .with_cache_dir(workspace_layout.cache_dir.clone()),
-    );
-    b.bind::<dyn PollingIngestService, PollingIngestServiceImpl>();
+    b.add::<PollingIngestServiceImpl>();
 
-    b.add_builder(
-        PushIngestServiceImpl::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()),
-    );
-    b.bind::<dyn PushIngestService, PushIngestServiceImpl>();
+    b.add::<PushIngestServiceImpl>();
 
     b.add::<TransformServiceImpl>();
 
     b.add::<VerificationServiceImpl>();
 
-    b.add_builder(
-        CompactingServiceImpl::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()),
-    );
-    b.bind::<dyn CompactingService, CompactingServiceImpl>();
+    b.add::<CompactingServiceImpl>();
 
     b.add::<SearchServiceImpl>();
 
@@ -320,10 +309,7 @@ pub fn configure_base_catalog(
 
     b.add::<ObjectStoreBuilderLocalFs>();
 
-    b.add_builder(
-        EngineProvisionerLocal::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()),
-    );
-    b.bind::<dyn EngineProvisioner, EngineProvisionerLocal>();
+    b.add::<EngineProvisionerLocal>();
 
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
 
@@ -365,8 +351,7 @@ pub fn configure_base_catalog(
     b.add::<kamu_adapter_auth_oso::KamuAuthOso>();
     b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
 
-    b.add_builder(UploadServiceLocal::builder().with_cache_dir(workspace_layout.cache_dir.clone()));
-    b.bind::<dyn UploadService, UploadServiceLocal>();
+    b.add::<UploadServiceLocal>();
 
     b.add::<DatabaseTransactionRunner>();
 

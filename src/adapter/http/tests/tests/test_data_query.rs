@@ -13,7 +13,6 @@ use chrono::{TimeZone, Utc};
 use datafusion::arrow::array::{RecordBatch, StringArray, UInt64Array};
 use datafusion::arrow::datatypes::*;
 use datafusion::prelude::*;
-use dill::Component;
 use kamu::domain::*;
 use kamu::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
@@ -40,13 +39,10 @@ impl Harness {
         let run_info_dir = tempfile::tempdir().unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add_value(RunInfoDir::new(run_info_dir.path()))
             .add::<DataFormatRegistryImpl>()
             .add::<QueryServiceImpl>()
-            .add_builder(
-                PushIngestServiceImpl::builder()
-                    .with_run_info_dir(run_info_dir.path().to_path_buf()),
-            )
-            .bind::<dyn PushIngestService, PushIngestServiceImpl>()
+            .add::<PushIngestServiceImpl>()
             .add::<EngineProvisionerNull>()
             .build();
 

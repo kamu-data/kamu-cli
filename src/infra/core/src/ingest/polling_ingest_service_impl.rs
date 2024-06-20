@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use datafusion::prelude::{DataFrame, SessionContext};
-use dill::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
@@ -31,14 +30,15 @@ pub struct PollingIngestServiceImpl {
     engine_provisioner: Arc<dyn EngineProvisioner>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     data_format_registry: Arc<dyn DataFormatRegistry>,
-    run_info_dir: PathBuf,
-    cache_dir: PathBuf,
+    run_info_dir: Arc<RunInfoDir>,
+    cache_dir: Arc<CacheDir>,
     time_source: Arc<dyn SystemTimeSource>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[dill::component(pub)]
+#[dill::interface(dyn PollingIngestService)]
 impl PollingIngestServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
@@ -47,8 +47,8 @@ impl PollingIngestServiceImpl {
         engine_provisioner: Arc<dyn EngineProvisioner>,
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
         data_format_registry: Arc<dyn DataFormatRegistry>,
-        run_info_dir: PathBuf,
-        cache_dir: PathBuf,
+        run_info_dir: Arc<RunInfoDir>,
+        cache_dir: Arc<CacheDir>,
         time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
@@ -360,7 +360,7 @@ impl PollingIngestServiceImpl {
 
         // Just in case user deleted it manually
         if !self.cache_dir.exists() {
-            std::fs::create_dir(&self.cache_dir).int_err()?;
+            std::fs::create_dir(self.cache_dir.as_path()).int_err()?;
         }
 
         let data_cache_key = get_random_name(Some("fetch-"), 10);
@@ -472,7 +472,7 @@ impl PollingIngestServiceImpl {
         &self,
         args: &IngestIterationArgs<'_>,
         fetch_result: &FetchSavepoint,
-        run_info_dir: PathBuf,
+        run_info_dir: Arc<RunInfoDir>,
     ) -> Result<PrepStepResult, PollingIngestError> {
         let prep_steps = args.polling_source.prepare.clone().unwrap_or_default();
 

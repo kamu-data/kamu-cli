@@ -20,6 +20,7 @@ use kamu::domain::{
     InternalError,
     ObjectStoreBuilder,
     ResultIntoInternal,
+    RunInfoDir,
     ServerUrlConfig,
     SystemTimeSource,
     SystemTimeSourceStub,
@@ -79,6 +80,7 @@ impl ServerSideS3Harness {
         let mut base_catalog_builder = dill::CatalogBuilder::new();
         base_catalog_builder
             .add_value(time_source.clone())
+            .add_value(RunInfoDir::new(run_info_dir))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
@@ -91,8 +93,7 @@ impl ServerSideS3Harness {
             .add_value(server_authentication_mock())
             .bind::<dyn AuthenticationService, MockAuthenticationService>()
             .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
-            .add_builder(CompactingServiceImpl::builder().with_run_info_dir(run_info_dir.clone()))
-            .bind::<dyn CompactingService, CompactingServiceImpl>()
+            .add::<CompactingServiceImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add_value(ObjectStoreBuilderS3::new(s3_context, true))

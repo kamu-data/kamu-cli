@@ -12,8 +12,13 @@ use std::ops::Add;
 use std::path::{Path, PathBuf};
 
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
-use dill::Component;
-use kamu::domain::{InternalError, ResultIntoInternal, ServerUrlConfig, SystemTimeSourceDefault};
+use kamu::domain::{
+    CacheDir,
+    InternalError,
+    ResultIntoInternal,
+    ServerUrlConfig,
+    SystemTimeSourceDefault,
+};
 use kamu_accounts::{JwtAuthenticationConfig, PredefinedAccountsConfig, DEFAULT_ACCOUNT_ID};
 use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
 use kamu_accounts_services::{
@@ -26,7 +31,6 @@ use kamu_adapter_http::{
     decode_upload_token_payload,
     FileUploadLimitConfig,
     UploadContext,
-    UploadService,
     UploadServiceLocal,
 };
 
@@ -56,7 +60,8 @@ impl Harness {
         let catalog = {
             let mut b = dill::CatalogBuilder::new();
 
-            b.add_value(PredefinedAccountsConfig::single_tenant())
+            b.add_value(CacheDir::new(cache_dir.clone()))
+                .add_value(PredefinedAccountsConfig::single_tenant())
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountRepositoryInMemory>()
                 .add::<AccessTokenServiceImpl>()
@@ -68,8 +73,7 @@ impl Harness {
                 .add_value(FileUploadLimitConfig {
                     max_file_size_in_bytes: 100,
                 })
-                .add_builder(UploadServiceLocal::builder().with_cache_dir(cache_dir.clone()))
-                .bind::<dyn UploadService, UploadServiceLocal>()
+                .add::<UploadServiceLocal>()
                 .add::<PredefinedAccountsRegistrator>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);

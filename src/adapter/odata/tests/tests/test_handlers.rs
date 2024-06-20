@@ -329,12 +329,15 @@ impl TestHarness {
         let cache_dir = temp_dir.path().join("cache");
         let datasets_dir = temp_dir.path().join("datasets");
         std::fs::create_dir(&run_info_dir).unwrap();
-        std::fs::create_dir(cache_dir).unwrap();
+        std::fs::create_dir(&cache_dir).unwrap();
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add_value(RunInfoDir::new(run_info_dir))
+            .add_value(CacheDir::new(cache_dir))
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
+            .add::<DataFormatRegistryImpl>()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
@@ -351,15 +354,7 @@ impl TestHarness {
             ))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<EngineProvisionerNull>()
-            .add_builder(
-                PushIngestServiceImpl::builder()
-                    .with_object_store_registry(Arc::new(ObjectStoreRegistryImpl::new(vec![
-                        Arc::new(ObjectStoreBuilderLocalFs::new()),
-                    ])))
-                    .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new()))
-                    .with_run_info_dir(run_info_dir),
-            )
-            .bind::<dyn PushIngestService, PushIngestServiceImpl>()
+            .add::<PushIngestServiceImpl>()
             .add::<QueryServiceImpl>()
             .add_value(ServerUrlConfig::new_test(None))
             .build();

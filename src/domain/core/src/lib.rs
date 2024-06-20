@@ -22,4 +22,5 @@ pub mod utils;
 pub use entities::{SetRefError, *};
 pub use repos::{DatasetNotFoundError, *};
 pub use services::*;
+pub use utils::paths::*;
 pub use utils::time_source::*;
