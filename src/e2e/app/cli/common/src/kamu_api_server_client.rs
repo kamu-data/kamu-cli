@@ -17,15 +17,15 @@ use tokio_retry::Retry;
 ////////////////////////////////////////////////////////////////////////////////
 
 pub enum RequestBody {
-    JSON(serde_json::Value),
-    NDJSON(String),
+    Json(serde_json::Value),
+    NdJson(String),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 pub enum ExpectedResponseBody {
-    JSON(String),
-    PLAIN(String),
+    Json(String),
+    Plain(String),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -101,8 +101,8 @@ impl KamuApiServerClient {
 
         if let Some(request_body) = request_body {
             request_builder = match request_body {
-                RequestBody::JSON(value) => request_builder.json(&value),
-                RequestBody::NDJSON(value) => request_builder
+                RequestBody::Json(value) => request_builder.json(&value),
+                RequestBody::NdJson(value) => request_builder
                     .header("Content-Type", MediaType::NDJSON.0)
                     .body(value),
             }
@@ -154,7 +154,7 @@ impl KamuApiServerClient {
         expected_response_body: ExpectedResponseBody,
     ) {
         match expected_response_body {
-            ExpectedResponseBody::JSON(expected_pretty_json_response_body) => {
+            ExpectedResponseBody::Json(expected_pretty_json_response_body) => {
                 let pretty_actual_response = {
                     let actual_response_body: serde_json::Value = response.json().await.unwrap();
 
@@ -167,7 +167,7 @@ impl KamuApiServerClient {
                     format!("{pretty_actual_response}\n"),
                 );
             }
-            ExpectedResponseBody::PLAIN(expected_plain_response_body) => {
+            ExpectedResponseBody::Plain(expected_plain_response_body) => {
                 let actual_response_body =
                     String::from_utf8(response.bytes().await.unwrap().into()).unwrap();
 

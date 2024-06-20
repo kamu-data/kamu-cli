@@ -111,7 +111,7 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
             Some(token),
             Method::POST,
             "player-scores/ingest",
-            Some(RequestBody::NDJSON(
+            Some(RequestBody::NdJson(
                 indoc::indoc!(
                     r#"
                     {"match_time": "2000-01-01", "match_id": 1, "player_id": "Alice", "score": 100}
@@ -141,7 +141,7 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
             "player-scores/tail?includeSchema=false",
             None,
             StatusCode::OK,
-            Some(ExpectedResponseBody::JSON(
+            Some(ExpectedResponseBody::Json(
                 indoc::indoc!(
                     r#"
                     {
