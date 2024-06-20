@@ -28,6 +28,7 @@ use kamu::{
     DatasetRepositoryLocalFs,
     DependencyGraphServiceInMemory,
     IpfsGateway,
+    RemoteReposDir,
     RemoteRepositoryRegistryImpl,
     SyncServiceImpl,
 };
@@ -59,10 +60,8 @@ async fn setup_dataset(
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .add_builder(
-            RemoteRepositoryRegistryImpl::builder().with_repos_dir(tmp_workspace_dir.join("repos")),
-        )
-        .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
+        .add_value(RemoteReposDir::new(tmp_workspace_dir.join("repos")))
+        .add::<RemoteRepositoryRegistryImpl>()
         .add::<auth::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()

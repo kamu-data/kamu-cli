@@ -15,10 +15,12 @@ use std::sync::Arc;
 use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::{
+    CacheDir,
     CompactingService,
     DatasetRepository,
     InternalError,
     ResultIntoInternal,
+    RunInfoDir,
     ServerUrlConfig,
     SystemTimeSource,
     SystemTimeSourceStub,
@@ -67,6 +69,9 @@ impl ServerSideLocalFsHarness {
         let run_info_dir = tempdir.path().join("run");
         std::fs::create_dir(&run_info_dir).unwrap();
 
+        let cache_dir = tempdir.path().join("cache");
+        std::fs::create_dir(&cache_dir).unwrap();
+
         let mut base_catalog_builder = match &options.base_catalog {
             None => dill::CatalogBuilder::new(),
             Some(c) => dill::CatalogBuilder::new_chained(c),
@@ -79,6 +84,8 @@ impl ServerSideLocalFsHarness {
         let base_url_rest = format!("http://{}", bind_socket.local_addr().unwrap());
 
         base_catalog_builder
+            .add_value(RunInfoDir::new(run_info_dir))
+            .add_value(CacheDir::new(cache_dir))
             .add::<EventBus>()
             .add_value(time_source.clone())
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
@@ -92,8 +99,7 @@ impl ServerSideLocalFsHarness {
             .add_value(server_authentication_mock())
             .bind::<dyn AuthenticationService, MockAuthenticationService>()
             .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
-            .add_builder(CompactingServiceImpl::builder().with_run_info_dir(run_info_dir.clone()))
-            .bind::<dyn CompactingService, CompactingServiceImpl>()
+            .add::<CompactingServiceImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>();
 
@@ -120,6 +126,10 @@ impl ServerSideLocalFsHarness {
 
     fn internal_datasets_folder_path(&self) -> PathBuf {
         self.tempdir.path().join("datasets")
+    }
+
+    pub fn base_catalog(&self) -> &dill::Catalog {
+        &self.base_catalog
     }
 }
 

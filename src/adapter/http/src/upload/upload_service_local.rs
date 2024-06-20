@@ -12,7 +12,13 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use dill::*;
-use kamu::domain::{ErrorIntoInternal, InternalError, ResultIntoInternal, ServerUrlConfig};
+use kamu::domain::{
+    CacheDir,
+    ErrorIntoInternal,
+    InternalError,
+    ResultIntoInternal,
+    ServerUrlConfig,
+};
 use opendatafabric::AccountID;
 use thiserror::Error;
 use tokio::io::AsyncRead;
@@ -39,7 +45,7 @@ pub struct UploadServiceLocal {
     server_url_config: Arc<ServerUrlConfig>,
     uploads_config: Arc<FileUploadLimitConfig>,
     access_token: Arc<AccessToken>,
-    cache_dir: PathBuf,
+    cache_dir: Arc<CacheDir>,
 }
 
 impl UploadServiceLocal {
@@ -47,7 +53,7 @@ impl UploadServiceLocal {
         server_url_config: Arc<ServerUrlConfig>,
         uploads_config: Arc<FileUploadLimitConfig>,
         access_token: Arc<AccessToken>,
-        cache_dir: PathBuf,
+        cache_dir: Arc<CacheDir>,
     ) -> Self {
         Self {
             server_url_config,

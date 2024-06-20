@@ -1228,10 +1228,10 @@ impl FetchTestHarness {
 
         let fetch_svc = FetchService::new(
             Arc::new(ContainerRuntime::default()),
-            temp_dir.path().join("run"),
             None,
             None,
             None,
+            Arc::new(RunInfoDir::new(temp_dir.path().join("run"))),
         );
 
         Self {

@@ -30,17 +30,15 @@ async fn test_current_push_sources() {
     let base_catalog = {
         let mut b = CatalogBuilder::new();
 
-        b.add::<EventBus>()
+        b.add_value(RunInfoDir::new(tempdir.path().join("run")))
+            .add::<EventBus>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_builder(
-                PushIngestServiceImpl::builder().with_run_info_dir(tempdir.path().join("run")),
-            )
-            .bind::<dyn PushIngestService, PushIngestServiceImpl>()
+            .add::<PushIngestServiceImpl>()
             .add::<SystemTimeSourceDefault>()
             .add::<EngineProvisionerNull>()
             .add::<ObjectStoreRegistryImpl>()

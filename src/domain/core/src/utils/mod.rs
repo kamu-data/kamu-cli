@@ -9,4 +9,5 @@
 
 pub mod metadata_chain_comparator;
 pub mod owned_file;
+pub mod paths;
 pub mod time_source;

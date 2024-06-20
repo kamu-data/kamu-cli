@@ -491,10 +491,12 @@ impl IngestTestHarness {
         let cache_dir = temp_dir.path().join("cache");
         let datasets_dir = temp_dir.path().join("datasets");
         std::fs::create_dir(&run_info_dir).unwrap();
-        std::fs::create_dir(cache_dir).unwrap();
+        std::fs::create_dir(&cache_dir).unwrap();
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add_value(RunInfoDir::new(run_info_dir))
+            .add_value(CacheDir::new(cache_dir))
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
@@ -511,24 +513,16 @@ impl IngestTestHarness {
             ))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<EngineProvisionerNull>()
-            .add_builder(
-                PushIngestServiceImpl::builder()
-                    .with_object_store_registry(Arc::new(ObjectStoreRegistryImpl::new(vec![
-                        Arc::new(ObjectStoreBuilderLocalFs::new()),
-                    ])))
-                    .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new()))
-                    .with_run_info_dir(run_info_dir),
-            )
-            .bind::<dyn PushIngestService, PushIngestServiceImpl>()
+            .add::<ObjectStoreRegistryImpl>()
+            .add::<ObjectStoreBuilderLocalFs>()
+            .add::<DataFormatRegistryImpl>()
+            .add::<PushIngestServiceImpl>()
             .build();
-
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-        let push_ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
 
         Self {
             temp_dir,
-            dataset_repo,
-            push_ingest_svc,
+            dataset_repo: catalog.get_one().unwrap(),
+            push_ingest_svc: catalog.get_one().unwrap(),
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
     }
