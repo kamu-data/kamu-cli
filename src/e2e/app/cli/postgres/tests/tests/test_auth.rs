@@ -31,7 +31,7 @@ kamu_cli_run_api_server_e2e_test!(
     postgres,
     kamu_cli_e2e_repo_tests,
     test_login_dummy_github,
-    Options::simple_multi_tenant()
+    Options::default().with_multi_tenant(true)
 );
 
 ////////////////////////////////////////////////////////////////////////////////

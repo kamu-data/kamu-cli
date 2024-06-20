@@ -77,10 +77,8 @@ impl Kamu {
             vec!["init"]
         };
 
-        if let Some(env_vars) = options.env_vars {
-            for (env_name, env_value) in env_vars {
-                std::env::set_var(env_name, env_value);
-            }
+        for (env_name, env_value) in options.env_vars {
+            std::env::set_var(env_name, env_value);
         }
 
         inst.execute(arguments).await.unwrap();
@@ -335,7 +333,7 @@ impl Kamu {
 pub struct NewWorkspaceOptions {
     pub is_multi_tenant: bool,
     pub kamu_config: Option<String>,
-    pub env_vars: Option<Vec<(String, String)>>,
+    pub env_vars: Vec<(String, String)>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

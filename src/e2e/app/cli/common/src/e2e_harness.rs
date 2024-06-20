@@ -23,30 +23,31 @@ use crate::{api_server_e2e_test, KamuApiServerClient};
 #[derive(Default)]
 pub struct KamuCliApiServerHarnessOptions {
     pub is_multi_tenant: bool,
-    pub env_vars: Option<Vec<(String, String)>>,
+    pub env_vars: Vec<(String, String)>,
     pub frozen_system_time: Option<DateTime<Utc>>,
 }
 
 impl KamuCliApiServerHarnessOptions {
-    pub fn simple_multi_tenant() -> Self {
-        Self {
-            is_multi_tenant: true,
-            env_vars: Some(vec![
+    pub fn with_multi_tenant(mut self, enabled: bool) -> Self {
+        self.is_multi_tenant = enabled;
+
+        if enabled {
+            self.env_vars.extend([
                 ("KAMU_AUTH_GITHUB_CLIENT_ID".into(), "1".into()),
                 ("KAMU_AUTH_GITHUB_CLIENT_SECRET".into(), "2".into()),
-            ]),
-            ..Default::default()
+            ]);
         }
+
+        self
     }
 
-    pub fn freeze_system_time_with(date_time: DateTime<Utc>) -> Self {
-        Self {
-            frozen_system_time: Some(date_time),
-            ..Default::default()
-        }
+    pub fn with_frozen_system_time(mut self, value: DateTime<Utc>) -> Self {
+        self.frozen_system_time = Some(value);
+
+        self
     }
 
-    pub fn freeze_system_time_with_today() -> Self {
+    pub fn with_today_as_frozen_system_time(self) -> Self {
         let today = {
             let now = Utc::now();
 
@@ -54,7 +55,7 @@ impl KamuCliApiServerHarnessOptions {
                 .unwrap()
         };
 
-        Self::freeze_system_time_with(today)
+        self.with_frozen_system_time(today)
     }
 }
 
