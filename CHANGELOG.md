@@ -12,7 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `<owner/dataset>/tail` REST API endpoint will:
   - return `404 Not Found` on not found datasets
   - return `202 No Content` on empty datasets
-- Temporarily disabled tests for OData
 ### Fixed
 - Stabilized query handling in case of database usage; affected:
   - The `<owner/dataset>/tail` REST API

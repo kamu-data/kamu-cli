@@ -56,7 +56,6 @@ pub async fn dataset_query_handler_post(
 
     // Apply pagination limits
     let df = res
-        .df_with_ctx
         .df
         .limit(
             usize::try_from(body.skip).unwrap(),

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::catalog::schema::SchemaProvider;
@@ -27,7 +27,6 @@ use datafusion::prelude::*;
 use futures::stream::{self, StreamExt, TryStreamExt};
 use kamu_core::*;
 use opendatafabric::*;
-use parking_lot::RwLock;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // Catalog
@@ -76,14 +75,11 @@ pub(crate) struct KamuSchema {
 }
 
 struct KamuSchemaImpl {
-    session_config: SessionConfig,
-    table_options: TableOptions,
-    // To avoid creating an Arc cyclic reference[1], with SessionContext, we are forced to use
-    // weak references instead.
-    //
-    // [1] SessionContext -> KamuCatalog(CatalogProvider) -> KamuSchema -> KamuSchemaImpl
-    //     -> SchemaCache -> KamuTable -> SessionContext
-    session_state: Weak<RwLock<SessionState>>,
+    // Note: Never include `SessionContext` or `SessionState` into this structure.
+    // Be mindful that this will cause a circular reference and thus prevent context
+    // from ever being released.
+    session_config: Arc<SessionConfig>,
+    table_options: Arc<TableOptions>,
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     options: QueryOptions,
@@ -106,9 +102,8 @@ impl KamuSchema {
     ) -> Self {
         Self {
             inner: Arc::new(KamuSchemaImpl {
-                session_config: session_context.copied_config(),
-                table_options: session_context.copied_table_options(),
-                session_state: session_context.state_weak_ref(),
+                session_config: Arc::new(session_context.copied_config()),
+                table_options: Arc::new(session_context.copied_table_options()),
                 dataset_repo,
                 dataset_action_authorizer,
                 options,
@@ -164,7 +159,6 @@ impl KamuSchema {
                     Arc::new(KamuTable::new(
                         self.inner.session_config.clone(),
                         self.inner.table_options.clone(),
-                        self.inner.session_state.clone(),
                         hdl,
                         dataset,
                         as_of,
@@ -216,7 +210,6 @@ impl KamuSchema {
                         Arc::new(KamuTable::new(
                             self.inner.session_config.clone(),
                             self.inner.table_options.clone(),
-                            self.inner.session_state.clone(),
                             hdl,
                             dataset,
                             as_of,
@@ -332,9 +325,8 @@ impl SchemaProvider for KamuSchema {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct KamuTable {
-    session_config: SessionConfig,
-    table_options: TableOptions,
-    session_state: Weak<RwLock<SessionState>>,
+    session_config: Arc<SessionConfig>,
+    table_options: Arc<TableOptions>,
     dataset_handle: DatasetHandle,
     dataset: Arc<dyn Dataset>,
     as_of: Option<Multihash>,
@@ -350,9 +342,8 @@ struct TableCache {
 
 impl KamuTable {
     pub(crate) fn new(
-        session_config: SessionConfig,
-        table_options: TableOptions,
-        session_state: Weak<RwLock<SessionState>>,
+        session_config: Arc<SessionConfig>,
+        table_options: Arc<TableOptions>,
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
         as_of: Option<Multihash>,
@@ -361,7 +352,6 @@ impl KamuTable {
         Self {
             session_config,
             table_options,
-            session_state,
             dataset_handle,
             dataset,
             as_of,
@@ -425,7 +415,7 @@ impl KamuTable {
             .await;
 
         let options = ParquetReadOptions {
-            schema: None,
+            schema: Some(&schema),
             // TODO: PERF: potential speedup if we specify `offset`?
             file_sort_order: Vec::new(),
             file_extension: "",
@@ -436,22 +426,11 @@ impl KamuTable {
 
         let table_paths = file_urls.to_urls().int_err()?;
         let listing_options =
-            options.to_listing_options(&self.session_config, self.table_options.clone());
-        let session_state = self
-            .session_state
-            .upgrade()
-            .expect("SessionState should be alive!")
-            .read()
-            .clone();
-
-        let resolved_schema = options
-            .get_resolved_schema(&self.session_config, session_state, table_paths[0].clone())
-            .await
-            .int_err()?;
+            options.to_listing_options(&self.session_config, self.table_options.as_ref().clone());
 
         let config = ListingTableConfig::new_with_multi_paths(table_paths)
             .with_listing_options(listing_options)
-            .with_schema(resolved_schema);
+            .with_schema(schema);
 
         let provider = ListingTable::try_new(config).int_err()?;
 
