@@ -3,38 +3,42 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: net.rocketpool.reth.mint-burn
-  kind: Root
+  kind: Derivative
   metadata:
-    - kind: SetPollingSource
-      fetch:
-        kind: Container
-        # Image src: https://github.com/kamu-data/kamu-contrib/tree/5009e5d75b4f1fb903e5745fa35ea67a4815fbe7/net.rocketpool
-        image: "ghcr.io/kamu-data/fetch-net.rocketpool.reth.mint-burn:0.2.0"
-        env:
-          - name: ETH_NODE_PROVIDER_URL
-          - name: BLOCK_BATCH_SIZE
-            value: "100000"
-          - name: ODF_BATCH_SIZE
-            value: "10000"
-      read:
-        kind: NdJson
-      preprocess:
+    - kind: SetTransform
+      inputs:
+        - datasetRef: net.rocketpool.reth.tokens-minted
+          alias: tokens_minted
+        - datasetRef: net.rocketpool.reth.tokens-burned
+          alias: tokens_burned
+      transform:
         kind: Sql
         engine: datafusion
         query: |
-          SELECT
-            to_timestamp_seconds("eventTime") as event_time,
-            'rETH' as token_symbol,
-            "eventName" as event_name,
-            cast("amount" as double) / pow(10.0, 18) as amount,
-            cast("ethAmount" as double) / pow(10.0, 18) as eth_amount,
-            "blockNumber" as block_number,
-            "blockHash" as block_hash,
-            "transactionIndex" as transaction_index,
-            "transactionHash" as transaction_hash,
-            "logIndex" as log_index
-          FROM input
-      merge:
-        kind: Ledger
-        primaryKey:
-          - transaction_hash
+          select
+            event_time,
+            block_number,
+            block_hash,
+            transaction_index,
+            transaction_hash,
+            log_index,
+            token_symbol,
+            event_name,
+            to as holder_address,
+            amount,
+            eth_amount
+          from tokens_minted
+          union all
+          select
+            event_time,
+            block_number,
+            block_hash,
+            transaction_index,
+            transaction_hash,
+            log_index,
+            token_symbol,
+            event_name,
+            from as holder_address,
+            amount,
+            eth_amount
+          from tokens_burned
