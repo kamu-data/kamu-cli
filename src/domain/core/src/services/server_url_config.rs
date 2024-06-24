@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{InternalError, ResultIntoInternal};
 use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -17,31 +16,6 @@ pub struct ServerUrlConfig {
 }
 
 impl ServerUrlConfig {
-    fn get_url_from_env(env_var: &str, default: &str) -> Result<Url, InternalError> {
-        let raw = std::env::var(env_var).unwrap_or_else(|_| default.to_string());
-
-        Url::parse(&raw).int_err()
-    }
-
-    pub fn load_from_env() -> Result<Self, InternalError> {
-        Ok(Self {
-            protocols: Protocols {
-                base_url_platform: Self::get_url_from_env(
-                    "KAMU_BASE_URL_PLATFORM",
-                    "http://localhost:4200",
-                )?,
-                base_url_rest: Self::get_url_from_env(
-                    "KAMU_BASE_URL_REST",
-                    "http://localhost:8080",
-                )?,
-                base_url_flightsql: Self::get_url_from_env(
-                    "KAMU_BASE_URL_FLIGHTSQL",
-                    "grpc://localhost:50050",
-                )?,
-            },
-        })
-    }
-
     pub fn new(protocols: Protocols) -> Self {
         Self { protocols }
     }
@@ -68,6 +42,16 @@ pub struct Protocols {
 impl Protocols {
     pub fn odata_base_url(&self) -> String {
         format!("{}odata", self.base_url_rest)
+    }
+}
+
+impl Default for Protocols {
+    fn default() -> Self {
+        Self {
+            base_url_platform: Url::parse("http://localhost:4200").expect("URL parse problem"),
+            base_url_rest: Url::parse("http://localhost:8080").expect("URL parse problem"),
+            base_url_flightsql: Url::parse("grpc://localhost:50050").expect("URL parse problem"),
+        }
     }
 }
 

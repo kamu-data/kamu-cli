@@ -12,7 +12,10 @@ use std::sync::Arc;
 
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
-use dill::Catalog;
+use database_common::DatabaseTransactionRunner;
+use dill::{Catalog, CatalogBuilder};
+use internal_error::InternalError;
+use kamu::domain::{Protocols, ServerUrlConfig};
 use kamu_accounts::{
     AccountConfig,
     AuthenticationService,
@@ -20,9 +23,11 @@ use kamu_accounts::{
     PROVIDER_PASSWORD,
 };
 use kamu_accounts_services::PasswordLoginCredentials;
+use kamu_adapter_http::FileUploadLimitConfig;
 use opendatafabric::AccountName;
 use rust_embed::RustEmbed;
 use serde::Serialize;
+use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,6 +41,8 @@ struct HttpRoot;
 #[serde(rename_all = "camelCase")]
 struct WebUIConfig {
     api_server_gql_url: String,
+    api_server_http_url: String,
+    ingest_upload_file_limit_mb: usize,
     login_instructions: Option<WebUILoginInstructions>,
     feature_flags: WebUIFeatureFlags,
 }
@@ -72,6 +79,7 @@ impl WebUIServer {
         multi_tenant_workspace: bool,
         current_account_name: AccountName,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
+        file_upload_limit_config: Arc<FileUploadLimitConfig>,
         address: Option<IpAddr>,
         port: Option<u16>,
     ) -> Self {
@@ -81,7 +89,7 @@ impl WebUIServer {
         ));
 
         let bound_addr = hyper::server::conn::AddrIncoming::bind(&addr).unwrap_or_else(|e| {
-            panic!("error binding to {}: {}", addr, e);
+            panic!("error binding to {addr}: {e}");
         });
 
         let account_config = predefined_accounts_config
@@ -101,19 +109,13 @@ impl WebUIServer {
             login_credentials_json: serde_json::to_string(&login_credentials).unwrap(),
         };
 
-        let auth_svc = base_catalog.get_one::<dyn AuthenticationService>().unwrap();
-        let access_token = auth_svc
-            .login(
-                &login_instructions.login_method,
-                login_instructions.login_credentials_json.clone(),
-            )
-            .await
-            .unwrap()
-            .access_token;
+        let web_ui_url = format!("http://{}", bound_addr.local_addr());
 
         let web_ui_config = WebUIConfig {
             api_server_gql_url: format!("http://{}/graphql", bound_addr.local_addr()),
-            login_instructions: Some(login_instructions),
+            api_server_http_url: web_ui_url.clone(),
+            login_instructions: Some(login_instructions.clone()),
+            ingest_upload_file_limit_mb: file_upload_limit_config.max_file_size_in_mb(),
             feature_flags: WebUIFeatureFlags {
                 // No way to log out, always logging in a predefined user
                 enable_logout: false,
@@ -121,6 +123,23 @@ impl WebUIServer {
                 enable_scheduling: false,
             },
         };
+
+        let access_token = Self::acquire_access_token(base_catalog.clone(), &login_instructions)
+            .await
+            .expect("Token not retreieved");
+
+        let web_ui_url = Url::parse(&web_ui_url).expect("URL failed to parse");
+
+        let default_protocols = Protocols::default();
+
+        let web_ui_catalog = CatalogBuilder::new_chained(&base_catalog)
+            .add_value(ServerUrlConfig::new(Protocols {
+                base_url_platform: web_ui_url.clone(),
+                base_url_rest: web_ui_url,
+                // Note: this is not a valid endpoint in Web UI mode
+                base_url_flightsql: default_protocols.base_url_flightsql,
+            }))
+            .build();
 
         let app = axum::Router::new()
             .route(
@@ -132,6 +151,14 @@ impl WebUIServer {
                 axum::routing::get(graphql_playground_handler).post(graphql_handler),
             )
             .nest("/", kamu_adapter_http::data::root_router())
+            .route(
+                "/platform/file/upload/prepare",
+                axum::routing::post(kamu_adapter_http::platform_file_upload_prepare_post_handler),
+            )
+            .route(
+                "/platform/file/upload/:upload_token",
+                axum::routing::post(kamu_adapter_http::platform_file_upload_post_handler),
+            )
             .nest(
                 "/odata",
                 if multi_tenant_workspace {
@@ -163,7 +190,7 @@ impl WebUIServer {
                             .allow_methods(vec![http::Method::GET, http::Method::POST])
                             .allow_headers(tower_http::cors::Any),
                     )
-                    .layer(axum::extract::Extension(base_catalog))
+                    .layer(axum::extract::Extension(web_ui_catalog))
                     .layer(axum::extract::Extension(gql_schema))
                     .layer(axum::extract::Extension(web_ui_config))
                     .layer(kamu_adapter_http::RunInDatabaseTransactionLayer::new())
@@ -176,6 +203,26 @@ impl WebUIServer {
             server,
             access_token,
         }
+    }
+
+    async fn acquire_access_token(
+        catalog: Catalog,
+        login_instructions: &WebUILoginInstructions,
+    ) -> Result<String, InternalError> {
+        let transaction_runner = DatabaseTransactionRunner::new(catalog);
+
+        transaction_runner
+            .transactional_with(|auth_svc: Arc<dyn AuthenticationService>| async move {
+                Ok(auth_svc
+                    .login(
+                        &login_instructions.login_method,
+                        login_instructions.login_credentials_json.clone(),
+                    )
+                    .await
+                    .unwrap()
+                    .access_token)
+            })
+            .await
     }
 
     pub fn local_addr(&self) -> SocketAddr {
@@ -222,7 +269,7 @@ async fn runtime_config_handler(
 
 async fn graphql_handler(
     schema: axum::extract::Extension<kamu_adapter_graphql::Schema>,
-    catalog: axum::extract::Extension<dill::Catalog>,
+    catalog: axum::extract::Extension<Catalog>,
     req: async_graphql_axum::GraphQLRequest,
 ) -> async_graphql_axum::GraphQLResponse {
     let graphql_request = req.into_inner().data(catalog.0);

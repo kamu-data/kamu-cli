@@ -99,8 +99,6 @@ pub async fn run(
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
 
-        base_catalog_builder.add_value(ServerUrlConfig::load_from_env()?);
-
         if let Some(db_configuration) = maybe_db_configuration.as_ref() {
             configure_database_components(&mut base_catalog_builder, db_configuration)?;
         } else {
@@ -608,9 +606,9 @@ pub fn register_config_in_catalog(
     }
 
     let uploads_config = config.uploads.as_ref().unwrap();
-    catalog_builder.add_value(FileUploadLimitConfig {
-        max_file_size_in_bytes: uploads_config.max_file_size_in_mb.unwrap() * 1024 * 1024,
-    });
+    catalog_builder.add_value(FileUploadLimitConfig::new_in_mb(
+        uploads_config.max_file_size_in_mb.unwrap(),
+    ));
 }
 
 fn try_convert_into_db_configuration(config: DatabaseConfig) -> Option<DatabaseConfiguration> {

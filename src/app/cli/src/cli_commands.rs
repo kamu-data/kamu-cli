@@ -554,6 +554,7 @@ pub fn get_command(
                 current_account_name,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
                 submatches.get_one("address").copied(),
                 submatches.get_one("http-port").copied(),
                 submatches.get_flag("get-token"),

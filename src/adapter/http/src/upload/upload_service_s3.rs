@@ -61,7 +61,7 @@ impl UploadService for UploadServiceS3 {
         content_type: String,
         content_length: usize,
     ) -> Result<UploadContext, MakeUploadContextError> {
-        if content_length > self.upload_config.max_file_size_in_bytes {
+        if content_length > self.upload_config.max_file_size_in_bytes() {
             return Err(MakeUploadContextError::TooLarge(ContentTooLargeError {}));
         }
 

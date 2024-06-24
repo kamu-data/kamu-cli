@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.188.3] - 2024-06-24
+### Fixed
+- Fixed support of  ingestion via file upload in `kamu ui` mode 
+  and `kamu system api-server` mode with custom HTTP port
+- Fixed launching `kamu ui` mode (related to transactions management)
+
 ## [0.188.2] - 2024-06-20
 ### Added
 - Added an E2E test group for REST API
