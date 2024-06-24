@@ -37,7 +37,7 @@ pub struct APIServer {
 
 impl APIServer {
     pub fn new(
-        base_catalog: Catalog,
+        base_catalog: &Catalog,
         cli_catalog: &Catalog,
         multi_tenant_workspace: bool,
         address: Option<IpAddr>,
@@ -61,13 +61,13 @@ impl APIServer {
             port.unwrap_or(0),
         ));
         let bound_addr = hyper::server::conn::AddrIncoming::bind(&addr).unwrap_or_else(|e| {
-            panic!("error binding to {}: {}", addr, e);
+            panic!("error binding to {addr}: {e}");
         });
 
         let api_server_url = Url::parse(&format!("http://{}", bound_addr.local_addr()))
             .expect("URL failed to parse");
 
-        let api_server_catalog = CatalogBuilder::new_chained(&base_catalog)
+        let api_server_catalog = CatalogBuilder::new_chained(base_catalog)
             .add_value(ServerUrlConfig::new(Protocols {
                 base_url_platform: Url::parse("http://localhost:4200").unwrap(),
                 base_url_rest: api_server_url,

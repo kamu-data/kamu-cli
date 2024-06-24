@@ -89,7 +89,7 @@ impl WebUIServer {
         ));
 
         let bound_addr = hyper::server::conn::AddrIncoming::bind(&addr).unwrap_or_else(|e| {
-            panic!("error binding to {}: {}", addr, e);
+            panic!("error binding to {addr}: {e}");
         });
 
         let account_config = predefined_accounts_config
