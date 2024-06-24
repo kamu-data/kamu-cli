@@ -12,14 +12,15 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
 
-use dill::Catalog;
+use dill::{Catalog, CatalogBuilder};
 use indoc::indoc;
 use internal_error::*;
-use kamu::domain::SystemTimeSource;
+use kamu::domain::{Protocols, ServerUrlConfig, SystemTimeSource};
 use kamu_adapter_http::e2e::e2e_router;
 use kamu_flow_system_inmem::domain::FlowService;
 use kamu_task_system_inmem::domain::TaskExecutor;
 use tokio::sync::Notify;
+use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,6 +55,27 @@ impl APIServer {
         let time_source = base_catalog.get_one().unwrap();
 
         let gql_schema = kamu_adapter_graphql::schema();
+
+        let addr = SocketAddr::from((
+            address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
+            port.unwrap_or(0),
+        ));
+        let bound_addr = hyper::server::conn::AddrIncoming::bind(&addr).unwrap_or_else(|e| {
+            panic!("error binding to {}: {}", addr, e);
+        });
+
+        let api_server_url = Url::parse(&format!("http://{}", bound_addr.local_addr()))
+            .expect("URL failed to parse");
+
+        let api_server_catalog = CatalogBuilder::new_chained(&base_catalog)
+            .add_value(ServerUrlConfig::new(Protocols {
+                base_url_platform: Url::parse("http://localhost:4200").unwrap(),
+                base_url_rest: api_server_url,
+                // Note: this is not a valid endpoint in "kamu system api-server" mode
+                base_url_flightsql: Url::parse("grpc://localhost:50050")
+                    .expect("URL failed to parse"),
+            }))
+            .build();
 
         let mut app = axum::Router::new()
             .route("/", axum::routing::get(root))
@@ -108,7 +130,7 @@ impl APIServer {
                             .allow_methods(vec![http::Method::GET, http::Method::POST])
                             .allow_headers(tower_http::cors::Any),
                     )
-                    .layer(Extension(base_catalog))
+                    .layer(Extension(api_server_catalog))
                     .layer(Extension(gql_schema))
                     // TODO: Use a more subtle application of this middleware,
                     //       since not for every request, we need a transaction
@@ -126,12 +148,7 @@ impl APIServer {
             None
         };
 
-        let addr = SocketAddr::from((
-            address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
-            port.unwrap_or(0),
-        ));
-
-        let server = axum::Server::bind(&addr).serve(app.into_make_service());
+        let server = axum::Server::builder(bound_addr).serve(app.into_make_service());
 
         Self {
             server,

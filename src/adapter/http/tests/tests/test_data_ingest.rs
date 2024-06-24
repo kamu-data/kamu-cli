@@ -514,9 +514,7 @@ impl DataIngestHarness {
             .add::<PushIngestServiceImpl>()
             .add::<EngineProvisionerNull>()
             .add::<UploadServiceLocal>()
-            .add_value(FileUploadLimitConfig {
-                max_file_size_in_bytes: 1000,
-            })
+            .add_value(FileUploadLimitConfig::new_in_bytes(1000))
             .build();
 
         let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {

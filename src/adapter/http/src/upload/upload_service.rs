@@ -113,7 +113,33 @@ pub struct UploadNotSupportedError {}
 
 #[derive(Debug)]
 pub struct FileUploadLimitConfig {
-    pub max_file_size_in_bytes: usize,
+    max_file_size_in_bytes: usize,
+}
+
+impl FileUploadLimitConfig {
+    #[inline]
+    pub fn new_in_bytes(max_file_size_in_bytes: usize) -> Self {
+        Self {
+            max_file_size_in_bytes,
+        }
+    }
+
+    #[inline]
+    pub fn new_in_mb(max_file_size_in_mb: usize) -> Self {
+        Self {
+            max_file_size_in_bytes: max_file_size_in_mb * 1024 * 1024,
+        }
+    }
+
+    #[inline]
+    pub fn max_file_size_in_bytes(&self) -> usize {
+        self.max_file_size_in_bytes
+    }
+
+    #[inline]
+    pub fn max_file_size_in_mb(&self) -> usize {
+        self.max_file_size_in_bytes / 1024 / 1024
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
