@@ -16,7 +16,7 @@ kamu pull "${S3_EXAMPLE_URL}account.transactions"
 kamu pull "${S3_EXAMPLE_URL}account.tokens.transfers"
 
 # Deriv
-kamu pull "${S3_CONTRIB_URL}net.rocketpool.reth.mint-burn"
+kamu pull "${S3_EXAMPLE_URL}net.rocketpool.reth.mint-burn"
 kamu pull "${S3_EXAMPLE_URL}account.tokens.portfolio"
 kamu pull "${S3_EXAMPLE_URL}account.tokens.portfolio.market-value"
 kamu pull "${S3_EXAMPLE_URL}account.tokens.portfolio.usd"
