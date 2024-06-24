@@ -130,13 +130,14 @@ impl WebUIServer {
 
         let web_ui_url = Url::parse(&web_ui_url).expect("URL failed to parse");
 
+        let default_protocols = Protocols::default();
+
         let web_ui_catalog = CatalogBuilder::new_chained(&base_catalog)
             .add_value(ServerUrlConfig::new(Protocols {
                 base_url_platform: web_ui_url.clone(),
                 base_url_rest: web_ui_url,
                 // Note: this is not a valid endpoint in Web UI mode
-                base_url_flightsql: Url::parse("grpc://localhost:50050")
-                    .expect("URL failed to parse"),
+                base_url_flightsql: default_protocols.base_url_flightsql,
             }))
             .build();
 

@@ -67,13 +67,14 @@ impl APIServer {
         let api_server_url = Url::parse(&format!("http://{}", bound_addr.local_addr()))
             .expect("URL failed to parse");
 
+        let default_protocols = Protocols::default();
+
         let api_server_catalog = CatalogBuilder::new_chained(base_catalog)
             .add_value(ServerUrlConfig::new(Protocols {
-                base_url_platform: Url::parse("http://localhost:4200").unwrap(),
                 base_url_rest: api_server_url,
-                // Note: this is not a valid endpoint in "kamu system api-server" mode
-                base_url_flightsql: Url::parse("grpc://localhost:50050")
-                    .expect("URL failed to parse"),
+                base_url_platform: default_protocols.base_url_platform,
+                // Note: this is not a valid endpoint in Web UI mode
+                base_url_flightsql: default_protocols.base_url_flightsql,
             }))
             .build();
 

@@ -131,7 +131,6 @@ pub async fn run(
 
         let cli_catalog = configure_cli_catalog(&base_catalog, is_multi_tenant_workspace)
             .add_value(current_account.to_current_account_subject())
-            .add_value(ServerUrlConfig::load_from_env()?)
             .build();
 
         (guards, base_catalog, cli_catalog, output_config)
