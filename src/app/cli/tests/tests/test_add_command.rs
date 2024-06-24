@@ -10,7 +10,7 @@
 use futures::TryStreamExt;
 use kamu::domain;
 use kamu::testing::MetadataFactory;
-use kamu_cli_wrapper::Kamu;
+use kamu_cli::testing::Kamu;
 use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////
