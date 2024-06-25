@@ -50,6 +50,7 @@ impl TransformTestHarness {
         std::fs::create_dir(&run_info_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add_value(RunInfoDir::new(run_info_dir))
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
@@ -64,16 +65,9 @@ impl TransformTestHarness {
             .add::<SystemTimeSourceDefault>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
-            .add_builder(CompactingServiceImpl::builder().with_run_info_dir(run_info_dir.clone()))
-            .bind::<dyn CompactingService, CompactingServiceImpl>()
-            .add_builder(
-                PushIngestServiceImpl::builder()
-                    .with_object_store_registry(Arc::new(ObjectStoreRegistryImpl::new(vec![
-                        Arc::new(ObjectStoreBuilderLocalFs::new()),
-                    ])))
-                    .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new()))
-                    .with_run_info_dir(run_info_dir),
-            )
+            .add::<CompactingServiceImpl>()
+            .add::<DataFormatRegistryImpl>()
+            .add::<PushIngestServiceImpl>()
             .bind::<dyn PushIngestService, PushIngestServiceImpl>()
             .add_value(engine_provisioner)
             .bind::<dyn EngineProvisioner, TEngineProvisioner>()
@@ -81,17 +75,12 @@ impl TransformTestHarness {
             .add::<VerificationServiceImpl>()
             .build();
 
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-        let compacting_service = catalog.get_one::<dyn CompactingService>().unwrap();
-        let push_ingest_svc = catalog.get_one::<PushIngestServiceImpl>().unwrap();
-        let transform_service = catalog.get_one::<TransformServiceImpl>().unwrap();
-
         Self {
             _tempdir: tempdir,
-            dataset_repo,
-            transform_service,
-            compacting_service,
-            push_ingest_svc,
+            dataset_repo: catalog.get_one().unwrap(),
+            transform_service: catalog.get_one().unwrap(),
+            compacting_service: catalog.get_one().unwrap(),
+            push_ingest_svc: catalog.get_one().unwrap(),
         }
     }
 

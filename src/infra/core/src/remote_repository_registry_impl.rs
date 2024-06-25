@@ -8,9 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use std::convert::TryInto;
-use std::path::PathBuf;
+use std::ops::Deref;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
-use dill::*;
 use kamu_core::*;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
@@ -20,20 +21,21 @@ use url::Url;
 
 #[derive(Clone)]
 pub struct RemoteRepositoryRegistryImpl {
-    repos_dir: PathBuf,
+    repos_dir: Arc<RemoteReposDir>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[dill::component(pub)]
+#[dill::interface(dyn RemoteRepositoryRegistry)]
 impl RemoteRepositoryRegistryImpl {
-    pub fn new(repos_dir: PathBuf) -> Self {
+    pub fn new(repos_dir: Arc<RemoteReposDir>) -> Self {
         Self { repos_dir }
     }
 
     pub fn create(repos_dir: impl Into<PathBuf>) -> Result<Self, std::io::Error> {
-        let repos_dir = repos_dir.into();
-        std::fs::create_dir_all(&repos_dir)?;
+        let repos_dir = Arc::new(RemoteReposDir::new(repos_dir));
+        std::fs::create_dir_all(repos_dir.as_path())?;
         Ok(Self::new(repos_dir))
     }
 
@@ -59,7 +61,7 @@ impl RemoteRepositoryRegistryImpl {
 
 impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
     fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepoName> + 's> {
-        let read_dir = std::fs::read_dir(&self.repos_dir).unwrap();
+        let read_dir = std::fs::read_dir(self.repos_dir.as_path()).unwrap();
         Box::new(read_dir.map(|i| {
             i.unwrap()
                 .file_name()
@@ -148,5 +150,37 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryNull {
             repo_name: repo_name.clone(),
         }
         .into())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+// Config
+////////////////////////////////////////////////////////////////////////////////////////
+pub struct RemoteReposDir(PathBuf);
+
+impl RemoteReposDir {
+    pub fn new(inner: impl Into<PathBuf>) -> Self {
+        Self(inner.into())
+    }
+    pub fn inner(&self) -> &PathBuf {
+        &self.0
+    }
+
+    pub fn into_inner(self) -> PathBuf {
+        self.0
+    }
+}
+
+impl AsRef<Path> for RemoteReposDir {
+    fn as_ref(&self) -> &Path {
+        self.0.as_path()
+    }
+}
+
+impl Deref for RemoteReposDir {
+    type Target = PathBuf;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

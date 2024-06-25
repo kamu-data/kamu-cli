@@ -9,22 +9,57 @@
 
 use std::assert_matches::assert_matches;
 use std::future::Future;
-use std::net::{Ipv4Addr, SocketAddrV4};
 
 use internal_error::InternalError;
-use kamu_cli_wrapper::{Kamu, NewWorkspaceOptions};
+use kamu_cli::testing::{Kamu, NewWorkspaceOptions};
 use regex::Regex;
+use sqlx::types::chrono::{DateTime, NaiveTime, Utc};
 use sqlx::{MySqlPool, PgPool, SqlitePool};
 
-use crate::{e2e_test, KamuApiServerClient};
+use crate::{api_server_e2e_test, KamuApiServerClient};
 
 ////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 pub struct KamuCliApiServerHarnessOptions {
     pub is_multi_tenant: bool,
-    pub env_vars: Option<Vec<(String, String)>>,
+    pub env_vars: Vec<(String, String)>,
+    pub frozen_system_time: Option<DateTime<Utc>>,
 }
+
+impl KamuCliApiServerHarnessOptions {
+    pub fn with_multi_tenant(mut self, enabled: bool) -> Self {
+        self.is_multi_tenant = enabled;
+
+        if enabled {
+            self.env_vars.extend([
+                ("KAMU_AUTH_GITHUB_CLIENT_ID".into(), "1".into()),
+                ("KAMU_AUTH_GITHUB_CLIENT_SECRET".into(), "2".into()),
+            ]);
+        }
+
+        self
+    }
+
+    pub fn with_frozen_system_time(mut self, value: DateTime<Utc>) -> Self {
+        self.frozen_system_time = Some(value);
+
+        self
+    }
+
+    pub fn with_today_as_frozen_system_time(self) -> Self {
+        let today = {
+            let now = Utc::now();
+
+            now.with_time(NaiveTime::from_hms_micro_opt(0, 0, 0, 0).unwrap())
+                .unwrap()
+        };
+
+        self.with_frozen_system_time(today)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 pub struct KamuCliApiServerHarness {
     kamu_config: Option<String>,
@@ -131,22 +166,12 @@ impl KamuCliApiServerHarness {
         Fixture: FnOnce(KamuApiServerClient) -> FixtureResult,
         FixtureResult: Future<Output = ()>,
     {
-        let KamuCliApiServerHarnessOptions {
-            is_multi_tenant,
-            env_vars,
-        } = self.options.unwrap_or_default();
-        let kamu = Kamu::new_workspace_tmp_with(NewWorkspaceOptions {
-            is_multi_tenant,
-            kamu_config: self.kamu_config,
-            env_vars,
-        })
-        .await;
+        let kamu = self.into_kamu().await;
 
-        // TODO: Random port support -- this unlocks parallel running
-        let server_addr = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 4000);
+        let server_addr = kamu.get_server_address();
         let server_run_fut = kamu.start_api_server(server_addr);
 
-        e2e_test(server_addr, server_run_fut, fixture).await;
+        api_server_e2e_test(server_addr, server_run_fut, fixture).await;
     }
 
     pub async fn execute_command<Fixture, FixtureResult>(self, fixture: Fixture)
@@ -154,20 +179,29 @@ impl KamuCliApiServerHarness {
         Fixture: FnOnce(Kamu) -> FixtureResult,
         FixtureResult: Future<Output = Result<(), InternalError>>,
     {
+        let kamu = self.into_kamu().await;
+
+        let execute_result = fixture(kamu).await;
+
+        assert_matches!(execute_result, Ok(()));
+    }
+
+    async fn into_kamu(self) -> Kamu {
         let KamuCliApiServerHarnessOptions {
             is_multi_tenant,
             env_vars,
+            frozen_system_time: freeze_system_time,
         } = self.options.unwrap_or_default();
-        let kamu = Kamu::new_workspace_tmp_with(NewWorkspaceOptions {
+        let mut kamu = Kamu::new_workspace_tmp_with(NewWorkspaceOptions {
             is_multi_tenant,
             kamu_config: self.kamu_config,
             env_vars,
         })
         .await;
 
-        let execute_result = fixture(kamu).await;
+        kamu.set_system_time(freeze_system_time);
 
-        assert_matches!(execute_result, Ok(()));
+        kamu
     }
 }
 

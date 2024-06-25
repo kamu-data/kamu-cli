@@ -1,0 +1,50 @@
+---
+kind: DatasetSnapshot
+version: 1
+content:
+  name: net.rocketpool.reth.tokens-burned
+  kind: Root
+  metadata:
+    - kind: SetPollingSource
+      fetch:
+        kind: EthereumLogs
+        chainId: 1 # Ethereum Mainnet
+        signature: |
+          TokensBurned(
+            address indexed from,
+            uint256 amount,
+            uint256 ethAmount,
+            uint256 time
+          )
+        # Using contract deployment block to limit scanning
+        filter: |
+          address = X'ae78736cd615f374d3085123a210448e74fc6393'
+          and
+          block_number > 13325304
+      read:
+        kind: Parquet
+      preprocess:
+        kind: Sql
+        engine: datafusion
+        # Note many providers don't yet return `blockTimestamp` from `eth_getLogs`
+        # so we fallback to the time contained within the event
+        # See: https://github.com/ethereum/execution-apis/issues/295
+        query: |
+          select
+            coalesce(
+              block_timestamp,
+              to_timestamp_seconds(cast(event.time as bigint))
+            ) as event_time,
+            block_number,
+            block_hash,
+            transaction_index,
+            transaction_hash,
+            log_index,
+            'rETH' as token_symbol,
+            'TokensBurned' as event_name,
+            event.from as from,
+            cast(event.amount as double) / pow(10.0, 18) as amount,
+            cast(event."ethAmount" as double) / pow(10.0, 18) as eth_amount
+          from input
+      merge:
+        kind: Append

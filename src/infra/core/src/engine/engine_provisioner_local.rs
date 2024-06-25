@@ -8,12 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use container_runtime::*;
-use dill::*;
 use kamu_core::engine::*;
 use kamu_core::*;
 
@@ -43,22 +41,20 @@ struct State {
     known_images: HashSet<String>,
 }
 
-#[component(pub)]
+#[dill::component(pub)]
+#[dill::interface(dyn EngineProvisioner)]
 impl EngineProvisionerLocal {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(
         config: EngineProvisionerLocalConfig,
         container_runtime: Arc<ContainerRuntime>,
         dataset_repo: Arc<dyn DatasetRepository>,
-        run_info_dir: PathBuf,
+        run_info_dir: Arc<RunInfoDir>,
     ) -> Self {
         let engine_config = ODFEngineConfig {
             start_timeout: config.start_timeout,
             shutdown_timeout: config.shutdown_timeout,
         };
-
-        // TODO: Eliminate
-        let run_info_dir: Arc<std::path::Path> = Arc::from(run_info_dir.as_path());
 
         Self {
             spark_engine: Arc::new(ODFEngine::new(
@@ -265,8 +261,8 @@ impl Default for EngineProvisionerLocalConfig {
 // Null Object
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn EngineProvisioner)]
+#[dill::component(pub)]
+#[dill::interface(dyn EngineProvisioner)]
 pub struct EngineProvisionerNull;
 
 #[async_trait::async_trait]

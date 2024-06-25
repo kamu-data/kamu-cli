@@ -18,6 +18,7 @@ use console::style as s;
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::PredefinedAccountsConfig;
+use kamu_adapter_http::FileUploadLimitConfig;
 use opendatafabric::AccountName;
 
 use super::{CLIError, Command};
@@ -30,6 +31,7 @@ pub struct UICommand {
     multi_tenant_workspace: bool,
     current_account_name: AccountName,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
+    file_upload_limit_config: Arc<FileUploadLimitConfig>,
     output_config: Arc<OutputConfig>,
     address: Option<IpAddr>,
     port: Option<u16>,
@@ -42,6 +44,7 @@ impl UICommand {
         multi_tenant_workspace: bool,
         current_account_name: AccountName,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
+        file_upload_limit_config: Arc<FileUploadLimitConfig>,
         output_config: Arc<OutputConfig>,
         address: Option<IpAddr>,
         port: Option<u16>,
@@ -52,6 +55,7 @@ impl UICommand {
             multi_tenant_workspace,
             current_account_name,
             predefined_accounts_config,
+            file_upload_limit_config,
             output_config,
             address,
             port,
@@ -69,6 +73,7 @@ impl Command for UICommand {
             self.multi_tenant_workspace,
             self.current_account_name.clone(),
             self.predefined_accounts_config.clone(),
+            self.file_upload_limit_config.clone(),
             self.address,
             self.port,
         )

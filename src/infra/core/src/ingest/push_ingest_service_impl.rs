@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use datafusion::prelude::{DataFrame, SessionContext};
-use dill::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_ingest_datafusion::*;
@@ -29,32 +28,33 @@ pub struct PushIngestServiceImpl {
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     data_format_registry: Arc<dyn DataFormatRegistry>,
-    run_info_dir: PathBuf,
     time_source: Arc<dyn SystemTimeSource>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
+    run_info_dir: Arc<RunInfoDir>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[dill::component(pub)]
+#[dill::interface(dyn PushIngestService)]
 impl PushIngestServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
         data_format_registry: Arc<dyn DataFormatRegistry>,
-        run_info_dir: PathBuf,
         time_source: Arc<dyn SystemTimeSource>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
+        run_info_dir: Arc<RunInfoDir>,
     ) -> Self {
         Self {
             dataset_repo,
             dataset_action_authorizer,
             object_store_registry,
             data_format_registry,
-            run_info_dir,
             time_source,
             engine_provisioner,
+            run_info_dir,
         }
     }
 

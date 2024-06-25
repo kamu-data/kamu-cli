@@ -9,7 +9,7 @@
 
 use assert_cmd::Command;
 use indoc::indoc;
-use kamu_cli_wrapper::Kamu;
+use kamu_cli::testing::Kamu;
 
 ////////////////////////////////////////////////////////////////////////////////
 

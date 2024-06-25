@@ -128,7 +128,7 @@ impl Command for APIServerRunCommand {
         let access_token = self.get_access_token().await?;
 
         let api_server = crate::explore::APIServer::new(
-            self.base_catalog.clone(),
+            &self.base_catalog,
             &self.cli_catalog,
             self.multi_tenant_workspace,
             self.address,
