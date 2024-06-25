@@ -263,7 +263,7 @@ impl AccessTokenRepository for MysqlAccessTokenRepository {
                 return Err(FindAccountByTokenError::InvalidTokenHash);
             }
             // Due to specific handling NULL values in MySql all left joined fields
-            // mapped as Option<T> but sych as we set is as required in migration it
+            // mapped as Option<T> but such as we set is as required in migration it
             // should be safe to unwrap these values
             Ok(Account {
                 id: account_row.id.unwrap(),

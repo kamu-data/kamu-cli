@@ -183,6 +183,6 @@ pub struct CreateResultDuplicate {
 #[ComplexObject]
 impl CreateResultDuplicate {
     async fn message(&self) -> String {
-        format!("Access token with {} name already exist", self.token_name)
+        format!("Access token with {} name already exists", self.token_name)
     }
 }

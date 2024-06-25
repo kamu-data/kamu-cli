@@ -251,7 +251,7 @@ async fn test_create_and_get_access_token() {
             "auth": {
                 "createAccessToken": {
                     "__typename": "CreateResultDuplicate",
-                    "message": "Access token with foo name already exist"
+                    "message": "Access token with foo name already exists"
                 }
             }
         })
