@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use crate::{make_test_access_token, make_test_account, GITHUB_ACCOUNT_ID_WASYA};
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_missing_access_token_not_found(catalog: &Catalog) {
     let access_token_repo = catalog.get_one::<dyn AccessTokenRepository>().unwrap();
@@ -24,7 +24,7 @@ pub async fn test_missing_access_token_not_found(catalog: &Catalog) {
     assert_matches!(access_token_result, Err(GetAccessTokenError::NotFound(_)));
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_insert_and_locate_access_token(catalog: &Catalog) {
     let access_token = make_test_access_token("foo", None, "wasya");
@@ -51,7 +51,7 @@ pub async fn test_insert_and_locate_access_token(catalog: &Catalog) {
     assert_eq!(db_access_token, access_token);
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_insert_and_locate_multiple_access_tokens(catalog: &Catalog) {
     let foo_access_token = make_test_access_token("foo", None, "wasya");
@@ -104,7 +104,7 @@ pub async fn test_insert_and_locate_multiple_access_tokens(catalog: &Catalog) {
     assert_eq!(db_access_tokens, vec![foo_access_token, bar_access_token]);
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_mark_existing_access_token_revorked(catalog: &Catalog) {
     let access_token = make_test_access_token("foo", None, "wasya");
@@ -144,7 +144,7 @@ pub async fn test_mark_existing_access_token_revorked(catalog: &Catalog) {
     assert_eq!(db_access_token.revoked_at, Some(revoke_time));
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_mark_non_existing_access_token_revorked(catalog: &Catalog) {
     let access_token = make_test_access_token("foo", None, "wasya");
@@ -158,7 +158,7 @@ pub async fn test_mark_non_existing_access_token_revorked(catalog: &Catalog) {
     assert_matches!(revoke_result, Err(RevokeTokenError::NotFound(_)));
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_find_account_by_active_token_id(catalog: &Catalog) {
     let access_token = make_test_access_token("foo", None, "wasya");

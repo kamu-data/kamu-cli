@@ -13,7 +13,7 @@ use futures::TryStreamExt;
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_event_store_empty(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn TaskSystemEventStore>().unwrap();
@@ -46,7 +46,7 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
     assert_eq!(tasks, []);
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_event_store_get_streams(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn TaskSystemEventStore>().unwrap();
@@ -123,7 +123,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     assert_eq!(&tasks[..], [task_id_2, task_id_1]);
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn TaskSystemEventStore>().unwrap();
@@ -221,7 +221,7 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     assert_eq!(&events[..], [event_2.into()]);
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_event_store_get_events_by_tasks(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn TaskSystemEventStore>().unwrap();
@@ -329,7 +329,7 @@ pub async fn test_event_store_get_events_by_tasks(catalog: &Catalog) {
     );
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn TaskSystemEventStore>().unwrap();
@@ -502,4 +502,4 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     assert_eq!(&task_ids[..], []);
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
