@@ -5148,7 +5148,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-mysql"
-version = "0.188.3"
+version = "0.188.4"
 dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
