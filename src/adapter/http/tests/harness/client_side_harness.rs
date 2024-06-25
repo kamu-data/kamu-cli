@@ -116,7 +116,7 @@ impl ClientSideHarness {
 
         b.add::<TransformServiceImpl>();
 
-        b.add::<CompactingServiceImpl>();
+        b.add::<CompactionServiceImpl>();
 
         b.add::<PullServiceImpl>();
 
@@ -152,8 +152,8 @@ impl ClientSideHarness {
         self.catalog.get_one::<dyn DatasetRepository>().unwrap()
     }
 
-    pub fn compacting_service(&self) -> Arc<dyn CompactingService> {
-        self.catalog.get_one::<dyn CompactingService>().unwrap()
+    pub fn compaction_service(&self) -> Arc<dyn CompactionService> {
+        self.catalog.get_one::<dyn CompactionService>().unwrap()
     }
 
     // TODO: accept alias or handle

@@ -8,14 +8,14 @@
 // by the Apache License, Version 2.0.
 
 mod batching_rule;
-mod compacting_rule;
+mod compaction_rule;
 mod flow_key;
 mod flow_run_snapshot;
 mod flow_type;
 mod schedule;
 
 pub use batching_rule::*;
-pub use compacting_rule::*;
+pub use compaction_rule::*;
 pub use flow_key::*;
 pub use flow_run_snapshot::*;
 pub use flow_type::*;

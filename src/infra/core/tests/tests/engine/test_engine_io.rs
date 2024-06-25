@@ -65,7 +65,7 @@ async fn test_engine_io_common(
         dataset_action_authorizer.clone(),
         engine_provisioner.clone(),
         Arc::new(SystemTimeSourceDefault),
-        Arc::new(CompactingServiceImpl::new(
+        Arc::new(CompactionServiceImpl::new(
             dataset_action_authorizer.clone(),
             dataset_repo.clone(),
             object_store_registry.clone(),

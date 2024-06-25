@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Changed
+- Renamed all places compacting -> compacting
+
 ## [0.188.3] - 2024-06-24
 ### Fixed
 - Fixed support of  ingestion via file upload in `kamu ui` mode 
@@ -100,15 +104,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.183.0] - 2024-05-22
 ### Added
-- New `keep_metadata_only` flag to `HardCompacting` flow. Also extended `FlowState` with `ConfigSnapshot`
+- New `keep_metadata_only` flag to `HardCompaction` flow. Also extended `FlowState` with `ConfigSnapshot`
   and possibility to pass configuration during triggering a flow
 ### Fixed
 - Added support of `--all` flag to the `kamu delete` command
 - Made recursive deletion dataset with provided `%` pattern
 ### Changed
-- `HardCompacting` configuration now is one of `Full` or `KeepMetadataOnly` variants. In case of 
+- `HardCompaction` configuration now is one of `Full` or `KeepMetadataOnly` variants. In case of 
   `KeepMetadataOnly` variant required to provide `recursive` value which will trigger downstream
-  dependencies compacting
+  dependencies compaction
 
 ## [0.182.0] - 2024-05-20
 ### Added
@@ -162,7 +166,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - account ID resolutions are no longer mocked
 - REST API to login remotely using password and GitHub methods  
 ### Fixed
-- Compacting datasets stored in an S3 bucket
+- Compaction datasets stored in an S3 bucket
 
 ## [0.177.0] - 2024-04-25
 ### Added
@@ -183,12 +187,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.176.2] - 2024-04-16
 ### Fixed
-- Fix the instant run of `ExecuteTransform` flow after the successful finish of `HardCompacting` flow 
-- Extend `FlowFailed` error type to indicate when `ExecuteTransform` failed due to `HardCompacting` of root dataset
+- Fix the instant run of `ExecuteTransform` flow after the successful finish of `HardCompaction` flow 
+- Extend `FlowFailed` error type to indicate when `ExecuteTransform` failed due to `HardCompaction` of root dataset
 
 ## [0.176.1] - 2024-04-16
 ### Fixed
-- Split result for different(`setFlowConfigResult`, `setFlowBatchingConfigResult`, `setFlowCompactingConfigResult`) flow configuration mutations
+- Split result for different(`setFlowConfigResult`, `setFlowBatchingConfigResult`, `setFlowCompactionConfigResult`) flow configuration mutations
 
 ## [0.176.0] - 2024-04-15
 - New engine based on RisingWave streaming database ([repo](https://github.com/kamu-data/kamu-engine-risingwave)) that provides mature streaming alternative to Flink. See:
@@ -203,8 +207,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `--system-time` root parameter allows overriding time for all CLI commands
 ### Fixed
 - CLI shows errors not only under TTY
-- Removed `paused` from `setConfigCompacting` mutation
-- Extended GraphQL `FlowDescriptionDatasetHardCompacting` empty result with a resulting message
+- Removed `paused` from `setConfigCompaction` mutation
+- Extended GraphQL `FlowDescriptionDatasetHardCompaction` empty result with a resulting message
 - GraphQL Dataset Endpoints object: fixed the query endpoint
 
 ## [0.174.1] - 2024-04-12
@@ -213,7 +217,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.174.0] - 2024-04-12
 ### Added
-- `HardCompacting` to flow system
+- `HardCompaction` to flow system
 
 ## [0.173.0] - 2024-04-09
 ### Added

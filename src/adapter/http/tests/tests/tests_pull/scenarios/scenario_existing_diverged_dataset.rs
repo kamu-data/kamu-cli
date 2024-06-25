@@ -29,8 +29,8 @@ pub(crate) struct SmartPullExistingDivergedDatasetScenario<TServerHarness: Serve
     pub server_dataset_layout: DatasetLayout,
     pub client_dataset_layout: DatasetLayout,
     pub server_dataset_ref: DatasetRefRemote,
-    pub server_precompacting_result: CommitResult,
-    pub server_compacting_result: CompactingResult,
+    pub server_precompaction_result: CommitResult,
+    pub server_compaction_result: CompactionResult,
 }
 
 impl<TServerHarness: ServerSideHarness> SmartPullExistingDivergedDatasetScenario<TServerHarness> {
@@ -88,11 +88,11 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingDivergedDatasetScenario
         )
         .await;
 
-        let compacting_service = server_harness.cli_compacting_service();
-        let server_compacting_result = compacting_service
+        let compaction_service = server_harness.cli_compaction_service();
+        let server_compaction_result = compaction_service
             .compact_dataset(
                 &server_create_result.dataset_handle,
-                CompactingOptions::default(),
+                CompactionOptions::default(),
                 None,
             )
             .await
@@ -108,8 +108,8 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingDivergedDatasetScenario
             server_dataset_layout,
             client_dataset_layout,
             server_dataset_ref,
-            server_precompacting_result: commit_result.unwrap(),
-            server_compacting_result,
+            server_precompaction_result: commit_result.unwrap(),
+            server_compaction_result,
         }
     }
 }

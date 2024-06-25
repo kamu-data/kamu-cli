@@ -17,7 +17,7 @@ use crate::prelude::*;
 pub enum FlowConfigurationSnapshot {
     Batching(FlowConfigurationBatching),
     Schedule(FlowConfigurationScheduleRule),
-    Compacting(FlowConfigurationCompactingRule),
+    Compaction(FlowConfigurationCompactionRule),
 }
 
 #[derive(SimpleObject)]
@@ -26,8 +26,8 @@ pub struct FlowConfigurationScheduleRule {
 }
 
 #[derive(SimpleObject)]
-pub struct FlowConfigurationCompactingRule {
-    compacting_rule: FlowConfigurationCompacting,
+pub struct FlowConfigurationCompactionRule {
+    compaction_rule: FlowConfigurationCompaction,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -50,15 +50,15 @@ impl From<fs::FlowConfigurationSnapshot> for FlowConfigurationSnapshot {
                     },
                 })
             }
-            fs::FlowConfigurationSnapshot::Compacting(compacting_rule) => {
-                Self::Compacting(FlowConfigurationCompactingRule {
-                    compacting_rule: match compacting_rule {
-                        fs::CompactingRule::Full(compacting_full_rule) => {
-                            FlowConfigurationCompacting::Full(compacting_full_rule.into())
+            fs::FlowConfigurationSnapshot::Compaction(compaction_rule) => {
+                Self::Compaction(FlowConfigurationCompactionRule {
+                    compaction_rule: match compaction_rule {
+                        fs::CompactionRule::Full(compaction_full_rule) => {
+                            FlowConfigurationCompaction::Full(compaction_full_rule.into())
                         }
-                        fs::CompactingRule::MetadataOnly(compacting_metadata_only_rule) => {
-                            FlowConfigurationCompacting::MetadataOnly(
-                                compacting_metadata_only_rule.into(),
+                        fs::CompactionRule::MetadataOnly(compaction_metadata_only_rule) => {
+                            FlowConfigurationCompaction::MetadataOnly(
+                                compaction_metadata_only_rule.into(),
                             )
                         }
                     },

@@ -31,7 +31,7 @@ struct TransformTestHarness {
     _tempdir: TempDir,
     dataset_repo: Arc<dyn DatasetRepository>,
     transform_service: Arc<TransformServiceImpl>,
-    compacting_service: Arc<dyn CompactingService>,
+    compaction_service: Arc<dyn CompactionService>,
     push_ingest_svc: Arc<PushIngestServiceImpl>,
 }
 
@@ -65,7 +65,7 @@ impl TransformTestHarness {
             .add::<SystemTimeSourceDefault>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
-            .add::<CompactingServiceImpl>()
+            .add::<CompactionServiceImpl>()
             .add::<DataFormatRegistryImpl>()
             .add::<PushIngestServiceImpl>()
             .bind::<dyn PushIngestService, PushIngestServiceImpl>()
@@ -79,7 +79,7 @@ impl TransformTestHarness {
             _tempdir: tempdir,
             dataset_repo: catalog.get_one().unwrap(),
             transform_service: catalog.get_one().unwrap(),
-            compacting_service: catalog.get_one().unwrap(),
+            compaction_service: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
         }
     }
@@ -629,7 +629,7 @@ async fn test_get_verification_plan_one_to_one() {
 }
 
 #[test_log::test(tokio::test)]
-async fn test_transform_with_compacting_retry() {
+async fn test_transform_with_compaction_retry() {
     let harness = TransformTestHarness::new_custom(
         auth::AlwaysHappyDatasetActionAuthorizer::new(),
         mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
@@ -709,10 +709,10 @@ async fn test_transform_with_compacting_retry() {
     assert_matches!(transform_result, Ok(TransformResult::Updated { .. }));
 
     harness
-        .compacting_service
+        .compaction_service
         .compact_dataset(
             &foo_created_result.dataset_handle,
-            CompactingOptions::default(),
+            CompactionOptions::default(),
             None,
         )
         .await
