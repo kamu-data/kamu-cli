@@ -15,8 +15,8 @@ use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
+use kamu_cli::testing::{CommandError, Kamu};
 use kamu_cli::*;
-use kamu_cli_wrapper::{CommandError, Kamu};
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
 

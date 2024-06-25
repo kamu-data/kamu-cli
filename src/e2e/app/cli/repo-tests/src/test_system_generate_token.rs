@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_cli_wrapper::Kamu;
+use kamu_cli::testing::Kamu;
 
 ////////////////////////////////////////////////////////////////////////////////
 

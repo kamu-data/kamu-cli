@@ -18,13 +18,23 @@ use chrono::{DateTime, Utc};
 use datafusion::prelude::*;
 use dill::Component;
 use event_bus::EventBus;
+use kamu::domain::*;
 use kamu::*;
-use kamu_cli::config::CONFIG_FILENAME;
-use kamu_cli::*;
-use kamu_core::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 use thiserror::Error;
+
+use crate::config::{ConfigService, CONFIG_FILENAME};
+use crate::{
+    accounts,
+    cli,
+    configure_base_catalog,
+    configure_cli_catalog,
+    run,
+    CLIError,
+    CompleteCommand,
+    WorkspaceLayout,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -181,10 +191,10 @@ impl Kamu {
 
         full_cmd.extend(cmd.into_iter().map(Into::into));
 
-        let app = kamu_cli::cli();
+        let app = cli();
         let matches = app.try_get_matches_from(&full_cmd).unwrap();
 
-        kamu_cli::run(self.workspace_layout.clone(), matches)
+        run(self.workspace_layout.clone(), matches)
             .await
             .map_err(|e| CommandError {
                 cmd: full_cmd,
@@ -219,7 +229,7 @@ impl Kamu {
     where
         S: Into<String>,
     {
-        let cli = kamu_cli::cli();
+        let cli = cli();
 
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
@@ -237,7 +247,7 @@ impl Kamu {
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
-        let config_service = Arc::new(kamu_cli::config::ConfigService::new(&self.workspace_layout));
+        let config_service = Arc::new(ConfigService::new(&self.workspace_layout));
 
         let mut buf = Vec::new();
         CompleteCommand::new(
@@ -274,7 +284,7 @@ impl Kamu {
     pub fn catalog(&self) -> dill::Catalog {
         let is_e2e_testing = true;
         let multi_tenant_workspace = false;
-        let base_catalog = kamu_cli::configure_base_catalog(
+        let base_catalog = configure_base_catalog(
             &self.workspace_layout,
             multi_tenant_workspace,
             self.system_time,
@@ -283,8 +293,7 @@ impl Kamu {
         .build();
 
         let multi_tenant_workspace = true;
-        let mut cli_catalog_builder =
-            kamu_cli::configure_cli_catalog(&base_catalog, multi_tenant_workspace);
+        let mut cli_catalog_builder = configure_cli_catalog(&base_catalog, multi_tenant_workspace);
         cli_catalog_builder.add_value(self.current_account.to_current_account_subject());
         cli_catalog_builder.build()
     }

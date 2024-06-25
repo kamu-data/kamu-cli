@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 use std::future::Future;
 
 use internal_error::InternalError;
-use kamu_cli_wrapper::{Kamu, NewWorkspaceOptions};
+use kamu_cli::testing::{Kamu, NewWorkspaceOptions};
 use regex::Regex;
 use sqlx::types::chrono::{DateTime, NaiveTime, Utc};
 use sqlx::{MySqlPool, PgPool, SqlitePool};

@@ -5055,7 +5055,6 @@ dependencies = [
  "kamu-adapter-http",
  "kamu-adapter-oauth",
  "kamu-adapter-odata",
- "kamu-cli-wrapper",
  "kamu-data-utils",
  "kamu-datafusion-cli",
  "kamu-flow-system-inmem",
@@ -5111,7 +5110,7 @@ version = "0.188.3"
 dependencies = [
  "indoc 2.0.5",
  "internal-error",
- "kamu-cli-wrapper",
+ "kamu-cli",
  "kamu-core",
  "pretty_assertions",
  "regex",
@@ -5130,7 +5129,6 @@ dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
- "kamu-cli-wrapper",
  "paste",
  "test-group",
  "tokio",
@@ -5143,7 +5141,6 @@ dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
- "kamu-cli-wrapper",
  "paste",
  "sqlx",
  "test-group",
@@ -5157,8 +5154,8 @@ dependencies = [
  "chrono",
  "indoc 2.0.5",
  "internal-error",
+ "kamu-cli",
  "kamu-cli-e2e-common",
- "kamu-cli-wrapper",
  "reqwest 0.11.27",
  "tokio",
 ]
@@ -5170,28 +5167,10 @@ dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
- "kamu-cli-wrapper",
  "paste",
  "sqlx",
  "test-group",
  "test-log",
-]
-
-[[package]]
-name = "kamu-cli-wrapper"
-version = "0.188.3"
-dependencies = [
- "chrono",
- "datafusion",
- "dill",
- "event-bus",
- "kamu",
- "kamu-cli",
- "kamu-core",
- "kamu-data-utils",
- "opendatafabric",
- "tempfile",
- "thiserror",
 ]
 
 [[package]]
@@ -8552,9 +8531,9 @@ dependencies = [
 
 [[package]]
 name = "subtle"
-version = "2.6.0"
+version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d0208408ba0c3df17ed26eb06992cb1a1268d41b2c0e12e65203fbe3972cee5"
+checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "syn"
