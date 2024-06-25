@@ -1079,6 +1079,7 @@ impl CompactTestHarness {
         let current_date_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add_value(RunInfoDir::new(run_info_dir))
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
@@ -1093,17 +1094,9 @@ impl CompactTestHarness {
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
-            .add_builder(CompactionServiceImpl::builder().with_run_info_dir(run_info_dir.clone()))
-            .bind::<dyn CompactionService, CompactionServiceImpl>()
-            .add_builder(
-                PushIngestServiceImpl::builder()
-                    .with_object_store_registry(Arc::new(ObjectStoreRegistryImpl::new(vec![
-                        Arc::new(ObjectStoreBuilderLocalFs::new()),
-                    ])))
-                    .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new()))
-                    .with_run_info_dir(run_info_dir),
-            )
-            .bind::<dyn PushIngestService, PushIngestServiceImpl>()
+            .add::<DataFormatRegistryImpl>()
+            .add::<CompactionServiceImpl>()
+            .add::<PushIngestServiceImpl>()
             .add_value(
                 mock_engine_provisioner::MockEngineProvisioner::new().stub_provision_engine(),
             )
@@ -1132,12 +1125,13 @@ impl CompactTestHarness {
 
     async fn new_s3(s3: &LocalS3Server) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
-        let run_info_dir = temp_dir.path().join("run");
+        let run_info_dir = Arc::new(RunInfoDir::new(temp_dir.path().join("run")));
         let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
         let s3_context = S3Context::from_items(endpoint.clone(), bucket, key_prefix).await;
         let current_date_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add_builder(run_info_dir.clone())
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_builder(
@@ -1157,38 +1151,21 @@ impl CompactTestHarness {
             .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
             .bind::<dyn TransformService, TestTransformService>()
             .add::<VerificationServiceImpl>()
+            .add::<PushIngestServiceImpl>()
+            .add::<DataFormatRegistryImpl>()
+            .add::<CompactionServiceImpl>()
             .add_value(CurrentAccountSubject::new_test())
             .build();
 
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-        let object_store_registry = catalog.get_one::<dyn ObjectStoreRegistry>().unwrap();
-        let compaction_svc = CompactionServiceImpl::new(
-            catalog.get_one().unwrap(),
-            dataset_repo.clone(),
-            object_store_registry.clone(),
-            catalog.get_one().unwrap(),
-            run_info_dir.clone(),
-        );
-        let push_ingest_svc = PushIngestServiceImpl::new(
-            dataset_repo.clone(),
-            catalog.get_one().unwrap(),
-            object_store_registry.clone(),
-            Arc::new(DataFormatRegistryImpl::new()),
-            run_info_dir,
-            catalog.get_one().unwrap(),
-            catalog.get_one().unwrap(),
-        );
-        let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
-        let transform_svc = catalog.get_one::<dyn TransformService>().unwrap();
-        let ctx = new_session_context(object_store_registry);
+        let ctx = new_session_context(catalog.get_one().unwrap());
 
         Self {
             _temp_dir: temp_dir,
-            dataset_repo,
-            compaction_svc: Arc::new(compaction_svc),
-            push_ingest_svc: Arc::new(push_ingest_svc),
-            verification_svc,
-            transform_svc,
+            dataset_repo: catalog.get_one().unwrap(),
+            compaction_svc: catalog.get_one().unwrap(),
+            push_ingest_svc: catalog.get_one().unwrap(),
+            verification_svc: catalog.get_one().unwrap(),
+            transform_svc: catalog.get_one().unwrap(),
             current_date_time,
             ctx,
         }

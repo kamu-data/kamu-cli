@@ -103,6 +103,7 @@ pub fn cli() -> Command {
                 .long("account")
                 .short('a')
                 .action(ArgAction::Set)
+                .help("Specifies account for multi-tenant Workspace")
                 .hide(true),
             Arg::new("e2e-testing")
                 .long("e2e-testing")
@@ -1284,7 +1285,7 @@ pub fn cli() -> Command {
                                     .required(true)
                                     .value_parser(value_parse_dataset_ref_local)
                                     .help("Dataset reference")])]),
-                        Command::new("check-token")
+                        Command::new("debug-token")
                             .about("Validate a Kamu token")
                             .args([
                                 Arg::new("token")

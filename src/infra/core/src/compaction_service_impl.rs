@@ -54,7 +54,7 @@ pub struct CompactionServiceImpl {
     dataset_authorizer: Arc<dyn domain::auth::DatasetActionAuthorizer>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     time_source: Arc<dyn SystemTimeSource>,
-    run_info_dir: PathBuf,
+    run_info_dir: Arc<RunInfoDir>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -105,7 +105,7 @@ impl CompactionServiceImpl {
         dataset_repo: Arc<dyn DatasetRepository>,
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
         time_source: Arc<dyn SystemTimeSource>,
-        run_info_dir: PathBuf,
+        run_info_dir: Arc<RunInfoDir>,
     ) -> Self {
         Self {
             dataset_repo,

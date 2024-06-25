@@ -13,7 +13,7 @@ use opendatafabric::AccountID;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{AccessToken, Account};
+use crate::AccessToken;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -38,11 +38,11 @@ pub trait AccessTokenRepository: Send + Sync {
         revoke_time: DateTime<Utc>,
     ) -> Result<(), RevokeTokenError>;
 
-    async fn find_account_by_active_token_id(
+    async fn find_account_id_by_active_token_id(
         &self,
         token_id: &Uuid,
         token_hash: [u8; 32],
-    ) -> Result<Account, FindAccountByTokenError>;
+    ) -> Result<AccountID, FindAccountByTokenError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

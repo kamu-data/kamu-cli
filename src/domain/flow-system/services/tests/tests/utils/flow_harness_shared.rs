@@ -139,6 +139,7 @@ impl FlowHarness {
                 .add::<AccessTokenRepositoryInMemory>()
                 .add::<DependencyGraphServiceInMemory>()
                 .add::<DatasetOwnershipServiceInMemory>()
+                .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
                 .add::<TaskSchedulerImpl>()
                 .add::<TaskSystemEventStoreInMemory>()
                 .add::<FlowSystemTestListener>()
@@ -232,14 +233,10 @@ impl FlowHarness {
             .await
             .unwrap();
 
-        let dataset_ownership_service = self
-            .catalog
-            .get_one::<dyn DatasetOwnershipService>()
-            .unwrap();
-        let authentication_service = self.catalog.get_one::<dyn AuthenticationService>().unwrap();
-
-        dataset_ownership_service
-            .eager_initialization(&authentication_service)
+        self.catalog
+            .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
+            .unwrap()
+            .eager_initialization()
             .await
             .unwrap();
     }

@@ -1,7 +1,7 @@
 IMAGE_PLATFORMS = linux/amd64,linux/arm64
 IMAGE_REPO = ghcr.io/kamu-data
 KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "kamu") | .version')
-DEMO_VERSION = 0.14.0
+DEMO_VERSION = 0.15.0
 
 #########################################################################################
 
@@ -29,6 +29,15 @@ jupyter: all-examples
 		.
 
 # Build and push multi-arch image
+# -------------------------------
+# Error: "libc-bin segfaults (script subprocess returned error exit status 139)".
+#
+# If you suddenly encounter this error (for example on Fedora), here's what will help you:
+# $ docker pull tonistiigi/binfmt:latest
+# $ docker run --privileged --rm tonistiigi/binfmt --uninstall qemu-*
+# $ docker run --privileged --rm tonistiigi/binfmt --install all
+#
+# Based on: https://github.com/docker/buildx/issues/314
 .PHONY: jupyter-multi-arch
 jupyter-multi-arch: all-examples
 	docker buildx build \

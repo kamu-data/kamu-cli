@@ -18,7 +18,7 @@ use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
 use kamu_accounts_services::PredefinedAccountsRegistrator;
-use kamu_adapter_http::{FileUploadLimitConfig, UploadService, UploadServiceLocal};
+use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
@@ -98,8 +98,6 @@ pub async fn run(
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
-
-        base_catalog_builder.add_value(ServerUrlConfig::load_from_env()?);
 
         if let Some(db_configuration) = maybe_db_configuration.as_ref() {
             configure_database_components(&mut base_catalog_builder, db_configuration)?;
@@ -245,6 +243,9 @@ pub fn configure_base_catalog(
     let mut b = CatalogBuilder::new();
 
     b.add_value(workspace_layout.clone());
+    b.add_value(RunInfoDir::new(&workspace_layout.run_info_dir));
+    b.add_value(CacheDir::new(&workspace_layout.cache_dir));
+    b.add_value(RemoteReposDir::new(&workspace_layout.repos_dir));
 
     b.add::<ContainerRuntime>();
 
@@ -268,10 +269,7 @@ pub fn configure_base_catalog(
 
     b.add::<DatasetChangesServiceImpl>();
 
-    b.add_builder(
-        RemoteRepositoryRegistryImpl::builder().with_repos_dir(workspace_layout.repos_dir.clone()),
-    );
-    b.bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
+    b.add::<RemoteRepositoryRegistryImpl>();
 
     b.add::<RemoteAliasesRegistryImpl>();
 
@@ -279,28 +277,17 @@ pub fn configure_base_catalog(
 
     b.add::<DataFormatRegistryImpl>();
 
-    b.add_builder(FetchService::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()));
+    b.add::<FetchService>();
 
-    b.add_builder(
-        PollingIngestServiceImpl::builder()
-            .with_run_info_dir(workspace_layout.run_info_dir.clone())
-            .with_cache_dir(workspace_layout.cache_dir.clone()),
-    );
-    b.bind::<dyn PollingIngestService, PollingIngestServiceImpl>();
+    b.add::<PollingIngestServiceImpl>();
 
-    b.add_builder(
-        PushIngestServiceImpl::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()),
-    );
-    b.bind::<dyn PushIngestService, PushIngestServiceImpl>();
+    b.add::<PushIngestServiceImpl>();
 
     b.add::<TransformServiceImpl>();
 
     b.add::<VerificationServiceImpl>();
 
-    b.add_builder(
-        CompactionServiceImpl::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()),
-    );
-    b.bind::<dyn CompactionService, CompactionServiceImpl>();
+    b.add::<CompactionServiceImpl>();
 
     b.add::<SearchServiceImpl>();
 
@@ -320,10 +307,7 @@ pub fn configure_base_catalog(
 
     b.add::<ObjectStoreBuilderLocalFs>();
 
-    b.add_builder(
-        EngineProvisionerLocal::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()),
-    );
-    b.bind::<dyn EngineProvisioner, EngineProvisionerLocal>();
+    b.add::<EngineProvisionerLocal>();
 
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
 
@@ -365,8 +349,7 @@ pub fn configure_base_catalog(
     b.add::<kamu_adapter_auth_oso::KamuAuthOso>();
     b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
 
-    b.add_builder(UploadServiceLocal::builder().with_cache_dir(workspace_layout.cache_dir.clone()));
-    b.bind::<dyn UploadService, UploadServiceLocal>();
+    b.add::<UploadServiceLocal>();
 
     b.add::<DatabaseTransactionRunner>();
 
@@ -455,8 +438,9 @@ pub fn configure_cli_catalog(
     b
 }
 
+#[tracing::instrument(level = "info", skip_all)]
 async fn initialize_components(cli_catalog: &Catalog) -> Result<(), CLIError> {
-    // TODO: For some reason, we if we do in a single transaction, there is a hangup
+    // TODO: Generalize on-startup initialization into a trait
     DatabaseTransactionRunner::new(cli_catalog.clone())
         .transactional(|transactional_catalog| async move {
             let registrator = transactional_catalog
@@ -466,11 +450,8 @@ async fn initialize_components(cli_catalog: &Catalog) -> Result<(), CLIError> {
             registrator
                 .ensure_predefined_accounts_are_registered()
                 .await
-                .map_err(CLIError::critical)
-        })
-        .await?;
-    DatabaseTransactionRunner::new(cli_catalog.clone())
-        .transactional(|transactional_catalog| async move {
+                .map_err(CLIError::critical)?;
+
             let initializer = transactional_catalog
                 .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
                 .map_err(CLIError::critical)?;
@@ -625,9 +606,9 @@ pub fn register_config_in_catalog(
     }
 
     let uploads_config = config.uploads.as_ref().unwrap();
-    catalog_builder.add_value(FileUploadLimitConfig {
-        max_file_size_in_bytes: uploads_config.max_file_size_in_mb.unwrap() * 1024 * 1024,
-    });
+    catalog_builder.add_value(FileUploadLimitConfig::new_in_mb(
+        uploads_config.max_file_size_in_mb.unwrap(),
+    ));
 }
 
 fn try_convert_into_db_configuration(config: DatabaseConfig) -> Option<DatabaseConfiguration> {

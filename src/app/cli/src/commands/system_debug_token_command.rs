@@ -16,12 +16,12 @@ use crate::{CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct CheckTokenCommand {
+pub struct DebugTokenCommand {
     auth_service: Arc<AuthenticationServiceImpl>,
     access_token: String,
 }
 
-impl CheckTokenCommand {
+impl DebugTokenCommand {
     pub fn new(auth_service: Arc<AuthenticationServiceImpl>, access_token: String) -> Self {
         Self {
             auth_service,
@@ -31,7 +31,7 @@ impl CheckTokenCommand {
 }
 
 #[async_trait::async_trait(?Send)]
-impl Command for CheckTokenCommand {
+impl Command for DebugTokenCommand {
     fn needs_workspace(&self) -> bool {
         false
     }

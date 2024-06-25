@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT\n                    at.token_hash,\n                    at.account_id\n                FROM access_tokens at\n                WHERE at.id = $1 and at.revoked_at IS null\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "token_hash",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "account_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "89766429d218ea9e0a7ab540a2d4612e84d8182de819837b38d7aed89e085bca"
+}

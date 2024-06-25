@@ -8,18 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, TimeZone, Utc};
-use dill::Component;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::DatasetDataHelper;
 use kamu::*;
 use kamu_accounts::DUMMY_ACCESS_TOKEN;
-use kamu_adapter_http::{
-    make_upload_token,
-    FileUploadLimitConfig,
-    UploadService,
-    UploadServiceLocal,
-};
+use kamu_adapter_http::{make_upload_token, FileUploadLimitConfig, UploadServiceLocal};
 use opendatafabric::{MergeStrategy, *};
 use serde_json::json;
 use url::Url;
@@ -509,27 +503,18 @@ async fn test_data_push_ingest_upload_token_actual_file_different_size() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct DataIngestHarness {
-    pub workspace_dir: tempfile::TempDir,
     pub server_harness: ServerSideLocalFsHarness,
     pub system_time: DateTime<Utc>,
 }
 
 impl DataIngestHarness {
     fn new() -> Self {
-        let workspace_dir = tempfile::tempdir().unwrap();
-        let run_info_dir = workspace_dir.path().join("run");
-        let cache_dir = workspace_dir.path().join("cache");
-
         let catalog = dill::CatalogBuilder::new()
             .add::<DataFormatRegistryImpl>()
-            .add_builder(PushIngestServiceImpl::builder().with_run_info_dir(run_info_dir))
-            .bind::<dyn PushIngestService, PushIngestServiceImpl>()
+            .add::<PushIngestServiceImpl>()
             .add::<EngineProvisionerNull>()
-            .add_builder(UploadServiceLocal::builder().with_cache_dir(cache_dir.clone()))
-            .bind::<dyn UploadService, UploadServiceLocal>()
-            .add_value(FileUploadLimitConfig {
-                max_file_size_in_bytes: 1000,
-            })
+            .add::<UploadServiceLocal>()
+            .add_value(FileUploadLimitConfig::new_in_bytes(1000))
             .build();
 
         let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
@@ -542,7 +527,6 @@ impl DataIngestHarness {
         server_harness.system_time_source().set(system_time);
 
         Self {
-            workspace_dir,
             server_harness,
             system_time,
         }
@@ -588,10 +572,13 @@ impl DataIngestHarness {
     }
 
     async fn upload_file(&self, upload_id: &str, file_name: &str, file_content: &str) {
-        let upload_dir = self
-            .workspace_dir
-            .path()
-            .join("cache")
+        let cache_dir = self
+            .server_harness
+            .base_catalog()
+            .get_one::<CacheDir>()
+            .unwrap();
+
+        let upload_dir = cache_dir
             .join("uploads")
             .join(
                 AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes())

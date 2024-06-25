@@ -20,8 +20,6 @@ use opendatafabric::{AccountID, AccountName, DatasetID};
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetOwnershipServiceInMemory {
-    current_account_subject: Arc<CurrentAccountSubject>,
-    dataset_repo: Arc<dyn DatasetRepository>,
     state: Arc<tokio::sync::RwLock<State>>,
 }
 
@@ -40,13 +38,8 @@ struct State {
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
 #[scope(Singleton)]
 impl DatasetOwnershipServiceInMemory {
-    pub fn new(
-        current_account_subject: Arc<CurrentAccountSubject>,
-        dataset_repo: Arc<dyn DatasetRepository>,
-    ) -> Self {
+    pub fn new() -> Self {
         Self {
-            current_account_subject,
-            dataset_repo,
             state: Default::default(),
         }
     }
@@ -89,63 +82,6 @@ impl DatasetOwnershipServiceInMemory {
 
 #[async_trait::async_trait]
 impl DatasetOwnershipService for DatasetOwnershipServiceInMemory {
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn eager_initialization(
-        &self,
-        authentication_service: &Arc<dyn AuthenticationService>,
-    ) -> Result<(), InternalError> {
-        let mut guard = self.state.write().await;
-        if guard.initially_scanned {
-            tracing::warn!("The service has already initialized");
-
-            return Ok(());
-        }
-
-        use futures::StreamExt;
-
-        tracing::debug!("Initializing dataset ownership data started");
-
-        let mut account_ids_by_name: HashMap<AccountName, AccountID> = HashMap::new();
-
-        let mut datasets_stream = self.dataset_repo.get_all_datasets();
-        while let Some(Ok(dataset_handle)) = datasets_stream.next().await {
-            let account_name = match dataset_handle.alias.account_name {
-                Some(account_name) => account_name,
-                None => match self.current_account_subject.as_ref() {
-                    CurrentAccountSubject::Anonymous(_) => {
-                        panic!("Initializing dataset ownership without authorization")
-                    }
-                    CurrentAccountSubject::Logged(l) => l.account_name.clone(),
-                },
-            };
-
-            let maybe_account_id = if let Some(account_id) = account_ids_by_name.get(&account_name)
-            {
-                Some(account_id.clone())
-            } else {
-                let maybe_account_id = authentication_service
-                    .find_account_id_by_name(&account_name)
-                    .await?;
-                if let Some(account_id) = maybe_account_id {
-                    account_ids_by_name.insert(account_name.clone(), account_id.clone());
-                    Some(account_id)
-                } else {
-                    None
-                }
-            };
-
-            if let Some(account_id) = maybe_account_id {
-                self.insert_dataset_record(&mut guard, &dataset_handle.id, &account_id);
-            }
-        }
-
-        guard.initially_scanned = true;
-
-        tracing::debug!("Finished initializing dataset ownership data",);
-
-        Ok(())
-    }
-
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn get_dataset_owners(
         &self,
@@ -230,3 +166,88 @@ impl AsyncEventHandler<DatasetEventDeleted> for DatasetOwnershipServiceInMemory 
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+// Initializer
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct DatasetOwnershipServiceInMemoryStateInitializer {
+    current_account_subject: Arc<CurrentAccountSubject>,
+    dataset_repo: Arc<dyn DatasetRepository>,
+    authentication_service: Arc<dyn AuthenticationService>,
+    dataset_ownership_service: Arc<DatasetOwnershipServiceInMemory>,
+}
+
+#[component(pub)]
+impl DatasetOwnershipServiceInMemoryStateInitializer {
+    pub fn new(
+        current_account_subject: Arc<CurrentAccountSubject>,
+        dataset_repo: Arc<dyn DatasetRepository>,
+        authentication_service: Arc<dyn AuthenticationService>,
+        dataset_ownership_service: Arc<DatasetOwnershipServiceInMemory>,
+    ) -> Self {
+        Self {
+            current_account_subject,
+            dataset_repo,
+            authentication_service,
+            dataset_ownership_service,
+        }
+    }
+
+    #[tracing::instrument(level = "debug", skip_all)]
+    pub async fn eager_initialization(&self) -> Result<(), InternalError> {
+        let mut guard = self.dataset_ownership_service.state.write().await;
+        if guard.initially_scanned {
+            tracing::warn!("The service has already initialized");
+
+            return Ok(());
+        }
+
+        use futures::StreamExt;
+
+        tracing::debug!("Initializing dataset ownership data started");
+
+        let mut account_ids_by_name: HashMap<AccountName, AccountID> = HashMap::new();
+
+        let mut datasets_stream = self.dataset_repo.get_all_datasets();
+        while let Some(Ok(dataset_handle)) = datasets_stream.next().await {
+            let account_name = match dataset_handle.alias.account_name {
+                Some(account_name) => account_name,
+                None => match self.current_account_subject.as_ref() {
+                    CurrentAccountSubject::Anonymous(_) => {
+                        panic!("Initializing dataset ownership without authorization")
+                    }
+                    CurrentAccountSubject::Logged(l) => l.account_name.clone(),
+                },
+            };
+
+            let maybe_account_id = if let Some(account_id) = account_ids_by_name.get(&account_name)
+            {
+                Some(account_id.clone())
+            } else {
+                let maybe_account_id = self
+                    .authentication_service
+                    .find_account_id_by_name(&account_name)
+                    .await?;
+                if let Some(account_id) = maybe_account_id {
+                    account_ids_by_name.insert(account_name.clone(), account_id.clone());
+                    Some(account_id)
+                } else {
+                    None
+                }
+            };
+
+            if let Some(account_id) = maybe_account_id {
+                self.dataset_ownership_service.insert_dataset_record(
+                    &mut guard,
+                    &dataset_handle.id,
+                    &account_id,
+                );
+            }
+        }
+
+        guard.initially_scanned = true;
+
+        tracing::debug!("Finished initializing dataset ownership data",);
+
+        Ok(())
+    }
+}

@@ -16,6 +16,7 @@ use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
 use kamu::{
     DatasetOwnershipServiceInMemory,
+    DatasetOwnershipServiceInMemoryStateInitializer,
     DatasetRepositoryLocalFs,
     DependencyGraphServiceInMemory,
 };
@@ -85,7 +86,7 @@ async fn test_multi_tenant_dataset_owners() {
 
 struct DatasetOwnershipHarness {
     _workdir: TempDir,
-    _catalog: dill::Catalog,
+    catalog: dill::Catalog,
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
     auth_svc: Arc<dyn AuthenticationService>,
@@ -128,6 +129,7 @@ impl DatasetOwnershipHarness {
                 .add::<AccountRepositoryInMemory>()
                 .add::<AccessTokenRepositoryInMemory>()
                 .add::<DatasetOwnershipServiceInMemory>()
+                .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<DependencyGraphServiceInMemory>()
                 .add::<DatabaseTransactionRunner>()
@@ -159,7 +161,7 @@ impl DatasetOwnershipHarness {
 
         Self {
             _workdir: workdir,
-            _catalog: catalog,
+            catalog,
             dataset_repo,
             dataset_ownership_service,
             auth_svc,
@@ -168,8 +170,10 @@ impl DatasetOwnershipHarness {
     }
 
     async fn eager_initialization(&self) {
-        self.dataset_ownership_service
-            .eager_initialization(&self.auth_svc)
+        self.catalog
+            .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
+            .unwrap()
+            .eager_initialization()
             .await
             .unwrap();
     }

@@ -135,9 +135,17 @@ impl TransactionRef {
     pub fn into_maybe_transaction<DB: sqlx::Database>(
         self,
     ) -> Option<sqlx::Transaction<'static, DB>> {
-        Arc::try_unwrap(self.inner)
-            .ok()
-            .and_then(|m| m.into_inner().maybe_transaction)
+        let inner = Arc::try_unwrap(self.inner)
+            .expect(
+                "Attempting to extract inner transaction while more than one strong reference is \
+                 present. This may be an indication that transaction reference is leaked, i.e. \
+                 held by some component whose lifetime exceeds the intended span of the \
+                 transaction scope.",
+            )
+            .into_inner();
+
+        inner
+            .maybe_transaction
             .map(|t| *t.downcast::<sqlx::Transaction<'static, DB>>().unwrap())
     }
 }

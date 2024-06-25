@@ -14,6 +14,7 @@ use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::catalog::schema::SchemaProvider;
 use datafusion::catalog::CatalogProvider;
 use datafusion::common::{Constraints, Statistics};
+use datafusion::config::TableOptions;
 use datafusion::datasource::empty::EmptyTable;
 use datafusion::datasource::listing::{ListingTable, ListingTableConfig};
 use datafusion::datasource::{TableProvider, TableType};
@@ -74,7 +75,11 @@ pub(crate) struct KamuSchema {
 }
 
 struct KamuSchemaImpl {
-    session_context: SessionContext,
+    // Note: Never include `SessionContext` or `SessionState` into this structure.
+    // Be mindful that this will cause a circular reference and thus prevent context
+    // from ever being released.
+    session_config: Arc<SessionConfig>,
+    table_options: Arc<TableOptions>,
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     options: QueryOptions,
@@ -90,14 +95,15 @@ struct SchemaCache {
 
 impl KamuSchema {
     pub fn new(
-        session_context: SessionContext,
+        session_context: &SessionContext,
         dataset_repo: Arc<dyn DatasetRepository>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         options: QueryOptions,
     ) -> Self {
         Self {
             inner: Arc::new(KamuSchemaImpl {
-                session_context,
+                session_config: Arc::new(session_context.copied_config()),
+                table_options: Arc::new(session_context.copied_table_options()),
                 dataset_repo,
                 dataset_action_authorizer,
                 options,
@@ -151,7 +157,8 @@ impl KamuSchema {
                 tables.insert(
                     alias.clone(),
                     Arc::new(KamuTable::new(
-                        self.inner.session_context.clone(),
+                        self.inner.session_config.clone(),
+                        self.inner.table_options.clone(),
                         hdl,
                         dataset,
                         as_of,
@@ -201,7 +208,8 @@ impl KamuSchema {
                     tables.insert(
                         hdl.alias.to_string(),
                         Arc::new(KamuTable::new(
-                            self.inner.session_context.clone(),
+                            self.inner.session_config.clone(),
+                            self.inner.table_options.clone(),
                             hdl,
                             dataset,
                             as_of,
@@ -258,7 +266,11 @@ impl SchemaProvider for KamuSchema {
         let this = self.clone();
 
         std::thread::spawn(move || {
-            let runtime = tokio::runtime::Runtime::new().unwrap();
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+
             runtime.block_on(this.table_names_impl())
         })
         .join()
@@ -271,7 +283,11 @@ impl SchemaProvider for KamuSchema {
         let name = name.to_owned();
 
         std::thread::spawn(move || {
-            let runtime = tokio::runtime::Runtime::new().unwrap();
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+
             runtime.block_on(this.table_exist_impl(&name))
         })
         .join()
@@ -309,7 +325,8 @@ impl SchemaProvider for KamuSchema {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct KamuTable {
-    session_context: SessionContext,
+    session_config: Arc<SessionConfig>,
+    table_options: Arc<TableOptions>,
     dataset_handle: DatasetHandle,
     dataset: Arc<dyn Dataset>,
     as_of: Option<Multihash>,
@@ -325,14 +342,16 @@ struct TableCache {
 
 impl KamuTable {
     pub(crate) fn new(
-        session_context: SessionContext,
+        session_config: Arc<SessionConfig>,
+        table_options: Arc<TableOptions>,
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
         as_of: Option<Multihash>,
         hints: Option<DatasetQueryHints>,
     ) -> Self {
         Self {
-            session_context,
+            session_config,
+            table_options,
             dataset_handle,
             dataset,
             as_of,
@@ -396,7 +415,7 @@ impl KamuTable {
             .await;
 
         let options = ParquetReadOptions {
-            schema: None,
+            schema: Some(&schema),
             // TODO: PERF: potential speedup if we specify `offset`?
             file_sort_order: Vec::new(),
             file_extension: "",
@@ -406,22 +425,12 @@ impl KamuTable {
         };
 
         let table_paths = file_urls.to_urls().int_err()?;
-        let session_config = self.session_context.copied_config();
-        let listing_options = options
-            .to_listing_options(&session_config, self.session_context.copied_table_options());
-
-        let resolved_schema = options
-            .get_resolved_schema(
-                &session_config,
-                self.session_context.state(),
-                table_paths[0].clone(),
-            )
-            .await
-            .int_err()?;
+        let listing_options =
+            options.to_listing_options(&self.session_config, self.table_options.as_ref().clone());
 
         let config = ListingTableConfig::new_with_multi_paths(table_paths)
             .with_listing_options(listing_options)
-            .with_schema(resolved_schema);
+            .with_schema(schema);
 
         let provider = ListingTable::try_new(config).int_err()?;
 

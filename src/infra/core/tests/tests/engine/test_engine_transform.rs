@@ -221,6 +221,8 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
 
     let catalog = dill::CatalogBuilder::new()
         .add_value(ContainerRuntimeConfig::default())
+        .add_value(RunInfoDir::new(run_info_dir))
+        .add_value(CacheDir::new(cache_dir))
         .add::<ContainerRuntime>()
         .add::<EventBus>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
@@ -232,27 +234,17 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .add_builder(
-            EngineProvisionerLocal::builder()
-                .with_config(EngineProvisionerLocalConfig::default())
-                .with_run_info_dir(run_info_dir.clone()),
-        )
-        .bind::<dyn EngineProvisioner, EngineProvisionerLocal>()
+        .add_value(EngineProvisionerLocalConfig::default())
+        .add::<EngineProvisionerLocal>()
         .add_value(ObjectStoreRegistryImpl::new(vec![Arc::new(
             ObjectStoreBuilderLocalFs::new(),
         )]))
         .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
         .add::<DataFormatRegistryImpl>()
-        .add_builder(FetchService::builder().with_run_info_dir(run_info_dir.clone()))
-        .add_builder(
-            PollingIngestServiceImpl::builder()
-                .with_cache_dir(cache_dir)
-                .with_run_info_dir(run_info_dir.clone()),
-        )
-        .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
+        .add::<FetchService>()
+        .add::<PollingIngestServiceImpl>()
         .add::<TransformServiceImpl>()
-        .add_builder(CompactionServiceImpl::builder().with_run_info_dir(run_info_dir))
-        .bind::<dyn CompactionService, CompactionServiceImpl>()
+        .add::<CompactionServiceImpl>()
         .add_value(SystemTimeSourceStub::new_set(
             Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
         ))

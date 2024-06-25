@@ -10,17 +10,26 @@ content:
       # Where to fetch the data from.
       fetch:
         kind: Url
-        # Source: https://resources-covid19canada.hub.arcgis.com/pages/open-data
-        url: https://opendata.arcgis.com/api/v3/datasets/4dabb4afab874804ba121536efaaacb4_0/downloads/data?format=csv&spatialRefId=4326
+        # Around June, 2024 Government of Quebec have restricted access to https://resources-covid19canada.hub.arcgis.com
+        # page now requiring credentials to sign-in. Another testament to how fragile the world's
+        # open data infrastructure is. To keep the demo operational we have switched the source to use
+        # the last seen version of this dataset.
+        #
+        # Original URL: https://opendata.arcgis.com/api/v3/datasets/4dabb4afab874804ba121536efaaacb4_0/downloads/data?format=csv&spatialRefId=4326
+        # Official page: https://resources-covid19canada.hub.arcgis.com/pages/open-data
+        url: https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/demo/covid/covid-19-quebec-2021-06-02.csv.gz
+      # Decompress the archive before reading
+      prepare:
+        - kind: Decompress
+          format: Gzip
       # How to interpret the data.
       read:
         kind: Csv
         header: true
-        # timestampFormat: "yyyy/MM/dd HH:mm:ssx"
         schema:
-          - ObjectId BIGINT
+          - date_reported TIMESTAMP
+          - objectid BIGINT
           - row_id BIGINT
-          - date_reported STRING
           - health_region STRING
           - age_group STRING
           - gender STRING
@@ -31,25 +40,6 @@ content:
           - province STRING
           - province_abbr STRING
           - hr_uid INT
-      preprocess:
-        kind: Sql
-        engine: datafusion
-        query: |
-          select
-            objectid,
-            row_id,
-            to_timestamp(date_reported, '%Y/%m/%d %H:%M:%S%#z') as date_reported,
-            health_region,
-            age_group,
-            gender,
-            exposure,
-            case_status,
-            latitude,
-            longitude,
-            province,
-            province_abbr,
-            hr_uid
-          from input
       # How to combine newly-ingested data with data that is already in the dataset
       merge:
         kind: Ledger

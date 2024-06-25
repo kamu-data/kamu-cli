@@ -6,6 +6,8 @@ REPO_BASE_URL="${KAMU_NODE_URL}kamu/"
 rm -rf .kamu
 kamu init
 
+kamu pull "${REPO_BASE_URL}net.rocketpool.reth.tokens-minted"
+kamu pull "${REPO_BASE_URL}net.rocketpool.reth.tokens-burned"
 kamu pull "${REPO_BASE_URL}net.rocketpool.reth.mint-burn"
 kamu pull "${REPO_BASE_URL}com.cryptocompare.ohlcv.eth-usd"
 

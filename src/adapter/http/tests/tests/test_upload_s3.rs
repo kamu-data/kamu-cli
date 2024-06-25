@@ -67,9 +67,7 @@ impl Harness {
                 .add::<LoginPasswordAuthProvider>()
                 .add_value(JwtAuthenticationConfig::default())
                 .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
-                .add_value(FileUploadLimitConfig {
-                    max_file_size_in_bytes: 100,
-                })
+                .add_value(FileUploadLimitConfig::new_in_bytes(100))
                 .add_builder(
                     UploadServiceS3::builder().with_s3_upload_context(s3_upload_context.clone()),
                 )

@@ -27,7 +27,6 @@ doctest = false
 [dev-dependencies]
 kamu-cli-e2e-common = { workspace = true }
 kamu-cli-e2e-repo-tests = { workspace = true }
-kamu-cli-wrapper = { workspace = true }
 
 indoc = "2"
 paste = "1"

@@ -8,5 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod test_auth;
+mod test_rest_api;
 mod test_selftest;
 mod test_system_generate_token;

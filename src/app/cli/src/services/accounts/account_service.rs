@@ -40,7 +40,6 @@ impl AccountService {
     ) -> CurrentAccountIndication {
         let (current_account, user_name, specified_explicitly) = {
             let default_account_name = AccountService::default_account_name(multi_tenant_workspace);
-            let default_user_name = AccountService::default_user_name(multi_tenant_workspace);
 
             if let Some(account) = arg_matches.get_one::<String>("account") {
                 (
@@ -54,6 +53,8 @@ impl AccountService {
                     true,
                 )
             } else {
+                let default_user_name = AccountService::default_user_name(multi_tenant_workspace);
+
                 (default_account_name, default_user_name, false)
             }
         };

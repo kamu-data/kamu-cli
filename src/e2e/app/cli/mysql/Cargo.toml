@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli-e2e-mysql"
-description = "MySQL-specific E2E tests"
+description = "MySQL-specific E2E tests (disabled)"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -27,7 +27,6 @@ doctest = false
 [dev-dependencies]
 kamu-cli-e2e-common = { workspace = true }
 kamu-cli-e2e-repo-tests = { workspace = true }
-kamu-cli-wrapper = { workspace = true }
 
 indoc = "2"
 paste = "1"

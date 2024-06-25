@@ -28,11 +28,14 @@ async fn test_engine_io_common(
     cache_dir: &Path,
     transform: Transform,
 ) {
+    let run_info_dir = Arc::new(RunInfoDir::new(run_info_dir.to_path_buf()));
+    let cache_dir = Arc::new(CacheDir::new(cache_dir.to_path_buf()));
+
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
         Arc::new(ContainerRuntime::default()),
         dataset_repo.clone(),
-        run_info_dir.to_path_buf(),
+        run_info_dir.clone(),
     ));
 
     let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
@@ -44,16 +47,16 @@ async fn test_engine_io_common(
         dataset_action_authorizer.clone(),
         Arc::new(FetchService::new(
             Arc::new(ContainerRuntime::default()),
-            run_info_dir.to_path_buf(),
             None,
             None,
             None,
+            run_info_dir.clone(),
         )),
         engine_provisioner.clone(),
         object_store_registry.clone(),
         Arc::new(DataFormatRegistryImpl::new()),
-        run_info_dir.to_path_buf(),
-        cache_dir.to_path_buf(),
+        run_info_dir.clone(),
+        cache_dir,
         time_source.clone(),
     );
 
@@ -67,7 +70,7 @@ async fn test_engine_io_common(
             dataset_repo.clone(),
             object_store_registry.clone(),
             time_source.clone(),
-            run_info_dir.to_path_buf(),
+            run_info_dir.clone(),
         )),
     );
 

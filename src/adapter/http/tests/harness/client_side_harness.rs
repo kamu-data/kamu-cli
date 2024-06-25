@@ -61,6 +61,10 @@ impl ClientSideHarness {
 
         let mut b = dill::CatalogBuilder::new();
 
+        b.add_value(RunInfoDir::new(run_info_dir));
+        b.add_value(CacheDir::new(cache_dir));
+        b.add_value(RemoteReposDir::new(repos_dir));
+
         b.add::<EventBus>();
 
         b.add::<DependencyGraphServiceInMemory>();
@@ -89,8 +93,7 @@ impl ClientSideHarness {
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 
-        b.add_builder(RemoteRepositoryRegistryImpl::builder().with_repos_dir(repos_dir))
-            .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
+        b.add::<RemoteRepositoryRegistryImpl>();
 
         b.add::<RemoteAliasesRegistryImpl>();
 
@@ -101,14 +104,9 @@ impl ClientSideHarness {
 
         b.add::<DataFormatRegistryImpl>();
 
-        b.add_builder(FetchService::builder().with_run_info_dir(run_info_dir.clone()));
+        b.add::<FetchService>();
 
-        b.add_builder(
-            PollingIngestServiceImpl::builder()
-                .with_run_info_dir(run_info_dir.clone())
-                .with_cache_dir(cache_dir),
-        )
-        .bind::<dyn PollingIngestService, PollingIngestServiceImpl>();
+        b.add::<PollingIngestServiceImpl>();
 
         b.add::<DatasetFactoryImpl>();
 
@@ -118,8 +116,7 @@ impl ClientSideHarness {
 
         b.add::<TransformServiceImpl>();
 
-        b.add_builder(CompactionServiceImpl::builder().with_run_info_dir(run_info_dir))
-            .bind::<dyn CompactionService, CompactionServiceImpl>();
+        b.add::<CompactionServiceImpl>();
 
         b.add::<PullServiceImpl>();
 

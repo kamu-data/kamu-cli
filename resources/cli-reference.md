@@ -1059,7 +1059,7 @@ Command group for system-level functionality
 * `info` — Summary of the system information
 * `diagnose` — Run basic system diagnose check
 * `ipfs` — IPFS helpers
-* `check-token` — Validate a Kamu token
+* `debug-token` — Validate a Kamu token
 * `generate-token` — Generate a platform token from a known secret for debugging
 * `compact` — Compact a dataset
 
@@ -1186,11 +1186,11 @@ Adds the specified dataset to IPFS and returns the CID
 
 
 
-## `kamu system check-token`
+## `kamu system debug-token`
 
 Validate a Kamu token
 
-**Usage:** `kamu system check-token <token>`
+**Usage:** `kamu system debug-token <token>`
 
 **Arguments:**
 

@@ -103,6 +103,10 @@ impl ApiError {
             status_code: http::StatusCode::UNSUPPORTED_MEDIA_TYPE,
         }
     }
+
+    pub fn no_content(source: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::new(source, http::StatusCode::NO_CONTENT)
+    }
 }
 
 impl axum::response::IntoResponse for ApiError {

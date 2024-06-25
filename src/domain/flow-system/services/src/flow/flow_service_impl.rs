@@ -195,7 +195,7 @@ impl FlowServiceImpl {
                         self.enqueue_auto_polling_flow_unconditionally(start_time, &flow_key)
                             .await?;
                     }
-                    // Sucn as compaction is very dangerous operation we
+                    // Such as compaction is very dangerous operation we
                     // skip running it during activation flow configurations
                     FlowConfigurationRule::CompactionRule(_) => (),
                 }
