@@ -102,7 +102,8 @@ impl AccountRepository for MySqlAccountRepository {
             .await
             .map_err(GetAccountByIdError::Internal)?;
 
-        let maybe_account_row = sqlx::query!(
+        let maybe_account_row = sqlx::query_as!(
+            AccountRowModel,
             r#"
             SELECT
                 id as "id: AccountID",
@@ -112,7 +113,7 @@ impl AccountRepository for MySqlAccountRepository {
                 account_type as "account_type: AccountType",
                 avatar_url,
                 registered_at,
-                is_admin,
+                is_admin as "is_admin: _",
                 provider,
                 provider_identity_key
             FROM accounts
@@ -126,18 +127,7 @@ impl AccountRepository for MySqlAccountRepository {
         .map_err(GetAccountByIdError::Internal)?;
 
         if let Some(account_row) = maybe_account_row {
-            Ok(Account {
-                id: account_row.id,
-                account_name: AccountName::new_unchecked(&account_row.account_name),
-                email: account_row.email,
-                display_name: account_row.display_name,
-                account_type: account_row.account_type,
-                avatar_url: account_row.avatar_url,
-                registered_at: account_row.registered_at,
-                is_admin: account_row.is_admin != 0,
-                provider: account_row.provider,
-                provider_identity_key: account_row.provider_identity_key,
-            })
+            Ok(account_row.into())
         } else {
             Err(GetAccountByIdError::NotFound(AccountNotFoundByIdError {
                 account_id: account_id.clone(),
@@ -223,7 +213,8 @@ impl AccountRepository for MySqlAccountRepository {
             .await
             .map_err(GetAccountByNameError::Internal)?;
 
-        let maybe_account_row = sqlx::query!(
+        let maybe_account_row = sqlx::query_as!(
+            AccountRowModel,
             r#"
             SELECT
                 id as "id: AccountID",
@@ -233,7 +224,7 @@ impl AccountRepository for MySqlAccountRepository {
                 account_type as "account_type: AccountType",
                 avatar_url,
                 registered_at,
-                is_admin,
+                is_admin as "is_admin: _",
                 provider,
                 provider_identity_key
             FROM accounts
@@ -247,18 +238,7 @@ impl AccountRepository for MySqlAccountRepository {
         .map_err(GetAccountByNameError::Internal)?;
 
         if let Some(account_row) = maybe_account_row {
-            Ok(Account {
-                id: account_row.id,
-                account_name: AccountName::new_unchecked(&account_row.account_name),
-                email: account_row.email,
-                display_name: account_row.display_name,
-                account_type: account_row.account_type,
-                avatar_url: account_row.avatar_url,
-                registered_at: account_row.registered_at,
-                is_admin: account_row.is_admin != 0,
-                provider: account_row.provider,
-                provider_identity_key: account_row.provider_identity_key,
-            })
+            Ok(account_row.into())
         } else {
             Err(GetAccountByNameError::NotFound(
                 AccountNotFoundByNameError {

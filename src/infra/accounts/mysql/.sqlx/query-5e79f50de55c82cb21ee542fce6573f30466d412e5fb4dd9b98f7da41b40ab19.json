@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                id as \"id: AccountID\",\n                account_name,\n                email as \"email?\",\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                is_admin,\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = ?\n            ",
+  "query": "\n            SELECT\n                id as \"id: AccountID\",\n                account_name,\n                email as \"email?\",\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                is_admin as \"is_admin: _\",\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE lower(account_name) = lower(?)\n            ",
   "describe": {
     "columns": [
       {
@@ -75,7 +75,7 @@
       },
       {
         "ordinal": 7,
-        "name": "is_admin",
+        "name": "is_admin: _",
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL | NO_DEFAULT_VALUE",
@@ -120,5 +120,5 @@
       false
     ]
   },
-  "hash": "3e8293e44dd73c470f6e3a73ed153d2d74a514721fc519dbcb9eb2bd3cebc39b"
+  "hash": "5e79f50de55c82cb21ee542fce6573f30466d412e5fb4dd9b98f7da41b40ab19"
 }

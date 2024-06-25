@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT\n                id as \"id: AccountID\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at as \"registered_at: _\",\n                is_admin,\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = $1\n            ",
+  "query": "\n            SELECT\n                id as \"id: AccountID\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at as \"registered_at: _\",\n                is_admin as \"is_admin: _\",\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE lower(account_name) = lower($1)\n            ",
   "describe": {
     "columns": [
       {
@@ -39,7 +39,7 @@
         "type_info": "Null"
       },
       {
-        "name": "is_admin",
+        "name": "is_admin: _",
         "ordinal": 7,
         "type_info": "Int64"
       },
@@ -70,5 +70,5 @@
       false
     ]
   },
-  "hash": "e746f6d2846a1f2249929da168f45f83705dd71c2b76044c11f560d33752a509"
+  "hash": "2d9ae238b8ffb764dad433fa7321bdefd8582bcac610575c7b238bd7f862c461"
 }
