@@ -16,15 +16,15 @@ use chrono::{DateTime, Utc};
 use datafusion::prelude::*;
 use dill::{component, interface};
 use domain::{
-    CompactingError,
-    CompactingListener,
-    CompactingMultiListener,
-    CompactingOptions,
-    CompactingPhase,
-    CompactingResult,
-    CompactingService,
+    CompactionError,
+    CompactionListener,
+    CompactionMultiListener,
+    CompactionOptions,
+    CompactionPhase,
+    CompactionResult,
+    CompactionService,
     InvalidDatasetKindError,
-    NullCompactingListener,
+    NullCompactionListener,
     DEFAULT_MAX_SLICE_RECORDS,
     DEFAULT_MAX_SLICE_SIZE,
 };
@@ -49,7 +49,7 @@ use url::Url;
 use crate::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use crate::*;
 
-pub struct CompactingServiceImpl {
+pub struct CompactionServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_authorizer: Arc<dyn domain::auth::DatasetActionAuthorizer>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
@@ -98,8 +98,8 @@ struct ChainFilesInfo {
 }
 
 #[component(pub)]
-#[interface(dyn CompactingService)]
-impl CompactingServiceImpl {
+#[interface(dyn CompactionService)]
+impl CompactionServiceImpl {
     pub fn new(
         dataset_authorizer: Arc<dyn domain::auth::DatasetActionAuthorizer>,
         dataset_repo: Arc<dyn DatasetRepository>,
@@ -122,7 +122,7 @@ impl CompactingServiceImpl {
         max_slice_size: u64,
         max_slice_records: u64,
         keep_metadata_only: bool,
-    ) -> Result<ChainFilesInfo, CompactingError> {
+    ) -> Result<ChainFilesInfo, CompactionError> {
         // Declare mut values for result
 
         let mut old_num_blocks: usize = 0;
@@ -163,7 +163,7 @@ impl CompactingServiceImpl {
                             || batch_records + current_records > max_slice_records
                         {
                             let is_appended =
-                                CompactingServiceImpl::append_add_data_batch_to_chain_info(
+                                CompactionServiceImpl::append_add_data_batch_to_chain_info(
                                     &mut data_slice_batches,
                                     &current_hash,
                                     &mut data_slice_batch_info,
@@ -216,7 +216,7 @@ impl CompactingServiceImpl {
                     if let MetadataEvent::SetVocab(set_vocab_event) = event {
                         vocab_event = Some(set_vocab_event);
                     }
-                    let is_appended = CompactingServiceImpl::append_add_data_batch_to_chain_info(
+                    let is_appended = CompactionServiceImpl::append_add_data_batch_to_chain_info(
                         &mut data_slice_batches,
                         &current_hash,
                         &mut data_slice_batch_info,
@@ -263,8 +263,8 @@ impl CompactingServiceImpl {
         &self,
         data_slice_batches: &mut [DataSliceBatch],
         offset_column: &str,
-        compacting_dir_path: &Path,
-    ) -> Result<(), CompactingError> {
+        compaction_dir_path: &Path,
+    ) -> Result<(), CompactionError> {
         let ctx = new_session_context(self.object_store_registry.clone());
 
         for (index, data_slice_batch) in data_slice_batches.iter_mut().enumerate() {
@@ -285,7 +285,7 @@ impl CompactingServiceImpl {
                     .int_err()?;
 
                 let new_file_path =
-                    compacting_dir_path.join(format!("merge-slice-{index}").as_str());
+                    compaction_dir_path.join(format!("merge-slice-{index}").as_str());
 
                 data_frame
                     .write_parquet(
@@ -303,19 +303,19 @@ impl CompactingServiceImpl {
         Ok(())
     }
 
-    fn create_run_compacting_dir(&self) -> Result<PathBuf, CompactingError> {
-        let compacting_dir_path = self
+    fn create_run_compaction_dir(&self) -> Result<PathBuf, CompactionError> {
+        let compaction_dir_path = self
             .run_info_dir
-            .join(get_random_name(Some("compacting-"), 10));
-        fs::create_dir_all(&compacting_dir_path).int_err()?;
-        Ok(compacting_dir_path)
+            .join(get_random_name(Some("compaction-"), 10));
+        fs::create_dir_all(&compaction_dir_path).int_err()?;
+        Ok(compaction_dir_path)
     }
 
     async fn commit_new_blocks(
         &self,
         dataset: Arc<dyn Dataset>,
         chain_files_info: &ChainFilesInfo,
-    ) -> Result<(Vec<Url>, Multihash, usize), CompactingError> {
+    ) -> Result<(Vec<Url>, Multihash, usize), CompactionError> {
         let chain = dataset.as_metadata_chain();
         let mut current_head = chain_files_info.old_head.clone();
         let mut old_data_slices: Vec<Url> = vec![];
@@ -399,11 +399,11 @@ impl CompactingServiceImpl {
         max_slice_size: u64,
         max_slice_records: u64,
         keep_metadata_only: bool,
-        listener: Arc<dyn CompactingListener>,
-    ) -> Result<CompactingResult, CompactingError> {
-        let compacting_dir_path = self.create_run_compacting_dir()?;
+        listener: Arc<dyn CompactionListener>,
+    ) -> Result<CompactionResult, CompactionError> {
+        let compaction_dir_path = self.create_run_compaction_dir()?;
 
-        listener.begin_phase(CompactingPhase::GatherChainInfo);
+        listener.begin_phase(CompactionPhase::GatherChainInfo);
         let mut chain_files_info = self
             .gather_chain_info(
                 dataset.clone(),
@@ -414,20 +414,20 @@ impl CompactingServiceImpl {
             .await?;
 
         // if slices amount +1(seed block) eq to amount of blocks we will not perform
-        // compacting
+        // compaction
         if chain_files_info.data_slice_batches.len() + 1 == chain_files_info.old_num_blocks {
-            return Ok(CompactingResult::NothingToDo);
+            return Ok(CompactionResult::NothingToDo);
         }
 
-        listener.begin_phase(CompactingPhase::MergeDataslices);
+        listener.begin_phase(CompactionPhase::MergeDataslices);
         self.merge_files(
             &mut chain_files_info.data_slice_batches,
             chain_files_info.offset_column.as_str(),
-            &compacting_dir_path,
+            &compaction_dir_path,
         )
         .await?;
 
-        listener.begin_phase(CompactingPhase::CommitNewBlocks);
+        listener.begin_phase(CompactionPhase::CommitNewBlocks);
         let (_old_data_slices, new_head, new_num_blocks) = self
             .commit_new_blocks(dataset.clone(), &chain_files_info)
             .await?;
@@ -444,7 +444,7 @@ impl CompactingServiceImpl {
             )
             .await?;
 
-        let res = CompactingResult::Success {
+        let res = CompactionResult::Success {
             old_head: chain_files_info.old_head,
             new_head,
             old_num_blocks: chain_files_info.old_num_blocks,
@@ -458,14 +458,14 @@ impl CompactingServiceImpl {
 }
 
 #[async_trait::async_trait]
-impl CompactingService for CompactingServiceImpl {
+impl CompactionService for CompactionServiceImpl {
     #[tracing::instrument(level = "info", skip_all)]
     async fn compact_dataset(
         &self,
         dataset_handle: &DatasetHandle,
-        options: CompactingOptions,
-        maybe_listener: Option<Arc<dyn CompactingListener>>,
-    ) -> Result<CompactingResult, CompactingError> {
+        options: CompactionOptions,
+        maybe_listener: Option<Arc<dyn CompactionListener>>,
+    ) -> Result<CompactionResult, CompactionError> {
         self.dataset_authorizer
             .check_action_allowed(dataset_handle, domain::auth::DatasetAction::Write)
             .await?;
@@ -482,14 +482,14 @@ impl CompactingService for CompactingServiceImpl {
             .kind;
 
         if !options.keep_metadata_only && dataset_kind != DatasetKind::Root {
-            return Err(CompactingError::InvalidDatasetKind(
+            return Err(CompactionError::InvalidDatasetKind(
                 InvalidDatasetKindError {
                     dataset_name: dataset_handle.alias.dataset_name.clone(),
                 },
             ));
         }
 
-        let listener = maybe_listener.unwrap_or(Arc::new(NullCompactingListener {}));
+        let listener = maybe_listener.unwrap_or(Arc::new(NullCompactionListener {}));
 
         let max_slice_size = options.max_slice_size.unwrap_or(DEFAULT_MAX_SLICE_SIZE);
         let max_slice_records = options
@@ -520,9 +520,9 @@ impl CompactingService for CompactingServiceImpl {
     async fn compact_multi(
         &self,
         dataset_refs: Vec<DatasetRef>,
-        options: CompactingOptions,
-        multi_listener: Option<Arc<dyn CompactingMultiListener>>,
-    ) -> Vec<CompactingResponse> {
+        options: CompactionOptions,
+        multi_listener: Option<Arc<dyn CompactionMultiListener>>,
+    ) -> Vec<CompactionResponse> {
         let filtered_dataset_results = filter_datasets_by_local_pattern(
             self.dataset_repo.as_ref(),
             dataset_refs
@@ -539,11 +539,11 @@ impl CompactingService for CompactingServiceImpl {
             return vec![];
         };
 
-        let listener = multi_listener.unwrap_or(Arc::new(NullCompactingMultiListener {}));
+        let listener = multi_listener.unwrap_or(Arc::new(NullCompactionMultiListener {}));
 
         let mut result = vec![];
         for dataset_handle in &dataset_handles {
-            result.push(CompactingResponse {
+            result.push(CompactionResponse {
                 dataset_ref: dataset_handle.as_local_ref(),
                 result: self
                     .compact_dataset(

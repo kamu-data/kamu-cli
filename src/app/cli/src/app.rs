@@ -287,7 +287,7 @@ pub fn configure_base_catalog(
 
     b.add::<VerificationServiceImpl>();
 
-    b.add::<CompactingServiceImpl>();
+    b.add::<CompactionServiceImpl>();
 
     b.add::<SearchServiceImpl>();
 

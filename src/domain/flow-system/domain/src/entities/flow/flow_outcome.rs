@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{CompactingResult, PullResult};
+use kamu_core::{CompactionResult, PullResult};
 use kamu_task_system as ts;
 use opendatafabric::{DatasetID, Multihash};
 use ts::TaskError;
@@ -100,10 +100,10 @@ impl From<ts::TaskResult> for FlowResult {
                     }
                 }
             }
-            ts::TaskResult::CompactingDatasetResult(task_compacting_result) => {
-                match task_compacting_result.compacting_result {
-                    CompactingResult::NothingToDo => Self::Empty,
-                    CompactingResult::Success {
+            ts::TaskResult::CompactionDatasetResult(task_compaction_result) => {
+                match task_compaction_result.compaction_result {
+                    CompactionResult::NothingToDo => Self::Empty,
+                    CompactionResult::Success {
                         new_head,
                         old_num_blocks,
                         new_num_blocks,

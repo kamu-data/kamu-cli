@@ -25,7 +25,7 @@ pub struct TransformServiceImpl {
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     time_source: Arc<dyn SystemTimeSource>,
-    compacting_svc: Arc<dyn CompactingService>,
+    compaction_svc: Arc<dyn CompactionService>,
 }
 
 #[component(pub)]
@@ -36,14 +36,14 @@ impl TransformServiceImpl {
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         time_source: Arc<dyn SystemTimeSource>,
-        compacting_svc: Arc<dyn CompactingService>,
+        compaction_svc: Arc<dyn CompactionService>,
     ) -> Self {
         Self {
             dataset_repo,
             dataset_action_authorizer,
             engine_provisioner,
             time_source,
-            compacting_svc,
+            compaction_svc,
         }
     }
 
@@ -711,11 +711,11 @@ impl TransformServiceImpl {
             && let Err(transform_err) = &next_operation
             && let TransformError::InvalidInterval(_) = transform_err
         {
-            let compacting_result = self
-                .compacting_svc
+            let compaction_result = self
+                .compaction_svc
                 .compact_dataset(
                     &dataset_handle,
-                    CompactingOptions {
+                    CompactionOptions {
                         keep_metadata_only: true,
                         ..Default::default()
                     },
@@ -724,7 +724,7 @@ impl TransformServiceImpl {
                 .await
                 .int_err()?;
 
-            if let CompactingResult::Success { .. } = compacting_result {
+            if let CompactionResult::Success { .. } = compaction_result {
                 return self
                     .transform_impl(
                         dataset_ref.clone(),

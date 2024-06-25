@@ -10,8 +10,8 @@
 use std::sync::Arc;
 
 use kamu::domain::{
-    CompactingOptions,
-    CompactingService,
+    CompactionOptions,
+    CompactionService,
     DatasetRepository,
     VerificationMultiListener,
     VerificationOptions,
@@ -19,12 +19,12 @@ use kamu::domain::{
 };
 use opendatafabric::{DatasetHandle, DatasetRef};
 
-use crate::{BatchError, CLIError, Command, CompactingMultiProgress, VerificationMultiProgress};
+use crate::{BatchError, CLIError, Command, CompactionMultiProgress, VerificationMultiProgress};
 
 pub struct CompactCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
-    compacting_svc: Arc<dyn CompactingService>,
+    compaction_svc: Arc<dyn CompactionService>,
     dataset_ref: DatasetRef,
     max_slice_size: u64,
     max_slice_records: u64,
@@ -37,7 +37,7 @@ impl CompactCommand {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
-        compacting_svc: Arc<dyn CompactingService>,
+        compaction_svc: Arc<dyn CompactionService>,
         dataset_ref: DatasetRef,
         max_slice_size: u64,
         max_slice_records: u64,
@@ -48,7 +48,7 @@ impl CompactCommand {
         Self {
             dataset_repo,
             verification_svc,
-            compacting_svc,
+            compaction_svc,
             dataset_ref,
             max_slice_size,
             max_slice_records,
@@ -87,7 +87,7 @@ impl Command for CompactCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         if !self.is_hard {
             return Err(CLIError::usage_error(
-                "Soft compactings are not yet supported",
+                "Soft compactions are not yet supported",
             ));
         }
         let dataset_handle = self
@@ -100,25 +100,25 @@ impl Command for CompactCommand {
             if let Err(err) = self.verify_dataset(&dataset_handle).await {
                 eprintln!(
                     "{}",
-                    console::style("Cannot perform compacting, dataset is invalid".to_string())
+                    console::style("Cannot perform compaction, dataset is invalid".to_string())
                         .red()
                 );
                 return Err(err);
             }
         }
 
-        let progress = CompactingMultiProgress::new();
+        let progress = CompactionMultiProgress::new();
         let listener = Arc::new(progress.clone());
 
         let draw_thread = std::thread::spawn(move || {
             progress.draw();
         });
 
-        let compacting_results = self
-            .compacting_svc
+        let compaction_results = self
+            .compaction_svc
             .compact_multi(
                 vec![dataset_handle.as_local_ref()],
-                CompactingOptions {
+                CompactionOptions {
                     max_slice_size: Some(self.max_slice_size),
                     max_slice_records: Some(self.max_slice_records),
                     keep_metadata_only: self.keep_metadata_only,
@@ -127,12 +127,12 @@ impl Command for CompactCommand {
             )
             .await;
 
-        let total_results = compacting_results.len();
+        let total_results = compaction_results.len();
 
         listener.finish();
         draw_thread.join().unwrap();
 
-        let errors: Vec<_> = compacting_results
+        let errors: Vec<_> = compaction_results
             .into_iter()
             .filter_map(|response| match response.result {
                 Ok(_) => None,

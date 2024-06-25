@@ -289,19 +289,19 @@ impl FlowHarness {
             .unwrap();
     }
 
-    pub async fn set_dataset_flow_compacting_rule(
+    pub async fn set_dataset_flow_compaction_rule(
         &self,
         request_time: DateTime<Utc>,
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
-        compacting_rule: CompactingRule,
+        compaction_rule: CompactionRule,
     ) {
         self.flow_configuration_service
             .set_configuration(
                 request_time,
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
-                FlowConfigurationRule::CompactingRule(compacting_rule),
+                FlowConfigurationRule::CompactionRule(compaction_rule),
             )
             .await
             .unwrap();

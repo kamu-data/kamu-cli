@@ -183,14 +183,14 @@ pub(crate) async fn test_smart_push_existing_diverged_dataset<TServerHarness: Se
             )
             .await;
 
-        let new_head = match scenario.client_compacting_result {
-            CompactingResult::NothingToDo => panic!("unexpected compacting result"),
-            CompactingResult::Success { new_head, .. } => new_head,
+        let new_head = match scenario.client_compaction_result {
+            CompactionResult::NothingToDo => panic!("unexpected compaction result"),
+            CompactionResult::Success { new_head, .. } => new_head,
         };
 
         assert_eq!(
             SyncResult::Updated {
-                old_head: Some(scenario.client_precompacting_result.new_head),
+                old_head: Some(scenario.client_precompaction_result.new_head),
                 new_head,
                 num_blocks: 4,
             },

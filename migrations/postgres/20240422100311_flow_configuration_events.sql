@@ -21,7 +21,7 @@ CREATE TABLE system_flow_configuration_events
 --
 -- Rename an enum value:
 -- ALTER TYPE dataset_flow_type RENAME VALUE 'existing_value' TO 'new_value';
-CREATE TYPE dataset_flow_type AS ENUM ('ingest', 'execute_transform', 'hard_compacting');
+CREATE TYPE dataset_flow_type AS ENUM ('ingest', 'execute_transform', 'hard_compaction');
 
 CREATE TABLE dataset_flow_configuration_events
 (

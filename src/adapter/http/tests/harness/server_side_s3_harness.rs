@@ -15,7 +15,7 @@ use std::sync::Arc;
 use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::{
-    CompactingService,
+    CompactionService,
     DatasetRepository,
     InternalError,
     ObjectStoreBuilder,
@@ -28,7 +28,7 @@ use kamu::domain::{
 use kamu::testing::LocalS3Server;
 use kamu::utils::s3_context::S3Context;
 use kamu::{
-    CompactingServiceImpl,
+    CompactionServiceImpl,
     DatasetLayout,
     DatasetRepositoryS3,
     DependencyGraphServiceInMemory,
@@ -93,7 +93,7 @@ impl ServerSideS3Harness {
             .add_value(server_authentication_mock())
             .bind::<dyn AuthenticationService, MockAuthenticationService>()
             .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
-            .add::<CompactingServiceImpl>()
+            .add::<CompactionServiceImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add_value(ObjectStoreBuilderS3::new(s3_context, true))
@@ -141,9 +141,9 @@ impl ServerSideHarness for ServerSideS3Harness {
         cli_catalog.get_one::<dyn DatasetRepository>().unwrap()
     }
 
-    fn cli_compacting_service(&self) -> Arc<dyn CompactingService> {
+    fn cli_compaction_service(&self) -> Arc<dyn CompactionService> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog);
-        cli_catalog.get_one::<dyn CompactingService>().unwrap()
+        cli_catalog.get_one::<dyn CompactionService>().unwrap()
     }
 
     fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url {

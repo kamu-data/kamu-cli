@@ -17,7 +17,7 @@ CREATE TABLE dataset_flow_configuration_events
 (
     event_id          INTEGER PRIMARY KEY                                                                           NOT NULL,
     dataset_id        VARCHAR(100)                                                                                  NOT NULL,
-    dataset_flow_type VARCHAR(20) CHECK ( dataset_flow_type IN ('ingest', 'execute_transform', 'hard_compacting') ) NOT NULL,
+    dataset_flow_type VARCHAR(20) CHECK ( dataset_flow_type IN ('ingest', 'execute_transform', 'hard_compaction') ) NOT NULL,
     event_type        VARCHAR(50)                                                                                   NOT NULL,
     event_time        TIMESTAMPTZ                                                                                   NOT NULL,
     event_payload     JSONB                                                                                         NOT NULL

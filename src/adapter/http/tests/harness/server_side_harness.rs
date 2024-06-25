@@ -17,7 +17,7 @@ use kamu::domain::auth::{
     DatasetAction,
     DatasetActionAuthorizer,
 };
-use kamu::domain::{CompactingService, DatasetRepository, InternalError, SystemTimeSourceStub};
+use kamu::domain::{CompactionService, DatasetRepository, InternalError, SystemTimeSourceStub};
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::DatasetLayout;
 use kamu_accounts::{
@@ -42,7 +42,7 @@ pub(crate) trait ServerSideHarness {
 
     fn cli_dataset_repository(&self) -> Arc<dyn DatasetRepository>;
 
-    fn cli_compacting_service(&self) -> Arc<dyn CompactingService>;
+    fn cli_compaction_service(&self) -> Arc<dyn CompactionService>;
 
     fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout;
 

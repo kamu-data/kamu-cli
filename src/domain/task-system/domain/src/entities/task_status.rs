@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{CompactingResult, PullResult};
+use kamu_core::{CompactionResult, PullResult};
 use opendatafabric::DatasetID;
 use serde::{Deserialize, Serialize};
 
@@ -49,7 +49,7 @@ impl TaskOutcome {
 pub enum TaskResult {
     Empty,
     UpdateDatasetResult(TaskUpdateDatasetResult),
-    CompactingDatasetResult(TaskCompactingDatasetResult),
+    CompactionDatasetResult(TaskCompactionDatasetResult),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,14 +64,14 @@ impl From<PullResult> for TaskUpdateDatasetResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TaskCompactingDatasetResult {
-    pub compacting_result: CompactingResult,
+pub struct TaskCompactionDatasetResult {
+    pub compaction_result: CompactionResult,
 }
 
-impl From<CompactingResult> for TaskCompactingDatasetResult {
-    fn from(value: CompactingResult) -> Self {
+impl From<CompactionResult> for TaskCompactionDatasetResult {
+    fn from(value: CompactionResult) -> Self {
         Self {
-            compacting_result: value,
+            compaction_result: value,
         }
     }
 }

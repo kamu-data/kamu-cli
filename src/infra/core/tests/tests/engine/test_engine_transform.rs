@@ -244,7 +244,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .add::<FetchService>()
         .add::<PollingIngestServiceImpl>()
         .add::<TransformServiceImpl>()
-        .add::<CompactingServiceImpl>()
+        .add::<CompactionServiceImpl>()
         .add_value(SystemTimeSourceStub::new_set(
             Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
         ))

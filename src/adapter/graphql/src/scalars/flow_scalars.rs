@@ -105,7 +105,7 @@ pub enum FlowStatus {
 pub enum DatasetFlowType {
     Ingest,
     ExecuteTransform,
-    HardCompacting,
+    HardCompaction,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
