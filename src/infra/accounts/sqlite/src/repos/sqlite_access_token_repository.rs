@@ -46,8 +46,8 @@ impl SqliteAccessTokenRepository {
                     id as "id: Uuid",
                     token_name,
                     token_hash,
-                    created_at as "created_at: DateTime<Utc>",
-                    revoked_at as "revoked_at: DateTime<Utc>",
+                    created_at as "created_at: _",
+                    revoked_at as "revoked_at: _",
                     account_id as "account_id: AccountID"
                 FROM access_tokens
                 WHERE id = $1
@@ -80,7 +80,6 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         let token_hash = access_token.token_hash.as_slice();
         let crated_at = access_token.created_at;
         let account_id = access_token.account_id.to_string();
-        println!("token_id: {:?}", token_id);
 
         sqlx::query!(
             r#"
@@ -155,8 +154,8 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
                     id as "id: Uuid",
                     token_name,
                     token_hash,
-                    created_at as "created_at: DateTime<Utc>",
-                    revoked_at as "revoked_at: DateTime<Utc>",
+                    created_at as "created_at: _",
+                    revoked_at as "revoked_at: _",
                     account_id as "account_id: AccountID"
                 FROM access_tokens
                 WHERE account_id = $1
@@ -239,13 +238,13 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
                     a.email as "email?",
                     a.display_name,
                     a.account_type as "account_type: AccountType",
-                    registered_at as "registered_at: DateTime<Utc>",
+                    registered_at as "registered_at: _",
                     a.avatar_url,
-                    a.is_admin as "is_admin: bool",
+                    a.is_admin as "is_admin: _",
                     a.provider,
                     a.provider_identity_key
                 FROM access_tokens at
-                JOIN accounts a ON at.account_id = a.id
+                INNER JOIN accounts a ON at.account_id = a.id
                 WHERE at.id = $1 and at.revoked_at IS null
                 "#,
             token_id_search

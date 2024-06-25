@@ -46,8 +46,8 @@ impl PostgresAccessTokenRepository {
                     id as "id: Uuid",
                     token_name,
                     token_hash,
-                    created_at as "created_at: DateTime<Utc>",
-                    revoked_at as "revoked_at: DateTime<Utc>",
+                    created_at,
+                    revoked_at,
                     account_id as "account_id: AccountID"
                 FROM access_tokens
                 WHERE id = $1
@@ -234,7 +234,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
                     a.provider,
                     a.provider_identity_key
                 FROM access_tokens at
-                LEFT JOIN accounts a ON a.id = account_id
+                INNER JOIN accounts a ON a.id = account_id
                 WHERE at.id = $1 AND at.revoked_at IS null
                 "#,
             token_id

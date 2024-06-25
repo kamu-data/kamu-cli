@@ -1,11 +1,11 @@
 {
   "db_name": "MySQL",
-  "query": "\n              SELECT\n                    id,\n                    token_name,\n                    token_hash as \"token_hash: Vec<u8>\",\n                    created_at,\n                    revoked_at,\n                    account_id as \"account_id: AccountID\"\n              FROM access_tokens\n              WHERE account_id = ?\n              LIMIT ? OFFSET ?\n              ",
+  "query": "\n              SELECT\n                    id as \"id: sqlx::types::uuid::fmt::Simple\",\n                    token_name,\n                    token_hash as \"token_hash: _\",\n                    created_at,\n                    revoked_at,\n                    account_id as \"account_id: AccountID\"\n              FROM access_tokens\n              WHERE account_id = ?\n              LIMIT ? OFFSET ?\n              ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
+        "name": "id: sqlx::types::uuid::fmt::Simple",
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | PRIMARY_KEY | NO_DEFAULT_VALUE",
@@ -25,7 +25,7 @@
       },
       {
         "ordinal": 2,
-        "name": "token_hash: Vec<u8>",
+        "name": "token_hash: _",
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
@@ -76,5 +76,5 @@
       false
     ]
   },
-  "hash": "4a08de1a0a19f13ed6ba0331ce3daaff21f5a19c2d781ce6461067bf7010f03b"
+  "hash": "2e15870c167cc07a349b32b685475ddb0f72527bb0771401904ea97a7cceaa7e"
 }

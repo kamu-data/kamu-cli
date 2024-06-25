@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use opendatafabric::{AccountID, AccountName};
+use opendatafabric::AccountID;
 use sqlx::MySqlConnection;
 use uuid::Uuid;
 
@@ -37,16 +37,15 @@ impl MysqlAccessTokenRepository {
         token_id: &Uuid,
         connection: &mut MySqlConnection,
     ) -> Result<Option<AccessToken>, InternalError> {
-        // ToDo change it to query_as macro after issue with Uuid mapping will be fixed
-        // https://github.com/launchbadge/sqlx/issues/3039
-        let access_token_row_maybe = sqlx::query!(
+        let access_token_row_maybe = sqlx::query_as!(
+            AccessTokenRowModel,
             r#"
                 SELECT
-                    id,
+                    id as "id: sqlx::types::uuid::fmt::Simple",
                     token_name,
-                    token_hash as "token_hash: Vec<u8>",
-                    created_at as "created_at: DateTime<Utc>",
-                    revoked_at as "revoked_at: DateTime<Utc>",
+                    token_hash as "token_hash: _",
+                    created_at,
+                    revoked_at,
                     account_id as "account_id: AccountID"
                 FROM access_tokens
                 WHERE id = ?
@@ -57,14 +56,7 @@ impl MysqlAccessTokenRepository {
         .await
         .int_err()?;
 
-        Ok(access_token_row_maybe.map(|access_token| AccessToken {
-            id: Uuid::try_parse(&access_token.id).unwrap(),
-            token_name: access_token.token_name,
-            token_hash: access_token.token_hash.try_into().unwrap(),
-            revoked_at: access_token.revoked_at,
-            created_at: access_token.created_at,
-            account_id: access_token.account_id,
-        }))
+        Ok(access_token_row_maybe.map(Into::into))
     }
 }
 
@@ -144,12 +136,13 @@ impl AccessTokenRepository for MysqlAccessTokenRepository {
             .await
             .map_err(GetAccessTokenError::Internal)?;
 
-        let access_token_rows = sqlx::query!(
+        let access_token_rows = sqlx::query_as!(
+            AccessTokenRowModel,
             r#"
               SELECT
-                    id,
+                    id as "id: sqlx::types::uuid::fmt::Simple",
                     token_name,
-                    token_hash as "token_hash: Vec<u8>",
+                    token_hash as "token_hash: _",
                     created_at,
                     revoked_at,
                     account_id as "account_id: AccountID"
@@ -166,17 +159,7 @@ impl AccessTokenRepository for MysqlAccessTokenRepository {
         .int_err()
         .map_err(GetAccessTokenError::Internal)?;
 
-        Ok(access_token_rows
-            .into_iter()
-            .map(|access_token| AccessToken {
-                id: Uuid::try_parse(&access_token.id).unwrap(),
-                token_name: access_token.token_name,
-                token_hash: access_token.token_hash.try_into().unwrap(),
-                revoked_at: access_token.revoked_at,
-                created_at: access_token.created_at,
-                account_id: access_token.account_id,
-            })
-            .collect())
+        Ok(access_token_rows.into_iter().map(Into::into).collect())
     }
 
     async fn mark_revoked(
@@ -233,22 +216,23 @@ impl AccessTokenRepository for MysqlAccessTokenRepository {
             .await
             .map_err(FindAccountByTokenError::Internal)?;
 
-        let maybe_account_row = sqlx::query!(
+        let maybe_account_row = sqlx::query_as!(
+            AccountWithTokenRowModel,
             r#"
               SELECT
-                  at.token_hash as "token_hash: Vec<u8>",
-                  a.id as "id?: AccountID",
+                  at.token_hash as "token_hash: _",
+                  a.id as "id: AccountID",
                   a.account_name,
                   a.email as "email?",
                   a.display_name,
                   a.account_type as "account_type: AccountType",
                   a.avatar_url,
                   a.registered_at,
-                  a.is_admin,
+                  a.is_admin as "is_admin: _",
                   a.provider,
                   a.provider_identity_key
               FROM access_tokens at
-              LEFT JOIN accounts a ON a.id = account_id
+              INNER JOIN accounts a ON a.id = account_id
               WHERE at.id = ? AND revoked_at IS null
               "#,
             token_id.to_string()
@@ -262,21 +246,7 @@ impl AccessTokenRepository for MysqlAccessTokenRepository {
             if token_hash != account_row.token_hash.as_slice() {
                 return Err(FindAccountByTokenError::InvalidTokenHash);
             }
-            // Due to specific handling NULL values in MySql all left joined fields
-            // mapped as Option<T> but such as we set is as required in migration it
-            // should be safe to unwrap these values
-            Ok(Account {
-                id: account_row.id.unwrap(),
-                account_name: AccountName::new_unchecked(&account_row.account_name.unwrap()),
-                email: account_row.email,
-                display_name: account_row.display_name.unwrap(),
-                account_type: account_row.account_type.unwrap(),
-                avatar_url: account_row.avatar_url,
-                registered_at: account_row.registered_at.unwrap(),
-                is_admin: account_row.is_admin.unwrap() != 0,
-                provider: account_row.provider.unwrap(),
-                provider_identity_key: account_row.provider_identity_key.unwrap(),
-            })
+            Ok(account_row.into())
         } else {
             Err(FindAccountByTokenError::NotFound(
                 AccessTokenNotFoundError {
