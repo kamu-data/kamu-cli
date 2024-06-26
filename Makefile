@@ -16,7 +16,7 @@ MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite
 .PHONY: lint
 lint:
 	cargo fmt --check
-	./scripts/lint-separate-comment-lines.sh
+	./scripts/lint-dividing-lines.sh
 	cargo test -p kamu-repo-tools
 	cargo deny check
 	# cargo udeps --all-targets

@@ -29,8 +29,8 @@ jobs:
         with:
           command: fmt
           args: --check
-      - name: Lint separate comment lines
-        run: ./scripts/lint-separate-comment-lines.sh
+      - name: Lint dividing lines
+        run: ./scripts/lint-dividing-lines.sh
       - name: license headers
         run: |
           cargo test -p kamu-repo-tools -- license_header
