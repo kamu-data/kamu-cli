@@ -48,9 +48,9 @@ impl Protocols {
 impl Default for Protocols {
     fn default() -> Self {
         Self {
-            base_url_platform: Url::parse("http://localhost:4200").expect("URL parse problem"),
-            base_url_rest: Url::parse("http://localhost:8080").expect("URL parse problem"),
-            base_url_flightsql: Url::parse("grpc://localhost:50050").expect("URL parse problem"),
+            base_url_platform: Url::parse("http://localhost:4200").expect("URL failed to parse"),
+            base_url_rest: Url::parse("http://localhost:8080").expect("URL failed to parse"),
+            base_url_flightsql: Url::parse("grpc://localhost:50050").expect("URL failed to parse"),
         }
     }
 }
