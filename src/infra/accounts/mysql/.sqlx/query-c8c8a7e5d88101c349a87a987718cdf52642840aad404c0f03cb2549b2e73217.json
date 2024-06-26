@@ -1,21 +1,11 @@
 {
   "db_name": "MySQL",
-  "query": "\n              SELECT\n                  at.token_hash as \"token_hash: _\",\n                  a.id as \"id: AccountID\",\n                  a.account_name,\n                  a.email as \"email?\",\n                  a.display_name,\n                  a.account_type as \"account_type: AccountType\",\n                  a.avatar_url,\n                  a.registered_at,\n                  a.is_admin as \"is_admin: _\",\n                  a.provider,\n                  a.provider_identity_key\n              FROM access_tokens at\n              INNER JOIN accounts a ON a.id = account_id\n              WHERE at.id = ? AND revoked_at IS null\n              ",
+  "query": "\n            SELECT\n                id as \"id: _\",\n                account_name,\n                email as \"email?\",\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                is_admin as \"is_admin: _\",\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE lower(account_name) = lower(?)\n            ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "token_hash: _",
-        "type_info": {
-          "type": "String",
-          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
-          "char_set": 63,
-          "max_size": 32
-        }
-      },
-      {
-        "ordinal": 1,
-        "name": "id: AccountID",
+        "name": "id: _",
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL | PRIMARY_KEY | NO_DEFAULT_VALUE",
@@ -24,7 +14,7 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 1,
         "name": "account_name",
         "type_info": {
           "type": "VarString",
@@ -34,7 +24,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 2,
         "name": "email?",
         "type_info": {
           "type": "VarString",
@@ -44,7 +34,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 3,
         "name": "display_name",
         "type_info": {
           "type": "VarString",
@@ -54,7 +44,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 4,
         "name": "account_type: AccountType",
         "type_info": {
           "type": "String",
@@ -64,7 +54,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 5,
         "name": "avatar_url",
         "type_info": {
           "type": "VarString",
@@ -74,7 +64,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 6,
         "name": "registered_at",
         "type_info": {
           "type": "Timestamp",
@@ -84,7 +74,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 7,
         "name": "is_admin: _",
         "type_info": {
           "type": "Tiny",
@@ -94,7 +84,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 8,
         "name": "provider",
         "type_info": {
           "type": "VarString",
@@ -104,7 +94,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 9,
         "name": "provider_identity_key",
         "type_info": {
           "type": "VarString",
@@ -120,7 +110,6 @@
     "nullable": [
       false,
       false,
-      false,
       true,
       false,
       false,
@@ -131,5 +120,5 @@
       false
     ]
   },
-  "hash": "0c2f3d9ddd3fc58579619d77ed305b47cbccbdccee68eac8f632f8b562457cee"
+  "hash": "c8c8a7e5d88101c349a87a987718cdf52642840aad404c0f03cb2549b2e73217"
 }

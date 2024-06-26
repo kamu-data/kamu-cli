@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT\n                    id as \"id: Uuid\",\n                    token_name,\n                    token_hash,\n                    created_at,\n                    revoked_at,\n                    account_id as \"account_id: AccountID\"\n                FROM access_tokens\n                WHERE id = $1\n                ",
+  "query": "\n                SELECT\n                    id as \"id: Uuid\",\n                    token_name,\n                    token_hash,\n                    created_at,\n                    revoked_at,\n                    account_id as \"account_id: _\"\n                FROM access_tokens\n                WHERE id = $1\n                ",
   "describe": {
     "columns": [
       {
@@ -30,7 +30,7 @@
       },
       {
         "ordinal": 5,
-        "name": "account_id: AccountID",
+        "name": "account_id: _",
         "type_info": "Varchar"
       }
     ],
@@ -48,5 +48,5 @@
       false
     ]
   },
-  "hash": "3236c0e5f80d9d09e4acc3ef14e04f713f88ab50db07093d050f147ff8cac9e4"
+  "hash": "1a52944e6809588ae9f68cbddeed314ecdf055ad9e04f12a5448de1fc2ab6748"
 }
