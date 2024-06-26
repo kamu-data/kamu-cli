@@ -1097,6 +1097,7 @@ Run HTTP + GraphQL server
 * `--address <ADDRESS>` — Bind to a specific network interface
 * `--http-port <HTTP-PORT>` — Expose HTTP+GraphQL server on specific port
 * `--get-token` — Output a JWT token you can use to authorize API queries
+* `--external-address <EXTERNAL-ADDRESS>` — Allows changing the base URL used in the API. Can be handy when launching inside a container
 
 **Examples:**
 

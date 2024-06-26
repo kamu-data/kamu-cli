@@ -463,6 +463,7 @@ pub fn get_command(
                         cli_catalog.get_one()?,
                         server_matches.get_one("address").copied(),
                         server_matches.get_one("http-port").copied(),
+                        server_matches.get_one("external-address").copied(),
                         server_matches.get_flag("get-token"),
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,

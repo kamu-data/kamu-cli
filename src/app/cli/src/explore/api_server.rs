@@ -42,6 +42,7 @@ impl APIServer {
         multi_tenant_workspace: bool,
         address: Option<IpAddr>,
         port: Option<u16>,
+        external_address: Option<IpAddr>,
         is_e2e_testing: bool,
     ) -> Self {
         use axum::extract::Extension;
@@ -64,14 +65,21 @@ impl APIServer {
             panic!("error binding to {addr}: {e}");
         });
 
-        let api_server_url = Url::parse(&format!("http://{}", bound_addr.local_addr()))
-            .expect("URL failed to parse");
+        let base_url_rest = {
+            let mut base_addr_rest = addr;
+
+            if let Some(external_address) = external_address {
+                base_addr_rest.set_ip(external_address);
+            }
+
+            Url::parse(&format!("http://{base_addr_rest}")).expect("URL failed to parse")
+        };
 
         let default_protocols = Protocols::default();
 
         let api_server_catalog = CatalogBuilder::new_chained(base_catalog)
             .add_value(ServerUrlConfig::new(Protocols {
-                base_url_rest: api_server_url,
+                base_url_rest,
                 base_url_platform: default_protocols.base_url_platform,
                 // Note: this is not a valid endpoint in Web UI mode
                 base_url_flightsql: default_protocols.base_url_flightsql,

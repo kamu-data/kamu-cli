@@ -1246,6 +1246,10 @@ pub fn cli() -> Command {
                                     .long("get-token")
                                     .action(ArgAction::SetTrue)
                                     .help("Output a JWT token you can use to authorize API queries"),
+                                Arg::new("external-address")
+                                    .long("external-address")
+                                    .value_parser(value_parser!(IpAddr))
+                                    .help("Allows changing the base URL used in the API. Can be handy when launching inside a container"),
                             ])
                             .after_help(indoc::indoc!(
                                 r#"

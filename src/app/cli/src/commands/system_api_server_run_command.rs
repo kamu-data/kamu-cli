@@ -30,6 +30,7 @@ pub struct APIServerRunCommand {
     output_config: Arc<OutputConfig>,
     address: Option<IpAddr>,
     port: Option<u16>,
+    external_address: Option<IpAddr>,
     get_token: bool,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     account_subject: Arc<CurrentAccountSubject>,
@@ -45,6 +46,7 @@ impl APIServerRunCommand {
         output_config: Arc<OutputConfig>,
         address: Option<IpAddr>,
         port: Option<u16>,
+        external_address: Option<IpAddr>,
         get_token: bool,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         account_subject: Arc<CurrentAccountSubject>,
@@ -58,6 +60,7 @@ impl APIServerRunCommand {
             output_config,
             address,
             port,
+            external_address,
             get_token,
             predefined_accounts_config,
             account_subject,
@@ -133,6 +136,7 @@ impl Command for APIServerRunCommand {
             self.multi_tenant_workspace,
             self.address,
             self.port,
+            self.external_address,
             self.is_e2e_testing,
         );
 
