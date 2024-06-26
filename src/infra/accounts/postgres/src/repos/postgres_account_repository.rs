@@ -100,7 +100,7 @@ impl AccountRepository for PostgresAccountRepository {
             AccountRowModel,
             r#"
             SELECT
-                id as "id: AccountID",
+                id as "id: _",
                 account_name,
                 email,
                 display_name,
@@ -149,7 +149,7 @@ impl AccountRepository for PostgresAccountRepository {
             AccountRowModel,
             r#"
             SELECT
-                id as "id: AccountID",
+                id as "id: _",
                 account_name,
                 email as "email?",
                 display_name,
@@ -187,7 +187,7 @@ impl AccountRepository for PostgresAccountRepository {
             AccountRowModel,
             r#"
             SELECT
-                id as "id: AccountID",
+                id as "id: _",
                 account_name,
                 email,
                 display_name,

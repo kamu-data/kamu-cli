@@ -48,7 +48,7 @@ impl PostgresAccessTokenRepository {
                     token_hash,
                     created_at,
                     revoked_at,
-                    account_id as "account_id: AccountID"
+                    account_id as "account_id: _"
                 FROM access_tokens
                 WHERE id = $1
                 "#,
@@ -147,7 +147,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
                     token_hash,
                     created_at,
                     revoked_at,
-                    account_id as "account_id: AccountID"
+                    account_id as "account_id: _"
                 FROM access_tokens
                 WHERE account_id = $1
                 LIMIT $2 OFFSET $3
@@ -223,7 +223,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
             r#"
                 SELECT
                     at.token_hash,
-                    a.id as "id: AccountID",
+                    a.id as "id: _",
                     a.account_name,
                     a.email as "email?",
                     a.display_name,

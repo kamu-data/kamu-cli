@@ -46,7 +46,7 @@ impl MysqlAccessTokenRepository {
                     token_hash as "token_hash: _",
                     created_at,
                     revoked_at,
-                    account_id as "account_id: AccountID"
+                    account_id as "account_id: _"
                 FROM access_tokens
                 WHERE id = ?
             "#,
@@ -145,7 +145,7 @@ impl AccessTokenRepository for MysqlAccessTokenRepository {
                     token_hash as "token_hash: _",
                     created_at,
                     revoked_at,
-                    account_id as "account_id: AccountID"
+                    account_id as "account_id: _"
               FROM access_tokens
               WHERE account_id = ?
               LIMIT ? OFFSET ?
@@ -221,7 +221,7 @@ impl AccessTokenRepository for MysqlAccessTokenRepository {
             r#"
               SELECT
                   at.token_hash as "token_hash: _",
-                  a.id as "id: AccountID",
+                  a.id as "id: _",
                   a.account_name,
                   a.email as "email?",
                   a.display_name,

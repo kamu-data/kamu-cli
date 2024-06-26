@@ -117,7 +117,7 @@ impl AccountRepository for SqliteAccountRepository {
             AccountRowModel,
             r#"
             SELECT
-                id as "id: AccountID",
+                id as "id: _",
                 account_name,
                 email,
                 display_name,
@@ -230,7 +230,7 @@ impl AccountRepository for SqliteAccountRepository {
             AccountRowModel,
             r#"
             SELECT
-                id as "id: AccountID",
+                id as "id: _",
                 account_name,
                 email,
                 display_name,
