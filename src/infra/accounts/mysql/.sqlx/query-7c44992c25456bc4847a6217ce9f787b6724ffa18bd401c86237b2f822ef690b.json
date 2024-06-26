@@ -1,11 +1,11 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                id as \"id: AccountID\",\n                account_name,\n                email as \"email?\",\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                is_admin,\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = ?\n            ",
+  "query": "\n            SELECT\n                id as \"id: _\",\n                account_name,\n                email as \"email?\",\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                is_admin as \"is_admin: _\",\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = ?\n            ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id: AccountID",
+        "name": "id: _",
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL | PRIMARY_KEY | NO_DEFAULT_VALUE",
@@ -75,7 +75,7 @@
       },
       {
         "ordinal": 7,
-        "name": "is_admin",
+        "name": "is_admin: _",
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL | NO_DEFAULT_VALUE",
@@ -120,5 +120,5 @@
       false
     ]
   },
-  "hash": "3e8293e44dd73c470f6e3a73ed153d2d74a514721fc519dbcb9eb2bd3cebc39b"
+  "hash": "7c44992c25456bc4847a6217ce9f787b6724ffa18bd401c86237b2f822ef690b"
 }

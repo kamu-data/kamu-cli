@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::RevokeTokenError;
+use kamu_accounts::{CreateAccessTokenError, RevokeTokenError};
 
 use crate::prelude::*;
-use crate::queries::{Account, CreatedAccessToken};
+use crate::queries::{Account, CreateAccessTokenResultSuccess, CreatedAccessToken};
 use crate::utils::{check_access_token_valid, check_logged_account_id_match};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -53,22 +53,30 @@ impl AuthMut {
         ctx: &Context<'_>,
         account_id: AccountID,
         token_name: String,
-    ) -> Result<CreatedAccessToken> {
+    ) -> Result<CreateTokenResult> {
         check_logged_account_id_match(ctx, &account_id)?;
 
         let access_token_service =
             from_catalog::<dyn kamu_accounts::AccessTokenService>(ctx).unwrap();
 
-        let created_token = access_token_service
+        match access_token_service
             .create_access_token(&token_name, &account_id)
             .await
-            .int_err()?;
-
-        Ok(CreatedAccessToken::new(
-            created_token,
-            &account_id,
-            &token_name,
-        ))
+        {
+            Ok(created_token) => Ok(CreateTokenResult::Success(CreateAccessTokenResultSuccess {
+                token: CreatedAccessToken::new(created_token, &account_id, &token_name),
+            })),
+            Err(err) => match err {
+                CreateAccessTokenError::Duplicate(_) => {
+                    Ok(CreateTokenResult::DuplicateName(CreateResultDuplicate {
+                        token_name,
+                    }))
+                }
+                CreateAccessTokenError::Internal(internal_err) => {
+                    Err(GqlError::Internal(internal_err))
+                }
+            },
+        }
     }
 
     async fn revoke_access_token(
@@ -156,4 +164,25 @@ pub enum RevokeResult {
     Success,
     AlreadyRevoked,
     NotFound,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface, Debug, Clone)]
+#[graphql(field(name = "message", ty = "String"))]
+pub enum CreateTokenResult {
+    Success(CreateAccessTokenResultSuccess),
+    DuplicateName(CreateResultDuplicate),
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct CreateResultDuplicate {
+    pub token_name: String,
+}
+
+#[ComplexObject]
+impl CreateResultDuplicate {
+    async fn message(&self) -> String {
+        format!("Access token with {} name already exists", self.token_name)
+    }
 }

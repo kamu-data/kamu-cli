@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
 use dill::*;
+use internal_error::ErrorIntoInternal;
 use kamu_accounts::AccessToken;
 use opendatafabric::AccountID;
 use uuid::Uuid;
@@ -23,6 +24,7 @@ use crate::domain::*;
 
 pub struct AccessTokenRepositoryInMemory {
     state: Arc<Mutex<State>>,
+    account_repository: Arc<dyn AccountRepository>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -50,8 +52,9 @@ impl State {
 #[interface(dyn AccessTokenRepository)]
 #[scope(Singleton)]
 impl AccessTokenRepositoryInMemory {
-    pub fn new() -> Self {
+    pub fn new(account_repository: Arc<dyn AccountRepository>) -> Self {
         Self {
+            account_repository,
             state: Arc::new(Mutex::new(State::new())),
         }
     }
@@ -154,11 +157,11 @@ impl AccessTokenRepository for AccessTokenRepositoryInMemory {
         }))
     }
 
-    async fn find_account_id_by_active_token_id(
+    async fn find_account_by_active_token_id(
         &self,
         token_id: &Uuid,
         token_hash: [u8; 32],
-    ) -> Result<AccountID, FindAccountByTokenError> {
+    ) -> Result<Account, FindAccountByTokenError> {
         let access_token = self
             .get_token_by_id(token_id)
             .await
@@ -178,6 +181,12 @@ impl AccessTokenRepository for AccessTokenRepositoryInMemory {
             return Err(FindAccountByTokenError::InvalidTokenHash);
         }
 
-        Ok(access_token.account_id)
+        let account = self
+            .account_repository
+            .get_account_by_id(&access_token.account_id)
+            .await
+            .map_err(|err| FindAccountByTokenError::Internal(err.int_err()))?;
+
+        Ok(account)
     }
 }

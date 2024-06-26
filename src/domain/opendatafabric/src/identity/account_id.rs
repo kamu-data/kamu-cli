@@ -197,3 +197,38 @@ where
         Ok(account_id)
     }
 }
+
+#[cfg(feature = "sqlx")]
+impl sqlx::Type<sqlx::Postgres> for AccountID {
+    fn type_info() -> <sqlx::Postgres as sqlx::Database>::TypeInfo {
+        <&str as sqlx::Type<sqlx::Postgres>>::type_info()
+    }
+
+    fn compatible(ty: &<sqlx::Postgres as sqlx::Database>::TypeInfo) -> bool {
+        <&str as sqlx::Type<sqlx::Postgres>>::compatible(ty)
+    }
+}
+
+#[cfg(feature = "sqlx")]
+impl sqlx::Type<sqlx::MySql> for AccountID {
+    fn type_info() -> <sqlx::MySql as sqlx::Database>::TypeInfo {
+        <&str as sqlx::Type<sqlx::MySql>>::type_info()
+    }
+
+    fn compatible(ty: &<sqlx::MySql as sqlx::Database>::TypeInfo) -> bool {
+        <&str as sqlx::Type<sqlx::MySql>>::compatible(ty)
+    }
+}
+
+#[cfg(feature = "sqlx")]
+impl sqlx::Type<sqlx::Sqlite> for AccountID {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <&str as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+
+    fn compatible(ty: &<sqlx::Sqlite as sqlx::Database>::TypeInfo) -> bool {
+        <&str as sqlx::Type<sqlx::Sqlite>>::compatible(ty)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////

@@ -10,6 +10,7 @@
 use chrono::{DateTime, TimeZone, Utc};
 use lazy_static::lazy_static;
 use opendatafabric::{AccountID, AccountName};
+use reusable::{reusable, reuse};
 use serde::{Deserialize, Serialize};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -78,8 +79,9 @@ impl Account {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[reusable(account_row_model)]
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
-pub struct AccountWithTokenRowModel {
+pub struct AccountRowModel {
     pub id: AccountID,
     pub account_name: String,
     pub email: Option<String>,
@@ -90,7 +92,29 @@ pub struct AccountWithTokenRowModel {
     pub is_admin: bool,
     pub provider: String,
     pub provider_identity_key: String,
+}
+
+#[reuse(account_row_model)]
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct AccountWithTokenRowModel {
     pub token_hash: Vec<u8>,
+}
+
+impl From<AccountRowModel> for Account {
+    fn from(value: AccountRowModel) -> Self {
+        Account {
+            id: value.id,
+            account_name: AccountName::new_unchecked(&value.account_name),
+            email: value.email,
+            display_name: value.display_name,
+            account_type: value.account_type,
+            avatar_url: value.avatar_url,
+            registered_at: value.registered_at,
+            is_admin: value.is_admin,
+            provider: value.provider,
+            provider_identity_key: value.provider_identity_key,
+        }
+    }
 }
 
 impl From<AccountWithTokenRowModel> for Account {
@@ -109,3 +133,5 @@ impl From<AccountWithTokenRowModel> for Account {
         }
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////

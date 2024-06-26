@@ -149,22 +149,20 @@ impl AuthenticationServiceImpl {
                     Err(e) => Err(GetAccountInfoError::Internal(e)),
                 }
             }
-            AccessTokenType::KamuAccessToken(kamu_access_token) => {
-                let account_id = self
-                    .access_token_svc
-                    .find_account_id_by_active_token_id(
-                        &kamu_access_token.id,
-                        kamu_access_token.random_bytes_hash,
-                    )
-                    .await
-                    .map_err(|err| GetAccountInfoError::Internal(err.int_err()))?;
-
-                match self.account_by_id(&account_id).await {
-                    Ok(Some(account)) => Ok(account),
-                    Ok(None) => Err(GetAccountInfoError::AccountUnresolved),
-                    Err(e) => Err(GetAccountInfoError::Internal(e)),
-                }
-            }
+            AccessTokenType::KamuAccessToken(kamu_access_token) => self
+                .access_token_svc
+                .find_account_by_active_token_id(
+                    &kamu_access_token.id,
+                    kamu_access_token.random_bytes_hash,
+                )
+                .await
+                .map_err(|err| match err {
+                    FindAccountByTokenError::NotFound(_) => GetAccountInfoError::AccountUnresolved,
+                    FindAccountByTokenError::InvalidTokenHash => {
+                        GetAccountInfoError::AccessToken(AccessTokenError::Invalid(Box::new(err)))
+                    }
+                    FindAccountByTokenError::Internal(err) => GetAccountInfoError::Internal(err),
+                }),
         }
     }
 }

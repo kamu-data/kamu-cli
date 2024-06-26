@@ -1,0 +1,80 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT\n                    at.token_hash,\n                    a.id as \"id: _\",\n                    a.account_name,\n                    a.email as \"email?\",\n                    a.display_name,\n                    a.account_type as \"account_type: AccountType\",\n                    registered_at as \"registered_at: _\",\n                    a.avatar_url,\n                    a.is_admin as \"is_admin: _\",\n                    a.provider,\n                    a.provider_identity_key\n                FROM access_tokens at\n                INNER JOIN accounts a ON at.account_id = a.id\n                WHERE at.id = $1 and at.revoked_at IS null\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "token_hash",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "id: _",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "email?",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "display_name",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_type: AccountType",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "registered_at: _",
+        "ordinal": 6,
+        "type_info": "Null"
+      },
+      {
+        "name": "avatar_url",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "is_admin: _",
+        "ordinal": 8,
+        "type_info": "Int64"
+      },
+      {
+        "name": "provider",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "provider_identity_key",
+        "ordinal": 10,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "908411ed3618da0eef322d0e1133b7ee78cee2972f3ed09df952a7c137c20a4b"
+}

@@ -46,9 +46,9 @@ impl SqliteAccessTokenRepository {
                     id as "id: Uuid",
                     token_name,
                     token_hash,
-                    created_at as "created_at: DateTime<Utc>",
-                    revoked_at as "revoked_at: DateTime<Utc>",
-                    account_id as "account_id: AccountID"
+                    created_at as "created_at: _",
+                    revoked_at as "revoked_at: _",
+                    account_id as "account_id: _"
                 FROM access_tokens
                 WHERE id = $1
                 "#,
@@ -80,7 +80,6 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         let token_hash = access_token.token_hash.as_slice();
         let crated_at = access_token.created_at;
         let account_id = access_token.account_id.to_string();
-        println!("token_id: {:?}", token_id);
 
         sqlx::query!(
             r#"
@@ -155,9 +154,9 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
                     id as "id: Uuid",
                     token_name,
                     token_hash,
-                    created_at as "created_at: DateTime<Utc>",
-                    revoked_at as "revoked_at: DateTime<Utc>",
-                    account_id as "account_id: AccountID"
+                    created_at as "created_at: _",
+                    revoked_at as "revoked_at: _",
+                    account_id as "account_id: _"
                 FROM access_tokens
                 WHERE account_id = $1
                 LIMIT $2 OFFSET $3
@@ -216,11 +215,11 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         Ok(())
     }
 
-    async fn find_account_id_by_active_token_id(
+    async fn find_account_by_active_token_id(
         &self,
         token_id: &Uuid,
         token_hash: [u8; 32],
-    ) -> Result<AccountID, FindAccountByTokenError> {
+    ) -> Result<Account, FindAccountByTokenError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr
@@ -229,12 +228,23 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
             .map_err(FindAccountByTokenError::Internal)?;
         let token_id_search = *token_id;
 
-        let maybe_row = sqlx::query!(
+        let maybe_account_row = sqlx::query_as!(
+            AccountWithTokenRowModel,
             r#"
                 SELECT
                     at.token_hash,
-                    at.account_id
+                    a.id as "id: _",
+                    a.account_name,
+                    a.email as "email?",
+                    a.display_name,
+                    a.account_type as "account_type: AccountType",
+                    registered_at as "registered_at: _",
+                    a.avatar_url,
+                    a.is_admin as "is_admin: _",
+                    a.provider,
+                    a.provider_identity_key
                 FROM access_tokens at
+                INNER JOIN accounts a ON at.account_id = a.id
                 WHERE at.id = $1 and at.revoked_at IS null
                 "#,
             token_id_search
@@ -244,11 +254,11 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         .int_err()
         .map_err(FindAccountByTokenError::Internal)?;
 
-        if let Some(row) = maybe_row {
-            if token_hash != row.token_hash.as_slice() {
+        if let Some(account_row) = maybe_account_row {
+            if token_hash != account_row.token_hash.as_slice() {
                 return Err(FindAccountByTokenError::InvalidTokenHash);
             }
-            Ok(AccountID::from_did_str(&row.account_id).unwrap())
+            Ok(account_row.into())
         } else {
             Err(FindAccountByTokenError::NotFound(
                 AccessTokenNotFoundError {

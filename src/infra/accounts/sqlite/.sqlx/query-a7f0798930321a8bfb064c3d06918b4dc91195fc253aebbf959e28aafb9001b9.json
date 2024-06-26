@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                SELECT\n                    id as \"id: Uuid\",\n                    token_name,\n                    token_hash,\n                    created_at as \"created_at: DateTime<Utc>\",\n                    revoked_at as \"revoked_at: DateTime<Utc>\",\n                    account_id as \"account_id: AccountID\"\n                FROM access_tokens\n                WHERE account_id = $1\n                LIMIT $2 OFFSET $3\n                ",
+  "query": "\n                SELECT\n                    id as \"id: Uuid\",\n                    token_name,\n                    token_hash,\n                    created_at as \"created_at: _\",\n                    revoked_at as \"revoked_at: _\",\n                    account_id as \"account_id: _\"\n                FROM access_tokens\n                WHERE account_id = $1\n                LIMIT $2 OFFSET $3\n                ",
   "describe": {
     "columns": [
       {
@@ -19,17 +19,17 @@
         "type_info": "Blob"
       },
       {
-        "name": "created_at: DateTime<Utc>",
+        "name": "created_at: _",
         "ordinal": 3,
         "type_info": "Text"
       },
       {
-        "name": "revoked_at: DateTime<Utc>",
+        "name": "revoked_at: _",
         "ordinal": 4,
         "type_info": "Text"
       },
       {
-        "name": "account_id: AccountID",
+        "name": "account_id: _",
         "ordinal": 5,
         "type_info": "Text"
       }
@@ -46,5 +46,5 @@
       false
     ]
   },
-  "hash": "daec44a972fc0d12ab6e760b4f16a06c240ae577ebfea9e3f6049236dd9eb5aa"
+  "hash": "a7f0798930321a8bfb064c3d06918b4dc91195fc253aebbf959e28aafb9001b9"
 }

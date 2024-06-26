@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id as \"id: AccountID\",\n                account_name,\n                email as \"email?\",\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                is_admin,\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = ANY($1)\n            ",
+  "query": "\n            SELECT\n                id as \"id: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                is_admin,\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE lower(account_name) = lower($1)\n            ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id: AccountID",
+        "name": "id: _",
         "type_info": "Varchar"
       },
       {
@@ -15,7 +15,7 @@
       },
       {
         "ordinal": 2,
-        "name": "email?",
+        "name": "email",
         "type_info": "Varchar"
       },
       {
@@ -66,7 +66,7 @@
     ],
     "parameters": {
       "Left": [
-        "TextArray"
+        "Text"
       ]
     },
     "nullable": [
@@ -82,5 +82,5 @@
       false
     ]
   },
-  "hash": "f412aba0f4b9d83dff18ac63cefc3f70f9aa2da2243290d1e423ea8254054de6"
+  "hash": "0839826a06830e043c719808198c9929823f2d231c0cb1de102f59468ef5c123"
 }

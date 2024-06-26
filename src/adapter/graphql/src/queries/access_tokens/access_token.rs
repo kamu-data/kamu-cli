@@ -57,7 +57,7 @@ impl ViewAccessToken {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CreatedAccessToken {
     token: KamuAccessToken,
     account_id: AccountID,
@@ -95,5 +95,18 @@ impl CreatedAccessToken {
         let account = Account::from_account_id(ctx, self.account_id.clone().into()).await?;
 
         Ok(account)
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct CreateAccessTokenResultSuccess {
+    pub token: CreatedAccessToken,
+}
+
+#[ComplexObject]
+impl CreateAccessTokenResultSuccess {
+    pub async fn message(&self) -> String {
+        "Success".to_string()
     }
 }

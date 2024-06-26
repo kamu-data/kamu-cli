@@ -12,20 +12,20 @@ use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use opendatafabric::AccountID;
-use sqlx::PgConnection;
+use sqlx::MySqlConnection;
 use uuid::Uuid;
 
 use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct PostgresAccessTokenRepository {
-    transaction: TransactionRefT<sqlx::Postgres>,
+pub struct MysqlAccessTokenRepository {
+    transaction: TransactionRefT<sqlx::MySql>,
 }
 
 #[component(pub)]
 #[interface(dyn AccessTokenRepository)]
-impl PostgresAccessTokenRepository {
+impl MysqlAccessTokenRepository {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
@@ -35,24 +35,22 @@ impl PostgresAccessTokenRepository {
     async fn query_token_by_id(
         &self,
         token_id: &Uuid,
-        connection: &mut PgConnection,
+        connection: &mut MySqlConnection,
     ) -> Result<Option<AccessToken>, InternalError> {
-        let token_id_search = *token_id;
-
         let access_token_row_maybe = sqlx::query_as!(
             AccessTokenRowModel,
             r#"
                 SELECT
-                    id as "id: Uuid",
+                    id as "id: sqlx::types::uuid::fmt::Simple",
                     token_name,
-                    token_hash,
+                    token_hash as "token_hash: _",
                     created_at,
                     revoked_at,
                     account_id as "account_id: _"
                 FROM access_tokens
-                WHERE id = $1
-                "#,
-            token_id_search
+                WHERE id = ?
+            "#,
+            token_id.to_string()
         )
         .fetch_optional(&mut *connection)
         .await
@@ -63,7 +61,7 @@ impl PostgresAccessTokenRepository {
 }
 
 #[async_trait::async_trait]
-impl AccessTokenRepository for PostgresAccessTokenRepository {
+impl AccessTokenRepository for MysqlAccessTokenRepository {
     async fn save_access_token(
         &self,
         access_token: &AccessToken,
@@ -77,12 +75,12 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
 
         sqlx::query!(
             r#"
-                INSERT INTO access_tokens (id, token_name, token_hash, created_at, account_id)
-                    VALUES ($1, $2, $3, $4, $5)
-                "#,
-            access_token.id,
+              INSERT INTO access_tokens (id, token_name, token_hash, created_at, account_id)
+                  VALUES (?, ?, ?, ?, ?)
+              "#,
+            access_token.id.to_string(),
             access_token.token_name,
-            &access_token.token_hash,
+            access_token.token_hash.to_vec(),
             access_token.created_at,
             access_token.account_id.to_string(),
         )
@@ -141,17 +139,17 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
         let access_token_rows = sqlx::query_as!(
             AccessTokenRowModel,
             r#"
-                SELECT
-                    id,
+              SELECT
+                    id as "id: sqlx::types::uuid::fmt::Simple",
                     token_name,
-                    token_hash,
+                    token_hash as "token_hash: _",
                     created_at,
                     revoked_at,
                     account_id as "account_id: _"
-                FROM access_tokens
-                WHERE account_id = $1
-                LIMIT $2 OFFSET $3
-                "#,
+              FROM access_tokens
+              WHERE account_id = ?
+              LIMIT ? OFFSET ?
+              "#,
             account_id.to_string(),
             pagination.limit,
             pagination.offset,
@@ -193,10 +191,10 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
 
         sqlx::query!(
             r#"
-                UPDATE access_tokens SET revoked_at = $1 where id = $2
-            "#,
+              UPDATE access_tokens SET revoked_at = ? where id = ?
+          "#,
             revoked_time,
-            token_id,
+            token_id.to_string(),
         )
         .execute(&mut *connection_mut)
         .await
@@ -221,23 +219,23 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
         let maybe_account_row = sqlx::query_as!(
             AccountWithTokenRowModel,
             r#"
-                SELECT
-                    at.token_hash,
-                    a.id as "id: _",
-                    a.account_name,
-                    a.email as "email?",
-                    a.display_name,
-                    a.account_type as "account_type: AccountType",
-                    a.avatar_url,
-                    a.registered_at,
-                    a.is_admin,
-                    a.provider,
-                    a.provider_identity_key
-                FROM access_tokens at
-                INNER JOIN accounts a ON a.id = account_id
-                WHERE at.id = $1 AND at.revoked_at IS null
-                "#,
-            token_id
+              SELECT
+                  at.token_hash as "token_hash: _",
+                  a.id as "id: _",
+                  a.account_name,
+                  a.email as "email?",
+                  a.display_name,
+                  a.account_type as "account_type: AccountType",
+                  a.avatar_url,
+                  a.registered_at,
+                  a.is_admin as "is_admin: _",
+                  a.provider,
+                  a.provider_identity_key
+              FROM access_tokens at
+              INNER JOIN accounts a ON a.id = account_id
+              WHERE at.id = ? AND revoked_at IS null
+              "#,
+            token_id.to_string()
         )
         .fetch_optional(connection_mut)
         .await

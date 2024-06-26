@@ -198,7 +198,7 @@ type Auth {
 type AuthMut {
 	login(loginMethod: String!, loginCredentialsJson: String!): LoginResponse!
 	accountDetails(accessToken: String!): Account!
-	createAccessToken(accountId: AccountID!, tokenName: String!): CreatedAccessToken!
+	createAccessToken(accountId: AccountID!, tokenName: String!): CreateTokenResult!
 	revokeAccessToken(tokenId: AccessTokenID!): RevokeResult!
 }
 
@@ -274,6 +274,11 @@ enum CompressionFormat {
 	ZIP
 }
 
+type CreateAccessTokenResultSuccess implements CreateTokenResult {
+	token: CreatedAccessToken!
+	message: String!
+}
+
 interface CreateDatasetFromSnapshotResult {
 	message: String!
 }
@@ -299,6 +304,14 @@ type CreateDatasetResultNameCollision implements CreateDatasetResult & CreateDat
 
 type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFromSnapshotResult {
 	dataset: Dataset!
+	message: String!
+}
+
+type CreateResultDuplicate implements CreateTokenResult {
+	tokenName: String!
+}
+
+interface CreateTokenResult {
 	message: String!
 }
 

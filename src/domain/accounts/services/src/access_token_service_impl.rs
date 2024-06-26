@@ -15,6 +15,7 @@ use kamu_accounts::{
     AccessTokenPaginationOpts,
     AccessTokenRepository,
     AccessTokenService,
+    Account,
     CreateAccessTokenError,
     FindAccountByTokenError,
     GetAccessTokenError,
@@ -80,13 +81,13 @@ impl AccessTokenService for AccessTokenServiceImpl {
         Ok(kamu_access_token)
     }
 
-    async fn find_account_id_by_active_token_id(
+    async fn find_account_by_active_token_id(
         &self,
         token_id: &Uuid,
         token_hash: [u8; 32],
-    ) -> Result<AccountID, FindAccountByTokenError> {
+    ) -> Result<Account, FindAccountByTokenError> {
         self.access_token_repository
-            .find_account_id_by_active_token_id(token_id, token_hash)
+            .find_account_by_active_token_id(token_id, token_hash)
             .await
     }
 

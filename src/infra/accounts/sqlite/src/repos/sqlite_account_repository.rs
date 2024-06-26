@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
@@ -31,20 +30,6 @@ impl SqliteAccountRepository {
             transaction: transaction.into(),
         }
     }
-}
-
-#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
-struct AccountRowModel {
-    id: AccountID,
-    account_name: String,
-    email: Option<String>,
-    display_name: String,
-    account_type: AccountType,
-    avatar_url: Option<String>,
-    registered_at: DateTime<Utc>,
-    is_admin: i64,
-    provider: String,
-    provider_identity_key: String,
 }
 
 #[async_trait::async_trait]
@@ -132,14 +117,14 @@ impl AccountRepository for SqliteAccountRepository {
             AccountRowModel,
             r#"
             SELECT
-                id as "id: AccountID",
+                id as "id: _",
                 account_name,
                 email,
                 display_name,
                 account_type as "account_type: AccountType",
                 avatar_url,
                 registered_at as "registered_at: _",
-                is_admin,
+                is_admin as "is_admin: _",
                 provider,
                 provider_identity_key
             FROM accounts
@@ -153,18 +138,7 @@ impl AccountRepository for SqliteAccountRepository {
         .map_err(GetAccountByIdError::Internal)?;
 
         if let Some(account_row) = maybe_account_row {
-            Ok(Account {
-                id: account_row.id,
-                account_name: AccountName::new_unchecked(&account_row.account_name),
-                email: account_row.email,
-                display_name: account_row.display_name,
-                account_type: account_row.account_type,
-                avatar_url: account_row.avatar_url,
-                registered_at: account_row.registered_at,
-                is_admin: account_row.is_admin != 0,
-                provider: account_row.provider,
-                provider_identity_key: account_row.provider_identity_key,
-            })
+            Ok(account_row.into())
         } else {
             Err(GetAccountByIdError::NotFound(AccountNotFoundByIdError {
                 account_id: account_id.clone(),
@@ -256,14 +230,14 @@ impl AccountRepository for SqliteAccountRepository {
             AccountRowModel,
             r#"
             SELECT
-                id as "id: AccountID",
+                id as "id: _",
                 account_name,
                 email,
                 display_name,
                 account_type as "account_type: AccountType",
                 avatar_url,
                 registered_at as "registered_at: _",
-                is_admin,
+                is_admin as "is_admin: _",
                 provider,
                 provider_identity_key
             FROM accounts
@@ -277,18 +251,7 @@ impl AccountRepository for SqliteAccountRepository {
         .map_err(GetAccountByNameError::Internal)?;
 
         if let Some(account_row) = maybe_account_row {
-            Ok(Account {
-                id: account_row.id,
-                account_name: AccountName::new_unchecked(&account_row.account_name),
-                email: account_row.email,
-                display_name: account_row.display_name,
-                account_type: account_row.account_type,
-                avatar_url: account_row.avatar_url,
-                registered_at: account_row.registered_at,
-                is_admin: account_row.is_admin != 0,
-                provider: account_row.provider,
-                provider_identity_key: account_row.provider_identity_key,
-            })
+            Ok(account_row.into())
         } else {
             Err(GetAccountByNameError::NotFound(
                 AccountNotFoundByNameError {
