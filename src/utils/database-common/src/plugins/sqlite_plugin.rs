@@ -23,19 +23,23 @@ impl SqlitePlugin {
         Self {}
     }
 
-    pub fn init_database_components(
-        catalog_builder: &mut CatalogBuilder,
-        connection_string: &Secret<String>,
-    ) -> Result<(), DatabaseError> {
-        let sqlite_pool = Self::open_sqlite_pool(connection_string)?;
-
+    pub fn init_database_components(catalog_builder: &mut CatalogBuilder) {
         catalog_builder.add::<Self>();
-        catalog_builder.add_value(sqlite_pool);
         catalog_builder.add::<SqliteTransactionManager>();
-
-        Ok(())
     }
 
+    pub fn catalog_with_connected_pool(
+        base_catalog: &Catalog,
+        connection_string: &Secret<String>,
+    ) -> Result<Catalog, DatabaseError> {
+        let sqlite_pool = Self::open_sqlite_pool(connection_string)?;
+
+        Ok(CatalogBuilder::new_chained(base_catalog)
+            .add_value(sqlite_pool)
+            .build())
+    }
+
+    #[tracing::instrument(level = "info", skip_all)]
     fn open_sqlite_pool(connection_string: &Secret<String>) -> Result<SqlitePool, DatabaseError> {
         SqlitePool::connect_lazy(connection_string.expose_secret())
             .map_err(DatabaseError::SqlxError)

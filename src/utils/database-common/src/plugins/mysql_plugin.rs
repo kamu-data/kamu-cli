@@ -26,19 +26,23 @@ impl MySqlPlugin {
         Self {}
     }
 
-    pub fn init_database_components(
-        catalog_builder: &mut CatalogBuilder,
-        connection_string: &Secret<String>,
-    ) -> Result<(), DatabaseError> {
-        let mysql_pool = Self::open_mysql_pool(connection_string)?;
-
+    pub fn init_database_components(catalog_builder: &mut CatalogBuilder) {
         catalog_builder.add::<Self>();
-        catalog_builder.add_value(mysql_pool);
         catalog_builder.add::<MySqlTransactionManager>();
-
-        Ok(())
     }
 
+    pub fn catalog_with_connected_pool(
+        base_catalog: &Catalog,
+        connection_string: &Secret<String>,
+    ) -> Result<Catalog, DatabaseError> {
+        let mysql_pool = Self::open_mysql_pool(connection_string)?;
+
+        Ok(CatalogBuilder::new_chained(base_catalog)
+            .add_value(mysql_pool)
+            .build())
+    }
+
+    #[tracing::instrument(level = "info", skip_all)]
     fn open_mysql_pool(connection_string: &Secret<String>) -> Result<MySqlPool, DatabaseError> {
         MySqlPool::connect_lazy(connection_string.expose_secret()).map_err(DatabaseError::SqlxError)
     }
@@ -48,6 +52,7 @@ impl MySqlPlugin {
 
 #[async_trait::async_trait]
 impl DatabasePasswordRefresher for MySqlPlugin {
+    #[tracing::instrument(level = "info", skip_all)]
     async fn refresh_password(&self, catalog: &Catalog) -> Result<(), InternalError> {
         let password_provider = catalog.get_one::<dyn DatabasePasswordProvider>().unwrap();
         let fresh_password = password_provider.provide_password().await?;

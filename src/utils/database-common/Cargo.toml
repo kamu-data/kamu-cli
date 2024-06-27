@@ -34,6 +34,7 @@ internal-error = { workspace = true }
 secrecy = "0.8"
 thiserror = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false, features = ["sync"] }
+tracing = "0.1"
 serde = "1"
 sha2 = "0.10"
 uuid = "1"

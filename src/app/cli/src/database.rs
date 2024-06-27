@@ -8,19 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use std::path::Path;
-use std::sync::Arc;
 
 use database_common::*;
-use dill::CatalogBuilder;
+use dill::{Catalog, CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
 use secrecy::Secret;
 
-use crate::config::{
-    DatabaseConfig,
-    DatabasePasswordPolicyConfig,
-    DatabasePasswordSourceConfig,
-    RemoteDatabaseConfig,
-};
+use crate::config::{DatabaseConfig, DatabasePasswordSourceConfig, RemoteDatabaseConfig};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -37,21 +31,15 @@ pub async fn configure_database_components(
     b.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
-    let db_password_provider = make_database_password_provider(raw_db_config, &db_credentials);
-    let db_password = db_password_provider.provide_password().await?;
-    let connection_string = db_credentials.connection_string(db_password);
-
     match db_credentials.provider {
         DatabaseProvider::Postgres => {
-            database_common::PostgresPlugin::init_database_components(b, &connection_string)
-                .int_err()?;
+            database_common::PostgresPlugin::init_database_components(b);
 
             b.add::<kamu_accounts_postgres::PostgresAccountRepository>();
             b.add::<kamu_accounts_postgres::PostgresAccessTokenRepository>();
         }
         DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
-            database_common::MySqlPlugin::init_database_components(b, &connection_string)
-                .int_err()?;
+            database_common::MySqlPlugin::init_database_components(b);
 
             b.add::<kamu_accounts_mysql::MySqlAccountRepository>();
             b.add::<kamu_accounts_mysql::MysqlAccessTokenRepository>();
@@ -59,8 +47,7 @@ pub async fn configure_database_components(
             // TODO: Task & Flow System MySQL versions
         }
         DatabaseProvider::Sqlite => {
-            database_common::SqlitePlugin::init_database_components(b, &connection_string)
-                .int_err()?;
+            database_common::SqlitePlugin::init_database_components(b);
 
             b.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
             b.add::<kamu_accounts_sqlite::SqliteAccessTokenRepository>();
@@ -68,7 +55,8 @@ pub async fn configure_database_components(
     }
 
     b.add_value(db_credentials);
-    b.add_value(db_password_provider);
+
+    init_database_password_provider(b, raw_db_config);
 
     Ok(())
 }
@@ -107,39 +95,97 @@ pub fn try_build_db_credentials(raw_db_config: DatabaseConfig) -> Option<Databas
 
 ///////////////////////////////////////////////////////////////////////////////
 
-fn make_database_password_provider(
-    raw_db_config: &DatabaseConfig,
-    db_credentials: &DatabaseCredentials,
-) -> Arc<dyn DatabasePasswordProvider> {
-    match raw_db_config {
-        DatabaseConfig::InMemory => unreachable!(),
-        DatabaseConfig::Sqlite(_) => Arc::new(DatabaseNoPasswordProvider {}),
-        DatabaseConfig::MySql(config)
-        | DatabaseConfig::Postgres(config)
-        | DatabaseConfig::MariaDB(config) => {
-            make_remote_database_password_provider(db_credentials, &config.password_policy)
+pub async fn connect_database_initially(base_catalog: &Catalog) -> Result<Catalog, InternalError> {
+    let db_credentials = base_catalog.get_one::<DatabaseCredentials>().unwrap();
+    let db_password_provider = base_catalog
+        .get_one::<dyn DatabasePasswordProvider>()
+        .unwrap();
+
+    let db_password = db_password_provider.provide_password().await?;
+    let db_connection_string = db_credentials.connection_string(db_password);
+
+    match db_credentials.provider {
+        DatabaseProvider::Postgres => database_common::PostgresPlugin::catalog_with_connected_pool(
+            base_catalog,
+            &db_connection_string,
+        )
+        .int_err(),
+        DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
+            database_common::MySqlPlugin::catalog_with_connected_pool(
+                base_catalog,
+                &db_connection_string,
+            )
+            .int_err()
         }
+        DatabaseProvider::Sqlite => database_common::SqlitePlugin::catalog_with_connected_pool(
+            base_catalog,
+            &db_connection_string,
+        )
+        .int_err(),
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-fn make_remote_database_password_provider(
-    db_configuration: &DatabaseCredentials,
-    password_policy_config: &DatabasePasswordPolicyConfig,
-) -> Arc<dyn DatabasePasswordProvider> {
-    match &password_policy_config.source {
-        DatabasePasswordSourceConfig::RawPassword(raw_password_config) => {
-            Arc::new(DatabaseFixedPasswordProvider::new(Secret::new(
-                raw_password_config.raw_password.clone(),
-            )))
+pub async fn spawn_password_refreshing_job(db_config: &DatabaseConfig, catalog: &Catalog) {
+    let password_policy_config = match db_config {
+        DatabaseConfig::Sqlite(_) | DatabaseConfig::InMemory => None,
+        DatabaseConfig::Postgres(config)
+        | DatabaseConfig::MySql(config)
+        | DatabaseConfig::MariaDB(config) => Some(config.password_policy.clone()),
+    };
+
+    if let Some(rotation_frequency_in_minutes) =
+        password_policy_config.and_then(|config| config.rotation_frequency_in_minutes)
+    {
+        let awaiting_duration = std::time::Duration::from_mins(rotation_frequency_in_minutes);
+
+        let catalog = catalog.clone();
+
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(awaiting_duration).await;
+
+                let password_refresher =
+                    catalog.get_one::<dyn DatabasePasswordRefresher>().unwrap();
+                password_refresher
+                    .refresh_password(&catalog)
+                    .await
+                    .expect("Password refreshing failed");
+            }
+        });
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+fn init_database_password_provider(b: &mut CatalogBuilder, raw_db_config: &DatabaseConfig) {
+    match raw_db_config {
+        DatabaseConfig::InMemory => unreachable!(),
+        DatabaseConfig::Sqlite(_) => {
+            b.add::<DatabaseNoPasswordProvider>();
         }
-        DatabasePasswordSourceConfig::AwsSecret(aws_secret_config) => Arc::new(
-            DatabaseAwsSecretPasswordProvider::new(aws_secret_config.secret_name.clone()),
-        ),
-        DatabasePasswordSourceConfig::AwsIamToken => {
-            Arc::new(DatabaseAwsIamTokenProvider::new(db_configuration.clone()))
-        }
+        DatabaseConfig::MySql(config)
+        | DatabaseConfig::Postgres(config)
+        | DatabaseConfig::MariaDB(config) => match &config.password_policy.source {
+            DatabasePasswordSourceConfig::RawPassword(raw_password_config) => {
+                b.add_builder(
+                    DatabaseFixedPasswordProvider::builder()
+                        .with_fixed_password(Secret::new(raw_password_config.raw_password.clone())),
+                );
+                b.bind::<dyn DatabasePasswordProvider, DatabaseFixedPasswordProvider>();
+            }
+            DatabasePasswordSourceConfig::AwsSecret(aws_secret_config) => {
+                b.add_builder(
+                    DatabaseAwsSecretPasswordProvider::builder()
+                        .with_secret_name(aws_secret_config.secret_name.clone()),
+                );
+                b.bind::<dyn DatabasePasswordProvider, DatabaseAwsSecretPasswordProvider>();
+            }
+            DatabasePasswordSourceConfig::AwsIamToken => {
+                b.add::<DatabaseAwsIamTokenProvider>();
+            }
+        },
     }
 }
 

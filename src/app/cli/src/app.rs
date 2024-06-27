@@ -30,7 +30,9 @@ use crate::{
     config,
     configure_database_components,
     configure_in_memory_components,
+    connect_database_initially,
     odf_server,
+    spawn_password_refreshing_job,
     try_build_db_credentials,
     GcService,
     WorkspaceLayout,
@@ -141,11 +143,24 @@ pub async fn run(
 
         let base_catalog = base_catalog_builder.build();
 
-        let cli_catalog = configure_cli_catalog(&base_catalog, is_multi_tenant_workspace)
+        // Database requires extra actions:
+        let final_base_catalog = if let Some(db_config) = config.database {
+            // Connect database and obtain a connection pool
+            let catalog_with_pool = connect_database_initially(&base_catalog).await?;
+
+            // Periodically refresh password in the connection pool, if configured
+            spawn_password_refreshing_job(&db_config, &catalog_with_pool).await;
+
+            catalog_with_pool
+        } else {
+            base_catalog
+        };
+
+        let cli_catalog = configure_cli_catalog(&final_base_catalog, is_multi_tenant_workspace)
             .add_value(current_account.to_current_account_subject())
             .build();
 
-        (guards, base_catalog, cli_catalog, output_config)
+        (guards, final_base_catalog, cli_catalog, output_config)
     };
 
     // Evict cache
@@ -156,8 +171,8 @@ pub async fn run(
     initialize_components(&cli_catalog).await?;
 
     let need_to_wrap_with_transaction = cli_commands::command_needs_transaction(&matches)?;
-    let run_command = |cli_catalog: Catalog| async move {
-        match cli_commands::get_command(&base_catalog, &cli_catalog, &matches) {
+    let run_command = |catalog: Catalog| async move {
+        match cli_commands::get_command(&base_catalog, &catalog, &matches) {
             Ok(mut command) => {
                 if command.needs_workspace() && !workspace_svc.is_in_workspace() {
                     Err(CLIError::usage_error_from(NotInWorkspace))

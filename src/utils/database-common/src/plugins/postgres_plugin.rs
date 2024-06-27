@@ -20,24 +20,29 @@ use crate::*;
 pub struct PostgresPlugin {}
 
 #[component(pub)]
+#[interface(dyn DatabasePasswordRefresher)]
 impl PostgresPlugin {
     pub fn new() -> Self {
         Self {}
     }
 
-    pub fn init_database_components(
-        catalog_builder: &mut CatalogBuilder,
-        connection_string: &Secret<String>,
-    ) -> Result<(), DatabaseError> {
-        let pg_pool = Self::open_pg_pool(connection_string)?;
-
+    pub fn init_database_components(catalog_builder: &mut CatalogBuilder) {
         catalog_builder.add::<Self>();
-        catalog_builder.add_value(pg_pool);
         catalog_builder.add::<PostgresTransactionManager>();
-
-        Ok(())
     }
 
+    pub fn catalog_with_connected_pool(
+        base_catalog: &Catalog,
+        connection_string: &Secret<String>,
+    ) -> Result<Catalog, DatabaseError> {
+        let pg_pool = Self::open_pg_pool(connection_string)?;
+
+        Ok(CatalogBuilder::new_chained(base_catalog)
+            .add_value(pg_pool)
+            .build())
+    }
+
+    #[tracing::instrument(level = "info", skip_all)]
     fn open_pg_pool(connection_string: &Secret<String>) -> Result<PgPool, DatabaseError> {
         PgPool::connect_lazy(connection_string.expose_secret()).map_err(DatabaseError::SqlxError)
     }
@@ -47,6 +52,7 @@ impl PostgresPlugin {
 
 #[async_trait::async_trait]
 impl DatabasePasswordRefresher for PostgresPlugin {
+    #[tracing::instrument(level = "info", skip_all)]
     async fn refresh_password(&self, catalog: &Catalog) -> Result<(), InternalError> {
         let password_provider = catalog.get_one::<dyn DatabasePasswordProvider>().unwrap();
         let fresh_password = password_provider.provide_password().await?;

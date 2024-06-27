@@ -566,7 +566,7 @@ pub struct RemoteDatabaseConfig {
 #[serde(rename_all = "camelCase")]
 pub struct DatabasePasswordPolicyConfig {
     pub source: DatabasePasswordSourceConfig,
-    pub rotation_frequency_in_minutes: Option<i64>,
+    pub rotation_frequency_in_minutes: Option<u64>,
 }
 
 #[skip_serializing_none]

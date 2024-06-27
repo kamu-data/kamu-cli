@@ -13,6 +13,7 @@
 #![feature(error_in_core)]
 #![feature(panic_update_hook)]
 #![feature(let_chains)]
+#![feature(duration_constructors)]
 
 pub mod app;
 pub use app::*;
