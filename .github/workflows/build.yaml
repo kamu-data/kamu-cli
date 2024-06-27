@@ -29,7 +29,10 @@ jobs:
         with:
           command: fmt
           args: --check
-      - name: license headers
+      - name: Lint dividing lines
+        run: |
+          cargo test -p kamu-repo-tools -- dividing_lines
+      - name: Lint license headers
         run: |
           cargo test -p kamu-repo-tools -- license_header
       - name: clippy
@@ -89,7 +92,7 @@ jobs:
             runs-on: windows-latest
             cargo-flags: --profile ci
             nextest-flags: --cargo-profile ci
-          # platform(target) is a workaround for Windows only issue in cargo-nextest upon proc macro crates
+            # platform(target) is a workaround for Windows only issue in cargo-nextest upon proc macro crates
             nextest-exclusions: -E 'platform(target) & !(test(::containerized::) | test(::datafusion::) | test(::database::))'
             container-runtime: ''
             ipfs: false
