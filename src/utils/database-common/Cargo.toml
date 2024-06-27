@@ -24,14 +24,18 @@ doctest = false
 [dependencies]
 aws-config = "0.57"
 aws-sdk-secretsmanager = "0.35"
+aws-sdk-sts = "0.35"
 async-trait = "0.1"
 chrono = { version = "0.4", default-features = false }
 dill = "0.8"
+hex = "0.4"
+hmac = "0.12"
 internal-error = { workspace = true }
 secrecy = "0.8"
 thiserror = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false, features = ["sync"] }
 serde = "1"
+sha2 = "0.10"
 uuid = "1"
 
 [dependencies.sqlx]

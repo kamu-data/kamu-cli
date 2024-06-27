@@ -101,8 +101,10 @@ pub async fn run(
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
 
         if let Some(db_configuration) = maybe_db_configuration.as_ref() {
-            let db_password_provider =
-                make_database_password_provider(config.database.as_ref().unwrap());
+            let db_password_provider = make_database_password_provider(
+                config.database.as_ref().unwrap(),
+                db_configuration,
+            );
             let db_password = db_password_provider.provide_password().await?;
 
             configure_database_components(

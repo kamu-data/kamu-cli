@@ -15,7 +15,7 @@ use crate::DatabaseProvider;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DatabaseConfiguration {
     pub provider: DatabaseProvider,
     pub user: String,
@@ -41,6 +41,10 @@ impl DatabaseConfiguration {
         }
     }
 
+    pub fn port(&self) -> u32 {
+        self.port.unwrap_or_else(|| self.provider.default_port())
+    }
+
     pub fn connection_string(&self, password: Option<&Secret<String>>) -> String {
         if let DatabaseProvider::Sqlite = self.provider {
             format!("{}://{}", self.provider, self.database_name)
@@ -51,7 +55,7 @@ impl DatabaseConfiguration {
                 self.user,
                 password.expose_secret(),
                 self.host,
-                self.port.unwrap_or_else(|| self.provider.default_port()),
+                self.port(),
                 self.database_name
             )
         } else {
@@ -60,7 +64,7 @@ impl DatabaseConfiguration {
                 self.provider,
                 self.user,
                 self.host,
-                self.port.unwrap_or_else(|| self.provider.default_port()),
+                self.port(),
                 self.database_name
             )
         }
@@ -76,7 +80,7 @@ impl DatabaseConfiguration {
                 self.user,
                 password.expose_secret(),
                 self.host,
-                self.port.unwrap_or_else(|| self.provider.default_port()),
+                self.port(),
             )
         } else {
             format!(
@@ -84,7 +88,7 @@ impl DatabaseConfiguration {
                 self.provider,
                 self.user,
                 self.host,
-                self.port.unwrap_or_else(|| self.provider.default_port()),
+                self.port(),
             )
         }
     }

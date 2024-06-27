@@ -565,6 +565,7 @@ pub struct RemoteDatabaseConfig {
 pub enum DatabasePasswordPolicyConfig {
     RawPassword(RawDatabasePasswordPolicyConfig),
     AwsSecret(AwsSecretDatabasePasswordPolicyConfig),
+    AwsIamToken,
 }
 
 #[skip_serializing_none]
