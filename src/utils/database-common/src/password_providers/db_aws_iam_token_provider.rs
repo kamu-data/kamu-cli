@@ -10,22 +10,25 @@
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_sts::Client as StsClient;
 use chrono::Utc;
+use dill::*;
 use hmac::{Hmac, Mac};
 use internal_error::{InternalError, ResultIntoInternal};
 use secrecy::Secret;
 use sha2::{Digest, Sha256};
 
-use crate::{DatabaseConfiguration, DatabasePasswordProvider};
+use crate::{DatabaseCredentials, DatabasePasswordProvider};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
+#[interface(dyn DatabasePasswordProvider)]
 pub struct DatabaseAwsIamTokenProvider {
-    db_configuration: DatabaseConfiguration,
+    db_credentials: DatabaseCredentials,
 }
 
 impl DatabaseAwsIamTokenProvider {
-    pub fn new(db_configuration: DatabaseConfiguration) -> Self {
-        Self { db_configuration }
+    pub fn new(db_credentials: DatabaseCredentials) -> Self {
+        Self { db_credentials }
     }
 
     fn get_signature_key(
@@ -66,13 +69,13 @@ impl DatabasePasswordProvider for DatabaseAwsIamTokenProvider {
 
         let endpoint = format!(
             "{}:{}/{}",
-            self.db_configuration.host,
-            self.db_configuration.port(),
-            self.db_configuration.user
+            self.db_credentials.host,
+            self.db_credentials.port(),
+            self.db_credentials.user
         );
         let canonical_request = format!(
             "GET\n{}\n\nhost:{}\n\nhost\n",
-            endpoint, self.db_configuration.host,
+            endpoint, self.db_credentials.host,
         );
 
         let date = Utc::now().format("%Y%m%dT%H%M%SZ").to_string();

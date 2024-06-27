@@ -25,10 +25,10 @@ impl MySqlPlugin {
 
     pub fn init_database_components(
         catalog_builder: &mut CatalogBuilder,
-        db_configuration: &DatabaseConfiguration,
+        db_credentials: &DatabaseCredentials,
         db_password: Option<&Secret<String>>,
     ) -> Result<(), DatabaseError> {
-        let mysql_pool = Self::open_mysql_pool(db_configuration, db_password)?;
+        let mysql_pool = Self::open_mysql_pool(db_credentials, db_password)?;
 
         catalog_builder.add::<Self>();
         catalog_builder.add_value(mysql_pool);
@@ -38,10 +38,10 @@ impl MySqlPlugin {
     }
 
     fn open_mysql_pool(
-        db_configuration: &DatabaseConfiguration,
+        db_credentials: &DatabaseCredentials,
         db_password: Option<&Secret<String>>,
     ) -> Result<MySqlPool, DatabaseError> {
-        let connection_string = db_configuration.connection_string(db_password);
+        let connection_string = db_credentials.connection_string(db_password);
         MySqlPool::connect_lazy(&connection_string).map_err(DatabaseError::SqlxError)
     }
 }

@@ -17,6 +17,9 @@
 pub mod app;
 pub use app::*;
 
+pub mod database;
+pub use database::*;
+
 pub mod cli_commands;
 pub use cli_commands::*;
 

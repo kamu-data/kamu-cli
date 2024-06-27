@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use dill::*;
 use internal_error::InternalError;
 use secrecy::Secret;
 
@@ -14,6 +15,8 @@ use crate::DatabasePasswordProvider;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
+#[interface(dyn DatabasePasswordProvider)]
 pub struct DatabaseNoPasswordProvider {}
 
 /////////////////////////////////////////////////////////////////////////////////////////

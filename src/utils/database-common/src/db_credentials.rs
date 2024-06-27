@@ -16,7 +16,7 @@ use crate::DatabaseProvider;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct DatabaseConfiguration {
+pub struct DatabaseCredentials {
     pub provider: DatabaseProvider,
     pub user: String,
     pub database_name: String,
@@ -24,7 +24,7 @@ pub struct DatabaseConfiguration {
     pub port: Option<u32>,
 }
 
-impl DatabaseConfiguration {
+impl DatabaseCredentials {
     pub fn new(
         provider: DatabaseProvider,
         user: String,
