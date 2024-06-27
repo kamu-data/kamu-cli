@@ -8,9 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
+use secrecy::Secret;
 use sqlx::PgPool;
 
-use crate::{DatabaseConfiguration, DatabaseError, PostgresTransactionManager};
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,8 +26,9 @@ impl PostgresPlugin {
     pub fn init_database_components(
         catalog_builder: &mut CatalogBuilder,
         db_configuration: &DatabaseConfiguration,
+        db_password: Option<&Secret<String>>,
     ) -> Result<(), DatabaseError> {
-        let pg_pool = Self::open_pg_pool(db_configuration)?;
+        let pg_pool = Self::open_pg_pool(db_configuration, db_password)?;
 
         catalog_builder.add::<Self>();
         catalog_builder.add_value(pg_pool);
@@ -35,9 +37,12 @@ impl PostgresPlugin {
         Ok(())
     }
 
-    fn open_pg_pool(db_configuration: &DatabaseConfiguration) -> Result<PgPool, DatabaseError> {
-        PgPool::connect_lazy(db_configuration.connection_string().as_str())
-            .map_err(DatabaseError::SqlxError)
+    fn open_pg_pool(
+        db_configuration: &DatabaseConfiguration,
+        db_password: Option<&Secret<String>>,
+    ) -> Result<PgPool, DatabaseError> {
+        let connection_string = db_configuration.connection_string(db_password);
+        PgPool::connect_lazy(&connection_string).map_err(DatabaseError::SqlxError)
     }
 }
 

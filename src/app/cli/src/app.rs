@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
-use database_common::{DatabaseConfiguration, DatabaseProvider, DatabaseTransactionRunner};
+use database_common::*;
 use dill::*;
 use kamu::domain::*;
 use kamu::*;
@@ -20,9 +20,10 @@ use kamu_accounts::*;
 use kamu_accounts_services::PredefinedAccountsRegistrator;
 use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
+use secrecy::Secret;
 
 use crate::accounts::AccountService;
-use crate::config::{DatabaseConfig, RemoteDatabaseConfig};
+use crate::config::*;
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
@@ -100,7 +101,15 @@ pub async fn run(
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
 
         if let Some(db_configuration) = maybe_db_configuration.as_ref() {
-            configure_database_components(&mut base_catalog_builder, db_configuration)?;
+            let db_password_provider =
+                make_database_password_provider(config.database.as_ref().unwrap());
+            let db_password = db_password_provider.provide_password().await?;
+
+            configure_database_components(
+                &mut base_catalog_builder,
+                db_configuration,
+                db_password.as_ref(),
+            )?;
         } else {
             configure_in_memory_components(&mut base_catalog_builder);
         };
@@ -359,6 +368,7 @@ pub fn configure_base_catalog(
 fn configure_database_components(
     catalog_builder: &mut CatalogBuilder,
     db_configuration: &DatabaseConfiguration,
+    db_password: Option<&Secret<String>>,
 ) -> Result<(), CLIError> {
     // TODO: Remove after adding implementation of FlowEventStore for databases
     catalog_builder.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
@@ -373,6 +383,7 @@ fn configure_database_components(
             database_common::PostgresPlugin::init_database_components(
                 catalog_builder,
                 db_configuration,
+                db_password,
             )
             .int_err()?;
 
@@ -385,6 +396,7 @@ fn configure_database_components(
             database_common::MySqlPlugin::init_database_components(
                 catalog_builder,
                 db_configuration,
+                db_password,
             )
             .int_err()?;
 
@@ -399,6 +411,7 @@ fn configure_database_components(
             database_common::SqlitePlugin::init_database_components(
                 catalog_builder,
                 db_configuration,
+                db_password,
             )
             .int_err()?;
 
@@ -611,14 +624,7 @@ pub fn register_config_in_catalog(
 
 fn try_convert_into_db_configuration(config: DatabaseConfig) -> Option<DatabaseConfiguration> {
     fn convert(c: RemoteDatabaseConfig, provider: DatabaseProvider) -> DatabaseConfiguration {
-        DatabaseConfiguration::new(
-            provider,
-            c.user,
-            c.password,
-            c.database_name,
-            c.host,
-            c.port,
-        )
+        DatabaseConfiguration::new(provider, c.user, c.database_name, c.host, c.port)
     }
 
     match config {

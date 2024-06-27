@@ -1364,6 +1364,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-sdk-secretsmanager"
+version = "0.35.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7146800d907748fe1a0dd1a12a1387f5be249bac8bd5902af30f8559972a7272"
+dependencies = [
+ "aws-credential-types",
+ "aws-http",
+ "aws-runtime",
+ "aws-smithy-async",
+ "aws-smithy-http",
+ "aws-smithy-json",
+ "aws-smithy-runtime",
+ "aws-smithy-runtime-api",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes",
+ "fastrand",
+ "http 0.2.12",
+ "regex",
+ "tracing",
+]
+
+[[package]]
 name = "aws-sdk-sso"
 version = "0.36.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2676,6 +2699,8 @@ name = "database-common"
 version = "0.188.6"
 dependencies = [
  "async-trait",
+ "aws-config",
+ "aws-sdk-secretsmanager",
  "chrono",
  "dill",
  "internal-error",
@@ -4177,9 +4202,9 @@ checksum = "add0ab9360ddbd88cfeb3bd9574a1d85cfdfa14db10b3e21d3700dbc4328758f"
 
 [[package]]
 name = "httparse"
-version = "1.9.4"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fcc0b4a115bf80b728eb8ea024ad5bd707b615bfed49e0665b6e0f86fd082d9"
+checksum = "d897f394bad6a705d5f4104762e116a75639e470d80901eed05a860a95cb1904"
 
 [[package]]
 name = "httpdate"
@@ -5133,6 +5158,7 @@ dependencies = [
  "regex",
  "reqwest 0.11.27",
  "rust-embed",
+ "secrecy",
  "serde",
  "serde_json",
  "serde_with",

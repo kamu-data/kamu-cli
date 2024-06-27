@@ -55,5 +55,7 @@ configs:
           provider: postgres
           host: db
           user: ${DB_USER}
-          password: ${DB_PASSWORD}
+          passwordPolicy: 
+            kind: rawPassword
+            rawPassword: ${DB_PASSWORD}
           databaseName: ${DB_DATABASE_NAME}

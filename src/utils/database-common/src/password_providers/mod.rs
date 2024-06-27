@@ -7,17 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod db_configuration;
-mod db_error;
-mod db_provider;
+mod db_aws_secret_password_provider;
+mod db_fixed_password_provider;
+mod db_no_password_provider;
+mod db_password_provider;
 
-mod password_providers;
-mod plugins;
-mod transactions;
-
-pub use db_configuration::*;
-pub use db_error::*;
-pub use db_provider::*;
-pub use password_providers::*;
-pub use plugins::*;
-pub use transactions::*;
+pub use db_aws_secret_password_provider::*;
+pub use db_fixed_password_provider::*;
+pub use db_no_password_provider::*;
+pub use db_password_provider::*;
