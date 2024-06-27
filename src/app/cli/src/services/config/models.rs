@@ -526,11 +526,14 @@ impl DatabaseConfig {
     pub fn sample() -> Self {
         Self::Postgres(RemoteDatabaseConfig {
             user: String::from("root"),
-            password_policy: DatabasePasswordPolicyConfig::RawPassword(
-                RawDatabasePasswordPolicyConfig {
-                    raw_password: String::from("p455w0rd"),
-                },
-            ),
+            password_policy: DatabasePasswordPolicyConfig {
+                source: DatabasePasswordSourceConfig::RawPassword(
+                    RawDatabasePasswordPolicyConfig {
+                        raw_password: String::from("p455w0rd"),
+                    },
+                ),
+                rotation_frequency_in_minutes: None,
+            },
             database_name: String::from("kamu"),
             host: String::from("localhost"),
             port: Some(DatabaseProvider::Postgres.default_port()),
@@ -561,8 +564,17 @@ pub struct RemoteDatabaseConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
+pub struct DatabasePasswordPolicyConfig {
+    pub source: DatabasePasswordSourceConfig,
+    pub rotation_frequency_in_minutes: Option<i64>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 #[serde(tag = "kind")]
-pub enum DatabasePasswordPolicyConfig {
+pub enum DatabasePasswordSourceConfig {
     RawPassword(RawDatabasePasswordPolicyConfig),
     AwsSecret(AwsSecretDatabasePasswordPolicyConfig),
     AwsIamToken,

@@ -110,7 +110,7 @@ pub async fn run(
             configure_database_components(
                 &mut base_catalog_builder,
                 config.database.as_ref().unwrap(),
-                db_credentials,
+                db_credentials.clone(),
             )
             .await?;
         } else {

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
-use secrecy::Secret;
+use secrecy::{ExposeSecret, Secret};
 use sqlx::SqlitePool;
 
 use crate::*;
@@ -25,10 +25,9 @@ impl SqlitePlugin {
 
     pub fn init_database_components(
         catalog_builder: &mut CatalogBuilder,
-        db_credentials: &DatabaseCredentials,
-        db_password: Option<&Secret<String>>,
+        connection_string: &Secret<String>,
     ) -> Result<(), DatabaseError> {
-        let sqlite_pool = Self::open_sqlite_pool(db_credentials, db_password)?;
+        let sqlite_pool = Self::open_sqlite_pool(connection_string)?;
 
         catalog_builder.add::<Self>();
         catalog_builder.add_value(sqlite_pool);
@@ -37,12 +36,9 @@ impl SqlitePlugin {
         Ok(())
     }
 
-    fn open_sqlite_pool(
-        db_credentials: &DatabaseCredentials,
-        db_password: Option<&Secret<String>>,
-    ) -> Result<SqlitePool, DatabaseError> {
-        let connection_string = db_credentials.connection_string(db_password);
-        SqlitePool::connect_lazy(&connection_string).map_err(DatabaseError::SqlxError)
+    fn open_sqlite_pool(connection_string: &Secret<String>) -> Result<SqlitePool, DatabaseError> {
+        SqlitePool::connect_lazy(connection_string.expose_secret())
+            .map_err(DatabaseError::SqlxError)
     }
 }
 

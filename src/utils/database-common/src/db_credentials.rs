@@ -45,11 +45,11 @@ impl DatabaseCredentials {
         self.port.unwrap_or_else(|| self.provider.default_port())
     }
 
-    pub fn connection_string(&self, password: Option<&Secret<String>>) -> String {
+    pub fn connection_string(&self, password: Option<Secret<String>>) -> Secret<String> {
         if let DatabaseProvider::Sqlite = self.provider {
-            format!("{}://{}", self.provider, self.database_name)
-        } else if let Some(password) = &password {
-            format!(
+            Secret::new(format!("{}://{}", self.provider, self.database_name))
+        } else if let Some(password) = password {
+            Secret::new(format!(
                 "{}://{}:{}@{}:{}/{}",
                 self.provider,
                 self.user,
@@ -57,39 +57,39 @@ impl DatabaseCredentials {
                 self.host,
                 self.port(),
                 self.database_name
-            )
+            ))
         } else {
-            format!(
+            Secret::new(format!(
                 "{}://{}@{}:{}/{}",
                 self.provider,
                 self.user,
                 self.host,
                 self.port(),
                 self.database_name
-            )
+            ))
         }
     }
 
-    pub fn connection_string_no_db(&self, password: Option<&Secret<String>>) -> String {
+    pub fn connection_string_no_db(&self, password: Option<Secret<String>>) -> Secret<String> {
         if let DatabaseProvider::Sqlite = self.provider {
             panic!("Sqlite does not support connection strings without DB")
-        } else if let Some(password) = &password {
-            format!(
+        } else if let Some(password) = password {
+            Secret::new(format!(
                 "{}://{}:{}@{}:{}",
                 self.provider,
                 self.user,
                 password.expose_secret(),
                 self.host,
                 self.port(),
-            )
+            ))
         } else {
-            format!(
+            Secret::new(format!(
                 "{}://{}@{}:{}",
                 self.provider,
                 self.user,
                 self.host,
                 self.port(),
-            )
+            ))
         }
     }
 

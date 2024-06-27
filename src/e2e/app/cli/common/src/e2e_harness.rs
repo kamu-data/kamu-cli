@@ -84,8 +84,9 @@ impl KamuCliApiServerHarness {
                         host: {host}
                         user: {user}
                         passwordPolicy:
-                            kind: rawPassword
-                            rawPassword: {password}
+                            source:
+                                kind: rawPassword
+                                rawPassword: {password}
                         databaseName: {database}
                 "#
             ),
@@ -111,8 +112,9 @@ impl KamuCliApiServerHarness {
                         host: {host}
                         user: {user}
                         passwordPolicy:
-                            kind: rawPassword
-                            rawPassword: {password}
+                            source:
+                                kind: rawPassword
+                                rawPassword: {password}
                         databaseName: {database}
                 "#
             ),

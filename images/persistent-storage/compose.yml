@@ -56,6 +56,7 @@ configs:
           host: db
           user: ${DB_USER}
           passwordPolicy: 
-            kind: rawPassword
-            rawPassword: ${DB_PASSWORD}
+            source: 
+              kind: rawPassword
+              rawPassword: ${DB_PASSWORD}
           databaseName: ${DB_DATABASE_NAME}
