@@ -250,7 +250,7 @@ async fn test_create_and_get_access_token() {
         value!({
             "auth": {
                 "createAccessToken": {
-                    "__typename": "CreateResultDuplicate",
+                    "__typename": "CreateAccessTokenResultDuplicate",
                     "message": "Access token with foo name already exists"
                 }
             }

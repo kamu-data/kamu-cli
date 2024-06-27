@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.188.6] - 2024-06-27
+### Fixed
+- Added missed field to create access token result API
+
 ## [0.188.5] - 2024-06-26
 ### Added
 - `kamu system api-server`: Added the option of overriding the base URL in the API with `--external-address`. 
