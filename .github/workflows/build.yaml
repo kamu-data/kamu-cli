@@ -30,8 +30,9 @@ jobs:
           command: fmt
           args: --check
       - name: Lint dividing lines
-        run: ./scripts/lint-dividing-lines.sh
-      - name: license headers
+        run: |
+          cargo test -p kamu-repo-tools -- dividing_lines
+      - name: Lint license headers
         run: |
           cargo test -p kamu-repo-tools -- license_header
       - name: clippy

@@ -25,5 +25,7 @@ semver = { version = "1", default-features = false }
 toml = { version = "0.8", default-features = false, features = ["parse"] }
 
 [dev-dependencies]
-indoc = "2"
 glob = { version = "0.3", default-features = false }
+grep-searcher = "0.1"
+grep-regex = "0.1"
+indoc = "2"
