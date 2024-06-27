@@ -67,11 +67,9 @@ impl AuthMut {
                 token: CreatedAccessToken::new(created_token, &account_id, &token_name),
             })),
             Err(err) => match err {
-                CreateAccessTokenError::Duplicate(_) => {
-                    Ok(CreateTokenResult::DuplicateName(CreateResultDuplicate {
-                        token_name,
-                    }))
-                }
+                CreateAccessTokenError::Duplicate(_) => Ok(CreateTokenResult::DuplicateName(
+                    CreateAccessTokenResultDuplicate { token_name },
+                )),
                 CreateAccessTokenError::Internal(internal_err) => {
                     Err(GqlError::Internal(internal_err))
                 }
@@ -172,17 +170,18 @@ pub enum RevokeResult {
 #[graphql(field(name = "message", ty = "String"))]
 pub enum CreateTokenResult {
     Success(CreateAccessTokenResultSuccess),
-    DuplicateName(CreateResultDuplicate),
+    DuplicateName(CreateAccessTokenResultDuplicate),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
-pub struct CreateResultDuplicate {
+#[graphql(complex)]
+pub struct CreateAccessTokenResultDuplicate {
     pub token_name: String,
 }
 
 #[ComplexObject]
-impl CreateResultDuplicate {
-    async fn message(&self) -> String {
+impl CreateAccessTokenResultDuplicate {
+    pub async fn message(&self) -> String {
         format!("Access token with {} name already exists", self.token_name)
     }
 }
