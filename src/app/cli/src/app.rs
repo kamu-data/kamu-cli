@@ -113,8 +113,7 @@ pub async fn run(
                 &mut base_catalog_builder,
                 config.database.as_ref().unwrap(),
                 db_credentials.clone(),
-            )
-            .await?;
+            );
         } else {
             configure_in_memory_components(&mut base_catalog_builder);
         };

@@ -18,11 +18,11 @@ use crate::config::{DatabaseConfig, DatabasePasswordSourceConfig, RemoteDatabase
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn configure_database_components(
+pub fn configure_database_components(
     b: &mut CatalogBuilder,
     raw_db_config: &DatabaseConfig,
     db_credentials: DatabaseCredentials,
-) -> Result<(), InternalError> {
+) {
     // TODO: Remove after adding implementation of FlowEventStore for databases
     b.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
 
@@ -57,8 +57,6 @@ pub async fn configure_database_components(
     b.add_value(db_credentials);
 
     init_database_password_provider(b, raw_db_config);
-
-    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
