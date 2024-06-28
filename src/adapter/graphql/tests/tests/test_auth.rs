@@ -306,7 +306,10 @@ async fn test_revoke_access_token() {
         res.data,
         value!({
             "auth": {
-                "revokeAccessToken": "SUCCESS"
+                "revokeAccessToken": {
+                    "__typename": "RevokeResultSuccess",
+                    "message": "Access token revoked succesfully"
+                }
             }
         })
     );
@@ -323,7 +326,9 @@ async fn test_revoke_access_token() {
         res.data,
         value!({
             "auth": {
-                "revokeAccessToken": "ALREADY_REVOKED"
+                "revokeAccessToken": {
+                    "__typename": "RevokeResultAlreadyRevoked",
+                }
             }
         })
     );
@@ -392,7 +397,12 @@ impl AuthGQLHarness {
             r#"
             mutation {
                 auth {
-                    revokeAccessToken (tokenId: <token_id>)
+                    revokeAccessToken (tokenId: <token_id>) {
+                        __typename
+                        ... on RevokeResultSuccess {
+                            message
+                        }
+                    }
                 }
             }
             "#
