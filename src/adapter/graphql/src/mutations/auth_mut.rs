@@ -87,12 +87,13 @@ impl AuthMut {
         let access_token_service =
             from_catalog::<dyn kamu_accounts::AccessTokenService>(ctx).unwrap();
 
-        match access_token_service
-            .revoke_access_token(&token_id.into())
-            .await
-        {
-            Ok(_) => Ok(RevokeResult::Success),
-            Err(RevokeTokenError::AlreadyRevoked) => Ok(RevokeResult::AlreadyRevoked),
+        match access_token_service.revoke_access_token(&token_id).await {
+            Ok(_) => Ok(RevokeResult::Success(RevokeResultSuccess { token_id })),
+            Err(RevokeTokenError::AlreadyRevoked) => {
+                Ok(RevokeResult::AlreadyRevoked(RevokeResultAlreadyRevoked {
+                    token_id,
+                }))
+            }
             Err(RevokeTokenError::NotFound(_)) => Err(GqlError::Gql(async_graphql::Error::new(
                 "Access token not found",
             ))),
@@ -157,11 +158,37 @@ impl From<kamu_accounts::LoginResponse> for LoginResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Enum, Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Interface)]
+#[graphql(field(name = "message", ty = "String"))]
 pub enum RevokeResult {
-    Success,
-    AlreadyRevoked,
-    NotFound,
+    Success(RevokeResultSuccess),
+    AlreadyRevoked(RevokeResultAlreadyRevoked),
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct RevokeResultSuccess {
+    pub token_id: AccessTokenID,
+}
+
+#[ComplexObject]
+impl RevokeResultSuccess {
+    async fn message(&self) -> String {
+        "Access token revoked succesfully".to_string()
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct RevokeResultAlreadyRevoked {
+    pub token_id: AccessTokenID,
+}
+
+#[ComplexObject]
+impl RevokeResultAlreadyRevoked {
+    async fn message(&self) -> String {
+        format!("Access token with id {} already revoked", self.token_id)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
