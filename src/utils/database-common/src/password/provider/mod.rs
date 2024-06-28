@@ -12,11 +12,9 @@ mod db_aws_secret_password_provider;
 mod db_fixed_password_provider;
 mod db_no_password_provider;
 mod db_password_provider;
-mod db_password_refresher;
 
 pub use db_aws_iam_token_provider::*;
 pub use db_aws_secret_password_provider::*;
 pub use db_fixed_password_provider::*;
 pub use db_no_password_provider::*;
 pub use db_password_provider::*;
-pub use db_password_refresher::*;

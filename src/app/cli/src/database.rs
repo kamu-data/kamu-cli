@@ -138,7 +138,7 @@ pub async fn spawn_password_refreshing_job(db_config: &DatabaseConfig, catalog: 
     if let Some(rotation_frequency_in_minutes) =
         password_policy_config.and_then(|config| config.rotation_frequency_in_minutes)
     {
-        let awaiting_duration = std::time::Duration::from_mins(rotation_frequency_in_minutes);
+        let awaiting_duration = std::time::Duration::from_secs(rotation_frequency_in_minutes);
 
         let catalog = catalog.clone();
 
@@ -149,7 +149,7 @@ pub async fn spawn_password_refreshing_job(db_config: &DatabaseConfig, catalog: 
                 let password_refresher =
                     catalog.get_one::<dyn DatabasePasswordRefresher>().unwrap();
                 password_refresher
-                    .refresh_password(&catalog)
+                    .refresh_password()
                     .await
                     .expect("Password refreshing failed");
             }
