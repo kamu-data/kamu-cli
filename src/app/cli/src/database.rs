@@ -136,7 +136,7 @@ pub async fn spawn_password_refreshing_job(db_config: &DatabaseConfig, catalog: 
     if let Some(rotation_frequency_in_minutes) =
         password_policy_config.and_then(|config| config.rotation_frequency_in_minutes)
     {
-        let awaiting_duration = std::time::Duration::from_secs(rotation_frequency_in_minutes);
+        let awaiting_duration = std::time::Duration::from_mins(rotation_frequency_in_minutes);
 
         let catalog = catalog.clone();
 
