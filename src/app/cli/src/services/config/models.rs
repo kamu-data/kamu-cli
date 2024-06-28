@@ -45,6 +45,7 @@ pub struct CLIConfig {
 
     /// Database connection configuration
     pub database: Option<DatabaseConfig>,
+
     /// Uploads configuration
     #[merge(strategy = merge_recursive)]
     pub uploads: Option<UploadsConfig>,
@@ -525,7 +526,14 @@ impl DatabaseConfig {
     pub fn sample() -> Self {
         Self::Postgres(RemoteDatabaseConfig {
             user: String::from("root"),
-            password: String::from("p455w0rd"),
+            password_policy: DatabasePasswordPolicyConfig {
+                source: DatabasePasswordSourceConfig::RawPassword(
+                    RawDatabasePasswordPolicyConfig {
+                        raw_password: String::from("p455w0rd"),
+                    },
+                ),
+                rotation_frequency_in_minutes: None,
+            },
             database_name: String::from("kamu"),
             host: String::from("localhost"),
             port: Some(DatabaseProvider::Postgres.default_port()),
@@ -546,10 +554,46 @@ pub struct SqliteDatabaseConfig {
 #[serde(rename_all = "camelCase")]
 pub struct RemoteDatabaseConfig {
     pub user: String,
-    pub password: String,
+    pub password_policy: DatabasePasswordPolicyConfig,
     pub database_name: String,
     pub host: String,
     pub port: Option<u32>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct DatabasePasswordPolicyConfig {
+    pub source: DatabasePasswordSourceConfig,
+    pub rotation_frequency_in_minutes: Option<u64>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind")]
+pub enum DatabasePasswordSourceConfig {
+    RawPassword(RawDatabasePasswordPolicyConfig),
+    AwsSecret(AwsSecretDatabasePasswordPolicyConfig),
+    AwsIamToken,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct RawDatabasePasswordPolicyConfig {
+    pub raw_password: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct AwsSecretDatabasePasswordPolicyConfig {
+    pub secret_name: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

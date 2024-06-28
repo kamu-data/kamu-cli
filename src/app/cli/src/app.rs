@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
-use database_common::{DatabaseConfiguration, DatabaseProvider, DatabaseTransactionRunner};
+use database_common::DatabaseTransactionRunner;
 use dill::*;
 use kamu::domain::*;
 use kamu::*;
@@ -22,11 +22,22 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
-use crate::config::{DatabaseConfig, RemoteDatabaseConfig};
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
-use crate::{cli_commands, config, odf_server, GcService, WorkspaceLayout, WorkspaceService};
+use crate::{
+    cli_commands,
+    config,
+    configure_database_components,
+    configure_in_memory_components,
+    connect_database_initially,
+    odf_server,
+    spawn_password_refreshing_job,
+    try_build_db_credentials,
+    GcService,
+    WorkspaceLayout,
+    WorkspaceService,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -77,10 +88,8 @@ pub async fn run(
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
-    let maybe_db_configuration = config
-        .database
-        .clone()
-        .and_then(try_convert_into_db_configuration);
+    let maybe_db_credentials = config.database.clone().and_then(try_build_db_credentials);
+
     // Configure application
     let (guards, base_catalog, cli_catalog, output_config) = {
         let dependencies_graph_repository = prepare_dependencies_graph_repository(
@@ -99,8 +108,13 @@ pub async fn run(
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
 
-        if let Some(db_configuration) = maybe_db_configuration.as_ref() {
-            configure_database_components(&mut base_catalog_builder, db_configuration)?;
+        if let Some(db_credentials) = maybe_db_credentials.as_ref() {
+            configure_database_components(
+                &mut base_catalog_builder,
+                config.database.as_ref().unwrap(),
+                db_credentials.clone(),
+            )
+            .await?;
         } else {
             configure_in_memory_components(&mut base_catalog_builder);
         };
@@ -129,11 +143,24 @@ pub async fn run(
 
         let base_catalog = base_catalog_builder.build();
 
-        let cli_catalog = configure_cli_catalog(&base_catalog, is_multi_tenant_workspace)
+        // Database requires extra actions:
+        let final_base_catalog = if let Some(db_config) = config.database {
+            // Connect database and obtain a connection pool
+            let catalog_with_pool = connect_database_initially(&base_catalog).await?;
+
+            // Periodically refresh password in the connection pool, if configured
+            spawn_password_refreshing_job(&db_config, &catalog_with_pool).await;
+
+            catalog_with_pool
+        } else {
+            base_catalog
+        };
+
+        let cli_catalog = configure_cli_catalog(&final_base_catalog, is_multi_tenant_workspace)
             .add_value(current_account.to_current_account_subject())
             .build();
 
-        (guards, base_catalog, cli_catalog, output_config)
+        (guards, final_base_catalog, cli_catalog, output_config)
     };
 
     // Evict cache
@@ -144,8 +171,8 @@ pub async fn run(
     initialize_components(&cli_catalog).await?;
 
     let need_to_wrap_with_transaction = cli_commands::command_needs_transaction(&matches)?;
-    let run_command = |cli_catalog: Catalog| async move {
-        match cli_commands::get_command(&base_catalog, &cli_catalog, &matches) {
+    let run_command = |catalog: Catalog| async move {
+        match cli_commands::get_command(&base_catalog, &catalog, &matches) {
             Ok(mut command) => {
                 if command.needs_workspace() && !workspace_svc.is_in_workspace() {
                     Err(CLIError::usage_error_from(NotInWorkspace))
@@ -160,7 +187,7 @@ pub async fn run(
             Err(e) => Err(e),
         }
     };
-    let is_database_used = maybe_db_configuration.is_some();
+    let is_database_used = maybe_db_credentials.is_some();
     let command_result = if is_database_used && need_to_wrap_with_transaction {
         let transaction_runner = DatabaseTransactionRunner::new(cli_catalog);
 
@@ -356,71 +383,6 @@ pub fn configure_base_catalog(
     b
 }
 
-fn configure_database_components(
-    catalog_builder: &mut CatalogBuilder,
-    db_configuration: &DatabaseConfiguration,
-) -> Result<(), CLIError> {
-    // TODO: Remove after adding implementation of FlowEventStore for databases
-    catalog_builder.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
-
-    // TODO: Delete after preparing services for transactional work and replace with
-    //       permanent storage options
-    catalog_builder.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
-    catalog_builder.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
-
-    match db_configuration.provider {
-        DatabaseProvider::Postgres => {
-            database_common::PostgresPlugin::init_database_components(
-                catalog_builder,
-                db_configuration,
-            )
-            .int_err()?;
-
-            catalog_builder.add::<kamu_accounts_postgres::PostgresAccountRepository>();
-            catalog_builder.add::<kamu_accounts_postgres::PostgresAccessTokenRepository>();
-
-            Ok(())
-        }
-        DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
-            database_common::MySqlPlugin::init_database_components(
-                catalog_builder,
-                db_configuration,
-            )
-            .int_err()?;
-
-            catalog_builder.add::<kamu_accounts_mysql::MySqlAccountRepository>();
-            catalog_builder.add::<kamu_accounts_mysql::MysqlAccessTokenRepository>();
-
-            // TODO: Task & Flow System MySQL versions
-
-            Ok(())
-        }
-        DatabaseProvider::Sqlite => {
-            database_common::SqlitePlugin::init_database_components(
-                catalog_builder,
-                db_configuration,
-            )
-            .int_err()?;
-
-            catalog_builder.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
-            catalog_builder.add::<kamu_accounts_sqlite::SqliteAccessTokenRepository>();
-
-            Ok(())
-        }
-    }
-}
-
-// Public only for tests
-pub fn configure_in_memory_components(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<kamu_accounts_inmem::AccountRepositoryInMemory>();
-    catalog_builder.add::<kamu_accounts_inmem::AccessTokenRepositoryInMemory>();
-    catalog_builder.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
-    catalog_builder.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
-    catalog_builder.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
-
-    database_common::NoOpDatabasePlugin::init_database_components(catalog_builder);
-}
-
 // Public only for tests
 pub fn configure_cli_catalog(
     base_catalog: &Catalog,
@@ -607,31 +569,6 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(FileUploadLimitConfig::new_in_mb(
         uploads_config.max_file_size_in_mb.unwrap(),
     ));
-}
-
-fn try_convert_into_db_configuration(config: DatabaseConfig) -> Option<DatabaseConfiguration> {
-    fn convert(c: RemoteDatabaseConfig, provider: DatabaseProvider) -> DatabaseConfiguration {
-        DatabaseConfiguration::new(
-            provider,
-            c.user,
-            c.password,
-            c.database_name,
-            c.host,
-            c.port,
-        )
-    }
-
-    match config {
-        DatabaseConfig::Sqlite(c) => {
-            let path = Path::new(&c.database_path);
-
-            Some(DatabaseConfiguration::sqlite_from(path))
-        }
-        DatabaseConfig::Postgres(config) => Some(convert(config, DatabaseProvider::Postgres)),
-        DatabaseConfig::MySql(config) => Some(convert(config, DatabaseProvider::MySql)),
-        DatabaseConfig::MariaDB(config) => Some(convert(config, DatabaseProvider::MariaDB)),
-        DatabaseConfig::InMemory => None,
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -831,3 +768,5 @@ struct Guards {
     appender: Option<tracing_appender::non_blocking::WorkerGuard>,
     perfetto: Option<tracing_perfetto::FlushGuard>,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

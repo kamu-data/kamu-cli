@@ -8,9 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
+use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
 
-use crate::{DatabaseConfiguration, DatabaseError, PostgresTransactionManager};
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,22 +23,26 @@ impl PostgresPlugin {
         Self {}
     }
 
-    pub fn init_database_components(
-        catalog_builder: &mut CatalogBuilder,
-        db_configuration: &DatabaseConfiguration,
-    ) -> Result<(), DatabaseError> {
-        let pg_pool = Self::open_pg_pool(db_configuration)?;
-
+    pub fn init_database_components(catalog_builder: &mut CatalogBuilder) {
         catalog_builder.add::<Self>();
-        catalog_builder.add_value(pg_pool);
         catalog_builder.add::<PostgresTransactionManager>();
-
-        Ok(())
+        catalog_builder.add::<PostgresPasswordRefresher>();
     }
 
-    fn open_pg_pool(db_configuration: &DatabaseConfiguration) -> Result<PgPool, DatabaseError> {
-        PgPool::connect_lazy(db_configuration.connection_string().as_str())
-            .map_err(DatabaseError::SqlxError)
+    pub fn catalog_with_connected_pool(
+        base_catalog: &Catalog,
+        connection_string: &Secret<String>,
+    ) -> Result<Catalog, DatabaseError> {
+        let pg_pool = Self::open_pg_pool(connection_string)?;
+
+        Ok(CatalogBuilder::new_chained(base_catalog)
+            .add_value(pg_pool)
+            .build())
+    }
+
+    #[tracing::instrument(level = "info", skip_all)]
+    fn open_pg_pool(connection_string: &Secret<String>) -> Result<PgPool, DatabaseError> {
+        PgPool::connect_lazy(connection_string.expose_secret()).map_err(DatabaseError::SqlxError)
     }
 }
 

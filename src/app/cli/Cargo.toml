@@ -155,6 +155,7 @@ indoc = "2"
 itertools = "0.11"
 libc = "0.2" # Signal names
 regex = "1"
+secrecy = "0.8"
 shlex = "1" # Parsing partial input for custom completions
 signal-hook = "0.3" # Signal handling
 tokio = { version = "1", default-features = false, features = ["io-util"] }

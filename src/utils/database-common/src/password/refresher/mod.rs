@@ -7,17 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod db_credentials;
-mod db_error;
-mod db_provider;
+mod db_password_refresher;
+mod mysql_password_refresher;
+mod postgres_password_refresher;
 
-mod password;
-mod plugins;
-mod transactions;
-
-pub use db_credentials::*;
-pub use db_error::*;
-pub use db_provider::*;
-pub use password::*;
-pub use plugins::*;
-pub use transactions::*;
+pub use db_password_refresher::*;
+pub use mysql_password_refresher::*;
+pub use postgres_password_refresher::*;
