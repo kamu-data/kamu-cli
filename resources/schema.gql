@@ -1495,10 +1495,18 @@ type RestProtocolDesc {
 	pushUrl: String!
 }
 
-enum RevokeResult {
-	SUCCESS
-	ALREADY_REVOKED
-	NOT_FOUND
+interface RevokeResult {
+	message: String!
+}
+
+type RevokeResultAlreadyRevoked implements RevokeResult {
+	tokenId: AccessTokenID!
+	message: String!
+}
+
+type RevokeResultSuccess implements RevokeResult {
+	tokenId: AccessTokenID!
+	message: String!
 }
 
 input ScheduleInput @oneOf {
