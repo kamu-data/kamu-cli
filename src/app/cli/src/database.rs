@@ -190,7 +190,7 @@ fn init_database_password_provider(b: &mut CatalogBuilder, raw_db_config: &Datab
                     DatabaseAwsIamTokenProvider::builder()
                         .with_db_user_name(Secret::new(aws_iam_config.user_name.clone())),
                 );
-                b.add::<DatabaseAwsIamTokenProvider>();
+                b.bind::<dyn DatabasePasswordProvider, DatabaseAwsIamTokenProvider>();
             }
         },
     }
