@@ -368,6 +368,8 @@ pub fn configure_base_catalog(
     b.add::<kamu_accounts_services::AccessTokenServiceImpl>();
     b.add::<PredefinedAccountsRegistrator>();
 
+    b.add::<kamu_dataset_env_vars_services::DatasetEnvVarServiceStaticImpl>();
+
     // Give both CLI and server access to stored repo access tokens
     b.add::<odf_server::AccessTokenRegistryService>();
     b.add::<odf_server::CLIAccessTokenStore>();

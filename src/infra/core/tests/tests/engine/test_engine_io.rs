@@ -19,6 +19,7 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_dataset_env_vars_services::DatasetEnvVarServiceStaticImpl;
 use opendatafabric::*;
 
 async fn test_engine_io_common(
@@ -41,6 +42,7 @@ async fn test_engine_io_common(
     let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
     let object_store_registry = Arc::new(ObjectStoreRegistryImpl::new(object_stores));
     let time_source = Arc::new(SystemTimeSourceDefault);
+    let dataset_env_var_static = Arc::new(DatasetEnvVarServiceStaticImpl::new());
 
     let ingest_svc = PollingIngestServiceImpl::new(
         dataset_repo.clone(),
@@ -50,6 +52,7 @@ async fn test_engine_io_common(
             None,
             None,
             None,
+            dataset_env_var_static,
             run_info_dir.clone(),
         )),
         engine_provisioner.clone(),
@@ -260,6 +263,7 @@ async fn test_engine_io_local_file_mount() {
         .add::<EventBus>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<kamu::DependencyGraphServiceInMemory>()
+        .add::<DatasetEnvVarServiceStaticImpl>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
             DatasetRepositoryLocalFs::builder()

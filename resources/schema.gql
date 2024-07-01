@@ -437,6 +437,10 @@ type Dataset {
 	"""
 	metadata: DatasetMetadata!
 	"""
+	Access to the environment variable of this dataset
+	"""
+	envVars: DatasetEnvVars!
+	"""
 	Access to the flow configurations of this dataset
 	"""
 	flows: DatasetFlows!
@@ -519,6 +523,16 @@ type DatasetEndpoints {
 	kafka: KafkaProtocolDesc!
 	websocket: WebSocketProtocolDesc!
 	odata: OdataProtocolDesc!
+}
+
+scalar DatasetEnvVarID
+
+type DatasetEnvVars {
+	listEnvVariables(page: Int, perPage: Int): ViewDatasetEnvVarConnection!
+}
+
+type DatasetEnvVarsMut {
+	saveEnvVariable(key: String!, value: String!, isSecret: Boolean!): SaveDatasetEnvVarResult!
 }
 
 type DatasetFlowConfigs {
@@ -658,6 +672,10 @@ type DatasetMut {
 	Access to the mutable flow configurations of this dataset
 	"""
 	flows: DatasetFlowsMut!
+	"""
+	Access to the mutable flow configurations of this dataset
+	"""
+	envVars: DatasetEnvVarsMut!
 	"""
 	Rename the dataset
 	"""
@@ -1509,6 +1527,21 @@ type RevokeResultSuccess implements RevokeResult {
 	message: String!
 }
 
+interface SaveDatasetEnvVarResult {
+	message: String!
+}
+
+type SaveDatasetEnvVarResultDuplicate implements SaveDatasetEnvVarResult {
+	datasetEnvVarKey: String!
+	datasetName: DatasetName!
+	message: String!
+}
+
+type SaveDatasetEnvVarResultSuccess implements SaveDatasetEnvVarResult {
+	envVar: ViewDatasetEnvVar!
+	message: String!
+}
+
 input ScheduleInput @oneOf {
 	timeDelta: TimeDeltaInput
 	cron5ComponentExpression: String
@@ -1840,6 +1873,46 @@ type ViewAccessToken {
 	Access token account owner
 	"""
 	account: Account!
+}
+
+type ViewDatasetEnvVar {
+	"""
+	Unique identifier of the dataset environment variable
+	"""
+	id: DatasetEnvVarID!
+	"""
+	Key of the dataset environment variable
+	"""
+	key: String!
+	"""
+	Value of dataset environment variable
+	"""
+	value: String!
+	"""
+	Date of the dataset environment variable creation
+	"""
+	createdAt: DateTime!
+	isSecret: Boolean!
+}
+
+type ViewDatasetEnvVarConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [ViewDatasetEnvVar!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [ViewDatasetEnvVarEdge!]!
+}
+
+type ViewDatasetEnvVarEdge {
+	node: ViewDatasetEnvVar!
 }
 
 type WebSocketProtocolDesc {

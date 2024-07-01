@@ -17,11 +17,13 @@ members = [
     # Domain
     "src/domain/opendatafabric",
     "src/domain/accounts/domain",
+    "src/domain/dataset-env-vars/domain",
     "src/domain/core",
     "src/domain/task-system/domain",
     "src/domain/flow-system/domain",
     # Domain service layer
     "src/domain/accounts/services",
+    "src/domain/dataset-env-vars/services",
     "src/domain/task-system/services",
     "src/domain/flow-system/services",
     # Infra
@@ -38,6 +40,10 @@ members = [
     "src/infra/accounts/mysql",
     "src/infra/accounts/postgres",
     "src/infra/accounts/sqlite",
+    ## DatasetEnvVars
+    "src/infra/dataset-env-vars/inmem",
+    "src/infra/dataset-env-vars/postgres",
+    "src/infra/dataset-env-vars/sqlite",
     ## Task System
     "src/infra/task-system/repo-tests",
     "src/infra/task-system/inmem",
@@ -88,9 +94,11 @@ kamu-core = { version = "0.189.1", path = "src/domain/core", default-features = 
 kamu-accounts = { version = "0.189.1", path = "src/domain/accounts/domain", default-features = false }
 kamu-task-system = { version = "0.189.1", path = "src/domain/task-system/domain", default-features = false }
 kamu-flow-system = { version = "0.189.1", path = "src/domain/flow-system/domain", default-features = false }
+kamu-dataset-env-vars = { version = "0.189.1", path = "src/domain/dataset-env-vars/domain", default-features = false }
 
 # Domain service layer
 kamu-accounts-services = { version = "0.189.1", path = "src/domain/accounts/services", default-features = false }
+kamu-dataset-env-vars-services = { version = "0.189.1", path = "src/domain/dataset-env-vars/services", default-features = false }
 kamu-task-system-services = { version = "0.189.1", path = "src/domain/task-system/services", default-features = false }
 kamu-flow-system-services = { version = "0.189.1", path = "src/domain/flow-system/services", default-features = false }
 
@@ -108,6 +116,11 @@ kamu-accounts-mysql = { version = "0.189.1", path = "src/infra/accounts/mysql", 
 kamu-accounts-postgres = { version = "0.189.1", path = "src/infra/accounts/postgres", default-features = false }
 kamu-accounts-sqlite = { version = "0.189.1", path = "src/infra/accounts/sqlite", default-features = false }
 kamu-accounts-repo-tests = { version = "0.189.1", path = "src/infra/accounts/repo-tests", default-features = false }
+## DatasetEnvVars
+kamu-dataset-env-vars-inmem = { version = "0.189.1", path = "src/infra/dataset-env-vars/inmem", default-features = false }
+kamu-dataset-env-vars-postgres = { version = "0.189.1", path = "src/infra/dataset-env-vars/postgres", default-features = false }
+kamu-dataset-env-vars-sqlite = { version = "0.189.1", path = "src/infra/dataset-env-vars/sqlite", default-features = false }
+kamu-dataset-env-vars-repo-tests = { version = "0.189.1", path = "src/infra/dataset-env-vars/repo-tests", default-features = false }
 ## Task System
 kamu-task-system-inmem = { version = "0.189.1", path = "src/infra/task-system/inmem", default-features = false }
 kamu-task-system-postgres = { version = "0.189.1", path = "src/infra/task-system/postgres", default-features = false }

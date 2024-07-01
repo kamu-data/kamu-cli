@@ -10,6 +10,8 @@
 mod dataset;
 mod dataset_data;
 mod dataset_endpoints;
+mod dataset_env_var;
+mod dataset_env_vars;
 mod dataset_flow_configs;
 mod dataset_flow_runs;
 mod dataset_flows;
@@ -20,6 +22,8 @@ mod metadata_chain;
 pub(crate) use dataset::*;
 pub(crate) use dataset_data::*;
 pub(crate) use dataset_endpoints::*;
+pub(crate) use dataset_env_var::*;
+pub(crate) use dataset_env_vars::*;
 pub(crate) use dataset_flow_configs::*;
 pub(crate) use dataset_flow_runs::*;
 pub(crate) use dataset_flows::*;

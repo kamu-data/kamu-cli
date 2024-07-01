@@ -17,6 +17,7 @@ use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_http::SmartTransferProtocolClientWs;
+use kamu_dataset_env_vars_services::DatasetEnvVarServiceStaticImpl;
 use opendatafabric::{
     AccountID,
     AccountName,
@@ -121,6 +122,8 @@ impl ClientSideHarness {
         b.add::<PullServiceImpl>();
 
         b.add::<PushServiceImpl>();
+
+        b.add::<DatasetEnvVarServiceStaticImpl>();
 
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());

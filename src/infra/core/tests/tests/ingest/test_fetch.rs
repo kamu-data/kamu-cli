@@ -17,6 +17,7 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::ingest::*;
 use kamu::utils::docker_images::BUSYBOX;
+use kamu_dataset_env_vars_services::DatasetEnvVarServiceStaticImpl;
 use opendatafabric::*;
 use url::Url;
 
@@ -1231,6 +1232,7 @@ impl FetchTestHarness {
             None,
             None,
             None,
+            Arc::new(DatasetEnvVarServiceStaticImpl::new()),
             Arc::new(RunInfoDir::new(temp_dir.path().join("run"))),
         );
 
