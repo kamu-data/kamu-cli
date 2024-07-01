@@ -8,13 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use secrecy::Secret;
+
+use crate::DatabaseCredentials;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DatabasePasswordProvider: Send + Sync {
-    async fn provide_password(&self) -> Result<Option<Secret<String>>, InternalError>;
+    async fn provide_credentials(&self) -> Result<Option<DatabaseCredentials>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

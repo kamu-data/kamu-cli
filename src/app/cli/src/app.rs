@@ -33,7 +33,7 @@ use crate::{
     connect_database_initially,
     odf_server,
     spawn_password_refreshing_job,
-    try_build_db_credentials,
+    try_build_db_connection_settings,
     GcService,
     WorkspaceLayout,
     WorkspaceService,
@@ -88,7 +88,10 @@ pub async fn run(
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
-    let maybe_db_credentials = config.database.clone().and_then(try_build_db_credentials);
+    let maybe_db_connection_settings = config
+        .database
+        .clone()
+        .and_then(try_build_db_connection_settings);
 
     // Configure application
     let (guards, base_catalog, cli_catalog, output_config) = {
@@ -108,11 +111,11 @@ pub async fn run(
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
 
-        if let Some(db_credentials) = maybe_db_credentials.as_ref() {
+        if let Some(db_connection_settings) = maybe_db_connection_settings.as_ref() {
             configure_database_components(
                 &mut base_catalog_builder,
                 config.database.as_ref().unwrap(),
-                db_credentials.clone(),
+                db_connection_settings.clone(),
             );
         } else {
             configure_in_memory_components(&mut base_catalog_builder);
@@ -186,7 +189,7 @@ pub async fn run(
             Err(e) => Err(e),
         }
     };
-    let is_database_used = maybe_db_credentials.is_some();
+    let is_database_used = maybe_db_connection_settings.is_some();
     let command_result = if is_database_used && need_to_wrap_with_transaction {
         let transaction_runner = DatabaseTransactionRunner::new(cli_catalog);
 

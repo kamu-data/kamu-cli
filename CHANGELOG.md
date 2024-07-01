@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.189.2] - 2024-07-01
+### Fixed
+- AWS secret stores both user name and password, so database username should be a secret too.
+
 ## [0.189.1] - 2024-06-28
 ### Fixed
 - Modify revoke access token GQL response according to design
