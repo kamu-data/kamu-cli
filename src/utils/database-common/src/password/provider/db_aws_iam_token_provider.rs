@@ -13,22 +13,29 @@ use chrono::Utc;
 use dill::*;
 use hmac::{Hmac, Mac};
 use internal_error::{InternalError, ResultIntoInternal};
-use secrecy::Secret;
+use secrecy::{ExposeSecret, Secret};
 use sha2::{Digest, Sha256};
 
-use crate::{DatabaseCredentials, DatabasePasswordProvider};
+use crate::{DatabaseConnectionSettings, DatabaseCredentials, DatabasePasswordProvider};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn DatabasePasswordProvider)]
 pub struct DatabaseAwsIamTokenProvider {
-    db_credentials: DatabaseCredentials,
+    db_user_name: Secret<String>,
+    db_connection_settings: DatabaseConnectionSettings,
 }
 
 impl DatabaseAwsIamTokenProvider {
-    pub fn new(db_credentials: DatabaseCredentials) -> Self {
-        Self { db_credentials }
+    pub fn new(
+        db_user_name: Secret<String>,
+        db_connection_settings: DatabaseConnectionSettings,
+    ) -> Self {
+        Self {
+            db_user_name,
+            db_connection_settings,
+        }
     }
 
     fn get_signature_key(
@@ -54,7 +61,7 @@ impl DatabaseAwsIamTokenProvider {
 
 #[async_trait::async_trait]
 impl DatabasePasswordProvider for DatabaseAwsIamTokenProvider {
-    async fn provide_password(&self) -> Result<Option<Secret<String>>, InternalError> {
+    async fn provide_credentials(&self) -> Result<Option<DatabaseCredentials>, InternalError> {
         let region_provider = RegionProviderChain::default_provider().or_else("unspefified");
         let config = aws_config::from_env().region(region_provider).load().await;
 
@@ -69,13 +76,13 @@ impl DatabasePasswordProvider for DatabaseAwsIamTokenProvider {
 
         let endpoint = format!(
             "{}:{}/{}",
-            self.db_credentials.host,
-            self.db_credentials.port(),
-            self.db_credentials.user
+            self.db_connection_settings.host,
+            self.db_connection_settings.port(),
+            self.db_user_name.expose_secret(),
         );
         let canonical_request = format!(
             "GET\n{}\n\nhost:{}\n\nhost\n",
-            endpoint, self.db_credentials.host,
+            endpoint, self.db_connection_settings.host,
         );
 
         let date = Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
@@ -100,7 +107,10 @@ impl DatabasePasswordProvider for DatabaseAwsIamTokenProvider {
             "https://{endpoint}?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential={access_key}%2F{credential_scope}/rds-db/aws4_request&X-Amz-Date={date}&X-Amz-SignedHeaders=host&X-Amz-Signature={signature}&X-Amz-Security-Token={session_token}",
         );
 
-        Ok(Some(Secret::new(token)))
+        Ok(Some(DatabaseCredentials {
+            user_name: self.db_user_name.clone(),
+            password: Secret::new(token),
+        }))
     }
 }
 

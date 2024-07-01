@@ -14,14 +14,14 @@ use dill::{Catalog, CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
 use secrecy::Secret;
 
-use crate::config::{DatabaseConfig, DatabasePasswordSourceConfig, RemoteDatabaseConfig};
+use crate::config::{DatabaseConfig, DatabaseCredentialSourceConfig, RemoteDatabaseConfig};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn configure_database_components(
     b: &mut CatalogBuilder,
     raw_db_config: &DatabaseConfig,
-    db_credentials: DatabaseCredentials,
+    db_connection_settings: DatabaseConnectionSettings,
 ) {
     // TODO: Remove after adding implementation of FlowEventStore for databases
     b.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
@@ -31,7 +31,7 @@ pub fn configure_database_components(
     b.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
-    match db_credentials.provider {
+    match db_connection_settings.provider {
         DatabaseProvider::Postgres => {
             database_common::PostgresPlugin::init_database_components(b);
 
@@ -54,7 +54,7 @@ pub fn configure_database_components(
         }
     }
 
-    b.add_value(db_credentials);
+    b.add_value(db_connection_settings);
 
     init_database_password_provider(b, raw_db_config);
 }
@@ -74,15 +74,17 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn try_build_db_credentials(raw_db_config: DatabaseConfig) -> Option<DatabaseCredentials> {
-    fn convert(c: RemoteDatabaseConfig, provider: DatabaseProvider) -> DatabaseCredentials {
-        DatabaseCredentials::new(provider, c.user, c.database_name, c.host, c.port)
+pub fn try_build_db_connection_settings(
+    raw_db_config: DatabaseConfig,
+) -> Option<DatabaseConnectionSettings> {
+    fn convert(c: RemoteDatabaseConfig, provider: DatabaseProvider) -> DatabaseConnectionSettings {
+        DatabaseConnectionSettings::new(provider, c.database_name, c.host, c.port)
     }
 
     match raw_db_config {
         DatabaseConfig::Sqlite(c) => {
             let path = Path::new(&c.database_path);
-            Some(DatabaseCredentials::sqlite_from(path))
+            Some(DatabaseConnectionSettings::sqlite_from(path))
         }
         DatabaseConfig::Postgres(config) => Some(convert(config, DatabaseProvider::Postgres)),
         DatabaseConfig::MySql(config) => Some(convert(config, DatabaseProvider::MySql)),
@@ -94,15 +96,17 @@ pub fn try_build_db_credentials(raw_db_config: DatabaseConfig) -> Option<Databas
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn connect_database_initially(base_catalog: &Catalog) -> Result<Catalog, InternalError> {
-    let db_credentials = base_catalog.get_one::<DatabaseCredentials>().unwrap();
+    let db_connection_settings = base_catalog
+        .get_one::<DatabaseConnectionSettings>()
+        .unwrap();
     let db_password_provider = base_catalog
         .get_one::<dyn DatabasePasswordProvider>()
         .unwrap();
 
-    let db_password = db_password_provider.provide_password().await?;
-    let db_connection_string = db_credentials.connection_string(db_password);
+    let db_password = db_password_provider.provide_credentials().await?;
+    let db_connection_string = db_connection_settings.connection_string(db_password);
 
-    match db_credentials.provider {
+    match db_connection_settings.provider {
         DatabaseProvider::Postgres => database_common::PostgresPlugin::catalog_with_connected_pool(
             base_catalog,
             &db_connection_string,
@@ -126,15 +130,15 @@ pub async fn connect_database_initially(base_catalog: &Catalog) -> Result<Catalo
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn spawn_password_refreshing_job(db_config: &DatabaseConfig, catalog: &Catalog) {
-    let password_policy_config = match db_config {
+    let credentials_policy_config = match db_config {
         DatabaseConfig::Sqlite(_) | DatabaseConfig::InMemory => None,
         DatabaseConfig::Postgres(config)
         | DatabaseConfig::MySql(config)
-        | DatabaseConfig::MariaDB(config) => Some(config.password_policy.clone()),
+        | DatabaseConfig::MariaDB(config) => Some(config.credentials_policy.clone()),
     };
 
     if let Some(rotation_frequency_in_minutes) =
-        password_policy_config.and_then(|config| config.rotation_frequency_in_minutes)
+        credentials_policy_config.and_then(|config| config.rotation_frequency_in_minutes)
     {
         let awaiting_duration = std::time::Duration::from_mins(rotation_frequency_in_minutes);
 
@@ -165,22 +169,27 @@ fn init_database_password_provider(b: &mut CatalogBuilder, raw_db_config: &Datab
         }
         DatabaseConfig::MySql(config)
         | DatabaseConfig::Postgres(config)
-        | DatabaseConfig::MariaDB(config) => match &config.password_policy.source {
-            DatabasePasswordSourceConfig::RawPassword(raw_password_config) => {
+        | DatabaseConfig::MariaDB(config) => match &config.credentials_policy.source {
+            DatabaseCredentialSourceConfig::RawPassword(raw_password_config) => {
                 b.add_builder(
                     DatabaseFixedPasswordProvider::builder()
+                        .with_db_user_name(Secret::new(raw_password_config.user_name.clone()))
                         .with_fixed_password(Secret::new(raw_password_config.raw_password.clone())),
                 );
                 b.bind::<dyn DatabasePasswordProvider, DatabaseFixedPasswordProvider>();
             }
-            DatabasePasswordSourceConfig::AwsSecret(aws_secret_config) => {
+            DatabaseCredentialSourceConfig::AwsSecret(aws_secret_config) => {
                 b.add_builder(
                     DatabaseAwsSecretPasswordProvider::builder()
                         .with_secret_name(aws_secret_config.secret_name.clone()),
                 );
                 b.bind::<dyn DatabasePasswordProvider, DatabaseAwsSecretPasswordProvider>();
             }
-            DatabasePasswordSourceConfig::AwsIamToken => {
+            DatabaseCredentialSourceConfig::AwsIamToken(aws_iam_config) => {
+                b.add_builder(
+                    DatabaseAwsIamTokenProvider::builder()
+                        .with_db_user_name(Secret::new(aws_iam_config.user_name.clone())),
+                );
                 b.add::<DatabaseAwsIamTokenProvider>();
             }
         },

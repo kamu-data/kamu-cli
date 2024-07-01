@@ -9,9 +9,8 @@
 
 use dill::*;
 use internal_error::InternalError;
-use secrecy::Secret;
 
-use crate::DatabasePasswordProvider;
+use crate::{DatabaseCredentials, DatabasePasswordProvider};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +22,7 @@ pub struct DatabaseNoPasswordProvider {}
 
 #[async_trait::async_trait]
 impl DatabasePasswordProvider for DatabaseNoPasswordProvider {
-    async fn provide_password(&self) -> Result<Option<Secret<String>>, InternalError> {
+    async fn provide_credentials(&self) -> Result<Option<DatabaseCredentials>, InternalError> {
         Ok(None)
     }
 }

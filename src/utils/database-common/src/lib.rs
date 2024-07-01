@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod db_connection_settings;
 mod db_credentials;
 mod db_error;
 mod db_provider;
@@ -15,6 +16,7 @@ mod password;
 mod plugins;
 mod transactions;
 
+pub use db_connection_settings::*;
 pub use db_credentials::*;
 pub use db_error::*;
 pub use db_provider::*;

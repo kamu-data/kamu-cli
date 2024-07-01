@@ -12,9 +12,10 @@ use aws_sdk_secretsmanager::Client;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use secrecy::Secret;
+use serde::Deserialize;
 use thiserror::Error;
 
-use crate::DatabasePasswordProvider;
+use crate::{DatabaseCredentials, DatabasePasswordProvider};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,7 +35,7 @@ impl DatabaseAwsSecretPasswordProvider {
 
 #[async_trait::async_trait]
 impl DatabasePasswordProvider for DatabaseAwsSecretPasswordProvider {
-    async fn provide_password(&self) -> Result<Option<Secret<String>>, InternalError> {
+    async fn provide_credentials(&self) -> Result<Option<DatabaseCredentials>, InternalError> {
         let region_provider = RegionProviderChain::default_provider().or_else("unspecified");
         let config = aws_config::from_env().region(region_provider).load().await;
         let client = Client::new(&config);
@@ -47,7 +48,14 @@ impl DatabasePasswordProvider for DatabaseAwsSecretPasswordProvider {
             .int_err()?;
 
         match response.secret_string() {
-            Some(secret_string) => Ok(Some(Secret::new(secret_string.to_string()))),
+            Some(secret_string) => {
+                let secret_value =
+                    serde_json::from_str::<AwsRdsSecretValue>(secret_string).int_err()?;
+                Ok(Some(DatabaseCredentials {
+                    user_name: Secret::new(secret_value.username),
+                    password: Secret::new(secret_value.password),
+                }))
+            }
             None => Err(AwsSecretNotFoundError {
                 secret_name: self.secret_name.clone(),
             }
@@ -62,6 +70,16 @@ impl DatabasePasswordProvider for DatabaseAwsSecretPasswordProvider {
 #[error("AWS secret {secret_name} not found")]
 struct AwsSecretNotFoundError {
     pub secret_name: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// This matches JSON structure stored in AWS Secrets Manager for secrets
+/// generated via auto-managed database passwords
+#[derive(Debug, Deserialize)]
+struct AwsRdsSecretValue {
+    pub username: String,
+    pub password: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

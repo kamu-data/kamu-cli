@@ -82,10 +82,10 @@ impl KamuCliApiServerHarness {
                     database:
                         provider: postgres
                         host: {host}
-                        user: {user}
-                        passwordPolicy:
+                        credentialsPolicy:
                             source:
                                 kind: rawPassword
+                                userName: {user}
                                 rawPassword: {password}
                         databaseName: {database}
                 "#
@@ -110,10 +110,10 @@ impl KamuCliApiServerHarness {
                     database:
                         provider: mySql
                         host: {host}
-                        user: {user}
-                        passwordPolicy:
+                        credentialsPolicy:
                             source:
                                 kind: rawPassword
+                                userName: {user}
                                 rawPassword: {password}
                         databaseName: {database}
                 "#

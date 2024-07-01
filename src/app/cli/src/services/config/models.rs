@@ -525,10 +525,10 @@ pub enum DatabaseConfig {
 impl DatabaseConfig {
     pub fn sample() -> Self {
         Self::Postgres(RemoteDatabaseConfig {
-            user: String::from("root"),
-            password_policy: DatabasePasswordPolicyConfig {
-                source: DatabasePasswordSourceConfig::RawPassword(
+            credentials_policy: DatabaseCredentialsPolicyConfig {
+                source: DatabaseCredentialSourceConfig::RawPassword(
                     RawDatabasePasswordPolicyConfig {
+                        user_name: String::from("root"),
                         raw_password: String::from("p455w0rd"),
                     },
                 ),
@@ -553,8 +553,7 @@ pub struct SqliteDatabaseConfig {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteDatabaseConfig {
-    pub user: String,
-    pub password_policy: DatabasePasswordPolicyConfig,
+    pub credentials_policy: DatabaseCredentialsPolicyConfig,
     pub database_name: String,
     pub host: String,
     pub port: Option<u32>,
@@ -564,8 +563,8 @@ pub struct RemoteDatabaseConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
-pub struct DatabasePasswordPolicyConfig {
-    pub source: DatabasePasswordSourceConfig,
+pub struct DatabaseCredentialsPolicyConfig {
+    pub source: DatabaseCredentialSourceConfig,
     pub rotation_frequency_in_minutes: Option<u64>,
 }
 
@@ -574,10 +573,10 @@ pub struct DatabasePasswordPolicyConfig {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "kind")]
-pub enum DatabasePasswordSourceConfig {
+pub enum DatabaseCredentialSourceConfig {
     RawPassword(RawDatabasePasswordPolicyConfig),
     AwsSecret(AwsSecretDatabasePasswordPolicyConfig),
-    AwsIamToken,
+    AwsIamToken(AwsIamTokenPasswordPolicyConfig),
 }
 
 #[skip_serializing_none]
@@ -585,6 +584,7 @@ pub enum DatabasePasswordSourceConfig {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RawDatabasePasswordPolicyConfig {
+    pub user_name: String,
     pub raw_password: String,
 }
 
@@ -594,6 +594,14 @@ pub struct RawDatabasePasswordPolicyConfig {
 #[serde(rename_all = "camelCase")]
 pub struct AwsSecretDatabasePasswordPolicyConfig {
     pub secret_name: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct AwsIamTokenPasswordPolicyConfig {
+    pub user_name: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
