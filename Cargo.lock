@@ -4819,7 +4819,6 @@ dependencies = [
  "kamu-accounts",
  "kamu-accounts-repo-tests",
  "opendatafabric",
- "sqlx",
  "test-log",
  "thiserror",
  "tokio",
