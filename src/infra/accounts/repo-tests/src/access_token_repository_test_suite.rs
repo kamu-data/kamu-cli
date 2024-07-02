@@ -102,6 +102,13 @@ pub async fn test_insert_and_locate_multiple_access_tokens(catalog: &Catalog) {
 
     db_access_tokens.sort_by(|a, b| a.created_at.cmp(&b.created_at));
     assert_eq!(db_access_tokens, vec![foo_access_token, bar_access_token]);
+
+    let db_access_tokens_count = access_token_repo
+        .get_access_tokens_count_by_account_id(&account.id)
+        .await
+        .unwrap();
+
+    assert_eq!(db_access_tokens_count, 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

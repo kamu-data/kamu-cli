@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT\n                    count(*)\n                FROM access_tokens\n                WHERE account_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count(*)",
+        "ordinal": 0,
+        "type_info": "Int"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0369b12ee46e3144221bc74c96c29271a27b87242f49715b3265339ef08d13df"
+}
