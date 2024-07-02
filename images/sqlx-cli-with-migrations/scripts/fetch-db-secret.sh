@@ -19,5 +19,3 @@ USERNAME=$(echo $SECRET_STRING | jq -r .username)
 PASSWORD=$(echo $SECRET_STRING | jq -r .password)
 
 export DB_CONNECTION_STRING="${DB_PROVIDER}://${USERNAME}:${PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
-
-exec "$@"
