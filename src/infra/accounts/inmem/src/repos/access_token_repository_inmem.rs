@@ -115,6 +115,18 @@ impl AccessTokenRepository for AccessTokenRepositoryInMemory {
         }
     }
 
+    async fn get_access_tokens_count_by_account_id(
+        &self,
+        account_id: &AccountID,
+    ) -> Result<usize, GetAccessTokenError> {
+        let guard = self.state.lock().unwrap();
+
+        if let Some(access_token_ids) = guard.token_hashes_by_account_id.get(account_id) {
+            return Ok(access_token_ids.len());
+        }
+        Ok(0)
+    }
+
     async fn get_access_tokens_by_account_id(
         &self,
         account_id: &AccountID,

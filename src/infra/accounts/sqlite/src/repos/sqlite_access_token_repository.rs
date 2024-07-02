@@ -132,6 +132,35 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         }
     }
 
+    async fn get_access_tokens_count_by_account_id(
+        &self,
+        account_id: &AccountID,
+    ) -> Result<usize, GetAccessTokenError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(GetAccessTokenError::Internal)?;
+        let account_id_string = account_id.to_string();
+
+        let access_token_count = sqlx::query_scalar!(
+            r#"
+                SELECT
+                    count(*)
+                FROM access_tokens
+                WHERE account_id = $1
+            "#,
+            account_id_string,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()
+        .map_err(GetAccessTokenError::Internal)?;
+
+        Ok(usize::try_from(access_token_count).unwrap_or(0))
+    }
+
     async fn get_access_tokens_by_account_id(
         &self,
         account_id: &AccountID,

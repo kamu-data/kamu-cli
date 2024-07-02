@@ -43,7 +43,12 @@ pub trait AccessTokenService: Sync + Send {
         &self,
         account_id: &AccountID,
         pagination: &AccessTokenPaginationOpts,
-    ) -> Result<Vec<AccessToken>, GetAccessTokenError>;
+    ) -> Result<AccessTokenListing, GetAccessTokenError>;
 
     async fn revoke_access_token(&self, token_id: &Uuid) -> Result<(), RevokeTokenError>;
+}
+
+pub struct AccessTokenListing {
+    pub list: Vec<AccessToken>,
+    pub total_count: usize,
 }
