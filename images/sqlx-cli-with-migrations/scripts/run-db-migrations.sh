@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 if [ -z "$DB_CONNECTION_STRING" ]; then
   echo "Error: DB_CONNECTION_STRING is not defined."
   exit 1

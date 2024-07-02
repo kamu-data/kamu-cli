@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 if [ $# -ne 6 ]; then
     echo "Usage: $0 <secret-name> <region> <db-provider> <db-host> <db-port> <db-name>"
     exit 1
