@@ -101,6 +101,12 @@ impl AccessTokenService for AccessTokenServiceImpl {
             .access_token_repository
             .get_access_tokens_count_by_account_id(account_id)
             .await?;
+        if total_count == 0 {
+            return Ok(AccessTokenListing {
+                total_count,
+                list: vec![],
+            });
+        }
 
         let access_token_list = self
             .access_token_repository
