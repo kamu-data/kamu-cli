@@ -12,6 +12,7 @@ use std::sync::Arc;
 use dill::*;
 use kamu_accounts::{
     AccessToken,
+    AccessTokenListing,
     AccessTokenPaginationOpts,
     AccessTokenRepository,
     AccessTokenService,
@@ -95,10 +96,26 @@ impl AccessTokenService for AccessTokenServiceImpl {
         &self,
         account_id: &AccountID,
         pagination: &AccessTokenPaginationOpts,
-    ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
-        self.access_token_repository
+    ) -> Result<AccessTokenListing, GetAccessTokenError> {
+        let total_count = self
+            .access_token_repository
+            .get_access_tokens_count_by_account_id(account_id)
+            .await?;
+        if total_count == 0 {
+            return Ok(AccessTokenListing {
+                total_count,
+                list: vec![],
+            });
+        }
+
+        let access_token_list = self
+            .access_token_repository
             .get_access_tokens_by_account_id(account_id, pagination)
-            .await
+            .await?;
+        Ok(AccessTokenListing {
+            total_count,
+            list: access_token_list,
+        })
     }
 
     async fn revoke_access_token(&self, token_id: &Uuid) -> Result<(), RevokeTokenError> {
