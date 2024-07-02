@@ -9,7 +9,7 @@ LABEL org.opencontainers.image.source https://github.com/kamu-data/kamu-cli
 RUN apk --no-cache add \
     bash \
     curl \
-    jq && \
+    jq \
     aws-cli
 
 COPY scripts /scripts
