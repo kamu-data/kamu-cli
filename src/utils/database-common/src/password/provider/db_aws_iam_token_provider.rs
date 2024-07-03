@@ -7,14 +7,25 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::time::Duration;
+
 use aws_config::meta::region::RegionProviderChain;
 use aws_credential_types::provider::ProvideCredentials;
-use chrono::Utc;
+use aws_runtime::auth::sigv4::SigV4Signer;
+use aws_runtime::auth::{HttpSignatureType, SigV4OperationSigningConfig, SigningOptions};
+use aws_smithy_async::time::SystemTimeSource;
+use aws_smithy_runtime_api::client::auth::{AuthSchemeEndpointConfig, Sign};
+use aws_smithy_runtime_api::client::identity::Identity;
+use aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder;
+use aws_smithy_types::body::SdkBody;
+use aws_smithy_types::config_bag::{ConfigBag, Layer};
+use aws_types::region::SigningRegion;
+use aws_types::sdk_config::SharedTimeSource;
+use aws_types::SigningName;
 use dill::*;
-use hmac::{Hmac, Mac};
-use internal_error::{InternalError, ResultIntoInternal};
+use http::Request;
+use internal_error::InternalError;
 use secrecy::{ExposeSecret, Secret};
-use sha2::{Digest, Sha256};
 
 use crate::{DatabaseConnectionSettings, DatabaseCredentials, DatabasePasswordProvider};
 
@@ -37,24 +48,6 @@ impl DatabaseAwsIamTokenProvider {
             db_connection_settings,
         }
     }
-
-    fn get_signature_key(
-        key: &str,
-        date_stamp: &str,
-        region_name: &str,
-        service_name: &str,
-    ) -> Vec<u8> {
-        let k_date = Self::hmac_sha256(format!("AWS4{key}").as_bytes(), date_stamp.as_bytes());
-        let k_region = Self::hmac_sha256(&k_date, region_name.as_bytes());
-        let k_service = Self::hmac_sha256(&k_region, service_name.as_bytes());
-        Self::hmac_sha256(&k_service, b"aws4_request")
-    }
-
-    fn hmac_sha256(key: &[u8], msg: &[u8]) -> Vec<u8> {
-        let mut mac = Hmac::<Sha256>::new_from_slice(key).unwrap();
-        mac.update(msg);
-        mac.finalize().into_bytes().to_vec()
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,52 +55,64 @@ impl DatabaseAwsIamTokenProvider {
 #[async_trait::async_trait]
 impl DatabasePasswordProvider for DatabaseAwsIamTokenProvider {
     async fn provide_credentials(&self) -> Result<Option<DatabaseCredentials>, InternalError> {
+        // Inspired by https://gist.github.com/ysaito1001/6619bf34f2c53d81d37cdd58515092ce
         let region_provider = RegionProviderChain::default_provider().or_else("unspefified");
         let config = aws_config::from_env().region(region_provider).load().await;
 
-        let creds = config
+        let credentials = config
             .credentials_provider()
             .unwrap()
             .provide_credentials()
             .await
             .unwrap();
 
-        let access_key = creds.access_key_id();
-        let secret_key = creds.secret_access_key();
-        let session_token = creds.session_token().unwrap_or_default();
+        let region = config.region().unwrap();
 
-        let endpoint = format!(
-            "{}:{}/{}",
-            self.db_connection_settings.host,
-            self.db_connection_settings.port(),
-            self.db_user_name.expose_secret(),
-        );
-        let canonical_request = format!(
-            "GET\n{}\n\nhost:{}\n\nhost\n",
-            endpoint, self.db_connection_settings.host,
+        let mut request = Request::builder()
+            .uri(format!(
+                "http://{db_hostname}:{port}/?Action=connect&DBUser={db_user}",
+                db_hostname = self.db_connection_settings.host,
+                port = self.db_connection_settings.port(),
+                db_user = self.db_user_name.expose_secret()
+            ))
+            .body(SdkBody::empty())
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        let identity = Identity::new(credentials, None);
+
+        let mut signing_options = SigningOptions::default();
+        signing_options.signature_type = HttpSignatureType::HttpRequestQueryParams;
+        signing_options.expires_in = Some(Duration::from_secs(15 * 60));
+        let signing_config = SigV4OperationSigningConfig {
+            region: Some(SigningRegion::from(region.clone())),
+            name: Some(SigningName::from_static("rds-db")),
+            signing_options,
+            ..Default::default()
+        };
+
+        let time_source = SharedTimeSource::new(SystemTimeSource::new());
+        let mut rc_builder = RuntimeComponentsBuilder::for_tests();
+        rc_builder.set_time_source(Some(time_source));
+        let runtime_components = rc_builder.build().unwrap();
+
+        let mut layer = Layer::new("SigningConfig");
+        layer.store_put(signing_config);
+        let config_bag = ConfigBag::of_layers(vec![layer]);
+
+        let signer = SigV4Signer::new();
+        let _ = signer.sign_http_request(
+            &mut request,
+            &identity,
+            AuthSchemeEndpointConfig::empty(),
+            &runtime_components,
+            &config_bag,
         );
 
-        let date = Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
-        let credential_scope = format!("{}/{}/rds-db/aws4_request", date, "us-west-2");
-        let string_to_sign = format!(
-            "AWS4-HMAC-SHA256\n{}\n{}\n{}",
-            date,
-            credential_scope,
-            hex::encode(Sha256::digest(canonical_request.as_bytes()))
-        );
-
-        let signing_key = Self::get_signature_key(secret_key, &date, "us-west-2", "rds-db");
-        let signature = hex::encode(
-            Hmac::<Sha256>::new_from_slice(&signing_key)
-                .int_err()?
-                .chain_update(string_to_sign.as_bytes())
-                .finalize()
-                .into_bytes(),
-        );
-
-        let token = format!(
-            "https://{endpoint}?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential={access_key}%2F{credential_scope}/rds-db/aws4_request&X-Amz-Date={date}&X-Amz-SignedHeaders=host&X-Amz-Signature={signature}&X-Amz-Security-Token={session_token}",
-        );
+        let mut uri = request.uri().to_string();
+        assert!(uri.starts_with("http://"));
+        let token = uri.split_off("http://".len());
 
         Ok(Some(DatabaseCredentials {
             user_name: self.db_user_name.clone(),

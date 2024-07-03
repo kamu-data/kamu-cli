@@ -9,9 +9,7 @@
 
 use std::path::Path;
 
-use secrecy::{ExposeSecret, Secret};
-
-use crate::{DatabaseCredentials, DatabaseProvider};
+use crate::DatabaseProvider;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +18,7 @@ pub struct DatabaseConnectionSettings {
     pub provider: DatabaseProvider,
     pub database_name: String,
     pub host: String,
-    pub port: Option<u32>,
+    pub port: Option<u16>,
 }
 
 impl DatabaseConnectionSettings {
@@ -28,7 +26,7 @@ impl DatabaseConnectionSettings {
         provider: DatabaseProvider,
         database_name: String,
         host: String,
-        port: Option<u32>,
+        port: Option<u16>,
     ) -> Self {
         Self {
             provider,
@@ -38,59 +36,15 @@ impl DatabaseConnectionSettings {
         }
     }
 
-    pub fn port(&self) -> u32 {
+    pub fn port(&self) -> u16 {
         self.port.unwrap_or_else(|| self.provider.default_port())
-    }
-
-    pub fn connection_string(&self, credentials: Option<DatabaseCredentials>) -> Secret<String> {
-        if let DatabaseProvider::Sqlite = self.provider {
-            Secret::new(format!("{}://{}", self.provider, self.database_name))
-        } else if let Some(credentials) = credentials {
-            Secret::new(format!(
-                "{}://{}:{}@{}:{}/{}",
-                self.provider,
-                credentials.user_name.expose_secret(),
-                credentials.password.expose_secret(),
-                self.host,
-                self.port(),
-                self.database_name
-            ))
-        } else {
-            Secret::new(format!(
-                "{}://{}:{}/{}",
-                self.provider,
-                self.host,
-                self.port(),
-                self.database_name
-            ))
-        }
-    }
-
-    pub fn connection_string_no_db(
-        &self,
-        credentials: Option<DatabaseCredentials>,
-    ) -> Secret<String> {
-        if let DatabaseProvider::Sqlite = self.provider {
-            panic!("Sqlite does not support connection strings without DB")
-        } else if let Some(credentials) = credentials {
-            Secret::new(format!(
-                "{}://{}:{}@{}:{}",
-                self.provider,
-                credentials.user_name.expose_secret(),
-                credentials.password.expose_secret(),
-                self.host,
-                self.port(),
-            ))
-        } else {
-            Secret::new(format!("{}://{}:{}", self.provider, self.host, self.port(),))
-        }
     }
 
     pub fn sqlite_from(path: &Path) -> Self {
         Self {
             provider: DatabaseProvider::Sqlite,
-            database_name: String::from(path.to_str().unwrap()),
-            host: String::new(),
+            database_name: String::new(),
+            host: String::from(path.to_str().unwrap()),
             port: None,
         }
     }
