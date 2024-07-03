@@ -266,7 +266,39 @@ async fn test_data_query_handler_full() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_data_query_handler_invalid_sql() {
+async fn test_data_query_handler_error_sql_unparsable() {
+    let harness = Harness::new().await;
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+
+        let query_url = format!("{}query", harness.root_url);
+        let res = cl
+            .post(&query_url)
+            .json(&json!({
+                "query": "select ???"
+            }))
+            .send()
+            .await
+            .unwrap();
+
+        let status = res.status();
+        let body = res.text().await.unwrap();
+        assert_eq!(status, 400, "Unexpected response: {status} {body}");
+        assert_eq!(
+            body,
+            "sql parser error: Expected end of statement, found: ?"
+        );
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_query_handler_error_sql_missing_function() {
     let harness = Harness::new().await;
 
     let client = async move {

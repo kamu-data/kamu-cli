@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Fixed
+- GQL API regression where unparsable SQL was ending up in internal error
+- REST API `/query` endpoint will return `400 Bad Request` in case of unparsable SQL
+
 ## [0.189.4] - 2024-07-02
 ### Fixed
 - GQL access token list pagination
