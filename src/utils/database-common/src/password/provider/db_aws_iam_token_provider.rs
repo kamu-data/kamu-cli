@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use aws_config::meta::region::RegionProviderChain;
-use aws_sdk_sts::Client as StsClient;
+use aws_credential_types::provider::ProvideCredentials;
 use chrono::Utc;
 use dill::*;
 use hmac::{Hmac, Mac};
@@ -65,14 +65,16 @@ impl DatabasePasswordProvider for DatabaseAwsIamTokenProvider {
         let region_provider = RegionProviderChain::default_provider().or_else("unspefified");
         let config = aws_config::from_env().region(region_provider).load().await;
 
-        let sts_client = StsClient::new(&config);
-        let session_token_output = sts_client.get_session_token().send().await.int_err()?;
+        let creds = config
+            .credentials_provider()
+            .unwrap()
+            .provide_credentials()
+            .await
+            .unwrap();
 
-        let credentials = session_token_output.credentials().unwrap();
-
-        let access_key = credentials.access_key_id();
-        let secret_key = credentials.secret_access_key();
-        let session_token = credentials.session_token();
+        let access_key = creds.access_key_id();
+        let secret_key = creds.secret_access_key();
+        let session_token = creds.session_token().unwrap_or_default();
 
         let endpoint = format!(
             "{}:{}/{}",

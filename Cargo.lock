@@ -1262,7 +1262,7 @@ dependencies = [
  "aws-runtime",
  "aws-sdk-sso",
  "aws-sdk-ssooidc",
- "aws-sdk-sts 0.36.0",
+ "aws-sdk-sts",
  "aws-smithy-async",
  "aws-smithy-http",
  "aws-smithy-json",
@@ -1425,29 +1425,6 @@ dependencies = [
  "aws-smithy-types",
  "aws-types",
  "bytes",
- "http 0.2.12",
- "regex",
- "tracing",
-]
-
-[[package]]
-name = "aws-sdk-sts"
-version = "0.35.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51b1a8ae5c7098502a3e6d4130dbee1e1d3fcb8dc5d65cecab39e01d595f90f6"
-dependencies = [
- "aws-credential-types",
- "aws-http",
- "aws-runtime",
- "aws-smithy-async",
- "aws-smithy-http",
- "aws-smithy-json",
- "aws-smithy-query",
- "aws-smithy-runtime",
- "aws-smithy-runtime-api",
- "aws-smithy-types",
- "aws-smithy-xml",
- "aws-types",
  "http 0.2.12",
  "regex",
  "tracing",
@@ -2320,7 +2297,7 @@ checksum = "f7144d30dcf0fafbce74250a3963025d8d52177934239851c917d29f1df280c2"
 
 [[package]]
 name = "container-runtime"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -2719,12 +2696,12 @@ checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 
 [[package]]
 name = "database-common"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-trait",
  "aws-config",
+ "aws-credential-types",
  "aws-sdk-secretsmanager",
- "aws-sdk-sts 0.35.0",
  "chrono",
  "dill",
  "hex",
@@ -3476,7 +3453,7 @@ dependencies = [
 
 [[package]]
 name = "enum-variants"
-version = "0.189.5"
+version = "0.189.6"
 
 [[package]]
 name = "env_filter"
@@ -3538,7 +3515,7 @@ dependencies = [
 
 [[package]]
 name = "event-bus"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-trait",
  "dill",
@@ -3559,7 +3536,7 @@ checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
 
 [[package]]
 name = "event-sourcing"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -3574,7 +3551,7 @@ dependencies = [
 
 [[package]]
 name = "event-sourcing-macros"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "quote",
  "syn 2.0.68",
@@ -4327,7 +4304,7 @@ dependencies = [
  "hyper 1.4.0",
  "hyper-util",
  "rustls 0.23.10",
- "rustls-native-certs 0.7.0",
+ "rustls-native-certs 0.7.1",
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.26.0",
@@ -4545,7 +4522,7 @@ checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
 name = "internal-error"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "thiserror",
 ]
@@ -4702,7 +4679,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "alloy",
  "async-recursion",
@@ -4785,7 +4762,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-trait",
  "base32",
@@ -4810,7 +4787,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-inmem"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4828,7 +4805,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-mysql"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4848,7 +4825,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-postgres"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4868,7 +4845,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-repo-tests"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "argon2",
  "chrono",
@@ -4883,7 +4860,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-services"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "argon2",
  "async-trait",
@@ -4909,7 +4886,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-sqlite"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4929,7 +4906,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-auth-oso"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-trait",
  "dill",
@@ -4949,7 +4926,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-flight-sql"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "arrow-flight",
  "async-trait",
@@ -4972,7 +4949,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-graphql"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-graphql",
  "async-trait",
@@ -5017,7 +4994,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-http"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-trait",
  "aws-sdk-s3",
@@ -5070,7 +5047,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-oauth"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5090,7 +5067,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-odata"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "axum",
  "chrono",
@@ -5120,7 +5097,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "arrow-flight",
  "assert_cmd",
@@ -5219,7 +5196,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-common"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "indoc 2.0.5",
  "internal-error",
@@ -5237,7 +5214,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-inmem"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
@@ -5249,7 +5226,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-mysql"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
@@ -5262,7 +5239,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-postgres"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
@@ -5275,7 +5252,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-repo-tests"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "chrono",
  "indoc 2.0.5",
@@ -5288,7 +5265,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-sqlite"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
@@ -5301,7 +5278,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-core"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5329,7 +5306,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-data-utils"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "arrow",
  "arrow-digest",
@@ -5354,7 +5331,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datafusion-cli"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "arrow",
  "async-trait",
@@ -5376,7 +5353,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5401,7 +5378,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-inmem"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5428,7 +5405,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-postgres"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5451,7 +5428,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-repo-tests"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "chrono",
  "dill",
@@ -5462,7 +5439,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-services"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5500,7 +5477,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-sqlite"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5523,7 +5500,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-ingest-datafusion"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5560,7 +5537,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-repo-tools"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "chrono",
  "clap",
@@ -5575,7 +5552,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5590,7 +5567,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-inmem"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5605,7 +5582,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-postgres"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5627,7 +5604,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-repo-tests"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "chrono",
  "dill",
@@ -5638,7 +5615,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-services"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5657,7 +5634,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-sqlite"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6143,7 +6120,7 @@ dependencies = [
 
 [[package]]
 name = "multiformats"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "bs58",
  "digest 0.10.7",
@@ -6462,7 +6439,7 @@ checksum = "0ab1bc2a289d34bd04a330323ac98a1b4bc82c9d9fcb1e66b63caa84da26b575"
 
 [[package]]
 name = "opendatafabric"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "arrow",
  "base64 0.21.7",
@@ -7320,7 +7297,7 @@ dependencies = [
 
 [[package]]
 name = "random-names"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "rand",
 ]
@@ -7501,7 +7478,7 @@ dependencies = [
  "pin-project-lite",
  "quinn",
  "rustls 0.23.10",
- "rustls-native-certs 0.7.0",
+ "rustls-native-certs 0.7.1",
  "rustls-pemfile 2.1.2",
  "rustls-pki-types",
  "serde",
@@ -7776,7 +7753,7 @@ dependencies = [
  "once_cell",
  "ring",
  "rustls-pki-types",
- "rustls-webpki 0.102.4",
+ "rustls-webpki 0.102.5",
  "subtle",
  "zeroize",
 ]
@@ -7795,9 +7772,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-native-certs"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f1fb85efa936c42c6d5fc28d2629bb51e4b2f4b8a5211e297d599cc5a093792"
+checksum = "a88d6d420651b496bdd98684116959239430022a115c1240e6c3993be0b15fba"
 dependencies = [
  "openssl-probe",
  "rustls-pemfile 2.1.2",
@@ -7843,9 +7820,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.102.4"
+version = "0.102.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff448f7e92e913c4b7d4c6d8e4540a1724b319b4152b8aef6d4cf8339712b33e"
+checksum = "f9a6fccd794a42c2c105b513a2f62bc3fd8f3ba57a4593677ceb0bd035164d78"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -9320,7 +9297,7 @@ dependencies = [
 
 [[package]]
 name = "tracing-perfetto"
-version = "0.189.5"
+version = "0.189.6"
 dependencies = [
  "conv",
  "serde",
@@ -10130,18 +10107,18 @@ checksum = "09041cd90cf85f7f8b2df60c646f853b7f535ce68f85244eb6731cf89fa498ec"
 
 [[package]]
 name = "zerocopy"
-version = "0.7.34"
+version = "0.7.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae87e3fcd617500e5d106f0380cf7b77f3c6092aae37191433159dda23cfb087"
+checksum = "1b9b4fd18abc82b8136838da5d50bae7bdea537c574d8dc1a34ed098d6c166f0"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.7.34"
+version = "0.7.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15e934569e47891f7d9411f1a451d947a60e000ab3bd24fbb970f000387d1b3b"
+checksum = "fa4f8080344d4671fb4e831a13ad1e68092748387dfc4f55e356242fae12ce3e"
 dependencies = [
  "proc-macro2",
  "quote",
