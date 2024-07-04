@@ -12,11 +12,13 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
 
+use axum::Extension;
 use dill::{Catalog, CatalogBuilder};
 use indoc::indoc;
 use internal_error::*;
 use kamu::domain::{Protocols, ServerUrlConfig, SystemTimeSource};
 use kamu_adapter_http::e2e::e2e_router;
+use kamu_adapter_http::{transactionize, transactionize_route};
 use kamu_flow_system_inmem::domain::FlowService;
 use kamu_task_system_inmem::domain::TaskExecutor;
 use tokio::sync::Notify;
@@ -45,8 +47,6 @@ impl APIServer {
         external_address: Option<IpAddr>,
         is_e2e_testing: bool,
     ) -> Self {
-        use axum::extract::Extension;
-
         // Background task executor must run with server privileges to execute tasks on
         // behalf of the system, as they are automatically scheduled
         let task_executor = cli_catalog.get_one().unwrap();
@@ -88,13 +88,12 @@ impl APIServer {
 
         let mut app = axum::Router::new()
             .route("/", axum::routing::get(root))
-            .route(
-                "/graphql",
-                axum::routing::get(graphql_playground).post(graphql_handler),
-            )
+            .route("/graphql", graphql_method_rooter())
             .route(
                 "/platform/login",
-                axum::routing::post(kamu_adapter_http::platform_login_handler),
+                transactionize_route(axum::routing::post(
+                    kamu_adapter_http::platform_login_handler,
+                )),
             )
             .route(
                 "/platform/token/validate",
@@ -108,14 +107,14 @@ impl APIServer {
                 "/platform/file/upload/:upload_token",
                 axum::routing::post(kamu_adapter_http::platform_file_upload_post_handler),
             )
-            .nest("/", kamu_adapter_http::data::root_router())
+            .nest("/", transactionize(kamu_adapter_http::data::root_router()))
             .nest(
                 "/odata",
-                if multi_tenant_workspace {
+                transactionize(if multi_tenant_workspace {
                     kamu_adapter_odata::router_multi_tenant()
                 } else {
                     kamu_adapter_odata::router_single_tenant()
-                },
+                }),
             )
             .nest(
                 if multi_tenant_workspace {
@@ -126,7 +125,10 @@ impl APIServer {
                 kamu_adapter_http::add_dataset_resolver_layer(
                     axum::Router::new()
                         .nest("/", kamu_adapter_http::smart_transfer_protocol_router())
-                        .nest("/", kamu_adapter_http::data::dataset_router()),
+                        .nest(
+                            "/",
+                            transactionize(kamu_adapter_http::data::dataset_router()),
+                        ),
                     multi_tenant_workspace,
                 ),
             )
@@ -141,9 +143,6 @@ impl APIServer {
                     )
                     .layer(Extension(api_server_catalog))
                     .layer(Extension(gql_schema))
-                    // TODO: Use a more subtle application of this middleware,
-                    //       since not for every request, we need a transaction
-                    .layer(kamu_adapter_http::RunInDatabaseTransactionLayer::new())
                     .layer(kamu_adapter_http::AuthenticationLayer::new()),
             );
 
@@ -195,6 +194,17 @@ impl APIServer {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Routers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn graphql_method_rooter() -> axum::routing::MethodRouter {
+    // Transaction for POST only
+    transactionize_route(axum::routing::post(graphql_handler)).get(graphql_playground_handler)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Handlers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn root() -> impl axum::response::IntoResponse {
     axum::response::Html(indoc!(
@@ -210,17 +220,18 @@ async fn root() -> impl axum::response::IntoResponse {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn graphql_handler(
-    schema: axum::extract::Extension<kamu_adapter_graphql::Schema>,
-    catalog: axum::extract::Extension<dill::Catalog>,
+    Extension(schema): Extension<kamu_adapter_graphql::Schema>,
+    Extension(catalog): Extension<dill::Catalog>,
     req: async_graphql_axum::GraphQLRequest,
 ) -> async_graphql_axum::GraphQLResponse {
-    let graphql_request = req.into_inner().data(catalog.0);
+    let graphql_request = req.into_inner().data(catalog);
+
     schema.execute(graphql_request).await.into()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn graphql_playground() -> impl axum::response::IntoResponse {
+async fn graphql_playground_handler() -> impl axum::response::IntoResponse {
     axum::response::Html(async_graphql::http::playground_source(
         async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
     ))
