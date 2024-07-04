@@ -166,3 +166,125 @@ pub async fn test_login_dummy_github(kamu_api_server_client: KamuApiServerClient
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_kamu_access_token_middleware(kamu_api_server_client: KamuApiServerClient) {
+    // 1. Grub a JWT
+    let login_response = kamu_api_server_client
+     .graphql_api_call(indoc::indoc!(
+        r#"
+        mutation {
+            auth {
+                login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
+                    accessToken,
+                    account {
+                        id
+                    }
+                }
+            }
+        }
+        "#,
+         ), None)
+     .await;
+    let jwt = login_response["auth"]["login"]["accessToken"]
+        .as_str()
+        .map(ToOwned::to_owned)
+        .unwrap();
+    let account_id = login_response["auth"]["login"]["account"]["id"]
+        .as_str()
+        .map(ToOwned::to_owned)
+        .unwrap();
+
+    // 2. Grub a kamu access token
+    let create_token_response = kamu_api_server_client
+        .graphql_api_call(
+            indoc::indoc!(
+                r#"
+            mutation {
+                auth {
+                    createAccessToken (accountId: "<account_id>", tokenName: "foo") {
+                        __typename
+                        message
+                        ... on CreateAccessTokenResultSuccess {
+                            token {
+                                id,
+                                name,
+                                composed
+                            }
+                        }
+                    }
+                }
+            }
+            "#,
+            )
+            .replace("<account_id>", account_id.as_str())
+            .as_str(),
+            Some(jwt.clone()),
+        )
+        .await;
+    let kamu_token = create_token_response["auth"]["createAccessToken"]["token"]["composed"]
+        .as_str()
+        .map(ToOwned::to_owned)
+        .unwrap();
+
+    // 3. Create dataset from snapshot with new token
+    let snapshot = indoc::indoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: player-scores
+          kind: Root
+          metadata:
+            - kind: AddPushSource
+              sourceName: default
+              read:
+                kind: NdJson
+                schema:
+                  - "match_time TIMESTAMP"
+                  - "match_id BIGINT"
+                  - "player_id STRING"
+                  - "score BIGINT"
+              merge:
+                kind: Ledger
+                primaryKey:
+                  - match_id
+                  - player_id
+            - kind: SetVocab
+              eventTimeColumn: match_time
+        "#
+    )
+    .escape_default()
+    .to_string();
+
+    kamu_api_server_client
+        .graphql_api_call_assert_with_token(
+            kamu_token.clone(),
+            indoc::indoc!(
+                r#"
+                mutation {
+                  datasets {
+                    createFromSnapshot(snapshot: "<snapshot>", snapshotFormat: YAML) {
+                      message
+                    }
+                  }
+                }
+                "#,
+            )
+            .replace("<snapshot>", snapshot.as_str())
+            .as_str(),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "datasets": {
+                    "createFromSnapshot": {
+                      "message": "Success"
+                    }
+                  }
+                }
+                "#,
+            )),
+        )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
