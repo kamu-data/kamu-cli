@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Wrapping only necessary, not all HTTP requests in a transaction
 - Respect the `--quiet` option for:
   - `kamu add`
+  - `kamu ingest`
 ### Fixed
 - Fixed SmTP working together with transactions
 

@@ -215,10 +215,12 @@ impl Command for IngestCommand {
             }
         }
 
-        if updated != 0 {
-            eprintln!("{}", console::style("Dataset updated").green().bold());
-        } else {
-            eprintln!("{}", console::style("Dataset up-to-date").yellow().bold());
+        if !self.output_config.quiet {
+            if updated != 0 {
+                eprintln!("{}", console::style("Dataset updated").green().bold());
+            } else {
+                eprintln!("{}", console::style("Dataset up-to-date").yellow().bold());
+            }
         }
 
         Ok(())
