@@ -118,6 +118,7 @@ impl FlowHarness {
                 .add::<FlowServiceImpl>()
                 .add::<FlowEventStoreInMem>()
                 .add::<FlowConfigurationServiceImpl>()
+                .add::<FlowConfigurationEventSink>()
                 .add::<FlowConfigurationEventStoreInMem>()
                 .add_value(fake_system_time_source.clone())
                 .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()

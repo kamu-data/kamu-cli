@@ -10,7 +10,7 @@
 use database_common::{DatabaseTransactionRunner, SqliteTransactionManager};
 use dill::{Catalog, CatalogBuilder};
 use internal_error::InternalError;
-use kamu_flow_system_sqlite::FlowSystemEventStoreSqlite;
+use kamu_flow_system_sqlite::FlowConfigurationEventStoreSqlite;
 use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,7 +75,7 @@ impl SqliteAccountRepositoryHarness {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add_value(sqlite_pool);
         catalog_builder.add::<SqliteTransactionManager>();
-        catalog_builder.add::<FlowSystemEventStoreSqlite>();
+        catalog_builder.add::<FlowConfigurationEventStoreSqlite>();
 
         Self {
             catalog: catalog_builder.build(),

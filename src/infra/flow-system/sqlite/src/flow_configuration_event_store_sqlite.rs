@@ -30,13 +30,13 @@ struct ReturningEventModel {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct FlowSystemEventStoreSqlite {
+pub struct FlowConfigurationEventStoreSqlite {
     transaction: TransactionRefT<Sqlite>,
 }
 
 #[component(pub)]
 #[interface(dyn FlowConfigurationEventStore)]
-impl FlowSystemEventStoreSqlite {
+impl FlowConfigurationEventStoreSqlite {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
@@ -133,7 +133,7 @@ impl FlowSystemEventStoreSqlite {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl EventStore<FlowConfigurationState> for FlowSystemEventStoreSqlite {
+impl EventStore<FlowConfigurationState> for FlowConfigurationEventStoreSqlite {
     async fn get_events(
         &self,
         flow_key: &FlowKey,
@@ -269,7 +269,7 @@ impl EventStore<FlowConfigurationState> for FlowSystemEventStoreSqlite {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowConfigurationEventStore for FlowSystemEventStoreSqlite {
+impl FlowConfigurationEventStore for FlowConfigurationEventStoreSqlite {
     async fn list_all_dataset_ids(&self) -> FailableDatasetIDStream<'_> {
         let mut tr = self.transaction.lock().await;
 

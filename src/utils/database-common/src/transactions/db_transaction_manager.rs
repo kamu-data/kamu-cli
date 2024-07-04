@@ -15,6 +15,8 @@ use dill::{component, Catalog, CatalogBuilder};
 use internal_error::{InternalError, ResultIntoInternal};
 use tokio::sync::Mutex;
 
+use crate::TransactionListener;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -59,6 +61,14 @@ impl DatabaseTransactionRunner {
             .get_one::<dyn DatabaseTransactionManager>()
             .unwrap();
 
+        // Extract transaction listeners
+        let mut listeners = Vec::new();
+        let builders = self.catalog.builders_for::<dyn TransactionListener>();
+        for b in builders {
+            let listener = b.get(&self.catalog).unwrap();
+            listeners.push(listener);
+        }
+
         // Start transaction
         let transaction_ref = db_transaction_manager.make_transaction_ref().await?;
 
@@ -80,6 +90,9 @@ impl DatabaseTransactionRunner {
                 db_transaction_manager
                     .commit_transaction(transaction_ref)
                     .await?;
+
+                self.notify_commit_listeners(&listeners).await?;
+
                 Ok(res)
             }
 
@@ -88,6 +101,9 @@ impl DatabaseTransactionRunner {
                 db_transaction_manager
                     .rollback_transaction(transaction_ref)
                     .await?;
+
+                self.notify_rollback_listeners(&listeners).await?;
+
                 Err(e)
             }
         }
@@ -109,6 +125,36 @@ impl DatabaseTransactionRunner {
             callback(catalog_item).await
         })
         .await
+    }
+
+    async fn notify_commit_listeners(
+        &self,
+        listeners: &Vec<Arc<dyn TransactionListener>>,
+    ) -> Result<(), InternalError> {
+        let futures: Vec<_> = listeners
+            .iter()
+            .map(|listener: &Arc<dyn TransactionListener>| listener.on_transaction_commit())
+            .collect();
+
+        let results = futures::future::join_all(futures).await;
+        results.into_iter().try_for_each(|res| res)?;
+
+        Ok(())
+    }
+
+    async fn notify_rollback_listeners(
+        &self,
+        listeners: &Vec<Arc<dyn TransactionListener>>,
+    ) -> Result<(), InternalError> {
+        let futures: Vec<_> = listeners
+            .iter()
+            .map(|listener: &Arc<dyn TransactionListener>| listener.on_transaction_rollback())
+            .collect();
+
+        let results = futures::future::join_all(futures).await;
+        results.into_iter().try_for_each(|res| res)?;
+
+        Ok(())
     }
 }
 

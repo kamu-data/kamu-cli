@@ -37,7 +37,11 @@ use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
 use kamu_flow_system::FlowServiceRunConfig;
 use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
-use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceImpl};
+use kamu_flow_system_services::{
+    FlowConfigurationEventSink,
+    FlowConfigurationServiceImpl,
+    FlowServiceImpl,
+};
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
@@ -671,6 +675,7 @@ impl FlowConfigHarness {
                 .add_value(dependency_graph_mock)
                 .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
                 .add::<FlowConfigurationServiceImpl>()
+                .add::<FlowConfigurationEventSink>()
                 .add::<FlowConfigurationEventStoreInMem>()
                 .add::<FlowServiceImpl>()
                 .add::<FlowEventStoreInMem>()

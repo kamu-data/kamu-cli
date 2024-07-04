@@ -28,7 +28,6 @@ pub fn configure_database_components(
 
     // TODO: Delete after preparing services for transactional work and replace with
     //       permanent storage options
-    b.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
     match db_connection_settings.provider {
@@ -37,12 +36,17 @@ pub fn configure_database_components(
 
             b.add::<kamu_accounts_postgres::PostgresAccountRepository>();
             b.add::<kamu_accounts_postgres::PostgresAccessTokenRepository>();
+
+            b.add::<kamu_flow_system_postgres::FlowConfigurationEventStorePostgres>();
         }
         DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
             database_common::MySqlPlugin::init_database_components(b);
 
             b.add::<kamu_accounts_mysql::MySqlAccountRepository>();
             b.add::<kamu_accounts_mysql::MysqlAccessTokenRepository>();
+
+            // TODO: implement MySQL
+            b.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
 
             // TODO: Task & Flow System MySQL versions
         }
@@ -51,6 +55,8 @@ pub fn configure_database_components(
 
             b.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
             b.add::<kamu_accounts_sqlite::SqliteAccessTokenRepository>();
+
+            b.add::<kamu_flow_system_sqlite::FlowConfigurationEventStoreSqlite>();
         }
     }
 

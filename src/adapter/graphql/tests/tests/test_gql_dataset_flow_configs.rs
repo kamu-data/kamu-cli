@@ -25,7 +25,7 @@ use kamu_core::{
     TransformService,
 };
 use kamu_flow_system_inmem::FlowConfigurationEventStoreInMem;
-use kamu_flow_system_services::FlowConfigurationServiceImpl;
+use kamu_flow_system_services::{FlowConfigurationEventSink, FlowConfigurationServiceImpl};
 use opendatafabric::*;
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
@@ -1537,6 +1537,7 @@ impl FlowConfigHarness {
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<DependencyGraphServiceInMemory>()
                 .add::<FlowConfigurationServiceImpl>()
+                .add::<FlowConfigurationEventSink>()
                 .add::<FlowConfigurationEventStoreInMem>()
                 .add::<DatabaseTransactionRunner>();
 

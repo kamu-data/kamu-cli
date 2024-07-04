@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use dill::*;
-use event_bus::{AsyncEventHandler, EventBus};
+use event_bus::{AsyncEventHandler, EventSink};
 use futures::TryStreamExt;
 use kamu_core::events::DatasetEventDeleted;
 use kamu_core::SystemTimeSource;
@@ -23,7 +23,7 @@ use opendatafabric::DatasetID;
 pub struct FlowConfigurationServiceImpl {
     event_store: Arc<dyn FlowConfigurationEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
-    event_bus: Arc<EventBus>,
+    event_sink_modified: Arc<dyn EventSink<FlowConfigurationEventModified>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,16 +35,16 @@ impl FlowConfigurationServiceImpl {
     pub fn new(
         event_store: Arc<dyn FlowConfigurationEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
-        event_bus: Arc<EventBus>,
+        event_sink_modified: Arc<dyn EventSink<FlowConfigurationEventModified>>,
     ) -> Self {
         Self {
             event_store,
             time_source,
-            event_bus,
+            event_sink_modified,
         }
     }
 
-    async fn publish_flow_configuration_modified(
+    fn post_configuration_modified(
         &self,
         state: &FlowConfigurationState,
         request_time: DateTime<Utc>,
@@ -55,7 +55,7 @@ impl FlowConfigurationServiceImpl {
             paused: !state.is_active(),
             rule: state.rule.clone(),
         };
-        self.event_bus.dispatch_event(event).await
+        self.event_sink_modified.post_event(event)
     }
 
     fn get_dataset_flow_keys(
@@ -163,8 +163,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
             .await
             .int_err()?;
 
-        self.publish_flow_configuration_modified(&flow_configuration, request_time)
-            .await?;
+        self.post_configuration_modified(&flow_configuration, request_time)?;
 
         Ok(flow_configuration.into())
     }
@@ -213,8 +212,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
                 .await
                 .int_err()?;
 
-            self.publish_flow_configuration_modified(&flow_configuration, request_time)
-                .await?;
+            self.post_configuration_modified(&flow_configuration, request_time)?;
         }
 
         Ok(())
@@ -238,8 +236,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
                 .await
                 .int_err()?;
 
-            self.publish_flow_configuration_modified(&flow_configuration, request_time)
-                .await?;
+            self.post_configuration_modified(&flow_configuration, request_time)?;
         }
 
         Ok(())
@@ -324,6 +321,8 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
+        // TODO: transactional
+
         for flow_type in DatasetFlowType::all() {
             let maybe_flow_configuration = FlowConfiguration::try_load(
                 FlowKeyDataset::new(event.dataset_id.clone(), *flow_type).into(),

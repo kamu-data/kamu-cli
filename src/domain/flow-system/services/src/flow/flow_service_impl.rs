@@ -13,6 +13,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, DurationRound, Utc};
+use database_common::DatabaseTransactionRunner;
 use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
 use futures::TryStreamExt;
@@ -36,13 +37,13 @@ use super::pending_flows_state::PendingFlowsState;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FlowServiceImpl {
+    catalog: Catalog,
     state: Arc<Mutex<State>>,
     run_config: Arc<FlowServiceRunConfig>,
     event_bus: Arc<EventBus>,
     flow_event_store: Arc<dyn FlowEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
-    flow_configuration_service: Arc<dyn FlowConfigurationService>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
@@ -70,24 +71,24 @@ struct State {
 #[scope(Singleton)]
 impl FlowServiceImpl {
     pub fn new(
+        catalog: Catalog,
         run_config: Arc<FlowServiceRunConfig>,
         event_bus: Arc<EventBus>,
         flow_event_store: Arc<dyn FlowEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
         task_scheduler: Arc<dyn TaskScheduler>,
-        flow_configuration_service: Arc<dyn FlowConfigurationService>,
         dataset_changes_service: Arc<dyn DatasetChangesService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
     ) -> Self {
         Self {
+            catalog,
             state: Arc::new(Mutex::new(State::default())),
             run_config,
             event_bus,
             flow_event_store,
             time_source,
             task_scheduler,
-            flow_configuration_service,
             dataset_changes_service,
             dependency_graph_service,
             dataset_ownership_service,
@@ -137,11 +138,11 @@ impl FlowServiceImpl {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn initialize_auto_polling_flows_from_configurations(
         &self,
+        flow_configuration_service: &dyn FlowConfigurationService,
         start_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
         // Query all enabled flow configurations
-        let enabled_configurations: Vec<_> = self
-            .flow_configuration_service
+        let enabled_configurations: Vec<_> = flow_configuration_service
             .list_enabled_configurations()
             .try_collect()
             .await?;
@@ -911,8 +912,18 @@ impl FlowService for FlowServiceImpl {
 
         // Initial scheduling
         let start_time = self.round_time(planned_start_time)?;
-        self.initialize_auto_polling_flows_from_configurations(start_time)
-            .await?;
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>| async move {
+                    self.initialize_auto_polling_flows_from_configurations(
+                        flow_configuration_service.as_ref(),
+                        start_time,
+                    )
+                    .await
+                },
+            )
+            .await
+            .int_err()?;
 
         // Publish progress event
         self.event_bus

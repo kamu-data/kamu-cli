@@ -56,9 +56,8 @@ random-names = { workspace = true }
 
 kamu-flow-system-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
-# TODO: Activate after preparing services for transactional work
-# kamu-flow-system-postgres = { workspace = true }
-# kamu-flow-system-sqlite = { workspace = true }
+kamu-flow-system-postgres = { workspace = true }
+kamu-flow-system-sqlite = { workspace = true }
 
 kamu-task-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }

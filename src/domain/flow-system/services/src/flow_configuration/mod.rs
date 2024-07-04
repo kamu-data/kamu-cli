@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod flow_configuration_event_sink;
 mod flow_configuration_service_impl;
 
+pub use flow_configuration_event_sink::*;
 pub use flow_configuration_service_impl::*;

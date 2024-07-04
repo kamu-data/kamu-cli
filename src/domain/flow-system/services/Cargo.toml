@@ -22,6 +22,7 @@ doctest = false
 
 
 [dependencies]
+database-common = { workspace = true }
 opendatafabric = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
@@ -46,7 +47,6 @@ serde_with = { version = "3", default-features = false }
 
 
 [dev-dependencies]
-database-common = { workspace = true }
 kamu = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }

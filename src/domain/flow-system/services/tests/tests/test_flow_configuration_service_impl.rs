@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use chrono::{Duration, Utc};
+use database_common::DatabaseTransactionRunner;
 use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
 use futures::TryStreamExt;
@@ -421,7 +422,6 @@ struct FlowConfigurationHarness {
     _tmp_dir: tempfile::TempDir,
     catalog: Catalog,
     dataset_repo: Arc<dyn DatasetRepository>,
-    flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_configuration_event_store: Arc<dyn FlowConfigurationEventStore>,
     config_events_listener: Arc<FlowConfigEventsListener>,
 }
@@ -432,9 +432,10 @@ impl FlowConfigurationHarness {
         let datasets_dir = tmp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = CatalogBuilder::new()
-            .add::<EventBus>()
+        let mut b = CatalogBuilder::new();
+        b.add::<EventBus>()
             .add::<FlowConfigurationServiceImpl>()
+            .add::<FlowConfigurationEventSink>()
             .add::<FlowConfigurationEventStoreInMem>()
             .add::<SystemTimeSourceDefault>()
             .add_builder(
@@ -446,10 +447,12 @@ impl FlowConfigurationHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
-            .add::<FlowConfigEventsListener>()
-            .build();
+            .add::<FlowConfigEventsListener>();
 
-        let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
+        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
+        let catalog = b.build();
+
         let flow_configuration_event_store = catalog
             .get_one::<dyn FlowConfigurationEventStore>()
             .unwrap();
@@ -459,7 +462,6 @@ impl FlowConfigurationHarness {
         Self {
             _tmp_dir: tmp_dir,
             catalog,
-            flow_configuration_service,
             flow_configuration_event_store,
             dataset_repo,
             config_events_listener: flow_config_events_listener,
@@ -467,27 +469,39 @@ impl FlowConfigurationHarness {
     }
 
     async fn list_enabled_configurations(&self) -> HashMap<FlowKey, FlowConfigurationState> {
-        let active_configs: Vec<_> = self
-            .flow_configuration_service
-            .list_enabled_configurations()
-            .try_collect::<Vec<_>>()
-            .await
-            .unwrap();
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>| async move {
+                    let active_configs: Vec<_> = flow_configuration_service
+                        .list_enabled_configurations()
+                        .try_collect::<Vec<_>>()
+                        .await
+                        .unwrap();
 
-        let mut res = HashMap::new();
-        for active_config in active_configs {
-            res.insert(active_config.flow_key.clone(), active_config);
-        }
-        res
+                    let mut res = HashMap::new();
+                    for active_config in active_configs {
+                        res.insert(active_config.flow_key.clone(), active_config);
+                    }
+                    Ok::<_, InternalError>(res)
+                },
+            )
+            .await
+            .unwrap()
     }
 
     async fn set_system_flow_schedule(&self, system_flow_type: SystemFlowType, schedule: Schedule) {
-        self.flow_configuration_service
-            .set_configuration(
-                Utc::now(),
-                system_flow_type.into(),
-                false,
-                FlowConfigurationRule::Schedule(schedule),
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>| async move {
+                    flow_configuration_service
+                        .set_configuration(
+                            Utc::now(),
+                            system_flow_type.into(),
+                            false,
+                            FlowConfigurationRule::Schedule(schedule),
+                        )
+                        .await
+                },
             )
             .await
             .unwrap();
@@ -499,12 +513,18 @@ impl FlowConfigurationHarness {
         dataset_flow_type: DatasetFlowType,
         schedule: Schedule,
     ) {
-        self.flow_configuration_service
-            .set_configuration(
-                Utc::now(),
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                false,
-                FlowConfigurationRule::Schedule(schedule),
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>| async move {
+                    flow_configuration_service
+                        .set_configuration(
+                            Utc::now(),
+                            FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
+                            false,
+                            FlowConfigurationRule::Schedule(schedule),
+                        )
+                        .await
+                },
             )
             .await
             .unwrap();
@@ -544,43 +564,79 @@ impl FlowConfigurationHarness {
     }
 
     async fn pause_dataset_flow(&self, dataset_id: DatasetID, dataset_flow_type: DatasetFlowType) {
-        self.flow_configuration_service
-            .pause_dataset_flows(Utc::now(), &dataset_id, Some(dataset_flow_type))
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>| async move {
+                    flow_configuration_service
+                        .pause_dataset_flows(Utc::now(), &dataset_id, Some(dataset_flow_type))
+                        .await
+                },
+            )
             .await
             .unwrap();
     }
 
     async fn pause_all_dataset_flows(&self, dataset_id: DatasetID) {
-        self.flow_configuration_service
-            .pause_dataset_flows(Utc::now(), &dataset_id, None)
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>| async move {
+                    flow_configuration_service
+                        .pause_dataset_flows(Utc::now(), &dataset_id, None)
+                        .await
+                },
+            )
             .await
             .unwrap();
     }
 
     async fn pause_system_flow(&self, system_flow_type: SystemFlowType) {
-        self.flow_configuration_service
-            .pause_system_flows(Utc::now(), Some(system_flow_type))
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>| async move {
+                    flow_configuration_service
+                        .pause_system_flows(Utc::now(), Some(system_flow_type))
+                        .await
+                },
+            )
             .await
             .unwrap();
     }
 
     async fn resume_dataset_flow(&self, dataset_id: DatasetID, dataset_flow_type: DatasetFlowType) {
-        self.flow_configuration_service
-            .resume_dataset_flows(Utc::now(), &dataset_id, Some(dataset_flow_type))
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>| async move {
+                    flow_configuration_service
+                        .resume_dataset_flows(Utc::now(), &dataset_id, Some(dataset_flow_type))
+                        .await
+                },
+            )
             .await
             .unwrap();
     }
 
     async fn resume_all_dataset_flows(&self, dataset_id: DatasetID) {
-        self.flow_configuration_service
-            .resume_dataset_flows(Utc::now(), &dataset_id, None)
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>| async move {
+                    flow_configuration_service
+                        .resume_dataset_flows(Utc::now(), &dataset_id, None)
+                        .await
+                },
+            )
             .await
             .unwrap();
     }
 
     async fn resume_system_flow(&self, system_flow_type: SystemFlowType) {
-        self.flow_configuration_service
-            .resume_system_flows(Utc::now(), Some(system_flow_type))
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>| async move {
+                    flow_configuration_service
+                        .resume_system_flows(Utc::now(), Some(system_flow_type))
+                        .await
+                },
+            )
             .await
             .unwrap();
     }
