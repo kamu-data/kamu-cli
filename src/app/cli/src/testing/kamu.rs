@@ -38,7 +38,7 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Test wrapper on top of CLI library
+/// Test wrapper on top of CLI library
 pub struct Kamu {
     workspace_layout: WorkspaceLayout,
     current_account: accounts::CurrentAccountIndication,

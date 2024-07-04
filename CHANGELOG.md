@@ -6,7 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Added
-- New Kamu access token E2E test
+- Added Kamu access token E2E test
+- SmTP: added E2E test group to cover the pushing and pulling of datasets
 ### Changed
 - Wrapping only necessary, not all HTTP requests in a transaction
 ### Fixed
