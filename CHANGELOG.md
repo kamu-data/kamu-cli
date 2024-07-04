@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SmTP: added E2E test group to cover the pushing and pulling of datasets
 ### Changed
 - Wrapping only necessary, not all HTTP requests in a transaction
+- Respect the `--quiet` option for:
+  - `kamu add`
 ### Fixed
 - Fixed SmTP working together with transactions
 
@@ -38,9 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.189.0] - 2024-06-28
 ### Added
 - Support multiple methods to access database:
-    - via raw password
-    - via password stored as AWS secret
-    - via generated AWS IAM authentication tokens
+  - via raw password
+  - via password stored as AWS secret
+  - via generated AWS IAM authentication tokens
 - Support periodic database password rotation with configurable period
 
 ## [0.188.6] - 2024-06-27
