@@ -143,15 +143,20 @@ impl ServerHarness {
         authentication_service: MockAuthenticationService,
         initial_current_account_subject: Option<CurrentAccountSubject>,
     ) -> Self {
-        let mut catalog_builder = dill::CatalogBuilder::new();
-        catalog_builder
-            .add_value(authentication_service)
-            .bind::<dyn AuthenticationService, MockAuthenticationService>();
-        if let Some(current_account_subject) = initial_current_account_subject {
-            catalog_builder.add_value(current_account_subject);
-        }
+        let catalog = {
+            let mut b = dill::CatalogBuilder::new();
 
-        let catalog = catalog_builder.build();
+            b.add_value(authentication_service)
+                .bind::<dyn AuthenticationService, MockAuthenticationService>();
+
+            if let Some(current_account_subject) = initial_current_account_subject {
+                b.add_value(current_account_subject);
+            }
+
+            database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
 
         let app = axum::Router::new()
             .route(
