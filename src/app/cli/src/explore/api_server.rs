@@ -198,8 +198,10 @@ impl APIServer {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn graphql_method_rooter() -> axum::routing::MethodRouter {
-    // Transaction for POST only
-    transactionize_route(axum::routing::post(graphql_handler)).get(graphql_playground_handler)
+    let post_handler = transactionize_route(axum::routing::post(graphql_handler));
+    let get_handler = axum::routing::get(graphql_playground_handler);
+
+    post_handler.merge(get_handler)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
