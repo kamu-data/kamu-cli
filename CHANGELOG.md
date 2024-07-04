@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Respect the `--quiet` option for:
   - `kamu add`
   - `kamu ingest`
+  - `kamu push`
 ### Fixed
 - Fixed SmTP working together with transactions
 
