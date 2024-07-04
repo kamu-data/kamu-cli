@@ -6,7 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Added
-- New kamu access token e2e test
+- New Kamu access token E2E test
+### Changed
+- Wrapping only necessary, not all HTTP requests in a transaction
+### Fixed
+- Fixed SmTP working together with transactions
 
 ## [0.189.6] - 2024-07-3
 ### Fixed
