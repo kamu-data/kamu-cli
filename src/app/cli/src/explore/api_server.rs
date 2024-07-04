@@ -88,7 +88,7 @@ impl APIServer {
 
         let mut app = axum::Router::new()
             .route("/", axum::routing::get(root))
-            .route("/graphql", graphql_method_rooter())
+            .route("/graphql", graphql_method_router())
             .route(
                 "/platform/login",
                 transactionize_route(axum::routing::post(
@@ -197,7 +197,7 @@ impl APIServer {
 // Routers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn graphql_method_rooter() -> axum::routing::MethodRouter {
+fn graphql_method_router() -> axum::routing::MethodRouter {
     let post_handler = transactionize_route(axum::routing::post(graphql_handler));
     let get_handler = axum::routing::get(graphql_playground_handler);
 
