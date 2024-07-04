@@ -172,16 +172,16 @@ pub async fn test_kamu_access_token_middleware(kamu_api_server_client: KamuApiSe
     let login_response = kamu_api_server_client
      .graphql_api_call(indoc::indoc!(
         r#"
-            mutation {
-                auth {
-                    login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
-                        accessToken,
-                        account {
-                            id
-                        }
+        mutation {
+            auth {
+                login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
+                    accessToken,
+                    account {
+                        id
                     }
                 }
             }
+        }
         "#,
          ), None)
      .await;
@@ -199,7 +199,7 @@ pub async fn test_kamu_access_token_middleware(kamu_api_server_client: KamuApiSe
         .graphql_api_call(
             indoc::indoc!(
                 r#"
-                mutation {
+            mutation {
                 auth {
                     createAccessToken (accountId: "<account_id>", tokenName: "foo") {
                         __typename
@@ -229,29 +229,29 @@ pub async fn test_kamu_access_token_middleware(kamu_api_server_client: KamuApiSe
     // 3. Create dataset from snapshot with new token
     let snapshot = indoc::indoc!(
         r#"
-            kind: DatasetSnapshot
-            version: 1
-            content:
-              name: player-scores
-              kind: Root
-              metadata:
-                - kind: AddPushSource
-                  sourceName: default
-                  read:
-                    kind: NdJson
-                    schema:
-                      - "match_time TIMESTAMP"
-                      - "match_id BIGINT"
-                      - "player_id STRING"
-                      - "score BIGINT"
-                  merge:
-                    kind: Ledger
-                    primaryKey:
-                      - match_id
-                      - player_id
-                - kind: SetVocab
-                  eventTimeColumn: match_time
-            "#
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: player-scores
+          kind: Root
+          metadata:
+            - kind: AddPushSource
+              sourceName: default
+              read:
+                kind: NdJson
+                schema:
+                  - "match_time TIMESTAMP"
+                  - "match_id BIGINT"
+                  - "player_id STRING"
+                  - "score BIGINT"
+              merge:
+                kind: Ledger
+                primaryKey:
+                  - match_id
+                  - player_id
+            - kind: SetVocab
+              eventTimeColumn: match_time
+        "#
     )
     .escape_default()
     .to_string();
