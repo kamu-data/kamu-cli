@@ -31,7 +31,6 @@ pub struct FlowConfigurationServiceImpl {
 #[component(pub)]
 #[interface(dyn FlowConfigurationService)]
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
-#[scope(Singleton)]
 impl FlowConfigurationServiceImpl {
     pub fn new(
         event_store: Arc<dyn FlowConfigurationEventStore>,
