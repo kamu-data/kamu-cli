@@ -10,6 +10,7 @@
 use std::net::{SocketAddr, TcpListener};
 
 use dill::Catalog;
+use kamu_adapter_http::{transactionize, transactionize_route};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,7 +26,9 @@ impl TestAPIServer {
         let app = axum::Router::new()
             .route(
                 "/platform/login",
-                axum::routing::post(kamu_adapter_http::platform_login_handler),
+                transactionize_route(axum::routing::post(
+                    kamu_adapter_http::platform_login_handler,
+                )),
             )
             .route(
                 "/platform/token/validate",
@@ -39,7 +42,7 @@ impl TestAPIServer {
                 "/platform/file/upload/:upload_token",
                 axum::routing::post(kamu_adapter_http::platform_file_upload_post_handler),
             )
-            .nest("/", kamu_adapter_http::data::root_router())
+            .nest("/", transactionize(kamu_adapter_http::data::root_router()))
             .nest(
                 if multi_tenant {
                     "/:account_name/:dataset_name"
@@ -49,7 +52,10 @@ impl TestAPIServer {
                 kamu_adapter_http::add_dataset_resolver_layer(
                     axum::Router::new()
                         .nest("/", kamu_adapter_http::smart_transfer_protocol_router())
-                        .nest("/", kamu_adapter_http::data::dataset_router()),
+                        .nest(
+                            "/",
+                            transactionize(kamu_adapter_http::data::dataset_router()),
+                        ),
                     multi_tenant,
                 ),
             )
