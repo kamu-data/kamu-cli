@@ -11,19 +11,23 @@ use dill::*;
 use internal_error::InternalError;
 use secrecy::Secret;
 
-use crate::DatabasePasswordProvider;
+use crate::{DatabaseCredentials, DatabasePasswordProvider};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn DatabasePasswordProvider)]
 pub struct DatabaseFixedPasswordProvider {
+    db_user_name: Secret<String>,
     fixed_password: Secret<String>,
 }
 
 impl DatabaseFixedPasswordProvider {
-    pub fn new(fixed_password: Secret<String>) -> Self {
-        Self { fixed_password }
+    pub fn new(db_user_name: Secret<String>, fixed_password: Secret<String>) -> Self {
+        Self {
+            db_user_name,
+            fixed_password,
+        }
     }
 }
 
@@ -31,8 +35,11 @@ impl DatabaseFixedPasswordProvider {
 
 #[async_trait::async_trait]
 impl DatabasePasswordProvider for DatabaseFixedPasswordProvider {
-    async fn provide_password(&self) -> Result<Option<Secret<String>>, InternalError> {
-        Ok(Some(self.fixed_password.clone()))
+    async fn provide_credentials(&self) -> Result<Option<DatabaseCredentials>, InternalError> {
+        Ok(Some(DatabaseCredentials {
+            user_name: self.db_user_name.clone(),
+            password: self.fixed_password.clone(),
+        }))
     }
 }
 

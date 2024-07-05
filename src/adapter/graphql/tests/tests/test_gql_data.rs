@@ -161,10 +161,12 @@ async fn create_test_dataset(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tail
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_dataset_schema_local_fs() {
+async fn test_dataset_tail_schema() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(tempdir.path(), true).await;
     create_test_dataset(&catalog, tempdir.path(), None).await;
@@ -223,7 +225,7 @@ async fn test_dataset_schema_local_fs() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_dataset_tail_local_fs() {
+async fn test_dataset_tail_some() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(tempdir.path(), true).await;
     create_test_dataset(&catalog, tempdir.path(), None).await;
@@ -264,7 +266,7 @@ async fn test_dataset_tail_local_fs() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_dataset_tail_empty_local_fs() {
+async fn test_dataset_tail_empty() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(tempdir.path(), true).await;
     create_test_dataset(&catalog, tempdir.path(), None).await;
@@ -299,6 +301,151 @@ async fn test_dataset_tail_empty_local_fs() {
     let data = &json["datasets"]["byOwnerAndName"]["data"]["tail"]["data"]["content"];
     let data = serde_json::from_str::<serde_json::Value>(data.as_str().unwrap()).unwrap();
     assert_eq!(data, serde_json::json!([]));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Query
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_query_some() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let catalog = create_catalog_with_local_workspace(tempdir.path(), true).await;
+    create_test_dataset(&catalog, tempdir.path(), None).await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let res = schema
+        .execute(
+            async_graphql::Request::new(indoc::indoc!(
+                r#"
+                {
+                    data {
+                        query(
+                            query: "select * from \"kamu/foo\" order by offset",
+                            queryDialect: SQL_DATA_FUSION,
+                            schemaFormat: ARROW_JSON,
+                            dataFormat: JSON,
+                        ) {
+                            ... on DataQueryResultSuccess {
+                                data { content }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .data(catalog),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+    let json = serde_json::to_string(&res.data).unwrap();
+    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+    let data = &json["data"]["query"]["data"]["content"];
+    let data = serde_json::from_str::<serde_json::Value>(data.as_str().unwrap()).unwrap();
+    assert_eq!(
+        data,
+        serde_json::json!([
+            {"offset": 0, "blah": "a"},
+            {"offset": 1, "blah": "b"},
+            {"offset": 2, "blah": "c"},
+            {"offset": 3, "blah": "d"},
+        ])
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_query_error_sql_unparsable() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let catalog = create_catalog_with_local_workspace(tempdir.path(), true).await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let res = schema
+        .execute(
+            async_graphql::Request::new(indoc::indoc!(
+                r#"
+                {
+                    data {
+                        query(
+                            query: "select ???",
+                            queryDialect: SQL_DATA_FUSION,
+                            schemaFormat: ARROW_JSON,
+                            dataFormat: JSON,
+                        ) {
+                            ... on DataQueryResultError {
+                                errorMessage
+                                errorKind
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .data(catalog),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+    let json = serde_json::to_string(&res.data).unwrap();
+    tracing::debug!(?json, "Response data");
+    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+    let data = &json["data"]["query"];
+    assert_eq!(
+        *data,
+        serde_json::json!({
+            "errorMessage": "sql parser error: Expected end of statement, found: ?",
+            "errorKind": "INVALID_SQL",
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_query_error_sql_missing_function() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let catalog = create_catalog_with_local_workspace(tempdir.path(), true).await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let res = schema
+        .execute(
+            async_graphql::Request::new(indoc::indoc!(
+                r#"
+                {
+                    data {
+                        query(
+                            query: "select foobar(1)",
+                            queryDialect: SQL_DATA_FUSION,
+                            schemaFormat: ARROW_JSON,
+                            dataFormat: JSON,
+                        ) {
+                            ... on DataQueryResultError {
+                                errorMessage
+                                errorKind
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .data(catalog),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+    let json = serde_json::to_string(&res.data).unwrap();
+    tracing::debug!(?json, "Response data");
+    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+    let data = &json["data"]["query"];
+    assert_eq!(
+        *data,
+        serde_json::json!({
+            "errorMessage": "Invalid function 'foobar'.\nDid you mean 'floor'?",
+            "errorKind": "INVALID_SQL",
+        })
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

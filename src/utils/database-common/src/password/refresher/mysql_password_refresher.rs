@@ -15,14 +15,14 @@ use secrecy::ExposeSecret;
 use sqlx::mysql::MySqlConnectOptions;
 use sqlx::MySqlPool;
 
-use crate::{DatabaseCredentials, DatabasePasswordProvider, DatabasePasswordRefresher};
+use crate::{DatabaseConnectionSettings, DatabasePasswordProvider, DatabasePasswordRefresher};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MySqlPasswordRefresher {
     password_provider: Arc<dyn DatabasePasswordProvider>,
     mysql_pool: Arc<MySqlPool>,
-    db_credentials: Arc<DatabaseCredentials>,
+    db_connection_settings: Arc<DatabaseConnectionSettings>,
 }
 
 #[component(pub)]
@@ -31,12 +31,12 @@ impl MySqlPasswordRefresher {
     pub fn new(
         password_provider: Arc<dyn DatabasePasswordProvider>,
         mysql_pool: Arc<MySqlPool>,
-        db_credentials: Arc<DatabaseCredentials>,
+        db_connection_settings: Arc<DatabaseConnectionSettings>,
     ) -> Self {
         Self {
             password_provider,
             mysql_pool,
-            db_credentials,
+            db_connection_settings,
         }
     }
 }
@@ -47,14 +47,14 @@ impl MySqlPasswordRefresher {
 impl DatabasePasswordRefresher for MySqlPasswordRefresher {
     #[tracing::instrument(level = "info", skip_all)]
     async fn refresh_password(&self) -> Result<(), InternalError> {
-        let fresh_password = self.password_provider.provide_password().await?;
-        if let Some(fresh_password) = fresh_password {
+        let fresh_credentials = self.password_provider.provide_credentials().await?;
+        if let Some(fresh_credentials) = fresh_credentials {
             self.mysql_pool.set_connect_options(
                 MySqlConnectOptions::new()
-                    .host(&self.db_credentials.host)
-                    .username(&self.db_credentials.user)
-                    .database(&self.db_credentials.database_name)
-                    .password(fresh_password.expose_secret()),
+                    .host(&self.db_connection_settings.host)
+                    .username(fresh_credentials.user_name.expose_secret())
+                    .database(&self.db_connection_settings.database_name)
+                    .password(fresh_credentials.password.expose_secret()),
             );
         }
         Ok(())

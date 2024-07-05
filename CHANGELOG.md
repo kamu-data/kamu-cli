@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Added
+- New kamu access token e2e test
+
+## [0.189.6] - 2024-07-3
+### Fixed
+- GQL API regression where unparsable SQL was ending up in internal error
+- REST API `/query` endpoint will return `400 Bad Request` in case of unparsable SQL
+- Bug fixed in database IAM token authentication method (redundant session token request)
+
+## [0.189.4] - 2024-07-02
+### Fixed
+- GQL access token list pagination
+
+## [0.189.3] - 2024-07-02
+### Fixed
+- SQLX images now include scripts and programs necessary to fetch database credentials from AWS secrets manager
+
+## [0.189.2] - 2024-07-01
+### Fixed
+- AWS secret stores both user name and password, so database username should be a secret too.
+
 ## [0.189.1] - 2024-06-28
 ### Fixed
 - Modify revoke access token GQL response according to design

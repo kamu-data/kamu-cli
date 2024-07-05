@@ -44,7 +44,7 @@ impl Auth {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let access_tokens: Vec<_> = access_token_service
+        let access_token_listing = access_token_service
             .get_access_tokens_by_account_id(
                 &account_id,
                 &AccessTokenPaginationOpts {
@@ -53,7 +53,10 @@ impl Auth {
                 },
             )
             .await
-            .int_err()?
+            .int_err()?;
+
+        let access_tokens: Vec<_> = access_token_listing
+            .list
             .into_iter()
             .map(ViewAccessToken::new)
             .collect();
@@ -62,7 +65,7 @@ impl Auth {
             access_tokens,
             0,
             usize::try_from(per_page).unwrap(),
-            usize::try_from(per_page).unwrap(),
+            access_token_listing.total_count,
         ))
     }
 }

@@ -5,4 +5,14 @@ LABEL org.opencontainers.image.source https://github.com/kamu-data/kamu-cli
 
 ################################################################################
 
+# Install dependencies
+RUN apk --no-cache add \
+    bash \
+    curl \
+    jq \
+    aws-cli
+
+COPY scripts /scripts
+RUN chmod -R 0755 /scripts
+
 COPY ./migrations/ /migrations/

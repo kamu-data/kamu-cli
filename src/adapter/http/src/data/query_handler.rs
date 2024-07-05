@@ -48,6 +48,9 @@ pub async fn dataset_query_handler_post(
     {
         Ok(res) => res,
         Err(QueryError::DatasetNotFound(err)) => Err(ApiError::not_found(err))?,
+        Err(QueryError::DataFusionError(DataFusionError::SQL(err, _))) => {
+            Err(ApiError::bad_request(err))?
+        }
         Err(QueryError::DataFusionError(err @ DataFusionError::Plan(_))) => {
             Err(ApiError::bad_request(err))?
         }

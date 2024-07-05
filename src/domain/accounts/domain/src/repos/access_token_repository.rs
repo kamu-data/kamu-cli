@@ -32,6 +32,11 @@ pub trait AccessTokenRepository: Send + Sync {
         pagination: &AccessTokenPaginationOpts,
     ) -> Result<Vec<AccessToken>, GetAccessTokenError>;
 
+    async fn get_access_tokens_count_by_account_id(
+        &self,
+        account_id: &AccountID,
+    ) -> Result<usize, GetAccessTokenError>;
+
     async fn mark_revoked(
         &self,
         token_id: &Uuid,

@@ -12,6 +12,7 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use datafusion::arrow;
+use datafusion::error::DataFusionError;
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
 use datafusion::parquet::arrow::async_reader::ParquetObjectReader;
 use datafusion::parquet::file::metadata::ParquetMetaData;
@@ -115,7 +116,11 @@ impl QueryServiceImpl {
         // understand which datasets the query is using and populate the state and
         // aliases for them
         let mut table_refs = Vec::new();
-        for stmt in datafusion::sql::parser::DFParser::parse_sql(sql).int_err()? {
+
+        let statements = datafusion::sql::parser::DFParser::parse_sql(sql)
+            .map_err(|e| DataFusionError::SQL(e, None))?;
+
+        for stmt in statements {
             match stmt {
                 Statement::Statement(stmt) => {
                     table_refs.append(&mut extract_table_refs(&stmt)?);
