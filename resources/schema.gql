@@ -533,6 +533,8 @@ type DatasetEnvVars {
 
 type DatasetEnvVarsMut {
 	saveEnvVariable(key: String!, value: String!, isSecret: Boolean!): SaveDatasetEnvVarResult!
+	deleteEnvVariable(id: DatasetEnvVarID!): DeleteDatasetEnvVarResult!
+	modifyEnvVariable(id: DatasetEnvVarID!, newValue: String!, isSecret: Boolean!): ModifyDatasetEnvVarResult!
 }
 
 type DatasetFlowConfigs {
@@ -742,6 +744,20 @@ Implement the DateTime<Utc> scalar
 The input/output is a string in RFC3339 format.
 """
 scalar DateTime
+
+interface DeleteDatasetEnvVarResult {
+	message: String!
+}
+
+type DeleteDatasetEnvVarResultNotFound implements DeleteDatasetEnvVarResult {
+	envVarId: DatasetEnvVarID!
+	message: String!
+}
+
+type DeleteDatasetEnvVarResultSuccess implements DeleteDatasetEnvVarResult {
+	envVarId: DatasetEnvVarID!
+	message: String!
+}
 
 interface DeleteResult {
 	message: String!
@@ -1290,6 +1306,20 @@ type MetadataManifestMalformed implements CommitResult & CreateDatasetFromSnapsh
 }
 
 type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetFromSnapshotResult {
+	message: String!
+}
+
+interface ModifyDatasetEnvVarResult {
+	message: String!
+}
+
+type ModifyDatasetEnvVarResultNotFound implements ModifyDatasetEnvVarResult {
+	envVarId: DatasetEnvVarID!
+	message: String!
+}
+
+type ModifyDatasetEnvVarResultSuccess implements ModifyDatasetEnvVarResult {
+	envVarId: DatasetEnvVarID!
 	message: String!
 }
 
