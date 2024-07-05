@@ -18,6 +18,7 @@
 
 use axum::extract::{Extension, Query};
 use chrono::{DateTime, Utc};
+use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http::HeaderMap;
 use kamu::domain::*;
@@ -51,8 +52,9 @@ struct IngestTaskArguments {
 // until their data was processed. We may still provide a "synchronous" version
 // of push for convenience that waits for passed data to be flushed as part of
 // some block.
+#[transactional_handler]
 pub async fn dataset_ingest_handler(
-    Extension(catalog): Extension<dill::Catalog>,
+    Extension(catalog): Extension<Catalog>,
     Extension(dataset_ref): Extension<DatasetRef>,
     Query(params): Query<IngestQueryParams>,
     headers: HeaderMap,

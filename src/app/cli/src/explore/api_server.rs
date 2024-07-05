@@ -13,12 +13,14 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use axum::Extension;
+use database_common_macros::transactional_handler;
 use dill::{Catalog, CatalogBuilder};
 use indoc::indoc;
 use internal_error::*;
 use kamu::domain::{Protocols, ServerUrlConfig, SystemTimeSource};
+use kamu_adapter_http::api_error::ApiError;
 use kamu_adapter_http::e2e::e2e_router;
-use kamu_adapter_http::{transactionize, transactionize_route};
+use kamu_adapter_http::transactionize;
 use kamu_flow_system_inmem::domain::FlowService;
 use kamu_task_system_inmem::domain::TaskExecutor;
 use tokio::sync::Notify;
@@ -88,12 +90,13 @@ impl APIServer {
 
         let mut app = axum::Router::new()
             .route("/", axum::routing::get(root))
-            .route("/graphql", graphql_method_router())
+            .route(
+                "/graphql",
+                axum::routing::get(graphql_playground_handler).post(graphql_handler),
+            )
             .route(
                 "/platform/login",
-                transactionize_route(axum::routing::post(
-                    kamu_adapter_http::platform_login_handler,
-                )),
+                axum::routing::post(kamu_adapter_http::platform_login_handler),
             )
             .route(
                 "/platform/token/validate",
@@ -107,7 +110,7 @@ impl APIServer {
                 "/platform/file/upload/:upload_token",
                 axum::routing::post(kamu_adapter_http::platform_file_upload_post_handler),
             )
-            .nest("/", transactionize(kamu_adapter_http::data::root_router()))
+            .nest("/", kamu_adapter_http::data::root_router())
             .nest(
                 "/odata",
                 transactionize(if multi_tenant_workspace {
@@ -194,17 +197,6 @@ impl APIServer {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Routers
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn graphql_method_router() -> axum::routing::MethodRouter {
-    let post_handler = transactionize_route(axum::routing::post(graphql_handler));
-    let get_handler = axum::routing::get(graphql_playground_handler);
-
-    post_handler.merge(get_handler)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Handlers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -221,14 +213,16 @@ async fn root() -> impl axum::response::IntoResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[transactional_handler]
 async fn graphql_handler(
     Extension(schema): Extension<kamu_adapter_graphql::Schema>,
-    Extension(catalog): Extension<dill::Catalog>,
+    Extension(catalog): Extension<Catalog>,
     req: async_graphql_axum::GraphQLRequest,
-) -> async_graphql_axum::GraphQLResponse {
+) -> Result<async_graphql_axum::GraphQLResponse, ApiError> {
     let graphql_request = req.into_inner().data(catalog);
+    let graphql_response = schema.execute(graphql_request).await.into();
 
-    schema.execute(graphql_request).await.into()
+    Ok(graphql_response)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

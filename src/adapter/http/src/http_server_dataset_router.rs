@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use axum::Json;
+use axum::{Extension, Json};
+use database_common_macros::transactional_handler;
+use dill::Catalog;
 use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -19,14 +21,14 @@ use crate::{DatasetAuthorizationLayer, DatasetResolverLayer};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Extractor of dataset identity for single-tenant smart transfer protocol
+/// Extractor of dataset identity for single-tenant smart transfer protocol
 #[derive(serde::Deserialize)]
 struct DatasetByName {
     dataset_name: odf::DatasetName,
 }
 
-// Extractor of account + dataset identity for multi-tenant smart transfer
-// protocol
+/// Extractor of account + dataset identity for multi-tenant smart transfer
+/// protocol
 #[derive(serde::Deserialize)]
 struct DatasetByAccountAndName {
     account_name: odf::AccountName,
@@ -96,10 +98,11 @@ pub struct LoginResponseBody {
     pub access_token: String,
 }
 
+#[transactional_handler]
 pub async fn platform_login_handler(
-    catalog: axum::extract::Extension<dill::Catalog>,
+    Extension(catalog): Extension<Catalog>,
     Json(payload): Json<LoginRequestBody>,
-) -> Result<axum::Json<Value>, ApiError> {
+) -> Result<Json<Value>, ApiError> {
     let authentication_service = catalog
         .get_one::<dyn kamu_accounts::AuthenticationService>()
         .unwrap();
@@ -131,9 +134,7 @@ pub async fn platform_login_handler(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(clippy::unused_async)]
-pub async fn platform_token_validate_handler(
-    catalog: axum::extract::Extension<dill::Catalog>,
-) -> Result<(), ApiError> {
+pub async fn platform_token_validate_handler(catalog: Extension<Catalog>) -> Result<(), ApiError> {
     ensure_authenticated_account(&catalog).api_err()?;
     Ok(())
 }

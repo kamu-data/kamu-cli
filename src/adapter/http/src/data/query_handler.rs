@@ -18,11 +18,13 @@
 
 use std::fmt::Debug;
 
-use axum::extract::{self, Extension, Query};
+use axum::extract::{Extension, Query};
 use axum::response::Json;
+use database_common_macros::transactional_handler;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::common::DFSchema;
 use datafusion::error::DataFusionError;
+use dill::Catalog;
 use kamu::domain::*;
 use kamu_data_utils::data::format::*;
 use opendatafabric::{DatasetID, Multihash};
@@ -36,9 +38,10 @@ const MAX_SOA_BUFFER_SIZE: usize = 100_000_000;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[transactional_handler]
 pub async fn dataset_query_handler_post(
-    Extension(catalog): Extension<dill::Catalog>,
-    extract::Json(body): extract::Json<QueryRequestBody>,
+    Extension(catalog): Extension<Catalog>,
+    Json(body): Json<QueryRequestBody>,
 ) -> Result<Json<QueryResponseBody>, ApiError> {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
 
@@ -105,10 +108,10 @@ pub async fn dataset_query_handler_post(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn dataset_query_handler(
-    catalog: Extension<dill::Catalog>,
+    catalog: Extension<Catalog>,
     Query(params): Query<QueryRequestParams>,
 ) -> Result<Json<QueryResponseBody>, ApiError> {
-    dataset_query_handler_post(catalog, extract::Json(params.into())).await
+    dataset_query_handler_post(catalog, Json(params.into())).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -12,7 +12,6 @@ use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::response::{IntoResponse, Response};
-use axum::routing::MethodRouter;
 use axum::Router;
 use database_common::DatabaseTransactionRunner;
 use futures::Future;
@@ -94,12 +93,6 @@ where
 
 pub fn transactionize(router: Router) -> Router {
     router.layer(RunInDatabaseTransactionLayer::new())
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub fn transactionize_route(method_router: MethodRouter) -> MethodRouter {
-    method_router.layer(RunInDatabaseTransactionLayer::new())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

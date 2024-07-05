@@ -39,6 +39,7 @@ ftp = ["kamu/ftp"]
 # Kamu
 container-runtime = { workspace = true }
 database-common = { workspace = true }
+database-common-macros = { workspace = true }
 event-bus = { workspace = true }
 internal-error = { workspace = true }
 kamu = { workspace = true }

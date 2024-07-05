@@ -109,6 +109,12 @@ impl ApiError {
     }
 }
 
+impl From<InternalError> for ApiError {
+    fn from(e: InternalError) -> Self {
+        e.api_err()
+    }
+}
+
 impl axum::response::IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
         // TODO: Logging as a side effect of conversion is not great - we should move
