@@ -20,7 +20,6 @@ use indoc::indoc;
 use internal_error::*;
 use kamu::domain::{Protocols, ServerUrlConfig, SystemTimeSource};
 use kamu_adapter_http::e2e::e2e_router;
-use kamu_adapter_http::transactionize;
 use kamu_flow_system_inmem::domain::FlowService;
 use kamu_task_system_inmem::domain::TaskExecutor;
 use tokio::sync::Notify;
@@ -128,10 +127,7 @@ impl APIServer {
                 kamu_adapter_http::add_dataset_resolver_layer(
                     axum::Router::new()
                         .nest("/", kamu_adapter_http::smart_transfer_protocol_router())
-                        .nest(
-                            "/",
-                            transactionize(kamu_adapter_http::data::dataset_router()),
-                        ),
+                        .nest("/", kamu_adapter_http::data::dataset_router()),
                     multi_tenant_workspace,
                 ),
             )
