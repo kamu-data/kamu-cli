@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
+use database_common::TransactionId;
 use fs::FlowConfigurationService;
 use kamu_accounts::Account;
 use kamu_core::DatasetOwnershipService;
@@ -39,11 +40,12 @@ impl AccountFlowConfigsMut {
 
     async fn resume_account_dataset_flows(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let transaction_id = from_catalog::<TransactionId>(ctx).unwrap();
 
         let account_dataset_ids = self.get_account_dataset_ids(ctx).await?;
         for dataset_id in &account_dataset_ids {
             flow_config_service
-                .resume_dataset_flows(Utc::now(), dataset_id, None)
+                .resume_dataset_flows(transaction_id.as_ref(), Utc::now(), dataset_id, None)
                 .await
                 .int_err()?;
         }
@@ -53,11 +55,12 @@ impl AccountFlowConfigsMut {
 
     async fn pause_account_dataset_flows(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let transaction_id = from_catalog::<TransactionId>(ctx).unwrap();
 
         let account_dataset_ids = self.get_account_dataset_ids(ctx).await?;
         for dataset_id in &account_dataset_ids {
             flow_config_service
-                .pause_dataset_flows(Utc::now(), dataset_id, None)
+                .pause_dataset_flows(transaction_id.as_ref(), Utc::now(), dataset_id, None)
                 .await
                 .int_err()?;
         }

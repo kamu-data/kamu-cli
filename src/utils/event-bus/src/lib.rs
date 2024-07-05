@@ -11,8 +11,8 @@
 
 mod event_bus;
 mod event_handler;
-mod event_sink;
+mod transaction_event_sink;
 
 pub use event_bus::*;
 pub use event_handler::*;
-pub use event_sink::*;
+pub use transaction_event_sink::*;

@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin, TransactionId};
 use dill::*;
 use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, MockDatasetChangesService};
@@ -57,7 +57,6 @@ pub(crate) struct FlowHarness {
     _tmp_dir: tempfile::TempDir,
     pub catalog: dill::Catalog,
     pub dataset_repo: Arc<dyn DatasetRepository>,
-    pub flow_configuration_service: Arc<dyn FlowConfigurationService>,
     pub flow_service: Arc<dyn FlowService>,
     pub auth_svc: Arc<dyn AuthenticationService>,
     pub fake_system_time_source: FakeSystemTimeSource,
@@ -167,7 +166,6 @@ impl FlowHarness {
             .unwrap();
 
         let flow_service = catalog.get_one::<dyn FlowService>().unwrap();
-        let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
         let auth_svc = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
@@ -175,7 +173,6 @@ impl FlowHarness {
             _tmp_dir: tmp_dir,
             catalog,
             flow_service,
-            flow_configuration_service,
             dataset_repo,
             fake_system_time_source,
             auth_svc,
@@ -261,12 +258,20 @@ impl FlowHarness {
         dataset_flow_type: DatasetFlowType,
         schedule: Schedule,
     ) {
-        self.flow_configuration_service
-            .set_configuration(
-                request_time,
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                false,
-                FlowConfigurationRule::Schedule(schedule),
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with2(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>,
+                 transaction_id: Arc<TransactionId>| async move {
+                    flow_configuration_service
+                        .set_configuration(
+                            transaction_id.as_ref(),
+                            request_time,
+                            FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
+                            false,
+                            FlowConfigurationRule::Schedule(schedule),
+                        )
+                        .await
+                },
             )
             .await
             .unwrap();
@@ -279,12 +284,20 @@ impl FlowHarness {
         dataset_flow_type: DatasetFlowType,
         batching_rule: BatchingRule,
     ) {
-        self.flow_configuration_service
-            .set_configuration(
-                request_time,
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                false,
-                FlowConfigurationRule::BatchingRule(batching_rule),
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with2(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>,
+                 transaction_id: Arc<TransactionId>| async move {
+                    flow_configuration_service
+                        .set_configuration(
+                            transaction_id.as_ref(),
+                            request_time,
+                            FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
+                            false,
+                            FlowConfigurationRule::BatchingRule(batching_rule),
+                        )
+                        .await
+                },
             )
             .await
             .unwrap();
@@ -297,12 +310,20 @@ impl FlowHarness {
         dataset_flow_type: DatasetFlowType,
         compaction_rule: CompactionRule,
     ) {
-        self.flow_configuration_service
-            .set_configuration(
-                request_time,
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                false,
-                FlowConfigurationRule::CompactionRule(compaction_rule),
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with2(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>,
+                 transaction_id: Arc<TransactionId>| async move {
+                    flow_configuration_service
+                        .set_configuration(
+                            transaction_id.as_ref(),
+                            request_time,
+                            FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
+                            false,
+                            FlowConfigurationRule::CompactionRule(compaction_rule),
+                        )
+                        .await
+                },
             )
             .await
             .unwrap();
@@ -314,16 +335,29 @@ impl FlowHarness {
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
     ) {
-        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
-        let current_config = self
-            .flow_configuration_service
-            .find_configuration(flow_key.clone())
-            .await
-            .unwrap()
-            .unwrap();
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with2(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>,
+                 transaction_id: Arc<TransactionId>| async move {
+                    let flow_key: FlowKey =
+                        FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
+                    let current_config = flow_configuration_service
+                        .find_configuration(flow_key.clone())
+                        .await
+                        .unwrap()
+                        .unwrap();
 
-        self.flow_configuration_service
-            .set_configuration(request_time, flow_key, true, current_config.rule)
+                    flow_configuration_service
+                        .set_configuration(
+                            transaction_id.as_ref(),
+                            request_time,
+                            flow_key,
+                            true,
+                            current_config.rule,
+                        )
+                        .await
+                },
+            )
             .await
             .unwrap();
     }
@@ -334,16 +368,29 @@ impl FlowHarness {
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
     ) {
-        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
-        let current_config = self
-            .flow_configuration_service
-            .find_configuration(flow_key.clone())
-            .await
-            .unwrap()
-            .unwrap();
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with2(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>,
+                 transaction_id: Arc<TransactionId>| async move {
+                    let flow_key: FlowKey =
+                        FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
+                    let current_config = flow_configuration_service
+                        .find_configuration(flow_key.clone())
+                        .await
+                        .unwrap()
+                        .unwrap();
 
-        self.flow_configuration_service
-            .set_configuration(request_time, flow_key, false, current_config.rule)
+                    flow_configuration_service
+                        .set_configuration(
+                            transaction_id.as_ref(),
+                            request_time,
+                            flow_key,
+                            false,
+                            current_config.rule,
+                        )
+                        .await
+                },
+            )
             .await
             .unwrap();
     }

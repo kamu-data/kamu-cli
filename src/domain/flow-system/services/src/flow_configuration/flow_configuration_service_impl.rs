@@ -10,8 +10,9 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use database_common::TransactionId;
 use dill::*;
-use event_bus::{AsyncEventHandler, EventSink};
+use event_bus::{AsyncEventHandler, TransactionEventSink};
 use futures::TryStreamExt;
 use kamu_core::events::DatasetEventDeleted;
 use kamu_core::SystemTimeSource;
@@ -23,7 +24,7 @@ use opendatafabric::DatasetID;
 pub struct FlowConfigurationServiceImpl {
     event_store: Arc<dyn FlowConfigurationEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
-    event_sink_modified: Arc<dyn EventSink<FlowConfigurationEventModified>>,
+    event_sink_modified: Arc<dyn TransactionEventSink<FlowConfigurationEventModified>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +36,7 @@ impl FlowConfigurationServiceImpl {
     pub fn new(
         event_store: Arc<dyn FlowConfigurationEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
-        event_sink_modified: Arc<dyn EventSink<FlowConfigurationEventModified>>,
+        event_sink_modified: Arc<dyn TransactionEventSink<FlowConfigurationEventModified>>,
     ) -> Self {
         Self {
             event_store,
@@ -46,6 +47,7 @@ impl FlowConfigurationServiceImpl {
 
     fn post_configuration_modified(
         &self,
+        transaction_id: &TransactionId,
         state: &FlowConfigurationState,
         request_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
@@ -55,7 +57,8 @@ impl FlowConfigurationServiceImpl {
             paused: !state.is_active(),
             rule: state.rule.clone(),
         };
-        self.event_sink_modified.post_event(event)
+        self.event_sink_modified
+            .post_event(transaction_id.inner(), event)
     }
 
     fn get_dataset_flow_keys(
@@ -133,41 +136,6 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         })
     }
 
-    /// Set or modify dataset update schedule
-    #[tracing::instrument(level = "info", skip_all, fields(?flow_key, %paused, ?rule))]
-    async fn set_configuration(
-        &self,
-        request_time: DateTime<Utc>,
-        flow_key: FlowKey,
-        paused: bool,
-        rule: FlowConfigurationRule,
-    ) -> Result<FlowConfigurationState, SetFlowConfigurationError> {
-        let maybe_flow_configuration =
-            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await?;
-
-        let mut flow_configuration = match maybe_flow_configuration {
-            // Modification
-            Some(mut flow_configuration) => {
-                flow_configuration
-                    .modify_configuration(self.time_source.now(), paused, rule)
-                    .int_err()?;
-
-                flow_configuration
-            }
-            // New configuration
-            None => FlowConfiguration::new(self.time_source.now(), flow_key.clone(), paused, rule),
-        };
-
-        flow_configuration
-            .save(self.event_store.as_ref())
-            .await
-            .int_err()?;
-
-        self.post_configuration_modified(&flow_configuration, request_time)?;
-
-        Ok(flow_configuration.into())
-    }
-
     /// Lists all enabled configurations
     fn list_enabled_configurations(&self) -> FlowConfigurationStateStream {
         // Note: terribly inefficient - walks over events multiple times
@@ -194,9 +162,46 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         })
     }
 
+    /// Set or modify dataset update schedule
+    #[tracing::instrument(level = "info", skip_all, fields(?flow_key, %paused, ?rule))]
+    async fn set_configuration(
+        &self,
+        transaction_id: &TransactionId,
+        request_time: DateTime<Utc>,
+        flow_key: FlowKey,
+        paused: bool,
+        rule: FlowConfigurationRule,
+    ) -> Result<FlowConfigurationState, SetFlowConfigurationError> {
+        let maybe_flow_configuration =
+            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await?;
+
+        let mut flow_configuration = match maybe_flow_configuration {
+            // Modification
+            Some(mut flow_configuration) => {
+                flow_configuration
+                    .modify_configuration(self.time_source.now(), paused, rule)
+                    .int_err()?;
+
+                flow_configuration
+            }
+            // New configuration
+            None => FlowConfiguration::new(self.time_source.now(), flow_key.clone(), paused, rule),
+        };
+
+        flow_configuration
+            .save(self.event_store.as_ref())
+            .await
+            .int_err()?;
+
+        self.post_configuration_modified(transaction_id, &flow_configuration, request_time)?;
+
+        Ok(flow_configuration.into())
+    }
+
     /// Pauses particular flow configuration
     async fn pause_flow_configuration(
         &self,
+        transaction_id: &TransactionId,
         request_time: DateTime<Utc>,
         flow_key: FlowKey,
     ) -> Result<(), InternalError> {
@@ -212,7 +217,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
                 .await
                 .int_err()?;
 
-            self.post_configuration_modified(&flow_configuration, request_time)?;
+            self.post_configuration_modified(transaction_id, &flow_configuration, request_time)?;
         }
 
         Ok(())
@@ -221,6 +226,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
     /// Resumes particular flow configuration
     async fn resume_flow_configuration(
         &self,
+        transaction_id: &TransactionId,
         request_time: DateTime<Utc>,
         flow_key: FlowKey,
     ) -> Result<(), InternalError> {
@@ -236,7 +242,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
                 .await
                 .int_err()?;
 
-            self.post_configuration_modified(&flow_configuration, request_time)?;
+            self.post_configuration_modified(transaction_id, &flow_configuration, request_time)?;
         }
 
         Ok(())
@@ -246,6 +252,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
     /// If the type is omitted, all possible dataset flow types are paused
     async fn pause_dataset_flows(
         &self,
+        transaction_id: &TransactionId,
         request_time: DateTime<Utc>,
         dataset_id: &DatasetID,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
@@ -253,7 +260,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         let flow_keys = Self::get_dataset_flow_keys(dataset_id, maybe_dataset_flow_type);
 
         for flow_key in flow_keys {
-            self.pause_flow_configuration(request_time, flow_key)
+            self.pause_flow_configuration(transaction_id, request_time, flow_key)
                 .await?;
         }
 
@@ -264,13 +271,14 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
     /// If the type is omitted, all possible system flow types are paused
     async fn pause_system_flows(
         &self,
+        transaction_id: &TransactionId,
         request_time: DateTime<Utc>,
         maybe_system_flow_type: Option<SystemFlowType>,
     ) -> Result<(), InternalError> {
         let flow_keys = Self::get_system_flow_keys(maybe_system_flow_type);
 
         for flow_key in flow_keys {
-            self.pause_flow_configuration(request_time, flow_key)
+            self.pause_flow_configuration(transaction_id, request_time, flow_key)
                 .await?;
         }
 
@@ -282,6 +290,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
     /// configured)
     async fn resume_dataset_flows(
         &self,
+        transaction_id: &TransactionId,
         request_time: DateTime<Utc>,
         dataset_id: &DatasetID,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
@@ -289,7 +298,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         let flow_keys = Self::get_dataset_flow_keys(dataset_id, maybe_dataset_flow_type);
 
         for flow_key in flow_keys {
-            self.resume_flow_configuration(request_time, flow_key)
+            self.resume_flow_configuration(transaction_id, request_time, flow_key)
                 .await?;
         }
 
@@ -301,13 +310,14 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
     /// (where configured)
     async fn resume_system_flows(
         &self,
+        transaction_id: &TransactionId,
         request_time: DateTime<Utc>,
         maybe_system_flow_type: Option<SystemFlowType>,
     ) -> Result<(), InternalError> {
         let flow_keys = Self::get_system_flow_keys(maybe_system_flow_type);
 
         for flow_key in flow_keys {
-            self.resume_flow_configuration(request_time, flow_key)
+            self.resume_flow_configuration(transaction_id, request_time, flow_key)
                 .await?;
         }
 
@@ -321,8 +331,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
-        // TODO: transactional
-
+        // TODO: transaction required!
         for flow_type in DatasetFlowType::all() {
             let maybe_flow_configuration = FlowConfiguration::try_load(
                 FlowKeyDataset::new(event.dataset_id.clone(), *flow_type).into(),

@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use database_common::TransactionId;
 use event_sourcing::TryLoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::DatasetID;
@@ -37,21 +38,23 @@ pub trait FlowConfigurationService: Sync + Send {
         dataset_ids: Vec<DatasetID>,
     ) -> FlowConfigurationStateStream;
 
+    /// Lists all flow configurations, which are currently enabled
+    fn list_enabled_configurations(&self) -> FlowConfigurationStateStream;
+
     /// Set or modify flow configuration
     async fn set_configuration(
         &self,
+        transaction_id: &TransactionId,
         request_time: DateTime<Utc>,
         flow_key: FlowKey,
         paused: bool,
         rule: FlowConfigurationRule,
     ) -> Result<FlowConfigurationState, SetFlowConfigurationError>;
 
-    /// Lists all flow configurations, which are currently enabled
-    fn list_enabled_configurations(&self) -> FlowConfigurationStateStream;
-
     /// Pauses particular flow configuration
     async fn pause_flow_configuration(
         &self,
+        transaction_id: &TransactionId,
         request_time: DateTime<Utc>,
         flow_key: FlowKey,
     ) -> Result<(), InternalError>;
@@ -59,6 +62,7 @@ pub trait FlowConfigurationService: Sync + Send {
     /// Resumes particular flow configuration
     async fn resume_flow_configuration(
         &self,
+        transaction_id: &TransactionId,
         request_time: DateTime<Utc>,
         flow_key: FlowKey,
     ) -> Result<(), InternalError>;
@@ -67,6 +71,7 @@ pub trait FlowConfigurationService: Sync + Send {
     /// If type is omitted, all possible dataset flow types are paused
     async fn pause_dataset_flows(
         &self,
+        transaction_id: &TransactionId,
         request_time: DateTime<Utc>,
         dataset_id: &DatasetID,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
@@ -76,6 +81,7 @@ pub trait FlowConfigurationService: Sync + Send {
     /// If type is omitted, all possible system flow types are paused
     async fn pause_system_flows(
         &self,
+        transaction_id: &TransactionId,
         request_time: DateTime<Utc>,
         maybe_system_flow_type: Option<SystemFlowType>,
     ) -> Result<(), InternalError>;
@@ -84,6 +90,7 @@ pub trait FlowConfigurationService: Sync + Send {
     /// If type is omitted, all possible types are resumed (where configured)
     async fn resume_dataset_flows(
         &self,
+        transaction_id: &TransactionId,
         request_time: DateTime<Utc>,
         dataset_id: &DatasetID,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
@@ -94,6 +101,7 @@ pub trait FlowConfigurationService: Sync + Send {
     /// configured)
     async fn resume_system_flows(
         &self,
+        transaction_id: &TransactionId,
         request_time: DateTime<Utc>,
         maybe_system_flow_type: Option<SystemFlowType>,
     ) -> Result<(), InternalError>;

@@ -3527,6 +3527,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -5361,6 +5362,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "cron",
+ "database-common",
  "datafusion",
  "enum-variants",
  "event-sourcing",
@@ -5476,6 +5478,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "uuid",
 ]
 
 [[package]]

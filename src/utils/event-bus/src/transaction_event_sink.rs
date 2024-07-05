@@ -8,11 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait EventSink<TEvent: 'static + Clone>: Send + Sync {
-    fn post_event(&self, event: TEvent) -> Result<(), InternalError>;
+pub trait TransactionEventSink<TEvent: 'static + Clone>: Send + Sync {
+    fn post_event(&self, transaction_id: &Uuid, event: TEvent) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

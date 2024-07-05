@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
+use database_common::TransactionId;
 use kamu_flow_system::{
     BatchingRule,
     CompactionRule,
@@ -73,6 +74,8 @@ impl DatasetFlowConfigsMut {
         }
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let transaction_id = from_catalog::<TransactionId>(ctx).unwrap();
+
         let configuration_rule = match schedule {
             ScheduleInput::TimeDelta(td) => {
                 Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
@@ -85,6 +88,7 @@ impl DatasetFlowConfigsMut {
 
         let res = flow_config_service
             .set_configuration(
+                transaction_id.as_ref(),
                 Utc::now(),
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
@@ -145,9 +149,11 @@ impl DatasetFlowConfigsMut {
         }
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let transaction_id = from_catalog::<TransactionId>(ctx).unwrap();
 
         let res = flow_config_service
             .set_configuration(
+                transaction_id.as_ref(),
                 Utc::now(),
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
@@ -211,9 +217,11 @@ impl DatasetFlowConfigsMut {
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let transaction_id = from_catalog::<TransactionId>(ctx).unwrap();
 
         let res = flow_config_service
             .set_configuration(
+                transaction_id.as_ref(),
                 Utc::now(),
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
@@ -239,9 +247,11 @@ impl DatasetFlowConfigsMut {
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let transaction_id = from_catalog::<TransactionId>(ctx).unwrap();
 
         flow_config_service
             .pause_dataset_flows(
+                transaction_id.as_ref(),
                 Utc::now(),
                 &self.dataset_handle.id,
                 dataset_flow_type.map(Into::into),
@@ -260,9 +270,11 @@ impl DatasetFlowConfigsMut {
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let transaction_id = from_catalog::<TransactionId>(ctx).unwrap();
 
         flow_config_service
             .resume_dataset_flows(
+                transaction_id.as_ref(),
                 Utc::now(),
                 &self.dataset_handle.id,
                 dataset_flow_type.map(Into::into),

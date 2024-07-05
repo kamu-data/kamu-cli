@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use async_graphql::value;
-use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin, TransactionId};
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
@@ -1539,7 +1539,8 @@ impl FlowConfigHarness {
                 .add::<FlowConfigurationServiceImpl>()
                 .add::<FlowConfigurationEventSink>()
                 .add::<FlowConfigurationEventStoreInMem>()
-                .add::<DatabaseTransactionRunner>();
+                .add::<DatabaseTransactionRunner>()
+                .add_value(TransactionId::new());
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

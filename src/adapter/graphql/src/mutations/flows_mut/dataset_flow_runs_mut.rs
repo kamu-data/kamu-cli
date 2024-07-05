@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
+use database_common::TransactionId;
 use {kamu_flow_system as fs, opendatafabric as odf};
 
 use super::{
@@ -121,8 +122,14 @@ impl DatasetFlowRunsMut {
         // Duplicate requests are auto-ignored.
         let flow_configuration_service =
             from_catalog::<dyn fs::FlowConfigurationService>(ctx).unwrap();
+        let transaction_id = from_catalog::<TransactionId>(ctx).unwrap();
+
         flow_configuration_service
-            .pause_flow_configuration(Utc::now(), flow_state.flow_key.clone())
+            .pause_flow_configuration(
+                transaction_id.as_ref(),
+                Utc::now(),
+                flow_state.flow_key.clone(),
+            )
             .await?;
 
         Ok(CancelScheduledTasksResult::Success(

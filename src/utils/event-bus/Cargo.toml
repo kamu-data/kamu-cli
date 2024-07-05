@@ -28,6 +28,7 @@ async-trait = "0.1"
 dill = "0.8"
 futures = "0.3"
 tracing = "0.1"
+uuid = "1"
 
 [dev-dependencies]
 test-log = { version = "0.2", features = ["trace"] }

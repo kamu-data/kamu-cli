@@ -8,13 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait TransactionListener: Send + Sync {
-    async fn on_transaction_commit(&self) -> Result<(), InternalError>;
-    async fn on_transaction_rollback(&self) -> Result<(), InternalError>;
+    async fn on_transaction_commit(&self, transaction_id: &Uuid) -> Result<(), InternalError>;
+    async fn on_transaction_rollback(&self, transaction_id: &Uuid) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

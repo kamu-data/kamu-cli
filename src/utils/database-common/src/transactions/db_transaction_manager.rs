@@ -14,6 +14,7 @@ use std::sync::Arc;
 use dill::{component, Catalog, CatalogBuilder};
 use internal_error::{InternalError, ResultIntoInternal};
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
 use crate::TransactionListener;
 
@@ -61,16 +62,11 @@ impl DatabaseTransactionRunner {
             .get_one::<dyn DatabaseTransactionManager>()
             .unwrap();
 
-        // Extract transaction listeners
-        let mut listeners = Vec::new();
-        let builders = self.catalog.builders_for::<dyn TransactionListener>();
-        for b in builders {
-            let listener = b.get(&self.catalog).unwrap();
-            listeners.push(listener);
-        }
-
         // Start transaction
         let transaction_ref = db_transaction_manager.make_transaction_ref().await?;
+
+        // Associate transaction with unique ID
+        let transaction_id = TransactionId::new();
 
         // A catalog with a transaction must live for a limited time
         let result = {
@@ -78,6 +74,7 @@ impl DatabaseTransactionRunner {
             // but keep a local copy of a transaction pointer
             let catalog_with_transaction = CatalogBuilder::new_chained(&self.catalog)
                 .add_value(transaction_ref.clone())
+                .add_value(transaction_id.clone())
                 .build();
 
             callback(catalog_with_transaction).await
@@ -91,7 +88,7 @@ impl DatabaseTransactionRunner {
                     .commit_transaction(transaction_ref)
                     .await?;
 
-                self.notify_commit_listeners(&listeners).await?;
+                self.notify_commit_listeners(&transaction_id.0).await?;
 
                 Ok(res)
             }
@@ -102,7 +99,7 @@ impl DatabaseTransactionRunner {
                     .rollback_transaction(transaction_ref)
                     .await?;
 
-                self.notify_rollback_listeners(&listeners).await?;
+                self.notify_rollback_listeners(&transaction_id.0).await?;
 
                 Err(e)
             }
@@ -127,13 +124,34 @@ impl DatabaseTransactionRunner {
         .await
     }
 
-    async fn notify_commit_listeners(
+    pub async fn transactional_with2<Iface1, Iface2, H, HFut, HFutResultT, HFutResultE>(
         &self,
-        listeners: &Vec<Arc<dyn TransactionListener>>,
-    ) -> Result<(), InternalError> {
+        callback: H,
+    ) -> Result<HFutResultT, HFutResultE>
+    where
+        Iface1: 'static + ?Sized + Send + Sync,
+        Iface2: 'static + ?Sized + Send + Sync,
+        H: FnOnce(Arc<Iface1>, Arc<Iface2>) -> HFut,
+        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
+        HFutResultE: From<InternalError>,
+    {
+        self.transactional(|transactional_catalog| async move {
+            let catalog_item1 = transactional_catalog.get_one().int_err()?;
+            let catalog_item2 = transactional_catalog.get_one().int_err()?;
+
+            callback(catalog_item1, catalog_item2).await
+        })
+        .await
+    }
+
+    async fn notify_commit_listeners(&self, transaction_id: &Uuid) -> Result<(), InternalError> {
+        let listeners = self.get_transaction_listeners();
+
         let futures: Vec<_> = listeners
             .iter()
-            .map(|listener: &Arc<dyn TransactionListener>| listener.on_transaction_commit())
+            .map(|listener: &Arc<dyn TransactionListener>| {
+                listener.on_transaction_commit(transaction_id)
+            })
             .collect();
 
         let results = futures::future::join_all(futures).await;
@@ -142,19 +160,30 @@ impl DatabaseTransactionRunner {
         Ok(())
     }
 
-    async fn notify_rollback_listeners(
-        &self,
-        listeners: &Vec<Arc<dyn TransactionListener>>,
-    ) -> Result<(), InternalError> {
+    async fn notify_rollback_listeners(&self, transaction_id: &Uuid) -> Result<(), InternalError> {
+        let listeners = self.get_transaction_listeners();
+
         let futures: Vec<_> = listeners
             .iter()
-            .map(|listener: &Arc<dyn TransactionListener>| listener.on_transaction_rollback())
+            .map(|listener: &Arc<dyn TransactionListener>| {
+                listener.on_transaction_rollback(transaction_id)
+            })
             .collect();
 
         let results = futures::future::join_all(futures).await;
         results.into_iter().try_for_each(|res| res)?;
 
         Ok(())
+    }
+
+    fn get_transaction_listeners(&self) -> Vec<Arc<dyn TransactionListener>> {
+        let mut listeners = Vec::new();
+        let builders = self.catalog.builders_for::<dyn TransactionListener>();
+        for b in builders {
+            let listener = b.get(&self.catalog).unwrap();
+            listeners.push(listener);
+        }
+        listeners
     }
 }
 
@@ -270,6 +299,21 @@ impl<'a, DB: sqlx::Database> TransactionGuard<'a, DB> {
         Ok(transaction
             .downcast_mut::<sqlx::Transaction<'static, DB>>()
             .unwrap())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone)]
+pub struct TransactionId(Uuid);
+
+impl TransactionId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+
+    pub fn inner(&self) -> &Uuid {
+        &self.0
     }
 }
 

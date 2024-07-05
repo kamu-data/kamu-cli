@@ -7,13 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use database_common::TransactionListener;
 use dill::*;
-use event_bus::{EventBus, EventSink};
+use event_bus::{EventBus, TransactionEventSink};
 use kamu_core::InternalError;
 use kamu_flow_system::FlowConfigurationEventModified;
+use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,12 +26,17 @@ pub struct FlowConfigurationEventSink {
 
 #[derive(Default)]
 struct State {
-    configuration_modified_events: Vec<FlowConfigurationEventModified>,
+    events_by_transaction_id: HashMap<Uuid, TransactionEvents>,
+}
+
+struct TransactionEvents {
+    configuration_modified: Vec<FlowConfigurationEventModified>,
 }
 
 #[component(pub)]
+#[scope(Singleton)]
 #[interface(dyn TransactionListener)]
-#[interface(dyn EventSink<FlowConfigurationEventModified>)]
+#[interface(dyn TransactionEventSink<FlowConfigurationEventModified>)]
 impl FlowConfigurationEventSink {
     pub fn new(event_bus: Arc<EventBus>) -> Self {
         Self {
@@ -41,13 +48,24 @@ impl FlowConfigurationEventSink {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl EventSink<FlowConfigurationEventModified> for FlowConfigurationEventSink {
+impl TransactionEventSink<FlowConfigurationEventModified> for FlowConfigurationEventSink {
     fn post_event(
         &self,
+        transaction_id: &Uuid,
         event: FlowConfigurationEventModified,
     ) -> Result<(), kamu_core::InternalError> {
         let mut guard = self.state.lock().unwrap();
-        guard.configuration_modified_events.push(event);
+        guard
+            .events_by_transaction_id
+            .entry(*transaction_id)
+            .and_modify(|transaction_events| {
+                transaction_events
+                    .configuration_modified
+                    .push(event.clone())
+            })
+            .or_insert(TransactionEvents {
+                configuration_modified: vec![event],
+            });
         Ok(())
     }
 }
@@ -56,25 +74,24 @@ impl EventSink<FlowConfigurationEventModified> for FlowConfigurationEventSink {
 
 #[async_trait::async_trait]
 impl TransactionListener for FlowConfigurationEventSink {
-    async fn on_transaction_commit(&self) -> Result<(), InternalError> {
-        let configuration_modified_events = {
+    async fn on_transaction_commit(&self, transaction_id: &Uuid) -> Result<(), InternalError> {
+        let maybe_events = {
             let mut guard = self.state.lock().unwrap();
-            let mut events = vec![];
-            guard
-                .configuration_modified_events
-                .swap_with_slice(&mut events);
-            events
+            guard.events_by_transaction_id.remove(transaction_id)
         };
 
-        for event in configuration_modified_events {
-            self.event_bus.dispatch_event(event).await?;
+        if let Some(events) = maybe_events {
+            for event in events.configuration_modified {
+                self.event_bus.dispatch_event(event).await?;
+            }
         }
+
         Ok(())
     }
 
-    async fn on_transaction_rollback(&self) -> Result<(), InternalError> {
+    async fn on_transaction_rollback(&self, transaction_id: &Uuid) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
-        guard.configuration_modified_events.clear();
+        guard.events_by_transaction_id.remove(transaction_id);
         Ok(())
     }
 }

@@ -40,6 +40,7 @@ tokio = { version = "1", default-features = false, features = [] }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 url = { version = "2", default-features = false, features = ["serde"] }
+uuid = "1"
 
 # TODO: Make serde optional
 serde = { version = "1", default-features = false, features = ["derive"] }
