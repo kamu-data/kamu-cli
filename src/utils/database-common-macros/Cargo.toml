@@ -1,0 +1,26 @@
+[package]
+name = "database-common-macros"
+description = "Macros for working with a database"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+proc-macro = true
+
+
+[dependencies]
+syn = { version = "2", default-features = false }
+quote = "1"
