@@ -22,6 +22,7 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
+use crate::config::DatasetEnvVarsType;
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
@@ -371,8 +372,6 @@ pub fn configure_base_catalog(
     b.add::<kamu_accounts_services::AccessTokenServiceImpl>();
     b.add::<PredefinedAccountsRegistrator>();
 
-    b.add::<kamu_dataset_env_vars_services::DatasetEnvVarServiceStaticImpl>();
-
     // Give both CLI and server access to stored repo access tokens
     b.add::<odf_server::AccessTokenRegistryService>();
     b.add::<odf_server::CLIAccessTokenStore>();
@@ -573,6 +572,14 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(FileUploadLimitConfig::new_in_mb(
         uploads_config.max_file_size_in_mb.unwrap(),
     ));
+    match config.dataset_env_vars.as_ref().unwrap() {
+        DatasetEnvVarsType::Static => {
+            catalog_builder.add::<kamu_dataset_env_vars_services::DatasetEnvVarServiceStaticImpl>()
+        }
+        DatasetEnvVarsType::Storage => {
+            catalog_builder.add::<kamu_dataset_env_vars_services::DatasetEnvVarServiceImpl>()
+        }
+    };
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
