@@ -42,7 +42,7 @@ pub trait DatasetEnvVarService: Sync + Send {
         &self,
         dataset_id: &DatasetID,
         pagination: &DatasetEnvVarPaginationOpts,
-    ) -> Result<Vec<DatasetEnvVar>, GetDatasetEnvVarError>;
+    ) -> Result<DatasetEnvVarListing, GetDatasetEnvVarError>;
 
     async fn delete_dataset_env_var(
         &self,
@@ -54,4 +54,11 @@ pub trait DatasetEnvVarService: Sync + Send {
         dataset_env_var_id: &Uuid,
         dataset_env_var_new_value: &DatasetEnvVarValue,
     ) -> Result<(), ModifyDatasetEnvVarError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct DatasetEnvVarListing {
+    pub list: Vec<DatasetEnvVar>,
+    pub total_count: usize,
 }

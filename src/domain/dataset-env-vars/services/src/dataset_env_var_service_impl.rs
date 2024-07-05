@@ -14,6 +14,7 @@ use internal_error::ResultIntoInternal;
 use kamu_core::{ErrorIntoInternal, SystemTimeSource};
 use kamu_dataset_env_vars::{
     DatasetEnvVar,
+    DatasetEnvVarListing,
     DatasetEnvVarPaginationOpts,
     DatasetEnvVarRepository,
     DatasetEnvVarService,
@@ -93,10 +94,26 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
         &self,
         dataset_id: &DatasetID,
         pagination: &DatasetEnvVarPaginationOpts,
-    ) -> Result<Vec<DatasetEnvVar>, GetDatasetEnvVarError> {
-        self.dataset_env_var_repository
+    ) -> Result<DatasetEnvVarListing, GetDatasetEnvVarError> {
+        let total_count = self
+            .dataset_env_var_repository
+            .get_all_dataset_env_vars_count_by_dataset_id(dataset_id)
+            .await?;
+        if total_count == 0 {
+            return Ok(DatasetEnvVarListing {
+                total_count,
+                list: vec![],
+            });
+        }
+
+        let dataset_env_var_list = self
+            .dataset_env_var_repository
             .get_all_dataset_env_vars_by_dataset_id(dataset_id, pagination)
-            .await
+            .await?;
+        Ok(DatasetEnvVarListing {
+            list: dataset_env_var_list,
+            total_count,
+        })
     }
 
     async fn delete_dataset_env_var(

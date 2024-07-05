@@ -63,7 +63,7 @@ impl Auth {
 
         Ok(AccessTokenConnection::new(
             access_tokens,
-            0,
+            usize::try_from(page).unwrap(),
             usize::try_from(per_page).unwrap(),
             access_token_listing.total_count,
         ))

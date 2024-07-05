@@ -41,7 +41,7 @@ impl DatasetEnvVars {
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
         let dataset_env_var_service = from_catalog::<dyn DatasetEnvVarService>(ctx).unwrap();
-        let dataset_env_vars: Vec<_> = dataset_env_var_service
+        let dataset_env_var_listing = dataset_env_var_service
             .get_all_dataset_env_vars_by_dataset_id(
                 &self.dataset_handle.id,
                 &DatasetEnvVarPaginationOpts {
@@ -50,17 +50,19 @@ impl DatasetEnvVars {
                 },
             )
             .await
-            .int_err()?
+            .int_err()?;
+
+        let dataset_env_vars: Vec<_> = dataset_env_var_listing
+            .list
             .into_iter()
             .map(ViewDatasetEnvVar::new)
             .collect();
-        let total_count = dataset_env_vars.len();
 
         Ok(ViewDatasetEnvVarConnection::new(
             dataset_env_vars,
             usize::try_from(page).unwrap(),
             usize::try_from(per_page).unwrap(),
-            total_count,
+            dataset_env_var_listing.total_count,
         ))
     }
 }

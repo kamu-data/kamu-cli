@@ -23,6 +23,11 @@ pub trait DatasetEnvVarRepository: Send + Sync {
         dataset_env_var: &DatasetEnvVar,
     ) -> Result<(), SaveDatasetEnvVarError>;
 
+    async fn get_all_dataset_env_vars_count_by_dataset_id(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<usize, GetDatasetEnvVarError>;
+
     async fn get_all_dataset_env_vars_by_dataset_id(
         &self,
         dataset_id: &DatasetID,

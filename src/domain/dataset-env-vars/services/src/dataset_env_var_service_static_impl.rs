@@ -11,6 +11,7 @@ use dill::*;
 use kamu_core::ErrorIntoInternal;
 use kamu_dataset_env_vars::{
     DatasetEnvVar,
+    DatasetEnvVarListing,
     DatasetEnvVarPaginationOpts,
     DatasetEnvVarService,
     DatasetEnvVarValue,
@@ -66,7 +67,7 @@ impl DatasetEnvVarService for DatasetEnvVarServiceStaticImpl {
         &self,
         _dataset_id: &DatasetID,
         _pagination: &DatasetEnvVarPaginationOpts,
-    ) -> Result<Vec<DatasetEnvVar>, GetDatasetEnvVarError> {
+    ) -> Result<DatasetEnvVarListing, GetDatasetEnvVarError> {
         unreachable!()
     }
 

@@ -123,6 +123,18 @@ impl DatasetEnvVarRepository for DatasetEnvVarRepositoryInMemory {
         Ok(vec![])
     }
 
+    async fn get_all_dataset_env_vars_count_by_dataset_id(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<usize, GetDatasetEnvVarError> {
+        let guard = self.state.lock().unwrap();
+
+        if let Some(dataset_env_var_ids) = guard.dataset_env_var_ids_by_dataset_id.get(dataset_id) {
+            return Ok(dataset_env_var_ids.len());
+        }
+        Ok(0)
+    }
+
     async fn get_dataset_env_var_by_id(
         &self,
         dataset_env_var_id: &Uuid,

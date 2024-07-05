@@ -170,6 +170,13 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
         db_dataset_env_vars,
         vec![new_secret_dataset_env_var, new_dataset_env_var]
     );
+
+    let db_dataset_env_vars_count = dataset_env_var_repo
+        .get_all_dataset_env_vars_count_by_dataset_id(&dataset_id)
+        .await
+        .unwrap();
+
+    assert_eq!(db_dataset_env_vars_count, 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
