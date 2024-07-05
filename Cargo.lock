@@ -5472,6 +5472,7 @@ dependencies = [
  "chrono",
  "cron",
  "database-common",
+ "database-common-macros",
  "dill",
  "event-bus",
  "futures",
@@ -5633,6 +5634,8 @@ name = "kamu-task-system-repo-tests"
 version = "0.189.7"
 dependencies = [
  "chrono",
+ "database-common",
+ "database-common-macros",
  "dill",
  "futures",
  "kamu-task-system",

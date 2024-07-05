@@ -9,7 +9,8 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, FnArg, ItemFn};
+use syn::parse::{Parse, ParseStream};
+use syn::{parse_macro_input, FnArg, Ident, ItemFn, Token, Type};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,6 +48,52 @@ pub fn transactional_handler(_attr: TokenStream, item: TokenStream) -> TokenStre
 
         panic!("{function_name}(): the expected argument \"{CATALOG_ARGUMENT}\" was not found!");
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct CatalogItem {
+    item_name: Ident,
+    item_type: Type,
+}
+
+impl Parse for CatalogItem {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let item_name: Ident = input.parse()?;
+        let _colon: Token![:] = input.parse()?;
+        let item_type: Type = input.parse()?;
+
+        Ok(CatalogItem {
+            item_name,
+            item_type,
+        })
+    }
+}
+
+#[proc_macro_attribute]
+pub fn transactional_method(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let CatalogItem {
+        item_name: catalog_item_name,
+        item_type: catalog_item_type,
+    } = parse_macro_input!(attr as CatalogItem);
+    let input = parse_macro_input!(item as ItemFn);
+
+    let method_signature = &input.sig;
+    let method_body = &input.block;
+    let method_visibility = &input.vis;
+
+    let expanded = quote! {
+        #method_visibility #method_signature {
+            ::database_common::DatabaseTransactionRunner::new(self.catalog.clone())
+                .transactional_with(|#catalog_item_name: #catalog_item_type| async move {
+                    #method_body
+                })
+                .await
+                .unwrap();
+        }
+    };
+
+    TokenStream::from(expanded)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

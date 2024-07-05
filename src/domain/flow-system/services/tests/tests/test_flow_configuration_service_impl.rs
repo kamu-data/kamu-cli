@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use chrono::{Duration, Utc};
+use database_common_macros::transactional_method;
 use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
 use futures::TryStreamExt;
@@ -432,22 +433,28 @@ impl FlowConfigurationHarness {
         let datasets_dir = tmp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = CatalogBuilder::new()
-            .add::<EventBus>()
-            .add::<FlowConfigurationServiceImpl>()
-            .add::<FlowConfigurationEventStoreInMem>()
-            .add::<SystemTimeSourceDefault>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(false),
-            )
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceInMemory>()
-            .add::<FlowConfigEventsListener>()
-            .build();
+        let catalog = {
+            let mut b = CatalogBuilder::new();
+
+            b.add::<EventBus>()
+                .add::<FlowConfigurationServiceImpl>()
+                .add::<FlowConfigurationEventStoreInMem>()
+                .add::<SystemTimeSourceDefault>()
+                .add_builder(
+                    DatasetRepositoryLocalFs::builder()
+                        .with_root(datasets_dir)
+                        .with_multi_tenant(false),
+                )
+                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .add_value(CurrentAccountSubject::new_test())
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<DependencyGraphServiceInMemory>()
+                .add::<FlowConfigEventsListener>();
+
+            database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
 
         let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
         let flow_configuration_event_store = catalog
@@ -481,8 +488,9 @@ impl FlowConfigurationHarness {
         res
     }
 
+    #[transactional_method(flow_configuration_service: Arc<dyn FlowConfigurationService>)]
     async fn set_system_flow_schedule(&self, system_flow_type: SystemFlowType, schedule: Schedule) {
-        self.flow_configuration_service
+        flow_configuration_service
             .set_configuration(
                 Utc::now(),
                 system_flow_type.into(),
@@ -490,7 +498,6 @@ impl FlowConfigurationHarness {
                 FlowConfigurationRule::Schedule(schedule),
             )
             .await
-            .unwrap();
     }
 
     async fn set_dataset_flow_schedule(
