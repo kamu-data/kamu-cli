@@ -10,11 +10,11 @@
 use axum::{Extension, Json};
 use database_common_macros::transactional_handler;
 use dill::Catalog;
+use http_common::{ApiError, IntoApiError, ResultIntoApiError};
 use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::api_error::{ApiError, IntoApiError, ResultIntoApiError};
 use crate::axum_utils::ensure_authenticated_account;
 use crate::simple_protocol::*;
 use crate::{DatasetAuthorizationLayer, DatasetResolverLayer};

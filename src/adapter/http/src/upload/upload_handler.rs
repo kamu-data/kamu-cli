@@ -8,11 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use bytes::Bytes;
+use http_common::{ApiError, IntoApiError, ResultIntoApiError};
 use kamu::domain::{ErrorIntoInternal, ResultIntoInternal};
 use serde_json::{json, Value};
 use thiserror::Error;
 
-use crate::api_error::{ApiError, IntoApiError, ResultIntoApiError};
 use crate::axum_utils::ensure_authenticated_account;
 use crate::{MakeUploadContextError, SaveUploadError, UploadService};
 

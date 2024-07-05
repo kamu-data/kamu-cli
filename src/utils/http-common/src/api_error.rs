@@ -16,7 +16,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::*;
+use kamu_core::*;
+use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,7 +60,7 @@ use kamu::domain::*;
 ///     }
 /// }
 /// ```
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Error)]
 #[error("api error {status_code:?}")]
 pub struct ApiError {
     status_code: http::StatusCode,

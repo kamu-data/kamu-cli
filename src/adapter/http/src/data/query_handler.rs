@@ -25,11 +25,10 @@ use datafusion::arrow::array::RecordBatch;
 use datafusion::common::DFSchema;
 use datafusion::error::DataFusionError;
 use dill::Catalog;
+use http_common::*;
 use kamu::domain::*;
 use kamu_data_utils::data::format::*;
 use opendatafabric::{DatasetID, Multihash};
-
-use crate::api_error::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

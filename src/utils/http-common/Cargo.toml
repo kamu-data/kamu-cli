@@ -1,0 +1,30 @@
+[package]
+name = "http-common"
+description = "Common code for working with HTTP API"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+kamu-core = { workspace = true }
+
+axum = "0.6"
+http = "0.2"
+thiserror = { version = "1", default-features = false }
+tracing = "0.1"
