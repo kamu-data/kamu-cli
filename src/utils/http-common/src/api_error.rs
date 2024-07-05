@@ -98,6 +98,13 @@ impl ApiError {
         Self::new(source, http::StatusCode::NOT_FOUND)
     }
 
+    pub fn not_found_without_body() -> Self {
+        Self {
+            source: "".into(),
+            status_code: http::StatusCode::NOT_FOUND,
+        }
+    }
+
     pub fn new_unsupported_media_type() -> Self {
         Self {
             source: "Unsupported media type".into(),

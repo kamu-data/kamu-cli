@@ -5100,6 +5100,7 @@ dependencies = [
  "event-bus",
  "futures",
  "http 0.2.12",
+ "http-common",
  "hyper 0.14.29",
  "indoc 2.0.5",
  "kamu",

@@ -113,11 +113,11 @@ impl APIServer {
             .nest("/", kamu_adapter_http::data::root_router())
             .nest(
                 "/odata",
-                transactionize(if multi_tenant_workspace {
+                if multi_tenant_workspace {
                     kamu_adapter_odata::router_multi_tenant()
                 } else {
                     kamu_adapter_odata::router_single_tenant()
-                }),
+                },
             )
             .nest(
                 if multi_tenant_workspace {
