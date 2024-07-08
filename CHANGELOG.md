@@ -4,11 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.189.7] - 2024-07-04
 ### Added
-- New kamu access token e2e test
+- Added Kamu access token E2E test
+- SmTP: added E2E test group to cover the pushing and pulling of datasets
+### Changed
+- Wrapping only necessary, not all HTTP requests in a transaction
+- Respect the `--quiet` option for:
+  - `kamu add`
+  - `kamu ingest`
+  - `kamu push`
+### Fixed
+- Fixed SmTP working together with transactions
 
-## [0.189.6] - 2024-07-3
+## [0.189.6] - 2024-07-03
 ### Fixed
 - GQL API regression where unparsable SQL was ending up in internal error
 - REST API `/query` endpoint will return `400 Bad Request` in case of unparsable SQL
@@ -33,9 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.189.0] - 2024-06-28
 ### Added
 - Support multiple methods to access database:
-    - via raw password
-    - via password stored as AWS secret
-    - via generated AWS IAM authentication tokens
+  - via raw password
+  - via password stored as AWS secret
+  - via generated AWS IAM authentication tokens
 - Support periodic database password rotation with configurable period
 
 ## [0.188.6] - 2024-06-27

@@ -1,6 +1,6 @@
 [package]
-name = "kamu-task-system-repo-tests"
-description = "Shared repository tests for Kamu task system"
+name = "database-common-macros"
+description = "Macros for working with a database"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -18,13 +18,9 @@ workspace = true
 
 
 [lib]
-doctest = false
+proc-macro = true
 
 
 [dependencies]
-kamu-task-system = { workspace = true }
-opendatafabric = { workspace = true }
-
-chrono = { version = "0.4", default-features = false }
-dill = "0.8"
-futures = "0.3"
+syn = { version = "2", default-features = false }
+quote = "1"

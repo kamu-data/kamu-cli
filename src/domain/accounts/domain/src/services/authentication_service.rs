@@ -132,8 +132,10 @@ pub enum GetAccountInfoError {
     AccountUnresolved,
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
 pub enum AccessTokenError {

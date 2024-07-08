@@ -22,12 +22,14 @@ doctest = false
 
 
 [dependencies]
-opendatafabric = { workspace = true }
+database-common = { workspace = true }
+database-common-macros = { workspace = true }
+event-bus = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
-kamu-task-system = { workspace = true }
 kamu-flow-system = { workspace = true }
-event-bus = { workspace = true }
+kamu-task-system = { workspace = true }
+opendatafabric = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }

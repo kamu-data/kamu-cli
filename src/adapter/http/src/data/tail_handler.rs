@@ -18,19 +18,22 @@
 
 use axum::extract::{Extension, Query};
 use axum::response::Json;
+use database_common_macros::transactional_handler;
+use dill::Catalog;
+use http_common::*;
 use kamu::domain::*;
 use opendatafabric::DatasetRef;
 
 use super::query_handler::{DataFormat, SchemaFormat};
-use crate::api_error::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: This endpoint is temporary to enable some demo integrations
 // it should be properly re-designed in future to allow for different query
 // dialects, returning schema, error handling etc.
+#[transactional_handler]
 pub async fn dataset_tail_handler(
-    Extension(catalog): Extension<dill::Catalog>,
+    Extension(catalog): Extension<Catalog>,
     Extension(dataset_ref): Extension<DatasetRef>,
     Query(params): Query<TailRequestParams>,
 ) -> Result<Json<TailResponseBody>, ApiError> {

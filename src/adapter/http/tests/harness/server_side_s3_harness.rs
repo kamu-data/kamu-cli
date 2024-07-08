@@ -73,33 +73,37 @@ impl ServerSideS3Harness {
 
         let time_source = SystemTimeSourceStub::new();
 
-        let addr = SocketAddr::from(([127, 0, 0, 1], 0));
-        let bind_socket = TcpListener::bind(addr).unwrap();
-        let base_url_rest = format!("http://{}", bind_socket.local_addr().unwrap());
+        let (base_catalog, bind_socket) = {
+            let addr = SocketAddr::from(([127, 0, 0, 1], 0));
+            let bind_socket = TcpListener::bind(addr).unwrap();
+            let base_url_rest = format!("http://{}", bind_socket.local_addr().unwrap());
 
-        let mut base_catalog_builder = dill::CatalogBuilder::new();
-        base_catalog_builder
-            .add_value(time_source.clone())
-            .add_value(RunInfoDir::new(run_info_dir))
-            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
-            .add::<EventBus>()
-            .add::<DependencyGraphServiceInMemory>()
-            .add_builder(
-                DatasetRepositoryS3::builder()
-                    .with_s3_context(s3_context.clone())
-                    .with_multi_tenant(false),
-            )
-            .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
-            .add_value(server_authentication_mock())
-            .bind::<dyn AuthenticationService, MockAuthenticationService>()
-            .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
-            .add::<CompactionServiceImpl>()
-            .add::<ObjectStoreRegistryImpl>()
-            .add::<ObjectStoreBuilderLocalFs>()
-            .add_value(ObjectStoreBuilderS3::new(s3_context, true))
-            .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>();
+            let mut b = dill::CatalogBuilder::new();
 
-        let base_catalog = base_catalog_builder.build();
+            b.add_value(time_source.clone())
+                .add_value(RunInfoDir::new(run_info_dir))
+                .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+                .add::<EventBus>()
+                .add::<DependencyGraphServiceInMemory>()
+                .add_builder(
+                    DatasetRepositoryS3::builder()
+                        .with_s3_context(s3_context.clone())
+                        .with_multi_tenant(false),
+                )
+                .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
+                .add_value(server_authentication_mock())
+                .bind::<dyn AuthenticationService, MockAuthenticationService>()
+                .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
+                .add::<CompactionServiceImpl>()
+                .add::<ObjectStoreRegistryImpl>()
+                .add::<ObjectStoreBuilderLocalFs>()
+                .add_value(ObjectStoreBuilderS3::new(s3_context, true))
+                .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>();
+
+            database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
+            (b.build(), bind_socket)
+        };
 
         let api_server = TestAPIServer::new(
             create_web_user_catalog(&base_catalog, &options),

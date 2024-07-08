@@ -12,7 +12,10 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
 
+use axum::Extension;
+use database_common_macros::transactional_handler;
 use dill::{Catalog, CatalogBuilder};
+use http_common::ApiError;
 use indoc::indoc;
 use internal_error::*;
 use kamu::domain::{Protocols, ServerUrlConfig, SystemTimeSource};
@@ -45,8 +48,6 @@ impl APIServer {
         external_address: Option<IpAddr>,
         is_e2e_testing: bool,
     ) -> Self {
-        use axum::extract::Extension;
-
         // Background task executor must run with server privileges to execute tasks on
         // behalf of the system, as they are automatically scheduled
         let task_executor = cli_catalog.get_one().unwrap();
@@ -90,7 +91,7 @@ impl APIServer {
             .route("/", axum::routing::get(root))
             .route(
                 "/graphql",
-                axum::routing::get(graphql_playground).post(graphql_handler),
+                axum::routing::get(graphql_playground_handler).post(graphql_handler),
             )
             .route(
                 "/platform/login",
@@ -141,9 +142,6 @@ impl APIServer {
                     )
                     .layer(Extension(api_server_catalog))
                     .layer(Extension(gql_schema))
-                    // TODO: Use a more subtle application of this middleware,
-                    //       since not for every request, we need a transaction
-                    .layer(kamu_adapter_http::RunInDatabaseTransactionLayer::new())
                     .layer(kamu_adapter_http::AuthenticationLayer::new()),
             );
 
@@ -195,6 +193,8 @@ impl APIServer {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Handlers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn root() -> impl axum::response::IntoResponse {
     axum::response::Html(indoc!(
@@ -209,18 +209,21 @@ async fn root() -> impl axum::response::IntoResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[transactional_handler]
 async fn graphql_handler(
-    schema: axum::extract::Extension<kamu_adapter_graphql::Schema>,
-    catalog: axum::extract::Extension<dill::Catalog>,
+    Extension(schema): Extension<kamu_adapter_graphql::Schema>,
+    Extension(catalog): Extension<Catalog>,
     req: async_graphql_axum::GraphQLRequest,
-) -> async_graphql_axum::GraphQLResponse {
-    let graphql_request = req.into_inner().data(catalog.0);
-    schema.execute(graphql_request).await.into()
+) -> Result<async_graphql_axum::GraphQLResponse, ApiError> {
+    let graphql_request = req.into_inner().data(catalog);
+    let graphql_response = schema.execute(graphql_request).await.into();
+
+    Ok(graphql_response)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn graphql_playground() -> impl axum::response::IntoResponse {
+async fn graphql_playground_handler() -> impl axum::response::IntoResponse {
     axum::response::Html(async_graphql::http::playground_source(
         async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
     ))

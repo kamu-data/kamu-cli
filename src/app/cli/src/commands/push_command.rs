@@ -190,22 +190,25 @@ impl Command for PushCommand {
             }
         }
 
-        if updated != 0 {
-            eprintln!(
-                "{}",
-                console::style(format!("{updated} dataset(s) pushed"))
-                    .green()
-                    .bold()
-            );
+        if !self.output_config.quiet {
+            if updated != 0 {
+                eprintln!(
+                    "{}",
+                    console::style(format!("{updated} dataset(s) pushed"))
+                        .green()
+                        .bold()
+                );
+            }
+            if up_to_date != 0 {
+                eprintln!(
+                    "{}",
+                    console::style(format!("{up_to_date} dataset(s) up-to-date"))
+                        .yellow()
+                        .bold()
+                );
+            }
         }
-        if up_to_date != 0 {
-            eprintln!(
-                "{}",
-                console::style(format!("{up_to_date} dataset(s) up-to-date"))
-                    .yellow()
-                    .bold()
-            );
-        }
+
         if errors != 0 {
             Err(BatchError::new(
                 format!("Failed to push {errors} dataset(s)"),

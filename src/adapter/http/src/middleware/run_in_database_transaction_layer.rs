@@ -14,10 +14,9 @@ use axum::body::Body;
 use axum::response::{IntoResponse, Response};
 use database_common::DatabaseTransactionRunner;
 use futures::Future;
+use http_common::IntoApiError;
 use kamu::domain::InternalError;
 use tower::{Layer, Service};
-
-use crate::api_error::IntoApiError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

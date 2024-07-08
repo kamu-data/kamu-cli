@@ -32,6 +32,7 @@ pub fn get_command(
             submatches.get_flag("recursive"),
             submatches.get_flag("replace"),
             submatches.get_flag("stdin"),
+            cli_catalog.get_one()?,
         )),
         Some(("complete", submatches)) => {
             let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;

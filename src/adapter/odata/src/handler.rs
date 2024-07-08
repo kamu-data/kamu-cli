@@ -18,8 +18,11 @@
 
 use std::sync::Arc;
 
+use axum::Extension;
+use database_common_macros::transactional_handler;
 use datafusion_odata::collection::{CollectionAddr, QueryParamsRaw};
 use dill::Catalog;
+use http_common::ApiError;
 use kamu_core::*;
 use opendatafabric::*;
 
@@ -30,54 +33,60 @@ use crate::context::*;
 // TODO: Replace these variations with middleware
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[transactional_handler]
 pub async fn odata_service_handler_st(
-    catalog: axum::extract::Extension<Catalog>,
-) -> axum::response::Response<String> {
+    Extension(catalog): Extension<Catalog>,
+) -> Result<axum::response::Response<String>, ApiError> {
     odata_service_handler_common(catalog, None).await
 }
 
+#[transactional_handler]
 pub async fn odata_service_handler_mt(
-    catalog: axum::extract::Extension<Catalog>,
+    Extension(catalog): Extension<Catalog>,
     axum::extract::Path(account_name): axum::extract::Path<AccountName>,
-) -> axum::response::Response<String> {
+) -> Result<axum::response::Response<String>, ApiError> {
     odata_service_handler_common(catalog, Some(account_name)).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[transactional_handler]
 pub async fn odata_metadata_handler_st(
-    catalog: axum::extract::Extension<Catalog>,
-) -> axum::response::Response<String> {
+    Extension(catalog): Extension<Catalog>,
+) -> Result<axum::response::Response<String>, ApiError> {
     odata_metadata_handler_common(catalog, None).await
 }
 
+#[transactional_handler]
 pub async fn odata_metadata_handler_mt(
-    catalog: axum::extract::Extension<Catalog>,
+    Extension(catalog): Extension<Catalog>,
     axum::extract::Path(account_name): axum::extract::Path<AccountName>,
-) -> axum::response::Response<String> {
+) -> Result<axum::response::Response<String>, ApiError> {
     odata_metadata_handler_common(catalog, Some(account_name)).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[transactional_handler]
 pub async fn odata_collection_handler_st(
-    catalog: axum::extract::Extension<Catalog>,
+    Extension(catalog): Extension<Catalog>,
     axum::extract::Path(collection_addr): axum::extract::Path<String>,
     headers: axum::http::HeaderMap,
     query: axum::extract::Query<QueryParamsRaw>,
-) -> axum::response::Response<String> {
+) -> Result<axum::response::Response<String>, ApiError> {
     odata_collection_handler_common(catalog, None, collection_addr, headers, query).await
 }
 
+#[transactional_handler]
 pub async fn odata_collection_handler_mt(
-    catalog: axum::extract::Extension<Catalog>,
+    Extension(catalog): Extension<Catalog>,
     axum::extract::Path((account_name, collection_addr)): axum::extract::Path<(
         AccountName,
         String,
     )>,
     headers: axum::http::HeaderMap,
     query: axum::extract::Query<QueryParamsRaw>,
-) -> axum::response::Response<String> {
+) -> Result<axum::response::Response<String>, ApiError> {
     odata_collection_handler_common(catalog, Some(account_name), collection_addr, headers, query)
         .await
 }
@@ -87,44 +96,44 @@ pub async fn odata_collection_handler_mt(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn odata_service_handler_common(
-    axum::extract::Extension(catalog): axum::extract::Extension<Catalog>,
+    catalog: Catalog,
     account_name: Option<AccountName>,
-) -> axum::response::Response<String> {
+) -> Result<axum::response::Response<String>, ApiError> {
     let ctx = ODataServiceContext::new(catalog, account_name);
-    datafusion_odata::handlers::odata_service_handler(axum::Extension(Arc::new(ctx))).await
+    let response =
+        datafusion_odata::handlers::odata_service_handler(Extension(Arc::new(ctx))).await;
+
+    Ok(response)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn odata_metadata_handler_common(
-    axum::extract::Extension(catalog): axum::extract::Extension<Catalog>,
+    catalog: Catalog,
     account_name: Option<AccountName>,
-) -> axum::response::Response<String> {
+) -> Result<axum::response::Response<String>, ApiError> {
     let ctx = ODataServiceContext::new(catalog, account_name);
-    datafusion_odata::handlers::odata_metadata_handler(axum::Extension(Arc::new(ctx))).await
+    let response =
+        datafusion_odata::handlers::odata_metadata_handler(Extension(Arc::new(ctx))).await;
+
+    Ok(response)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn odata_collection_handler_common(
-    axum::extract::Extension(catalog): axum::extract::Extension<Catalog>,
+    catalog: Catalog,
     account_name: Option<AccountName>,
     collection_addr: String,
     headers: axum::http::HeaderMap,
     query: axum::extract::Query<QueryParamsRaw>,
-) -> axum::response::Response<String> {
+) -> Result<axum::response::Response<String>, ApiError> {
     let Some(addr) = CollectionAddr::decode(&collection_addr) else {
-        return axum::response::Response::builder()
-            .status(http::StatusCode::NOT_FOUND)
-            .body(Default::default())
-            .unwrap();
+        return Err(ApiError::not_found_without_body());
     };
 
     let Ok(dataset_name) = DatasetName::try_from(&addr.name) else {
-        return axum::response::Response::builder()
-            .status(http::StatusCode::NOT_FOUND)
-            .body(Default::default())
-            .unwrap();
+        return Err(ApiError::not_found_without_body());
     };
 
     let repo: Arc<dyn DatasetRepository> = catalog.get_one().unwrap();
@@ -135,10 +144,7 @@ pub async fn odata_collection_handler_common(
     {
         Ok(hdl) => Ok(hdl),
         Err(GetDatasetError::NotFound(_)) => {
-            return axum::response::Response::builder()
-                .status(http::StatusCode::NOT_FOUND)
-                .body(Default::default())
-                .unwrap()
+            return Err(ApiError::not_found_without_body());
         }
         Err(e) => Err(e),
     }
@@ -150,10 +156,12 @@ pub async fn odata_collection_handler_common(
         .unwrap();
 
     let ctx = ODataCollectionContext::new(catalog, addr, dataset_handle, dataset);
-    datafusion_odata::handlers::odata_collection_handler(
-        axum::Extension(Arc::new(ctx)),
+    let response = datafusion_odata::handlers::odata_collection_handler(
+        Extension(Arc::new(ctx)),
         query,
         headers,
     )
-    .await
+    .await;
+
+    Ok(response)
 }
