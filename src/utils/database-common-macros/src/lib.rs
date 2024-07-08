@@ -10,46 +10,170 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::{parse_macro_input, FnArg, Ident, ItemFn, LitStr, Token, Type};
+use syn::{
+    parse_macro_input,
+    FnArg,
+    GenericArgument,
+    Ident,
+    ItemFn,
+    LitStr,
+    Pat,
+    PatTupleStruct,
+    PathArguments,
+    Token,
+    Type,
+    TypePath,
+};
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// #[transactional_handler]
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[proc_macro_attribute]
 pub fn transactional_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    const CATALOG_ARGUMENT: &str = "Extension(catalog): Extension<Catalog>";
-
     let input = parse_macro_input!(item as ItemFn);
 
-    let catalog_argument: FnArg = syn::parse_str(CATALOG_ARGUMENT).unwrap();
-    let has_catalog_argument = input
-        .sig
-        .inputs
-        .iter()
-        .any(|argument| catalog_argument == *argument);
+    let has_catalog_argument = input.sig.inputs.iter().any(is_catalog_argument);
 
-    if has_catalog_argument {
-        let function_signature = &input.sig;
-        let function_body = &input.block;
-        let function_visibility = &input.vis;
-
-        let updated_function = quote! {
-            #function_visibility #function_signature {
-                ::database_common::DatabaseTransactionRunner::new(catalog)
-                    .transactional(|catalog: ::dill::Catalog| async move {
-                        #function_body
-                    })
-                    .await
-            }
-        };
-
-        TokenStream::from(updated_function)
-    } else {
+    if !has_catalog_argument {
         let function_name = &input.sig.ident;
+
+        const CATALOG_ARGUMENT: &str = "Extension(catalog): Extension<Catalog>";
 
         panic!("{function_name}(): the expected argument \"{CATALOG_ARGUMENT}\" was not found!");
     }
+
+    let function_signature = &input.sig;
+    let function_body = &input.block;
+    let function_visibility = &input.vis;
+
+    let updated_function = quote! {
+        #function_visibility #function_signature {
+            ::database_common::DatabaseTransactionRunner::new(catalog)
+                .transactional(|catalog: ::dill::Catalog| async move {
+                    #function_body
+                })
+                .await
+        }
+    };
+
+    TokenStream::from(updated_function)
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn is_catalog_argument(argument: &FnArg) -> bool {
+    let FnArg::Typed(typed_pattern) = argument else {
+        return false;
+    };
+
+    let Pat::TupleStruct(tuple_struct_pattern) = typed_pattern.pat.as_ref() else {
+        return false;
+    };
+
+    if !is_catalog_tuple_struct(tuple_struct_pattern) {
+        return false;
+    }
+
+    let Type::Path(ref type_path) = *typed_pattern.ty else {
+        return false;
+    };
+
+    is_catalog_type(type_path)
+}
+
+#[test]
+fn test_is_catalog_argument_works_correctly() {
+    let mut inputs = vec![];
+
+    for tuple_type in ["Extension", "axum::Extension", "::axum::Extension"] {
+        for argument_type in ["Extension", "axum::Extension", "::axum::Extension"] {
+            for generic_type in ["Catalog", "dill::Catalog", "::dill::Catalog"] {
+                let input: FnArg = syn::parse_str(&format!(
+                    "{tuple_type}(catalog): {argument_type}<{generic_type}>"
+                ))
+                .unwrap();
+
+                inputs.push(input);
+            }
+        }
+    }
+
+    for input in inputs {
+        assert!(is_catalog_argument(&input));
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// ::axum::Extension(catalog): ::axum::Extension<::dill::Catalog>,
+//   ^^^^^^^^^^^^^^^^^^^^^^^^
+fn is_catalog_tuple_struct(tuple_struct_pattern: &PatTupleStruct) -> bool {
+    // ::axum::Extension(catalog): ::axum::Extension<::dill::Catalog>,
+    //         ^^^^^^^^^
+    let Some(last_type_segment) = tuple_struct_pattern.path.segments.last() else {
+        return false;
+    };
+
+    if last_type_segment.ident != "Extension" {
+        return false;
+    }
+
+    // ::axum::Extension(catalog): ::axum::Extension<::dill::Catalog>,
+    //                   ^^^^^^^
+    let Some(first_tuple_element) = tuple_struct_pattern.elems.first() else {
+        return false;
+    };
+
+    let Pat::Ident(tuple_ident) = first_tuple_element else {
+        return false;
+    };
+
+    tuple_ident.ident == "catalog"
+}
+
+// ::axum::Extension(catalog): ::axum::Extension<::dill::Catalog>,
+//                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+fn is_catalog_type(type_path: &TypePath) -> bool {
+    // ::axum::Extension(catalog): ::axum::Extension<::dill::Catalog>,
+    //                                     ^^^^^^^^^
+    let Some(last_type_segment) = type_path.path.segments.last() else {
+        return false;
+    };
+
+    if last_type_segment.ident != "Extension" {
+        return false;
+    }
+
+    // ::axum::Extension(catalog): ::axum::Extension<::dill::Catalog>,
+    //                                                       ^^^^^^^
+    let PathArguments::AngleBracketed(ref generic_arguments) = last_type_segment.arguments else {
+        return false;
+    };
+
+    let Some(last_generic_argument) = generic_arguments.args.last() else {
+        return false;
+    };
+
+    let GenericArgument::Type(type_generic_argument) = last_generic_argument else {
+        return false;
+    };
+
+    let Type::Path(generic_type_path) = type_generic_argument else {
+        return false;
+    };
+
+    let Some(last_type_segment) = generic_type_path.path.segments.last() else {
+        return false;
+    };
+
+    last_type_segment.ident == "Catalog"
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// #[transactional_method]
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum ReturnValueAction {
