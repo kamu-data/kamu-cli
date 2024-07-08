@@ -19,16 +19,16 @@ pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServer
         let login_response = kamu_api_server_client
             .graphql_api_call(
                 indoc::indoc!(
-                r#"
-                mutation {
-                  auth {
-                    login(loginMethod: "oauth_github", loginCredentialsJson: "{\"login\":\"e2e-user\"}") {
-                      accessToken
+                    r#"
+                    mutation {
+                      auth {
+                        login(loginMethod: "oauth_github", loginCredentialsJson: "{\"login\":\"e2e-user\"}") {
+                          accessToken
+                        }
+                      }
                     }
-                  }
-                }
-                "#,
-            ),
+                    "#,
+                ),
                 None,
             )
             .await;
