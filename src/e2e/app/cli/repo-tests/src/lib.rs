@@ -10,11 +10,11 @@
 mod test_auth;
 mod test_rest_api;
 mod test_selftest;
-mod test_smtp;
+mod test_smart_transfer_protocol;
 mod test_system_generate_token;
 
 pub use test_auth::*;
 pub use test_rest_api::*;
 pub use test_selftest::*;
-pub use test_smtp::*;
+pub use test_smart_transfer_protocol::*;
 pub use test_system_generate_token::*;

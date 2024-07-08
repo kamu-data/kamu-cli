@@ -10,5 +10,5 @@
 mod test_auth;
 mod test_rest_api;
 mod test_selftest;
-mod test_smtp;
+mod test_smart_transfer_protocol;
 mod test_system_generate_token;

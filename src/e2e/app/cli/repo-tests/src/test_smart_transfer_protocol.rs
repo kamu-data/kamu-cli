@@ -13,7 +13,7 @@ use reqwest::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smpt_push_pull_sequence(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServerClient) {
     // 1. Grub a token
     let token = {
         let login_response = kamu_api_server_client
