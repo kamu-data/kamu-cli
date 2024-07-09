@@ -97,7 +97,7 @@ fn do_force_utc_time(schema: DFSchema) -> DFSchema {
 fn force_utc_time_rec(field: &Arc<Field>, tz: &Arc<str>) -> Arc<Field> {
     match field.data_type() {
         DataType::Timestamp(unit, None) => {
-            let data_type = DataType::Timestamp(unit.clone(), Some(tz.clone()));
+            let data_type = DataType::Timestamp(*unit, Some(tz.clone()));
             Arc::new(Field::new(field.name(), data_type, field.is_nullable()))
         }
         DataType::Struct(fields) => {
