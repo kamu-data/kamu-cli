@@ -528,6 +528,7 @@ type DatasetEndpoints {
 scalar DatasetEnvVarID
 
 type DatasetEnvVars {
+	exposedValue(datasetEnvVarId: DatasetEnvVarID!): String!
 	listEnvVariables(page: Int, perPage: Int): ViewDatasetEnvVarConnection!
 }
 
@@ -1915,9 +1916,9 @@ type ViewDatasetEnvVar {
 	"""
 	key: String!
 	"""
-	Value of dataset environment variable
+	Non sercret value of dataset environment variable
 	"""
-	value: String!
+	value: String
 	"""
 	Date of the dataset environment variable creation
 	"""

@@ -17,7 +17,7 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::ingest::*;
 use kamu::utils::docker_images::BUSYBOX;
-use kamu_dataset_env_vars_services::DatasetEnvVarServiceStaticImpl;
+use kamu_datasets_services::DatasetEnvVarServiceStaticImpl;
 use opendatafabric::*;
 use url::Url;
 

@@ -574,10 +574,10 @@ pub fn register_config_in_catalog(
     ));
     match config.dataset_env_vars.as_ref().unwrap() {
         DatasetEnvVarsType::Static => {
-            catalog_builder.add::<kamu_dataset_env_vars_services::DatasetEnvVarServiceStaticImpl>()
+            catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceStaticImpl>()
         }
         DatasetEnvVarsType::Storage => {
-            catalog_builder.add::<kamu_dataset_env_vars_services::DatasetEnvVarServiceImpl>()
+            catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>()
         }
     };
 }

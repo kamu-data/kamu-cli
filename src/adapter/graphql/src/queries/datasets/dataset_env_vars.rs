@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_dataset_env_vars::{DatasetEnvVarPaginationOpts, DatasetEnvVarService};
+use database_common::DatabasePaginationOpts;
+use kamu_datasets::{DatasetEnvVarService, GetDatasetEnvVarError};
 use opendatafabric as odf;
 
 use super::ViewDatasetEnvVar;
@@ -29,6 +30,25 @@ impl DatasetEnvVars {
         Self { dataset_handle }
     }
 
+    async fn exposed_value(
+        &self,
+        ctx: &Context<'_>,
+        dataset_env_var_id: DatasetEnvVarID,
+    ) -> Result<String> {
+        utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
+
+        let dataset_env_var_service = from_catalog::<dyn DatasetEnvVarService>(ctx).unwrap();
+        let dataset_env_var = dataset_env_var_service
+            .get_dataset_env_var_by_id(&dataset_env_var_id)
+            .await
+            .map_err(|err| match err {
+                GetDatasetEnvVarError::NotFound(err) => GqlError::Gql(err.into()),
+                GetDatasetEnvVarError::Internal(err) => GqlError::Internal(err),
+            })?;
+
+        Ok(dataset_env_var.get_exposed_value().int_err()?)
+    }
+
     async fn list_env_variables(
         &self,
         ctx: &Context<'_>,
@@ -44,7 +64,7 @@ impl DatasetEnvVars {
         let dataset_env_var_listing = dataset_env_var_service
             .get_all_dataset_env_vars_by_dataset_id(
                 &self.dataset_handle.id,
-                &DatasetEnvVarPaginationOpts {
+                &DatabasePaginationOpts {
                     offset: (page * per_page),
                     limit: per_page,
                 },

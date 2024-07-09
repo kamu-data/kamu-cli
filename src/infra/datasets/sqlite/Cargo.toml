@@ -1,0 +1,50 @@
+[package]
+name = "kamu-datasets-sqlite"
+description = "Sqlite-specific implementation of datasets domain"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+database-common = { workspace = true }
+kamu-datasets = { workspace = true }
+internal-error = { workspace = true }
+opendatafabric = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+dill = "0.8"
+secrecy = "0.8"
+sqlx = { version = "0.7", default-features = false, features = [
+    "runtime-tokio-rustls",
+    "macros",
+    "sqlite",
+    "chrono"
+] }
+thiserror = { version = "1", default-features = false }
+tracing = { version = "0.1", default-features = false }
+uuid = "1"
+
+
+[dev-dependencies]
+internal-error = { workspace = true }
+kamu-datasets-repo-tests = { workspace = true }
+
+test-log = { version = "0.2", features = ["trace"] }
+test-group = { version = "1" }

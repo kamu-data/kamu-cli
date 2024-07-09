@@ -17,7 +17,7 @@ use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_http::SmartTransferProtocolClientWs;
-use kamu_dataset_env_vars_services::DatasetEnvVarServiceStaticImpl;
+use kamu_datasets_services::DatasetEnvVarServiceStaticImpl;
 use opendatafabric::{
     AccountID,
     AccountName,

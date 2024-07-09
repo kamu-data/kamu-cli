@@ -23,7 +23,7 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_dataset_env_vars_services::DatasetEnvVarServiceStaticImpl;
+use kamu_datasets_services::DatasetEnvVarServiceStaticImpl;
 use opendatafabric::*;
 
 struct DatasetHelper {

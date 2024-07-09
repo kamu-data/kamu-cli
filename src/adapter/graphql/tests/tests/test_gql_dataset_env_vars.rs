@@ -17,9 +17,9 @@ use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_core::{auth, CreateDatasetResult, DatasetRepository, SystemTimeSourceDefault};
-use kamu_dataset_env_vars::DATASET_ENV_VAR_ENCRYPTION_KEY_VAR;
-use kamu_dataset_env_vars_inmem::DatasetEnvVarRepositoryInMemory;
-use kamu_dataset_env_vars_services::DatasetEnvVarServiceImpl;
+use kamu_datasets::DATASET_ENV_VAR_ENCRYPTION_KEY_VAR;
+use kamu_datasets_inmem::DatasetEnvVarRepositoryInMemory;
+use kamu_datasets_services::DatasetEnvVarServiceImpl;
 use opendatafabric::DatasetKind;
 
 use crate::utils::authentication_catalogs;

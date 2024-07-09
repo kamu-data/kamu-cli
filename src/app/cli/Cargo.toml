@@ -73,11 +73,11 @@ kamu-accounts-postgres = { workspace = true }
 kamu-accounts-mysql = { workspace = true }
 kamu-accounts-sqlite = { workspace = true }
 
-kamu-dataset-env-vars-services = { workspace = true }
-kamu-dataset-env-vars = { workspace = true }
-kamu-dataset-env-vars-inmem = { workspace = true }
-kamu-dataset-env-vars-postgres = { workspace = true }
-kamu-dataset-env-vars-sqlite = { workspace = true }
+kamu-datasets-services = { workspace = true }
+kamu-datasets = { workspace = true }
+kamu-datasets-inmem = { workspace = true }
+kamu-datasets-postgres = { workspace = true }
+kamu-datasets-sqlite = { workspace = true }
 
 # CLI
 chrono-humanize = "0.2"                                           # Human readable durations

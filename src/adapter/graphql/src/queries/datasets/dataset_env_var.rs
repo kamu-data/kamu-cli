@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_dataset_env_vars::DatasetEnvVar;
+use kamu_datasets::DatasetEnvVar;
 
 use crate::prelude::*;
 
@@ -36,12 +36,10 @@ impl ViewDatasetEnvVar {
         self.env_var.key.clone()
     }
 
-    /// Value of dataset environment variable
+    /// Non sercret value of dataset environment variable
     #[allow(clippy::unused_async)]
-    async fn value(&self) -> Result<String> {
-        self.env_var
-            .get_exposed_value()
-            .map_err(|err| GqlError::Internal(err.int_err()))
+    async fn value(&self) -> Option<String> {
+        self.env_var.get_non_secret_value()
     }
 
     /// Date of the dataset environment variable creation

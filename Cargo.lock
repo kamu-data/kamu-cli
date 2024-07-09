@@ -4766,7 +4766,7 @@ dependencies = [
  "kamu-accounts-services",
  "kamu-core",
  "kamu-data-utils",
- "kamu-dataset-env-vars-services",
+ "kamu-datasets-services",
  "kamu-ingest-datafusion",
  "libc",
  "like",
@@ -5016,9 +5016,9 @@ dependencies = [
  "kamu-accounts-services",
  "kamu-core",
  "kamu-data-utils",
- "kamu-dataset-env-vars",
- "kamu-dataset-env-vars-inmem",
- "kamu-dataset-env-vars-services",
+ "kamu-datasets",
+ "kamu-datasets-inmem",
+ "kamu-datasets-services",
  "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-flow-system-services",
@@ -5069,7 +5069,7 @@ dependencies = [
  "kamu-accounts-inmem",
  "kamu-accounts-services",
  "kamu-data-utils",
- "kamu-dataset-env-vars-services",
+ "kamu-datasets-services",
  "kamu-ingest-datafusion",
  "mockall",
  "opendatafabric",
@@ -5197,11 +5197,11 @@ dependencies = [
  "kamu-adapter-odata",
  "kamu-data-utils",
  "kamu-datafusion-cli",
- "kamu-dataset-env-vars",
- "kamu-dataset-env-vars-inmem",
- "kamu-dataset-env-vars-postgres",
- "kamu-dataset-env-vars-services",
- "kamu-dataset-env-vars-sqlite",
+ "kamu-datasets",
+ "kamu-datasets-inmem",
+ "kamu-datasets-postgres",
+ "kamu-datasets-services",
+ "kamu-datasets-sqlite",
  "kamu-flow-system-inmem",
  "kamu-flow-system-services",
  "kamu-task-system-inmem",
@@ -5408,12 +5408,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamu-dataset-env-vars"
+name = "kamu-datasets"
 version = "0.189.6"
 dependencies = [
  "aes-gcm",
  "async-trait",
  "chrono",
+ "database-common",
  "internal-error",
  "opendatafabric",
  "secrecy",
@@ -5423,15 +5424,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamu-dataset-env-vars-inmem"
+name = "kamu-datasets-inmem"
 version = "0.189.6"
 dependencies = [
  "async-trait",
  "chrono",
+ "database-common",
  "dill",
  "internal-error",
- "kamu-dataset-env-vars",
- "kamu-dataset-env-vars-repo-tests",
+ "kamu-datasets",
+ "kamu-datasets-repo-tests",
  "opendatafabric",
  "secrecy",
  "test-log",
@@ -5442,7 +5444,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamu-dataset-env-vars-postgres"
+name = "kamu-datasets-postgres"
 version = "0.189.6"
 dependencies = [
  "async-trait",
@@ -5450,8 +5452,8 @@ dependencies = [
  "database-common",
  "dill",
  "internal-error",
- "kamu-dataset-env-vars",
- "kamu-dataset-env-vars-repo-tests",
+ "kamu-datasets",
+ "kamu-datasets-repo-tests",
  "opendatafabric",
  "secrecy",
  "sqlx",
@@ -5463,27 +5465,29 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamu-dataset-env-vars-repo-tests"
+name = "kamu-datasets-repo-tests"
 version = "0.189.6"
 dependencies = [
  "chrono",
+ "database-common",
  "dill",
- "kamu-dataset-env-vars",
+ "kamu-datasets",
  "opendatafabric",
  "secrecy",
  "uuid",
 ]
 
 [[package]]
-name = "kamu-dataset-env-vars-services"
+name = "kamu-datasets-services"
 version = "0.189.6"
 dependencies = [
  "async-trait",
  "chrono",
+ "database-common",
  "dill",
  "internal-error",
  "kamu-core",
- "kamu-dataset-env-vars",
+ "kamu-datasets",
  "opendatafabric",
  "secrecy",
  "serde",
@@ -5495,7 +5499,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamu-dataset-env-vars-sqlite"
+name = "kamu-datasets-sqlite"
 version = "0.189.6"
 dependencies = [
  "async-trait",
@@ -5503,8 +5507,8 @@ dependencies = [
  "database-common",
  "dill",
  "internal-error",
- "kamu-dataset-env-vars",
- "kamu-dataset-env-vars-repo-tests",
+ "kamu-datasets",
+ "kamu-datasets-repo-tests",
  "opendatafabric",
  "secrecy",
  "sqlx",

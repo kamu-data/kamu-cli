@@ -17,7 +17,7 @@ use container_runtime::*;
 use futures::TryStreamExt;
 use kamu_core::engine::ProcessError;
 use kamu_core::*;
-use kamu_dataset_env_vars_services::domain::{DatasetEnvVarService, GetDatasetEnvVarError};
+use kamu_datasets_services::domain::{DatasetEnvVarService, GetDatasetEnvVarError};
 use opendatafabric::*;
 use secrecy::ExposeSecret;
 use url::Url;

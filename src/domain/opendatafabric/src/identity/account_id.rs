@@ -10,6 +10,7 @@
 use ed25519_dalek::SigningKey;
 
 use crate::formats::*;
+use crate::impl_sqlx;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -181,54 +182,8 @@ impl<'de> serde::de::Visitor<'de> for AccountIDSerdeVisitor {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/// SQLX
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(feature = "sqlx")]
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for AccountID
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::database::HasValueRef<'r>>::ValueRef,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let value = <&str as sqlx::Decode<DB>>::decode(value)?;
-        let account_id = AccountID::from_did_str(value)?;
-        Ok(account_id)
-    }
-}
-
-#[cfg(feature = "sqlx")]
-impl sqlx::Type<sqlx::Postgres> for AccountID {
-    fn type_info() -> <sqlx::Postgres as sqlx::Database>::TypeInfo {
-        <&str as sqlx::Type<sqlx::Postgres>>::type_info()
-    }
-
-    fn compatible(ty: &<sqlx::Postgres as sqlx::Database>::TypeInfo) -> bool {
-        <&str as sqlx::Type<sqlx::Postgres>>::compatible(ty)
-    }
-}
-
-#[cfg(feature = "sqlx")]
-impl sqlx::Type<sqlx::MySql> for AccountID {
-    fn type_info() -> <sqlx::MySql as sqlx::Database>::TypeInfo {
-        <&str as sqlx::Type<sqlx::MySql>>::type_info()
-    }
-
-    fn compatible(ty: &<sqlx::MySql as sqlx::Database>::TypeInfo) -> bool {
-        <&str as sqlx::Type<sqlx::MySql>>::compatible(ty)
-    }
-}
-
-#[cfg(feature = "sqlx")]
-impl sqlx::Type<sqlx::Sqlite> for AccountID {
-    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
-        <&str as sqlx::Type<sqlx::Sqlite>>::type_info()
-    }
-
-    fn compatible(ty: &<sqlx::Sqlite as sqlx::Database>::TypeInfo) -> bool {
-        <&str as sqlx::Type<sqlx::Sqlite>>::compatible(ty)
-    }
-}
+impl_sqlx!(AccountID);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_dataset_env_vars::{
+use kamu_datasets::{
     DatasetEnvVarService,
     DatasetEnvVarValue,
     DeleteDatasetEnvVarError,
@@ -97,7 +97,7 @@ impl DatasetEnvVarsMut {
                 },
             )),
             Err(err) => match err {
-                DeleteDatasetEnvVarError::NotFound(_) => Ok(DeleteDatasetEnvVarResult::NotFount(
+                DeleteDatasetEnvVarError::NotFound(_) => Ok(DeleteDatasetEnvVarResult::NotFound(
                     DeleteDatasetEnvVarResultNotFound {
                         env_var_id: id.clone(),
                     },
@@ -135,7 +135,7 @@ impl DatasetEnvVarsMut {
                 },
             )),
             Err(err) => match err {
-                ModifyDatasetEnvVarError::NotFound(_) => Ok(ModifyDatasetEnvVarResult::NotFount(
+                ModifyDatasetEnvVarError::NotFound(_) => Ok(ModifyDatasetEnvVarResult::NotFound(
                     ModifyDatasetEnvVarResultNotFound {
                         env_var_id: id.clone(),
                     },
@@ -193,7 +193,7 @@ impl SaveDatasetEnvVarResultDuplicate {
 #[graphql(field(name = "message", ty = "String"))]
 pub enum DeleteDatasetEnvVarResult {
     Success(DeleteDatasetEnvVarResultSuccess),
-    NotFount(DeleteDatasetEnvVarResultNotFound),
+    NotFound(DeleteDatasetEnvVarResultNotFound),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
@@ -228,7 +228,7 @@ impl DeleteDatasetEnvVarResultNotFound {
 #[graphql(field(name = "message", ty = "String"))]
 pub enum ModifyDatasetEnvVarResult {
     Success(ModifyDatasetEnvVarResultSuccess),
-    NotFount(ModifyDatasetEnvVarResultNotFound),
+    NotFound(ModifyDatasetEnvVarResultNotFound),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
