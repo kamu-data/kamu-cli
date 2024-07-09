@@ -87,6 +87,25 @@ kamu-base-with-data-mt-push:
 ################################################################################
 
 
+.PHONY: kamu-base-with-env-var-storage
+kamu-base-with-env-var-storage:
+	make -C kamu-base-with-env-var-storage/ \
+		IMAGE_REPO=$(IMAGE_REPO) \
+		KAMU_VERSION=$(KAMU_VERSION) \
+		workspace image
+
+
+.PHONY: kamu-base-with-env-var-storage-push
+kamu-base-with-env-var-storage-push:
+	make -C kamu-base-with-env-var-storage/ \
+		IMAGE_REPO=$(IMAGE_REPO) \
+		KAMU_VERSION=$(KAMU_VERSION) \
+		image-push
+
+
+################################################################################
+
+
 .PHONY: sqlx-cli
 sqlx-cli:
 	docker build \
