@@ -82,10 +82,47 @@ async fn test_create_and_get_dataset_env_var() {
                             "totalCount": 1,
                             "nodes": [{
                                 "key": "foo",
-                                "value": "foo_value",
+                                "value": null,
                                 "isSecret": true
                             }]
                         }
+                    }
+                }
+            }
+        })
+    );
+
+    let query_code = DatasetEnvVarsHarness::get_dataset_env_vars_with_id(
+        created_dataset.dataset_handle.id.to_string().as_str(),
+    );
+    let res = schema
+        .execute(
+            async_graphql::Request::new(query_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    let json = serde_json::to_string(&res.data).unwrap();
+    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+    let created_dataset_env_var_id =
+        json["datasets"]["byId"]["envVars"]["listEnvVariables"]["nodes"][0]["id"].clone();
+
+    let query_code = DatasetEnvVarsHarness::get_dataset_env_var_exposed_value(
+        created_dataset.dataset_handle.id.to_string().as_str(),
+        created_dataset_env_var_id.to_string().as_str(),
+    );
+    let res = schema
+        .execute(
+            async_graphql::Request::new(query_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "envVars": {
+                        "exposedValue": "foo_value"
                     }
                 }
             }
@@ -399,6 +436,24 @@ impl DatasetEnvVarsHarness {
             "#
         )
         .replace("<dataset_id>", dataset_id)
+    }
+
+    fn get_dataset_env_var_exposed_value(dataset_id: &str, dataset_env_var_id: &str) -> String {
+        indoc!(
+            r#"
+            query Datasets {
+                datasets {
+                    byId(datasetId: "<dataset_id>") {
+                        envVars {
+                            exposedValue(datasetEnvVarId: <dataset_env_var_id>)
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<dataset_id>", dataset_id)
+        .replace("<dataset_env_var_id>", dataset_env_var_id)
     }
 
     fn create_dataset_env(
