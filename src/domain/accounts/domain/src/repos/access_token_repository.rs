@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use database_common::DatabasePaginationOpts;
 use internal_error::InternalError;
 use opendatafabric::AccountID;
 use thiserror::Error;
@@ -29,7 +30,7 @@ pub trait AccessTokenRepository: Send + Sync {
     async fn get_access_tokens_by_account_id(
         &self,
         account_id: &AccountID,
-        pagination: &AccessTokenPaginationOpts,
+        pagination: &DatabasePaginationOpts,
     ) -> Result<Vec<AccessToken>, GetAccessTokenError>;
 
     async fn get_access_tokens_count_by_account_id(
@@ -48,13 +49,6 @@ pub trait AccessTokenRepository: Send + Sync {
         token_id: &Uuid,
         token_hash: [u8; 32],
     ) -> Result<Account, FindAccountByTokenError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct AccessTokenPaginationOpts {
-    pub limit: i64,
-    pub offset: i64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

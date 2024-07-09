@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::{DatabasePaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use opendatafabric::AccountID;
@@ -157,7 +157,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
     async fn get_access_tokens_by_account_id(
         &self,
         account_id: &AccountID,
-        pagination: &AccessTokenPaginationOpts,
+        pagination: &DatabasePaginationOpts,
     ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
         let mut tr = self.transaction.lock().await;
 

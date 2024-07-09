@@ -9,12 +9,12 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+use database_common::DatabasePaginationOpts;
 use opendatafabric::AccountID;
 use uuid::Uuid;
 
 use crate::{
     AccessToken,
-    AccessTokenPaginationOpts,
     Account,
     CreateAccessTokenError,
     FindAccountByTokenError,
@@ -42,7 +42,7 @@ pub trait AccessTokenService: Sync + Send {
     async fn get_access_tokens_by_account_id(
         &self,
         account_id: &AccountID,
-        pagination: &AccessTokenPaginationOpts,
+        pagination: &DatabasePaginationOpts,
     ) -> Result<AccessTokenListing, GetAccessTokenError>;
 
     async fn revoke_access_token(&self, token_id: &Uuid) -> Result<(), RevokeTokenError>;

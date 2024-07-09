@@ -4833,6 +4833,7 @@ dependencies = [
  "base32",
  "chrono",
  "crc32fast",
+ "database-common",
  "internal-error",
  "jsonwebtoken",
  "lazy_static",
@@ -4856,6 +4857,7 @@ version = "0.189.7"
 dependencies = [
  "async-trait",
  "chrono",
+ "database-common",
  "dill",
  "internal-error",
  "kamu-accounts",
@@ -4914,6 +4916,7 @@ version = "0.189.7"
 dependencies = [
  "argon2",
  "chrono",
+ "database-common",
  "dill",
  "kamu-accounts",
  "kamu-adapter-oauth",

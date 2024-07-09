@@ -10,6 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use chrono::{SubsecRound, Utc};
+use database_common::DatabasePaginationOpts;
 use dill::Catalog;
 use kamu_accounts::*;
 use uuid::Uuid;
@@ -92,7 +93,7 @@ pub async fn test_insert_and_locate_multiple_access_tokens(catalog: &Catalog) {
     let mut db_access_tokens = access_token_repo
         .get_access_tokens_by_account_id(
             &account.id,
-            &AccessTokenPaginationOpts {
+            &DatabasePaginationOpts {
                 limit: 10,
                 offset: 0,
             },
