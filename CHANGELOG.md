@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Added
+- New repository `DatasetEnvVars` to work with dataset secrets
+- Now is possible to set new `DatasetEnvVars` configuration to `storage` 
+  and manage it via GQL api
+- New Gql APIs to manage dataset env vars
+  - `listEnvVariables` to fetch list of env vars by dataset
+  - `exposedValue` to get secret value of env var by id
+  - `saveEnvVariable` to store new dataset env var
+  - `deleteEnvVariable` to delete dataset env var
+  - `modifyEnvVariable` to modify dataset env var
+
+
 ## [0.189.7] - 2024-07-04
 ### Added
 - Added Kamu access token E2E test
