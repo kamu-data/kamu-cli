@@ -49,6 +49,9 @@ pub struct CLIConfig {
     /// Uploads configuration
     #[merge(strategy = merge_recursive)]
     pub uploads: Option<UploadsConfig>,
+
+    /// Dataset environment variables configuration
+    pub dataset_env_vars: Option<DatasetEnvVarsType>,
 }
 
 impl CLIConfig {
@@ -61,6 +64,7 @@ impl CLIConfig {
             users: None,
             database: None,
             uploads: None,
+            dataset_env_vars: None,
         }
     }
 
@@ -77,6 +81,7 @@ impl CLIConfig {
             users: Some(PredefinedAccountsConfig::sample()),
             database: Some(DatabaseConfig::sample()),
             uploads: Some(UploadsConfig::sample()),
+            dataset_env_vars: Some(DatasetEnvVarsType::sample()),
         }
     }
 }
@@ -91,6 +96,7 @@ impl Default for CLIConfig {
             users: Some(PredefinedAccountsConfig::default()),
             database: None,
             uploads: Some(UploadsConfig::default()),
+            dataset_env_vars: Some(DatasetEnvVarsType::default()),
         }
     }
 }
@@ -627,6 +633,27 @@ impl Default for UploadsConfig {
         Self {
             max_file_size_in_mb: Some(50),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DatasetEnvVarsType {
+    Static,
+    Storage,
+}
+
+impl DatasetEnvVarsType {
+    pub fn sample() -> Self {
+        Default::default()
+    }
+}
+
+impl Default for DatasetEnvVarsType {
+    fn default() -> Self {
+        Self::Static
     }
 }
 

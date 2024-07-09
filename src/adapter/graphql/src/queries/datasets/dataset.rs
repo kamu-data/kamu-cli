@@ -98,6 +98,11 @@ impl Dataset {
         DatasetMetadata::new(self.dataset_handle.clone())
     }
 
+    /// Access to the environment variable of this dataset
+    async fn env_vars(&self) -> DatasetEnvVars {
+        DatasetEnvVars::new(self.dataset_handle.clone())
+    }
+
     /// Access to the flow configurations of this dataset
     async fn flows(&self) -> DatasetFlows {
         DatasetFlows::new(self.dataset_handle.clone())

@@ -9,11 +9,11 @@
 
 use std::sync::Arc;
 
+use database_common::DatabasePaginationOpts;
 use dill::*;
 use kamu_accounts::{
     AccessToken,
     AccessTokenListing,
-    AccessTokenPaginationOpts,
     AccessTokenRepository,
     AccessTokenService,
     Account,
@@ -95,7 +95,7 @@ impl AccessTokenService for AccessTokenServiceImpl {
     async fn get_access_tokens_by_account_id(
         &self,
         account_id: &AccountID,
-        pagination: &AccessTokenPaginationOpts,
+        pagination: &DatabasePaginationOpts,
     ) -> Result<AccessTokenListing, GetAccessTokenError> {
         let total_count = self
             .access_token_repository

@@ -22,6 +22,7 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 
 use crate::accounts::AccountService;
+use crate::config::DatasetEnvVarsType;
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
@@ -571,6 +572,14 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(FileUploadLimitConfig::new_in_mb(
         uploads_config.max_file_size_in_mb.unwrap(),
     ));
+    match config.dataset_env_vars.as_ref().unwrap() {
+        DatasetEnvVarsType::Static => {
+            catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceStaticImpl>()
+        }
+        DatasetEnvVarsType::Storage => {
+            catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>()
+        }
+    };
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

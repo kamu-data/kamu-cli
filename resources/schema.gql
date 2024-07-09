@@ -437,6 +437,10 @@ type Dataset {
 	"""
 	metadata: DatasetMetadata!
 	"""
+	Access to the environment variable of this dataset
+	"""
+	envVars: DatasetEnvVars!
+	"""
 	Access to the flow configurations of this dataset
 	"""
 	flows: DatasetFlows!
@@ -519,6 +523,19 @@ type DatasetEndpoints {
 	kafka: KafkaProtocolDesc!
 	websocket: WebSocketProtocolDesc!
 	odata: OdataProtocolDesc!
+}
+
+scalar DatasetEnvVarID
+
+type DatasetEnvVars {
+	exposedValue(datasetEnvVarId: DatasetEnvVarID!): String!
+	listEnvVariables(page: Int, perPage: Int): ViewDatasetEnvVarConnection!
+}
+
+type DatasetEnvVarsMut {
+	saveEnvVariable(key: String!, value: String!, isSecret: Boolean!): SaveDatasetEnvVarResult!
+	deleteEnvVariable(id: DatasetEnvVarID!): DeleteDatasetEnvVarResult!
+	modifyEnvVariable(id: DatasetEnvVarID!, newValue: String!, isSecret: Boolean!): ModifyDatasetEnvVarResult!
 }
 
 type DatasetFlowConfigs {
@@ -659,6 +676,10 @@ type DatasetMut {
 	"""
 	flows: DatasetFlowsMut!
 	"""
+	Access to the mutable flow configurations of this dataset
+	"""
+	envVars: DatasetEnvVarsMut!
+	"""
 	Rename the dataset
 	"""
 	rename(newName: DatasetName!): RenameResult!
@@ -724,6 +745,20 @@ Implement the DateTime<Utc> scalar
 The input/output is a string in RFC3339 format.
 """
 scalar DateTime
+
+interface DeleteDatasetEnvVarResult {
+	message: String!
+}
+
+type DeleteDatasetEnvVarResultNotFound implements DeleteDatasetEnvVarResult {
+	envVarId: DatasetEnvVarID!
+	message: String!
+}
+
+type DeleteDatasetEnvVarResultSuccess implements DeleteDatasetEnvVarResult {
+	envVarId: DatasetEnvVarID!
+	message: String!
+}
 
 interface DeleteResult {
 	message: String!
@@ -1275,6 +1310,20 @@ type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetF
 	message: String!
 }
 
+interface ModifyDatasetEnvVarResult {
+	message: String!
+}
+
+type ModifyDatasetEnvVarResultNotFound implements ModifyDatasetEnvVarResult {
+	envVarId: DatasetEnvVarID!
+	message: String!
+}
+
+type ModifyDatasetEnvVarResultSuccess implements ModifyDatasetEnvVarResult {
+	envVarId: DatasetEnvVarID!
+	message: String!
+}
+
 enum MqttQos {
 	AT_MOST_ONCE
 	AT_LEAST_ONCE
@@ -1506,6 +1555,21 @@ type RevokeResultAlreadyRevoked implements RevokeResult {
 
 type RevokeResultSuccess implements RevokeResult {
 	tokenId: AccessTokenID!
+	message: String!
+}
+
+interface SaveDatasetEnvVarResult {
+	message: String!
+}
+
+type SaveDatasetEnvVarResultDuplicate implements SaveDatasetEnvVarResult {
+	datasetEnvVarKey: String!
+	datasetName: DatasetName!
+	message: String!
+}
+
+type SaveDatasetEnvVarResultSuccess implements SaveDatasetEnvVarResult {
+	envVar: ViewDatasetEnvVar!
 	message: String!
 }
 
@@ -1840,6 +1904,46 @@ type ViewAccessToken {
 	Access token account owner
 	"""
 	account: Account!
+}
+
+type ViewDatasetEnvVar {
+	"""
+	Unique identifier of the dataset environment variable
+	"""
+	id: DatasetEnvVarID!
+	"""
+	Key of the dataset environment variable
+	"""
+	key: String!
+	"""
+	Non sercret value of dataset environment variable
+	"""
+	value: String
+	"""
+	Date of the dataset environment variable creation
+	"""
+	createdAt: DateTime!
+	isSecret: Boolean!
+}
+
+type ViewDatasetEnvVarConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [ViewDatasetEnvVar!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [ViewDatasetEnvVarEdge!]!
+}
+
+type ViewDatasetEnvVarEdge {
+	node: ViewDatasetEnvVar!
 }
 
 type WebSocketProtocolDesc {

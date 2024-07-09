@@ -11,6 +11,7 @@ mod db_connection_settings;
 mod db_credentials;
 mod db_error;
 mod db_provider;
+mod entities;
 
 mod password;
 mod plugins;
@@ -20,6 +21,7 @@ pub use db_connection_settings::*;
 pub use db_credentials::*;
 pub use db_error::*;
 pub use db_provider::*;
+pub use entities::*;
 pub use password::*;
 pub use plugins::*;
 pub use transactions::*;

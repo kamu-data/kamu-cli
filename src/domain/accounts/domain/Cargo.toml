@@ -22,6 +22,7 @@ doctest = false
 
 
 [dependencies]
+database-common = { workspace = true }
 internal-error = { workspace = true }
 opendatafabric = { workspace = true, default-features = true, features = ["sqlx"]}
 random-names = { workspace = true }

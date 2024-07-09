@@ -495,3 +495,57 @@ impl_parse_error!(DatasetAliasRemote);
 impl_parse_error!(DatasetAliasPattern);
 
 impl_serde!(DatasetAliasRemote, DatasetAliasRemoteSerdeVisitor);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// SQLX
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "sqlx")]
+macro_rules! impl_sqlx {
+    ($typ:ident) => {
+        impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for $typ
+        where
+            &'r str: sqlx::Decode<'r, DB>,
+        {
+            fn decode(
+                value: <DB as sqlx::database::HasValueRef<'r>>::ValueRef,
+            ) -> Result<Self, sqlx::error::BoxDynError> {
+                let value = <&str as sqlx::Decode<DB>>::decode(value)?;
+                let account_id = $typ::from_did_str(value)?;
+                Ok(account_id)
+            }
+        }
+
+        impl sqlx::Type<sqlx::Postgres> for $typ {
+            fn type_info() -> <sqlx::Postgres as sqlx::Database>::TypeInfo {
+                <&str as sqlx::Type<sqlx::Postgres>>::type_info()
+            }
+
+            fn compatible(ty: &<sqlx::Postgres as sqlx::Database>::TypeInfo) -> bool {
+                <&str as sqlx::Type<sqlx::Postgres>>::compatible(ty)
+            }
+        }
+
+        impl sqlx::Type<sqlx::MySql> for $typ {
+            fn type_info() -> <sqlx::MySql as sqlx::Database>::TypeInfo {
+                <&str as sqlx::Type<sqlx::MySql>>::type_info()
+            }
+
+            fn compatible(ty: &<sqlx::MySql as sqlx::Database>::TypeInfo) -> bool {
+                <&str as sqlx::Type<sqlx::MySql>>::compatible(ty)
+            }
+        }
+
+        impl sqlx::Type<sqlx::Sqlite> for $typ {
+            fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+                <&str as sqlx::Type<sqlx::Sqlite>>::type_info()
+            }
+
+            fn compatible(ty: &<sqlx::Sqlite as sqlx::Database>::TypeInfo) -> bool {
+                <&str as sqlx::Type<sqlx::Sqlite>>::compatible(ty)
+            }
+        }
+    };
+}
+
+pub(crate) use impl_sqlx;

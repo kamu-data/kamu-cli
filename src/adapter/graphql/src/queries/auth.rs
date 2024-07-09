@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::AccessTokenPaginationOpts;
+use database_common::DatabasePaginationOpts;
 
 use super::ViewAccessToken;
 use crate::prelude::*;
@@ -47,7 +47,7 @@ impl Auth {
         let access_token_listing = access_token_service
             .get_access_tokens_by_account_id(
                 &account_id,
-                &AccessTokenPaginationOpts {
+                &DatabasePaginationOpts {
                     offset: page * per_page,
                     limit: per_page,
                 },
@@ -63,7 +63,7 @@ impl Auth {
 
         Ok(AccessTokenConnection::new(
             access_tokens,
-            0,
+            usize::try_from(page).unwrap(),
             usize::try_from(per_page).unwrap(),
             access_token_listing.total_count,
         ))

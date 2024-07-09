@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT\n                    count(*)\n                FROM dataset_env_vars\n                WHERE dataset_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count(*)",
+        "ordinal": 0,
+        "type_info": "Int"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "75559118bbccfb88b1ecfd3ff44e49438d13be39bdcc2be800871f53177b2c4e"
+}
