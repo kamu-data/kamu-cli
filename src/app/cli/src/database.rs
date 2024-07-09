@@ -33,14 +33,14 @@ pub fn configure_database_components(
 
     match db_connection_settings.provider {
         DatabaseProvider::Postgres => {
-            database_common::PostgresPlugin::init_database_components(b);
+            PostgresPlugin::init_database_components(b);
 
             b.add::<kamu_accounts_postgres::PostgresAccountRepository>();
             b.add::<kamu_accounts_postgres::PostgresAccessTokenRepository>();
             b.add::<kamu_datasets_postgres::PostgresDatasetEnvVarRepository>();
         }
         DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
-            database_common::MySqlPlugin::init_database_components(b);
+            MySqlPlugin::init_database_components(b);
 
             b.add::<kamu_accounts_mysql::MySqlAccountRepository>();
             b.add::<kamu_accounts_mysql::MysqlAccessTokenRepository>();
@@ -48,7 +48,7 @@ pub fn configure_database_components(
             // TODO: Task & Flow System MySQL versions
         }
         DatabaseProvider::Sqlite => {
-            database_common::SqlitePlugin::init_database_components(b);
+            SqlitePlugin::init_database_components(b);
 
             b.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
             b.add::<kamu_accounts_sqlite::SqliteAccessTokenRepository>();
@@ -72,7 +72,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
     b.add::<kamu_datasets_inmem::DatasetEnvVarRepositoryInMemory>();
 
-    database_common::NoOpDatabasePlugin::init_database_components(b);
+    NoOpDatabasePlugin::init_database_components(b);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,23 +110,16 @@ pub async fn connect_database_initially(base_catalog: &Catalog) -> Result<Catalo
     let db_connection_string = db_connection_settings.connection_string(db_password);
 
     match db_connection_settings.provider {
-        DatabaseProvider::Postgres => database_common::PostgresPlugin::catalog_with_connected_pool(
-            base_catalog,
-            &db_connection_string,
-        )
-        .int_err(),
-        DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
-            database_common::MySqlPlugin::catalog_with_connected_pool(
-                base_catalog,
-                &db_connection_string,
-            )
-            .int_err()
+        DatabaseProvider::Postgres => {
+            PostgresPlugin::catalog_with_connected_pool(base_catalog, &db_connection_string)
+                .int_err()
         }
-        DatabaseProvider::Sqlite => database_common::SqlitePlugin::catalog_with_connected_pool(
-            base_catalog,
-            &db_connection_string,
-        )
-        .int_err(),
+        DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
+            MySqlPlugin::catalog_with_connected_pool(base_catalog, &db_connection_string).int_err()
+        }
+        DatabaseProvider::Sqlite => {
+            SqlitePlugin::catalog_with_connected_pool(base_catalog, &db_connection_string).int_err()
+        }
     }
 }
 

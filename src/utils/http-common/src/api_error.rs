@@ -16,7 +16,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::*;
+use kamu_core::*;
+use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,7 +60,7 @@ use kamu::domain::*;
 ///     }
 /// }
 /// ```
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Error)]
 #[error("api error {status_code:?}")]
 pub struct ApiError {
     status_code: http::StatusCode,
@@ -97,6 +98,13 @@ impl ApiError {
         Self::new(source, http::StatusCode::NOT_FOUND)
     }
 
+    pub fn not_found_without_body() -> Self {
+        Self {
+            source: "".into(),
+            status_code: http::StatusCode::NOT_FOUND,
+        }
+    }
+
     pub fn new_unsupported_media_type() -> Self {
         Self {
             source: "Unsupported media type".into(),
@@ -106,6 +114,12 @@ impl ApiError {
 
     pub fn no_content(source: impl std::error::Error + Send + Sync + 'static) -> Self {
         Self::new(source, http::StatusCode::NO_CONTENT)
+    }
+}
+
+impl From<InternalError> for ApiError {
+    fn from(e: InternalError) -> Self {
+        e.api_err()
     }
 }
 

@@ -22,9 +22,12 @@ doctest = false
 
 
 [dependencies]
-opendatafabric = { workspace = true }
+database-common = { workspace = true }
+database-common-macros = { workspace = true }
+http-common = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
+opendatafabric = { workspace = true }
 
 axum = { version = "0.6", features = ["headers"] }
 chrono = { version = "0.4", default-features = false }

@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
+use database_common::NoOpDatabasePlugin;
 use dill::*;
 use event_bus::EventBus;
 use indoc::indoc;
@@ -332,32 +333,38 @@ impl TestHarness {
         std::fs::create_dir(&cache_dir).unwrap();
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
-            .add_value(RunInfoDir::new(run_info_dir))
-            .add_value(CacheDir::new(cache_dir))
-            .add::<ObjectStoreRegistryImpl>()
-            .add::<ObjectStoreBuilderLocalFs>()
-            .add::<DataFormatRegistryImpl>()
-            .add::<EventBus>()
-            .add::<DependencyGraphServiceInMemory>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add_value(dataset_action_authorizer)
-            .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(false),
-            )
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_value(SystemTimeSourceStub::new_set(
-                Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
-            ))
-            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
-            .add::<EngineProvisionerNull>()
-            .add::<PushIngestServiceImpl>()
-            .add::<QueryServiceImpl>()
-            .add_value(ServerUrlConfig::new_test(None))
-            .build();
+        let catalog = {
+            let mut b = dill::CatalogBuilder::new();
+
+            b.add_value(RunInfoDir::new(run_info_dir))
+                .add_value(CacheDir::new(cache_dir))
+                .add::<ObjectStoreRegistryImpl>()
+                .add::<ObjectStoreBuilderLocalFs>()
+                .add::<DataFormatRegistryImpl>()
+                .add::<EventBus>()
+                .add::<DependencyGraphServiceInMemory>()
+                .add_value(CurrentAccountSubject::new_test())
+                .add_value(dataset_action_authorizer)
+                .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
+                .add_builder(
+                    DatasetRepositoryLocalFs::builder()
+                        .with_root(datasets_dir)
+                        .with_multi_tenant(false),
+                )
+                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .add_value(SystemTimeSourceStub::new_set(
+                    Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
+                ))
+                .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+                .add::<EngineProvisionerNull>()
+                .add::<PushIngestServiceImpl>()
+                .add::<QueryServiceImpl>()
+                .add_value(ServerUrlConfig::new_test(None));
+
+            NoOpDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
         let push_ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();

@@ -20,6 +20,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use event_bus::EventBus;
+use http_common::*;
 use kamu::domain::*;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
@@ -27,7 +28,6 @@ use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::{DatasetRef, Multihash};
 use url::Url;
 
-use crate::api_error::*;
 use crate::smart_protocol::{
     AxumServerPullProtocolInstance,
     AxumServerPushProtocolInstance,

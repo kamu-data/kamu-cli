@@ -1,6 +1,6 @@
 [package]
-name = "kamu-task-system-repo-tests"
-description = "Shared repository tests for Kamu task system"
+name = "http-common"
+description = "Common code for working with HTTP API"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -22,9 +22,9 @@ doctest = false
 
 
 [dependencies]
-kamu-task-system = { workspace = true }
-opendatafabric = { workspace = true }
+kamu-core = { workspace = true }
 
-chrono = { version = "0.4", default-features = false }
-dill = "0.8"
-futures = "0.3"
+axum = "0.6"
+http = "0.2"
+thiserror = { version = "1", default-features = false }
+tracing = "0.1"

@@ -72,38 +72,40 @@ impl ServerSideLocalFsHarness {
         let cache_dir = tempdir.path().join("cache");
         std::fs::create_dir(&cache_dir).unwrap();
 
-        let mut base_catalog_builder = match &options.base_catalog {
-            None => dill::CatalogBuilder::new(),
-            Some(c) => dill::CatalogBuilder::new_chained(c),
-        };
-
         let time_source = SystemTimeSourceStub::new();
+        let (base_catalog, bind_socket) = {
+            let mut b = match &options.base_catalog {
+                None => dill::CatalogBuilder::new(),
+                Some(c) => dill::CatalogBuilder::new_chained(c),
+            };
 
-        let addr = SocketAddr::from(([127, 0, 0, 1], 0));
-        let bind_socket = TcpListener::bind(addr).unwrap();
-        let base_url_rest = format!("http://{}", bind_socket.local_addr().unwrap());
+            let addr = SocketAddr::from(([127, 0, 0, 1], 0));
+            let bind_socket = TcpListener::bind(addr).unwrap();
+            let base_url_rest = format!("http://{}", bind_socket.local_addr().unwrap());
 
-        base_catalog_builder
-            .add_value(RunInfoDir::new(run_info_dir))
-            .add_value(CacheDir::new(cache_dir))
-            .add::<EventBus>()
-            .add_value(time_source.clone())
-            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
-            .add::<DependencyGraphServiceInMemory>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(options.multi_tenant),
-            )
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_value(server_authentication_mock())
-            .bind::<dyn AuthenticationService, MockAuthenticationService>()
-            .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
-            .add::<CompactionServiceImpl>()
-            .add::<ObjectStoreRegistryImpl>()
-            .add::<ObjectStoreBuilderLocalFs>();
+            b.add_value(RunInfoDir::new(run_info_dir))
+                .add_value(CacheDir::new(cache_dir))
+                .add::<EventBus>()
+                .add_value(time_source.clone())
+                .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+                .add::<DependencyGraphServiceInMemory>()
+                .add_builder(
+                    DatasetRepositoryLocalFs::builder()
+                        .with_root(datasets_dir)
+                        .with_multi_tenant(options.multi_tenant),
+                )
+                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .add_value(server_authentication_mock())
+                .bind::<dyn AuthenticationService, MockAuthenticationService>()
+                .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
+                .add::<CompactionServiceImpl>()
+                .add::<ObjectStoreRegistryImpl>()
+                .add::<ObjectStoreBuilderLocalFs>();
 
-        let base_catalog = base_catalog_builder.build();
+            database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
+            (b.build(), bind_socket)
+        };
 
         let api_server = TestAPIServer::new(
             create_web_user_catalog(&base_catalog, &options),

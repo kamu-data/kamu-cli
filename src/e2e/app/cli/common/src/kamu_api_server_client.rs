@@ -76,6 +76,10 @@ impl KamuApiServerClient {
         Ok(())
     }
 
+    pub fn get_base_url(&self) -> &Url {
+        &self.server_base_url
+    }
+
     pub async fn rest_api_call_assert(
         &self,
         token: Option<String>,

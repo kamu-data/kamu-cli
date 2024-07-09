@@ -13,6 +13,9 @@ use kamu::domain::*;
 use opendatafabric::*;
 
 use super::{common, BatchError, CLIError, Command};
+use crate::OutputConfig;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AddCommand {
     resource_loader: Arc<dyn ResourceLoader>,
@@ -21,6 +24,7 @@ pub struct AddCommand {
     recursive: bool,
     replace: bool,
     stdin: bool,
+    output_config: Arc<OutputConfig>,
 }
 
 impl AddCommand {
@@ -31,6 +35,7 @@ impl AddCommand {
         recursive: bool,
         replace: bool,
         stdin: bool,
+        output_config: Arc<OutputConfig>,
     ) -> Self
     where
         I: Iterator<Item = &'s str>,
@@ -42,6 +47,7 @@ impl AddCommand {
             recursive,
             replace,
             stdin,
+            output_config,
         }
     }
 
@@ -212,14 +218,19 @@ impl Command for AddCommand {
             match res {
                 Ok(_) => {
                     num_added += 1;
-                    eprintln!("{}: {}", console::style("Added").green(), id);
+
+                    if !self.output_config.quiet {
+                        eprintln!("{}: {}", console::style("Added").green(), id);
+                    }
                 }
                 Err(CreateDatasetFromSnapshotError::NameCollision(_)) => {
-                    eprintln!(
-                        "{}: {}: Already exists",
-                        console::style("Skipped").yellow(),
-                        id
-                    );
+                    if !self.output_config.quiet {
+                        eprintln!(
+                            "{}: {}: Already exists",
+                            console::style("Skipped").yellow(),
+                            id
+                        );
+                    }
                 }
                 Err(err) => {
                     errors_with_contexts.push((err, format!("Failed to add dataset {id}")));
@@ -228,12 +239,14 @@ impl Command for AddCommand {
         }
 
         if errors_with_contexts.is_empty() {
-            eprintln!(
-                "{}",
-                console::style(format!("Added {num_added} dataset(s)"))
-                    .green()
-                    .bold()
-            );
+            if !self.output_config.quiet {
+                eprintln!(
+                    "{}",
+                    console::style(format!("Added {num_added} dataset(s)"))
+                        .green()
+                        .bold()
+                );
+            }
 
             Ok(())
         } else {
@@ -245,3 +258,5 @@ impl Command for AddCommand {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -8,11 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::response::Response;
 use axum::RequestExt;
+use database_common::DatabaseTransactionRunner;
 use futures::Future;
 use kamu_accounts::{
     AccessTokenError,
@@ -59,15 +61,19 @@ impl<Svc> AuthenticationMiddleware<Svc> {
         maybe_access_token: Option<AccessToken>,
     ) -> Result<CurrentAccountSubject, Response> {
         if let Some(access_token) = maybe_access_token {
-            let authentication_service =
-                base_catalog.get_one::<dyn AuthenticationService>().unwrap();
+            let account_res = DatabaseTransactionRunner::new(base_catalog.clone())
+                .transactional_with(
+                    |authentication_service: Arc<dyn AuthenticationService>| async move {
+                        authentication_service
+                            .account_by_token(access_token.token)
+                            .await
+                    },
+                )
+                .await;
 
             // TODO: Getting the full account info here is expensive while all we need is
-            // the caller identity
-            match authentication_service
-                .account_by_token(access_token.token)
-                .await
-            {
+            //       the caller identity
+            match account_res {
                 Ok(account) => Ok(CurrentAccountSubject::logged(
                     account.id,
                     account.account_name,
