@@ -12,7 +12,8 @@ use std::net::{SocketAddr, TcpListener};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use http::{HeaderMap, HeaderName, HeaderValue};
-use kamu::domain::{InternalError, ResultIntoInternal, ServerUrlConfig, SystemTimeSourceDefault};
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu::domain::ServerUrlConfig;
 use kamu::testing::LocalS3Server;
 use kamu::utils::s3_context::S3Context;
 use kamu_accounts::{JwtAuthenticationConfig, PredefinedAccountsConfig, DEFAULT_ACCOUNT_ID};
@@ -30,6 +31,7 @@ use kamu_adapter_http::{
     UploadService,
     UploadServiceS3,
 };
+use time_source::SystemTimeSourceDefault;
 use tokio::io::AsyncReadExt;
 
 use crate::harness::{await_client_server_flow, TestAPIServer};

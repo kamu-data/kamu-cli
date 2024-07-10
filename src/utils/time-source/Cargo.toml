@@ -1,0 +1,32 @@
+[package]
+name = "time-source"
+description = "A helper encapsulating access to time (real or faked)"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+dill = "0.9"
+tokio = { version = "1", default-features = false }
+
+
+[dev-dependencies]
+futures = { version = "0.3", default-features = false }

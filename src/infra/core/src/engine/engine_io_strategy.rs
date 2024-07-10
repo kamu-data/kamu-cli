@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use container_runtime::*;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::engine::*;
 use kamu_core::*;
 use opendatafabric::*;

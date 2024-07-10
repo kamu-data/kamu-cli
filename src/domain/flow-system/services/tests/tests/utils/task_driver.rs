@@ -10,17 +10,17 @@
 use std::sync::Arc;
 
 use chrono::Duration;
-use event_bus::EventBus;
-use kamu_core::SystemTimeSource;
 use kamu_task_system::*;
+use messaging_outbox::{Outbox, OutboxExt};
 use opendatafabric::DatasetID;
+use time_source::SystemTimeSource;
 use tokio::task::yield_now;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct TaskDriver {
     time_source: Arc<dyn SystemTimeSource>,
-    event_bus: Arc<EventBus>,
+    outbox: Arc<dyn Outbox>,
     task_event_store: Arc<dyn TaskSystemEventStore>,
     args: TaskDriverArgs,
 }
@@ -36,13 +36,13 @@ pub(crate) struct TaskDriverArgs {
 impl TaskDriver {
     pub(crate) fn new(
         time_source: Arc<dyn SystemTimeSource>,
-        event_bus: Arc<EventBus>,
+        outbox: Arc<dyn Outbox>,
         task_event_store: Arc<dyn TaskSystemEventStore>,
         args: TaskDriverArgs,
     ) -> Self {
         Self {
             time_source,
-            event_bus,
+            outbox,
             task_event_store,
             args,
         }
@@ -58,23 +58,33 @@ impl TaskDriver {
 
         self.ensure_task_matches_logical_plan().await;
 
-        self.event_bus
-            .dispatch_event(TaskEventRunning {
-                event_time: start_time + self.args.run_since_start,
-                task_id: self.args.task_id,
-            })
+        // Note: we can omit transaction, since this is a test-only abstraction
+        // with assummed immediate delivery
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                TaskProgressMessage::running(
+                    start_time + self.args.run_since_start,
+                    self.args.task_id,
+                ),
+            )
             .await
             .unwrap();
 
         if let Some((finish_in, with_outcome)) = self.args.finish_in_with {
             self.time_source.sleep(finish_in).await;
 
-            self.event_bus
-                .dispatch_event(TaskEventFinished {
-                    event_time: start_time + self.args.run_since_start + finish_in,
-                    task_id: self.args.task_id,
-                    outcome: with_outcome,
-                })
+            // Note: we can omit transaction, since this is a test-only abstraction
+            // with assummed immediate delivery
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                    TaskProgressMessage::finished(
+                        start_time + self.args.run_since_start + finish_in,
+                        self.args.task_id,
+                        with_outcome,
+                    ),
+                )
                 .await
                 .unwrap();
         }

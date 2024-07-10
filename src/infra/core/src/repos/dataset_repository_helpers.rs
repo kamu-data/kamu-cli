@@ -7,15 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use chrono::{DateTime, Utc};
-use event_bus::EventBus;
 use internal_error::*;
-use kamu_core::events::DatasetEventDependenciesUpdated;
 use kamu_core::*;
 use opendatafabric::*;
 use random_names::get_random_name;
+
+use crate::DatasetRepositoryWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,12 +24,13 @@ pub fn get_staging_name() -> String {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn create_dataset_from_snapshot_impl(
-    dataset_repo: &dyn DatasetRepositoryExt,
-    event_bus: &EventBus,
+pub(crate) async fn create_dataset_from_snapshot_impl<
+    TRepository: DatasetRepositoryExt + DatasetRepositoryWriter,
+>(
+    dataset_repo: &TRepository,
     mut snapshot: DatasetSnapshot,
     system_time: DateTime<Utc>,
-) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
+) -> Result<CreateDatasetFromSnapshotResult, CreateDatasetFromSnapshotError> {
     // Validate / resolve events
     for event in &mut snapshot.metadata {
         match event {
@@ -175,20 +174,12 @@ pub async fn create_dataset_from_snapshot_impl(
         .await
         .int_err()?;
 
-    // TODO: encapsulate this inside dataset/chain
-    if !new_upstream_ids.is_empty() {
-        event_bus
-            .dispatch_event(DatasetEventDependenciesUpdated {
-                dataset_id: create_result.dataset_handle.id.clone(),
-                new_upstream_ids,
-            })
-            .await
-            .int_err()?;
-    }
-
-    Ok(CreateDatasetResult {
-        head,
-        ..create_result
+    Ok(CreateDatasetFromSnapshotResult {
+        create_dataset_result: CreateDatasetResult {
+            head,
+            ..create_result
+        },
+        new_upstream_ids,
     })
 }
 

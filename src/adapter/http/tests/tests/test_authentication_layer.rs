@@ -10,7 +10,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 
-use kamu::domain::{InternalError, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     AnonymousAccountReason,
     AuthenticationService,

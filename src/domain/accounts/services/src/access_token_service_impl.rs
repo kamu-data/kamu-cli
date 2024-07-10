@@ -23,8 +23,8 @@ use kamu_accounts::{
     KamuAccessToken,
     RevokeTokenError,
 };
-use kamu_core::SystemTimeSource;
 use opendatafabric::AccountID;
+use time_source::SystemTimeSource;
 use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

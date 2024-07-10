@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::{
     BlockRef,
     Dataset,
@@ -21,7 +21,6 @@ use kamu_core::{
     GetDatasetError,
     GetIncrementError,
     GetRefError,
-    InternalError,
     MetadataChainExt,
     SearchSingleDataBlockVisitor,
 };

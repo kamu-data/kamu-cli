@@ -8,11 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use dill::Component;
-use event_bus::EventBus;
 use indoc::indoc;
-use kamu::*;
+use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::*;
+use kamu_core::{auth, DatasetRepository};
+use time_source::SystemTimeSourceDefault;
 
 #[test_log::test(tokio::test)]
 async fn test_malformed_argument() {
@@ -60,7 +60,6 @@ async fn test_internal_error() {
 
     let cat = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add::<EventBus>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<DependencyGraphServiceInMemory>()

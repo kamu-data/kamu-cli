@@ -9,7 +9,8 @@
 
 use std::sync::Arc;
 
-use kamu::domain::{BlockRef, Dataset, ErrorIntoInternal, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_core::{BlockRef, Dataset};
 use url::Url;
 
 use super::errors::*;

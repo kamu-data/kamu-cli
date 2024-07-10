@@ -13,31 +13,37 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::Component;
-use event_bus::EventBus;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::{
+    CommitDatasetEventUseCase,
     CompactionService,
+    CreateDatasetFromSnapshotUseCase,
+    CreateDatasetUseCase,
     DatasetRepository,
-    InternalError,
     ObjectStoreBuilder,
-    ResultIntoInternal,
     RunInfoDir,
     ServerUrlConfig,
-    SystemTimeSource,
-    SystemTimeSourceStub,
 };
 use kamu::testing::LocalS3Server;
 use kamu::utils::s3_context::S3Context;
 use kamu::{
+    AppendDatasetMetadataBatchUseCaseImpl,
+    CommitDatasetEventUseCaseImpl,
     CompactionServiceImpl,
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
     DatasetLayout,
     DatasetRepositoryS3,
+    DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
     ObjectStoreBuilderLocalFs,
     ObjectStoreBuilderS3,
     ObjectStoreRegistryImpl,
 };
 use kamu_accounts::{AuthenticationService, MockAuthenticationService};
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
+use time_source::{SystemTimeSource, SystemTimeSourceStub};
 use url::Url;
 
 use super::{
@@ -83,7 +89,7 @@ impl ServerSideS3Harness {
             b.add_value(time_source.clone())
                 .add_value(RunInfoDir::new(run_info_dir))
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
-                .add::<EventBus>()
+                .add::<DummyOutboxImpl>()
                 .add::<DependencyGraphServiceInMemory>()
                 .add_builder(
                     DatasetRepositoryS3::builder()
@@ -91,6 +97,7 @@ impl ServerSideS3Harness {
                         .with_multi_tenant(false),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
+                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()
                 .add_value(server_authentication_mock())
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
@@ -98,7 +105,11 @@ impl ServerSideS3Harness {
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
                 .add_value(ObjectStoreBuilderS3::new(s3_context, true))
-                .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>();
+                .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
+                .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+                .add::<CreateDatasetUseCaseImpl>()
+                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<CommitDatasetEventUseCaseImpl>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -143,6 +154,27 @@ impl ServerSideHarness for ServerSideS3Harness {
     fn cli_dataset_repository(&self) -> Arc<dyn DatasetRepository> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog);
         cli_catalog.get_one::<dyn DatasetRepository>().unwrap()
+    }
+
+    fn cli_create_dataset_use_case(&self) -> Arc<dyn CreateDatasetUseCase> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        cli_catalog.get_one::<dyn CreateDatasetUseCase>().unwrap()
+    }
+
+    fn cli_create_dataset_from_snapshot_use_case(
+        &self,
+    ) -> Arc<dyn CreateDatasetFromSnapshotUseCase> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        cli_catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap()
+    }
+
+    fn cli_commit_dataset_event_use_case(&self) -> Arc<dyn CommitDatasetEventUseCase> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        cli_catalog
+            .get_one::<dyn CommitDatasetEventUseCase>()
+            .unwrap()
     }
 
     fn cli_compaction_service(&self) -> Arc<dyn CompactionService> {

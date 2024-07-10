@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use opendatafabric::*;
 

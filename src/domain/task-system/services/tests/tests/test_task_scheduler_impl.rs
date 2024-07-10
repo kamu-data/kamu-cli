@@ -10,10 +10,10 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu_core::SystemTimeSourceStub;
 use kamu_task_system::{LogicalPlan, Probe, TaskScheduler, TaskState, TaskStatus};
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
+use time_source::SystemTimeSourceStub;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

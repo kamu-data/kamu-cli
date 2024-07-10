@@ -13,6 +13,7 @@ use datafusion::arrow;
 use datafusion::error::DataFusionError;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::{DataFrame, SessionContext};
+use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
 

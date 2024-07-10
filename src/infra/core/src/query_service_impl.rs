@@ -20,6 +20,7 @@ use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
 use dill::*;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
 use opendatafabric::*;

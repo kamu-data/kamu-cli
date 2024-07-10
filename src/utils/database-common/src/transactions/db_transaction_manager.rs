@@ -110,6 +110,26 @@ impl DatabaseTransactionRunner {
         })
         .await
     }
+
+    pub async fn transactional_with2<Iface1, Iface2, H, HFut, HFutResultT, HFutResultE>(
+        &self,
+        callback: H,
+    ) -> Result<HFutResultT, HFutResultE>
+    where
+        Iface1: 'static + ?Sized + Send + Sync,
+        Iface2: 'static + ?Sized + Send + Sync,
+        H: FnOnce(Arc<Iface1>, Arc<Iface2>) -> HFut,
+        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
+        HFutResultE: From<InternalError>,
+    {
+        self.transactional(|transactional_catalog| async move {
+            let catalog_item1 = transactional_catalog.get_one().int_err()?;
+            let catalog_item2 = transactional_catalog.get_one().int_err()?;
+
+            callback(catalog_item1, catalog_item2).await
+        })
+        .await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

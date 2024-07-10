@@ -10,7 +10,7 @@
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, SecondsFormat, Utc};
-use kamu_core::{InternalError, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
 use opendatafabric::serde::yaml::{datetime_rfc3339, datetime_rfc3339_opt, SourceStateDef};
 use opendatafabric::SourceState;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};

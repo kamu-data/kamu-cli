@@ -14,7 +14,6 @@ use chrono::{TimeZone, Utc};
 use container_runtime::*;
 use datafusion::prelude::*;
 use dill::Component;
-use event_bus::EventBus;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -23,6 +22,7 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::DatasetKeyValueServiceStaticImpl;
 use opendatafabric::*;
 use tempfile::TempDir;
+use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1070,7 +1070,7 @@ async fn test_ingest_checks_auth() {
 
 struct IngestTestHarness {
     temp_dir: TempDir,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<DatasetRepositoryLocalFs>,
     ingest_svc: Arc<dyn PollingIngestService>,
     time_source: Arc<SystemTimeSourceStub>,
     ctx: SessionContext,
@@ -1099,7 +1099,6 @@ impl IngestTestHarness {
             .add::<ContainerRuntime>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
-            .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(dataset_action_authorizer)
@@ -1122,7 +1121,7 @@ impl IngestTestHarness {
             .add::<DatasetKeyValueServiceStaticImpl>()
             .build();
 
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
         let ingest_svc = catalog.get_one::<dyn PollingIngestService>().unwrap();
         let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
 

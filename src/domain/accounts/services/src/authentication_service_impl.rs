@@ -17,8 +17,8 @@ use internal_error::*;
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use kamu_accounts::*;
-use kamu_core::SystemTimeSource;
 use opendatafabric::{AccountID, AccountName};
+use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

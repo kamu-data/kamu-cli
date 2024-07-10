@@ -14,14 +14,21 @@ use std::str::FromStr;
 
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::{CatalogBuilder, Component};
-use event_bus::EventBus;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::auth::DatasetAction;
-use kamu::domain::{DatasetRepository, InternalError, ResultIntoInternal, SystemTimeSourceDefault};
+use kamu::domain::{CreateDatasetUseCase, DatasetRepository};
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
-use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu::{
+    CreateDatasetUseCaseImpl,
+    DatasetRepositoryLocalFs,
+    DatasetRepositoryWriter,
+    DependencyGraphServiceInMemory,
+};
 use kamu_accounts::*;
+use messaging_outbox::DummyOutboxImpl;
 use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetHandle, DatasetKind, DatasetName, DatasetRef};
+use time_source::SystemTimeSourceDefault;
 use url::Url;
 
 use crate::harness::await_client_server_flow;
@@ -214,7 +221,7 @@ impl ServerHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<SystemTimeSourceDefault>()
-                .add::<EventBus>()
+                .add::<DummyOutboxImpl>()
                 .add::<DependencyGraphServiceInMemory>()
                 .add_value(MockAuthenticationService::resolving_token(
                     DUMMY_ACCESS_TOKEN,
@@ -229,6 +236,8 @@ impl ServerHarness {
                         .with_root(datasets_dir),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<CreateDatasetUseCaseImpl>()
                 .add::<DatabaseTransactionRunner>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
@@ -240,9 +249,11 @@ impl ServerHarness {
             .add_value(CurrentAccountSubject::new_test())
             .build();
 
-        let dataset_repo = catalog_system.get_one::<dyn DatasetRepository>().unwrap();
-        dataset_repo
-            .create_dataset(
+        let create_dataset = catalog_system
+            .get_one::<dyn CreateDatasetUseCase>()
+            .unwrap();
+        create_dataset
+            .execute(
                 &Self::dataset_alias(),
                 MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                     .build_typed(),

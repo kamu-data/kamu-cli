@@ -15,6 +15,7 @@ use std::process;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 
+use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use opendatafabric::*;
 use thiserror::Error;

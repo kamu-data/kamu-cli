@@ -21,13 +21,13 @@ workspace = true
 doctest = false
 
 [dependencies]
+internal-error = { workspace = true }
 opendatafabric = { workspace = true }
-kamu-core = { workspace = true }
 kamu-accounts = { workspace = true }
 
 async-trait = "0.1"
 chrono = "0.4"
-dill = "0.8"
+dill = "0.9"
 http = "0.2"
 reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json"] }
 serde = "1"
@@ -35,6 +35,5 @@ serde_json = "1"
 thiserror = "1"
 
 [dev-dependencies]
-tempfile = "3"
 tokio = { version = "1", default-features = false, features = [] }
 tracing = "0.1"

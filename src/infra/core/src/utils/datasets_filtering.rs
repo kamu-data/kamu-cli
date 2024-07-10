@@ -11,14 +11,8 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use futures::{future, StreamExt, TryStreamExt};
-use kamu_core::{
-    DatasetRepository,
-    GetDatasetError,
-    InternalError,
-    SearchError,
-    SearchOptions,
-    SearchService,
-};
+use internal_error::InternalError;
+use kamu_core::{DatasetRepository, GetDatasetError, SearchError, SearchOptions, SearchService};
 use opendatafabric::{
     AccountName,
     DatasetAliasRemote,

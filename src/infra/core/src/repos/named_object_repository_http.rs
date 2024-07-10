@@ -9,6 +9,7 @@
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use reqwest::Client;
 use url::Url;

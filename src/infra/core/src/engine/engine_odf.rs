@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use container_runtime::*;
 use datafusion::config::{ParquetOptions, TableParquetOptions};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::engine::*;
 use kamu_core::*;
 use odf::engine::{EngineGrpcClient, ExecuteRawQueryError, ExecuteTransformError};

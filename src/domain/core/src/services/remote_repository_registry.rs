@@ -10,6 +10,7 @@
 use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use async_trait::async_trait;
+use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
 use url::Url;

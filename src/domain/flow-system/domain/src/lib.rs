@@ -13,6 +13,8 @@
 // Re-exports
 pub use event_sourcing::*;
 
+mod flow_messages_types;
+
 pub mod aggregates;
 pub mod dataset_flow_key;
 pub mod entities;
@@ -22,5 +24,6 @@ pub mod services;
 pub use aggregates::*;
 pub use dataset_flow_key::*;
 pub use entities::*;
+pub use flow_messages_types::*;
 pub use repos::*;
 pub use services::*;

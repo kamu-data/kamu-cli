@@ -14,13 +14,14 @@ use axum::extract::{FromRequestParts, Path};
 use axum::routing::IntoMakeService;
 use axum::Router;
 use dill::Component;
-use event_bus::EventBus;
 use hyper::server::conn::AddrIncoming;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
+use time_source::SystemTimeSourceDefault;
 
 use crate::harness::await_client_server_flow;
 
@@ -40,7 +41,7 @@ async fn setup_repo() -> RepoFixture {
 
     let catalog = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add::<EventBus>()
+        .add::<DummyOutboxImpl>()
         .add::<DependencyGraphServiceInMemory>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
@@ -48,14 +49,18 @@ async fn setup_repo() -> RepoFixture {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .build();
 
-    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let create_dataset_from_snapshot = catalog
+        .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+        .unwrap();
 
-    let created_dataset = dataset_repo
-        .create_dataset_from_snapshot(
+    let created_dataset = create_dataset_from_snapshot
+        .execute(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -113,18 +118,13 @@ where
 
 async fn setup_client(dataset_url: url::Url, head_expected: Multihash) {
     let catalog = dill::CatalogBuilder::new()
-        .add::<EventBus>()
         .add::<auth::DummyOdfServerAccessTokenResolver>()
         .build();
 
-    let dataset = DatasetFactoryImpl::new(
-        IpfsGateway::default(),
-        catalog.get_one().unwrap(),
-        catalog.get_one().unwrap(),
-    )
-    .get_dataset(&dataset_url, false)
-    .await
-    .unwrap();
+    let dataset = DatasetFactoryImpl::new(IpfsGateway::default(), catalog.get_one().unwrap())
+        .get_dataset(&dataset_url, false)
+        .await
+        .unwrap();
 
     let head_actual = dataset
         .as_metadata_chain()

@@ -13,8 +13,8 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use kamu_accounts::*;
 use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
 use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
-use kamu_core::{SystemTimeSource, SystemTimeSourceStub};
 use opendatafabric::{AccountID, AccountName};
+use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

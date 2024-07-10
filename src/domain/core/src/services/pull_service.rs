@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
 

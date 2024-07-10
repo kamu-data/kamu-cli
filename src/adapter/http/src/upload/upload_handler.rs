@@ -9,7 +9,7 @@
 
 use bytes::Bytes;
 use http_common::{ApiError, IntoApiError, ResultIntoApiError};
-use kamu::domain::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use serde_json::{json, Value};
 use thiserror::Error;
 

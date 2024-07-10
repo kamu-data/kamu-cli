@@ -25,6 +25,7 @@ use datafusion::dataframe::DataFrame;
 use datafusion_odata::collection::{CollectionAddr, QueryParams};
 use datafusion_odata::context::{CollectionContext, OnUnsupported, ServiceContext};
 use dill::Catalog;
+use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use opendatafabric::*;
 

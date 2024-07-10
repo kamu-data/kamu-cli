@@ -9,7 +9,6 @@
 
 use std::assert_matches::assert_matches;
 
-use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -20,8 +19,7 @@ async fn test_summary_updates() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let layout = DatasetLayout::create(tmp_dir.path()).unwrap();
 
-    let catalog = dill::CatalogBuilder::new().add::<EventBus>().build();
-    let ds = DatasetFactoryImpl::get_local_fs(layout, catalog.get_one().unwrap());
+    let ds = DatasetFactoryImpl::get_local_fs(layout);
 
     assert_matches!(
         ds.get_summary(GetSummaryOpts::default()).await,

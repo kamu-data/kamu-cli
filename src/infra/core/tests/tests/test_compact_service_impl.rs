@@ -15,7 +15,6 @@ use datafusion::execution::config::SessionConfig;
 use datafusion::execution::context::SessionContext;
 use dill::Component;
 use domain::{CompactionError, CompactionOptions, CompactionResult, CompactionService};
-use event_bus::EventBus;
 use futures::TryStreamExt;
 use indoc::{formatdoc, indoc};
 use kamu::domain::*;
@@ -25,6 +24,7 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth;
 use opendatafabric::*;
+use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 use super::test_pull_service_impl::TestTransformService;
 use crate::mock_engine_provisioner;
@@ -1057,6 +1057,7 @@ async fn test_dataset_keep_metadata_only_compact() {
 struct CompactTestHarness {
     _temp_dir: tempfile::TempDir,
     dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     compaction_svc: Arc<CompactionServiceImpl>,
     push_ingest_svc: Arc<PushIngestServiceImpl>,
     verification_svc: Arc<dyn VerificationService>,
@@ -1080,7 +1081,6 @@ impl CompactTestHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add_value(RunInfoDir::new(run_info_dir))
-            .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
             .add_builder(
@@ -1089,6 +1089,7 @@ impl CompactTestHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
@@ -1106,6 +1107,7 @@ impl CompactTestHarness {
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
         let compaction_svc = catalog.get_one::<CompactionServiceImpl>().unwrap();
         let push_ingest_svc = catalog.get_one::<PushIngestServiceImpl>().unwrap();
         let transform_svc = catalog.get_one::<TransformServiceImpl>().unwrap();
@@ -1114,6 +1116,7 @@ impl CompactTestHarness {
         Self {
             _temp_dir: temp_dir,
             dataset_repo,
+            dataset_repo_writer,
             compaction_svc,
             push_ingest_svc,
             transform_svc,
@@ -1132,7 +1135,6 @@ impl CompactTestHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add_builder(run_info_dir.clone())
-            .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_builder(
                 DatasetRepositoryS3::builder()
@@ -1140,6 +1142,7 @@ impl CompactTestHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
@@ -1162,6 +1165,7 @@ impl CompactTestHarness {
         Self {
             _temp_dir: temp_dir,
             dataset_repo: catalog.get_one().unwrap(),
+            dataset_repo_writer: catalog.get_one().unwrap(),
             compaction_svc: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
             verification_svc: catalog.get_one().unwrap(),
@@ -1195,10 +1199,11 @@ impl CompactTestHarness {
     }
 
     async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) -> CreateDatasetResult {
-        self.dataset_repo
+        self.dataset_repo_writer
             .create_dataset_from_snapshot(dataset_snapshot)
             .await
             .unwrap()
+            .create_dataset_result
     }
 
     async fn create_test_root_dataset(&self) -> CreateDatasetResult {

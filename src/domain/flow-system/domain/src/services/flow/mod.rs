@@ -8,9 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod flow_service;
-mod flow_service_event;
 mod flow_service_test_driver;
 
 pub use flow_service::*;
-pub use flow_service_event::*;
 pub use flow_service_test_driver::*;

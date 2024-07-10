@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::*;
 

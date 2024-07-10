@@ -13,6 +13,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use chrono_humanize::HumanTime;
 use futures::TryStreamExt;
+use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use opendatafabric::*;
 

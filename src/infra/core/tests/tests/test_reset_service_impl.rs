@@ -11,13 +11,13 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use dill::Component;
-use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use tempfile::TempDir;
+use time_source::SystemTimeSourceDefault;
 
 #[test_log::test(tokio::test)]
 async fn test_reset_dataset_with_2revisions_drop_last() {
@@ -106,6 +106,7 @@ impl ChainWith2BlocksTestCase {
 struct ResetTestHarness {
     _temp_dir: TempDir,
     dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     reset_svc: Arc<dyn ResetService>,
 }
 
@@ -117,7 +118,6 @@ impl ResetTestHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
-            .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1))
@@ -128,15 +128,18 @@ impl ResetTestHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<ResetServiceImpl>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
         let reset_svc = catalog.get_one::<dyn ResetService>().unwrap();
 
         Self {
             _temp_dir: tempdir,
             dataset_repo,
+            dataset_repo_writer,
             reset_svc,
         }
     }
@@ -152,7 +155,7 @@ impl ResetTestHarness {
         .build_typed();
 
         let create_result = self
-            .dataset_repo
+            .dataset_repo_writer
             .create_dataset(&DatasetAlias::new(None, dataset_name.clone()), seed_block)
             .await
             .unwrap();
