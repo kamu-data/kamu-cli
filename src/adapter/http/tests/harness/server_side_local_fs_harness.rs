@@ -13,10 +13,12 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::Component;
-use event_bus::EventBus;
 use kamu::domain::{
     CacheDir,
+    CommitDatasetEventUseCase,
     CompactionService,
+    CreateDatasetFromSnapshotUseCase,
+    CreateDatasetUseCase,
     DatasetRepository,
     InternalError,
     ResultIntoInternal,
@@ -26,14 +28,20 @@ use kamu::domain::{
     SystemTimeSourceStub,
 };
 use kamu::{
+    AppendDatasetMetadataBatchUseCaseImpl,
+    CommitDatasetEventUseCaseImpl,
     CompactionServiceImpl,
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
     DatasetLayout,
     DatasetRepositoryLocalFs,
+    DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
     ObjectStoreBuilderLocalFs,
     ObjectStoreRegistryImpl,
 };
 use kamu_accounts::{AuthenticationService, MockAuthenticationService};
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use tempfile::TempDir;
 use url::Url;
@@ -85,7 +93,7 @@ impl ServerSideLocalFsHarness {
 
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add_value(CacheDir::new(cache_dir))
-                .add::<EventBus>()
+                .add::<DummyOutboxImpl>()
                 .add_value(time_source.clone())
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<DependencyGraphServiceInMemory>()
@@ -95,12 +103,17 @@ impl ServerSideLocalFsHarness {
                         .with_multi_tenant(options.multi_tenant),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
                 .add_value(server_authentication_mock())
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add::<CompactionServiceImpl>()
                 .add::<ObjectStoreRegistryImpl>()
-                .add::<ObjectStoreBuilderLocalFs>();
+                .add::<ObjectStoreBuilderLocalFs>()
+                .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+                .add::<CreateDatasetUseCaseImpl>()
+                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<CommitDatasetEventUseCaseImpl>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -148,6 +161,27 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
     fn cli_dataset_repository(&self) -> Arc<dyn DatasetRepository> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog);
         cli_catalog.get_one::<dyn DatasetRepository>().unwrap()
+    }
+
+    fn cli_create_dataset_use_case(&self) -> Arc<dyn CreateDatasetUseCase> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        cli_catalog.get_one::<dyn CreateDatasetUseCase>().unwrap()
+    }
+
+    fn cli_create_dataset_from_snapshot_use_case(
+        &self,
+    ) -> Arc<dyn CreateDatasetFromSnapshotUseCase> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        cli_catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap()
+    }
+
+    fn cli_commit_dataset_event_use_case(&self) -> Arc<dyn CommitDatasetEventUseCase> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        cli_catalog
+            .get_one::<dyn CommitDatasetEventUseCase>()
+            .unwrap()
     }
 
     fn cli_compaction_service(&self) -> Arc<dyn CompactionService> {

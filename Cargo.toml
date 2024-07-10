@@ -7,11 +7,11 @@ members = [
     "src/utils/database-common-macros",
     "src/utils/datafusion-cli",
     "src/utils/enum-variants",
-    "src/utils/event-bus",
     "src/utils/event-sourcing",
     "src/utils/event-sourcing-macros",
     "src/utils/http-common",
     "src/utils/internal-error",
+    "src/utils/messaging-outbox",
     "src/utils/multiformats",
     "src/utils/random-names",
     "src/utils/repo-tools",
@@ -51,6 +51,10 @@ members = [
     "src/infra/task-system/inmem",
     "src/infra/task-system/postgres",
     "src/infra/task-system/sqlite",
+    ## Outbox
+    "src/infra/messaging-outbox/inmem",
+    "src/infra/messaging-outbox/postgres",
+    "src/infra/messaging-outbox/sqlite",
     # Adapters
     "src/adapter/auth-oso",
     "src/adapter/flight-sql",
@@ -81,13 +85,13 @@ container-runtime = { version = "0.191.4", path = "src/utils/container-runtime",
 database-common = { version = "0.191.4", path = "src/utils/database-common", default-features = false }
 database-common-macros = { version = "0.191.4", path = "src/utils/database-common-macros", default-features = false }
 enum-variants = { version = "0.191.4", path = "src/utils/enum-variants", default-features = false }
-event-bus = { version = "0.191.4", path = "src/utils/event-bus", default-features = false }
 event-sourcing = { version = "0.191.4", path = "src/utils/event-sourcing", default-features = false }
 event-sourcing-macros = { version = "0.191.4", path = "src/utils/event-sourcing-macros", default-features = false }
 http-common = { version = "0.191.4", path = "src/utils/http-common", default-features = false }
 internal-error = { version = "0.191.4", path = "src/utils/internal-error", default-features = false }
 kamu-data-utils = { version = "0.191.4", path = "src/utils/data-utils", default-features = false }
 kamu-datafusion-cli = { version = "0.191.4", path = "src/utils/datafusion-cli", default-features = false }
+messaging-outbox = { version = "0.191.4", path = "src/utils/messaging-outbox", default-features = false }
 multiformats = { version = "0.191.4", path = "src/utils/multiformats", default-features = false }
 random-names = { version = "0.191.4", path = "src/utils/random-names", default-features = false }
 tracing-perfetto = { version = "0.191.4", path = "src/utils/tracing-perfetto", default-features = false }
@@ -130,6 +134,10 @@ kamu-task-system-inmem = { version = "0.191.4", path = "src/infra/task-system/in
 kamu-task-system-postgres = { version = "0.191.4", path = "src/infra/task-system/postgres", default-features = false }
 kamu-task-system-sqlite = { version = "0.191.4", path = "src/infra/task-system/sqlite", default-features = false }
 kamu-task-system-repo-tests = { version = "0.191.4", path = "src/infra/task-system/repo-tests", default-features = false }
+## Outbox
+kamu-messaging-outbox-inmem = { version = "0.191.4", path = "src/infra/messaging-outbox/inmem", default-features = false }
+kamu-messaging-outbox-postgres = { version = "0.191.4", path = "src/infra/messaging-outbox/postgres", default-features = false }
+kamu-messaging-outbox-sqlite = { version = "0.191.4", path = "src/infra/messaging-outbox/sqlite", default-features = false }
 
 # Adapters
 kamu-adapter-auth-oso = { version = "0.191.4", path = "src/adapter/auth-oso", default-features = false }

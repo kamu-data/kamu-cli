@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT max(message_id) as max_message_id FROM outbox_messages",
+  "describe": {
+    "columns": [
+      {
+        "name": "max_message_id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "5492168e915fb17da4b56fc7c7349962a5468069f8dc07765a8509f2e02d35eb"
+}

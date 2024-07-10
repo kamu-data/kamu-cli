@@ -24,6 +24,7 @@ doctest = false
 [dependencies]
 kamu-accounts = { workspace = true }
 container-runtime = { workspace = true }
+messaging-outbox = { workspace = true }
 internal-error = { workspace = true }
 opendatafabric = { workspace = true }
 

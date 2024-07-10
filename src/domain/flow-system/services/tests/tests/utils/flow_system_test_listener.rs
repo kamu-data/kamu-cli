@@ -12,19 +12,22 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
 use dill::*;
-use event_bus::AsyncEventHandler;
 use kamu_core::{FakeSystemTimeSource, InternalError};
 use kamu_flow_system::{
     FlowKey,
     FlowOutcome,
     FlowPaginationOpts,
     FlowService,
-    FlowServiceEvent,
+    FlowServiceExecutedTimeSlotMessage,
+    FlowServiceFlowFinishedMessage,
+    FlowServiceFlowRunningMessage,
+    FlowServiceLoadedMessage,
     FlowStartCondition,
     FlowState,
     FlowStatus,
     FlowTrigger,
 };
+use messaging_outbox::MessageConsumerT;
 use opendatafabric::DatasetID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,7 +48,10 @@ struct FlowSystemTestListenerState {
 
 #[component(pub)]
 #[scope(Singleton)]
-#[interface(dyn AsyncEventHandler<FlowServiceEvent>)]
+#[interface(dyn MessageConsumerT<FlowServiceLoadedMessage>)]
+#[interface(dyn MessageConsumerT<FlowServiceExecutedTimeSlotMessage>)]
+#[interface(dyn MessageConsumerT<FlowServiceFlowRunningMessage>)]
+#[interface(dyn MessageConsumerT<FlowServiceFlowFinishedMessage>)]
 impl FlowSystemTestListener {
     pub(crate) fn new(
         flow_service: Arc<dyn FlowService>,
@@ -230,10 +236,66 @@ impl std::fmt::Display for FlowSystemTestListener {
 }
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<FlowServiceEvent> for FlowSystemTestListener {
-    async fn handle(&self, event: &FlowServiceEvent) -> Result<(), InternalError> {
-        self.make_a_snapshot(event.event_time()).await;
+impl MessageConsumerT<FlowServiceLoadedMessage> for FlowSystemTestListener {
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: FlowServiceLoadedMessage,
+    ) -> Result<(), InternalError> {
+        self.make_a_snapshot(message.event_time).await;
         Ok(())
+    }
+
+    fn consumer_name(&self) -> &'static str {
+        unreachable!("Should not be ever called for test listener");
+    }
+}
+
+#[async_trait::async_trait]
+impl MessageConsumerT<FlowServiceExecutedTimeSlotMessage> for FlowSystemTestListener {
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: FlowServiceExecutedTimeSlotMessage,
+    ) -> Result<(), InternalError> {
+        self.make_a_snapshot(message.event_time).await;
+        Ok(())
+    }
+
+    fn consumer_name(&self) -> &'static str {
+        unreachable!("Should not be ever called for test listener");
+    }
+}
+
+#[async_trait::async_trait]
+impl MessageConsumerT<FlowServiceFlowRunningMessage> for FlowSystemTestListener {
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: FlowServiceFlowRunningMessage,
+    ) -> Result<(), InternalError> {
+        self.make_a_snapshot(message.event_time).await;
+        Ok(())
+    }
+
+    fn consumer_name(&self) -> &'static str {
+        unreachable!("Should not be ever called for test listener");
+    }
+}
+
+#[async_trait::async_trait]
+impl MessageConsumerT<FlowServiceFlowFinishedMessage> for FlowSystemTestListener {
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: FlowServiceFlowFinishedMessage,
+    ) -> Result<(), InternalError> {
+        self.make_a_snapshot(message.event_time).await;
+        Ok(())
+    }
+
+    fn consumer_name(&self) -> &'static str {
+        unreachable!("Should not be ever called for test listener");
     }
 }
 

@@ -11,14 +11,14 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dill::*;
-use event_bus::AsyncEventHandler;
 use internal_error::InternalError;
-use kamu_core::events::{
-    DatasetEventCreated,
-    DatasetEventDeleted,
-    DatasetEventDependenciesUpdated,
+use kamu_core::messages::{
+    DatasetCreatedMessage,
+    DatasetDeletedMessage,
+    DatasetDependenciesUpdatedMessage,
 };
 use kamu_core::*;
+use messaging_outbox::MessageConsumerT;
 use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use petgraph::visit::{depth_first_search, Bfs, DfsEvent, Reversed};
@@ -70,9 +70,9 @@ impl State {
 
 #[component(pub)]
 #[interface(dyn DependencyGraphService)]
-#[interface(dyn AsyncEventHandler<DatasetEventCreated>)]
-#[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
-#[interface(dyn AsyncEventHandler<DatasetEventDependenciesUpdated>)]
+#[interface(dyn MessageConsumerT<DatasetCreatedMessage>)]
+#[interface(dyn MessageConsumerT<DatasetDeletedMessage>)]
+#[interface(dyn MessageConsumerT<DatasetDependenciesUpdatedMessage>)]
 #[scope(Singleton)]
 impl DependencyGraphServiceInMemory {
     pub fn new(repository: Option<Arc<dyn DependencyGraphRepository>>) -> Self {
@@ -374,41 +374,61 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventCreated> for DependencyGraphServiceInMemory {
-    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
-    async fn handle(&self, event: &DatasetEventCreated) -> Result<(), InternalError> {
+impl MessageConsumerT<DatasetCreatedMessage> for DependencyGraphServiceInMemory {
+    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: DatasetCreatedMessage,
+    ) -> Result<(), InternalError> {
         let mut state = self.state.write().await;
-        state.get_or_create_dataset_node(&event.dataset_id);
+        state.get_or_create_dataset_node(&message.dataset_id);
         Ok(())
+    }
+
+    fn consumer_name(&self) -> &'static str {
+        MESSAGE_CONSUMER_KAMU_CORE_DEPENDENCY_GRAPH_SERVICE
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventDeleted> for DependencyGraphServiceInMemory {
-    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
-    async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
+impl MessageConsumerT<DatasetDeletedMessage> for DependencyGraphServiceInMemory {
+    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: DatasetDeletedMessage,
+    ) -> Result<(), InternalError> {
         let mut state = self.state.write().await;
 
-        let node_index = state.get_dataset_node(&event.dataset_id).int_err()?;
+        let node_index = state.get_dataset_node(&message.dataset_id).int_err()?;
 
         state.datasets_graph.remove_node(node_index);
-        state.dataset_node_indices.remove(&event.dataset_id);
+        state.dataset_node_indices.remove(&message.dataset_id);
 
         Ok(())
+    }
+
+    fn consumer_name(&self) -> &'static str {
+        MESSAGE_CONSUMER_KAMU_CORE_DEPENDENCY_GRAPH_SERVICE
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventDependenciesUpdated> for DependencyGraphServiceInMemory {
-    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
-    async fn handle(&self, event: &DatasetEventDependenciesUpdated) -> Result<(), InternalError> {
+impl MessageConsumerT<DatasetDependenciesUpdatedMessage> for DependencyGraphServiceInMemory {
+    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: DatasetDependenciesUpdatedMessage,
+    ) -> Result<(), InternalError> {
         let mut state = self.state.write().await;
 
-        let node_index = state.get_dataset_node(&event.dataset_id).int_err()?;
+        let node_index = state.get_dataset_node(&message.dataset_id).int_err()?;
 
         let existing_upstream_ids: HashSet<_> = state
             .datasets_graph
@@ -422,17 +442,21 @@ impl AsyncEventHandler<DatasetEventDependenciesUpdated> for DependencyGraphServi
             })
             .collect();
 
-        let new_upstream_ids: HashSet<_> = event.new_upstream_ids.iter().cloned().collect();
+        let new_upstream_ids: HashSet<_> = message.new_upstream_ids.iter().cloned().collect();
 
         for obsolete_upstream_id in existing_upstream_ids.difference(&new_upstream_ids) {
-            self.remove_dependency(&mut state, obsolete_upstream_id, &event.dataset_id);
+            self.remove_dependency(&mut state, obsolete_upstream_id, &message.dataset_id);
         }
 
         for added_id in new_upstream_ids.difference(&existing_upstream_ids) {
-            self.add_dependency(&mut state, added_id, &event.dataset_id);
+            self.add_dependency(&mut state, added_id, &message.dataset_id);
         }
 
         Ok(())
+    }
+
+    fn consumer_name(&self) -> &'static str {
+        MESSAGE_CONSUMER_KAMU_CORE_DEPENDENCY_GRAPH_SERVICE
     }
 }
 

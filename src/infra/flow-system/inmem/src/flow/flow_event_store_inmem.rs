@@ -16,7 +16,7 @@ use opendatafabric::{AccountID, DatasetID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct FlowEventStoreInMem {
+pub struct FlowEventStoreInMemory {
     inner: EventStoreInMemory<FlowState, State>,
 }
 
@@ -151,7 +151,7 @@ impl FlowIndexEntry {
 #[component(pub)]
 #[interface(dyn FlowEventStore)]
 #[scope(Singleton)]
-impl FlowEventStoreInMem {
+impl FlowEventStoreInMemory {
     pub fn new() -> Self {
         Self {
             inner: EventStoreInMemory::new(),
@@ -250,7 +250,7 @@ impl FlowEventStoreInMem {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl EventStore<FlowState> for FlowEventStoreInMem {
+impl EventStore<FlowState> for FlowEventStoreInMemory {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn len(&self) -> Result<usize, InternalError> {
         self.inner.len().await
@@ -282,7 +282,7 @@ impl EventStore<FlowState> for FlowEventStoreInMem {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowEventStore for FlowEventStoreInMem {
+impl FlowEventStore for FlowEventStoreInMemory {
     #[tracing::instrument(level = "debug", skip_all)]
     fn new_flow_id(&self) -> FlowID {
         self.inner.as_state().lock().unwrap().next_flow_id()

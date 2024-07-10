@@ -10,7 +10,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use database_common::DatabaseTransactionRunner;
 use dill::*;
@@ -244,7 +244,6 @@ pub fn prepare_dependencies_graph_repository(
     // bound to CLI user. It also should be authorized to access any dataset.
 
     let special_catalog_for_graph = CatalogBuilder::new()
-        .add::<event_bus::EventBus>()
         .add::<SystemTimeSourceDefault>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
@@ -252,6 +251,7 @@ pub fn prepare_dependencies_graph_repository(
                 .with_multi_tenant(multi_tenant_workspace),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
         .add_value(current_account_subject)
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<DependencyGraphServiceInMemory>()
@@ -286,14 +286,13 @@ pub fn configure_base_catalog(
         b.add::<SystemTimeSourceDefault>();
     }
 
-    b.add::<event_bus::EventBus>();
-
     b.add_builder(
         DatasetRepositoryLocalFs::builder()
             .with_root(workspace_layout.datasets_dir.clone())
             .with_multi_tenant(multi_tenant_workspace),
     );
     b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
+    b.bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>();
 
     b.add::<DatasetFactoryImpl>();
 
@@ -350,6 +349,13 @@ pub fn configure_base_catalog(
     b.add::<DatasetOwnershipServiceInMemory>();
     b.add::<DatasetOwnershipServiceInMemoryStateInitializer>();
 
+    b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
+    b.add::<CommitDatasetEventUseCaseImpl>();
+    b.add::<CreateDatasetUseCaseImpl>();
+    b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
+    b.add::<DeleteDatasetUseCaseImpl>();
+    b.add::<RenameDatasetUseCaseImpl>();
+
     b.add::<kamu_flow_system_services::FlowConfigurationServiceImpl>();
     b.add::<kamu_flow_system_services::FlowServiceImpl>();
     b.add_value(kamu_flow_system_inmem::domain::FlowServiceRunConfig::new(
@@ -382,6 +388,13 @@ pub fn configure_base_catalog(
     b.add::<UploadServiceLocal>();
 
     b.add::<DatabaseTransactionRunner>();
+
+    b.add::<messaging_outbox::OutboxTransactionalImpl>();
+    b.add::<messaging_outbox::OutboxTransactionalProcessor>();
+
+    b.add::<CoreMessageConsumerMediator>();
+    b.add::<kamu_task_system_services::TaskMessageConsumerMediator>();
+    b.add::<kamu_flow_system_services::FlowMessageConsumerMediator>();
 
     b
 }
@@ -595,6 +608,12 @@ pub fn register_config_in_catalog(
             catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>()
         }
     };
+
+    let outbox_config = config.outbox.as_ref().unwrap();
+    catalog_builder.add_value(messaging_outbox::OutboxConfig::new(
+        Duration::seconds(outbox_config.awaiting_step_secs.unwrap()),
+        outbox_config.batch_size.unwrap(),
+    ));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

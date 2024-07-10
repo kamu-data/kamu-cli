@@ -10,12 +10,12 @@
 use async_graphql::*;
 use database_common::NoOpDatabasePlugin;
 use dill::Component;
-use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::*;
 use kamu_core::*;
+use messaging_outbox::OutboxImmediateImpl;
 use mockall::predicate::eq;
 use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
 use opendatafabric::serde::DatasetSnapshotSerializer;
@@ -675,7 +675,11 @@ impl GraphQLDatasetsHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<SystemTimeSourceDefault>()
-                .add::<EventBus>()
+                .add::<OutboxImmediateImpl>()
+                .add::<CoreMessageConsumerMediator>()
+                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<RenameDatasetUseCaseImpl>()
+                .add::<DeleteDatasetUseCaseImpl>()
                 .add::<DependencyGraphServiceInMemory>()
                 .add_builder(
                     DatasetRepositoryLocalFs::builder()
@@ -683,6 +687,7 @@ impl GraphQLDatasetsHarness {
                         .with_multi_tenant(is_multi_tenant),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
                 .add_value(mock_authentication_service)
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
@@ -722,12 +727,13 @@ impl GraphQLDatasetsHarness {
         account_name: Option<AccountName>,
         name: DatasetName,
     ) -> CreateDatasetResult {
-        let dataset_repo = self
+        let create_dataset = self
             .catalog_authorized
-            .get_one::<dyn DatasetRepository>()
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
             .unwrap();
-        dataset_repo
-            .create_dataset_from_snapshot(
+
+        create_dataset
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(DatasetAlias::new(account_name, name))
                     .kind(DatasetKind::Root)
@@ -743,12 +749,13 @@ impl GraphQLDatasetsHarness {
         name: DatasetName,
         input_dataset: &DatasetHandle,
     ) -> CreateDatasetResult {
-        let dataset_repo = self
+        let create_dataset = self
             .catalog_authorized
-            .get_one::<dyn DatasetRepository>()
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
             .unwrap();
-        dataset_repo
-            .create_dataset_from_snapshot(
+
+        create_dataset
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(DatasetAlias::new(None, name))
                     .kind(DatasetKind::Derivative)

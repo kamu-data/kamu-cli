@@ -24,7 +24,7 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
-event-bus = { workspace = true }
+messaging-outbox = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 kamu-flow-system = { workspace = true }
@@ -44,6 +44,7 @@ url = { version = "2", default-features = false, features = ["serde"] }
 
 # TODO: Make serde optional
 serde = { version = "1", default-features = false, features = ["derive"] }
+serde_json = "1"
 serde_with = { version = "3", default-features = false }
 
 

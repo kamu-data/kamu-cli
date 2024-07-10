@@ -15,12 +15,16 @@ pub use internal_error::*;
 
 pub mod auth;
 pub mod entities;
+pub mod messages;
 pub mod repos;
 pub mod services;
+pub mod use_cases;
 pub mod utils;
 
 pub use entities::{SetRefError, *};
+pub use messages::*;
 pub use repos::{DatasetNotFoundError, *};
 pub use services::*;
+pub use use_cases::*;
 pub use utils::paths::*;
 pub use utils::time_source::*;

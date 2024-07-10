@@ -19,7 +19,6 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use event_bus::EventBus;
 use http_common::*;
 use kamu::domain::*;
 use kamu_accounts::CurrentAccountSubject;
@@ -227,13 +226,10 @@ pub async fn dataset_push_ws_upgrade_handler(
         Err(err) => Err(err.api_err()),
     }?;
 
-    let event_bus = catalog.get_one::<EventBus>().unwrap();
-
     Ok(ws.on_upgrade(|socket| {
         AxumServerPushProtocolInstance::new(
             socket,
-            event_bus,
-            dataset_repo,
+            catalog,
             dataset_ref,
             dataset,
             dataset_url,

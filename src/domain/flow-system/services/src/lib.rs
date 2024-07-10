@@ -14,6 +14,8 @@ pub use kamu_flow_system as domain;
 
 mod flow;
 mod flow_configuration;
+mod messages;
 
 pub use flow::*;
 pub use flow_configuration::*;
+pub use messages::*;

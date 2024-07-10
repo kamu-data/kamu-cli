@@ -11,13 +11,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
+use database_common::NoOpDatabasePlugin;
 use dill::Component;
-use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_http::SmartTransferProtocolClientWs;
 use kamu_datasets_services::DatasetEnvVarServiceStaticImpl;
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{
     AccountID,
     AccountName,
@@ -66,7 +67,7 @@ impl ClientSideHarness {
         b.add_value(CacheDir::new(cache_dir));
         b.add_value(RemoteReposDir::new(repos_dir));
 
-        b.add::<EventBus>();
+        b.add::<DummyOutboxImpl>();
 
         b.add::<DependencyGraphServiceInMemory>();
 
@@ -92,7 +93,8 @@ impl ClientSideHarness {
                 .with_root(datasets_dir)
                 .with_multi_tenant(options.multi_tenant),
         )
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>();
 
         b.add::<RemoteRepositoryRegistryImpl>();
 
@@ -125,9 +127,15 @@ impl ClientSideHarness {
 
         b.add::<DatasetEnvVarServiceStaticImpl>();
 
+        b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
+        b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
+        b.add::<CommitDatasetEventUseCaseImpl>();
+
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
         b.add_value(IpfsGateway::default());
+
+        NoOpDatabasePlugin::init_database_components(&mut b);
 
         let catalog = b.build();
 
@@ -153,6 +161,18 @@ impl ClientSideHarness {
 
     pub fn dataset_repository(&self) -> Arc<dyn DatasetRepository> {
         self.catalog.get_one::<dyn DatasetRepository>().unwrap()
+    }
+
+    pub fn create_dataset_from_snapshot(&self) -> Arc<dyn CreateDatasetFromSnapshotUseCase> {
+        self.catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap()
+    }
+
+    pub fn commit_dataset_event(&self) -> Arc<dyn CommitDatasetEventUseCase> {
+        self.catalog
+            .get_one::<dyn CommitDatasetEventUseCase>()
+            .unwrap()
     }
 
     pub fn compaction_service(&self) -> Arc<dyn CompactionService> {

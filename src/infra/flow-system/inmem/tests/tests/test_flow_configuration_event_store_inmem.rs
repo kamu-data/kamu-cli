@@ -15,7 +15,7 @@ use kamu_flow_system_inmem::*;
 #[test_log::test(tokio::test)]
 async fn test_event_store_empty() {
     let catalog = CatalogBuilder::new()
-        .add::<FlowConfigurationEventStoreInMem>()
+        .add::<FlowConfigurationEventStoreInMemory>()
         .build();
 
     kamu_flow_system_repo_tests::test_event_store_empty(&catalog).await;
@@ -26,7 +26,7 @@ async fn test_event_store_empty() {
 #[test_log::test(tokio::test)]
 async fn test_event_store_get_streams() {
     let catalog = CatalogBuilder::new()
-        .add::<FlowConfigurationEventStoreInMem>()
+        .add::<FlowConfigurationEventStoreInMemory>()
         .build();
 
     kamu_flow_system_repo_tests::test_event_store_get_streams(&catalog).await;
@@ -37,7 +37,7 @@ async fn test_event_store_get_streams() {
 #[test_log::test(tokio::test)]
 async fn test_event_store_get_events_with_windowing() {
     let catalog = CatalogBuilder::new()
-        .add::<FlowConfigurationEventStoreInMem>()
+        .add::<FlowConfigurationEventStoreInMemory>()
         .build();
 
     kamu_flow_system_repo_tests::test_event_store_get_events_with_windowing(&catalog).await;

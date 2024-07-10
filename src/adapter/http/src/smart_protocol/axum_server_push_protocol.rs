@@ -11,16 +11,16 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
-use event_bus::EventBus;
-use kamu::domain::events::DatasetEventDependenciesUpdated;
+use database_common::DatabaseTransactionRunner;
+use dill::Catalog;
 use kamu::domain::{
+    AppendDatasetMetadataBatchUseCase,
     BlockRef,
     CorruptedSourceError,
     CreateDatasetError,
+    CreateDatasetUseCase,
     Dataset,
-    DatasetRepository,
     ErrorIntoInternal,
-    GetSummaryOpts,
     HashedMetadataBlock,
     ResultIntoInternal,
 };
@@ -42,8 +42,7 @@ const MIN_UPLOAD_PROGRESS_PING_DELAY_SEC: u64 = 10;
 
 pub struct AxumServerPushProtocolInstance {
     socket: axum::extract::ws::WebSocket,
-    event_bus: Arc<EventBus>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    catalog: Catalog,
     dataset_ref: DatasetRef,
     dataset: Option<Arc<dyn Dataset>>,
     dataset_url: Url,
@@ -53,8 +52,7 @@ pub struct AxumServerPushProtocolInstance {
 impl AxumServerPushProtocolInstance {
     pub fn new(
         socket: axum::extract::ws::WebSocket,
-        event_bus: Arc<EventBus>,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        catalog: Catalog,
         dataset_ref: DatasetRef,
         dataset: Option<Arc<dyn Dataset>>,
         dataset_url: Url,
@@ -62,8 +60,7 @@ impl AxumServerPushProtocolInstance {
     ) -> Self {
         Self {
             socket,
-            event_bus,
-            dataset_repo,
+            catalog,
             dataset_ref,
             dataset,
             dataset_url,
@@ -120,11 +117,16 @@ impl AxumServerPushProtocolInstance {
                     })
                     .int_err()?;
 
-                match self
-                    .dataset_repo
-                    .create_dataset(dataset_alias, seed_block)
-                    .await
-                {
+                let create_result = DatabaseTransactionRunner::new(self.catalog.clone())
+                    .transactional_with(
+                        |create_dataset_use_case: Arc<dyn CreateDatasetUseCase>| async move {
+                            create_dataset_use_case
+                                .execute(dataset_alias, seed_block)
+                                .await
+                        },
+                    )
+                    .await;
+                match create_result {
                     Ok(create_result) => self.dataset = Some(create_result.dataset),
                     Err(err) => {
                         if let CreateDatasetError::RefCollision(err) = &err {
@@ -360,31 +362,17 @@ impl AxumServerPushProtocolInstance {
 
         tracing::debug!("Push client sent a complete request. Committing the dataset");
 
-        if !new_blocks.is_empty() {
-            let dataset = self.dataset.as_ref().unwrap().as_ref();
-            let response = dataset_append_metadata(dataset, new_blocks, force_update_if_diverged)
-                .await
-                .map_err(|e| {
-                    tracing::debug!("Appending dataset metadata failed with error: {}", e);
-                    PushServerError::Internal(e.int_err())
-                })?;
-
-            // TODO: encapsulate this inside dataset/chain
-            if !response.new_upstream_ids.is_empty() {
-                let summary = dataset
-                    .get_summary(GetSummaryOpts::default())
-                    .await
-                    .int_err()?;
-
-                self.event_bus
-                    .dispatch_event(DatasetEventDependenciesUpdated {
-                        dataset_id: summary.id.clone(),
-                        new_upstream_ids: response.new_upstream_ids,
-                    })
-                    .await
-                    .int_err()?;
-            }
-        }
+        let dataset = self.dataset.clone().unwrap();
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |append_dataset_metadata_batch: Arc<dyn AppendDatasetMetadataBatchUseCase>| async move {
+                    append_dataset_metadata_batch
+                        .execute(dataset.as_ref(), new_blocks, force_update_if_diverged)
+                        .await
+                },
+            )
+            .await
+            .int_err()?;
 
         tracing::debug!("Sending completion confirmation");
 

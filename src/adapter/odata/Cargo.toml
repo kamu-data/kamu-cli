@@ -42,7 +42,8 @@ tracing = "0.1"
 
 
 [dev-dependencies]
-event-bus = { workspace = true }
+messaging-outbox = { workspace = true }
+
 hyper = { version = "0.14", default-features = false }
 indoc = { version = "2" }
 kamu = { workspace = true }

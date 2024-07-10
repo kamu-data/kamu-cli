@@ -24,7 +24,6 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
-event-bus = { workspace = true }
 http-common = { workspace = true }
 # TODO: Adapters should depend only on kamu-domain crate and be implementation-agnostic
 kamu = { workspace = true }
@@ -79,6 +78,7 @@ kamu-accounts-services = { workspace = true }
 kamu-datasets-services = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
+messaging-outbox = { workspace = true }
 
 fs_extra = "1.3"                                                    # Recursive folder copy
 indoc = "2"

@@ -20,6 +20,7 @@ use super::{common, CLIError, Command};
 
 pub struct DeleteCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
+    delete_dataset: Arc<dyn DeleteDatasetUseCase>,
     dataset_ref_patterns: Vec<DatasetRefPattern>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     all: bool,
@@ -30,6 +31,7 @@ pub struct DeleteCommand {
 impl DeleteCommand {
     pub fn new<I>(
         dataset_repo: Arc<dyn DatasetRepository>,
+        delete_dataset: Arc<dyn DeleteDatasetUseCase>,
         dataset_ref_patterns: I,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         all: bool,
@@ -41,6 +43,7 @@ impl DeleteCommand {
     {
         Self {
             dataset_repo,
+            delete_dataset,
             dataset_ref_patterns: dataset_ref_patterns.into_iter().collect(),
             dependency_graph_service,
             all,
@@ -129,7 +132,7 @@ impl Command for DeleteCommand {
         }
 
         for dataset_ref in &dataset_refs {
-            match self.dataset_repo.delete_dataset(dataset_ref).await {
+            match self.delete_dataset.execute(dataset_ref).await {
                 Ok(_) => Ok(()),
                 Err(DeleteDatasetError::DanglingReference(e)) => Err(CLIError::failure(e)),
                 Err(DeleteDatasetError::Access(e)) => Err(CLIError::failure(e)),

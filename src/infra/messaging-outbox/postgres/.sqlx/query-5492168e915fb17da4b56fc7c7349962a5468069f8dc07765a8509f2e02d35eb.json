@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT max(message_id) as max_message_id FROM outbox_messages",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "max_message_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "5492168e915fb17da4b56fc7c7349962a5468069f8dc07765a8509f2e02d35eb"
+}

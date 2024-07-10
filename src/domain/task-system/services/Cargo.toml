@@ -22,7 +22,8 @@ doctest = false
 
 
 [dependencies]
-event-bus = { workspace = true }
+database-common = { workspace = true }
+messaging-outbox = { workspace = true }
 opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
@@ -31,6 +32,7 @@ async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
 dill = "0.8"
 futures = "0.3"
+serde_json = "1"
 tokio = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 

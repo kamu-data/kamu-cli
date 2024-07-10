@@ -14,7 +14,6 @@ use datafusion::arrow::array::{Array, Int32Array, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use dill::Component;
-use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer, ParquetWriterHelper};
 use kamu::*;
@@ -33,7 +32,6 @@ async fn test_verify_data_consistency() {
 
     let catalog = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add::<EventBus>()
         .add::<DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(
@@ -46,6 +44,7 @@ async fn test_verify_data_consistency() {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
         .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
         .bind::<dyn TransformService, TestTransformService>()
         .add::<VerificationServiceImpl>()
@@ -53,8 +52,9 @@ async fn test_verify_data_consistency() {
 
     let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
 
-    dataset_repo
+    dataset_repo_writer
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
@@ -66,7 +66,7 @@ async fn test_verify_data_consistency() {
         .await
         .unwrap();
 
-    dataset_repo
+    dataset_repo_writer
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(dataset_alias.clone())

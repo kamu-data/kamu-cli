@@ -9,13 +9,10 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use std::sync::Arc;
-
 use async_graphql::value;
 use chrono::{DateTime, Duration, DurationRound, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
-use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::{
     MetadataFactory,
@@ -25,8 +22,11 @@ use kamu::testing::{
     MockTransformService,
 };
 use kamu::{
+    CoreMessageConsumerMediator,
+    CreateDatasetFromSnapshotUseCaseImpl,
     DatasetOwnershipServiceInMemory,
     DatasetRepositoryLocalFs,
+    DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
 };
 use kamu_accounts::{
@@ -41,6 +41,7 @@ use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::{
     auth,
     CompactionResult,
+    CreateDatasetFromSnapshotUseCase,
     CreateDatasetResult,
     DatasetChangesService,
     DatasetIntervalIncrement,
@@ -60,11 +61,16 @@ use kamu_flow_system::{
     FlowTrigger,
     FlowTriggerAutoPolling,
 };
-use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
-use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceImpl};
-use kamu_task_system as ts;
+use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMemory, FlowEventStoreInMemory};
+use kamu_flow_system_services::{
+    FlowConfigurationServiceImpl,
+    FlowMessageConsumerMediator,
+    FlowServiceImpl,
+};
+use kamu_task_system::{self as ts, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
-use kamu_task_system_services::TaskSchedulerImpl;
+use kamu_task_system_services::{TaskMessageConsumerMediator, TaskSchedulerImpl};
+use messaging_outbox::{post_outbox_message, Outbox, OutboxImmediateImpl};
 use opendatafabric::{AccountID, DatasetID, DatasetKind, Multihash};
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
@@ -2554,7 +2560,6 @@ struct FlowRunsHarness {
     _catalog_base: dill::Catalog,
     catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
-    dataset_repo: Arc<dyn DatasetRepository>,
 }
 
 #[derive(Default)]
@@ -2579,13 +2584,18 @@ impl FlowRunsHarness {
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new();
 
-            b.add::<EventBus>()
+            b.add::<OutboxImmediateImpl>()
+                .add::<CoreMessageConsumerMediator>()
+                .add::<FlowMessageConsumerMediator>()
+                .add::<TaskMessageConsumerMediator>()
                 .add_builder(
                     DatasetRepositoryLocalFs::builder()
                         .with_root(datasets_dir)
                         .with_multi_tenant(false),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add_value(dataset_changes_mock)
                 .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
                 .add::<SystemTimeSourceDefault>()
@@ -2594,9 +2604,9 @@ impl FlowRunsHarness {
                 .add_value(dependency_graph_mock)
                 .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
                 .add::<FlowConfigurationServiceImpl>()
-                .add::<FlowConfigurationEventStoreInMem>()
+                .add::<FlowConfigurationEventStoreInMemory>()
                 .add::<FlowServiceImpl>()
-                .add::<FlowEventStoreInMem>()
+                .add::<FlowEventStoreInMemory>()
                 .add_value(FlowServiceRunConfig::new(
                     Duration::try_seconds(1).unwrap(),
                     Duration::try_minutes(1).unwrap(),
@@ -2622,16 +2632,11 @@ impl FlowRunsHarness {
         // Init dataset with no sources
         let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
 
-        let dataset_repo = catalog_authorized
-            .get_one::<dyn DatasetRepository>()
-            .unwrap();
-
         Self {
             _tempdir: tempdir,
             _catalog_base: catalog_base,
             catalog_anonymous,
             catalog_authorized,
-            dataset_repo,
         }
     }
 
@@ -2649,8 +2654,13 @@ impl FlowRunsHarness {
     }
 
     async fn create_root_dataset(&self) -> CreateDatasetResult {
-        self.dataset_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .kind(DatasetKind::Root)
                     .name("foo")
@@ -2662,8 +2672,13 @@ impl FlowRunsHarness {
     }
 
     async fn create_derived_dataset(&self) -> CreateDatasetResult {
-        self.dataset_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .name("bar")
                     .kind(DatasetKind::Derivative)
@@ -2731,14 +2746,17 @@ impl FlowRunsHarness {
         task.run(event_time).unwrap();
         task.save(task_event_store.as_ref()).await.unwrap();
 
-        let event_bus = self.catalog_authorized.get_one::<EventBus>().unwrap();
-        event_bus
-            .dispatch_event(ts::TaskEventRunning {
+        let outbox = self.catalog_authorized.get_one::<dyn Outbox>().unwrap();
+        post_outbox_message(
+            outbox.as_ref(),
+            MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+            ts::TaskRunningMessage {
                 event_time,
                 task_id,
-            })
-            .await
-            .unwrap();
+            },
+        )
+        .await
+        .unwrap();
     }
 
     async fn mimic_task_completed(
@@ -2764,15 +2782,18 @@ impl FlowRunsHarness {
         task.finish(event_time, task_outcome.clone()).unwrap();
         task.save(task_event_store.as_ref()).await.unwrap();
 
-        let event_bus = self.catalog_authorized.get_one::<EventBus>().unwrap();
-        event_bus
-            .dispatch_event(ts::TaskEventFinished {
+        let outbox = self.catalog_authorized.get_one::<dyn Outbox>().unwrap();
+        post_outbox_message(
+            outbox.as_ref(),
+            MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+            ts::TaskFinishedMessage {
                 event_time,
                 task_id,
                 outcome: task_outcome,
-            })
-            .await
-            .unwrap();
+            },
+        )
+        .await
+        .unwrap();
     }
 
     fn extract_flow_id_from_trigger_response(response_json: &serde_json::Value) -> &str {

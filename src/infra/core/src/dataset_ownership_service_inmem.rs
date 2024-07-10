@@ -11,10 +11,10 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dill::*;
-use event_bus::AsyncEventHandler;
 use kamu_accounts::{AuthenticationService, CurrentAccountSubject};
-use kamu_core::events::{DatasetEventCreated, DatasetEventDeleted};
+use kamu_core::messages::{DatasetCreatedMessage, DatasetDeletedMessage};
 use kamu_core::*;
+use messaging_outbox::MessageConsumerT;
 use opendatafabric::{AccountID, AccountName, DatasetID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,8 +34,8 @@ struct State {
 
 #[component(pub)]
 #[interface(dyn DatasetOwnershipService)]
-#[interface(dyn AsyncEventHandler<DatasetEventCreated>)]
-#[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
+#[interface(dyn MessageConsumerT<DatasetCreatedMessage>)]
+#[interface(dyn MessageConsumerT<DatasetDeletedMessage>)]
 #[scope(Singleton)]
 impl DatasetOwnershipServiceInMemory {
     pub fn new() -> Self {
@@ -136,32 +136,48 @@ impl DatasetOwnershipService for DatasetOwnershipServiceInMemory {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventCreated> for DatasetOwnershipServiceInMemory {
-    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
-    async fn handle(&self, event: &DatasetEventCreated) -> Result<(), InternalError> {
+impl MessageConsumerT<DatasetCreatedMessage> for DatasetOwnershipServiceInMemory {
+    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: DatasetCreatedMessage,
+    ) -> Result<(), InternalError> {
         let mut guard = self.state.write().await;
-        self.insert_dataset_record(&mut guard, &event.dataset_id, &event.owner_account_id);
+        self.insert_dataset_record(&mut guard, &message.dataset_id, &message.owner_account_id);
         Ok(())
+    }
+
+    fn consumer_name(&self) -> &'static str {
+        MESSAGE_CONSUMER_KAMU_CORE_DATASET_OWNERSHIP_SERVICE
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventDeleted> for DatasetOwnershipServiceInMemory {
-    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
-    async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
-        let account_ids = self.get_dataset_owners(&event.dataset_id).await?;
+impl MessageConsumerT<DatasetDeletedMessage> for DatasetOwnershipServiceInMemory {
+    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: DatasetDeletedMessage,
+    ) -> Result<(), InternalError> {
+        let account_ids = self.get_dataset_owners(&message.dataset_id).await?;
         if !account_ids.is_empty() {
             let mut guard = self.state.write().await;
             for account_id in account_ids {
                 if let Some(dataset_ids) = guard.dataset_ids_by_account_id.get_mut(&account_id) {
-                    dataset_ids.remove(&event.dataset_id);
+                    dataset_ids.remove(&message.dataset_id);
                 }
             }
-            guard.account_ids_by_dataset_id.remove(&event.dataset_id);
+            guard.account_ids_by_dataset_id.remove(&message.dataset_id);
         }
         Ok(())
+    }
+
+    fn consumer_name(&self) -> &'static str {
+        MESSAGE_CONSUMER_KAMU_CORE_DATASET_OWNERSHIP_SERVICE
     }
 }
 
@@ -251,3 +267,5 @@ impl DatasetOwnershipServiceInMemoryStateInitializer {
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -24,11 +24,10 @@ pub fn configure_database_components(
     db_connection_settings: DatabaseConnectionSettings,
 ) {
     // TODO: Remove after adding implementation of FlowEventStore for databases
-    b.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
+    b.add::<kamu_flow_system_inmem::FlowEventStoreInMemory>();
 
     // TODO: Delete after preparing services for transactional work and replace with
     //       permanent storage options
-    b.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
     match db_connection_settings.provider {
@@ -37,13 +36,26 @@ pub fn configure_database_components(
 
             b.add::<kamu_accounts_postgres::PostgresAccountRepository>();
             b.add::<kamu_accounts_postgres::PostgresAccessTokenRepository>();
+
             b.add::<kamu_datasets_postgres::PostgresDatasetEnvVarRepository>();
+
+            b.add::<kamu_flow_system_postgres::FlowConfigurationEventStorePostgres>();
+
+            b.add::<kamu_messaging_outbox_postgres::OutboxMessageRepositoryPostgres>();
+            b.add::<kamu_messaging_outbox_postgres::OutboxMessageConsumptionRepositoryPostgres>();
         }
         DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
             MySqlPlugin::init_database_components(b);
 
             b.add::<kamu_accounts_mysql::MySqlAccountRepository>();
             b.add::<kamu_accounts_mysql::MysqlAccessTokenRepository>();
+
+            b.add::<kamu_datasets_inmem::DatasetEnvVarRepositoryInMemory>();
+
+            b.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMemory>();
+
+            b.add::<kamu_messaging_outbox_inmem::OutboxMessageRepositoryInMemory>();
+            b.add::<kamu_messaging_outbox_inmem::OutboxMessageConsumptionRepositoryInMemory>();
 
             // TODO: Task & Flow System MySQL versions
         }
@@ -52,7 +64,13 @@ pub fn configure_database_components(
 
             b.add::<kamu_accounts_sqlite::SqliteAccountRepository>();
             b.add::<kamu_accounts_sqlite::SqliteAccessTokenRepository>();
+
             b.add::<kamu_datasets_sqlite::SqliteDatasetEnvVarRepository>();
+
+            b.add::<kamu_flow_system_sqlite::FlowSystemEventStoreSqlite>();
+
+            b.add::<kamu_messaging_outbox_sqlite::OutboxMessageRepositorySqlite>();
+            b.add::<kamu_messaging_outbox_sqlite::OutboxMessageConsumptionRepositorySqlite>();
         }
     }
 
@@ -65,10 +83,12 @@ pub fn configure_database_components(
 
 // Public only for tests
 pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
+    b.add::<kamu_messaging_outbox_inmem::OutboxMessageRepositoryInMemory>();
+    b.add::<kamu_messaging_outbox_inmem::OutboxMessageConsumptionRepositoryInMemory>();
     b.add::<kamu_accounts_inmem::AccountRepositoryInMemory>();
     b.add::<kamu_accounts_inmem::AccessTokenRepositoryInMemory>();
-    b.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
-    b.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
+    b.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMemory>();
+    b.add::<kamu_flow_system_inmem::FlowEventStoreInMemory>();
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
     b.add::<kamu_datasets_inmem::DatasetEnvVarRepositoryInMemory>();
 

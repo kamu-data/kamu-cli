@@ -12,12 +12,12 @@ use std::sync::Arc;
 use chrono::{TimeZone, Utc};
 use database_common::NoOpDatabasePlugin;
 use dill::*;
-use event_bus::EventBus;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 
 use super::test_api_server::TestAPIServer;
@@ -312,7 +312,7 @@ async fn test_collection_handler_by_id_not_found() {
 
 struct TestHarness {
     temp_dir: tempfile::TempDir,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    catalog: Catalog,
     push_ingest_svc: Arc<dyn PushIngestService>,
     api_server: TestAPIServer,
 }
@@ -341,7 +341,7 @@ impl TestHarness {
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
                 .add::<DataFormatRegistryImpl>()
-                .add::<EventBus>()
+                .add::<DummyOutboxImpl>()
                 .add::<DependencyGraphServiceInMemory>()
                 .add_value(CurrentAccountSubject::new_test())
                 .add_value(dataset_action_authorizer)
@@ -352,6 +352,8 @@ impl TestHarness {
                         .with_multi_tenant(false),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add_value(SystemTimeSourceStub::new_set(
                     Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
                 ))
@@ -366,23 +368,26 @@ impl TestHarness {
             b.build()
         };
 
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
         let push_ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
 
         let api_server = TestAPIServer::new(catalog.clone(), None, None, false);
 
         Self {
             temp_dir,
-            dataset_repo,
+            catalog,
             push_ingest_svc,
             api_server,
         }
     }
 
     async fn create_simple_dataset(&self) -> CreateDatasetResult {
-        let ds = self
-            .dataset_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot = self
+            .catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        let ds = create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .name("foo.bar")
                     .kind(DatasetKind::Root)

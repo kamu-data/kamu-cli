@@ -10,11 +10,11 @@
 use async_graphql::*;
 use database_common::NoOpDatabasePlugin;
 use dill::*;
-use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_core::*;
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 
 use crate::utils::authentication_catalogs;
@@ -31,13 +31,15 @@ async fn test_current_push_sources() {
         let mut b = CatalogBuilder::new();
 
         b.add_value(RunInfoDir::new(tempdir.path().join("run")))
-            .add::<EventBus>()
+            .add::<DummyOutboxImpl>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<PushIngestServiceImpl>()
             .add::<SystemTimeSourceDefault>()
             .add::<EngineProvisionerNull>()
@@ -53,11 +55,12 @@ async fn test_current_push_sources() {
 
     // Init dataset with no sources
     let (_, catalog_authorized) = authentication_catalogs(&base_catalog).await;
-    let dataset_repo = catalog_authorized
-        .get_one::<dyn DatasetRepository>()
+
+    let create_dataset_from_snapshot = catalog_authorized
+        .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
         .unwrap();
-    let create_result = dataset_repo
-        .create_dataset_from_snapshot(
+    let create_result = create_dataset_from_snapshot
+        .execute(
             MetadataFactory::dataset_snapshot()
                 .kind(DatasetKind::Root)
                 .name("foo")

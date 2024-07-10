@@ -7,11 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{self as domain};
+use kamu_core::{self as domain, CommitDatasetEventUseCase};
 use opendatafabric as odf;
 
 use crate::prelude::*;
-use crate::utils::check_dataset_write_access;
+use crate::utils::make_dataset_access_error;
 use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,16 +29,6 @@ impl MetadataChainMut {
         Self { dataset_handle }
     }
 
-    #[graphql(skip)]
-    async fn get_dataset(&self, ctx: &Context<'_>) -> Result<std::sync::Arc<dyn domain::Dataset>> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = dataset_repo
-            .get_dataset(&self.dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
-        Ok(dataset)
-    }
-
     /// Commits new event to the metadata chain
     #[tracing::instrument(level = "info", skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
@@ -48,8 +38,6 @@ impl MetadataChainMut {
         event: String,
         event_format: MetadataManifestFormat,
     ) -> Result<CommitResult> {
-        check_dataset_write_access(ctx, &self.dataset_handle).await?;
-
         let event = match event_format {
             MetadataManifestFormat::Yaml => {
                 let de = odf::serde::yaml::YamlMetadataEventDeserializer;
@@ -68,10 +56,10 @@ impl MetadataChainMut {
             }
         };
 
-        let dataset = self.get_dataset(ctx).await?;
+        let commit_dataset_event = from_catalog::<dyn CommitDatasetEventUseCase>(ctx).unwrap();
 
-        let result = match dataset
-            .commit_event(event, domain::CommitOpts::default())
+        let result = match commit_dataset_event
+            .execute(&self.dataset_handle, event, domain::CommitOpts::default())
             .await
         {
             Ok(result) => CommitResult::Success(CommitResultSuccess {
@@ -87,6 +75,9 @@ impl MetadataChainMut {
                 CommitResult::AppendError(CommitResultAppendError {
                     message: e.to_string(),
                 })
+            }
+            Err(domain::CommitError::Access(_)) => {
+                return Err(make_dataset_access_error(&self.dataset_handle))
             }
             Err(e @ domain::CommitError::Internal(_)) => return Err(e.int_err().into()),
         };

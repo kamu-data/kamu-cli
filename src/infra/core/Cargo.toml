@@ -33,11 +33,11 @@ internal-error = { workspace = true }
 container-runtime = { workspace = true }
 kamu-data-utils = { workspace = true }
 opendatafabric = { workspace = true }
-event-bus = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-datasets-services = { workspace = true }
 kamu-core = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
+messaging-outbox = { workspace = true }
 random-names = { workspace = true }
 
 # Serialization

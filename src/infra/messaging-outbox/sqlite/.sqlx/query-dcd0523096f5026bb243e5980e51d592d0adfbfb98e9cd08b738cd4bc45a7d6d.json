@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO outbox_messages (message_type, producer_name, content_json, occurred_on)\n                    VALUES ($1, $2, $3, $4)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "dcd0523096f5026bb243e5980e51d592d0adfbfb98e9cd08b738cd4bc45a7d6d"
+}

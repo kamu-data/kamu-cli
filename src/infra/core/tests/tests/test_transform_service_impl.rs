@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use dill::Component;
-use event_bus::EventBus;
 use futures::TryStreamExt;
 use indoc::indoc;
 use kamu::domain::engine::*;
@@ -30,6 +29,7 @@ use crate::mock_engine_provisioner;
 struct TransformTestHarness {
     _tempdir: TempDir,
     dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     transform_service: Arc<TransformServiceImpl>,
     compaction_service: Arc<dyn CompactionService>,
     push_ingest_svc: Arc<PushIngestServiceImpl>,
@@ -51,7 +51,6 @@ impl TransformTestHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add_value(RunInfoDir::new(run_info_dir))
-            .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
             .add_builder(
@@ -60,6 +59,7 @@ impl TransformTestHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add_value(dataset_action_authorizer)
             .bind::<dyn auth::DatasetActionAuthorizer, TAuthorizer>()
             .add::<SystemTimeSourceDefault>()
@@ -78,6 +78,7 @@ impl TransformTestHarness {
         Self {
             _tempdir: tempdir,
             dataset_repo: catalog.get_one().unwrap(),
+            dataset_repo_writer: catalog.get_one().unwrap(),
             transform_service: catalog.get_one().unwrap(),
             compaction_service: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
@@ -99,10 +100,11 @@ impl TransformTestHarness {
             .build();
 
         let create_result = self
-            .dataset_repo
+            .dataset_repo_writer
             .create_dataset_from_snapshot(snap)
             .await
-            .unwrap();
+            .unwrap()
+            .create_dataset_result;
         create_result.dataset_handle
     }
 
@@ -122,10 +124,11 @@ impl TransformTestHarness {
             .build();
 
         let create_result = self
-            .dataset_repo
+            .dataset_repo_writer
             .create_dataset_from_snapshot(snap)
             .await
-            .unwrap();
+            .unwrap()
+            .create_dataset_result;
         (create_result.dataset_handle, transform)
     }
 
@@ -309,7 +312,7 @@ async fn test_get_verification_plan_one_to_one() {
     let t0 = Utc.with_ymd_and_hms(2020, 1, 1, 11, 0, 0).unwrap();
     let root_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
     let root_create_result = harness
-        .dataset_repo
+        .dataset_repo_writer
         .create_dataset(
             &root_alias,
             MetadataFactory::metadata_block(
@@ -342,7 +345,7 @@ async fn test_get_verification_plan_one_to_one() {
     // Create derivative
     let deriv_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
     let deriv_create_result = harness
-        .dataset_repo
+        .dataset_repo_writer
         .create_dataset(
             &deriv_alias,
             MetadataFactory::metadata_block(
@@ -637,7 +640,7 @@ async fn test_transform_with_compaction_retry() {
     let root_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
     let foo_created_result = harness
-        .dataset_repo
+        .dataset_repo_writer
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(root_alias)
@@ -666,7 +669,8 @@ async fn test_transform_with_compaction_retry() {
                 .build(),
         )
         .await
-        .unwrap();
+        .unwrap()
+        .create_dataset_result;
 
     let data_str = indoc!(
         "

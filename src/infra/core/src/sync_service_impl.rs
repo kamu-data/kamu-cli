@@ -20,12 +20,14 @@ use super::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use crate::utils::ipfs_wrapper::*;
 use crate::utils::simple_transfer_protocol::{DatasetFactoryFn, SimpleTransferProtocol};
 use crate::utils::smart_transfer_protocol::TransferOptions;
+use crate::DatasetRepositoryWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SyncServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     dataset_factory: Arc<dyn DatasetFactory>,
     smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
@@ -40,6 +42,7 @@ impl SyncServiceImpl {
     pub fn new(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         dataset_factory: Arc<dyn DatasetFactory>,
         smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
@@ -48,6 +51,7 @@ impl SyncServiceImpl {
         Self {
             remote_repo_reg,
             dataset_repo,
+            dataset_repo_writer,
             dataset_action_authorizer,
             dataset_factory,
             smart_transfer_protocol,
@@ -138,11 +142,13 @@ impl SyncServiceImpl {
                 }
                 Err(GetDatasetError::NotFound(_)) if create_if_not_exists => {
                     let alias = local_ref.alias().unwrap().clone();
-                    let repo = self.dataset_repo.clone();
+                    let repo_writer = self.dataset_repo_writer.clone();
                     Ok((
                         None,
                         Some(Box::new(move |seed_block| {
-                            Box::pin(async move { repo.create_dataset(&alias, seed_block).await })
+                            Box::pin(
+                                async move { repo_writer.create_dataset(&alias, seed_block).await },
+                            )
                         })),
                     ))
                 }

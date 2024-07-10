@@ -10,12 +10,13 @@
 use std::sync::Arc;
 
 use async_graphql::*;
+use chrono::Utc;
 use dill::Component;
-use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_core::*;
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::serde::yaml::YamlMetadataEventSerializer;
 use opendatafabric::*;
 
@@ -27,18 +28,24 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 async fn test_metadata_chain_events() {
     let harness = GraphQLMetadataChainHarness::new(false).await;
 
-    // Init dataset
-    let dataset_repo = harness
+    let create_dataset = harness
         .catalog_authorized
-        .get_one::<dyn DatasetRepository>()
+        .get_one::<dyn CreateDatasetUseCase>()
         .unwrap();
-    let create_result = dataset_repo
-        .create_dataset_from_seed(
+
+    let create_result = create_dataset
+        .execute(
             &"foo".try_into().unwrap(),
-            MetadataFactory::seed(DatasetKind::Root).build(),
+            MetadataBlockTyped {
+                system_time: Utc::now(),
+                prev_block_hash: None,
+                event: MetadataFactory::seed(DatasetKind::Root).build(),
+                sequence_number: 0,
+            },
         )
         .await
         .unwrap();
+
     create_result
         .dataset
         .commit_event(
@@ -167,12 +174,13 @@ async fn test_metadata_chain_events() {
 async fn metadata_chain_append_event() {
     let harness = GraphQLMetadataChainHarness::new(false).await;
 
-    let dataset_repo = harness
+    let create_dataset = harness
         .catalog_authorized
-        .get_one::<dyn DatasetRepository>()
+        .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
         .unwrap();
-    let create_result = dataset_repo
-        .create_dataset_from_snapshot(
+
+    let create_result = create_dataset
+        .execute(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -250,12 +258,13 @@ async fn metadata_chain_append_event() {
 async fn metadata_update_readme_new() {
     let harness = GraphQLMetadataChainHarness::new(false).await;
 
-    let dataset_repo = harness
+    let create_dataset = harness
         .catalog_authorized
-        .get_one::<dyn DatasetRepository>()
+        .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
         .unwrap();
-    let create_result = dataset_repo
-        .create_dataset_from_snapshot(
+
+    let create_result = create_dataset
+        .execute(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -514,7 +523,10 @@ impl GraphQLMetadataChainHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<SystemTimeSourceDefault>()
-                .add::<EventBus>()
+                .add::<DummyOutboxImpl>()
+                .add::<CreateDatasetUseCaseImpl>()
+                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<CommitDatasetEventUseCaseImpl>()
                 .add::<DependencyGraphServiceInMemory>()
                 .add_builder(
                     DatasetRepositoryLocalFs::builder()
@@ -522,6 +534,7 @@ impl GraphQLMetadataChainHarness {
                         .with_multi_tenant(is_multi_tenant),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);

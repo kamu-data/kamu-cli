@@ -25,6 +25,8 @@ pub fn get_command(
         Some(("add", submatches)) => Box::new(AddCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
             submatches
                 .get_many("manifest")
                 .unwrap_or_default()
@@ -89,6 +91,7 @@ pub fn get_command(
             _ => return Err(CommandInterpretationFailed.into()),
         },
         Some(("delete", submatches)) => Box::new(DeleteCommand::new(
+            cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             validate_many_dataset_patterns(
                 cli_catalog,

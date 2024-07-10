@@ -12,7 +12,6 @@ use std::path::Path;
 use std::str::FromStr;
 
 use dill::Component;
-use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::utils::ipfs_wrapper::IpfsClient;
@@ -93,7 +92,6 @@ async fn do_test_sync(
 
     let catalog = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add::<EventBus>()
         .add::<DependencyGraphServiceInMemory>()
         .add_value(ipfs_gateway)
         .add_value(ipfs_client)
@@ -106,6 +104,7 @@ async fn do_test_sync(
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
         .add_value(RemoteReposDir::new(tmp_workspace_dir.join("repos")))
         .add::<RemoteRepositoryRegistryImpl>()
         .add::<auth::DummyOdfServerAccessTokenResolver>()
@@ -153,6 +152,7 @@ async fn do_test_sync(
         .create_dataset_from_snapshot(snapshot)
         .await
         .unwrap()
+        .create_dataset_result
         .head;
 
     // Initial sync ///////////////////////////////////////////////////////////

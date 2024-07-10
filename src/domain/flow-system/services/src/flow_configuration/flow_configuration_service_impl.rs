@@ -11,37 +11,41 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use dill::*;
-use event_bus::{AsyncEventHandler, EventBus};
 use futures::TryStreamExt;
-use kamu_core::events::DatasetEventDeleted;
+use kamu_core::messages::DatasetDeletedMessage;
 use kamu_core::SystemTimeSource;
 use kamu_flow_system::*;
+use messaging_outbox::{post_outbox_message, MessageConsumerT, Outbox};
 use opendatafabric::DatasetID;
+
+use crate::{
+    MESSAGE_CONSUMER_KAMU_FLOW_CONFIGURATION_SERVICE,
+    MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FlowConfigurationServiceImpl {
     event_store: Arc<dyn FlowConfigurationEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
-    event_bus: Arc<EventBus>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn FlowConfigurationService)]
-#[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
-#[scope(Singleton)]
+#[interface(dyn MessageConsumerT<DatasetDeletedMessage>)]
 impl FlowConfigurationServiceImpl {
     pub fn new(
         event_store: Arc<dyn FlowConfigurationEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
-        event_bus: Arc<EventBus>,
+        outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             event_store,
             time_source,
-            event_bus,
+            outbox,
         }
     }
 
@@ -50,13 +54,19 @@ impl FlowConfigurationServiceImpl {
         state: &FlowConfigurationState,
         request_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
-        let event = FlowConfigurationEventModified {
+        let message = FlowConfigurationUpdatedMessage {
             event_time: request_time,
             flow_key: state.flow_key.clone(),
             paused: !state.is_active(),
             rule: state.rule.clone(),
         };
-        self.event_bus.dispatch_event(event).await
+
+        post_outbox_message(
+            self.outbox.as_ref(),
+            MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+            message,
+        )
+        .await
     }
 
     fn get_dataset_flow_keys(
@@ -322,12 +332,16 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
-    async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
+impl MessageConsumerT<DatasetDeletedMessage> for FlowConfigurationServiceImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: DatasetDeletedMessage,
+    ) -> Result<(), InternalError> {
         for flow_type in DatasetFlowType::all() {
             let maybe_flow_configuration = FlowConfiguration::try_load(
-                FlowKeyDataset::new(event.dataset_id.clone(), *flow_type).into(),
+                FlowKeyDataset::new(message.dataset_id.clone(), *flow_type).into(),
                 self.event_store.as_ref(),
             )
             .await
@@ -346,6 +360,10 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceImpl {
         }
 
         Ok(())
+    }
+
+    fn consumer_name(&self) -> &'static str {
+        MESSAGE_CONSUMER_KAMU_FLOW_CONFIGURATION_SERVICE
     }
 }
 

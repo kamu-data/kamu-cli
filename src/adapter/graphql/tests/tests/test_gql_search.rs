@@ -9,11 +9,11 @@
 
 use async_graphql::*;
 use dill::Component;
-use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 
 #[tokio::test]
@@ -24,7 +24,7 @@ async fn test_search_query() {
 
     let cat = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add::<EventBus>()
+        .add::<DummyOutboxImpl>()
         .add::<DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
@@ -34,11 +34,15 @@ async fn test_search_query() {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+        .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .build();
 
-    let dataset_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
-    dataset_repo
-        .create_dataset_from_snapshot(
+    let create_dataset_from_snapshot = cat
+        .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+        .unwrap();
+    create_dataset_from_snapshot
+        .execute(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)

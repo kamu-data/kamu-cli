@@ -12,7 +12,6 @@ use std::sync::Arc;
 use chrono::{TimeZone, Utc};
 use datafusion::prelude::*;
 use dill::Component;
-use event_bus::EventBus;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -473,7 +472,7 @@ async fn test_ingest_push_schema_stability() {
 
 struct IngestTestHarness {
     temp_dir: TempDir,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<DatasetRepositoryLocalFs>,
     push_ingest_svc: Arc<dyn PushIngestService>,
     ctx: SessionContext,
 }
@@ -497,7 +496,6 @@ impl IngestTestHarness {
         let catalog = dill::CatalogBuilder::new()
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CacheDir::new(cache_dir))
-            .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(dataset_action_authorizer)

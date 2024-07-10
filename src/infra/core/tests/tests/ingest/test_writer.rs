@@ -15,10 +15,9 @@ use chrono::{DateTime, TimeZone, Utc};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
 use dill::Component;
-use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
-use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu::{DatasetRepositoryLocalFs, DatasetRepositoryWriter, DependencyGraphServiceInMemory};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_data_utils::testing::{assert_data_eq, assert_schema_eq};
@@ -941,7 +940,6 @@ impl Harness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
-            .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(CurrentAccountSubject::new_test())
@@ -953,7 +951,7 @@ impl Harness {
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .build();
 
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
 
         let dataset = dataset_repo
             .create_dataset(

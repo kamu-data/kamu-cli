@@ -12,7 +12,6 @@ use std::sync::Arc;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
-use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, MockDatasetChangesService};
 use kamu::*;
 use kamu_accounts::{
@@ -34,7 +33,8 @@ use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
-use kamu_task_system_services::TaskSchedulerImpl;
+use kamu_task_system_services::{TaskMessageConsumerMediator, TaskSchedulerImpl};
+use messaging_outbox::OutboxImmediateImpl;
 use opendatafabric::*;
 use tokio::task::yield_now;
 
@@ -110,15 +110,19 @@ impl FlowHarness {
         let catalog = {
             let mut b = dill::CatalogBuilder::new();
 
-            b.add::<EventBus>()
+            b.add::<OutboxImmediateImpl>()
+                .add::<CoreMessageConsumerMediator>()
+                .add::<FlowMessageConsumerMediator>()
+                .add::<TaskMessageConsumerMediator>()
+                .add::<FlowSystemTestListener>()
                 .add_value(FlowServiceRunConfig::new(
                     awaiting_step,
                     mandatory_throttling_period,
                 ))
                 .add::<FlowServiceImpl>()
-                .add::<FlowEventStoreInMem>()
+                .add::<FlowEventStoreInMemory>()
                 .add::<FlowConfigurationServiceImpl>()
-                .add::<FlowConfigurationEventStoreInMem>()
+                .add::<FlowConfigurationEventStoreInMemory>()
                 .add_value(fake_system_time_source.clone())
                 .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
                 .add_builder(
@@ -127,10 +131,13 @@ impl FlowHarness {
                         .with_multi_tenant(overrides.is_multi_tenant),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
                 .add_value(mock_dataset_changes)
                 .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
                 .add_value(CurrentAccountSubject::new_test())
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<DeleteDatasetUseCaseImpl>()
                 .add::<AuthenticationServiceImpl>()
                 .add_value(predefined_accounts_config)
                 .add_value(JwtAuthenticationConfig::default())
@@ -142,7 +149,6 @@ impl FlowHarness {
                 .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
                 .add::<TaskSchedulerImpl>()
                 .add::<TaskSystemEventStoreInMemory>()
-                .add::<FlowSystemTestListener>()
                 .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<DatabaseTransactionRunner>();
@@ -182,9 +188,13 @@ impl FlowHarness {
     }
 
     pub async fn create_root_dataset(&self, dataset_alias: DatasetAlias) -> DatasetID {
-        let result = self
-            .dataset_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot = self
+            .catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        let result = create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(dataset_alias)
                     .kind(DatasetKind::Root)
@@ -202,9 +212,13 @@ impl FlowHarness {
         dataset_alias: DatasetAlias,
         input_ids: Vec<DatasetID>,
     ) -> DatasetID {
-        let create_result = self
-            .dataset_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot = self
+            .catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        let create_result = create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(dataset_alias)
                     .kind(DatasetKind::Derivative)
@@ -217,6 +231,7 @@ impl FlowHarness {
             )
             .await
             .unwrap();
+
         create_result.dataset_handle.id
     }
 
@@ -247,8 +262,9 @@ impl FlowHarness {
         self.eager_initialization().await;
 
         // Do the actual deletion
-        self.dataset_repo
-            .delete_dataset(&(dataset_id.as_local_ref()))
+        let delete_dataset = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
+        delete_dataset
+            .execute(&(dataset_id.as_local_ref()))
             .await
             .unwrap();
     }

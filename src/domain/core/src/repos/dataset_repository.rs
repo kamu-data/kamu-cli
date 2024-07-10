@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{HashSet, LinkedList};
 use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::Utc;
 use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
@@ -41,6 +39,13 @@ impl CreateDatasetResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct CreateDatasetFromSnapshotResult {
+    pub create_dataset_result: CreateDatasetResult,
+    pub new_upstream_ids: Vec<DatasetID>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait]
 pub trait DatasetRepository: DatasetRegistry + Sync + Send {
     fn is_multi_tenant(&self) -> bool;
@@ -58,25 +63,6 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError>;
-
-    async fn create_dataset(
-        &self,
-        dataset_alias: &DatasetAlias,
-        seed_block: MetadataBlockTyped<Seed>,
-    ) -> Result<CreateDatasetResult, CreateDatasetError>;
-
-    async fn create_dataset_from_snapshot(
-        &self,
-        snapshot: DatasetSnapshot,
-    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
-
-    async fn rename_dataset(
-        &self,
-        dataset_ref: &DatasetRef,
-        new_name: &DatasetName,
-    ) -> Result<(), RenameDatasetError>;
-
-    async fn delete_dataset(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,20 +85,6 @@ pub trait DatasetRepositoryExt: DatasetRepository {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<Arc<dyn Dataset>>, InternalError>;
-
-    async fn create_dataset_from_seed(
-        &self,
-        dataset_alias: &DatasetAlias,
-        seed: Seed,
-    ) -> Result<CreateDatasetResult, CreateDatasetError>;
-
-    async fn create_datasets_from_snapshots(
-        &self,
-        snapshots: Vec<DatasetSnapshot>,
-    ) -> Vec<(
-        DatasetAlias,
-        Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
-    )>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,85 +116,9 @@ where
             Err(GetDatasetError::Internal(e)) => Err(e),
         }
     }
-
-    async fn create_dataset_from_seed(
-        &self,
-        dataset_alias: &DatasetAlias,
-        seed: Seed,
-    ) -> Result<CreateDatasetResult, CreateDatasetError> {
-        // TODO: Externalize time
-        let system_time = Utc::now();
-
-        self.create_dataset(
-            dataset_alias,
-            MetadataBlockTyped {
-                system_time,
-                prev_block_hash: None,
-                event: seed,
-                sequence_number: 0,
-            },
-        )
-        .await
-    }
-
-    async fn create_datasets_from_snapshots(
-        &self,
-        snapshots: Vec<DatasetSnapshot>,
-    ) -> Vec<(
-        DatasetAlias,
-        Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
-    )> {
-        let snapshots_ordered = sort_snapshots_in_dependency_order(snapshots.into_iter().collect());
-
-        let mut ret = Vec::new();
-        for snapshot in snapshots_ordered {
-            let alias = snapshot.name.clone();
-            let res = self.create_dataset_from_snapshot(snapshot).await;
-            ret.push((alias, res));
-        }
-        ret
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[allow(clippy::linkedlist)]
-fn sort_snapshots_in_dependency_order(
-    mut snapshots: LinkedList<DatasetSnapshot>,
-) -> Vec<DatasetSnapshot> {
-    let mut ordered = Vec::with_capacity(snapshots.len());
-    let mut pending: HashSet<DatasetRef> =
-        snapshots.iter().map(|s| s.name.clone().into()).collect();
-    let mut added: HashSet<DatasetAlias> = HashSet::new();
-
-    // TODO: cycle detection
-    while !snapshots.is_empty() {
-        let snapshot = snapshots.pop_front().unwrap();
-
-        let transform = snapshot
-            .metadata
-            .iter()
-            .find_map(|e| e.as_variant::<SetTransform>());
-
-        let has_pending_deps = if let Some(transform) = transform {
-            transform
-                .inputs
-                .iter()
-                .any(|input| pending.contains(&input.dataset_ref))
-        } else {
-            false
-        };
-
-        if !has_pending_deps {
-            pending.remove(&snapshot.name.clone().into());
-            added.insert(snapshot.name.clone());
-            ordered.push(snapshot);
-        } else {
-            snapshots.push_back(snapshot);
-        }
-    }
-    ordered
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors

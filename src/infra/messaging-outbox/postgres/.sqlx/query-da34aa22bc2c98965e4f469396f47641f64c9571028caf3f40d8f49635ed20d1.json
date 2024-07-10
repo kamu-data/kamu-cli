@@ -1,0 +1,48 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT\n                        message_id,\n                        message_type,\n                        producer_name,\n                        content_json,\n                        occurred_on\n                    FROM outbox_messages\n                    WHERE producer_name = $1 and message_id > $2\n                    ORDER BY message_id\n                    LIMIT $3\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "message_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "message_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "producer_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "content_json",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 4,
+        "name": "occurred_on",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "da34aa22bc2c98965e4f469396f47641f64c9571028caf3f40d8f49635ed20d1"
+}

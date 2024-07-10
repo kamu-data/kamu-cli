@@ -9,13 +9,10 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use std::sync::Arc;
-
 use async_graphql::value;
 use chrono::Duration;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
-use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::{
     MetadataFactory,
@@ -26,9 +23,12 @@ use kamu::testing::{
     MockTransformService,
 };
 use kamu::{
+    CoreMessageConsumerMediator,
+    CreateDatasetFromSnapshotUseCaseImpl,
     DatasetOwnershipServiceInMemory,
     DatasetOwnershipServiceInMemoryStateInitializer,
     DatasetRepositoryLocalFs,
+    DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
 };
 use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
@@ -36,10 +36,11 @@ use kamu_accounts_inmem::AccessTokenRepositoryInMemory;
 use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
 use kamu_flow_system::FlowServiceRunConfig;
-use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
+use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMemory, FlowEventStoreInMemory};
 use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceImpl};
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
+use messaging_outbox::OutboxImmediateImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
 
 use crate::utils::authentication_catalogs;
@@ -623,7 +624,6 @@ struct FlowConfigHarness {
     _catalog_base: dill::Catalog,
     _catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
-    dataset_repo: Arc<dyn DatasetRepository>,
 }
 
 #[derive(Default)]
@@ -651,13 +651,16 @@ impl FlowConfigHarness {
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new();
 
-            b.add::<EventBus>()
+            b.add::<OutboxImmediateImpl>()
+                .add::<CoreMessageConsumerMediator>()
                 .add_builder(
                     DatasetRepositoryLocalFs::builder()
                         .with_root(datasets_dir)
                         .with_multi_tenant(true),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add_value(dataset_changes_mock)
                 .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
                 .add::<SystemTimeSourceDefault>()
@@ -671,9 +674,9 @@ impl FlowConfigHarness {
                 .add_value(dependency_graph_mock)
                 .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
                 .add::<FlowConfigurationServiceImpl>()
-                .add::<FlowConfigurationEventStoreInMem>()
+                .add::<FlowConfigurationEventStoreInMemory>()
                 .add::<FlowServiceImpl>()
-                .add::<FlowEventStoreInMem>()
+                .add::<FlowEventStoreInMemory>()
                 .add_value(FlowServiceRunConfig::new(
                     Duration::try_seconds(1).unwrap(),
                     Duration::try_minutes(1).unwrap(),
@@ -707,22 +710,22 @@ impl FlowConfigHarness {
             .await
             .unwrap();
 
-        let dataset_repo = catalog_authorized
-            .get_one::<dyn DatasetRepository>()
-            .unwrap();
-
         Self {
             _tempdir: tempdir,
             _catalog_base: catalog_base,
             _catalog_anonymous: catalog_anonymous,
             catalog_authorized,
-            dataset_repo,
         }
     }
 
     async fn create_root_dataset(&self, dataset_alias: DatasetAlias) -> CreateDatasetResult {
-        self.dataset_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .kind(DatasetKind::Root)
                     .name(dataset_alias)

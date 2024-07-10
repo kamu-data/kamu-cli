@@ -7,12 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use event_bus::EventBus;
-use kamu_core::events::DatasetEventDependenciesUpdated;
 use kamu_core::*;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
@@ -20,7 +16,6 @@ use opendatafabric::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> {
-    event_bus: Arc<EventBus>,
     metadata_chain: MetaChain,
     data_repo: DataRepo,
     checkpoint_repo: CheckpointRepo,
@@ -38,14 +33,12 @@ where
     InfoRepo: NamedObjectRepository + Sync + Send,
 {
     pub fn new(
-        event_bus: Arc<EventBus>,
         metadata_chain: MetaChain,
         data_repo: DataRepo,
         checkpoint_repo: CheckpointRepo,
         info_repo: InfoRepo,
     ) -> Self {
         Self {
-            event_bus,
             metadata_chain,
             data_repo,
             checkpoint_repo,
@@ -473,24 +466,10 @@ where
 
         tracing::info!(%new_head, "Committed new block");
 
-        if !new_upstream_ids.is_empty() {
-            let summary = self
-                .get_summary(GetSummaryOpts::default())
-                .await
-                .int_err()?;
-
-            self.event_bus
-                .dispatch_event(DatasetEventDependenciesUpdated {
-                    dataset_id: summary.id.clone(),
-                    new_upstream_ids,
-                })
-                .await
-                .int_err()?;
-        }
-
         Ok(CommitResult {
             old_head: prev_block_hash,
             new_head,
+            new_upstream_ids,
         })
     }
 

@@ -17,7 +17,6 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use datafusion::prelude::*;
 use dill::Component;
-use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::*;
 use opendatafabric::serde::yaml::*;
@@ -116,7 +115,6 @@ impl Kamu {
     ) {
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
-            .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(self.current_account.to_current_account_subject())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
@@ -232,7 +230,6 @@ impl Kamu {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
-            .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(self.current_account.to_current_account_subject())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
@@ -303,7 +300,6 @@ impl Kamu {
     ) -> (Vec<String>, Vec<String>) {
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
-            .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(self.current_account.to_current_account_subject())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()

@@ -17,7 +17,15 @@ use kamu::domain::auth::{
     DatasetAction,
     DatasetActionAuthorizer,
 };
-use kamu::domain::{CompactionService, DatasetRepository, InternalError, SystemTimeSourceStub};
+use kamu::domain::{
+    CommitDatasetEventUseCase,
+    CompactionService,
+    CreateDatasetFromSnapshotUseCase,
+    CreateDatasetUseCase,
+    DatasetRepository,
+    InternalError,
+    SystemTimeSourceStub,
+};
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::DatasetLayout;
 use kamu_accounts::{
@@ -39,8 +47,15 @@ pub(crate) const SERVER_ACCOUNT_NAME: &str = "kamu-server";
 #[async_trait::async_trait]
 pub(crate) trait ServerSideHarness {
     fn operating_account_name(&self) -> Option<AccountName>;
-
     fn cli_dataset_repository(&self) -> Arc<dyn DatasetRepository>;
+
+    fn cli_create_dataset_use_case(&self) -> Arc<dyn CreateDatasetUseCase>;
+
+    fn cli_create_dataset_from_snapshot_use_case(
+        &self,
+    ) -> Arc<dyn CreateDatasetFromSnapshotUseCase>;
+
+    fn cli_commit_dataset_event_use_case(&self) -> Arc<dyn CommitDatasetEventUseCase>;
 
     fn cli_compaction_service(&self) -> Arc<dyn CompactionService>;
 

@@ -19,12 +19,14 @@ use opendatafabric::DatasetID;
 
 pub struct TaskSchedulerImpl {
     state: Arc<Mutex<State>>,
+    // TODO: EventStore is transaction-dependent, it can't be instantiated in a singleton
     event_store: Arc<dyn TaskSystemEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
 }
 
 #[derive(Default)]
 struct State {
+    // TODO: store in DB or something like Redis
     task_queue: VecDeque<TaskID>,
 }
 

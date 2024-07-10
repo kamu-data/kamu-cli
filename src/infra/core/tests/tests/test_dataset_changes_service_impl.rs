@@ -11,9 +11,13 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use dill::Component;
-use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
-use kamu::{DatasetChangesServiceImpl, DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu::{
+    DatasetChangesServiceImpl,
+    DatasetRepositoryLocalFs,
+    DatasetRepositoryWriter,
+    DependencyGraphServiceInMemory,
+};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
     auth,
@@ -800,6 +804,7 @@ struct DatasetChangesHarness {
     _workdir: TempDir,
     _catalog: dill::Catalog,
     dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
 }
 
@@ -811,13 +816,13 @@ impl DatasetChangesHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
-            .add::<EventBus>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DatasetChangesServiceImpl>()
@@ -825,6 +830,7 @@ impl DatasetChangesHarness {
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
 
         let dataset_changes_service = catalog.get_one::<dyn DatasetChangesService>().unwrap();
 
@@ -832,6 +838,7 @@ impl DatasetChangesHarness {
             _workdir: workdir,
             _catalog: catalog,
             dataset_repo,
+            dataset_repo_writer,
             dataset_changes_service,
         }
     }
@@ -839,7 +846,7 @@ impl DatasetChangesHarness {
     async fn create_root_dataset(&self, dataset_name: &str) -> CreateDatasetResult {
         let alias = DatasetAlias::new(None, DatasetName::new_unchecked(dataset_name));
         let create_result = self
-            .dataset_repo
+            .dataset_repo_writer
             .create_dataset(
                 &alias,
                 MetadataFactory::metadata_block(
@@ -873,7 +880,7 @@ impl DatasetChangesHarness {
         dataset_name: &str,
         input_dataset_names: Vec<&str>,
     ) -> CreateDatasetResult {
-        self.dataset_repo
+        self.dataset_repo_writer
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
                     .name(DatasetAlias::new(
@@ -890,6 +897,7 @@ impl DatasetChangesHarness {
             )
             .await
             .unwrap()
+            .create_dataset_result
     }
 
     async fn check_between_cases(

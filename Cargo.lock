@@ -3601,21 +3601,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "event-bus"
-version = "0.191.4"
-dependencies = [
- "async-trait",
- "dill",
- "futures",
- "internal-error",
- "test-log",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "event-listener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3630,6 +3615,7 @@ dependencies = [
  "event-sourcing-macros",
  "futures",
  "internal-error",
+ "serde",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -4811,7 +4797,6 @@ dependencies = [
  "datafusion-functions-json",
  "digest 0.10.7",
  "dill",
- "event-bus",
  "filetime",
  "flatbuffers",
  "flate2",
@@ -4832,6 +4817,7 @@ dependencies = [
  "kamu-ingest-datafusion",
  "libc",
  "like",
+ "messaging-outbox",
  "mockall",
  "nanoid",
  "object_store",
@@ -5021,10 +5007,10 @@ version = "0.191.4"
 dependencies = [
  "async-trait",
  "dill",
- "event-bus",
  "kamu",
  "kamu-accounts",
  "kamu-core",
+ "messaging-outbox",
  "opendatafabric",
  "oso",
  "oso-derive",
@@ -5070,7 +5056,6 @@ dependencies = [
  "database-common",
  "datafusion",
  "dill",
- "event-bus",
  "event-sourcing",
  "futures",
  "indoc 2.0.5",
@@ -5090,6 +5075,7 @@ dependencies = [
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
+ "messaging-outbox",
  "mockall",
  "opendatafabric",
  "secrecy",
@@ -5123,7 +5109,6 @@ dependencies = [
  "database-common-macros",
  "datafusion",
  "dill",
- "event-bus",
  "flate2",
  "fs_extra",
  "futures",
@@ -5138,6 +5123,7 @@ dependencies = [
  "kamu-data-utils",
  "kamu-datasets-services",
  "kamu-ingest-datafusion",
+ "messaging-outbox",
  "mockall",
  "opendatafabric",
  "paste",
@@ -5194,7 +5180,6 @@ dependencies = [
  "datafusion",
  "datafusion-odata",
  "dill",
- "event-bus",
  "futures",
  "http 0.2.12",
  "http-common",
@@ -5203,6 +5188,7 @@ dependencies = [
  "kamu",
  "kamu-accounts",
  "kamu-core",
+ "messaging-outbox",
  "opendatafabric",
  "reqwest 0.11.27",
  "serde",
@@ -5240,7 +5226,6 @@ dependencies = [
  "dill",
  "dirs 5.0.1",
  "duration-string",
- "event-bus",
  "fs_extra",
  "futures",
  "glob",
@@ -5274,11 +5259,17 @@ dependencies = [
  "kamu-datasets-services",
  "kamu-datasets-sqlite",
  "kamu-flow-system-inmem",
+ "kamu-flow-system-postgres",
  "kamu-flow-system-services",
+ "kamu-flow-system-sqlite",
+ "kamu-messaging-outbox-inmem",
+ "kamu-messaging-outbox-postgres",
+ "kamu-messaging-outbox-sqlite",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
  "libc",
  "merge",
+ "messaging-outbox",
  "mime",
  "mime_guess",
  "minus",
@@ -5418,6 +5409,7 @@ dependencies = [
  "http 0.2.12",
  "internal-error",
  "kamu-accounts",
+ "messaging-outbox",
  "object_store",
  "opendatafabric",
  "pathdiff",
@@ -5608,6 +5600,7 @@ dependencies = [
  "kamu-core",
  "kamu-task-system",
  "lazy_static",
+ "messaging-outbox",
  "opendatafabric",
  "serde",
  "serde_with",
@@ -5690,7 +5683,6 @@ dependencies = [
  "database-common",
  "database-common-macros",
  "dill",
- "event-bus",
  "futures",
  "indoc 2.0.5",
  "kamu",
@@ -5703,10 +5695,12 @@ dependencies = [
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
+ "messaging-outbox",
  "mockall",
  "opendatafabric",
  "pretty_assertions",
  "serde",
+ "serde_json",
  "serde_with",
  "tempfile",
  "test-log",
@@ -5779,6 +5773,56 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-messaging-outbox-inmem"
+version = "0.191.4"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dill",
+ "internal-error",
+ "messaging-outbox",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
+name = "kamu-messaging-outbox-postgres"
+version = "0.191.4"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "futures",
+ "internal-error",
+ "messaging-outbox",
+ "sqlx",
+ "thiserror",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-messaging-outbox-sqlite"
+version = "0.191.4"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "futures",
+ "internal-error",
+ "messaging-outbox",
+ "sqlx",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "kamu-repo-tools"
 version = "0.191.4"
 dependencies = [
@@ -5802,6 +5846,7 @@ dependencies = [
  "enum-variants",
  "event-sourcing",
  "kamu-core",
+ "messaging-outbox",
  "opendatafabric",
  "serde",
  "thiserror",
@@ -5863,13 +5908,15 @@ dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
+ "database-common",
  "dill",
- "event-bus",
  "futures",
  "kamu-core",
  "kamu-task-system",
  "kamu-task-system-inmem",
+ "messaging-outbox",
  "opendatafabric",
+ "serde_json",
  "test-log",
  "tokio",
  "tracing",
@@ -6260,6 +6307,25 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "messaging-outbox"
+version = "0.191.4"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "futures",
+ "internal-error",
+ "mockall",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
 ]
 
 [[package]]

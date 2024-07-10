@@ -13,7 +13,7 @@ use opendatafabric::DatasetID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct FlowConfigurationEventStoreInMem {
+pub struct FlowConfigurationEventStoreInMemory {
     inner: EventStoreInMemory<FlowConfigurationState, State>,
 }
 
@@ -44,7 +44,7 @@ impl EventStoreState<FlowConfigurationState> for State {
 #[component(pub)]
 #[interface(dyn FlowConfigurationEventStore)]
 #[scope(Singleton)]
-impl FlowConfigurationEventStoreInMem {
+impl FlowConfigurationEventStoreInMemory {
     pub fn new() -> Self {
         Self {
             inner: EventStoreInMemory::new(),
@@ -55,7 +55,7 @@ impl FlowConfigurationEventStoreInMem {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl EventStore<FlowConfigurationState> for FlowConfigurationEventStoreInMem {
+impl EventStore<FlowConfigurationState> for FlowConfigurationEventStoreInMemory {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn len(&self) -> Result<usize, InternalError> {
         self.inner.len().await
@@ -93,7 +93,7 @@ impl EventStore<FlowConfigurationState> for FlowConfigurationEventStoreInMem {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowConfigurationEventStore for FlowConfigurationEventStoreInMem {
+impl FlowConfigurationEventStore for FlowConfigurationEventStoreInMemory {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn list_all_dataset_ids(&self) -> FailableDatasetIDStream {
         use futures::StreamExt;

@@ -24,6 +24,7 @@ use kamu::domain::{Protocols, ServerUrlConfig, SystemTimeSource};
 use kamu_adapter_http::e2e::e2e_router;
 use kamu_flow_system_inmem::domain::FlowService;
 use kamu_task_system_inmem::domain::TaskExecutor;
+use messaging_outbox::OutboxTransactionalProcessor;
 use tokio::sync::Notify;
 use url::Url;
 
@@ -36,6 +37,7 @@ pub struct APIServer {
     >,
     task_executor: Arc<dyn TaskExecutor>,
     flow_service: Arc<dyn FlowService>,
+    outbox_processor: Arc<OutboxTransactionalProcessor>,
     time_source: Arc<dyn SystemTimeSource>,
     maybe_shutdown_notify: Option<Arc<Notify>>,
 }
@@ -55,6 +57,8 @@ impl APIServer {
         let task_executor = cli_catalog.get_one().unwrap();
 
         let flow_service = cli_catalog.get_one().unwrap();
+
+        let outbox_processor = cli_catalog.get_one().unwrap();
 
         let time_source = base_catalog.get_one().unwrap();
 
@@ -168,6 +172,7 @@ impl APIServer {
             server,
             task_executor,
             flow_service,
+            outbox_processor,
             time_source,
             maybe_shutdown_notify,
         }
@@ -193,6 +198,7 @@ impl APIServer {
 
         tokio::select! {
             res = server_run_fut => { res.int_err() },
+            res = self.outbox_processor.run() => { res.int_err() },
             res = self.task_executor.run() => { res.int_err() },
             res = self.flow_service.run(self.time_source.now()) => { res.int_err() }
         }

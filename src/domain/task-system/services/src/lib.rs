@@ -11,7 +11,9 @@
 pub use kamu_task_system as domain;
 
 mod task_executor_impl;
+mod task_message_consumer_mediator;
 mod task_scheduler_impl;
 
 pub use task_executor_impl::*;
+pub use task_message_consumer_mediator::*;
 pub use task_scheduler_impl::*;
