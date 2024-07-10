@@ -188,15 +188,27 @@ pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
     );
     let dataset_env_var_repo = catalog.get_one::<dyn DatasetEnvVarRepository>().unwrap();
 
+    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
     let new_dataset_env_var = DatasetEnvVar::new(
         "foo",
         Utc::now().round_subsecs(6),
         &DatasetEnvVarValue::Regular("foo".to_string()),
-        &DatasetID::new_seeded_ed25519(b"foo"),
+        &dataset_id,
+    )
+    .unwrap();
+    let new_bar_dataset_env_var = DatasetEnvVar::new(
+        "bar",
+        Utc::now().round_subsecs(6),
+        &DatasetEnvVarValue::Regular("bar".to_string()),
+        &dataset_id,
     )
     .unwrap();
     let save_result = dataset_env_var_repo
         .save_dataset_env_var(&new_dataset_env_var)
+        .await;
+    assert!(save_result.is_ok());
+    let save_result = dataset_env_var_repo
+        .save_dataset_env_var(&new_bar_dataset_env_var)
         .await;
     assert!(save_result.is_ok());
 
@@ -211,6 +223,19 @@ pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
         .await;
 
     assert!(delete_result.is_ok());
+
+    let db_dataset_env_vars = dataset_env_var_repo
+        .get_all_dataset_env_vars_by_dataset_id(
+            &dataset_id,
+            &DatabasePaginationOpts {
+                offset: 0,
+                limit: 5,
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(db_dataset_env_vars, vec![new_bar_dataset_env_var]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

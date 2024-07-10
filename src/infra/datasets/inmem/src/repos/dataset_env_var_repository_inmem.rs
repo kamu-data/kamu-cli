@@ -187,11 +187,16 @@ impl DatasetEnvVarRepository for DatasetEnvVarRepositoryInMemory {
             guard
                 .dataset_env_var_ids_by_keys
                 .remove(&existing_dataset_env_var.key);
-            guard
+            let dataset_env_var_ids = guard
                 .dataset_env_var_ids_by_dataset_id
                 .get_mut(&existing_dataset_env_var.dataset_id)
-                .unwrap()
-                .retain(|env_var_id| env_var_id == dataset_env_var_id);
+                .unwrap();
+            dataset_env_var_ids.retain(|env_var_id| env_var_id != dataset_env_var_id);
+            if dataset_env_var_ids.is_empty() {
+                guard
+                    .dataset_env_var_ids_by_dataset_id
+                    .remove(&existing_dataset_env_var.dataset_id);
+            }
             return Ok(());
         }
 
