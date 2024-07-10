@@ -15,11 +15,10 @@ use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use dill::Component;
-use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
+use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
@@ -27,7 +26,9 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_core::*;
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
+use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,8 +55,7 @@ async fn create_catalog_with_local_workspace(
     let catalog = {
         let mut b = dill::CatalogBuilder::new();
 
-        b.add::<EventBus>()
-            .add::<DependencyGraphServiceInMemory>()
+        b.add::<DependencyGraphServiceInMemory>()
             .add_value(current_account_subject)
             .add_value(predefined_accounts_config)
             .add_builder(
@@ -64,6 +64,9 @@ async fn create_catalog_with_local_workspace(
                     .with_multi_tenant(is_multitenant),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<CreateDatasetUseCaseImpl>()
+            .add::<DummyOutboxImpl>()
             .add::<SystemTimeSourceDefault>()
             .add::<QueryServiceImpl>()
             .add::<ObjectStoreRegistryImpl>()
@@ -71,8 +74,8 @@ async fn create_catalog_with_local_workspace(
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<AuthenticationServiceImpl>()
             .add::<AccessTokenServiceImpl>()
-            .add::<AccessTokenRepositoryInMemory>()
-            .add::<AccountRepositoryInMemory>()
+            .add::<InMemoryAccessTokenRepository>()
+            .add::<InMemoryAccountRepository>()
             .add_value(JwtAuthenticationConfig::default())
             .add::<LoginPasswordAuthProvider>()
             .add::<PredefinedAccountsRegistrator>()
@@ -106,10 +109,10 @@ async fn create_test_dataset(
     tempdir: &Path,
     account_name: Option<AccountName>,
 ) {
-    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let create_dataset = catalog.get_one::<dyn CreateDatasetUseCase>().unwrap();
 
-    let dataset = dataset_repo
-        .create_dataset(
+    let dataset = create_dataset
+        .execute(
             &DatasetAlias::new(account_name, DatasetName::new_unchecked("foo")),
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                 .build_typed(),

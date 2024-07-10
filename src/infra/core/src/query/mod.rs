@@ -24,6 +24,7 @@ use datafusion::logical_expr::LogicalPlan;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::prelude::*;
 use futures::stream::{self, StreamExt, TryStreamExt};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::*;
 
@@ -130,12 +131,7 @@ impl KamuSchema {
                     .await
                     .int_err()?;
 
-                let dataset = self
-                    .inner
-                    .dataset_repo
-                    .get_dataset(&hdl.as_local_ref())
-                    .await
-                    .unwrap();
+                let dataset = self.inner.dataset_repo.get_dataset_by_handle(&hdl);
 
                 let as_of = self
                     .inner
@@ -187,12 +183,7 @@ impl KamuSchema {
                     .await
                     .is_ok()
                 {
-                    let dataset = self
-                        .inner
-                        .dataset_repo
-                        .get_dataset(&hdl.as_local_ref())
-                        .await
-                        .unwrap();
+                    let dataset = self.inner.dataset_repo.get_dataset_by_handle(&hdl);
 
                     let as_of = inputs_state.get(&hdl.id).cloned();
 

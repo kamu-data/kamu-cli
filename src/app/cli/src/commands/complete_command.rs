@@ -14,6 +14,7 @@ use std::{fs, path};
 use chrono::prelude::*;
 use futures::TryStreamExt;
 use glob;
+use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 
 use super::{CLIError, Command};

@@ -25,6 +25,7 @@ use datafusion::dataframe::DataFrame;
 use datafusion_odata::collection::{CollectionAddr, QueryParams};
 use datafusion_odata::context::{CollectionContext, OnUnsupported, ServiceContext};
 use dill::Catalog;
+use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use opendatafabric::*;
 
@@ -78,10 +79,7 @@ impl ServiceContext for ODataServiceContext {
 
         let mut collections: Vec<Arc<dyn CollectionContext>> = Vec::new();
         for dataset_handle in datasets {
-            let dataset = repo
-                .get_dataset(&dataset_handle.as_local_ref())
-                .await
-                .unwrap();
+            let dataset = repo.get_dataset_by_handle(&dataset_handle);
 
             collections.push(Arc::new(ODataCollectionContext {
                 catalog: self.catalog.clone(),

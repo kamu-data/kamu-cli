@@ -23,14 +23,14 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 internal-error = { workspace = true }
 opendatafabric = { workspace = true }
+time-source = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dill = "0.8"
+dill = "0.9"
 thiserror = { version = "1", default-features = false }
 secrecy = "0.8"
 serde = "1"

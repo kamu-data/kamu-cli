@@ -9,7 +9,7 @@
 
 use std::path::{Path, PathBuf};
 
-use kamu_core::*;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 
 #[derive(Default)]
 pub struct IpfsClient {

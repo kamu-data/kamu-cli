@@ -10,6 +10,6 @@
 // Re-exports
 pub use kamu_task_system as domain;
 
-mod task_system_event_store_postgres;
+mod postgres_task_system_event_store;
 
-pub use task_system_event_store_postgres::*;
+pub use postgres_task_system_event_store::*;

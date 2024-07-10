@@ -12,13 +12,8 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use dill::*;
-use kamu::domain::{
-    CacheDir,
-    ErrorIntoInternal,
-    InternalError,
-    ResultIntoInternal,
-    ServerUrlConfig,
-};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_core::{CacheDir, ServerUrlConfig};
 use opendatafabric::AccountID;
 use thiserror::Error;
 use tokio::io::AsyncRead;

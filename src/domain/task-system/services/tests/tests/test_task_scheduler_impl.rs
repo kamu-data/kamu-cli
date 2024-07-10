@@ -10,10 +10,10 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu_core::SystemTimeSourceStub;
 use kamu_task_system::{LogicalPlan, Probe, TaskScheduler, TaskState, TaskStatus};
-use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
+use kamu_task_system_inmem::InMemoryTaskSystemEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
+use time_source::SystemTimeSourceStub;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -85,7 +85,7 @@ async fn test_task_cancellation() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn create_task_scheduler() -> impl TaskScheduler {
-    let event_store = Arc::new(TaskSystemEventStoreInMemory::new());
+    let event_store = Arc::new(InMemoryTaskSystemEventStore::new());
     let time_source = Arc::new(SystemTimeSourceStub::new());
 
     TaskSchedulerImpl::new(event_store, time_source)

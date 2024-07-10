@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
+use auth::DatasetActionUnauthorizedError;
 use chrono::{DateTime, Utc};
+use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
 
@@ -120,6 +122,7 @@ impl<'a> Default for CommitOpts<'a> {
 pub struct CommitResult {
     pub old_head: Option<Multihash>,
     pub new_head: Multihash,
+    pub new_upstream_ids: Vec<DatasetID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -162,11 +165,26 @@ pub enum CommitError {
     #[error(transparent)]
     MetadataAppendError(#[from] AppendError),
     #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
         InternalError,
     ),
+}
+
+impl From<DatasetActionUnauthorizedError> for CommitError {
+    fn from(v: DatasetActionUnauthorizedError) -> Self {
+        match v {
+            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

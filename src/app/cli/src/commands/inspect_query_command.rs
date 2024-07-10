@@ -46,10 +46,7 @@ impl InspectQueryCommand {
         output: &mut impl Write,
         dataset_handle: &DatasetHandle,
     ) -> Result<(), CLIError> {
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
 
         let mut blocks = dataset.as_metadata_chain().iter_blocks();
         while let Some((block_hash, block)) = blocks.try_next().await? {

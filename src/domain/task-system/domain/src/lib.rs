@@ -14,10 +14,12 @@ pub use event_sourcing::*;
 
 pub mod aggregates;
 pub mod entities;
+mod messages;
 pub mod repos;
 pub mod services;
 
 pub use aggregates::*;
 pub use entities::*;
+pub use messages::*;
 pub use repos::*;
 pub use services::*;

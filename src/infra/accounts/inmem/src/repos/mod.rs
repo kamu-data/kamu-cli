@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod access_token_repository_inmem;
-mod account_repository_inmem;
+mod inmem_access_token_repository;
+mod inmem_account_repository;
 
-pub use access_token_repository_inmem::*;
-pub use account_repository_inmem::*;
+pub use inmem_access_token_repository::*;
+pub use inmem_account_repository::*;

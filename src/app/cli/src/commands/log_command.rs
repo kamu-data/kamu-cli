@@ -112,10 +112,7 @@ impl Command for LogCommand {
                 auth::DatasetActionUnauthorizedError::Internal(e) => CLIError::critical(e),
             })?;
 
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
 
         let blocks = Box::pin(
             dataset

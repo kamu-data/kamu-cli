@@ -150,10 +150,7 @@ pub async fn odata_collection_handler_common(
     }
     .unwrap();
 
-    let dataset = repo
-        .get_dataset(&dataset_handle.as_local_ref())
-        .await
-        .unwrap();
+    let dataset = repo.get_dataset_by_handle(&dataset_handle);
 
     let ctx = ODataCollectionContext::new(catalog, addr, dataset_handle, dataset);
     let response = datafusion_odata::handlers::odata_collection_handler(

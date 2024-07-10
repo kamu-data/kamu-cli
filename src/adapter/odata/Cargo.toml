@@ -25,6 +25,7 @@ doctest = false
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 http-common = { workspace = true }
+internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 opendatafabric = { workspace = true }
@@ -33,7 +34,7 @@ axum = { version = "0.6", features = ["headers"] }
 chrono = { version = "0.4", default-features = false }
 datafusion = { version = "41", default-features = false }
 datafusion-odata = { version = "41", default-features = false }
-dill = { version = "0.8" }
+dill = { version = "0.9" }
 futures = { version = "0.3", default-features = false }
 http = "0.2"
 quick-xml = { version = "0.36", features = ["serialize"] }
@@ -42,7 +43,9 @@ tracing = "0.1"
 
 
 [dev-dependencies]
-event-bus = { workspace = true }
+messaging-outbox = { workspace = true }
+time-source = { workspace = true }
+
 hyper = { version = "0.14", default-features = false }
 indoc = { version = "2" }
 kamu = { workspace = true }

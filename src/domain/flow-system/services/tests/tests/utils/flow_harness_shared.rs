@@ -12,7 +12,6 @@ use std::sync::Arc;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
-use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, MockDatasetChangesService};
 use kamu::*;
 use kamu_accounts::{
@@ -22,7 +21,7 @@ use kamu_accounts::{
     JwtAuthenticationConfig,
     PredefinedAccountsConfig,
 };
-use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
+use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
@@ -33,9 +32,12 @@ use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
-use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
+use kamu_task_system::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
+use kamu_task_system_inmem::InMemoryTaskSystemEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use opendatafabric::*;
+use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::task::yield_now;
 
 use super::{
@@ -110,44 +112,68 @@ impl FlowHarness {
         let catalog = {
             let mut b = dill::CatalogBuilder::new();
 
-            b.add::<EventBus>()
-                .add_value(FlowServiceRunConfig::new(
-                    awaiting_step,
-                    mandatory_throttling_period,
-                ))
-                .add::<FlowServiceImpl>()
-                .add::<FlowEventStoreInMem>()
-                .add::<FlowConfigurationServiceImpl>()
-                .add::<FlowConfigurationEventStoreInMem>()
-                .add_value(fake_system_time_source.clone())
-                .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
-                .add_builder(
-                    DatasetRepositoryLocalFs::builder()
-                        .with_root(datasets_dir)
-                        .with_multi_tenant(overrides.is_multi_tenant),
-                )
-                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .add_value(mock_dataset_changes)
-                .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
-                .add_value(CurrentAccountSubject::new_test())
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-                .add::<AuthenticationServiceImpl>()
-                .add_value(predefined_accounts_config)
-                .add_value(JwtAuthenticationConfig::default())
-                .add::<AccountRepositoryInMemory>()
-                .add::<AccessTokenServiceImpl>()
-                .add::<AccessTokenRepositoryInMemory>()
-                .add::<DependencyGraphServiceInMemory>()
-                .add::<DatasetOwnershipServiceInMemory>()
-                .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
-                .add::<TaskSchedulerImpl>()
-                .add::<TaskSystemEventStoreInMemory>()
-                .add::<FlowSystemTestListener>()
-                .add::<LoginPasswordAuthProvider>()
-                .add::<PredefinedAccountsRegistrator>()
-                .add::<DatabaseTransactionRunner>();
+            b.add_builder(
+                messaging_outbox::OutboxImmediateImpl::builder()
+                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+            )
+            .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .add::<FlowSystemTestListener>()
+            .add_value(FlowServiceRunConfig::new(
+                awaiting_step,
+                mandatory_throttling_period,
+            ))
+            .add::<FlowServiceImpl>()
+            .add::<InMemoryFlowEventStore>()
+            .add::<FlowConfigurationServiceImpl>()
+            .add::<InMemoryFlowConfigurationEventStore>()
+            .add_value(fake_system_time_source.clone())
+            .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(datasets_dir)
+                    .with_multi_tenant(overrides.is_multi_tenant),
+            )
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add_value(mock_dataset_changes)
+            .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
+            .add_value(CurrentAccountSubject::new_test())
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+            .add::<DeleteDatasetUseCaseImpl>()
+            .add::<AuthenticationServiceImpl>()
+            .add_value(predefined_accounts_config)
+            .add_value(JwtAuthenticationConfig::default())
+            .add::<InMemoryAccountRepository>()
+            .add::<AccessTokenServiceImpl>()
+            .add::<InMemoryAccessTokenRepository>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add::<DatasetOwnershipServiceInMemory>()
+            .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
+            .add::<TaskSchedulerImpl>()
+            .add::<InMemoryTaskSystemEventStore>()
+            .add::<LoginPasswordAuthProvider>()
+            .add::<PredefinedAccountsRegistrator>()
+            .add::<DatabaseTransactionRunner>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
+
+            register_message_dispatcher::<DatasetLifecycleMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+            );
+            register_message_dispatcher::<TaskProgressMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+            );
+            register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+            );
+            register_message_dispatcher::<FlowServiceUpdatedMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
+            );
 
             b.build()
         };
@@ -181,9 +207,14 @@ impl FlowHarness {
         }
     }
 
-    pub async fn create_dataset(&self, dataset_alias: DatasetAlias) -> CreateDatasetResult {
-        self.dataset_repo
-            .create_dataset_from_snapshot(
+    pub async fn create_root_dataset(&self, dataset_alias: DatasetAlias) -> CreateDatasetResult {
+        let create_dataset_from_snapshot = self
+            .catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(dataset_alias)
                     .kind(DatasetKind::Root)
@@ -194,20 +225,18 @@ impl FlowHarness {
             .unwrap()
     }
 
-    pub async fn create_root_dataset(&self, dataset_alias: DatasetAlias) -> DatasetID {
-        let result = self.create_dataset(dataset_alias).await;
-
-        result.dataset_handle.id
-    }
-
     pub async fn create_derived_dataset(
         &self,
         dataset_alias: DatasetAlias,
         input_ids: Vec<DatasetID>,
     ) -> DatasetID {
-        let result = self
-            .dataset_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot = self
+            .catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        let create_result = create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(dataset_alias)
                     .kind(DatasetKind::Derivative)
@@ -221,7 +250,7 @@ impl FlowHarness {
             .await
             .unwrap();
 
-        result.dataset_handle.id
+        create_result.dataset_handle.id
     }
 
     pub async fn eager_initialization(&self) {
@@ -251,8 +280,9 @@ impl FlowHarness {
         self.eager_initialization().await;
 
         // Do the actual deletion
-        self.dataset_repo
-            .delete_dataset(&(dataset_id.as_local_ref()))
+        let delete_dataset = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
+        delete_dataset
+            .execute_via_ref(&(dataset_id.as_local_ref()))
             .await
             .unwrap();
     }

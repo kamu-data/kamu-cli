@@ -43,9 +43,10 @@ query-extensions-json = ["kamu/query-extensions-json"]
 container-runtime = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
-event-bus = { workspace = true }
 http-common = { workspace = true }
 internal-error = { workspace = true }
+time-source = { workspace = true }
+
 kamu = { workspace = true }
 kamu-data-utils = { workspace = true }
 
@@ -61,9 +62,8 @@ random-names = { workspace = true }
 
 kamu-flow-system-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
-# TODO: Activate after preparing services for transactional work
-# kamu-flow-system-postgres = { workspace = true }
-# kamu-flow-system-sqlite = { workspace = true }
+kamu-flow-system-postgres = { workspace = true }
+kamu-flow-system-sqlite = { workspace = true }
 
 kamu-task-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
@@ -83,6 +83,11 @@ kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-postgres = { workspace = true }
 kamu-datasets-sqlite = { workspace = true }
+
+messaging-outbox = { workspace = true }
+kamu-messaging-outbox-inmem = { workspace = true }
+kamu-messaging-outbox-postgres = { workspace = true }
+kamu-messaging-outbox-sqlite = { workspace = true }
 
 # CLI
 chrono-humanize = "0.2"                                           # Human readable durations
@@ -156,7 +161,7 @@ datafusion = { version = "41", default-features = false, features = [
     "unicode_expressions",
     "compression",
 ] }
-dill = "0.8"
+dill = "0.9"
 dirs = "5"
 fs_extra = "1.3"
 futures = "0.3"

@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use dill::*;
-use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::{
     DatasetTestHelper,
@@ -26,6 +25,7 @@ use kamu::utils::simple_transfer_protocol::ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_
 use kamu::{
     DatasetFactoryImpl,
     DatasetRepositoryLocalFs,
+    DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
     IpfsGateway,
     RemoteReposDir,
@@ -49,7 +49,6 @@ async fn setup_dataset(
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
     let catalog = dill::CatalogBuilder::new()
-        .add::<EventBus>()
         .add::<DependencyGraphServiceInMemory>()
         .add_value(ipfs_gateway)
         .add_value(ipfs_client)
@@ -83,6 +82,7 @@ async fn setup_dataset(
         .create_dataset_from_snapshot(snapshot)
         .await
         .unwrap()
+        .create_dataset_result
         .head;
 
     append_data_to_dataset(

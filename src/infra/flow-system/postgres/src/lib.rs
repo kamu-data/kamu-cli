@@ -10,6 +10,6 @@
 // Re-exports
 pub use kamu_flow_system as domain;
 
-mod flow_configuration_event_store_postgres;
+mod postgres_flow_configuration_event_store;
 
-pub use flow_configuration_event_store_postgres::*;
+pub use postgres_flow_configuration_event_store::*;

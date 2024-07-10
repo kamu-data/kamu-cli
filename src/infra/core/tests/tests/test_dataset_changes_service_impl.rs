@@ -11,18 +11,15 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use dill::Component;
-use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
-use kamu::{DatasetChangesServiceImpl, DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu::{DatasetChangesServiceImpl, DatasetRepositoryLocalFs, DatasetRepositoryWriter};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
-    auth,
     CommitOpts,
     CreateDatasetResult,
     DatasetChangesService,
     DatasetIntervalIncrement,
     DatasetRepository,
-    SystemTimeSourceDefault,
 };
 use opendatafabric::{
     Checkpoint,
@@ -34,6 +31,7 @@ use opendatafabric::{
     Multihash,
 };
 use tempfile::TempDir;
+use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -108,9 +106,7 @@ async fn test_add_data_differences() {
 
     let dataset = harness
         .dataset_repo
-        .get_dataset(&foo_result.dataset_handle.as_local_ref())
-        .await
-        .unwrap();
+        .get_dataset_by_handle(&foo_result.dataset_handle);
 
     // Commit SetDataSchema and 2 data nodes
 
@@ -297,9 +293,7 @@ async fn test_execute_transform_differences() {
 
     let bar_dataset = harness
         .dataset_repo
-        .get_dataset(&bar_result.dataset_handle.as_local_ref())
-        .await
-        .unwrap();
+        .get_dataset_by_handle(&bar_result.dataset_handle);
 
     // Commit SetDataSchema and 2 trasnform data nodes
 
@@ -485,9 +479,7 @@ async fn test_multiple_watermarks_within_interval() {
 
     let dataset = harness
         .dataset_repo
-        .get_dataset(&foo_result.dataset_handle.as_local_ref())
-        .await
-        .unwrap();
+        .get_dataset_by_handle(&foo_result.dataset_handle);
 
     // Commit SetDataSchema and 2 data nodes each having a watermark
 
@@ -628,9 +620,7 @@ async fn test_older_watermark_before_interval() {
 
     let dataset = harness
         .dataset_repo
-        .get_dataset(&foo_result.dataset_handle.as_local_ref())
-        .await
-        .unwrap();
+        .get_dataset_by_handle(&foo_result.dataset_handle);
 
     // Commit SetDataSchema and 3 data nodes, with #1,3 containing watermark
 
@@ -800,6 +790,7 @@ struct DatasetChangesHarness {
     _workdir: TempDir,
     _catalog: dill::Catalog,
     dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
 }
 
@@ -811,20 +802,19 @@ impl DatasetChangesHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
-            .add::<EventBus>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DatasetChangesServiceImpl>()
-            .add::<DependencyGraphServiceInMemory>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
 
         let dataset_changes_service = catalog.get_one::<dyn DatasetChangesService>().unwrap();
 
@@ -832,6 +822,7 @@ impl DatasetChangesHarness {
             _workdir: workdir,
             _catalog: catalog,
             dataset_repo,
+            dataset_repo_writer,
             dataset_changes_service,
         }
     }
@@ -839,7 +830,7 @@ impl DatasetChangesHarness {
     async fn create_root_dataset(&self, dataset_name: &str) -> CreateDatasetResult {
         let alias = DatasetAlias::new(None, DatasetName::new_unchecked(dataset_name));
         let create_result = self
-            .dataset_repo
+            .dataset_repo_writer
             .create_dataset(
                 &alias,
                 MetadataFactory::metadata_block(
@@ -873,7 +864,7 @@ impl DatasetChangesHarness {
         dataset_name: &str,
         input_dataset_names: Vec<&str>,
     ) -> CreateDatasetResult {
-        self.dataset_repo
+        self.dataset_repo_writer
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
                     .name(DatasetAlias::new(
@@ -890,6 +881,7 @@ impl DatasetChangesHarness {
             )
             .await
             .unwrap()
+            .create_dataset_result
     }
 
     async fn check_between_cases(

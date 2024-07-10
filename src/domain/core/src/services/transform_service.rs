@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
 

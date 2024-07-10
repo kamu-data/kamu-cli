@@ -12,13 +12,12 @@ use std::sync::Arc;
 
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
-use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
 use kamu::{
     DatasetOwnershipServiceInMemory,
     DatasetOwnershipServiceInMemoryStateInitializer,
     DatasetRepositoryLocalFs,
-    DependencyGraphServiceInMemory,
+    DatasetRepositoryWriter,
 };
 use kamu_accounts::{
     AccountConfig,
@@ -28,16 +27,17 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
     DEFAULT_ACCOUNT_ID,
 };
-use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
+use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
-use kamu_core::{auth, DatasetOwnershipService, DatasetRepository, SystemTimeSourceDefault};
+use kamu_core::{DatasetOwnershipService, DatasetRepository};
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
 use tempfile::TempDir;
+use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -87,7 +87,7 @@ async fn test_multi_tenant_dataset_owners() {
 struct DatasetOwnershipHarness {
     _workdir: TempDir,
     catalog: dill::Catalog,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
     auth_svc: Arc<dyn AuthenticationService>,
     account_datasets: HashMap<AccountID, Vec<DatasetID>>,
@@ -114,24 +114,22 @@ impl DatasetOwnershipHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<SystemTimeSourceDefault>()
-                .add::<EventBus>()
                 .add_builder(
                     DatasetRepositoryLocalFs::builder()
                         .with_root(datasets_dir)
                         .with_multi_tenant(multi_tenant),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
                 .add_value(CurrentAccountSubject::new_test())
                 .add::<AccessTokenServiceImpl>()
                 .add::<AuthenticationServiceImpl>()
                 .add_value(predefined_accounts_config.clone())
                 .add_value(JwtAuthenticationConfig::default())
-                .add::<AccountRepositoryInMemory>()
-                .add::<AccessTokenRepositoryInMemory>()
+                .add::<InMemoryAccountRepository>()
+                .add::<InMemoryAccessTokenRepository>()
                 .add::<DatasetOwnershipServiceInMemory>()
                 .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-                .add::<DependencyGraphServiceInMemory>()
                 .add::<DatabaseTransactionRunner>()
                 .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>();
@@ -154,7 +152,7 @@ impl DatasetOwnershipHarness {
             .await
             .unwrap();
 
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
 
         let dataset_ownership_service = catalog.get_one::<dyn DatasetOwnershipService>().unwrap();
         let auth_svc = catalog.get_one::<dyn AuthenticationService>().unwrap();
@@ -162,7 +160,7 @@ impl DatasetOwnershipHarness {
         Self {
             _workdir: workdir,
             catalog,
-            dataset_repo,
+            dataset_repo_writer,
             dataset_ownership_service,
             auth_svc,
             account_datasets: HashMap::new(),
@@ -244,8 +242,9 @@ impl DatasetOwnershipHarness {
             .await
             .unwrap()
             .unwrap();
+
         let created_dataset = self
-            .dataset_repo
+            .dataset_repo_writer
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
                     .name(DatasetAlias::new(
@@ -257,7 +256,9 @@ impl DatasetOwnershipHarness {
                     .build(),
             )
             .await
-            .unwrap();
+            .unwrap()
+            .create_dataset_result;
+
         self.account_datasets
             .entry(account_id.clone())
             .and_modify(|e| {
@@ -278,8 +279,9 @@ impl DatasetOwnershipHarness {
             .await
             .unwrap()
             .unwrap();
+
         let created_dataset = self
-            .dataset_repo
+            .dataset_repo_writer
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
                     .name(DatasetAlias::new(
@@ -295,7 +297,8 @@ impl DatasetOwnershipHarness {
                     .build(),
             )
             .await
-            .unwrap();
+            .unwrap()
+            .create_dataset_result;
 
         self.account_datasets
             .entry(account_id.clone())

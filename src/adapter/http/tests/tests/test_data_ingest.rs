@@ -534,8 +534,8 @@ impl DataIngestHarness {
 
     async fn create_population_dataset(&self, with_schema: bool) -> CreateDatasetResult {
         self.server_harness
-            .cli_dataset_repository()
-            .create_dataset_from_snapshot(DatasetSnapshot {
+            .cli_create_dataset_from_snapshot_use_case()
+            .execute(DatasetSnapshot {
                 name: DatasetAlias::new(
                     self.server_harness.operating_account_name(),
                     DatasetName::new_unchecked("population"),

@@ -25,6 +25,10 @@ impl MetadataFactory {
         SetInfoBuilder::new()
     }
 
+    pub fn set_license() -> SetLicenseBuilder {
+        SetLicenseBuilder::new()
+    }
+
     pub fn transform() -> TransformSqlBuilder {
         TransformSqlBuilder::new()
     }
@@ -132,6 +136,51 @@ impl SetInfoBuilder {
     }
 
     pub fn build(self) -> SetInfo {
+        self.v
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SetLicense Builder
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SetLicenseBuilder {
+    v: SetLicense,
+}
+
+impl SetLicenseBuilder {
+    fn new() -> Self {
+        Self {
+            v: SetLicense {
+                short_name: String::from("TEST"),
+                name: String::from("TEST LICENSE"),
+                spdx_id: None,
+                website_url: String::from("http://example.com"),
+            },
+        }
+    }
+
+    pub fn short_name(mut self, short_name: &str) -> Self {
+        self.v.short_name = String::from(short_name);
+        self
+    }
+
+    pub fn name(mut self, name: &str) -> Self {
+        self.v.name = String::from(name);
+        self
+    }
+
+    pub fn spdx_id(mut self, spdx_id: &str) -> Self {
+        self.v.spdx_id = Some(String::from(spdx_id));
+        self
+    }
+
+    pub fn website_url(mut self, website_url: &str) -> Self {
+        self.v.website_url = String::from(website_url);
+        self
+    }
+
+    pub fn build(self) -> SetLicense {
         self.v
     }
 }

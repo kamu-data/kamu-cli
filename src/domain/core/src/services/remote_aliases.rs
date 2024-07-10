@@ -8,9 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
+use internal_error::InternalError;
 use opendatafabric::DatasetRefRemote;
-
-use crate::InternalError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RemoteAliasKind {

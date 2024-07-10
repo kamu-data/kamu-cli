@@ -17,7 +17,7 @@ use kamu_task_system_services::domain::*;
 
 #[test_log::test(tokio::test)]
 async fn test_task_agg_create_new() {
-    let event_store = TaskSystemEventStoreInMemory::new();
+    let event_store = InMemoryTaskSystemEventStore::new();
 
     let mut task = Task::new(
         Utc::now(),
@@ -42,7 +42,7 @@ async fn test_task_agg_create_new() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_save_load_update() {
-    let event_store = TaskSystemEventStoreInMemory::new();
+    let event_store = InMemoryTaskSystemEventStore::new();
     let task_id = event_store.new_task_id().await.unwrap();
 
     let mut task = Task::new(Utc::now(), task_id, Probe::default().into());
@@ -86,7 +86,7 @@ async fn test_task_save_load_update() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_agg_illegal_transition() {
-    let event_store = TaskSystemEventStoreInMemory::new();
+    let event_store = InMemoryTaskSystemEventStore::new();
 
     let mut task = Task::new(
         Utc::now(),
