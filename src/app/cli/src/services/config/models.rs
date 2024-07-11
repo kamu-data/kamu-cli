@@ -412,7 +412,7 @@ pub struct IpfsConfig {
     /// For safety, it defaults to `http://localhost:8080` - a local IPFS daemon.
     /// If you don't have IPFS installed, you can set this URL to
     /// one of the public gateways like `https://ipfs.io`.
-    /// List of public gateways can be found here: https://ipfs.github.io/public-gateway-checker/
+    /// List of public gateways can be found here: `https://ipfs.github.io/public-gateway-checker/`
     pub http_gateway: Option<Url>,
 
     /// Whether kamu should pre-resolve IPNS DNSLink names using DNS or leave it

@@ -117,8 +117,8 @@ impl DatasetFactoryImpl {
     ///
     /// WARNING: This function will create a new [S3Context] that will do
     /// credential resolution from scratch which can be very expensive. If you
-    /// already have an established [S3Context] use [get_s3_with_context]
-    /// function instead.
+    /// already have an established [S3Context] use
+    /// [DatasetFactoryImpl::get_s3_from_context()] function instead.
     pub async fn get_s3_from_url(
         base_url: Url,
         event_bus: Arc<EventBus>,
