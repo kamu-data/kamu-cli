@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::net::IpAddr;
+use std::path::PathBuf;
 
 use clap::{value_parser, Arg, ArgAction, Command};
 
@@ -105,10 +106,10 @@ pub fn cli() -> Command {
                 .action(ArgAction::Set)
                 .help("Specifies account for multi-tenant Workspace")
                 .hide(true),
-            Arg::new("e2e-testing")
-                .long("e2e-testing")
-                .action(ArgAction::SetTrue)
-                .help("Activates additional functions required for E2E testing")
+            Arg::new("e2e-output-data-path")
+                .long("e2e-output-data-path")
+                .help("E2E test interface: file path from which socket bound address will be read out")
+                .value_parser(value_parser!(PathBuf))
                 .hide(true),
         ])
         .after_help(indoc::indoc!(

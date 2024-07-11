@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::net::IpAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use console::style as s;
@@ -35,7 +36,7 @@ pub struct APIServerRunCommand {
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     account_subject: Arc<CurrentAccountSubject>,
     github_auth_config: Arc<GithubAuthenticationConfig>,
-    is_e2e_testing: bool,
+    e2e_output_data_path: Option<PathBuf>,
 }
 
 impl APIServerRunCommand {
@@ -51,7 +52,7 @@ impl APIServerRunCommand {
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         account_subject: Arc<CurrentAccountSubject>,
         github_auth_config: Arc<GithubAuthenticationConfig>,
-        is_e2e_testing: bool,
+        e2e_output_data_path: Option<PathBuf>,
     ) -> Self {
         Self {
             base_catalog,
@@ -65,7 +66,7 @@ impl APIServerRunCommand {
             predefined_accounts_config,
             account_subject,
             github_auth_config,
-            is_e2e_testing,
+            e2e_output_data_path,
         }
     }
 
@@ -137,7 +138,7 @@ impl Command for APIServerRunCommand {
             self.address,
             self.port,
             self.external_address,
-            self.is_e2e_testing,
+            self.e2e_output_data_path.as_ref(),
         );
 
         tracing::info!(

@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fs;
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -46,7 +48,7 @@ impl APIServer {
         address: Option<IpAddr>,
         port: Option<u16>,
         external_address: Option<IpAddr>,
-        is_e2e_testing: bool,
+        e2e_output_data_path: Option<&PathBuf>,
     ) -> Self {
         // Background task executor must run with server privileges to execute tasks on
         // behalf of the system, as they are automatically scheduled
@@ -67,13 +69,17 @@ impl APIServer {
         });
 
         let base_url_rest = {
-            let mut base_addr_rest = addr;
+            let mut base_addr_rest = bound_addr.local_addr();
 
             if let Some(external_address) = external_address {
                 base_addr_rest.set_ip(external_address);
             }
 
             Url::parse(&format!("http://{base_addr_rest}")).expect("URL failed to parse")
+        };
+
+        if let Some(path) = e2e_output_data_path {
+            fs::write(path, base_url_rest.to_string()).unwrap();
         };
 
         let default_protocols = Protocols::default();
@@ -145,6 +151,7 @@ impl APIServer {
                     .layer(kamu_adapter_http::AuthenticationLayer::new()),
             );
 
+        let is_e2e_testing = e2e_output_data_path.is_some();
         let maybe_shutdown_notify = if is_e2e_testing {
             let shutdown_notify = Arc::new(Notify::new());
 
