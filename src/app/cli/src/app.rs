@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -85,7 +85,7 @@ pub async fn run(
         .transpose()
         .map_err(CLIError::usage_error_from)?
         .map(Into::into);
-    let is_e2e_testing = matches.get_flag("e2e-testing");
+    let is_e2e_testing = matches.get_one::<PathBuf>("e2e-output-data-path").is_some();
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
