@@ -196,3 +196,43 @@ async fn test_smart_push_existing_dataset_unauthorized() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_push_existing_ref_collision() {
+    let scenario = SmartPushExistingRefCollisionScenarion::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            multi_tenant: true,
+            authenticated_remotely: true,
+        }),
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            multi_tenant: true,
+            authorized_writes: true,
+            base_catalog: None,
+        }),
+    )
+    .await;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let push_result = scenario
+            .client_harness
+            .push_dataset(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+                false,
+            )
+            .await;
+
+        let dataset_result = &push_result.first().unwrap().result;
+
+        assert_matches!(
+            dataset_result,
+            Err(PushError::SyncError(SyncError::RefCollision(_)))
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

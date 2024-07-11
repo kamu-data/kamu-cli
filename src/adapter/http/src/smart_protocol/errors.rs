@@ -9,7 +9,7 @@
 
 use std::fmt::{self, Display};
 
-use kamu::domain::{InternalError, InvalidIntervalError, RefCASError};
+use kamu::domain::{InternalError, InvalidIntervalError, RefCASError, RefCollisionError};
 use thiserror::Error;
 
 use super::phases::*;
@@ -192,6 +192,9 @@ pub enum PushClientError {
 
     #[error(transparent)]
     InvalidHead(RefCASError),
+
+    #[error(transparent)]
+    RefCollision(RefCollisionError),
 
     #[error(transparent)]
     Internal(

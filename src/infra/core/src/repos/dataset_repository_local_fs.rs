@@ -291,7 +291,16 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             .await
         {
             Ok(head) => head,
-            Err(err) => return Err(err.int_err().into()),
+            Err(err) => {
+                return Err(match err {
+                    AppendError::RefCASFailed(_) => {
+                        CreateDatasetError::RefCollision(RefCollisionError {
+                            id: dataset_handle.id,
+                        })
+                    }
+                    _ => err.int_err().into(),
+                })
+            }
         };
 
         self.storage_strategy

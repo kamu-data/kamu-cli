@@ -289,7 +289,7 @@ impl WsSmartTransferProtocolClient {
         &self,
         socket: &mut TungsteniteStream,
         object_files: Vec<ObjectFileReference>,
-    ) -> Result<DatasetPushObjectsTransferResponse, PushClientError> {
+    ) -> Result<DatasetPushObjectsTransferAccepted, PushClientError> {
         let push_objects_request = DatasetPushObjectsTransferRequest {
             object_files,
             is_truncated: false, // TODO: split on pages to avoid links expiry
@@ -312,6 +312,16 @@ impl WsSmartTransferProtocolClient {
                 .await
                 .map_err(|e| {
                     PushClientError::ReadFailed(PushReadError::new(e, PushPhase::ObjectsRequest))
+                })?
+                .map_err(|e| match e {
+                    DatasetPushObjectsTransferError::RefCollision(err) => {
+                        PushClientError::RefCollision(RefCollisionError { id: err.dataset_id })
+                    }
+                    DatasetPushObjectsTransferError::Internal(err) => {
+                        PushClientError::Internal(InternalError::new(Box::new(
+                            ClientInternalError::new(err.error_message.as_str()),
+                        )))
+                    }
                 })?;
 
         tracing::debug!(
@@ -348,7 +358,7 @@ impl WsSmartTransferProtocolClient {
     async fn export_group_of_object_files(
         &self,
         socket: &mut TungsteniteStream,
-        push_objects_response: DatasetPushObjectsTransferResponse,
+        push_objects_response: DatasetPushObjectsTransferAccepted,
         src: Arc<dyn Dataset>,
         transfer_options: TransferOptions,
     ) -> Result<(), SyncError> {
@@ -801,7 +811,10 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Ok(push_objects_response) => push_objects_response,
             Err(e) => {
                 tracing::debug!("Push process aborted with error: {}", e);
-                return Err(SyncError::Internal(e.int_err()));
+                return Err(match e {
+                    PushClientError::RefCollision(err) => SyncError::RefCollision(err),
+                    _ => SyncError::Internal(e.int_err()),
+                });
             }
         };
 
