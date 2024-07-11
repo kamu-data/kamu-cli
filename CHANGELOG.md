@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - E2E: unblocked parallel run for tests
 ### Fixed
 - Obscure error during push duplicate dataset with different aliases
-- Fixed base_url calculation for random port
+- Get Data Panel: fixed `base_url_rest` calculation  in case the API server is started on a random port
 - Minor corrections to references in generated code documentation
 
 ## [0.190.1] - 2024-07-10
