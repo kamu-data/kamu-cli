@@ -132,6 +132,7 @@ impl AxumServerPushProtocolInstance {
                                     PushPhase::InitialRequest,
                                 ))
                             })?;
+                            return Ok(());
                         };
                         return Err(err.int_err().into());
                     }
