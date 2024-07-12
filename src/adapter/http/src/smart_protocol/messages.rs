@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use opendatafabric::Multihash;
+use opendatafabric::{DatasetID, Multihash};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -129,9 +129,26 @@ pub struct DatasetPushObjectsTransferRequest {
 }
 
 /// Push phase 2: object transfer response
+pub type DatasetPushObjectsTransferResponse =
+    Result<DatasetPushObjectsTransferAccepted, DatasetPushObjectsTransferError>;
+
+/// Push phase 2: object transfer accepted
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct DatasetPushObjectsTransferResponse {
+pub struct DatasetPushObjectsTransferAccepted {
     pub object_transfer_strategies: Vec<PushObjectTransferStrategy>,
+}
+
+/// Push phase 2: unsuccessful response push object transfer request
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum DatasetPushObjectsTransferError {
+    Internal(DatasetInternalError),
+    RefCollision(DatasetPushObjectsTransferRefCollisionError),
+}
+
+// Dataset with such id already exists with different alias
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DatasetPushObjectsTransferRefCollisionError {
+    pub dataset_id: DatasetID,
 }
 
 /// Push object transfer strategy

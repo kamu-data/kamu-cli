@@ -291,6 +291,14 @@ pub struct NameCollisionError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("Dataset with id {id} already exists")]
+pub struct RefCollisionError {
+    pub id: DatasetID,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Invalid snapshot: {reason}")]
 pub struct InvalidSnapshotError {
     pub reason: String,
@@ -327,6 +335,8 @@ pub enum CreateDatasetError {
     #[error(transparent)]
     NameCollision(#[from] NameCollisionError),
     #[error(transparent)]
+    RefCollision(#[from] RefCollisionError),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -344,6 +354,8 @@ pub enum CreateDatasetFromSnapshotError {
     #[error(transparent)]
     NameCollision(#[from] NameCollisionError),
     #[error(transparent)]
+    RefCollision(#[from] RefCollisionError),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -356,6 +368,7 @@ impl From<CreateDatasetError> for CreateDatasetFromSnapshotError {
         match v {
             CreateDatasetError::EmptyDataset => unreachable!(),
             CreateDatasetError::NameCollision(e) => Self::NameCollision(e),
+            CreateDatasetError::RefCollision(e) => Self::RefCollision(e),
             CreateDatasetError::Internal(e) => Self::Internal(e),
         }
     }

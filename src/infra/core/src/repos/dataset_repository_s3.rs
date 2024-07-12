@@ -451,7 +451,16 @@ impl DatasetRepository for DatasetRepositoryS3 {
             .await
         {
             Ok(head) => head,
-            Err(err) => return Err(err.int_err().into()),
+            Err(err) => {
+                return Err(match err {
+                    AppendError::RefCASFailed(_) => {
+                        CreateDatasetError::RefCollision(RefCollisionError {
+                            id: dataset_handle.id,
+                        })
+                    }
+                    _ => err.int_err().into(),
+                })
+            }
         };
 
         self.save_dataset_alias(dataset.as_ref(), &dataset_alias)

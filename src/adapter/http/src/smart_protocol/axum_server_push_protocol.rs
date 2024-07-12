@@ -15,6 +15,7 @@ use kamu::domain::events::DatasetEventDependenciesUpdated;
 use kamu::domain::{
     BlockRef,
     CorruptedSourceError,
+    CreateDatasetError,
     Dataset,
     DatasetRepository,
     ErrorIntoInternal,
@@ -106,13 +107,36 @@ impl AxumServerPushProtocolInstance {
                     })
                     .int_err()?;
 
-                let create_result = self
+                match self
                     .dataset_repo
                     .create_dataset(dataset_alias, seed_block)
                     .await
-                    .int_err()?;
-
-                self.dataset = Some(create_result.dataset);
+                {
+                    Ok(create_result) => self.dataset = Some(create_result.dataset),
+                    Err(err) => {
+                        if let CreateDatasetError::RefCollision(err) = &err {
+                            axum_write_payload::<DatasetPushObjectsTransferResponse>(
+                                &mut self.socket,
+                                DatasetPushObjectsTransferResponse::Err(
+                                    DatasetPushObjectsTransferError::RefCollision(
+                                        DatasetPushObjectsTransferRefCollisionError {
+                                            dataset_id: err.id.clone(),
+                                        },
+                                    ),
+                                ),
+                            )
+                            .await
+                            .map_err(|e| {
+                                PushServerError::WriteFailed(PushWriteError::new(
+                                    e,
+                                    PushPhase::InitialRequest,
+                                ))
+                            })?;
+                            return Ok(());
+                        };
+                        return Err(err.int_err().into());
+                    }
+                }
             }
 
             loop {
@@ -262,9 +286,9 @@ impl AxumServerPushProtocolInstance {
 
         axum_write_payload::<DatasetPushObjectsTransferResponse>(
             &mut self.socket,
-            DatasetPushObjectsTransferResponse {
+            Ok(DatasetPushObjectsTransferAccepted {
                 object_transfer_strategies,
-            },
+            }),
         )
         .await
         .map_err(|e| {

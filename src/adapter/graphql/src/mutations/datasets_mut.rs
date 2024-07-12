@@ -120,6 +120,9 @@ impl DatasetsMut {
                     dataset_name: e.alias.dataset_name.into(),
                 })
             }
+            Err(domain::CreateDatasetFromSnapshotError::RefCollision(e)) => {
+                return Err(e.int_err().into())
+            }
             Err(domain::CreateDatasetFromSnapshotError::InvalidSnapshot(e)) => {
                 CreateDatasetFromSnapshotResult::InvalidSnapshot(
                     CreateDatasetResultInvalidSnapshot { message: e.reason },

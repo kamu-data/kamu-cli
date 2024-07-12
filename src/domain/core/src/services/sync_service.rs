@@ -167,6 +167,8 @@ pub enum SyncError {
     #[error(transparent)]
     DatasetNotFound(#[from] DatasetNotFoundError),
     #[error(transparent)]
+    RefCollision(#[from] RefCollisionError),
+    #[error(transparent)]
     CreateDatasetFailed(#[from] CreateDatasetError),
     #[error(transparent)]
     UnsupportedProtocol(#[from] UnsupportedProtocolError),
