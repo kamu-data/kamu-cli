@@ -132,7 +132,10 @@ impl AxumServerPushProtocolInstance {
                                     PushPhase::InitialRequest,
                                 ))
                             })?;
-                            return Ok(());
+                            let mut notify_interval = tokio::time::interval(
+                                std::time::Duration::from_secs(MIN_UPLOAD_PROGRESS_PING_DELAY_SEC),
+                            );
+                            notify_interval.tick().await;
                         };
                         return Err(err.int_err().into());
                     }
