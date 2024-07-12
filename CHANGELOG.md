@@ -5,8 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Changed
+- E2E: unblocked parallel run for tests
 ### Fixed
 - Obscure error during push duplicate dataset with different aliases
+- Get Data Panel: fixed `base_url_rest` calculation  in case the API server is started on a random port
+- Minor corrections to references in generated code documentation
 
 ## [0.190.1] - 2024-07-10
 ### Fixed
@@ -23,7 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `saveEnvVariable` to store new dataset env var
   - `deleteEnvVariable` to delete dataset env var
   - `modifyEnvVariable` to modify dataset env var
-
 
 ## [0.189.7] - 2024-07-04
 ### Added

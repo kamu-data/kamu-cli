@@ -174,10 +174,10 @@ impl KamuCliApiServerHarness {
     {
         let kamu = self.into_kamu().await;
 
-        let server_addr = kamu.get_server_address();
-        let server_run_fut = kamu.start_api_server(server_addr);
+        let e2e_data_file_path = kamu.get_e2e_output_data_path();
+        let server_run_fut = kamu.start_api_server(e2e_data_file_path.clone());
 
-        api_server_e2e_test(server_addr, server_run_fut, fixture).await;
+        api_server_e2e_test(e2e_data_file_path, server_run_fut, fixture).await;
     }
 
     pub async fn execute_command<Fixture, FixtureResult>(self, fixture: Fixture)

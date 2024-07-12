@@ -116,7 +116,7 @@ where
         }
     }
 
-    /// Same as [EventStore::load()] but with extra control knobs
+    /// Same as [Aggregate::load()] but with extra control knobs
     #[tracing::instrument(
         level = "debug",
         name = "load",
@@ -176,7 +176,7 @@ where
         self.update_ext(event_store, LoadOpts::default()).await
     }
 
-    /// Same as [EventStore::update()] but with extra control knobs
+    /// Same as [Aggregate::update()] but with extra control knobs
     #[tracing::instrument(
         level = "debug",
         name = "update",

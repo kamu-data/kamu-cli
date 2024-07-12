@@ -10,7 +10,7 @@
 use std::ffi::OsString;
 use std::fs;
 use std::io::Write;
-use std::net::{Ipv4Addr, SocketAddrV4};
+use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -44,7 +44,7 @@ pub struct Kamu {
     current_account: accounts::CurrentAccountIndication,
     workspace_path: PathBuf,
     system_time: Option<DateTime<Utc>>,
-    _temp_dir: Option<tempfile::TempDir>,
+    temp_dir: Option<tempfile::TempDir>,
 }
 
 impl Kamu {
@@ -60,7 +60,7 @@ impl Kamu {
             current_account,
             workspace_path,
             system_time: None,
-            _temp_dir: None,
+            temp_dir: None,
         }
     }
 
@@ -77,7 +77,7 @@ impl Kamu {
 
         let inst = Self::new(temp_dir.path());
         let inst = Self {
-            _temp_dir: Some(temp_dir),
+            temp_dir: Some(temp_dir),
             ..inst
         };
 
@@ -202,26 +202,25 @@ impl Kamu {
             })
     }
 
-    pub async fn start_api_server(self, addr: SocketAddrV4) -> Result<(), InternalError> {
-        let host = addr.ip().to_string();
-        let port = addr.port().to_string();
+    pub async fn start_api_server(self, e2e_data_file_path: PathBuf) -> Result<(), InternalError> {
+        let host = Ipv4Addr::LOCALHOST.to_string();
 
         self.execute([
-            "--e2e-testing",
+            "--e2e-output-data-path",
+            e2e_data_file_path.to_str().unwrap(),
             "system",
             "api-server",
             "--address",
             host.as_str(),
-            "--http-port",
-            port.as_str(),
         ])
         .await
         .int_err()
     }
 
-    pub fn get_server_address(&self) -> SocketAddrV4 {
-        // TODO: Random port support -- this unlocks parallel running
-        SocketAddrV4::new(Ipv4Addr::LOCALHOST, 4000)
+    pub fn get_e2e_output_data_path(&self) -> PathBuf {
+        let temp_dir = self.temp_dir.as_ref().unwrap().path();
+
+        temp_dir.join("e2e-output-data.txt")
     }
 
     // TODO: Generalize into execute with overridden STDOUT/ERR/IN

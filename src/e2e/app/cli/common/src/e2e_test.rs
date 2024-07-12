@@ -9,17 +9,19 @@
 
 use std::assert_matches::assert_matches;
 use std::future::Future;
-use std::net::SocketAddrV4;
+use std::path::PathBuf;
 
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use reqwest::Url;
+use tokio_retry::strategy::FixedInterval;
+use tokio_retry::Retry;
 
 use crate::KamuApiServerClient;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn api_server_e2e_test<ServerRunFut, Fixture, FixtureFut>(
-    server_addr: SocketAddrV4,
+    e2e_data_file_path: PathBuf,
     server_run_fut: ServerRunFut,
     fixture: Fixture,
 ) where
@@ -28,7 +30,7 @@ pub async fn api_server_e2e_test<ServerRunFut, Fixture, FixtureFut>(
     FixtureFut: Future<Output = ()>,
 {
     let test_fut = async move {
-        let base_url = Url::parse(&format!("http://{server_addr}")).unwrap();
+        let base_url = get_server_api_base_url(e2e_data_file_path).await?;
         let kamu_api_server_client = KamuApiServerClient::new(base_url);
 
         kamu_api_server_client.ready().await?;
@@ -41,6 +43,22 @@ pub async fn api_server_e2e_test<ServerRunFut, Fixture, FixtureFut>(
     };
 
     assert_matches!(tokio::try_join!(server_run_fut, test_fut), Ok(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn get_server_api_base_url(e2e_data_file_path: PathBuf) -> Result<Url, InternalError> {
+    let retry_strategy = FixedInterval::from_millis(500).take(10);
+    let base_url = Retry::spawn(retry_strategy, || async {
+        let data = tokio::fs::read_to_string(e2e_data_file_path.clone())
+            .await
+            .int_err()?;
+
+        Url::parse(data.as_str()).int_err()
+    })
+    .await?;
+
+    Ok(base_url)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

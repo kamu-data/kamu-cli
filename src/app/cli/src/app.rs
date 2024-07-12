@@ -85,7 +85,7 @@ pub async fn run(
         .transpose()
         .map_err(CLIError::usage_error_from)?
         .map(Into::into);
-    let is_e2e_testing = matches.get_flag("e2e-testing");
+    let is_e2e_testing = matches.contains_id("e2e-output-data-path");
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 

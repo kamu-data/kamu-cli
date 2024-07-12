@@ -8,71 +8,28 @@
 // by the Apache License, Version 2.0.
 
 use std::net::IpAddr;
+use std::path::PathBuf;
 
 use clap::{value_parser, Arg, ArgAction, Command};
 
 use super::cli_value_parser::*;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn tabular_output_params(app: Command) -> Command {
-    app.args([
-        Arg::new("output-format")
-            .long("output-format")
-            .short('o')
-            .value_name("FMT")
-            .value_parser([
-                "table", "csv", "json", "ndjson", "json-soa",
-                "json-aoa",
-                // "vertical",
-                // "tsv",
-                // "xmlattrs",
-                // "xmlelements",
-            ])
-            .help("Format to display the results in"),
-        /*Arg::new("no-color")
-            .long("no-color")
-            .action(ArgAction::SetTrue)
-            .help("Control whether color is used for display"),
-        Arg::new("incremental")
-            .long("incremental")
-            .action(ArgAction::SetTrue)
-            .help("Display result rows immediately as they are fetched"),
-        Arg::new("no-header")
-            .long("no-header")
-            .action(ArgAction::SetTrue)
-            .help("Whether to show column names in query results"),
-        Arg::new("header-interval")
-            .long("header-interval")
-            .value_name("INT")
-            .help("The number of rows between which headers are displayed"),
-        Arg::new("csv-delimiter")
-            .long("csv-delimiter")
-            .value_name("DELIM")
-            .help("Delimiter in the csv output format"),
-        Arg::new("csv-quote-character")
-            .long("csv-quote-character")
-            .value_name("CHAR")
-            .help("Quote character in the csv output format"),
-        Arg::new("null-value")
-            .long("null-value")
-            .value_name("VAL")
-            .help("Use specified string in place of NULL values"),
-        Arg::new("number-format")
-            .long("number-format")
-            .value_name("FMT")
-            .help("Format numbers using DecimalFormat pattern"),
-        Arg::new("date-format")
-            .long("date-format")
-            .value_name("FMT")
-            .help("Format dates using SimpleDateFormat pattern"),
-        Arg::new("time-format")
-            .long("time-format")
-            .value_name("FMT")
-            .help("Format times using SimpleDateFormat pattern"),
-        Arg::new("timestamp-format")
-            .long("timestamp-format")
-            .value_name("FMT")
-            .help("Format timestamps using SimpleDateFormat pattern"),*/
-    ])
+    app.args([Arg::new("output-format")
+        .long("output-format")
+        .short('o')
+        .value_name("FMT")
+        .value_parser([
+            "table", "csv", "json", "ndjson", "json-soa",
+            "json-aoa",
+            // "vertical",
+            // "tsv",
+            // "xmlattrs",
+            // "xmlelements",
+        ])
+        .help("Format to display the results in")])
 }
 
 pub fn cli() -> Command {
@@ -105,10 +62,10 @@ pub fn cli() -> Command {
                 .action(ArgAction::Set)
                 .help("Specifies account for multi-tenant Workspace")
                 .hide(true),
-            Arg::new("e2e-testing")
-                .long("e2e-testing")
-                .action(ArgAction::SetTrue)
-                .help("Activates additional functions required for E2E testing")
+            Arg::new("e2e-output-data-path")
+                .long("e2e-output-data-path")
+                .help("E2E test interface: file path from which socket bound address will be read out")
+                .value_parser(value_parser!(PathBuf))
                 .hide(true),
         ])
         .after_help(indoc::indoc!(
@@ -1494,3 +1451,5 @@ pub fn cli() -> Command {
             ],
         )
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
