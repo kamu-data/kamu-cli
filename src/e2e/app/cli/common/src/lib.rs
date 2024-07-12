@@ -69,7 +69,9 @@ macro_rules! kamu_cli_run_api_server_e2e_test {
     };
     (mysql, $test_package: expr, $test_name: expr) => {
         paste::paste! {
-            #[test_group::group(e2e, database, mysql)]
+            // flaky: when running in parallel, errors occur with table not found (or sporadic deadlocks),
+            //        restarting again solves the problem.
+            #[test_group::group(e2e, database, mysql, flaky)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/mysql"))]
             async fn [<$test_name>] (mysql_pool: sqlx::MySqlPool) {
                 KamuCliApiServerHarness::mysql(&mysql_pool, None)
@@ -80,7 +82,9 @@ macro_rules! kamu_cli_run_api_server_e2e_test {
     };
     (mysql, $test_package: expr, $test_name: expr, $test_options: expr) => {
         paste::paste! {
-            #[test_group::group(e2e, database, mysql)]
+            // flaky: when running in parallel, errors occur with table not found (or sporadic deadlocks),
+            //        restarting again solves the problem.
+            #[test_group::group(e2e, database, mysql, flaky)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/mysql"))]
             async fn [<$test_name>] (mysql_pool: sqlx::MySqlPool) {
                 KamuCliApiServerHarness::mysql(&mysql_pool, Some($test_options))
