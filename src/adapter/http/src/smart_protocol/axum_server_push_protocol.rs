@@ -10,6 +10,7 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 
+use axum::extract::ws::Message;
 use event_bus::EventBus;
 use kamu::domain::events::DatasetEventDependenciesUpdated;
 use kamu::domain::{
@@ -70,7 +71,7 @@ impl AxumServerPushProtocolInstance {
         }
     }
 
-    pub async fn serve(self) {
+    pub async fn serve(mut self) {
         match self.push_main_flow().await {
             Ok(_) => {
                 tracing::debug!("Push process success");
@@ -79,9 +80,14 @@ impl AxumServerPushProtocolInstance {
                 tracing::debug!("Push process aborted with error: {}", e);
             }
         }
+        while let Some(msg) = self.socket.recv().await {
+            if let Ok(Message::Close(_)) = msg {
+                break;
+            }
+        }
     }
 
-    async fn push_main_flow(mut self) -> Result<(), PushServerError> {
+    async fn push_main_flow(&mut self) -> Result<(), PushServerError> {
         let push_request = self.handle_push_request_initiation().await?;
         let force_update_if_diverged = push_request.force_update_if_diverged;
 
@@ -132,10 +138,6 @@ impl AxumServerPushProtocolInstance {
                                     PushPhase::InitialRequest,
                                 ))
                             })?;
-                            let mut notify_interval = tokio::time::interval(
-                                std::time::Duration::from_secs(MIN_UPLOAD_PROGRESS_PING_DELAY_SEC),
-                            );
-                            notify_interval.tick().await;
                         };
                         return Err(err.int_err().into());
                     }
