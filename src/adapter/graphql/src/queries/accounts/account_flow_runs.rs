@@ -74,10 +74,7 @@ impl AccountFlowRuns {
         let flows_state_listing = flow_service
             .list_all_flows_by_account(
                 &self.account.id,
-                match filters {
-                    Some(filters) => filters,
-                    None => Default::default(),
-                },
+                filters.unwrap_or_default(),
                 fs::FlowPaginationOpts {
                     offset: page * per_page,
                     limit: per_page,

@@ -54,6 +54,7 @@ impl LogCommand {
         }
     }
 
+    #[allow(clippy::match_same_arms)]
     fn filter_block(&self, block: &MetadataBlock) -> bool {
         // Keep in sync with CLI parser
         // TODO: replace with bitfield enum
@@ -190,7 +191,7 @@ impl AsciiRenderer {
             output,
             0,
             "SystemTime",
-            &block
+            block
                 .system_time
                 .to_rfc3339_opts(SecondsFormat::AutoSi, true),
         )?;

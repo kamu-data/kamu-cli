@@ -161,7 +161,7 @@ impl TransformSqlBuilder {
     }
 
     pub fn engine(mut self, engine: &str) -> Self {
-        self.v.engine = engine.to_owned();
+        engine.clone_into(&mut self.v.engine);
         self
     }
 

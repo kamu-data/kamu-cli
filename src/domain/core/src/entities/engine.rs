@@ -44,7 +44,7 @@ pub trait Engine: Send + Sync {
 pub struct RawQueryRequestExt {
     /// Randomly assigned value that identifies this specific engine operation
     pub operation_id: String,
-    /// Datafusion context to use for reading the result into a [DataFrame]
+    /// Datafusion context to use for reading the result into a [`DataFrame`]
     pub ctx: SessionContext,
     /// Data to be used in the query
     pub input_data: DataFrame,

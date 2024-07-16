@@ -24,7 +24,7 @@ pub enum DataBatchFormat {
     JsonAOA,
     NdJson,
     Csv,
-    /// Deprecated: Use ND_JSON instead
+    /// Deprecated: Use `ND_JSON` instead
     JsonLD,
 }
 

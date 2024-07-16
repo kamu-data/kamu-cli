@@ -146,7 +146,7 @@ pub struct QueryRequestBody {
     include_state: bool,
 
     /// Whether to include a logical hash of the resulting data batch.
-    /// See: https://docs.kamu.dev/odf/spec/#physical-and-logical-hashes
+    /// See: <https://docs.kamu.dev/odf/spec/#physical-and-logical-hashes>
     #[serde(default = "QueryRequestBody::default_include_data_hash")]
     include_data_hash: bool,
 

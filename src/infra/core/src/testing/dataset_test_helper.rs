@@ -49,6 +49,7 @@ impl DatasetTestHelper {
         assert_eq!(head_1, head_2);
     }
 
+    #[allow(clippy::assigning_clones)]
     fn list_files(dir: &Path) -> Vec<PathBuf> {
         if !dir.exists() {
             return Vec::new();

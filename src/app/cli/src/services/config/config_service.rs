@@ -209,7 +209,7 @@ impl ConfigService {
             false
         } else {
             value
-                .remove(&serde_yaml::Value::String(key.to_owned()))
+                .remove(serde_yaml::Value::String(key.to_owned()))
                 .is_some()
         }
     }

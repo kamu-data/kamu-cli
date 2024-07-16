@@ -746,7 +746,7 @@ async fn test_transform_with_compaction_retry() {
 
 fn assert_requests_equivalent(lhs: &TransformRequestExt, mut rhs: TransformRequestExt) {
     // Operation IDs are randomly generated, so ignoring them for this check
-    rhs.operation_id = lhs.operation_id.clone();
+    rhs.operation_id.clone_from(&lhs.operation_id);
 
     assert_eq!(lhs.inputs, rhs.inputs);
     assert_eq!(*lhs, rhs);

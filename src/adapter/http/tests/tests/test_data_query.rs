@@ -29,7 +29,7 @@ struct Harness {
     run_info_dir: tempfile::TempDir,
     server_harness: ServerSideLocalFsHarness,
     root_url: url::Url,
-    dataset_alias: DatasetAlias,
+    dataset_handle: DatasetHandle,
     dataset_url: url::Url,
 }
 
@@ -118,7 +118,7 @@ impl Harness {
             run_info_dir,
             server_harness,
             root_url,
-            dataset_alias: create_result.dataset_handle.alias,
+            dataset_handle: create_result.dataset_handle,
             dataset_url,
         }
     }
@@ -221,9 +221,20 @@ async fn test_data_query_handler_full() {
     let client = async move {
         let cl = reqwest::Client::new();
 
+        let head = cl
+            .get(format!("{}/refs/head", harness.dataset_url))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+
         let query = format!(
             "select offset, city, population from \"{}\" order by offset desc",
-            harness.dataset_alias
+            harness.dataset_handle.alias
         );
         let query_url = format!("{}query", harness.root_url);
         let res = cl
@@ -252,7 +263,7 @@ async fn test_data_query_handler_full() {
                 "state": {
                     "inputs": [{
                         "id": "did:odf:fed01df230b49615d175307d580c33d6fda61fc7b9aec91df0f5c1a5ebe3b8cbfee02",
-                        "blockHash": "f16204cec6245fadfbf0663b0e9e9a01c73268cc13e29087b33ce3454af08eb4d3e0b",
+                        "blockHash": head,
                     }]
                 }
             })
@@ -304,7 +315,10 @@ async fn test_data_query_handler_error_sql_missing_function() {
     let client = async move {
         let cl = reqwest::Client::new();
 
-        let query = format!("select foobar(offset) from \"{}\"", harness.dataset_alias);
+        let query = format!(
+            "select foobar(offset) from \"{}\"",
+            harness.dataset_handle.alias
+        );
 
         let query_url = format!("{}query", harness.root_url);
         let res = cl
@@ -372,7 +386,7 @@ async fn test_data_query_handler_dataset_does_not_exist_bad_alias() {
 
         let query = format!(
             "select offset, city, population from \"{}\"",
-            harness.dataset_alias
+            harness.dataset_handle.alias
         );
 
         let query_url = format!("{}query", harness.root_url);
@@ -381,7 +395,7 @@ async fn test_data_query_handler_dataset_does_not_exist_bad_alias() {
             .json(&json!({
                 "query": query,
                 "aliases": [{
-                    "alias": harness.dataset_alias,
+                    "alias": harness.dataset_handle.alias,
                     "id": DatasetID::new_seeded_ed25519(b"does-not-exist"),
                 }]
             }))
@@ -414,7 +428,7 @@ async fn test_data_query_handler_ranges() {
 
         let query = format!(
             "select offset, city, population from \"{}\" order by offset desc",
-            harness.dataset_alias
+            harness.dataset_handle.alias
         );
         let query_url = format!("{}query", harness.root_url);
 
@@ -484,7 +498,7 @@ async fn test_data_query_handler_data_formats() {
 
         let query = format!(
             "select offset, city, population from \"{}\" order by offset desc",
-            harness.dataset_alias
+            harness.dataset_handle.alias
         );
         let query_url = format!("{}query", harness.root_url);
         let res = cl
@@ -578,7 +592,7 @@ async fn test_data_query_handler_schema_formats() {
 
         let query = format!(
             "select offset, city, population from \"{}\"",
-            harness.dataset_alias
+            harness.dataset_handle.alias
         );
         let query_url = format!("{}query", harness.root_url);
         let res = cl

@@ -70,7 +70,7 @@ impl AccessTokenRepository for AccessTokenRepositoryInMemory {
         access_token: &AccessToken,
     ) -> Result<(), CreateAccessTokenError> {
         let mut guard = self.state.lock().unwrap();
-        if guard.tokens_by_id.get(&access_token.id).is_some() {
+        if guard.tokens_by_id.contains_key(&access_token.id) {
             return Err(CreateAccessTokenError::Duplicate(
                 CreateAccessTokenErrorDuplicate {
                     access_token_name: access_token.token_name.clone(),
@@ -78,7 +78,7 @@ impl AccessTokenRepository for AccessTokenRepositoryInMemory {
             ));
         }
         if let Some(existing_token_id) = guard.token_ids_by_name.get(&access_token.token_name)
-            && guard.tokens_by_id.get(existing_token_id).is_some()
+            && guard.tokens_by_id.contains_key(existing_token_id)
         {
             return Err(CreateAccessTokenError::Duplicate(
                 CreateAccessTokenErrorDuplicate {

@@ -62,20 +62,19 @@ impl AccountRepositoryInMemory {
 impl AccountRepository for AccountRepositoryInMemory {
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
         let mut guard = self.state.lock().unwrap();
-        if guard.accounts_by_id.get(&account.id).is_some() {
+        if guard.accounts_by_id.contains_key(&account.id) {
             return Err(CreateAccountError::Duplicate(CreateAccountErrorDuplicate {
                 account_field: CreateAccountDuplicateField::Id,
             }));
         }
-        if guard.accounts_by_name.get(&account.account_name).is_some() {
+        if guard.accounts_by_name.contains_key(&account.account_name) {
             return Err(CreateAccountError::Duplicate(CreateAccountErrorDuplicate {
                 account_field: CreateAccountDuplicateField::Name,
             }));
         }
         if guard
             .account_id_by_provider_identity_key
-            .get(&account.provider_identity_key)
-            .is_some()
+            .contains_key(&account.provider_identity_key)
         {
             return Err(CreateAccountError::Duplicate(CreateAccountErrorDuplicate {
                 account_field: CreateAccountDuplicateField::ProviderIdentityKey,

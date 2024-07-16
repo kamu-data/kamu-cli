@@ -149,7 +149,7 @@ impl MetadataChainVisitor for SearchSourceStateVisitor<'_> {
             );
         }
 
-        self.source_state = e.new_source_state.clone();
+        self.source_state.clone_from(&e.new_source_state);
 
         Ok(Decision::Stop)
     }

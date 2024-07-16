@@ -87,10 +87,7 @@ impl DatasetFlowRuns {
             None => None,
         };
 
-        let filters = match filters {
-            Some(filters) => filters,
-            None => Default::default(),
-        };
+        let filters = filters.unwrap_or_default();
 
         let flows_state_listing = flow_service
             .list_all_flows_by_dataset(

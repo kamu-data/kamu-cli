@@ -926,7 +926,9 @@ impl TransformService for TransformServiceImpl {
 
             // Currently we're considering checkpoints non-reproducible and thus exclude
             // them from equivalence test
-            cmp_actual_event.new_checkpoint = expected_event.new_checkpoint.clone();
+            cmp_actual_event
+                .new_checkpoint
+                .clone_from(&expected_event.new_checkpoint);
 
             if expected_event != cmp_actual_event {
                 tracing::warn!(%block_hash, ?expected_event, ?actual_event, "Data is not reproducible");

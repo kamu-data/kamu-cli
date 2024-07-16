@@ -197,6 +197,7 @@ fn test_local_alias_validation() {
     assert_matches!(DatasetAlias::try_from(".invalid/local.id"), Err(_));
 }
 
+#[allow(clippy::needless_borrows_for_generic_args)]
 #[test]
 fn test_dataset_refs_conversions() {
     fn takes_ref_local<R: Into<DatasetRef>>(_: R) {}

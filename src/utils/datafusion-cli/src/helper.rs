@@ -254,7 +254,7 @@ mod tests {
     fn unescape_readline_input() -> Result<()> {
         let validator = CliHelper::default();
 
-        // shoule be valid
+        // should be valid
         let result = readline_direct(
              Cursor::new(
                  r"create external table test stored as csv location 'data.csv' options ('format.delimiter' ',');"
@@ -328,7 +328,7 @@ mod tests {
     fn sql_dialect() -> Result<()> {
         let mut validator = CliHelper::default();
 
-        // shoule be invalid in generic dialect
+        // should be invalid in generic dialect
         let result = readline_direct(Cursor::new(r"select 1 # 2;".as_bytes()), &validator)?;
         assert!(
             matches!(result, ValidationResult::Invalid(Some(e)) if e.contains("Invalid statement"))

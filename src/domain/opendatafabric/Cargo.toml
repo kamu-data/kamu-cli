@@ -67,7 +67,7 @@ tonic = "0.11"
 arrow = { optional = true, version = "52", default-features = false, features = [
     "ipc",
 ] }
-sqlx = { optional = true, version = "0.7", default_features = false }
+sqlx = { optional = true, version = "0.7", default-features = false }
 
 [dev-dependencies]
 indoc = "2"

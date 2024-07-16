@@ -352,7 +352,7 @@ enum DataBatchFormat {
 	ND_JSON
 	CSV
 	"""
-	Deprecated: Use ND_JSON instead
+	Deprecated: Use `ND_JSON` instead
 	"""
 	JSON_LD
 }
@@ -1799,7 +1799,7 @@ enum TaskStatus {
 	"""
 	RUNNING
 	"""
-	Task has reached a certain final outcome (see [TaskOutcome])
+	Task has reached a certain final outcome (see [`TaskOutcome`])
 	"""
 	FINISHED
 }

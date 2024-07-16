@@ -44,11 +44,7 @@ impl Task {
 
     /// Task is queued or running and cancellation was not already requested
     pub fn can_cancel(&self) -> bool {
-        match self.status {
-            TaskStatus::Queued if !self.cancellation_requested => true,
-            TaskStatus::Running if !self.cancellation_requested => true,
-            _ => false,
-        }
+        matches!(self.status, TaskStatus::Queued | TaskStatus::Running if !self.cancellation_requested)
     }
 
     /// Set cancellation flag (if not already set)

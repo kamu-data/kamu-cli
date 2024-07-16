@@ -20,7 +20,7 @@ pub enum TaskStatus {
     Queued,
     /// Task is being executed
     Running,
-    /// Task has reached a certain final outcome (see [TaskOutcome])
+    /// Task has reached a certain final outcome (see [`TaskOutcome`])
     Finished,
 }
 

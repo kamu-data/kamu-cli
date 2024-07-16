@@ -184,7 +184,7 @@ enum ApiErrorCategory<'a> {
 }
 
 /// Categorizes an error into a certain group. As explained in [`ApiError`] docs
-/// - these categories are very general in order to be applicable regardless of
+/// these categories are very general in order to be applicable regardless of
 /// context.
 trait ApiErrorCategorizable {
     fn categorize(&self) -> ApiErrorCategory<'_>;

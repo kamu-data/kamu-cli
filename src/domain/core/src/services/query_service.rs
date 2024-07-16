@@ -97,7 +97,7 @@ pub struct QueryOptions {
     pub as_of_state: Option<QueryState>,
     /// Hints that can help the system to minimize metadata scanning. Be extra
     /// careful that your hints don't influence the actual result of the
-    /// query, as they are not inlcuded in the [QueryState] and thus can
+    /// query, as they are not inlcuded in the [`QueryState`] and thus can
     /// ruin reproducibility if misused.
     pub hints: Option<BTreeMap<DatasetID, DatasetQueryHints>>,
 }
@@ -114,10 +114,10 @@ pub struct DatasetQueryHints {
 
 #[derive(Debug, Clone)]
 pub struct QueryResponse {
-    /// A [DataFrame] that can be used to read schema and access the data. Note
-    /// that the data frames are "lazy". They are a representation of a logical
-    /// query plan. The actual query is executed only when you pull the
-    /// resulting data from it.
+    /// A [`DataFrame`] that can be used to read schema and access the data.
+    /// Note that the data frames are "lazy". They are a representation of a
+    /// logical query plan. The actual query is executed only when you pull
+    /// the resulting data from it.
     pub df: DataFrame,
     ///  The query state information that can be used for reproducibility.
     pub state: QueryState,

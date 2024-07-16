@@ -9,7 +9,6 @@
 
 use std::fmt::Display;
 use std::sync::Arc;
-use std::usize;
 
 use opendatafabric::*;
 use thiserror::Error;

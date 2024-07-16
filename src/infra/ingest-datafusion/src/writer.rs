@@ -804,7 +804,9 @@ impl DataWriter for DataWriterDataFusion {
             .map(|c| c.physical_hash.clone());
 
         self.meta.prev_watermark = new_block.event.new_watermark;
-        self.meta.prev_source_state = new_block.event.new_source_state.clone();
+        self.meta
+            .prev_source_state
+            .clone_from(&new_block.event.new_source_state);
 
         Ok(WriteDataResult {
             old_head,

@@ -49,8 +49,7 @@ serde_with = "3"
 serde_yaml = "0.9"
 
 # Ingest
-# TODO: Alloy is not yet regularly released on crates.io
-alloy = { version = "0.1", git = "https://github.com/alloy-rs/alloy", rev = "a81f9e1e80e677a8f78b592657ffba607a0098b9", default-features = false, features = [
+alloy = { version = "0.2", default-features = false, features = [
     "std",
     "provider-http",
     "provider-ws",
@@ -63,8 +62,8 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { version = "39", git = 'https://github.com/kamu-data/datafusion-ethers.git', tag = "v39.0.0" }
-datafusion-functions-json = { version = "0.1", git = 'https://github.com/kamu-data/datafusion-functions-json.git', branch = "datafusion-39" }
+datafusion-ethers = { version = "39", default-features = false }
+datafusion-functions-json = { version = "0.2", default-features = false }
 flate2 = "1" # GZip decoder
 reqwest = { version = "0.11", default-features = false, features = [
     "json",
@@ -103,7 +102,7 @@ async-trait = "0.1"
 bytes = "1"
 cfg-if = "1" # Conditional compilation
 chrono = { version = "0.4", features = ["serde"] }
-dashmap = "5"
+dashmap = "6"
 dill = "0.8"
 futures = "0.3"
 glob = "0.3" # Used for glob fetch
