@@ -232,5 +232,5 @@ debug = "line-tables-only"
 # datafusion-common = { git = 'https://github.com/apache/datafusion.git', tag = '39.0.0-rc1' }
 # datafusion-execution = { git = 'https://github.com/apache/datafusion.git', tag = '39.0.0-rc1' }
 # datafusion-expr = { git = 'https://github.com/apache/datafusion.git', tag = '39.0.0-rc1' }
-datafusion-odata = { git = 'https://github.com/kamu-data/datafusion-odata.git', branch = 'axum-0.6' }
+datafusion-odata = { git = 'https://github.com/kamu-data/datafusion-odata.git', branch = '40.0.0-axum-0.6' }
 # datafusion-ethers = { git = "https://github.com/kamu-data/datafusion-ethers.git", tag = "v39.0.0" }
