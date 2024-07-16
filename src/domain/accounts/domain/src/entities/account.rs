@@ -10,7 +10,6 @@
 use chrono::{DateTime, TimeZone, Utc};
 use lazy_static::lazy_static;
 use opendatafabric::{AccountID, AccountName};
-use reusable::{reusable, reuse};
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,8 +46,12 @@ pub struct Account {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, sqlx::Type, PartialEq, Eq, Serialize, Deserialize)]
-#[sqlx(type_name = "account_type", rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "sqlx",
+    derive(sqlx::Type),
+    sqlx(type_name = "account_type", rename_all = "lowercase")
+)]
 pub enum AccountType {
     User,
     Organization,
@@ -79,7 +82,8 @@ impl Account {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[reusable(account_row_model)]
+#[cfg(feature = "sqlx")]
+#[reusable::reusable(account_row_model)]
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct AccountRowModel {
     pub id: AccountID,
@@ -94,12 +98,14 @@ pub struct AccountRowModel {
     pub provider_identity_key: String,
 }
 
-#[reuse(account_row_model)]
+#[cfg(feature = "sqlx")]
+#[reusable::reuse(account_row_model)]
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct AccountWithTokenRowModel {
     pub token_hash: Vec<u8>,
 }
 
+#[cfg(feature = "sqlx")]
 impl From<AccountRowModel> for Account {
     fn from(value: AccountRowModel) -> Self {
         Account {
@@ -117,6 +123,7 @@ impl From<AccountRowModel> for Account {
     }
 }
 
+#[cfg(feature = "sqlx")]
 impl From<AccountWithTokenRowModel> for Account {
     fn from(value: AccountWithTokenRowModel) -> Self {
         Account {

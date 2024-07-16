@@ -25,6 +25,9 @@ doctest = false
 default = ["arrow"]
 arrow = ["dep:arrow"]
 sqlx = ["dep:sqlx"]
+sqlx-mysql = ["sqlx", "sqlx/mysql"]
+sqlx-postgres = ["sqlx", "sqlx/postgres"]
+sqlx-sqlite = ["sqlx", "sqlx/sqlite"]
 
 
 [dependencies]

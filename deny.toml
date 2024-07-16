@@ -16,9 +16,20 @@ features = [
     { name = "opendatafabric", allow = [
         "default",
         "sqlx",
+        "sqlx-mysql",
+        "sqlx-postgres",
+        "sqlx-sqlite",
     ] },
     { name = "kamu", allow = [
         "default",
+    ] },
+    { name = "kamu-accounts", allow = [
+        "default",
+        "sqlx",
+    ] },
+    { name = "kamu-datasets", allow = [
+        "default",
+        "sqlx",
     ] },
     { name = "kamu-cli", allow = [
         "default",

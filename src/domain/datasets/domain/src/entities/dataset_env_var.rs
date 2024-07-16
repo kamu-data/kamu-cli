@@ -135,6 +135,7 @@ impl DatasetEnvVar {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg(feature = "sqlx")]
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct DatasetEnvVarRowModel {
     pub id: Uuid,
@@ -145,6 +146,7 @@ pub struct DatasetEnvVarRowModel {
     pub dataset_id: DatasetID,
 }
 
+#[cfg(feature = "sqlx")]
 impl From<DatasetEnvVarRowModel> for DatasetEnvVar {
     fn from(value: DatasetEnvVarRowModel) -> Self {
         DatasetEnvVar {

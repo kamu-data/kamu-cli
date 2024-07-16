@@ -161,6 +161,7 @@ pub enum DecodeTokenError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg(feature = "sqlx")]
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct AccessTokenRowModel {
     pub id: Uuid,
@@ -171,6 +172,7 @@ pub struct AccessTokenRowModel {
     pub account_id: AccountID,
 }
 
+#[cfg(feature = "sqlx")]
 impl From<AccessTokenRowModel> for AccessToken {
     fn from(value: AccessTokenRowModel) -> Self {
         AccessToken {
