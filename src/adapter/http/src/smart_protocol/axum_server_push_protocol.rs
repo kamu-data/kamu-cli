@@ -10,7 +10,6 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 
-use axum::extract::ws::Message;
 use event_bus::EventBus;
 use kamu::domain::events::DatasetEventDependenciesUpdated;
 use kamu::domain::{
@@ -71,7 +70,7 @@ impl AxumServerPushProtocolInstance {
         }
     }
 
-    pub async fn serve(mut self) {
+    pub async fn serve(self) {
         match self.push_main_flow().await {
             Ok(_) => {
                 tracing::debug!("Push process success");
@@ -80,14 +79,9 @@ impl AxumServerPushProtocolInstance {
                 tracing::debug!("Push process aborted with error: {}", e);
             }
         }
-        while let Some(msg) = self.socket.recv().await {
-            if let Ok(Message::Close(_)) = msg {
-                break;
-            }
-        }
     }
 
-    async fn push_main_flow(&mut self) -> Result<(), PushServerError> {
+    async fn push_main_flow(mut self) -> Result<(), PushServerError> {
         let push_request = self.handle_push_request_initiation().await?;
         let force_update_if_diverged = push_request.force_update_if_diverged;
 
@@ -121,7 +115,7 @@ impl AxumServerPushProtocolInstance {
                     Ok(create_result) => self.dataset = Some(create_result.dataset),
                     Err(err) => {
                         if let CreateDatasetError::RefCollision(err) = &err {
-                            axum_write_payload::<DatasetPushObjectsTransferResponse>(
+                            axum_write_close_payload::<DatasetPushObjectsTransferResponse>(
                                 &mut self.socket,
                                 DatasetPushObjectsTransferResponse::Err(
                                     DatasetPushObjectsTransferError::RefCollision(

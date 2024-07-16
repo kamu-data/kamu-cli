@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use axum::extract::ws::Message;
+use axum::extract::ws::{CloseFrame, Message};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -40,6 +40,26 @@ pub(crate) async fn axum_write_payload<TMessagePayload: Serialize>(
     let payload_as_json_string = ws_common::payload_to_json::<TMessagePayload>(payload)?;
 
     let message = axum::extract::ws::Message::Text(payload_as_json_string);
+    let send_result = socket.send(message).await;
+    match send_result {
+        Ok(_) => Ok(()),
+        Err(e) => Err(WriteMessageError::SocketError(Box::new(e))),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn axum_write_close_payload<TMessagePayload: Serialize>(
+    socket: &mut axum::extract::ws::WebSocket,
+    payload: TMessagePayload,
+) -> Result<(), WriteMessageError> {
+    let payload_as_json_string = ws_common::payload_to_json::<TMessagePayload>(payload)?;
+    let close_frame = CloseFrame {
+        code: 1011,
+        reason: payload_as_json_string.into(),
+    };
+
+    let message = axum::extract::ws::Message::Close(Some(close_frame));
     let send_result = socket.send(message).await;
     match send_result {
         Ok(_) => Ok(()),
