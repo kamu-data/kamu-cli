@@ -4,13 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-### Changed
-- E2E: unblocked parallel run for tests
+## [0.191.0] - 2024-07-16
 ### Fixed
 - Obscure error during push duplicate dataset with different aliases
 - Get Data Panel: fixed `base_url_rest` calculation  in case the API server is started on a random port
 - Minor corrections to references in generated code documentation
+### Changed
+- Upgraded `rustc` version and some dependencies
+- E2E: unblocked parallel run for tests
 
 ## [0.190.1] - 2024-07-10
 ### Fixed
