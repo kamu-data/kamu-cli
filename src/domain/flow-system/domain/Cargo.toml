@@ -47,4 +47,4 @@ serde_with = { version = "3", default-features = false, features = [
 ] }
 
 [dev-dependencies]
-datafusion = { version = "39", default-features = false }
+datafusion = { version = "41", default-features = false }

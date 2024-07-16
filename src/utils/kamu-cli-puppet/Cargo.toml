@@ -46,8 +46,10 @@ kamu-data-utils = { optional = true, workspace = true }
 opendatafabric = { optional = true, workspace = true }
 
 async-trait = { optional = true, version = "0.1" }
-datafusion = { optional = true, version = "39", default-features = false }
-serde = { optional = true, version = "1", default-features = false, features = ["derive"] }
+datafusion = { optional = true, version = "41", default-features = false }
+serde = { optional = true, version = "1", default-features = false, features = [
+    "derive",
+] }
 serde_json = { optional = true, version = "1" }
 
 

@@ -105,6 +105,7 @@ impl Reader for ReaderCsv {
         let options = CsvReadOptions {
             schema: self.schema.as_ref(),
             delimiter,
+            comment: None,
             has_header: self.conf.header.unwrap_or(false),
             schema_infer_max_records: if self.conf.infer_schema.unwrap_or(false) {
                 Self::DEFAULT_INFER_SCHEMA_ROWS
@@ -120,6 +121,8 @@ impl Reader for ReaderCsv {
             // re-compress it.
             file_compression_type: FileCompressionType::UNCOMPRESSED,
             file_sort_order: Vec::new(),
+            // TODO: Expose in ODF
+            newlines_in_values: false,
         };
 
         let df = self

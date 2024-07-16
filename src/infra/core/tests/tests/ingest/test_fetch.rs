@@ -22,8 +22,6 @@ use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use opendatafabric::*;
 use url::Url;
 
-use crate::MqttBroker;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // URL: file
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -386,7 +384,7 @@ async fn test_fetch_url_http_env_interpolation() {
 // URL: ftp
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg(feature = "ftp")]
+#[cfg(feature = "ingest-ftp")]
 #[test_group::group(containerized, flaky)]
 #[tokio::test]
 async fn test_fetch_url_ftp_ok() {
@@ -662,6 +660,7 @@ async fn test_fetch_files_glob() {
 // MQTT
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg(feature = "ingest-mqtt")]
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_fetch_mqtt_empty() {
@@ -669,7 +668,7 @@ async fn test_fetch_mqtt_empty() {
 
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
-    let broker = MqttBroker::new().await;
+    let broker = crate::MqttBroker::new().await;
 
     let fetch_step = FetchStep::Mqtt(FetchStepMqtt {
         host: "localhost".to_string(),
@@ -704,6 +703,7 @@ async fn test_fetch_mqtt_empty() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg(feature = "ingest-mqtt")]
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_fetch_mqtt_one_record() {
@@ -711,7 +711,7 @@ async fn test_fetch_mqtt_one_record() {
 
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
-    let broker = MqttBroker::new().await;
+    let broker = crate::MqttBroker::new().await;
     let topic = "test-topic";
 
     // Publish one (retained) event

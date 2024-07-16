@@ -29,10 +29,13 @@ doctest = false
 
 
 [features]
-default = []
+default = ["kamu/ingest-evm", "kamu/ingest-mqtt", "kamu/query-extensions-json"]
 
 web-ui = ["rust-embed"]
-ftp = ["kamu/ftp"]
+ingest-evm = ["kamu/ingest-evm"]
+ingest-ftp = ["kamu/ingest-ftp"]
+ingest-mqtt = ["kamu/ingest-mqtt"]
+query-extensions-json = ["kamu/query-extensions-json"]
 
 
 [dependencies]
@@ -145,7 +148,7 @@ tracing-bunyan-formatter = "0.3"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1" # Conditional compilation
-datafusion = { version = "39", default-features = false, features = [
+datafusion = { version = "41", default-features = false, features = [
     "crypto_expressions",
     "encoding_expressions",
     "parquet",
@@ -181,7 +184,9 @@ libc = "0.2" # For getting uid:gid
 
 
 [dev-dependencies]
-kamu-cli-puppet = { workspace = true, default-features = false, features = ["extensions"] }
+kamu-cli-puppet = { workspace = true, default-features = false, features = [
+    "extensions",
+] }
 
 pretty_assertions = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
