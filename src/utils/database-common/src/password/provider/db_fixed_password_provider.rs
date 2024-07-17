@@ -9,7 +9,7 @@
 
 use dill::*;
 use internal_error::InternalError;
-use secrecy::Secret;
+use secrecy::SecretString;
 
 use crate::{DatabaseCredentials, DatabasePasswordProvider};
 
@@ -18,12 +18,12 @@ use crate::{DatabaseCredentials, DatabasePasswordProvider};
 #[component(pub)]
 #[interface(dyn DatabasePasswordProvider)]
 pub struct DatabaseFixedPasswordProvider {
-    db_user_name: Secret<String>,
-    fixed_password: Secret<String>,
+    db_user_name: SecretString,
+    fixed_password: SecretString,
 }
 
 impl DatabaseFixedPasswordProvider {
-    pub fn new(db_user_name: Secret<String>, fixed_password: Secret<String>) -> Self {
+    pub fn new(db_user_name: SecretString, fixed_password: SecretString) -> Self {
         Self {
             db_user_name,
             fixed_password,

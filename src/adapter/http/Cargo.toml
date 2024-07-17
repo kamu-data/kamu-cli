@@ -34,10 +34,10 @@ kamu-data-utils = { workspace = true }
 opendatafabric = { workspace = true }
 time-source = { workspace = true }
 
-aws-sdk-s3 = { version = "0.35" }
+aws-sdk-s3 = { version = "1" }
 
-axum = { version = "0.6", features = ["ws", "headers", "multipart"] }
-axum-extra = { version = "0.8", features = ["async-read-body"] }
+axum = { version = "0.7", features = ["ws", "multipart"] }
+axum-extra = { version = "0.9", features = ["async-read-body"] }
 async-trait = "0.1"
 base64 = { version = "0.22", default-features = false }
 bytes = "1"
@@ -52,9 +52,9 @@ ed25519-dalek = { version = "2", default-features = false, features = [
 ] }
 flate2 = "1" # GZip decoder
 futures = "0.3"
-http = "0.2"
-hyper = "0.14"
-reqwest = { version = "0.11", default-features = false, features = [
+http = "1"
+hyper = "1"
+reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls",
     "multipart",
     "json",
@@ -76,8 +76,8 @@ tokio-util = { version = "0.7", default-features = false, features = [
     "compat",
     "io",
 ] }
-tokio-tungstenite = { version = "0.20", features = ["rustls-tls-native-roots"] }
-tower = "0.4"
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-native-roots"] }
+tower = "0.5"
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["v4"] }
@@ -101,7 +101,7 @@ tempfile = "3"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tower-http = { version = "0.4", features = ["trace", "cors"] }
+tower-http = { version = "0.5", features = ["trace", "cors"] }
 rand = "0.8"
 sha3 = "0.10"
-mockall = "0.11"
+mockall = "0.13"

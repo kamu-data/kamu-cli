@@ -45,5 +45,5 @@ tracing = { version = "0.1", default-features = false }
 kamu-task-system-inmem = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
-mockall = "0.11"
+mockall = "0.13"
 test-log = { version = "0.2", features = ["trace"] }

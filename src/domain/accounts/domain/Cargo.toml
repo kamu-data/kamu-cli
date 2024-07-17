@@ -39,7 +39,7 @@ crc32fast = { version = "1.4.2" }
 jsonwebtoken = "9"
 lazy_static = { version = "1" }
 merge = "0.1"
-mockall = "0.11"
+mockall = "0.13"
 rand = "0.8"
 reusable = "0.1"
 serde = "1"

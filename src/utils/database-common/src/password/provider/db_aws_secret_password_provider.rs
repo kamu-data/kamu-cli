@@ -11,7 +11,7 @@ use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_secretsmanager::Client;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use secrecy::Secret;
+use secrecy::SecretString;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -52,8 +52,8 @@ impl DatabasePasswordProvider for DatabaseAwsSecretPasswordProvider {
                 let secret_value =
                     serde_json::from_str::<AwsRdsSecretValue>(secret_string).int_err()?;
                 Ok(Some(DatabaseCredentials {
-                    user_name: Secret::new(secret_value.username.clone()),
-                    password: Secret::new(secret_value.password.clone()),
+                    user_name: SecretString::from(secret_value.username.clone()),
+                    password: SecretString::from(secret_value.password.clone()),
                 }))
             }
             None => Err(AwsSecretNotFoundError {

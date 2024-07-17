@@ -106,25 +106,25 @@ minus = { version = "5", features = ["static_output", "search"] }
 num-format = "0.4"                                                # Human-readable number formatting
 prettytable-rs = "0.10"                                           # ASCII table formatting
 read_input = "0.8"                                                # Basic user input
-webbrowser = "0.8"                                                # For opening URLs in default system browser
+webbrowser = "1"                                                  # For opening URLs in default system browser
 
 # APIs
 arrow-flight = { version = "53", features = ["flight-sql-experimental"] }
-async-graphql = { version = "6", features = [
+async-graphql = { version = "7", features = [
     "chrono",
     "url",
     "apollo_tracing",
 ] }
-async-graphql-axum = "6"
-axum = { version = "0.6", features = ["ws"] }
-axum-extra = { version = "0.8", features = ["async-read-body"] }
-http = "0.2"
-hyper = "0.14"
-reqwest = { version = "0.11", default-features = false, features = [] }
+async-graphql-axum = "7"
+axum = { version = "0.7", features = ["ws"] }
+axum-extra = { version = "0.9", features = ["async-read-body"] }
+http = "1"
+hyper = "1"
+reqwest = { version = "0.12", default-features = false, features = [] }
 serde_json = "1"
 tonic = { version = "0.12", default-features = false }
-tower = "0.4"
-tower-http = { version = "0.4", features = ["trace", "cors"] }
+tower = "0.5"
+tower-http = { version = "0.5", features = ["trace", "cors"] }
 
 # Web UI
 rust-embed = { optional = true, version = "8", features = [
@@ -135,7 +135,7 @@ mime = "0.3"
 mime_guess = "2"
 
 # Config
-duration-string = { version = "0.3", features = ["serde"] }
+duration-string = { version = "0.4", features = ["serde"] }
 merge = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_with = "3"
@@ -177,7 +177,7 @@ indoc = "2"
 itertools = "0.13"
 libc = "0.2" # Signal names
 regex = "1"
-secrecy = "0.8"
+secrecy = "0.10"
 shlex = "1" # Parsing partial input for custom completions
 signal-hook = "0.3" # Signal handling
 tokio = { version = "1", default-features = false, features = ["io-util"] }

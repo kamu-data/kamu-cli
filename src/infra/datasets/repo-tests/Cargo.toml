@@ -29,6 +29,5 @@ opendatafabric = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
 dill = "0.9"
-secrecy = "0.8"
+secrecy = "0.10"
 uuid = "1"
-

@@ -13,7 +13,7 @@ use chrono::Utc;
 use dill::*;
 use hmac::{Hmac, Mac};
 use internal_error::{InternalError, ResultIntoInternal};
-use secrecy::{ExposeSecret, Secret};
+use secrecy::{ExposeSecret, SecretString};
 use sha2::{Digest, Sha256};
 
 use crate::{DatabaseConnectionSettings, DatabaseCredentials, DatabasePasswordProvider};
@@ -23,13 +23,13 @@ use crate::{DatabaseConnectionSettings, DatabaseCredentials, DatabasePasswordPro
 #[component(pub)]
 #[interface(dyn DatabasePasswordProvider)]
 pub struct DatabaseAwsIamTokenProvider {
-    db_user_name: Secret<String>,
+    db_user_name: SecretString,
     db_connection_settings: DatabaseConnectionSettings,
 }
 
 impl DatabaseAwsIamTokenProvider {
     pub fn new(
-        db_user_name: Secret<String>,
+        db_user_name: SecretString,
         db_connection_settings: DatabaseConnectionSettings,
     ) -> Self {
         Self {
@@ -111,7 +111,7 @@ impl DatabasePasswordProvider for DatabaseAwsIamTokenProvider {
 
         Ok(Some(DatabaseCredentials {
             user_name: self.db_user_name.clone(),
-            password: Secret::new(token),
+            password: SecretString::from(token),
         }))
     }
 }
