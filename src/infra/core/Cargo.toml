@@ -62,8 +62,8 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { version = "39", default-features = false }
-datafusion-functions-json = { version = "0.2", default-features = false }
+datafusion-ethers = { version = "40" }
+datafusion-functions-json = { version = "0.2", git = "https://github.com/datafusion-contrib/datafusion-functions-json", rev = "efe0491d2e5048611cbbf6f9ab73f89d93bc762f" }
 flate2 = "1" # GZip decoder
 reqwest = { version = "0.11", default-features = false, features = [
     "json",
@@ -80,7 +80,7 @@ secrecy = "0.8"
 zip = "0.6"
 
 # Data
-datafusion = { version = "39", default-features = false }
+datafusion = { version = "40", default-features = false }
 digest = "0.10"
 object_store = { version = "0.10", features = ["aws"] }
 parking_lot = { version = "0.12" }
