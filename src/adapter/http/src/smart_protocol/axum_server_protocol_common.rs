@@ -55,6 +55,7 @@ pub(crate) async fn axum_write_close_payload<TMessagePayload: Serialize>(
 ) -> Result<(), WriteMessageError> {
     let payload_as_json_string = ws_common::payload_to_json::<TMessagePayload>(payload)?;
     let close_frame = CloseFrame {
+        // Code will be mapped CloseCode::Error type on client side
         code: 1011,
         reason: payload_as_json_string.into(),
     };
