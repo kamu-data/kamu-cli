@@ -9,6 +9,7 @@
 
 use std::collections::VecDeque;
 use std::sync::Arc;
+use std::time::Duration;
 
 use event_bus::EventBus;
 use kamu::domain::events::DatasetEventDependenciesUpdated;
@@ -70,7 +71,7 @@ impl AxumServerPushProtocolInstance {
         }
     }
 
-    pub async fn serve(self) {
+    pub async fn serve(mut self) {
         match self.push_main_flow().await {
             Ok(_) => {
                 tracing::debug!("Push process success");
@@ -79,9 +80,21 @@ impl AxumServerPushProtocolInstance {
                 tracing::debug!("Push process aborted with error: {}", e);
             }
         }
+
+        // After we finish processing to ensure gracefull closing
+        // we wait for client acknowledgment. And to handle
+        // custom clients without logic of close acknowledgment
+        // we will give 5 secs timeout
+        let timeout_duration = Duration::from_secs(5);
+        tokio::select! {
+            _ = wait_for_close(&mut self.socket) => {}
+            _ = tokio::time::sleep(timeout_duration) => {
+                tracing::debug!("Timeout reached, closing connection");
+            }
+        };
     }
 
-    async fn push_main_flow(mut self) -> Result<(), PushServerError> {
+    async fn push_main_flow(&mut self) -> Result<(), PushServerError> {
         let push_request = self.handle_push_request_initiation().await?;
         let force_update_if_diverged = push_request.force_update_if_diverged;
 
@@ -115,7 +128,7 @@ impl AxumServerPushProtocolInstance {
                     Ok(create_result) => self.dataset = Some(create_result.dataset),
                     Err(err) => {
                         if let CreateDatasetError::RefCollision(err) = &err {
-                            axum_write_payload::<DatasetPushObjectsTransferResponse>(
+                            axum_write_close_payload::<DatasetPushObjectsTransferResponse>(
                                 &mut self.socket,
                                 DatasetPushObjectsTransferResponse::Err(
                                     DatasetPushObjectsTransferError::RefCollision(
@@ -132,7 +145,6 @@ impl AxumServerPushProtocolInstance {
                                     PushPhase::InitialRequest,
                                 ))
                             })?;
-                            return Ok(());
                         };
                         return Err(err.int_err().into());
                     }

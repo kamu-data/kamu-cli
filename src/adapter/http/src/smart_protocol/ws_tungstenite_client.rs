@@ -24,6 +24,7 @@ use opendatafabric::{AsTypedBlock, Multihash};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::net::TcpStream;
+use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use url::Url;
@@ -866,6 +867,14 @@ async fn read_payload<TMessagePayload: DeserializeOwned>(
         Some(msg) => match msg {
             Ok(Message::Text(raw_message)) => {
                 ws_common::parse_payload::<TMessagePayload>(raw_message.as_str())
+            }
+            Ok(Message::Close(close_frame_maybe)) => {
+                if let Some(close_frame) = close_frame_maybe
+                    && close_frame.code == CloseCode::Error
+                {
+                    return ws_common::parse_payload::<TMessagePayload>(&close_frame.reason);
+                }
+                Err(ReadMessageError::ClientDisconnected)
             }
             Ok(_) => Err(ReadMessageError::NonTextMessageReceived),
             Err(e) => Err(ReadMessageError::SocketError(Box::new(e))),
