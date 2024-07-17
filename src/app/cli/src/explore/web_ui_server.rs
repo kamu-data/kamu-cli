@@ -59,6 +59,7 @@ struct WebUILoginInstructions {
 struct WebUIFeatureFlags {
     enable_logout: bool,
     enable_scheduling: bool,
+    enable_dataset_env_vars_managment: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -80,6 +81,7 @@ impl WebUIServer {
         current_account_name: AccountName,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         file_upload_limit_config: Arc<FileUploadLimitConfig>,
+        enable_dataset_env_vars_managment: bool,
         address: Option<IpAddr>,
         port: Option<u16>,
     ) -> Self {
@@ -121,6 +123,7 @@ impl WebUIServer {
                 enable_logout: false,
                 // No way to configure scheduling of datasets
                 enable_scheduling: false,
+                enable_dataset_env_vars_managment,
             },
         };
 

@@ -34,7 +34,10 @@ opendatafabric = { workspace = true }
 aes-gcm = { version = "0.10.3" }
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
+merge = "0.1"
 secrecy = "0.8"
+serde = "1"
+serde_with = { version = "3", default-features = false }
 thiserror = { version = "1", default-features = false }
 uuid = { version = "1", default-features = false, features = ["v4"] }
 

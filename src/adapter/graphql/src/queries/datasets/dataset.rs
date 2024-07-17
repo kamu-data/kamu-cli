@@ -13,6 +13,7 @@ use opendatafabric as odf;
 
 use crate::prelude::*;
 use crate::queries::*;
+use crate::utils::ensure_dataset_env_vars_mode;
 
 #[derive(Debug, Clone)]
 pub struct Dataset {
@@ -99,8 +100,11 @@ impl Dataset {
     }
 
     /// Access to the environment variable of this dataset
-    async fn env_vars(&self) -> DatasetEnvVars {
-        DatasetEnvVars::new(self.dataset_handle.clone())
+    #[allow(clippy::unused_async)]
+    async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVars> {
+        ensure_dataset_env_vars_mode(ctx)?;
+
+        Ok(DatasetEnvVars::new(self.dataset_handle.clone()))
     }
 
     /// Access to the flow configurations of this dataset

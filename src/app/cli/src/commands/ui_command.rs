@@ -19,6 +19,7 @@ use dill::Catalog;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::PredefinedAccountsConfig;
 use kamu_adapter_http::FileUploadLimitConfig;
+use kamu_datasets::{DatasetEnvVarsConfig, DatasetEnvVarsType};
 use opendatafabric::AccountName;
 
 use super::{CLIError, Command};
@@ -33,6 +34,7 @@ pub struct UICommand {
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     file_upload_limit_config: Arc<FileUploadLimitConfig>,
     output_config: Arc<OutputConfig>,
+    dataset_env_vars_config: Arc<DatasetEnvVarsConfig>,
     address: Option<IpAddr>,
     port: Option<u16>,
     get_token: bool,
@@ -46,6 +48,7 @@ impl UICommand {
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         file_upload_limit_config: Arc<FileUploadLimitConfig>,
         output_config: Arc<OutputConfig>,
+        dataset_env_vars_config: Arc<DatasetEnvVarsConfig>,
         address: Option<IpAddr>,
         port: Option<u16>,
         get_token: bool,
@@ -57,6 +60,7 @@ impl UICommand {
             predefined_accounts_config,
             file_upload_limit_config,
             output_config,
+            dataset_env_vars_config,
             address,
             port,
             get_token,
@@ -74,6 +78,7 @@ impl Command for UICommand {
             self.current_account_name.clone(),
             self.predefined_accounts_config.clone(),
             self.file_upload_limit_config.clone(),
+            self.dataset_env_vars_config.mode == DatasetEnvVarsType::Storage,
             self.address,
             self.port,
         )

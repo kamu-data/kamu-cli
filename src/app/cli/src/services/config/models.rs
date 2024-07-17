@@ -12,6 +12,7 @@ use database_common::DatabaseProvider;
 use duration_string::DurationString;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
+use kamu_datasets::DatasetEnvVarsConfig;
 use merge::Merge;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -51,7 +52,8 @@ pub struct CLIConfig {
     pub uploads: Option<UploadsConfig>,
 
     /// Dataset environment variables configuration
-    pub dataset_env_vars: Option<DatasetEnvVarsType>,
+    #[merge(strategy = merge_recursive)]
+    pub dataset_env_vars: Option<DatasetEnvVarsConfig>,
 }
 
 impl CLIConfig {
@@ -81,7 +83,7 @@ impl CLIConfig {
             users: Some(PredefinedAccountsConfig::sample()),
             database: Some(DatabaseConfig::sample()),
             uploads: Some(UploadsConfig::sample()),
-            dataset_env_vars: Some(DatasetEnvVarsType::sample()),
+            dataset_env_vars: Some(DatasetEnvVarsConfig::sample()),
         }
     }
 }
@@ -96,7 +98,7 @@ impl Default for CLIConfig {
             users: Some(PredefinedAccountsConfig::default()),
             database: None,
             uploads: Some(UploadsConfig::default()),
-            dataset_env_vars: Some(DatasetEnvVarsType::default()),
+            dataset_env_vars: Some(DatasetEnvVarsConfig::default()),
         }
     }
 }
@@ -633,27 +635,6 @@ impl Default for UploadsConfig {
         Self {
             max_file_size_in_mb: Some(50),
         }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum DatasetEnvVarsType {
-    Static,
-    Storage,
-}
-
-impl DatasetEnvVarsType {
-    pub fn sample() -> Self {
-        Default::default()
-    }
-}
-
-impl Default for DatasetEnvVarsType {
-    fn default() -> Self {
-        Self::Static
     }
 }
 

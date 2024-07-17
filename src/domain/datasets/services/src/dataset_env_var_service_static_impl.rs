@@ -9,7 +9,7 @@
 
 use database_common::DatabasePaginationOpts;
 use dill::*;
-use kamu_core::ErrorIntoInternal;
+use kamu_core::{ErrorIntoInternal, InternalError};
 use kamu_datasets::{
     DatasetEnvVar,
     DatasetEnvVarListing,
@@ -67,6 +67,13 @@ impl DatasetEnvVarService for DatasetEnvVarServiceStaticImpl {
         &self,
         _dataset_env_var_id: &Uuid,
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
+        unreachable!()
+    }
+
+    async fn get_exposed_value(
+        &self,
+        _dataset_env_var: &DatasetEnvVar,
+    ) -> Result<String, InternalError> {
         unreachable!()
     }
 

@@ -19,7 +19,7 @@ use kamu_datasets::{
     DeleteDatasetEnvVarError,
     GetDatasetEnvVarError,
     ModifyDatasetEnvVarError,
-    DATASET_ENV_VAR_ENCRYPTION_KEY_VAR,
+    SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY,
 };
 use opendatafabric::DatasetID;
 use secrecy::Secret;
@@ -61,11 +61,6 @@ pub async fn test_missing_dataset_env_var_not_found(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_insert_and_get_dataset_env_var(catalog: &Catalog) {
-    std::env::set_var(
-        DATASET_ENV_VAR_ENCRYPTION_KEY_VAR,
-        "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC",
-    );
-
     let dataset_env_var_repo = catalog.get_one::<dyn DatasetEnvVarRepository>().unwrap();
     let dataset_env_var_key = "foo";
     let dataset_env_var_key_string = "foo_value".to_string();
@@ -78,6 +73,7 @@ pub async fn test_insert_and_get_dataset_env_var(catalog: &Catalog) {
         Utc::now().round_subsecs(6),
         &dataset_env_var_value,
         &dataset_id,
+        SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY,
     )
     .unwrap();
     let save_result = dataset_env_var_repo
@@ -114,10 +110,6 @@ pub async fn test_insert_and_get_dataset_env_var(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
-    std::env::set_var(
-        DATASET_ENV_VAR_ENCRYPTION_KEY_VAR,
-        "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC",
-    );
     let dataset_env_var_repo = catalog.get_one::<dyn DatasetEnvVarRepository>().unwrap();
     let secret_dataset_env_var_key = "foo";
     let secret_dataset_env_var_key_string = "foo_value".to_string();
@@ -130,6 +122,7 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
         Utc::now().round_subsecs(6),
         &secret_dataset_env_var_value,
         &dataset_id,
+        SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY,
     )
     .unwrap();
 
@@ -142,6 +135,7 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
         Utc::now().round_subsecs(6),
         &dataset_env_var_value,
         &dataset_id,
+        SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY,
     )
     .unwrap();
 
@@ -182,10 +176,6 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
-    std::env::set_var(
-        DATASET_ENV_VAR_ENCRYPTION_KEY_VAR,
-        "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC",
-    );
     let dataset_env_var_repo = catalog.get_one::<dyn DatasetEnvVarRepository>().unwrap();
 
     let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
@@ -194,6 +184,7 @@ pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
         Utc::now().round_subsecs(6),
         &DatasetEnvVarValue::Regular("foo".to_string()),
         &dataset_id,
+        SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY,
     )
     .unwrap();
     let new_bar_dataset_env_var = DatasetEnvVar::new(
@@ -201,6 +192,7 @@ pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
         Utc::now().round_subsecs(6),
         &DatasetEnvVarValue::Regular("bar".to_string()),
         &dataset_id,
+        SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY,
     )
     .unwrap();
     let save_result = dataset_env_var_repo
@@ -241,10 +233,6 @@ pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_modify_dataset_env_vars(catalog: &Catalog) {
-    std::env::set_var(
-        DATASET_ENV_VAR_ENCRYPTION_KEY_VAR,
-        "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC",
-    );
     let dataset_env_var_repo = catalog.get_one::<dyn DatasetEnvVarRepository>().unwrap();
 
     let new_dataset_env_var = DatasetEnvVar::new(
@@ -252,6 +240,7 @@ pub async fn test_modify_dataset_env_vars(catalog: &Catalog) {
         Utc::now().round_subsecs(6),
         &DatasetEnvVarValue::Regular("foo".to_string()),
         &DatasetID::new_seeded_ed25519(b"foo"),
+        SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY,
     )
     .unwrap();
     let save_result = dataset_env_var_repo
@@ -265,7 +254,10 @@ pub async fn test_modify_dataset_env_vars(catalog: &Catalog) {
 
     assert_matches!(modify_result, Err(ModifyDatasetEnvVarError::NotFound(_)));
     let (new_value, new_nonce) = new_dataset_env_var
-        .generate_new_value(&DatasetEnvVarValue::Regular("new_foo".to_string()))
+        .generate_new_value(
+            &DatasetEnvVarValue::Regular("new_foo".to_string()),
+            SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY,
+        )
         .unwrap();
 
     let modify_result = dataset_env_var_repo
@@ -284,7 +276,9 @@ pub async fn test_modify_dataset_env_vars(catalog: &Catalog) {
         .unwrap();
     assert_eq!(db_dataset_env_var.secret_nonce, new_nonce);
     assert_eq!(
-        db_dataset_env_var.get_exposed_value().unwrap(),
+        db_dataset_env_var
+            .get_exposed_value(SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY)
+            .unwrap(),
         std::str::from_utf8(new_value.as_slice()).unwrap()
     );
 }

@@ -20,9 +20,9 @@ use kamu_accounts::*;
 use kamu_accounts_services::PredefinedAccountsRegistrator;
 use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
+use kamu_datasets::{DatasetEnvVar, DatasetEnvVarsType};
 
 use crate::accounts::AccountService;
-use crate::config::DatasetEnvVarsType;
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
@@ -572,11 +572,25 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(FileUploadLimitConfig::new_in_mb(
         uploads_config.max_file_size_in_mb.unwrap(),
     ));
-    match config.dataset_env_vars.as_ref().unwrap() {
+
+    catalog_builder.add_value(config.dataset_env_vars.clone().unwrap());
+
+    let dataset_env_vars_config = config.dataset_env_vars.as_ref().unwrap();
+    match dataset_env_vars_config.mode.as_ref().unwrap() {
         DatasetEnvVarsType::Static => {
             catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceStaticImpl>()
         }
         DatasetEnvVarsType::Storage => {
+            if dataset_env_vars_config.encryption_key.is_none() {
+                panic!("Dataset env var ecryption key is required");
+            }
+            if DatasetEnvVar::try_asm_256_gcm_from_str(
+                dataset_env_vars_config.encryption_key.as_ref().unwrap(),
+            )
+            .is_err()
+            {
+                panic!("Invalid dataset env var ecryption key");
+            }
             catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>()
         }
     };

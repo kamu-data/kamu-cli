@@ -46,7 +46,9 @@ impl DatasetEnvVars {
                 GetDatasetEnvVarError::Internal(err) => GqlError::Internal(err),
             })?;
 
-        Ok(dataset_env_var.get_exposed_value().int_err()?)
+        Ok(dataset_env_var_service
+            .get_exposed_value(&dataset_env_var)
+            .await?)
     }
 
     async fn list_env_variables(

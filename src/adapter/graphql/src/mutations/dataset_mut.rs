@@ -14,6 +14,7 @@ use opendatafabric as odf;
 
 use super::{DatasetEnvVarsMut, DatasetFlowsMut, DatasetMetadataMut};
 use crate::prelude::*;
+use crate::utils::ensure_dataset_env_vars_mode;
 use crate::LoggedInGuard;
 
 #[derive(Debug, Clone)]
@@ -39,8 +40,11 @@ impl DatasetMut {
     }
 
     /// Access to the mutable flow configurations of this dataset
-    async fn env_vars(&self) -> DatasetEnvVarsMut {
-        DatasetEnvVarsMut::new(self.dataset_handle.clone())
+    #[allow(clippy::unused_async)]
+    async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVarsMut> {
+        ensure_dataset_env_vars_mode(ctx)?;
+
+        Ok(DatasetEnvVarsMut::new(self.dataset_handle.clone()))
     }
 
     /// Rename the dataset
