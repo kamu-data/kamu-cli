@@ -69,3 +69,14 @@ pub(crate) async fn axum_write_close_payload<TMessagePayload: Serialize>(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn wait_for_close(socket: &mut axum::extract::ws::WebSocket) {
+    while let Some(msg) = socket.recv().await {
+        match msg {
+            Ok(Message::Close(_)) | Err(_) => {
+                break;
+            }
+            Ok(_) => {}
+        }
+    }
+}
