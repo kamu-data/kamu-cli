@@ -582,7 +582,7 @@ pub fn register_config_in_catalog(
         }
         DatasetEnvVarsType::Storage => {
             assert!(
-                !dataset_env_vars_config.encryption_key.is_none(),
+                dataset_env_vars_config.encryption_key.is_some(),
                 "Dataset env var encryption key is required"
             );
             if DatasetEnvVar::try_asm_256_gcm_from_str(
