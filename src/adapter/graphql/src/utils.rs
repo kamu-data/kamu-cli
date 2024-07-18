@@ -14,6 +14,7 @@ use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
 use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{Dataset, DatasetRepository};
+use kamu_datasets::{DatasetEnvVarsConfig, DatasetEnvVarsType};
 use kamu_task_system as ts;
 use opendatafabric::{AccountName as OdfAccountName, DatasetHandle};
 
@@ -108,6 +109,18 @@ pub(crate) async fn get_task(
 ) -> Result<ts::TaskState, InternalError> {
     let task_scheduler = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
     task_scheduler.get_task(task_id).await.int_err()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn ensure_dataset_env_vars_mode(ctx: &Context<'_>) -> Result<(), GqlError> {
+    let dataset_env_vars_type = from_catalog::<DatasetEnvVarsConfig>(ctx).unwrap();
+    if dataset_env_vars_type.as_ref().mode.as_ref().unwrap() != &DatasetEnvVarsType::Storage {
+        return Err(GqlError::Gql(async_graphql::Error::new(
+            "API unavailable for static mode",
+        )));
+    }
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

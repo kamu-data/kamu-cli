@@ -12,20 +12,21 @@ use std::sync::Arc;
 use database_common::DatabasePaginationOpts;
 use dill::*;
 use internal_error::ResultIntoInternal;
-use kamu_core::{ErrorIntoInternal, SystemTimeSource};
+use kamu_core::{ErrorIntoInternal, InternalError, SystemTimeSource};
 use kamu_datasets::{
     DatasetEnvVar,
     DatasetEnvVarListing,
     DatasetEnvVarRepository,
     DatasetEnvVarService,
     DatasetEnvVarValue,
+    DatasetEnvVarsConfig,
     DeleteDatasetEnvVarError,
     GetDatasetEnvVarError,
     ModifyDatasetEnvVarError,
     SaveDatasetEnvVarError,
 };
 use opendatafabric::DatasetID;
-use secrecy::Secret;
+use secrecy::{ExposeSecret, Secret};
 use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,6 +34,7 @@ use uuid::Uuid;
 pub struct DatasetEnvVarServiceImpl {
     dataset_env_var_repository: Arc<dyn DatasetEnvVarRepository>,
     time_source: Arc<dyn SystemTimeSource>,
+    dataset_env_var_encryption_key: Secret<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,10 +46,18 @@ impl DatasetEnvVarServiceImpl {
     pub fn new(
         dataset_env_var_repository: Arc<dyn DatasetEnvVarRepository>,
         time_source: Arc<dyn SystemTimeSource>,
+        dataset_env_var_config: Arc<DatasetEnvVarsConfig>,
     ) -> Self {
         Self {
             dataset_env_var_repository,
             time_source,
+            dataset_env_var_encryption_key: Secret::new(
+                dataset_env_var_config
+                    .encryption_key
+                    .as_ref()
+                    .unwrap()
+                    .clone(),
+            ),
         }
     }
 }
@@ -67,6 +77,7 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
             self.time_source.now(),
             dataset_env_var_value,
             dataset_id,
+            self.dataset_env_var_encryption_key.expose_secret(),
         )
         .map_err(|err| SaveDatasetEnvVarError::Internal(err.int_err()))?;
         self.dataset_env_var_repository
@@ -85,9 +96,20 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
             .get_dataset_env_var_by_key_and_dataset_id(dataset_env_var_key, dataset_id)
             .await?;
 
-        Ok(Secret::new(existing_env_var.get_exposed_value().map_err(
-            |err| GetDatasetEnvVarError::Internal(err.int_err()),
-        )?))
+        Ok(Secret::new(
+            existing_env_var
+                .get_exposed_value(self.dataset_env_var_encryption_key.expose_secret())
+                .map_err(|err| GetDatasetEnvVarError::Internal(err.int_err()))?,
+        ))
+    }
+
+    async fn get_exposed_value(
+        &self,
+        dataset_env_var: &DatasetEnvVar,
+    ) -> Result<String, InternalError> {
+        dataset_env_var
+            .get_exposed_value(self.dataset_env_var_encryption_key.expose_secret())
+            .int_err()
     }
 
     async fn get_dataset_env_var_by_id(
@@ -149,7 +171,10 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
             })?;
 
         let (new_value, nonce) = existing_dataset_env_var
-            .generate_new_value(dataset_env_var_new_value)
+            .generate_new_value(
+                dataset_env_var_new_value,
+                self.dataset_env_var_encryption_key.expose_secret(),
+            )
             .int_err()
             .map_err(ModifyDatasetEnvVarError::Internal)?;
         self.dataset_env_var_repository

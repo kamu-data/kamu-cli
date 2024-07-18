@@ -17,7 +17,7 @@ use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_core::{auth, CreateDatasetResult, DatasetRepository, SystemTimeSourceDefault};
-use kamu_datasets::DATASET_ENV_VAR_ENCRYPTION_KEY_VAR;
+use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_datasets_inmem::DatasetEnvVarRepositoryInMemory;
 use kamu_datasets_services::DatasetEnvVarServiceImpl;
 use opendatafabric::DatasetKind;
@@ -336,15 +336,12 @@ impl DatasetEnvVarsHarness {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
-        std::env::set_var(
-            DATASET_ENV_VAR_ENCRYPTION_KEY_VAR,
-            "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC",
-        );
 
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<EventBus>()
+                .add_value(DatasetEnvVarsConfig::sample())
                 .add_builder(
                     DatasetRepositoryLocalFs::builder()
                         .with_root(datasets_dir)
