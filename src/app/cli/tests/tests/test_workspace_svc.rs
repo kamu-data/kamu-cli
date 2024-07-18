@@ -7,15 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
-use std::error::Error;
 use std::path::Path;
 
 use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
-use kamu_cli::testing::{CommandError, Kamu};
+use kamu_cli::testing::Kamu;
 use kamu_cli::*;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
@@ -44,12 +42,15 @@ async fn test_workspace_upgrade() {
         Some(WorkspaceVersion::V0_Initial)
     );
 
-    assert_matches!(
-        kamu.execute(["list"]).await,
-        Err(CommandError {
-            error: CLIError::UsageError(err),
-            ..
-        }) if err.source().unwrap().is::<WorkspaceUpgradeRequired>()
+    let assert = kamu.execute(["list"]).await.failure();
+    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+    assert!(
+        stderr.contains(
+            "Error: Workspace needs to be upgraded before continuing - please run `kamu system \
+             upgrade-workspace`"
+        ),
+        "Unexpected output:\n{stderr}",
     );
 
     // TODO: Restore this test upon the first upgrade post V5 breaking changes
