@@ -7,10 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
 use std::future::Future;
 
-use internal_error::InternalError;
 use kamu_cli::testing::{Kamu, NewWorkspaceOptions};
 use regex::Regex;
 use sqlx::types::chrono::{DateTime, NaiveTime, Utc};
@@ -187,13 +185,11 @@ impl KamuCliApiServerHarness {
     pub async fn execute_command<Fixture, FixtureResult>(self, fixture: Fixture)
     where
         Fixture: FnOnce(Kamu) -> FixtureResult,
-        FixtureResult: Future<Output = Result<(), InternalError>>,
+        FixtureResult: Future<Output = ()>,
     {
         let kamu = self.into_kamu().await;
 
-        let execute_result = fixture(kamu).await;
-
-        assert_matches!(execute_result, Ok(()));
+        fixture(kamu).await;
     }
 
     async fn into_kamu(self) -> Kamu {
