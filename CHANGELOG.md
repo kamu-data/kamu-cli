@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Changed
+- E2E: tests run `kamu-cli` child processes instead of `kamu-cli` compiled inside itself
+- E2E: update of the interfaces for interacting with puppet `kamu-cli`: stdout/stderr analysis is now available
+
+## Unreleased
 ### Fixed
 - Return `RootDatasetCompacted` error for manual triggered `EXECUTE_TRANSFROM` flows 
 ### Changed
