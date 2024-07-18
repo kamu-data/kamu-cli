@@ -178,21 +178,16 @@ impl Kamu {
         I: IntoIterator<Item = S>,
         S: AsRef<ffi::OsStr>,
     {
-        let mut command = assert_cmd::Command::cargo_bin("kamu-cli").unwrap();
+        self.execute_impl(cmd, None::<Vec<u8>>).await
+    }
 
-        command.current_dir(self.workspace_path.clone());
-
-        if let Some(system_time) = &self.system_time {
-            let system_time = system_time.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-
-            command.args(["--system-time", system_time.as_str()]);
-        }
-
-        command.args(cmd);
-
-        tokio::task::spawn_blocking(move || command.assert())
-            .await
-            .unwrap()
+    pub async fn execute_with_input<I, S, T>(&self, cmd: I, input: T) -> assert_cmd::assert::Assert
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<ffi::OsStr>,
+        T: Into<Vec<u8>>,
+    {
+        self.execute_impl(cmd, Some(input)).await
     }
 
     pub async fn start_api_server(self, e2e_data_file_path: PathBuf) -> Result<(), InternalError> {
@@ -330,6 +325,37 @@ impl Kamu {
             .collect();
 
         (pull_aliases, push_aliases)
+    }
+
+    async fn execute_impl<I, S, T>(
+        &self,
+        cmd: I,
+        maybe_input: Option<T>,
+    ) -> assert_cmd::assert::Assert
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<ffi::OsStr>,
+        T: Into<Vec<u8>>,
+    {
+        let mut command = assert_cmd::Command::cargo_bin("kamu-cli").unwrap();
+
+        command.current_dir(self.workspace_path.clone());
+
+        if let Some(system_time) = &self.system_time {
+            let system_time = system_time.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+
+            command.args(["--system-time", system_time.as_str()]);
+        }
+
+        command.args(cmd);
+
+        if let Some(input) = maybe_input {
+            command.write_stdin(input);
+        }
+
+        tokio::task::spawn_blocking(move || command.assert())
+            .await
+            .unwrap()
     }
 }
 

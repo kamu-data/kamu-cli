@@ -17,13 +17,10 @@ use kamu_cli::testing::Kamu;
 #[test_log::test(tokio::test)]
 async fn test_datafusion_cli() {
     let kamu = Kamu::new_workspace_tmp().await;
-
-    let assert = Command::cargo_bin(env!("CARGO_PKG_NAME"))
-        .unwrap()
-        .current_dir(kamu.workspace_path())
-        .arg("sql")
-        .write_stdin("select 1;")
-        .assert();
+    let assert = kamu
+        .execute_with_input(["sql"], "select 1;")
+        .await
+        .success();
 
     let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
