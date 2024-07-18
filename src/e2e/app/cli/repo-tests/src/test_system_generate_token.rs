@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 use kamu_cli::testing::Kamu;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -15,7 +15,9 @@ use kamu_cli::testing::Kamu;
 pub async fn test_generate_token(kamu: Kamu) -> Result<(), InternalError> {
     kamu.execute(["system", "generate-token", "--login", "test"])
         .await
-        .int_err()
+        .success();
+
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

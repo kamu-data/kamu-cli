@@ -46,7 +46,7 @@ async fn test_push_ingest_from_file_ledger() {
         .into()],
     })
     .await
-    .unwrap();
+    .success();
 
     let data_path = kamu.workspace_path().join("data.csv");
     std::fs::write(
@@ -69,7 +69,7 @@ async fn test_push_ingest_from_file_ledger() {
         path(&data_path),
     ])
     .await
-    .unwrap();
+    .success();
 
     kamu.assert_last_data_slice(
         &DatasetName::new_unchecked("population"),
@@ -130,7 +130,7 @@ async fn test_push_ingest_from_file_snapshot_with_event_time() {
         .into()],
     })
     .await
-    .unwrap();
+    .success();
 
     let data_path = kamu.workspace_path().join("data.csv");
     std::fs::write(
@@ -156,7 +156,7 @@ async fn test_push_ingest_from_file_snapshot_with_event_time() {
         path(&data_path),
     ])
     .await
-    .unwrap();
+    .success();
 
     kamu.assert_last_data_slice(
         &DatasetName::new_unchecked("population"),

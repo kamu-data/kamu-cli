@@ -71,7 +71,7 @@ async fn test_add_recursive() {
         kamu.workspace_path().as_os_str().to_str().unwrap(),
     ])
     .await
-    .unwrap();
+    .success();
 
     let dataset_repo = kamu
         .catalog()

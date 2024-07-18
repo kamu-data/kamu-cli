@@ -8,11 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use std::ffi::OsString;
-use std::fs;
+use std::fmt::Debug;
 use std::io::Write;
 use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::{ffi, fs};
 
 use chrono::{DateTime, Utc};
 use datafusion::prelude::*;
@@ -30,7 +31,6 @@ use crate::{
     cli,
     configure_base_catalog,
     configure_cli_catalog,
-    run,
     CLIError,
     CompleteCommand,
     WorkspaceLayout,
@@ -91,7 +91,7 @@ impl Kamu {
             std::env::set_var(env_name, env_value);
         }
 
-        inst.execute(arguments).await.unwrap();
+        inst.execute(arguments).await.success();
 
         inst
     }
@@ -173,33 +173,26 @@ impl Kamu {
         kamu_data_utils::testing::assert_schema_eq(df.schema(), expected_schema);
     }
 
-    pub async fn execute<I, S>(&self, cmd: I) -> Result<(), CommandError>
+    pub async fn execute<I, S>(&self, cmd: I) -> assert_cmd::assert::Assert
     where
         I: IntoIterator<Item = S>,
-        S: Into<OsString>,
+        S: AsRef<ffi::OsStr>,
     {
-        let mut full_cmd: Vec<OsString> = vec!["kamu".into(), "-q".into()];
+        let mut command = assert_cmd::Command::cargo_bin("kamu-cli").unwrap();
+
+        command.current_dir(self.workspace_path.clone());
 
         if let Some(system_time) = &self.system_time {
-            full_cmd.push("--system-time".into());
-            full_cmd.push(
-                system_time
-                    .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
-                    .into(),
-            );
+            let system_time = system_time.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+
+            command.args(["--system-time", system_time.as_str()]);
         }
 
-        full_cmd.extend(cmd.into_iter().map(Into::into));
+        command.args(cmd);
 
-        let app = cli();
-        let matches = app.try_get_matches_from(&full_cmd).unwrap();
-
-        run(self.workspace_layout.clone(), matches)
+        tokio::task::spawn_blocking(move || command.assert())
             .await
-            .map_err(|e| CommandError {
-                cmd: full_cmd,
-                error: e,
-            })
+            .unwrap()
     }
 
     pub async fn start_api_server(self, e2e_data_file_path: PathBuf) -> Result<(), InternalError> {
@@ -214,7 +207,9 @@ impl Kamu {
             host.as_str(),
         ])
         .await
-        .int_err()
+        .success();
+
+        Ok(())
     }
 
     pub fn get_e2e_output_data_path(&self) -> PathBuf {
@@ -269,7 +264,10 @@ impl Kamu {
             .collect())
     }
 
-    pub async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot) -> Result<(), CommandError> {
+    pub async fn add_dataset(
+        &self,
+        dataset_snapshot: DatasetSnapshot,
+    ) -> assert_cmd::assert::Assert {
         let content = YamlDatasetSnapshotSerializer
             .write_manifest(&dataset_snapshot)
             .unwrap();

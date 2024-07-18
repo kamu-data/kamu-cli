@@ -40,7 +40,7 @@ async fn test_complete_dataset_name() {
         metadata: vec![],
     })
     .await
-    .unwrap();
+    .success();
 
     let completions = kamu.complete("kamu log", 2).await.unwrap();
     assert_eq!(completions, ["foo.bar"]);

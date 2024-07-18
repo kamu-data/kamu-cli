@@ -97,7 +97,7 @@ pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServer
             kamu_in_push_workspace
                 .execute(["add", dataset_path.to_str().unwrap()])
                 .await
-                .unwrap();
+                .success();
         }
 
         // 2.1. Ingest data to the dataset
@@ -124,7 +124,7 @@ pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServer
                     dataset_data_path.to_str().unwrap(),
                 ])
                 .await
-                .unwrap();
+                .success();
         }
 
         // 2.2. Login to the API server
@@ -136,7 +136,7 @@ pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServer
                 token.as_str(),
             ])
             .await
-            .unwrap();
+            .success();
 
         // 2.3. Push the dataset to the API server
         kamu_in_push_workspace
@@ -147,7 +147,7 @@ pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServer
                 kamu_api_server_dataset_endpoint.as_str(),
             ])
             .await
-            .unwrap();
+            .success();
     }
 
     // 3. Pulling the dataset from the API server
@@ -157,7 +157,7 @@ pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServer
         kamu_in_pull_workspace
             .execute(["pull", kamu_api_server_dataset_endpoint.as_str()])
             .await
-            .unwrap();
+            .success();
     }
 }
 

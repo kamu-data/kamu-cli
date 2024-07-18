@@ -175,13 +175,15 @@ url = "2"
 urlencoding = "2"
 whoami = "1.5"
 
+# Testing
+assert_cmd = "2"
+
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2" # For getting uid:gid
 
 
 [dev-dependencies]
-assert_cmd = "2"
 pretty_assertions = { version = "1" }
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
