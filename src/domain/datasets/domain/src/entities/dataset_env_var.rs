@@ -26,7 +26,7 @@ use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY: &str = "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC";
+pub const SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY: &str = "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -238,7 +238,7 @@ impl DatasetEnvVarsConfig {
     pub fn sample() -> Self {
         Self {
             mode: Some(DatasetEnvVarsType::Storage),
-            encryption_key: Some(SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY.to_string()),
+            encryption_key: Some(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY.to_string()),
         }
     }
 }
@@ -260,7 +260,7 @@ mod tests {
     use opendatafabric::DatasetID;
     use secrecy::Secret;
 
-    use crate::{DatasetEnvVar, SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY};
+    use crate::{DatasetEnvVar, SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY};
 
     #[test]
     fn test_secret_env_var_generation() {
@@ -270,12 +270,12 @@ mod tests {
             Utc::now(),
             &crate::DatasetEnvVarValue::Secret(Secret::new(secret_value.to_string())),
             &DatasetID::new_seeded_ed25519(b"foo"),
-            SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY,
+            SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
         )
         .unwrap();
 
         let original_value = new_env_var
-            .get_exposed_value(SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY)
+            .get_exposed_value(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY)
             .unwrap();
         assert_eq!(secret_value, original_value.as_str());
     }
@@ -288,12 +288,12 @@ mod tests {
             Utc::now(),
             &crate::DatasetEnvVarValue::Regular(value.to_string()),
             &DatasetID::new_seeded_ed25519(b"foo"),
-            SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY,
+            SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
         )
         .unwrap();
 
         let original_value = new_env_var
-            .get_exposed_value(SAMPLET_DATASET_ENV_VAR_ENCRYPTION_KEY)
+            .get_exposed_value(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY)
             .unwrap();
         assert_eq!(value, original_value.as_str());
     }
