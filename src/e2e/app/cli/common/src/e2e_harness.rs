@@ -139,8 +139,12 @@ impl KamuCliApiServerHarness {
             let re = Regex::new(r#"filename: "(.*)""#).unwrap();
             let connect_options = format!("{:#?}", sqlite_pool.connect_options());
             let re_groups = re.captures(connect_options.as_str()).unwrap();
+            let relative_path = re_groups[1].to_string();
 
-            re_groups[1].to_string()
+            std::fs::canonicalize(relative_path)
+                .unwrap()
+                .display()
+                .to_string()
         };
 
         let kamu_config = format!(
