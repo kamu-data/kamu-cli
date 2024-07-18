@@ -78,7 +78,7 @@ impl Command for UICommand {
             self.current_account_name.clone(),
             self.predefined_accounts_config.clone(),
             self.file_upload_limit_config.clone(),
-            self.dataset_env_vars_config.mode == DatasetEnvVarsType::Storage,
+            self.dataset_env_vars_config.mode == Some(DatasetEnvVarsType::Storage),
             self.address,
             self.port,
         )
