@@ -18,4 +18,23 @@ SECRET_STRING=$(aws secretsmanager get-secret-value --secret-id $SECRET_NAME --r
 USERNAME=$(echo $SECRET_STRING | jq -r .username)
 PASSWORD=$(echo $SECRET_STRING | jq -r .password)
 
-export DB_CONNECTION_STRING="${DB_PROVIDER}://${USERNAME}:${PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+urlencode() {
+    local string="${1}"
+    local encoded=""
+    local special_chars="!#$&'()*+,/:;=?@[]"
+
+    for (( i = 0; i < ${#string}; i++ )); do
+        local c="${string:i:1}"
+        if [[ $special_chars == *"$c"* ]]; then
+            encoded+=$(printf %s "$c" | jq -sRr @uri)
+        else
+            encoded+="${c}"
+        fi
+    done
+    
+    echo "${encoded}"
+}
+ENCODED_USERNAME=$(urlencode "${USERNAME}")
+ENCODED_PASSWORD=$(urlencode "${PASSWORD}")
+
+export DB_CONNECTION_STRING="${DB_PROVIDER}://${ENCODED_USERNAME}:${ENCODED_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
