@@ -24,7 +24,7 @@ doctest = false
 [dependencies]
 kamu-core = { workspace = true }
 
-axum = "0.6"
-http = "0.2"
+axum = "0.7"
+http = "1"
 thiserror = { version = "1", default-features = false }
 tracing = "0.1"

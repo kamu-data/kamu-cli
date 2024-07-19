@@ -29,14 +29,14 @@ kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 opendatafabric = { workspace = true }
 
-axum = { version = "0.6", features = ["headers"] }
+axum = { version = "0.7", default-features = false, features = [] }
 chrono = { version = "0.4", default-features = false }
 datafusion = { version = "39", default-features = false }
 # ToDo remove version pin after we will migrate axum to new major version
 datafusion-odata = { version = "39", default-features = false }
 dill = { version = "0.8" }
 futures = { version = "0.3", default-features = false }
-http = "0.2"
+http = "1"
 quick-xml = { version = "0.31", features = ["serialize"] }
 serde = { version = "1", features = ["derive"] }
 tracing = "0.1"
@@ -44,13 +44,13 @@ tracing = "0.1"
 
 [dev-dependencies]
 event-bus = { workspace = true }
-hyper = { version = "0.14", default-features = false }
+hyper = { version = "1", default-features = false }
 indoc = { version = "2" }
 kamu = { workspace = true }
-reqwest = { version = "0.11", default-features = false }
+reqwest = { version = "0.12", default-features = false }
 tempfile = { version = "3" }
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = [] }
-tower-http = { version = "0.4", features = ["trace", "cors"] }
+tower-http = { version = "0.5", features = ["trace", "cors"] }
 url = { version = "2", default-features = false }

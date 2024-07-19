@@ -43,70 +43,72 @@ pub async fn get_s3_object_store_builder(
     url: &Url,
     aws_options: &AwsOptions,
 ) -> Result<AmazonS3Builder> {
-    let AwsOptions {
-        access_key_id,
-        secret_access_key,
-        session_token,
-        region,
-        endpoint,
-        allow_http,
-    } = aws_options;
+    unimplemented!()
 
-    let bucket_name = get_bucket_name(url)?;
-    let mut builder = AmazonS3Builder::from_env().with_bucket_name(bucket_name);
+    // let AwsOptions {
+    //     access_key_id,
+    //     secret_access_key,
+    //     session_token,
+    //     region,
+    //     endpoint,
+    //     allow_http,
+    // } = aws_options;
 
-    if let (Some(access_key_id), Some(secret_access_key)) = (access_key_id, secret_access_key) {
-        builder = builder
-            .with_access_key_id(access_key_id)
-            .with_secret_access_key(secret_access_key);
+    // let bucket_name = get_bucket_name(url)?;
+    // let mut builder = AmazonS3Builder::defaults().with_bucket_name(bucket_name);
 
-        if let Some(session_token) = session_token {
-            builder = builder.with_token(session_token);
-        }
-    } else {
-        let config = aws_config::from_env().load().await;
-        if let Some(region) = config.region() {
-            builder = builder.with_region(region.to_string());
-        }
+    // if let (Some(access_key_id), Some(secret_access_key)) = (access_key_id, secret_access_key) {
+    //     builder = builder
+    //         .with_access_key_id(access_key_id)
+    //         .with_secret_access_key(secret_access_key);
 
-        let credentials = config
-            .credentials_provider()
-            .ok_or_else(|| {
-                DataFusionError::ObjectStore(object_store::Error::Generic {
-                    store: "S3",
-                    source: "Failed to get S3 credentials from the environment".into(),
-                })
-            })?
-            .clone();
+    //     if let Some(session_token) = session_token {
+    //         builder = builder.with_token(session_token);
+    //     }
+    // } else {
+    //     let config = aws_config::defaults().load().await;
+    //     if let Some(region) = config.region() {
+    //         builder = builder.with_region(region.to_string());
+    //     }
 
-        let credentials = Arc::new(S3CredentialProvider { credentials });
-        builder = builder.with_credentials(credentials);
-    }
+    //     let credentials = config
+    //         .credentials_provider()
+    //         .ok_or_else(|| {
+    //             DataFusionError::ObjectStore(object_store::Error::Generic {
+    //                 store: "S3",
+    //                 source: "Failed to get S3 credentials from the environment".into(),
+    //             })
+    //         })?
+    //         .clone();
 
-    if let Some(region) = region {
-        builder = builder.with_region(region);
-    }
+    //     let credentials = Arc::new(S3CredentialProvider { credentials });
+    //     builder = builder.with_credentials(credentials);
+    // }
 
-    if let Some(endpoint) = endpoint {
-        // Make a nicer error if the user hasn't allowed http and the endpoint
-        // is http as the default message is "URL scheme is not allowed"
-        if let Ok(endpoint_url) = Url::try_from(endpoint.as_str()) {
-            if !matches!(allow_http, Some(true)) && endpoint_url.scheme() == "http" {
-                return config_err!(
-                    "Invalid endpoint: {endpoint}. HTTP is not allowed for S3 endpoints. To allow \
-                     HTTP, set 'aws.allow_http' to true"
-                );
-            }
-        }
+    // if let Some(region) = region {
+    //     builder = builder.with_region(region);
+    // }
 
-        builder = builder.with_endpoint(endpoint);
-    }
+    // if let Some(endpoint) = endpoint {
+    //     // Make a nicer error if the user hasn't allowed http and the endpoint
+    //     // is http as the default message is "URL scheme is not allowed"
+    //     if let Ok(endpoint_url) = Url::try_from(endpoint.as_str()) {
+    //         if !matches!(allow_http, Some(true)) && endpoint_url.scheme() == "http" {
+    //             return config_err!(
+    //                 "Invalid endpoint: {endpoint}. HTTP is not allowed for S3 endpoints. To allow \
+    //                  HTTP, set 'aws.allow_http' to true"
+    //             );
+    //         }
+    //     }
 
-    if let Some(allow_http) = allow_http {
-        builder = builder.with_allow_http(*allow_http);
-    }
+    //     builder = builder.with_endpoint(endpoint);
+    // }
 
-    Ok(builder)
+    // if let Some(allow_http) = allow_http {
+    //     builder = builder.with_allow_http(*allow_http);
+    // }
+
+    // Ok(builder)
 }
 
 #[derive(Debug)]
