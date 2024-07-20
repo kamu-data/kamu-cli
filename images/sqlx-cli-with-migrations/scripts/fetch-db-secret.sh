@@ -19,20 +19,7 @@ USERNAME=$(echo $SECRET_STRING | jq -r .username)
 PASSWORD=$(echo $SECRET_STRING | jq -r .password)
 
 urlencode() {
-    local string="${1}"
-    local encoded=""
-    local special_chars="!#$&'()*+,/:;=?@[]"
-
-    for (( i = 0; i < ${#string}; i++ )); do
-        local c="${string:i:1}"
-        if [[ $special_chars == *"$c"* ]]; then
-            encoded+=$(printf %s "$c" | jq -sRr @uri)
-        else
-            encoded+="${c}"
-        fi
-    done
-    
-    echo "${encoded}"
+    printf %s "$1" | jq -sRr @uri
 }
 ENCODED_USERNAME=$(urlencode "${USERNAME}")
 ENCODED_PASSWORD=$(urlencode "${PASSWORD}")
