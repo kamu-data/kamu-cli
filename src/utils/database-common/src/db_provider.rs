@@ -21,7 +21,7 @@ pub enum DatabaseProvider {
 }
 
 impl DatabaseProvider {
-    pub fn default_port(&self) -> u32 {
+    pub fn default_port(&self) -> u16 {
         match self {
             DatabaseProvider::MariaDB | DatabaseProvider::MySql => 3306,
             DatabaseProvider::Postgres => 5432,
