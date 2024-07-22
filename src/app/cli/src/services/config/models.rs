@@ -564,7 +564,7 @@ pub struct RemoteDatabaseConfig {
     pub credentials_policy: DatabaseCredentialsPolicyConfig,
     pub database_name: String,
     pub host: String,
-    pub port: Option<u32>,
+    pub port: Option<u16>,
 }
 
 #[skip_serializing_none]

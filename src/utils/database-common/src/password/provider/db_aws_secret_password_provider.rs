@@ -52,8 +52,8 @@ impl DatabasePasswordProvider for DatabaseAwsSecretPasswordProvider {
                 let secret_value =
                     serde_json::from_str::<AwsRdsSecretValue>(secret_string).int_err()?;
                 Ok(Some(DatabaseCredentials {
-                    user_name: Secret::new(secret_value.username),
-                    password: Secret::new(secret_value.password),
+                    user_name: Secret::new(secret_value.username.clone()),
+                    password: Secret::new(secret_value.password.clone()),
                 }))
             }
             None => Err(AwsSecretNotFoundError {
