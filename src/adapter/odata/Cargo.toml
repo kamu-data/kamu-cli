@@ -37,7 +37,6 @@ datafusion-odata = { version = "39", default-features = false }
 dill = { version = "0.8" }
 futures = { version = "0.3", default-features = false }
 http = "0.2"
-quick-xml = { version = "0.31", features = ["serialize"] }
 serde = { version = "1", features = ["derive"] }
 tracing = "0.1"
 
