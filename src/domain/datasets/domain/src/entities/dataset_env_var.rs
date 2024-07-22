@@ -224,6 +224,19 @@ impl std::error::Error for AesGcmError {}
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DatasetEnvVarsConfig {
     pub mode: Option<DatasetEnvVarsType>,
+    /// Represents the encryption key for the dataset env vars. This field is
+    /// required if `DatasetEnvVarsType` is `Storage`.
+    ///
+    /// The encryption key must be a 32-character alphanumeric string, which
+    /// includes both uppercase and lowercase Latin letters (A-Z, a-z) and
+    /// digits (0-9).
+    ///
+    /// # Example
+    /// let config = DatasetEnvVarsConfig {
+    ///     mode: Some(DatasetEnvVarsType::Storage),
+    ///     encryption_key:
+    /// Some(String::from("aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")) };
+    /// ```
     pub encryption_key: Option<String>,
 }
 
