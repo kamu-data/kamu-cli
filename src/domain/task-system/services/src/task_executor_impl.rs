@@ -49,10 +49,11 @@ impl TaskExecutorImpl {
     }
 
     async fn take_task(&self) -> Result<Task, InternalError> {
+        let task_id = self.task_sched.take().await.int_err()?;
+
         DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with2(
                 |event_store: Arc<dyn TaskSystemEventStore>, outbox: Arc<dyn Outbox>| async move {
-                    let task_id = self.task_sched.take().await.int_err()?;
                     let task = Task::load(task_id, event_store.as_ref()).await.int_err()?;
 
                     tracing::info!(
