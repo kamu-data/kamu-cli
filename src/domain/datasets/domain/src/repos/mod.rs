@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod dataset_env_var_repository;
+mod dataset_repository;
 
 pub use dataset_env_var_repository::*;
+pub use dataset_repository::*;
