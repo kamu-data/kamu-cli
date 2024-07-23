@@ -1,6 +1,9 @@
 # Developer Guide <!-- omit in toc -->
 - [Building Locally](#building-locally)
   - [Configure Podman as Default Runtime (Recommended)](#configure-podman-as-default-runtime-recommended)
+  - [Build with Databases](#build-with-databases)
+  - [Database migrations](#database-migrations)
+  - [Run Linters](#run-linters)
   - [Run Tests](#run-tests)
   - [Build Speed Tweaks (Optional)](#build-speed-tweaks-optional)
     - [Building](#building)
@@ -15,6 +18,7 @@
 - [Typical Workflows](#typical-workflows)
   - [Feature Branches](#feature-branches)
   - [Release Procedure](#release-procedure)
+  - [Jupyter Demo Release Procedure](#jupyter-demo-release-procedure)
   - [Minor Dependencies Update](#minor-dependencies-update)
   - [Major Dependencies Update](#major-dependencies-update)
   - [Building Multi-platform Images](#building-multi-platform-images)
@@ -361,6 +365,18 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
 6. On `master` tag the latest commit with a new version: `git tag vX.Y.Z`.
 7. Push the tag to the repo: `git push origin tag vX.Y.Z`
 8. GitHub Actions will pick up the new tag and create a new GitHub release from it
+
+### Jupyter Demo Release Procedure
+Our Jupyter demo at https://demo.kamu.dev includes a special Jupyter notebook image that embeds `kamu-cli`, multiple examples, and some other tools. The tutorials also guide users to interact with `kamu-node` deployed in the demo environment. Because of this - it's important to update Jupyter whenever we break any protocol compatibility.
+
+1. Increment `DEMO_VERSION` version in the [Makefile](https://github.com/kamu-data/kamu-cli/blob/master/images/demo/Makefile)
+2. Set the same version for `jupyter` and `minio` images in [`docker-compose.yml`](https://github.com/kamu-data/kamu-cli/blob/master/images/demo/docker-compose.yml) (`minio` image that we will build is used to run the demo environment locally)
+3. Run `make clean`
+4. Run `make minio-data` - this will prepare example datasets to be included into `minio` image
+5. Prepare your `docker buildx` to build multi-platform images (see [instructions below](#building-multi-platform-images))
+6. Run `make minio-multi-arch` to build **and push** multi-arch `minio` image
+7. Run `make jupyter-multi-arch` to build **and push** multi-arch `jupyter` image
+8. You can now proceed to deploy the new image to kubernetes environment
 
 ### Minor Dependencies Update
 1. Run `cargo update` to pull in any minor updates
