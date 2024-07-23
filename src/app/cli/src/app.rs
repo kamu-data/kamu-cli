@@ -583,14 +583,17 @@ pub fn register_config_in_catalog(
         DatasetEnvVarsType::Storage => {
             assert!(
                 dataset_env_vars_config.encryption_key.is_some(),
-                "Dataset env var encryption key is required"
+                "Dataset env var encryption key is required for storage mode"
             );
             if DatasetEnvVar::try_asm_256_gcm_from_str(
                 dataset_env_vars_config.encryption_key.as_ref().unwrap(),
             )
             .is_err()
             {
-                panic!("Invalid dataset env var encryption key");
+                panic!(
+                    "Invalid dataset env var encryption key. Key must be a 32-character \
+                     alphanumeric string"
+                );
             }
             catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>()
         }
