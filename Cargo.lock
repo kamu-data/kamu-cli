@@ -5863,6 +5863,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
+ "database-common",
  "dill",
  "event-bus",
  "futures",

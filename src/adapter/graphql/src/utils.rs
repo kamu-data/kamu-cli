@@ -115,9 +115,11 @@ pub(crate) async fn get_task(
 
 pub(crate) fn ensure_dataset_env_vars_mode(ctx: &Context<'_>) -> Result<(), GqlError> {
     let dataset_env_vars_type = from_catalog::<DatasetEnvVarsConfig>(ctx).unwrap();
-    if dataset_env_vars_type.as_ref().mode.as_ref().unwrap() != &DatasetEnvVarsType::Storage {
+    if dataset_env_vars_type.as_ref().mode.as_ref().unwrap() != &DatasetEnvVarsType::Storage
+        || dataset_env_vars_type.as_ref().encryption_key.is_none()
+    {
         return Err(GqlError::Gql(async_graphql::Error::new(
-            "API unavailable for static mode",
+            "API unavailable for static mode or without encryption key",
         )));
     }
     Ok(())

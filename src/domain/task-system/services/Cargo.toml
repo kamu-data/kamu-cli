@@ -22,6 +22,7 @@ doctest = false
 
 
 [dependencies]
+database-common = { workspace = true }
 event-bus = { workspace = true }
 opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
