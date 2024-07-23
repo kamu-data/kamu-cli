@@ -18,12 +18,12 @@ members = [
     "src/utils/repo-tools",
     "src/utils/tracing-perfetto",
     # Domain
-    "src/domain/opendatafabric",
     "src/domain/accounts/domain",
-    "src/domain/datasets/domain",
     "src/domain/core",
-    "src/domain/task-system/domain",
+    "src/domain/datasets/domain",
     "src/domain/flow-system/domain",
+    "src/domain/opendatafabric",
+    "src/domain/task-system/domain",
     # Domain service layer
     "src/domain/accounts/services",
     "src/domain/datasets/services",
