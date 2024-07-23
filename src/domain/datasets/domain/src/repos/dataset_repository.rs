@@ -15,6 +15,7 @@ use crate::Dataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait]
 pub trait DatasetRepository: Send + Sync {
     async fn get_dataset(&self, dataset_id: &DatasetID) -> Result<Dataset, GetDatasetError>;
 
