@@ -6,7 +6,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.191.5] - 2024-07-23
 ### Fixed
-- Ingest task executing runs under transaction
 - Extend error messages when dataset env vars encryption key is missing 
 
 ## [0.191.4] - 2024-07-22

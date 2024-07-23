@@ -99,20 +99,17 @@ impl TaskExecutor for TaskExecutorImpl {
 
             let outcome = match &task.logical_plan {
                 LogicalPlan::UpdateDataset(upd) => {
-                    database_common::DatabaseTransactionRunner::new(self.catalog.clone())
-                        .transactional_with(|pull_svc: Arc<dyn PullService>| async move {
-                            let maybe_pull_result = pull_svc
-                                .pull(&upd.dataset_id.as_any_ref(), PullOptions::default(), None)
-                                .await;
+                    let pull_svc = self.catalog.get_one::<dyn PullService>().int_err()?;
+                    let maybe_pull_result = pull_svc
+                        .pull(&upd.dataset_id.as_any_ref(), PullOptions::default(), None)
+                        .await;
 
-                            Ok(match maybe_pull_result {
-                                Ok(pull_result) => TaskOutcome::Success(
-                                    TaskResult::UpdateDatasetResult(pull_result.into()),
-                                ),
-                                Err(_) => TaskOutcome::Failed(TaskError::Empty),
-                            })
-                        })
-                        .await?
+                    match maybe_pull_result {
+                        Ok(pull_result) => TaskOutcome::Success(TaskResult::UpdateDatasetResult(
+                            pull_result.into(),
+                        )),
+                        Err(_) => TaskOutcome::Failed(TaskError::Empty),
+                    }
                 }
                 LogicalPlan::Probe(Probe {
                     busy_time,
