@@ -117,7 +117,6 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         let assert = self
             .execute([
                 "complete",
-                "alias",
                 input.into().as_str(),
                 current.to_string().as_str(),
             ])
