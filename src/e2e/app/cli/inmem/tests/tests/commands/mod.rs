@@ -8,3 +8,4 @@
 // by the Apache License, Version 2.0.
 
 mod test_add_command;
+mod test_sql_command;

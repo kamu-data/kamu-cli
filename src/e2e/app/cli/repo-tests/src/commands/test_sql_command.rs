@@ -7,16 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use assert_cmd::Command;
 use indoc::indoc;
-use kamu_cli::testing::Kamu;
+use kamu_cli_e2e_common::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(engine, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_datafusion_cli() {
-    let kamu = Kamu::new_workspace_tmp().await;
+pub async fn test_datafusion_cli(kamu: KamuCliPuppet) {
     let assert = kamu
         .execute_with_input(["sql"], "select 1;")
         .await
@@ -39,19 +35,6 @@ async fn test_datafusion_cli() {
         ),
         "Unexpected output:\n{stdout}",
     );
-
-    assert.success();
-}
-
-#[test_group::group(engine, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_datafusion_cli_not_launched_in_root_ws() {
-    // this test checks that workspace was not created in root directory
-    Command::cargo_bin(env!("CARGO_PKG_NAME"))
-        .unwrap()
-        .arg("list")
-        .assert()
-        .failure();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
