@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::MediaType;
 use reqwest::{Method, Response, StatusCode, Url};
 use serde::Deserialize;
 use tokio_retry::strategy::FixedInterval;
@@ -107,7 +106,7 @@ impl KamuApiServerClient {
             request_builder = match request_body {
                 RequestBody::Json(value) => request_builder.json(&value),
                 RequestBody::NdJson(value) => request_builder
-                    .header("Content-Type", MediaType::NDJSON.0)
+                    .header("Content-Type", "application/x-ndjson")
                     .body(value),
             }
         };

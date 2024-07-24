@@ -23,13 +23,13 @@ doctest = false
 
 [dependencies]
 internal-error = { workspace = true }
-kamu-cli = { workspace = true }
-kamu-core = { workspace = true }
 
+assert_cmd = "2"
+chrono = { version = "0.4", default-features = false, features = ["now"] }
 indoc = "2"
 pretty_assertions = "1"
 regex = "1"
-reqwest = { version = "0.11", default-features = false, features = [] }
+reqwest = { version = "0.11", default-features = false, features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sqlx = { version = "0.7", default-features = false, features = [
@@ -37,7 +37,8 @@ sqlx = { version = "0.7", default-features = false, features = [
     "mysql",
     "sqlite",
 ] }
-tokio = { version = "1", default-features = false, features = [] }
+tempfile = "3"
+tokio = { version = "1", default-features = false, features = ["macros", "fs"] }
 tokio-retry = "0.3"
 
 

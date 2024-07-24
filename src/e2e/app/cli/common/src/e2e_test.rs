@@ -25,10 +25,15 @@ pub async fn api_server_e2e_test<ServerRunFut, Fixture, FixtureFut>(
     server_run_fut: ServerRunFut,
     fixture: Fixture,
 ) where
-    ServerRunFut: Future<Output = Result<(), InternalError>>,
+    ServerRunFut: Future<Output = ()>,
     Fixture: FnOnce(KamuApiServerClient) -> FixtureFut,
     FixtureFut: Future<Output = ()>,
 {
+    let wrapped_server_run_fut = async move {
+        server_run_fut.await;
+
+        Ok::<_, InternalError>(())
+    };
     let test_fut = async move {
         let base_url = get_server_api_base_url(e2e_data_file_path).await?;
         let kamu_api_server_client = KamuApiServerClient::new(base_url);
@@ -42,7 +47,7 @@ pub async fn api_server_e2e_test<ServerRunFut, Fixture, FixtureFut>(
         Ok::<_, InternalError>(())
     };
 
-    assert_matches!(tokio::try_join!(server_run_fut, test_fut), Ok(_));
+    assert_matches!(tokio::try_join!(wrapped_server_run_fut, test_fut), Ok(_));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

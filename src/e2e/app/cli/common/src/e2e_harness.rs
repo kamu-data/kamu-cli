@@ -9,12 +9,11 @@
 
 use std::future::Future;
 
-use kamu_cli::testing::{Kamu, NewWorkspaceOptions};
+use chrono::{DateTime, NaiveTime, Utc};
 use regex::Regex;
-use sqlx::types::chrono::{DateTime, NaiveTime, Utc};
 use sqlx::{MySqlPool, PgPool, SqlitePool};
 
-use crate::{api_server_e2e_test, KamuApiServerClient};
+use crate::{api_server_e2e_test, KamuApiServerClient, KamuCliPuppet, NewWorkspaceOptions};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -184,7 +183,7 @@ impl KamuCliApiServerHarness {
 
     pub async fn execute_command<Fixture, FixtureResult>(self, fixture: Fixture)
     where
-        Fixture: FnOnce(Kamu) -> FixtureResult,
+        Fixture: FnOnce(KamuCliPuppet) -> FixtureResult,
         FixtureResult: Future<Output = ()>,
     {
         let kamu = self.into_kamu().await;
@@ -192,13 +191,13 @@ impl KamuCliApiServerHarness {
         fixture(kamu).await;
     }
 
-    async fn into_kamu(self) -> Kamu {
+    async fn into_kamu(self) -> KamuCliPuppet {
         let KamuCliApiServerHarnessOptions {
             is_multi_tenant,
             env_vars,
             frozen_system_time: freeze_system_time,
         } = self.options.unwrap_or_default();
-        let mut kamu = Kamu::new_workspace_tmp_with(NewWorkspaceOptions {
+        let mut kamu = KamuCliPuppet::new_workspace_tmp_with(NewWorkspaceOptions {
             is_multi_tenant,
             kamu_config: self.kamu_config,
             env_vars,
