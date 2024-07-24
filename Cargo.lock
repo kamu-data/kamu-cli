@@ -5326,6 +5326,7 @@ name = "kamu-cli-e2e-common"
 version = "0.191.5"
 dependencies = [
  "assert_cmd",
+ "async-trait",
  "chrono",
  "indoc 2.0.5",
  "internal-error",

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu::testing::MetadataFactory;
-use kamu_cli_e2e_common::KamuCliPuppet;
+use kamu_cli_e2e_common::{KamuCliPuppet, KamuCliPuppetExt};
 use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,22 +68,9 @@ pub async fn test_add_recursive(kamu: KamuCliPuppet) {
     .await
     .success();
 
-    // TODO: parse stdout
-    // let dataset_repo = kamu
-    //     .catalog()
-    //     .get_one::<dyn domain::DatasetRepository>()
-    //     .unwrap();
-    //
-    // let mut datasets: Vec<_> = dataset_repo
-    //     .get_all_datasets()
-    //     .map_ok(|h| h.alias.to_string())
-    //     .try_collect()
-    //     .await
-    //     .unwrap();
-    //
-    // datasets.sort();
-    //
-    // assert_eq!(datasets, ["commented", "plain"]);
+    let datasets = kamu.get_dataset_names().await;
+
+    assert_eq!(datasets, ["commented", "plain"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
