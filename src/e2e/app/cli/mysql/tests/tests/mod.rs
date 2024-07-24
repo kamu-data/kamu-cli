@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod commands;
 mod test_auth;
 mod test_rest_api;
 mod test_selftest;
 mod test_smart_transfer_protocol;
-mod test_system_generate_token;

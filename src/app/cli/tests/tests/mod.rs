@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod test_access_token_registry_svc;
-mod test_complete_command;
 mod test_di_graph;
 mod test_generate_cli_markdown;
 mod test_ingest_command;
