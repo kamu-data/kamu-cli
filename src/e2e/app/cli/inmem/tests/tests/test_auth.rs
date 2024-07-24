@@ -27,7 +27,7 @@ kamu_cli_run_api_server_e2e_test!(
     inmem,
     kamu_cli_e2e_repo_tests,
     test_login_dummy_github,
-    Options::default().with_multi_tenant(true)
+    Options::default().with_multi_tenant()
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

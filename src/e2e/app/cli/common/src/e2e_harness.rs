@@ -17,23 +17,37 @@ use crate::{api_server_e2e_test, KamuApiServerClient, KamuCliPuppet, NewWorkspac
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Default, PartialEq)]
+enum PotentialWorkspace {
+    NoWorkspace,
+    #[default]
+    SingleTenant,
+    MultiTenant,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Default)]
 pub struct KamuCliApiServerHarnessOptions {
-    pub is_multi_tenant: bool,
-    pub env_vars: Vec<(String, String)>,
-    pub frozen_system_time: Option<DateTime<Utc>>,
+    potential_workspace: PotentialWorkspace,
+    env_vars: Vec<(String, String)>,
+    frozen_system_time: Option<DateTime<Utc>>,
 }
 
 impl KamuCliApiServerHarnessOptions {
-    pub fn with_multi_tenant(mut self, enabled: bool) -> Self {
-        self.is_multi_tenant = enabled;
+    pub fn with_no_workspace(mut self) -> Self {
+        self.potential_workspace = PotentialWorkspace::NoWorkspace;
 
-        if enabled {
-            self.env_vars.extend([
-                ("KAMU_AUTH_GITHUB_CLIENT_ID".into(), "1".into()),
-                ("KAMU_AUTH_GITHUB_CLIENT_SECRET".into(), "2".into()),
-            ]);
-        }
+        self
+    }
+
+    pub fn with_multi_tenant(mut self) -> Self {
+        self.potential_workspace = PotentialWorkspace::MultiTenant;
+
+        self.env_vars.extend([
+            ("KAMU_AUTH_GITHUB_CLIENT_ID".into(), "1".into()),
+            ("KAMU_AUTH_GITHUB_CLIENT_SECRET".into(), "2".into()),
+        ]);
 
         self
     }
@@ -193,16 +207,24 @@ impl KamuCliApiServerHarness {
 
     async fn into_kamu(self) -> KamuCliPuppet {
         let KamuCliApiServerHarnessOptions {
-            is_multi_tenant,
+            potential_workspace,
             env_vars,
             frozen_system_time: freeze_system_time,
         } = self.options.unwrap_or_default();
-        let mut kamu = KamuCliPuppet::new_workspace_tmp_with(NewWorkspaceOptions {
-            is_multi_tenant,
-            kamu_config: self.kamu_config,
-            env_vars,
-        })
-        .await;
+
+        let mut kamu = match potential_workspace {
+            PotentialWorkspace::NoWorkspace => KamuCliPuppet::new("."),
+            ws @ _ => {
+                let is_multi_tenant = ws == PotentialWorkspace::MultiTenant;
+
+                KamuCliPuppet::new_workspace_tmp_with(NewWorkspaceOptions {
+                    is_multi_tenant,
+                    kamu_config: self.kamu_config,
+                    env_vars,
+                })
+                .await
+            }
+        };
 
         kamu.set_system_time(freeze_system_time);
 

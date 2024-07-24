@@ -28,6 +28,10 @@ pub trait KamuCliPuppetExt {
         &self,
         dataset_ref: &DatasetRef,
     ) -> (Vec<String>, Vec<String>);
+
+    async fn complete<T>(&self, input: T, current: usize) -> Vec<String>
+    where
+        T: Into<String> + Send;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -100,6 +104,25 @@ impl KamuCliPuppetExt for KamuCliPuppet {
 
                 acc
             })
+    }
+
+    async fn complete<T>(&self, input: T, current: usize) -> Vec<String>
+    where
+        T: Into<String> + Send,
+    {
+        let assert = self
+            .execute([
+                "complete",
+                "alias",
+                input.into().as_str(),
+                current.to_string().as_str(),
+            ])
+            .await
+            .success();
+
+        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+
+        stdout.lines().map(ToString::to_string).collect()
     }
 }
 
