@@ -82,9 +82,6 @@ impl KamuCliPuppet {
         temp_dir.join("e2e-output-data.txt")
     }
 
-    // todo нужно ли использовать InternalError
-    // pub async fn start_api_server(self, e2e_data_file_path: PathBuf) ->
-    // Result<(), InternalError> {
     pub async fn start_api_server(self, e2e_data_file_path: PathBuf) {
         let host = Ipv4Addr::LOCALHOST.to_string();
 
