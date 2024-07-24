@@ -5330,6 +5330,7 @@ dependencies = [
  "chrono",
  "indoc 2.0.5",
  "internal-error",
+ "opendatafabric",
  "pretty_assertions",
  "regex",
  "reqwest 0.11.27",

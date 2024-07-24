@@ -7,7 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::io::Write;
+
 use async_trait::async_trait;
+use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
+use opendatafabric::serde::DatasetSnapshotSerializer;
+use opendatafabric::{DatasetRef, DatasetSnapshot};
 
 use crate::KamuCliPuppet;
 
@@ -16,6 +21,13 @@ use crate::KamuCliPuppet;
 #[async_trait]
 pub trait KamuCliPuppetExt {
     async fn get_dataset_names(&self) -> Vec<String>;
+
+    async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot);
+
+    async fn get_list_of_repo_aliases(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> (Vec<String>, Vec<String>);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,9 +44,62 @@ impl KamuCliPuppetExt for KamuCliPuppet {
 
         stdout
             .lines()
-            .skip(1)
+            .skip(1) // Skip header
             .map(|line| line.split(',').next().unwrap().to_string())
             .collect()
+    }
+
+    async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot) {
+        let content = YamlDatasetSnapshotSerializer
+            .write_manifest(&dataset_snapshot)
+            .unwrap();
+
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+
+        f.as_file().write_all(&content).unwrap();
+        f.flush().unwrap();
+
+        self.execute(["add".as_ref(), f.path().as_os_str()])
+            .await
+            .success();
+    }
+
+    async fn get_list_of_repo_aliases(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> (Vec<String>, Vec<String>) {
+        let assert = self
+            .execute([
+                "repo",
+                "alias",
+                "list",
+                dataset_ref.to_string().as_str(),
+                "--output-format",
+                "csv",
+            ])
+            .await
+            .success();
+
+        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+
+        stdout
+            .lines()
+            .skip(1) // Skip header
+            .fold((vec![], vec![]), |mut acc, line| {
+                // Skip name
+                let mut line_it = line.split(',').skip(1);
+
+                let alias_kind = line_it.next().unwrap();
+                let alias = line_it.next().unwrap().to_string();
+
+                match alias_kind {
+                    "pull" => acc.0.push(alias),
+                    "push" => acc.1.push(alias),
+                    _ => panic!("Unexpected alias kind: {alias_kind}"),
+                }
+
+                acc
+            })
     }
 }
 

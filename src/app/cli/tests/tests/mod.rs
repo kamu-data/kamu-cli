@@ -14,6 +14,5 @@ mod test_generate_cli_markdown;
 mod test_ingest_command;
 mod test_new_dataset_command;
 mod test_output;
-mod test_repository_alias_commands;
 mod test_system_info_command;
 mod test_workspace_svc;

@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod test_add_command;
+mod test_repo_alias_command;
 mod test_sql_command;
 
 pub use test_add_command::*;
+pub use test_repo_alias_command::*;
 pub use test_sql_command::*;

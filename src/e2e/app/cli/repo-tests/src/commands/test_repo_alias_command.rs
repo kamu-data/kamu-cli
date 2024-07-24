@@ -7,14 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli::testing::Kamu;
+use kamu_cli_e2e_common::{KamuCliPuppet, KamuCliPuppetExt};
 use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_repository_pull_aliases_commands() {
-    let kamu = Kamu::new_workspace_tmp().await;
+pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
     kamu.add_dataset(DatasetSnapshot {
         name: "foo".try_into().unwrap(),
         kind: DatasetKind::Root,
@@ -36,8 +34,8 @@ async fn test_repository_pull_aliases_commands() {
         }
         .into()],
     })
-    .await
-    .success();
+    .await;
+
     let dataset_aliases = vec![
         "http://pull.example.com/".to_string(),
         "http://pull.example1.com/".to_string(),
@@ -76,9 +74,7 @@ async fn test_repository_pull_aliases_commands() {
     assert!(pull_aliases.is_empty());
 }
 
-#[test_log::test(tokio::test)]
-async fn test_repository_push_aliases_commands() {
-    let kamu = Kamu::new_workspace_tmp().await;
+pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
     kamu.add_dataset(DatasetSnapshot {
         name: "foo".try_into().unwrap(),
         kind: DatasetKind::Root,
@@ -100,8 +96,8 @@ async fn test_repository_push_aliases_commands() {
         }
         .into()],
     })
-    .await
-    .success();
+    .await;
+
     let dataset_aliases = vec![
         "http://push.example.com/".to_string(),
         "http://push.example1.com/".to_string(),
