@@ -13,7 +13,13 @@ use chrono::{DateTime, NaiveTime, Utc};
 use regex::Regex;
 use sqlx::{MySqlPool, PgPool, SqlitePool};
 
-use crate::{api_server_e2e_test, KamuApiServerClient, KamuCliPuppet, NewWorkspaceOptions};
+use crate::{
+    api_server_e2e_test,
+    KamuApiServerClient,
+    KamuCliPuppet,
+    KamuCliPuppetExt,
+    NewWorkspaceOptions,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -214,7 +220,7 @@ impl KamuCliApiServerHarness {
 
         let mut kamu = match potential_workspace {
             PotentialWorkspace::NoWorkspace => KamuCliPuppet::new("."),
-            ws @ _ => {
+            ws => {
                 let is_multi_tenant = ws == PotentialWorkspace::MultiTenant;
 
                 KamuCliPuppet::new_workspace_tmp_with(NewWorkspaceOptions {

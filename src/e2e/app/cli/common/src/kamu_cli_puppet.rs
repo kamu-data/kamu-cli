@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
 use std::{ffi, fs};
 
@@ -80,21 +79,6 @@ impl KamuCliPuppet {
         let temp_dir = self.temp_dir.as_ref().unwrap().path();
 
         temp_dir.join("e2e-output-data.txt")
-    }
-
-    pub async fn start_api_server(self, e2e_data_file_path: PathBuf) {
-        let host = Ipv4Addr::LOCALHOST.to_string();
-
-        self.execute([
-            "--e2e-output-data-path",
-            e2e_data_file_path.to_str().unwrap(),
-            "system",
-            "api-server",
-            "--address",
-            host.as_str(),
-        ])
-        .await
-        .success();
     }
 
     pub async fn execute<I, S>(&self, cmd: I) -> assert_cmd::assert::Assert

@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use std::io::Write;
+use std::net::Ipv4Addr;
+use std::path::PathBuf;
 
 use async_trait::async_trait;
 use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
@@ -32,6 +34,8 @@ pub trait KamuCliPuppetExt {
     async fn complete<T>(&self, input: T, current: usize) -> Vec<String>
     where
         T: Into<String> + Send;
+
+    async fn start_api_server(self, e2e_data_file_path: PathBuf);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -123,6 +127,21 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
         stdout.lines().map(ToString::to_string).collect()
+    }
+
+    async fn start_api_server(self, e2e_data_file_path: PathBuf) {
+        let host = Ipv4Addr::LOCALHOST.to_string();
+
+        self.execute([
+            "--e2e-output-data-path",
+            e2e_data_file_path.to_str().unwrap(),
+            "system",
+            "api-server",
+            "--address",
+            host.as_str(),
+        ])
+        .await
+        .success();
     }
 }
 
