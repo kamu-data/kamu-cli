@@ -7,11 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli::testing::Kamu;
+use kamu_cli_e2e_common::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_generate_token(kamu: Kamu) {
+pub async fn test_generate_token(kamu: KamuCliPuppet) {
     kamu.execute(["system", "generate-token", "--login", "test"])
         .await
         .success();
