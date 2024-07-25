@@ -162,7 +162,10 @@ impl APIServer {
             None
         };
 
-        let server = axum::Server::builder(bound_addr).serve(app.into_make_service());
+        let server = axum::Server::builder(bound_addr)
+            .http1_keepalive(true)
+            .http1_half_close(true)
+            .serve(app.into_make_service());
 
         Self {
             server,

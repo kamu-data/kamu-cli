@@ -34,7 +34,7 @@ geojson = { version = "0.24", default-features = false, features = [
     "geo-types",
 ] }
 glob = "0.3"
-object_store = { version = "0.10", features = ["aws"] }
+object_store = { version = "0.10.1", features = ["aws"] }
 serde = { version = "1" }
 serde_json = "1"
 sha3 = "0.10"

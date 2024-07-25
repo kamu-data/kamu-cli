@@ -26,7 +26,7 @@ macro_rules! kamu_cli_run_api_server_e2e_test {
     (inmem, $test_package: expr, $test_name: expr) => {
         paste::paste! {
             #[test_group::group(e2e)]
-            #[tokio::test]
+            #[test_log::test(tokio::test)]
             async fn [<$test_name>] () {
                 KamuCliApiServerHarness::inmem(None)
                     .run_api_server($test_package::$test_name)
@@ -37,7 +37,7 @@ macro_rules! kamu_cli_run_api_server_e2e_test {
     (inmem, $test_package: expr, $test_name: expr, $test_options: expr) => {
         paste::paste! {
             #[test_group::group(e2e)]
-            #[tokio::test]
+            #[test_log::test(tokio::test)]
             async fn [<$test_name>] () {
                 KamuCliApiServerHarness::inmem(Some($test_options))
                     .run_api_server($test_package::$test_name)

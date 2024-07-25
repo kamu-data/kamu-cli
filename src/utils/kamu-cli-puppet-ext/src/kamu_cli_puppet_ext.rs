@@ -13,6 +13,7 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
+use internal_error::InternalError;
 use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
 use opendatafabric::serde::DatasetSnapshotSerializer;
@@ -35,7 +36,7 @@ pub trait KamuCliPuppetExt {
     where
         T: Into<String> + Send;
 
-    async fn start_api_server(self, e2e_data_file_path: PathBuf);
+    async fn start_api_server(self, e2e_data_file_path: PathBuf) -> Result<String, InternalError>;
 
     async fn assert_last_data_slice(
         &self,
@@ -135,19 +136,30 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         stdout.lines().map(ToString::to_string).collect()
     }
 
-    async fn start_api_server(self, e2e_data_file_path: PathBuf) {
+    async fn start_api_server(self, e2e_data_file_path: PathBuf) -> Result<String, InternalError> {
         let host = Ipv4Addr::LOCALHOST.to_string();
 
-        self.execute([
-            "--e2e-output-data-path",
-            e2e_data_file_path.to_str().unwrap(),
-            "system",
-            "api-server",
-            "--address",
-            host.as_str(),
-        ])
-        .await
-        .success();
+        let assert = self
+            .execute([
+                "--e2e-output-data-path",
+                e2e_data_file_path.to_str().unwrap(),
+                "system",
+                "api-server",
+                "--address",
+                host.as_str(),
+            ])
+            .await
+            .success();
+
+        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+
+        let mut res = format!("stdout:\n{stdout}\n");
+
+        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+        res += format!("stderr:\n{stderr}\n").as_str();
+
+        Ok(res)
     }
 
     async fn assert_last_data_slice(

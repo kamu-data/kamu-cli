@@ -60,6 +60,8 @@ pub async fn dataset_ingest_handler(
     headers: HeaderMap,
     body_stream: axum::extract::BodyStream,
 ) -> Result<(), ApiError> {
+    dbg!("dataset_ingest_handler");
+
     let arguments = if params.upload_token.is_some() {
         resolve_ready_upload_arguments(&catalog, &params).await?
     } else {

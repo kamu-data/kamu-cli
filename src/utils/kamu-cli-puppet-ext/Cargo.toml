@@ -22,6 +22,7 @@ doctest = false
 
 
 [dependencies]
+internal-error = { workspace = true }
 kamu-cli-puppet = { workspace = true }
 kamu-data-utils = { workspace = true }
 opendatafabric = { workspace = true }

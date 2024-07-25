@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::time::Duration;
+
 use internal_error::{InternalError, ResultIntoInternal};
 use reqwest::{Method, Response, StatusCode, Url};
 use serde::Deserialize;
@@ -37,7 +39,13 @@ pub struct KamuApiServerClient {
 
 impl KamuApiServerClient {
     pub fn new(server_base_url: Url) -> Self {
-        let http_client = reqwest::Client::new();
+        let http_client = reqwest::Client::builder()
+            // .tcp_keepalive(Some(Duration::from_secs(60)))
+            // .timeout(Duration::from_secs(60))
+            .pool_max_idle_per_host(0)
+            .connection_verbose(true)
+            .build()
+            .unwrap();
 
         Self {
             http_client,
@@ -89,14 +97,25 @@ impl KamuApiServerClient {
         expected_response_body: Option<ExpectedResponseBody>,
     ) {
         let endpoint = self.server_base_url.join(endpoint).unwrap();
+
+        let client = reqwest::Client::builder()
+            .pool_max_idle_per_host(0)
+            .http1_allow_obsolete_multiline_headers_in_responses(true)
+            .timeout(Duration::from_secs(2))
+            // .http2_prior_knowledge()
+            .build()
+            .unwrap();
+
         let mut request_builder = match method {
-            Method::GET => self.http_client.get(endpoint),
-            Method::POST => self.http_client.post(endpoint),
-            Method::PUT => self.http_client.put(endpoint),
+            Method::GET => client.get(endpoint),
+            Method::POST => client.post(endpoint),
+            Method::PUT => client.put(endpoint),
             _ => {
                 unimplemented!()
             }
         };
+
+        request_builder = request_builder.timeout(Duration::from_secs(5));
 
         if let Some(token) = token {
             request_builder = request_builder.bearer_auth(token);
@@ -111,7 +130,10 @@ impl KamuApiServerClient {
             }
         };
 
-        let response = request_builder.send().await.unwrap();
+        let response = match request_builder.send().await {
+            Ok(response_body) => response_body,
+            Err(e) => panic!("Unexpected send error: {e:?}"),
+        };
 
         pretty_assertions::assert_eq!(expected_status, response.status());
 
@@ -180,10 +202,14 @@ impl KamuApiServerClient {
     }
 
     async fn graphql_api_call_impl(&self, query: &str, maybe_token: Option<String>) -> Response {
+        dbg!(2.1);
+
         let endpoint = self.server_base_url.join("graphql").unwrap();
         let request_data = serde_json::json!({
            "query": query
         });
+
+        dbg!(2.2);
 
         let mut request_builder = self.http_client.post(endpoint).json(&request_data);
 
@@ -191,7 +217,13 @@ impl KamuApiServerClient {
             request_builder = request_builder.bearer_auth(token);
         }
 
-        request_builder.send().await.unwrap()
+        dbg!(2.3);
+
+        let a = request_builder.send().await.unwrap();
+
+        dbg!(2.4);
+
+        a
     }
 
     async fn graphql_api_call_assert_impl(
@@ -200,12 +232,19 @@ impl KamuApiServerClient {
         expected_response: Result<&str, &str>,
         maybe_token: Option<String>,
     ) {
+        dbg!(2);
+
         let response = self.graphql_api_call_impl(query, maybe_token).await;
+
+        dbg!(3);
 
         pretty_assertions::assert_eq!(StatusCode::OK, response.status());
 
         let pretty_response_body: GraphQLPrettyResponseBody =
-            response.json::<GraphQLResponseBody>().await.unwrap().into();
+            match response.json::<GraphQLResponseBody>().await {
+                Ok(response_body) => response_body.into(),
+                Err(e) => panic!("Unexpected parsing error: {e:?}"),
+            };
 
         match (
             pretty_response_body.errors,

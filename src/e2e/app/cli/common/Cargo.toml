@@ -28,10 +28,11 @@ kamu-cli-puppet-ext = { workspace = true }
 opendatafabric = { workspace = true }
 
 chrono = { version = "0.4", default-features = false, features = ["now"] }
+futures = { version = "0.3", default-features = false }
 indoc = "2"
 pretty_assertions = "1"
 regex = "1"
-reqwest = { version = "0.11", default-features = false, features = ["json"] }
+reqwest = { version = "0.11.27", default-features = false, features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sqlx = { version = "0.7", default-features = false, features = [
@@ -39,7 +40,7 @@ sqlx = { version = "0.7", default-features = false, features = [
     "mysql",
     "sqlite",
 ] }
-tokio = { version = "1", default-features = false, features = ["macros", "fs"] }
+tokio = { version = "1", default-features = false, features = ["macros", "fs", "time"] }
 tokio-retry = "0.3"
 
 

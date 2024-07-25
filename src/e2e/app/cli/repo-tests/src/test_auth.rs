@@ -14,6 +14,7 @@ use kamu_cli_e2e_common::KamuApiServerClient;
 pub async fn test_login_password_predefined_successful(
     kamu_api_server_client: KamuApiServerClient,
 ) {
+    dbg!(1);
     kamu_api_server_client
         .graphql_api_call_assert(
             indoc::indoc!(

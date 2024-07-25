@@ -659,6 +659,8 @@ fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceL
         },
     };
 
+    dbg!(output_config.verbosity_level);
+
     if output_config.verbosity_level > 0 {
         // Log to STDERR
         tracing_subscriber::fmt()

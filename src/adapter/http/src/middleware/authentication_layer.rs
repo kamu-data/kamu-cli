@@ -117,10 +117,14 @@ where
         Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        dbg!("poll_ready");
+
         self.inner.poll_ready(cx)
     }
 
     fn call(&mut self, mut request: http::Request<Body>) -> Self::Future {
+        dbg!("call");
+
         // Inspired by https://github.com/maxcountryman/axum-login/blob/5239b38b2698a3db3f92075b6ad430aea79c215a/axum-login/src/auth.rs
         // TODO: PERF: Is cloning a performance concern?
         let mut inner = self.inner.clone();

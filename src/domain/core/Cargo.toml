@@ -47,7 +47,7 @@ url = { version = "2", default-features = false, features = ["serde"] }
 datafusion = { version = "39", default-features = false, features = [
     "parquet",
 ] }
-object_store = { version = "0.10", default-features = false }
+object_store = { version = "0.10.1", default-features = false }
 
 # TODO: Make serde optional
 serde = { version = "1", default-features = false, features = ["derive"] }

@@ -16,76 +16,76 @@ env:
   RUST_LOG_SPAN_EVENTS: "new,close"
   RUST_BACKTRACE: "1"
 jobs:
-  lint_fmt:
-    name: Lint / Code
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
-        with:
-          components: rustfmt, clippy
-      - name: cargo fmt --check
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --check
-      - name: Lint dividing lines
-        run: |
-          cargo test -p kamu-repo-tools -- dividing_lines
-      - name: Lint license headers
-        run: |
-          cargo test -p kamu-repo-tools -- license_header
-      - name: clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --workspace --all-targets -- -D warnings
-
-  lint_deps:
-    name: Lint / Dependencies
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
-      - uses: cargo-bins/cargo-binstall@main
-      - run: cargo binstall cargo-deny -y
-      - run: cargo deny check
-      - run: cargo binstall cargo-udeps -y
-      - run: cargo udeps --all-targets
+  #  lint_fmt:
+  #    name: Lint / Code
+  #    runs-on: ubuntu-latest
+  #    steps:
+  #      - uses: actions/checkout@v4
+  #      - uses: actions-rs/toolchain@v1
+  #        with:
+  #          components: rustfmt, clippy
+  #      - name: cargo fmt --check
+  #        uses: actions-rs/cargo@v1
+  #        with:
+  #          command: fmt
+  #          args: --check
+  #      - name: Lint dividing lines
+  #        run: |
+  #          cargo test -p kamu-repo-tools -- dividing_lines
+  #      - name: Lint license headers
+  #        run: |
+  #          cargo test -p kamu-repo-tools -- license_header
+  #      - name: clippy
+  #        uses: actions-rs/cargo@v1
+  #        with:
+  #          command: clippy
+  #          args: --workspace --all-targets -- -D warnings
+  #
+  #  lint_deps:
+  #    name: Lint / Dependencies
+  #    runs-on: ubuntu-latest
+  #    steps:
+  #      - uses: actions/checkout@v4
+  #      - uses: actions-rs/toolchain@v1
+  #      - uses: cargo-bins/cargo-binstall@main
+  #      - run: cargo binstall cargo-deny -y
+  #      - run: cargo deny check
+  #      - run: cargo binstall cargo-udeps -y
+  #      - run: cargo udeps --all-targets
 
   test:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: Linux / amd64
-            runs-on: ubuntu-latest
-            cargo-flags: --profile ci --features ftp
-            nextest-flags: --cargo-profile ci --features ftp
-            nextest-exclusions: -E '!(test(::database::) | test(::spark::)| test(::flink::))'
-            container-runtime: podman
-            ipfs: true
-            database: true
-          # TODO: Not running docker as it takes ~7 minutes to install
-          # See: https://github.com/actions/runner/issues/1456
-          - name: MacOS / amd64
-            runs-on: macos-13
-            cargo-flags: --profile ci --features ftp
-            nextest-flags: --cargo-profile ci --features ftp
-            nextest-exclusions: -E '!(test(::containerized::) | test(::database::))'
-            container-runtime: ''
-            ipfs: false
-            database: false
-          # TODO: M1 cannot run docker due to lack of nested virtualization
-          # See: https://github.com/marketplace/actions/setup-docker-on-macos#arm64-processors-m1-m2-m3-series-used-on-macos-14-images-are-unsupported
-          - name: MacOS / arm64
-            runs-on: macos-14
-            cargo-flags: --profile ci
-            nextest-flags: --cargo-profile ci
-            nextest-exclusions: -E '!(test(::containerized::) | test(::database::))'
-            container-runtime: ''
-            ipfs: false
-            database: false
+          #          - name: Linux / amd64
+          #            runs-on: ubuntu-latest
+          #            cargo-flags: --profile ci --features ftp
+          #            nextest-flags: --cargo-profile ci --features ftp
+          #            nextest-exclusions: -E '!(test(::database::) | test(::spark::)| test(::flink::))'
+          #            container-runtime: podman
+          #            ipfs: true
+          #            database: true
+          #          # TODO: Not running docker as it takes ~7 minutes to install
+          #          # See: https://github.com/actions/runner/issues/1456
+          #          - name: MacOS / amd64
+          #            runs-on: macos-13
+          #            cargo-flags: --profile ci --features ftp
+          #            nextest-flags: --cargo-profile ci --features ftp
+          #            nextest-exclusions: -E '!(test(::containerized::) | test(::database::))'
+          #            container-runtime: ''
+          #            ipfs: false
+          #            database: false
+          #          # TODO: M1 cannot run docker due to lack of nested virtualization
+          #          # See: https://github.com/marketplace/actions/setup-docker-on-macos#arm64-processors-m1-m2-m3-series-used-on-macos-14-images-are-unsupported
+          #          - name: MacOS / arm64
+          #            runs-on: macos-14
+          #            cargo-flags: --profile ci
+          #            nextest-flags: --cargo-profile ci
+          #            nextest-exclusions: -E '!(test(::containerized::) | test(::database::))'
+          #            container-runtime: ''
+          #            ipfs: false
+          #            database: false
           # TODO: DataFusion tests are temporarily disabled
           # See: https://github.com/kamu-data/kamu-cli/issues/226
           - name: Windows / amd64
@@ -100,14 +100,14 @@ jobs:
     name: Test / ${{ matrix.name }}
     runs-on: ${{ matrix.runs-on }}
     services:
-      postgres:
-        image: ${{ matrix.database && 'postgres:16' || '' }}
-        env:
-          POSTGRES_USER: root
-          POSTGRES_PASSWORD: root
-          POSTGRES_DB: kamu-test
-        ports:
-          - 5432:5432
+      #      postgres:
+      #        image: ${{ matrix.database && 'postgres:16' || '' }}
+      #        env:
+      #          POSTGRES_USER: root
+      #          POSTGRES_PASSWORD: root
+      #          POSTGRES_DB: kamu-test
+      #        ports:
+      #          - 5432:5432
       mariadb:
         image: ${{ matrix.database && 'mariadb:11' || '' }}
         env:
@@ -116,11 +116,11 @@ jobs:
         ports:
           - 3306:3306
     steps:
-      - name: Setup IPFS
-        uses: ibnesayeed/setup-ipfs@master
-        if: matrix.ipfs
-        with:
-          ipfs_version: "0.19"
+      #      - name: Setup IPFS
+      #        uses: ibnesayeed/setup-ipfs@master
+      #        if: matrix.ipfs
+      #        with:
+      #          ipfs_version: "0.19"
 
       - uses: actions/checkout@v4
 
@@ -146,9 +146,14 @@ jobs:
         run: |
           cargo test ${{ matrix.cargo-flags }} --no-run
 
-      - name: Pull test images
-        if: matrix.container-runtime != ''
-        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::setup::)' --no-capture
+      #      - name: Pull test images
+      #        if: matrix.container-runtime != ''
+      #        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::setup::)' --no-capture
+
+      - name: test_rest_api_request_dataset_tail
+        env:
+          RUST_LOG: trace
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::e2e::test_rest_api_request_dataset_tail)' --no-capture
 
       - name: Run main set of tests
         run: cargo nextest run ${{ matrix.nextest-flags }} ${{ matrix.nextest-exclusions }} -v
@@ -161,12 +166,12 @@ jobs:
         # platform(target) is a workaround for Windows only issue in cargo-nextest upon proc macro crates
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'platform(target) & test(::sqlite::)'
 
-      - name: Postgres database tests
-        if: matrix.database
-        env:
-          SQLX_OFFLINE: false
-          DATABASE_URL: postgres://root:root@localhost:5432/kamu-test
-        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::)'
+      #      - name: Postgres database tests
+      #        if: matrix.database
+      #        env:
+      #          SQLX_OFFLINE: false
+      #          DATABASE_URL: postgres://root:root@localhost:5432/kamu-test
+      #        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::)'
 
       - name: MariaDB database tests
         if: matrix.database

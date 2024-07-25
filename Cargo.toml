@@ -229,7 +229,7 @@ incremental = false
 debug = "line-tables-only"
 
 
-# Use this section to test or apply emergency ovverides to dependencies
+# Use this section to test or apply emergency overides to dependencies
 # See: https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html
 [patch.crates-io]
 # datafusion = { git = 'https://github.com/apache/datafusion.git', tag = '39.0.0-rc1' }
@@ -238,3 +238,4 @@ debug = "line-tables-only"
 # datafusion-expr = { git = 'https://github.com/apache/datafusion.git', tag = '39.0.0-rc1' }
 datafusion-odata = { git = 'https://github.com/kamu-data/datafusion-odata.git', branch = 'axum-0.6' }
 # datafusion-ethers = { git = "https://github.com/kamu-data/datafusion-ethers.git", tag = "v39.0.0" }
+# object_store = { git = 'https://github.com/s373r/arrow-rs', branch = 'add-debug-logs', package = "object_store" }

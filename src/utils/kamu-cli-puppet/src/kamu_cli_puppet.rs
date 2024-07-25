@@ -110,6 +110,9 @@ impl KamuCliPuppet {
     {
         let mut command = assert_cmd::Command::cargo_bin("kamu-cli").unwrap();
 
+        command.env("RUST_LOG", "trace");
+        command.arg("-v");
+
         command.current_dir(self.workspace_path.clone());
 
         if let Some(system_time) = &self.system_time {

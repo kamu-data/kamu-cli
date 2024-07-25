@@ -431,6 +431,9 @@ pub(crate) async fn get_object_store(
     url: &Url,
     table_options: &TableOptions,
 ) -> Result<Arc<dyn ObjectStore>, DataFusionError> {
+    dbg!(scheme);
+    dbg!(&url);
+
     let store: Arc<dyn ObjectStore> = match scheme {
         "s3" => {
             let Some(options) = table_options.extensions.get::<AwsOptions>() else {

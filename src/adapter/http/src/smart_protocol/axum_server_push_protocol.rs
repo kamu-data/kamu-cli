@@ -81,7 +81,7 @@ impl AxumServerPushProtocolInstance {
             }
         }
 
-        // After we finish processing to ensure gracefull closing
+        // After we finish processing to ensure graceful closing
         // we wait for client acknowledgment. And to handle
         // custom clients without logic of close acknowledgment
         // we will give 5 secs timeout
