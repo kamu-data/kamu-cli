@@ -5409,6 +5409,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-cli-puppet"
+version = "0.191.4"
+dependencies = [
+ "assert_cmd",
+ "chrono",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "kamu-cli-puppet-ext"
+version = "0.191.4"
+dependencies = [
+ "async-trait",
+ "kamu-cli-puppet",
+ "opendatafabric",
+ "tempfile",
+]
+
+[[package]]
 name = "kamu-core"
 version = "0.191.5"
 dependencies = [
