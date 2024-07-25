@@ -99,6 +99,14 @@ pub fn get_command(
             submatches.get_flag("recursive"),
             submatches.get_flag("yes"),
         )),
+        Some(("e2e", submatches)) => Box::new(E2ECommand::new(
+            submatches
+                .get_one::<String>("action")
+                .map(String::as_str)
+                .unwrap(),
+            submatches.get_one::<DatasetRef>("dataset").cloned(),
+            cli_catalog.get_one()?,
+        )),
         Some(("ingest", submatches)) => Box::new(IngestCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,

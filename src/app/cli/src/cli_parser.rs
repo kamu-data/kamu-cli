@@ -297,6 +297,22 @@ pub fn cli() -> Command {
                             kamu delete my.dataset.%
                         "#
                     )),
+                Command::new("e2e")
+                    .about("Hidden command, used exclusively in E2E tests")
+                    .hide(true)
+                    .args([
+                        Arg::new("action")
+                            .long("action")
+                            .required(true)
+                            .value_name("ACT")
+                            .value_parser([
+                                "get-last-data-block-path",
+                            ]),
+                        Arg::new("dataset")
+                            .long("dataset")
+                            .value_parser(value_parse_dataset_ref_local)
+                            .help("Local dataset reference"),
+                    ]),
                 Command::new("ingest")
                     .about("Adds data to the root dataset according to its push source configuration")
                     .args([
