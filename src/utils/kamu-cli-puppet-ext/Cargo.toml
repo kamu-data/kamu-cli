@@ -22,10 +22,12 @@ doctest = false
 
 
 [dependencies]
-opendatafabric = { workspace = true }
 kamu-cli-puppet = { workspace = true }
+kamu-data-utils = { workspace = true }
+opendatafabric = { workspace = true }
 
 async-trait = "0.1"
+datafusion = { version = "39", default-features = false }
 tempfile = "3"
 
 

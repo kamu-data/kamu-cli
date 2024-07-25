@@ -12,10 +12,11 @@ use std::net::Ipv4Addr;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
+use datafusion::prelude::{ParquetReadOptions, SessionContext};
 use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
 use opendatafabric::serde::DatasetSnapshotSerializer;
-use opendatafabric::{DatasetRef, DatasetSnapshot};
+use opendatafabric::{DatasetName, DatasetRef, DatasetSnapshot};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,6 +36,13 @@ pub trait KamuCliPuppetExt {
         T: Into<String> + Send;
 
     async fn start_api_server(self, e2e_data_file_path: PathBuf);
+
+    async fn assert_last_data_slice(
+        &self,
+        dataset_name: &DatasetName,
+        expected_schema: &str,
+        expected_data: &str,
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -140,6 +148,46 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         ])
         .await
         .success();
+    }
+
+    async fn assert_last_data_slice(
+        &self,
+        dataset_name: &DatasetName,
+        expected_schema: &str,
+        expected_data: &str,
+    ) {
+        let assert = self
+            .execute([
+                "e2e",
+                "--action",
+                "get-last-data-block-path",
+                "--dataset",
+                dataset_name.as_str(),
+            ])
+            .await
+            .success();
+
+        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+        let part_file: PathBuf = stdout.trim().parse().unwrap();
+
+        let ctx = SessionContext::new();
+        let df = ctx
+            .read_parquet(
+                vec![part_file.to_string_lossy().to_string()],
+                ParquetReadOptions {
+                    file_extension: "",
+                    table_partition_cols: Vec::new(),
+                    parquet_pruning: None,
+                    skip_metadata: None,
+                    schema: None,
+                    file_sort_order: Vec::new(),
+                },
+            )
+            .await
+            .unwrap();
+
+        kamu_data_utils::testing::assert_data_eq(df.clone(), expected_data).await;
+        kamu_data_utils::testing::assert_schema_eq(df.schema(), expected_schema);
     }
 }
 
