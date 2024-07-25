@@ -6,8 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Changed
-- E2E: tests run `kamu-cli` child processes instead of `kamu-cli` compiled inside itself
-- E2E: update of the interfaces for interacting with puppet `kamu-cli`: stdout/stderr analysis is now available
+- E2E: Reorganized work with tests that call `kamu-cli`:
+  - Added `kamu-cli-puppet` crate to allow `kamu-cli` to be run as a separate process from tests.
+    The crate contains basic functionality: calling commands.
+  - Added `kamu-cli-puppet-ext` crate containing extensions based on `kamu-cli-puppet` command calls
+  - Removed past `kamu-cli` wrapper that ran in-process.
+  - Some of `kamu-cli` tests that are inherently E2E are moved and adapted to E2E scope
 
 ## Unreleased
 ### Fixed
