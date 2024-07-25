@@ -5220,7 +5220,6 @@ name = "kamu-cli"
 version = "0.191.5"
 dependencies = [
  "arrow-flight",
- "assert_cmd",
  "async-graphql",
  "async-graphql-axum",
  "async-trait",
@@ -5266,6 +5265,7 @@ dependencies = [
  "kamu-adapter-http",
  "kamu-adapter-oauth",
  "kamu-adapter-odata",
+ "kamu-cli-puppet",
  "kamu-data-utils",
  "kamu-datafusion-cli",
  "kamu-datasets",
@@ -5299,7 +5299,6 @@ dependencies = [
  "shlex",
  "signal-hook",
  "tempfile",
- "test-group",
  "test-log",
  "thiserror",
  "tokio",
@@ -5427,7 +5426,9 @@ name = "kamu-cli-puppet-ext"
 version = "0.191.4"
 dependencies = [
  "async-trait",
+ "datafusion",
  "kamu-cli-puppet",
+ "kamu-data-utils",
  "opendatafabric",
  "tempfile",
 ]

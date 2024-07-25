@@ -8,13 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use std::path::Path;
+use std::sync::Arc;
 
 use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
-use kamu_cli::testing::Kamu;
 use kamu_cli::*;
+use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
 
@@ -24,8 +25,10 @@ use opendatafabric::*;
 async fn test_workspace_upgrade() {
     let temp_dir = tempfile::tempdir().unwrap();
 
-    let kamu = Kamu::new(temp_dir.path());
-    let workspace_svc = kamu.catalog().get_one::<WorkspaceService>().unwrap();
+    let dot_kamu_path = temp_dir.path().join(KAMU_WORKSPACE_DIR_NAME);
+    let workspace_layout = Arc::new(WorkspaceLayout::new(dot_kamu_path));
+    let workspace_svc = WorkspaceService::new(workspace_layout, false);
+
     assert_eq!(workspace_svc.workspace_version().unwrap(), None);
 
     init_v0_workspace(temp_dir.path()).await;
@@ -41,6 +44,8 @@ async fn test_workspace_upgrade() {
         workspace_svc.workspace_version().unwrap(),
         Some(WorkspaceVersion::V0_Initial)
     );
+
+    let kamu = KamuCliPuppet::new(temp_dir.path());
 
     let assert = kamu.execute(["list"]).await.failure();
     let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
