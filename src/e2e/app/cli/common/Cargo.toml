@@ -23,6 +23,8 @@ doctest = false
 
 [dependencies]
 internal-error = { workspace = true }
+kamu-cli-puppet = { workspace = true }
+kamu-cli-puppet-ext = { workspace = true }
 opendatafabric = { workspace = true }
 
 assert_cmd = "2"

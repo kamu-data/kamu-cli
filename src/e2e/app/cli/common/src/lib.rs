@@ -12,14 +12,10 @@
 mod e2e_harness;
 mod e2e_test;
 mod kamu_api_server_client;
-mod kamu_cli_puppet;
-mod kamu_cli_puppet_ext;
 
 pub use e2e_harness::*;
 pub use e2e_test::*;
 pub use kamu_api_server_client::*;
-pub use kamu_cli_puppet::*;
-pub use kamu_cli_puppet_ext::*;
 
 pub mod prelude;
 

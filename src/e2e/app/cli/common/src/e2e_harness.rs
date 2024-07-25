@@ -10,16 +10,12 @@
 use std::future::Future;
 
 use chrono::{DateTime, NaiveTime, Utc};
+use kamu_cli_puppet::{KamuCliPuppet, NewWorkspaceOptions};
+use kamu_cli_puppet_ext::KamuCliPuppetExt;
 use regex::Regex;
 use sqlx::{MySqlPool, PgPool, SqlitePool};
 
-use crate::{
-    api_server_e2e_test,
-    KamuApiServerClient,
-    KamuCliPuppet,
-    KamuCliPuppetExt,
-    NewWorkspaceOptions,
-};
+use crate::{api_server_e2e_test, KamuApiServerClient};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

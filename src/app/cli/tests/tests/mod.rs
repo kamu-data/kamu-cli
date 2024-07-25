@@ -10,7 +10,6 @@
 mod test_access_token_registry_svc;
 mod test_di_graph;
 mod test_generate_cli_markdown;
-mod test_ingest_command;
 mod test_new_dataset_command;
 mod test_output;
 mod test_system_info_command;

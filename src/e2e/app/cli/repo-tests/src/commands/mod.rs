@@ -9,6 +9,7 @@
 
 mod test_add_command;
 mod test_complete_command;
+mod test_ingest_command;
 mod test_repo_alias_command;
 mod test_sql_command;
 mod test_system_generate_token_command;
