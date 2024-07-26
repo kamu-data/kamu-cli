@@ -69,7 +69,13 @@ use kamu_flow_system_services::{
 use kamu_task_system::{self as ts, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::{TaskMessageConsumerMediator, TaskSchedulerImpl};
-use messaging_outbox::{post_outbox_message, Outbox, OutboxImmediateImpl};
+use messaging_outbox::{
+    post_outbox_message,
+    MessageRelevance,
+    Outbox,
+    OutboxConfig,
+    OutboxImmediateImpl,
+};
 use opendatafabric::{AccountID, DatasetID, DatasetKind, Multihash};
 use time_source::SystemTimeSourceDefault;
 
@@ -2585,6 +2591,7 @@ impl FlowRunsHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<OutboxImmediateImpl>()
+                .add_value(OutboxConfig::for_tests())
                 .add::<CoreMessageConsumerMediator>()
                 .add::<FlowMessageConsumerMediator>()
                 .add::<TaskMessageConsumerMediator>()
@@ -2754,6 +2761,7 @@ impl FlowRunsHarness {
                 event_time,
                 task_id,
             },
+            MessageRelevance::Essential,
         )
         .await
         .unwrap();
@@ -2791,6 +2799,7 @@ impl FlowRunsHarness {
                 task_id,
                 outcome: task_outcome,
             },
+            MessageRelevance::Essential,
         )
         .await
         .unwrap();

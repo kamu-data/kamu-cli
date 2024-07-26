@@ -22,7 +22,7 @@ use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
-use messaging_outbox::OutboxImmediateImpl;
+use messaging_outbox::{OutboxConfig, OutboxImmediateImpl};
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
 
@@ -440,6 +440,7 @@ impl FlowConfigurationHarness {
             let mut b = CatalogBuilder::new();
 
             b.add::<OutboxImmediateImpl>()
+                .add_value(OutboxConfig::for_tests())
                 .add::<CoreMessageConsumerMediator>()
                 .add::<FlowMessageConsumerMediator>()
                 .add::<FlowConfigTestListener>()

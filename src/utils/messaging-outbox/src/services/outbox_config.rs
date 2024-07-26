@@ -18,15 +18,46 @@ pub struct OutboxConfig {
     pub awaiting_step: Duration,
     /// Defines maximum number of messages attempted to read in 1 step
     pub batch_size: i64,
+    /// Minimal relevance level
+    pub minimal_relevance: MessageRelevance,
 }
 
 impl OutboxConfig {
-    pub fn new(awaiting_step: Duration, batch_size: i64) -> Self {
+    pub fn new(
+        awaiting_step: Duration,
+        batch_size: i64,
+        minimal_relevance: MessageRelevance,
+    ) -> Self {
         Self {
             awaiting_step,
             batch_size,
+            minimal_relevance,
         }
     }
+
+    pub fn for_tests() -> Self {
+        Self {
+            awaiting_step: Duration::seconds(1),
+            batch_size: 20,
+            minimal_relevance: MessageRelevance::Essential,
+        }
+    }
+
+    pub fn for_tests_with_diagnostic_on() -> Self {
+        Self {
+            awaiting_step: Duration::seconds(1),
+            batch_size: 20,
+            minimal_relevance: MessageRelevance::Diagnostic,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MessageRelevance {
+    Essential = 50,
+    Diagnostic = 10,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

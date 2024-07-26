@@ -30,7 +30,7 @@ use kamu_core::{
     DeleteDatasetUseCase,
     DependencyGraphService,
 };
-use messaging_outbox::OutboxImmediateImpl;
+use messaging_outbox::{OutboxConfig, OutboxImmediateImpl};
 use time_source::SystemTimeSourceDefault;
 
 use super::test_dataset_repository_shared;
@@ -53,6 +53,7 @@ impl S3RepoHarness {
         catalog
             .add::<SystemTimeSourceDefault>()
             .add::<OutboxImmediateImpl>()
+            .add_value(OutboxConfig::for_tests())
             .add::<CoreMessageConsumerMediator>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())

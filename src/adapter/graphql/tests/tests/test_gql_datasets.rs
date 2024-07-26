@@ -15,7 +15,7 @@ use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::*;
 use kamu_core::*;
-use messaging_outbox::OutboxImmediateImpl;
+use messaging_outbox::{OutboxConfig, OutboxImmediateImpl};
 use mockall::predicate::eq;
 use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
 use opendatafabric::serde::DatasetSnapshotSerializer;
@@ -677,6 +677,7 @@ impl GraphQLDatasetsHarness {
 
             b.add::<SystemTimeSourceDefault>()
                 .add::<OutboxImmediateImpl>()
+                .add_value(OutboxConfig::for_tests())
                 .add::<CoreMessageConsumerMediator>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<RenameDatasetUseCaseImpl>()

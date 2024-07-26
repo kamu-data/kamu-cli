@@ -24,6 +24,7 @@ use kamu_datasets::{DatasetEnvVar, DatasetEnvVarsType};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 
 use crate::accounts::AccountService;
+use crate::config::MessageRelevance;
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
@@ -614,6 +615,10 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(messaging_outbox::OutboxConfig::new(
         Duration::seconds(outbox_config.awaiting_step_secs.unwrap()),
         outbox_config.batch_size.unwrap(),
+        match outbox_config.minimal_relevance.as_ref().unwrap() {
+            MessageRelevance::Essential => messaging_outbox::MessageRelevance::Essential,
+            MessageRelevance::Diagnostic => messaging_outbox::MessageRelevance::Diagnostic,
+        },
     ));
 }
 

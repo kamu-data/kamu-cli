@@ -34,7 +34,7 @@ use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::{TaskMessageConsumerMediator, TaskSchedulerImpl};
-use messaging_outbox::OutboxImmediateImpl;
+use messaging_outbox::{OutboxConfig, OutboxImmediateImpl};
 use opendatafabric::*;
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::task::yield_now;
@@ -112,6 +112,7 @@ impl FlowHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<OutboxImmediateImpl>()
+                .add_value(OutboxConfig::for_tests_with_diagnostic_on())
                 .add::<CoreMessageConsumerMediator>()
                 .add::<FlowMessageConsumerMediator>()
                 .add::<TaskMessageConsumerMediator>()

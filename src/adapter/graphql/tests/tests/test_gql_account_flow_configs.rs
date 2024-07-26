@@ -40,7 +40,7 @@ use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMemory, FlowEventStore
 use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceImpl};
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
-use messaging_outbox::OutboxImmediateImpl;
+use messaging_outbox::{OutboxConfig, OutboxImmediateImpl};
 use opendatafabric::{AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
 use time_source::SystemTimeSourceDefault;
 
@@ -653,6 +653,7 @@ impl FlowConfigHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<OutboxImmediateImpl>()
+                .add_value(OutboxConfig::for_tests())
                 .add::<CoreMessageConsumerMediator>()
                 .add_builder(
                     DatasetRepositoryLocalFs::builder()

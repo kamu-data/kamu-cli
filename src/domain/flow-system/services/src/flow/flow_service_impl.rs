@@ -21,7 +21,7 @@ use kamu_core::messages::DatasetDeletedMessage;
 use kamu_core::{DatasetChangesService, DatasetOwnershipService, DependencyGraphService};
 use kamu_flow_system::*;
 use kamu_task_system::*;
-use messaging_outbox::{post_outbox_message, MessageConsumerT, Outbox};
+use messaging_outbox::{post_outbox_message, MessageConsumerT, MessageRelevance, Outbox};
 use opendatafabric::{AccountID, DatasetID};
 use time_source::SystemTimeSource;
 use tokio_stream::StreamExt;
@@ -924,6 +924,7 @@ impl FlowService for FlowServiceImpl {
                             update_time: start_time,
                             update_details: FlowServiceUpdateDetails::Loaded,
                         },
+                        MessageRelevance::Diagnostic,
                     )
                     .await?;
 
@@ -962,6 +963,7 @@ impl FlowService for FlowServiceImpl {
                                 update_time: nearest_activation_time,
                                 update_details: FlowServiceUpdateDetails::ExecutedTimeslot,
                             },
+                            MessageRelevance::Diagnostic,
                         )
                         .await
                     })
@@ -1305,6 +1307,7 @@ impl MessageConsumerT<TaskRunningMessage> for FlowServiceImpl {
                     update_time: message.event_time,
                     update_details: FlowServiceUpdateDetails::FlowRunning,
                 },
+                MessageRelevance::Diagnostic,
             )
             .await?;
         }
@@ -1386,6 +1389,7 @@ impl MessageConsumerT<TaskFinishedMessage> for FlowServiceImpl {
                     update_time: message.event_time,
                     update_details: FlowServiceUpdateDetails::FlowFinished,
                 },
+                MessageRelevance::Diagnostic,
             )
             .await?;
 

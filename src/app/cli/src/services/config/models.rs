@@ -654,6 +654,14 @@ impl Default for UploadsConfig {
 pub struct OutboxConfig {
     pub awaiting_step_secs: Option<i64>,
     pub batch_size: Option<i64>,
+    pub minimal_relevance: Option<MessageRelevance>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MessageRelevance {
+    Essential,
+    Diagnostic,
 }
 
 impl OutboxConfig {
@@ -667,6 +675,7 @@ impl Default for OutboxConfig {
         Self {
             awaiting_step_secs: Some(1),
             batch_size: Some(20),
+            minimal_relevance: Some(MessageRelevance::Essential),
         }
     }
 }

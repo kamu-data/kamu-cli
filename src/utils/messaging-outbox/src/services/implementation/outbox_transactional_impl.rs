@@ -13,11 +13,12 @@ use dill::{component, interface};
 use internal_error::InternalError;
 use time_source::SystemTimeSource;
 
-use crate::{NewOutboxMessage, Outbox, OutboxMessageRepository};
+use crate::{MessageRelevance, NewOutboxMessage, Outbox, OutboxConfig, OutboxMessageRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct OutboxTransactionalImpl {
+    outbox_config: Arc<OutboxConfig>,
     outbox_message_repository: Arc<dyn OutboxMessageRepository>,
     time_source: Arc<dyn SystemTimeSource>,
 }
@@ -26,10 +27,12 @@ pub struct OutboxTransactionalImpl {
 #[interface(dyn Outbox)]
 impl OutboxTransactionalImpl {
     pub fn new(
+        outbox_config: Arc<OutboxConfig>,
         outbox_message_repository: Arc<dyn OutboxMessageRepository>,
         time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
+            outbox_config,
             outbox_message_repository,
             time_source,
         }
@@ -44,7 +47,12 @@ impl Outbox for OutboxTransactionalImpl {
         producer_name: &str,
         message_type: &str,
         content_json: serde_json::Value,
+        relevance: MessageRelevance,
     ) -> Result<(), InternalError> {
+        if relevance < self.outbox_config.minimal_relevance {
+            return Ok(());
+        }
+
         let new_outbox_message = NewOutboxMessage {
             message_type: message_type.to_string(),
             content_json,

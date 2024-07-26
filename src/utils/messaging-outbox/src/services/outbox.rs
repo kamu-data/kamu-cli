@@ -9,6 +9,7 @@
 
 use internal_error::InternalError;
 
+use super::MessageRelevance;
 use crate::Message;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,6 +21,7 @@ pub trait Outbox: Send + Sync {
         publisher_name: &str,
         message_type: &str,
         content_json: serde_json::Value,
+        relevance: MessageRelevance,
     ) -> Result<(), InternalError>;
 }
 
@@ -30,10 +32,16 @@ pub async fn post_outbox_message<M: Message>(
     outbox: &dyn Outbox,
     publisher_name: &str,
     message: M,
+    relevance: MessageRelevance,
 ) -> Result<(), InternalError> {
     let message_as_json = serde_json::to_value(&message).unwrap();
     outbox
-        .post_message_as_json(publisher_name, message.type_name(), message_as_json)
+        .post_message_as_json(
+            publisher_name,
+            message.type_name(),
+            message_as_json,
+            relevance,
+        )
         .await
 }
 

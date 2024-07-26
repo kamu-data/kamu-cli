@@ -10,7 +10,7 @@
 use dill::{component, interface};
 use internal_error::InternalError;
 
-use crate::Outbox;
+use crate::{MessageRelevance, Outbox};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,6 +25,7 @@ impl Outbox for DummyOutboxImpl {
         _publisher_name: &str,
         _message_type: &str,
         _content_json: serde_json::Value,
+        _relevance: MessageRelevance,
     ) -> Result<(), InternalError> {
         // We are happy
         Ok(())

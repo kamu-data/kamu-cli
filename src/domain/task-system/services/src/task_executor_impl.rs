@@ -19,7 +19,7 @@ use kamu_core::{
     PullService,
 };
 use kamu_task_system::*;
-use messaging_outbox::{post_outbox_message, Outbox};
+use messaging_outbox::{post_outbox_message, MessageRelevance, Outbox};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,6 +69,7 @@ impl TaskExecutorImpl {
                             event_time: self.time_source.now(),
                             task_id,
                         },
+                        MessageRelevance::Essential,
                     )
                     .await?;
 
@@ -182,6 +183,7 @@ impl TaskExecutorImpl {
                             task_id: task.task_id,
                             outcome: task_outcome,
                         },
+                        MessageRelevance::Essential,
                     )
                     .await
                 },

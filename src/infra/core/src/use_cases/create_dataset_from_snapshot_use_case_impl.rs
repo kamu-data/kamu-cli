@@ -20,7 +20,7 @@ use kamu_core::{
     DatasetDependenciesUpdatedMessage,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use messaging_outbox::{post_outbox_message, Outbox};
+use messaging_outbox::{post_outbox_message, MessageRelevance, Outbox};
 use opendatafabric::DatasetSnapshot;
 
 use crate::DatasetRepositoryWriter;
@@ -77,6 +77,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             self.outbox.as_ref(),
             MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
             message_created,
+            MessageRelevance::Essential,
         )
         .await?;
 
@@ -90,6 +91,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                 self.outbox.as_ref(),
                 MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
                 message_dependencies_updated,
+                MessageRelevance::Essential,
             )
             .await?;
         }

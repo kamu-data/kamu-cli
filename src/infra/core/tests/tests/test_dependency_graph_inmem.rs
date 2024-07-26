@@ -17,7 +17,7 @@ use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
-use messaging_outbox::OutboxImmediateImpl;
+use messaging_outbox::{OutboxConfig, OutboxImmediateImpl};
 use opendatafabric::*;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
@@ -577,6 +577,7 @@ impl DependencyGraphHarness {
             .add::<CoreMessageConsumerMediator>()
             .add::<SystemTimeSourceDefault>()
             .add::<OutboxImmediateImpl>()
+            .add_value(OutboxConfig::for_tests())
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)

@@ -13,12 +13,20 @@ use std::sync::Arc;
 use dill::{component, interface, Catalog};
 use internal_error::InternalError;
 
-use crate::{organize_consumers_mediators, ConsumerFilter, MessageConsumersMediator, Outbox};
+use crate::{
+    organize_consumers_mediators,
+    ConsumerFilter,
+    MessageConsumersMediator,
+    MessageRelevance,
+    Outbox,
+    OutboxConfig,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct OutboxImmediateImpl {
     catalog: Catalog,
+    outbox_config: Arc<OutboxConfig>,
     consumers_mediator_per_message_type: HashMap<String, Arc<dyn MessageConsumersMediator>>,
 }
 
@@ -28,10 +36,12 @@ impl OutboxImmediateImpl {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(
         catalog: Catalog,
+        outbox_config: Arc<OutboxConfig>,
         message_consumer_mediators: Vec<Arc<dyn MessageConsumersMediator>>,
     ) -> Self {
         Self {
             catalog,
+            outbox_config,
             consumers_mediator_per_message_type: organize_consumers_mediators(
                 &message_consumer_mediators,
             ),
@@ -47,7 +57,12 @@ impl Outbox for OutboxImmediateImpl {
         _publisher_name: &str,
         message_type: &str,
         content_json: serde_json::Value,
+        relevance: MessageRelevance,
     ) -> Result<(), InternalError> {
+        if relevance < self.outbox_config.minimal_relevance {
+            return Ok(());
+        }
+
         let maybe_consumers_mediator = self.consumers_mediator_per_message_type.get(message_type);
         if let Some(consumers_mediator) = maybe_consumers_mediator {
             consumers_mediator

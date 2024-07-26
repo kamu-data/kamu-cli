@@ -9,7 +9,7 @@
 
 use internal_error::InternalError;
 
-use crate::Outbox;
+use crate::{MessageRelevance, Outbox};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,6 +23,7 @@ mockall::mock! {
             publisher_name: &str,
             message_type: &str,
             content_json: serde_json::Value,
+            relevance: MessageRelevance,
         ) -> Result<(), InternalError>;
     }
 }

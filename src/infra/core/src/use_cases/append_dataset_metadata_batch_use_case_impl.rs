@@ -24,7 +24,7 @@ use kamu_core::{
     SetRefOpts,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use messaging_outbox::{post_outbox_message, Outbox};
+use messaging_outbox::{post_outbox_message, MessageRelevance, Outbox};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -116,6 +116,7 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
                     dataset_id: summary.id.clone(),
                     new_upstream_ids,
                 },
+                MessageRelevance::Essential,
             )
             .await?;
         }

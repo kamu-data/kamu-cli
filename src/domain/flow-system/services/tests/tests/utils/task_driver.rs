@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use chrono::Duration;
 use kamu_task_system::*;
-use messaging_outbox::{post_outbox_message, Outbox};
+use messaging_outbox::{post_outbox_message, MessageRelevance, Outbox};
 use opendatafabric::DatasetID;
 use time_source::SystemTimeSource;
 use tokio::task::yield_now;
@@ -67,6 +67,7 @@ impl TaskDriver {
                 event_time: start_time + self.args.run_since_start,
                 task_id: self.args.task_id,
             },
+            MessageRelevance::Essential,
         )
         .await
         .unwrap();
@@ -84,6 +85,7 @@ impl TaskDriver {
                     task_id: self.args.task_id,
                     outcome: with_outcome,
                 },
+                MessageRelevance::Essential,
             )
             .await
             .unwrap();

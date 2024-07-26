@@ -15,7 +15,7 @@ use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
 use kamu_core::auth::AlwaysHappyDatasetActionAuthorizer;
 use kamu_core::{CreateDatasetFromSnapshotUseCase, DeleteDatasetUseCase};
-use messaging_outbox::OutboxImmediateImpl;
+use messaging_outbox::{OutboxConfig, OutboxImmediateImpl};
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 
@@ -38,6 +38,7 @@ impl LocalFsRepoHarness {
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
             .add::<OutboxImmediateImpl>()
+            .add_value(OutboxConfig::for_tests())
             .add::<CoreMessageConsumerMediator>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
