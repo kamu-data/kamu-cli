@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::OutboxMessageConsumptionBoundary;
+use crate::OutboxMessageID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,6 +35,15 @@ pub trait OutboxMessageConsumptionRepository: Send + Sync {
         &self,
         boundary: OutboxMessageConsumptionBoundary,
     ) -> Result<(), UpdateConsumptionBoundaryError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct OutboxMessageConsumptionBoundary {
+    pub consumer_name: String,
+    pub producer_name: String,
+    pub last_consumed_message_id: OutboxMessageID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

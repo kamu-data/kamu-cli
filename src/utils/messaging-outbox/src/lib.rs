@@ -14,11 +14,9 @@ mod entities;
 mod message;
 mod repos;
 mod services;
-mod values;
 
 pub use consumers::*;
 pub use entities::*;
 pub use message::*;
 pub use repos::*;
 pub use services::*;
-pub use values::*;
