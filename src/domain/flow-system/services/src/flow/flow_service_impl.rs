@@ -920,8 +920,9 @@ impl FlowService for FlowServiceImpl {
                     post_outbox_message(
                         outbox.as_ref(),
                         MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
-                        FlowServiceLoadedMessage {
-                            event_time: start_time,
+                        FlowServiceUpdatedMessage {
+                            update_time: start_time,
+                            update_details: FlowServiceUpdateDetails::Loaded,
                         },
                     )
                     .await?;
@@ -957,8 +958,9 @@ impl FlowService for FlowServiceImpl {
                         post_outbox_message(
                             outbox.as_ref(),
                             MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
-                            FlowServiceExecutedTimeSlotMessage {
-                                event_time: nearest_activation_time,
+                            FlowServiceUpdatedMessage {
+                                update_time: nearest_activation_time,
+                                update_details: FlowServiceUpdateDetails::ExecutedTimeslot,
                             },
                         )
                         .await
@@ -1299,8 +1301,9 @@ impl MessageConsumerT<TaskRunningMessage> for FlowServiceImpl {
             post_outbox_message(
                 outbox.as_ref(),
                 MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
-                FlowServiceFlowRunningMessage {
-                    event_time: message.event_time,
+                FlowServiceUpdatedMessage {
+                    update_time: message.event_time,
+                    update_details: FlowServiceUpdateDetails::FlowRunning,
                 },
             )
             .await?;
@@ -1379,8 +1382,9 @@ impl MessageConsumerT<TaskFinishedMessage> for FlowServiceImpl {
             post_outbox_message(
                 outbox.as_ref(),
                 MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
-                FlowServiceFlowFinishedMessage {
-                    event_time: message.event_time,
+                FlowServiceUpdatedMessage {
+                    update_time: message.event_time,
+                    update_details: FlowServiceUpdateDetails::FlowFinished,
                 },
             )
             .await?;

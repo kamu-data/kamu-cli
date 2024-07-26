@@ -12,15 +12,9 @@ use internal_error::InternalError;
 use kamu_core::{MESSAGE_KAMU_CORE_DATASET_DELETED, MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE};
 use kamu_flow_system::{
     FlowConfigurationUpdatedMessage,
-    FlowServiceExecutedTimeSlotMessage,
-    FlowServiceFlowFinishedMessage,
-    FlowServiceFlowRunningMessage,
-    FlowServiceLoadedMessage,
+    FlowServiceUpdatedMessage,
     MESSAGE_KAMU_FLOW_CONFIGURATION_UPDATED,
-    MESSAGE_KAMU_FLOW_SERVICE_EXECUTED_TIMESLOT,
-    MESSAGE_KAMU_FLOW_SERVICE_FINISHED_FLOW,
-    MESSAGE_KAMU_FLOW_SERVICE_LOADED,
-    MESSAGE_KAMU_FLOW_SERVICE_RUNNING_FLOW,
+    MESSAGE_KAMU_FLOW_SERVICE_UPDATED,
 };
 use kamu_task_system::{
     MESSAGE_KAMU_TASK_FINISHED,
@@ -54,10 +48,7 @@ impl MessageConsumersMediator for FlowMessageConsumerMediator {
             // Flow configuration service producer
             MESSAGE_KAMU_FLOW_CONFIGURATION_UPDATED,
             // Flow service producer
-            MESSAGE_KAMU_FLOW_SERVICE_LOADED,
-            MESSAGE_KAMU_FLOW_SERVICE_EXECUTED_TIMESLOT,
-            MESSAGE_KAMU_FLOW_SERVICE_RUNNING_FLOW,
-            MESSAGE_KAMU_FLOW_SERVICE_FINISHED_FLOW,
+            MESSAGE_KAMU_FLOW_SERVICE_UPDATED,
         ]
     }
 
@@ -112,38 +103,8 @@ impl MessageConsumersMediator for FlowMessageConsumerMediator {
                 .await
             }
 
-            MESSAGE_KAMU_FLOW_SERVICE_LOADED => {
-                consume_deserialized_message::<FlowServiceLoadedMessage>(
-                    catalog,
-                    consumer_filter,
-                    message_type,
-                    content_json,
-                )
-                .await
-            }
-
-            MESSAGE_KAMU_FLOW_SERVICE_EXECUTED_TIMESLOT => {
-                consume_deserialized_message::<FlowServiceExecutedTimeSlotMessage>(
-                    catalog,
-                    consumer_filter,
-                    message_type,
-                    content_json,
-                )
-                .await
-            }
-
-            MESSAGE_KAMU_FLOW_SERVICE_RUNNING_FLOW => {
-                consume_deserialized_message::<FlowServiceFlowRunningMessage>(
-                    catalog,
-                    consumer_filter,
-                    message_type,
-                    content_json,
-                )
-                .await
-            }
-
-            MESSAGE_KAMU_FLOW_SERVICE_FINISHED_FLOW => {
-                consume_deserialized_message::<FlowServiceFlowFinishedMessage>(
+            MESSAGE_KAMU_FLOW_SERVICE_UPDATED => {
+                consume_deserialized_message::<FlowServiceUpdatedMessage>(
                     catalog,
                     consumer_filter,
                     message_type,

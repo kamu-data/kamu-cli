@@ -16,16 +16,11 @@ use crate::{FlowConfigurationRule, FlowKey};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const MESSAGE_KAMU_FLOW_CONFIGURATION_UPDATED: &str = "dev.kamu.flow.configuration.updated";
-
-pub const MESSAGE_KAMU_FLOW_SERVICE_LOADED: &str = "dev.kamu.flow.service.loaded";
-pub const MESSAGE_KAMU_FLOW_SERVICE_EXECUTED_TIMESLOT: &str =
-    "dev.kamu.flow.service.executed_timeslot";
-pub const MESSAGE_KAMU_FLOW_SERVICE_RUNNING_FLOW: &str = "dev.kamu.flow.service.running_flow";
-pub const MESSAGE_KAMU_FLOW_SERVICE_FINISHED_FLOW: &str = "dev.kamu.flow.service.finished_flow";
+pub const MESSAGE_KAMU_FLOW_SERVICE_UPDATED: &str = "dev.kamu.flow.service.updated";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowConfigurationUpdatedMessage {
     pub event_time: DateTime<Utc>,
     pub flow_key: FlowKey,
@@ -42,53 +37,25 @@ impl Message for FlowConfigurationUpdatedMessage {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlowServiceLoadedMessage {
-    pub event_time: DateTime<Utc>,
+pub struct FlowServiceUpdatedMessage {
+    pub update_time: DateTime<Utc>,
+    pub update_details: FlowServiceUpdateDetails,
 }
 
-impl Message for FlowServiceLoadedMessage {
+impl Message for FlowServiceUpdatedMessage {
     fn type_name(&self) -> &'static str {
-        MESSAGE_KAMU_FLOW_SERVICE_LOADED
+        MESSAGE_KAMU_FLOW_SERVICE_UPDATED
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlowServiceExecutedTimeSlotMessage {
-    pub event_time: DateTime<Utc>,
-}
-
-impl Message for FlowServiceExecutedTimeSlotMessage {
-    fn type_name(&self) -> &'static str {
-        MESSAGE_KAMU_FLOW_SERVICE_EXECUTED_TIMESLOT
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlowServiceFlowRunningMessage {
-    pub event_time: DateTime<Utc>,
-}
-
-impl Message for FlowServiceFlowRunningMessage {
-    fn type_name(&self) -> &'static str {
-        MESSAGE_KAMU_FLOW_SERVICE_RUNNING_FLOW
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlowServiceFlowFinishedMessage {
-    pub event_time: DateTime<Utc>,
-}
-
-impl Message for FlowServiceFlowFinishedMessage {
-    fn type_name(&self) -> &'static str {
-        MESSAGE_KAMU_FLOW_SERVICE_FINISHED_FLOW
-    }
+pub enum FlowServiceUpdateDetails {
+    Loaded,
+    ExecutedTimeslot,
+    FlowRunning,
+    FlowFinished,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
