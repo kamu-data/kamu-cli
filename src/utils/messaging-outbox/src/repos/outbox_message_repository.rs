@@ -24,11 +24,6 @@ pub trait OutboxMessageRepository: Send + Sync {
         batch_size: usize,
     ) -> Result<OutboxMessageStream, InternalError>;
 
-    // TODO: unused
-    async fn get_largest_message_id_recorded(
-        &self,
-    ) -> Result<Option<OutboxMessageID>, InternalError>;
-
     async fn get_latest_message_ids_by_producer(
         &self,
     ) -> Result<Vec<(String, OutboxMessageID)>, InternalError>;

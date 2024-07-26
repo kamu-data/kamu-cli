@@ -9,9 +9,9 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
 use dill::{component, interface};
 use internal_error::InternalError;
+use time_source::SystemTimeSource;
 
 use crate::{NewOutboxMessage, Outbox, OutboxMessageRepository};
 
@@ -19,14 +19,19 @@ use crate::{NewOutboxMessage, Outbox, OutboxMessageRepository};
 
 pub struct OutboxTransactionalImpl {
     outbox_message_repository: Arc<dyn OutboxMessageRepository>,
+    time_source: Arc<dyn SystemTimeSource>,
 }
 
 #[component(pub)]
 #[interface(dyn Outbox)]
 impl OutboxTransactionalImpl {
-    pub fn new(outbox_message_repository: Arc<dyn OutboxMessageRepository>) -> Self {
+    pub fn new(
+        outbox_message_repository: Arc<dyn OutboxMessageRepository>,
+        time_source: Arc<dyn SystemTimeSource>,
+    ) -> Self {
         Self {
             outbox_message_repository,
+            time_source,
         }
     }
 }
@@ -44,8 +49,9 @@ impl Outbox for OutboxTransactionalImpl {
             message_type: message_type.to_string(),
             content_json,
             producer_name: producer_name.to_string(),
-            occurred_on: Utc::now(), // TODO: replace on time source
+            occurred_on: self.time_source.now(),
         };
+
         self.outbox_message_repository
             .push_message(new_outbox_message)
             .await

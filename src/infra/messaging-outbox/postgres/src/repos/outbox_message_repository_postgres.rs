@@ -96,21 +96,6 @@ impl OutboxMessageRepository for OutboxMessageRepositoryPostgres {
         }))
     }
 
-    async fn get_largest_message_id_recorded(
-        &self,
-    ) -> Result<Option<OutboxMessageID>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let row = sqlx::query!("SELECT max(message_id) as max_message_id FROM outbox_messages")
-            .fetch_optional(connection_mut)
-            .await
-            .map_err(ErrorIntoInternal::int_err)?;
-
-        Ok(row.and_then(|r| r.max_message_id).map(OutboxMessageID::new))
-    }
-
     async fn get_latest_message_ids_by_producer(
         &self,
     ) -> Result<Vec<(String, OutboxMessageID)>, InternalError> {

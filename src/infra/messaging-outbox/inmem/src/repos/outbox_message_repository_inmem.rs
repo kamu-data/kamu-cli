@@ -109,13 +109,6 @@ impl OutboxMessageRepository for OutboxMessageRepositoryInMemory {
         Ok(Box::pin(tokio_stream::iter(messages)))
     }
 
-    async fn get_largest_message_id_recorded(
-        &self,
-    ) -> Result<Option<OutboxMessageID>, InternalError> {
-        let guard = self.state.lock().unwrap();
-        Ok(guard.last_message_id)
-    }
-
     async fn get_latest_message_ids_by_producer(
         &self,
     ) -> Result<Vec<(String, OutboxMessageID)>, InternalError> {
