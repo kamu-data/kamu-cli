@@ -19,6 +19,7 @@ use kamu_core::*;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::serde::yaml::YamlMetadataEventSerializer;
 use opendatafabric::*;
+use time_source::SystemTimeSourceDefault;
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 

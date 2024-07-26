@@ -23,9 +23,11 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
+time-source = { workspace = true }
 kamu-task-system = { workspace = true }
 
 async-stream = "0.3"

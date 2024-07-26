@@ -10,8 +10,8 @@
 use std::sync::Arc;
 
 use dill::*;
+use internal_error::ResultIntoInternal;
 use kamu_accounts::*;
-use kamu_core::ResultIntoInternal;
 use opendatafabric::{AccountID, AccountName};
 use serde::Deserialize;
 use thiserror::Error;

@@ -8,11 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use dill::{component, interface, Catalog};
+use internal_error::InternalError;
 use kamu_core::{
     DatasetCreatedMessage,
     DatasetDeletedMessage,
     DatasetDependenciesUpdatedMessage,
-    InternalError,
     MESSAGE_CONSUMER_KAMU_CORE_DATASET_OWNERSHIP_SERVICE,
     MESSAGE_CONSUMER_KAMU_CORE_DEPENDENCY_GRAPH_SERVICE,
     MESSAGE_KAMU_CORE_DATASET_CREATED,

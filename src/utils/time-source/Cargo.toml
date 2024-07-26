@@ -1,6 +1,6 @@
 [package]
-name = "http-common"
-description = "Common code for working with HTTP API"
+name = "time-source"
+description = "A helper encapsulating access to time (real or faked)"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -22,10 +22,11 @@ doctest = false
 
 
 [dependencies]
-internal-error = { workspace = true }
-kamu-core = { workspace = true }
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+dill = { version = "0.8", default-features = false }
+tokio = { version = "1", default-features = false }
 
-axum = "0.6"
-http = "0.2"
-thiserror = { version = "1", default-features = false }
-tracing = "0.1"
+
+[dev-dependencies]
+futures = { version = "0.3", default-features = false }

@@ -15,6 +15,7 @@ use std::sync::Arc;
 use chrono::{DateTime, SubsecRound, TimeZone, Utc};
 use container_runtime::*;
 use futures::TryStreamExt;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::engine::ProcessError;
 use kamu_core::*;
 use kamu_datasets_services::domain::{DatasetEnvVarService, GetDatasetEnvVarError};

@@ -13,12 +13,13 @@ use std::sync::Arc;
 use database_common::DatabaseTransactionRunner;
 use dill::*;
 use futures::SinkExt;
-use kamu::domain::*;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu::utils::smart_transfer_protocol::{
     DatasetFactoryFn,
     SmartTransferProtocolClient,
     TransferOptions,
 };
+use kamu_core::*;
 use opendatafabric::{AsTypedBlock, Multihash};
 use serde::de::DeserializeOwned;
 use serde::Serialize;

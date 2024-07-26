@@ -9,9 +9,10 @@
 
 use dill::Component;
 use indoc::indoc;
-use kamu::*;
+use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::*;
+use kamu_core::{auth, DatasetRepository};
+use time_source::SystemTimeSourceDefault;
 
 #[test_log::test(tokio::test)]
 async fn test_malformed_argument() {

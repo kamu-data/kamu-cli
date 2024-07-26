@@ -10,6 +10,7 @@
 use async_trait::async_trait;
 use auth::DatasetActionUnauthorizedError;
 use chrono::{DateTime, Utc};
+use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
 

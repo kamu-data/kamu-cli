@@ -13,10 +13,10 @@ use chrono::{DateTime, Utc};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_core::messages::DatasetDeletedMessage;
-use kamu_core::SystemTimeSource;
 use kamu_flow_system::*;
 use messaging_outbox::{post_outbox_message, MessageConsumerT, Outbox};
 use opendatafabric::DatasetID;
+use time_source::SystemTimeSource;
 
 use crate::{
     MESSAGE_CONSUMER_KAMU_FLOW_CONFIGURATION_SERVICE,

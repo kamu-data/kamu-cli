@@ -10,7 +10,7 @@
 use std::sync::Mutex;
 
 use dill::{component, interface, scope, Catalog, Singleton};
-use kamu_core::InternalError;
+use internal_error::InternalError;
 use kamu_flow_system::FlowConfigurationUpdatedMessage;
 use messaging_outbox::MessageConsumerT;
 

@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use container_runtime::ImagePullError;
+use internal_error::{BoxedError, InternalError};
 use opendatafabric::*;
 use thiserror::Error;
 

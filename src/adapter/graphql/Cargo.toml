@@ -72,6 +72,7 @@ kamu-datasets-inmem = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
+time-source = { workspace = true }
 
 
 indoc = "2"

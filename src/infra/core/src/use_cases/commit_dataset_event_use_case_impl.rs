@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
+use internal_error::ResultIntoInternal;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::{
     CommitDatasetEventUseCase,
@@ -18,7 +19,6 @@ use kamu_core::{
     CommitResult,
     DatasetDependenciesUpdatedMessage,
     DatasetRepository,
-    ResultIntoInternal,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{post_outbox_message, Outbox};

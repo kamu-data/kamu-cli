@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use argon2::Argon2;
 use dill::*;
-use kamu_core::{InternalError, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
 use opendatafabric::{AccountID, AccountName};
 use password_hash::rand_core::OsRng;
 use password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};

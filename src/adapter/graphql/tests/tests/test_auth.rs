@@ -19,7 +19,7 @@ use kamu_accounts::{
 };
 use kamu_accounts_inmem::AccessTokenRepositoryInMemory;
 use kamu_accounts_services::AccessTokenServiceImpl;
-use kamu_core::SystemTimeSourceDefault;
+use time_source::SystemTimeSourceDefault;
 
 use crate::utils::authentication_catalogs;
 

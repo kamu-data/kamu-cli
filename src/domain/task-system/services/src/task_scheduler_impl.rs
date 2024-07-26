@@ -11,9 +11,9 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use dill::*;
-use kamu_core::SystemTimeSource;
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
+use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -9,7 +9,7 @@
 
 use database_common::DatabasePaginationOpts;
 use dill::*;
-use kamu_core::{ErrorIntoInternal, InternalError};
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_datasets::{
     DatasetEnvVar,
     DatasetEnvVarListing,

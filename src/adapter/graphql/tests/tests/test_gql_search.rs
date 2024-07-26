@@ -15,6 +15,7 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
+use time_source::SystemTimeSourceDefault;
 
 #[tokio::test]
 async fn test_search_query() {

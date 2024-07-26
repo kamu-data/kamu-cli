@@ -17,10 +17,10 @@ use kamu_core::{
     DatasetRepository,
     PullOptions,
     PullService,
-    SystemTimeSource,
 };
 use kamu_task_system::*;
 use messaging_outbox::{post_outbox_message, Outbox};
+use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

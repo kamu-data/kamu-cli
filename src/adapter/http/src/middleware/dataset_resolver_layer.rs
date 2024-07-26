@@ -16,7 +16,7 @@ use axum::body::Body;
 use axum::extract::FromRequestParts;
 use axum::response::Response;
 use axum::RequestExt;
-use kamu::domain::{DatasetRepository, GetDatasetError};
+use kamu_core::{DatasetRepository, GetDatasetError};
 use opendatafabric::DatasetRef;
 use tower::{Layer, Service};
 

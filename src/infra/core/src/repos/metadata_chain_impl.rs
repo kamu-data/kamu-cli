@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
+use internal_error::ErrorIntoInternal;
 use kamu_core::*;
 use opendatafabric::*;
 

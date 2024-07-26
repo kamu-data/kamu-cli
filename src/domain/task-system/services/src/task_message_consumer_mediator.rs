@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::{component, interface, Catalog};
-use kamu_core::InternalError;
+use internal_error::InternalError;
 use kamu_task_system::{
     TaskFinishedMessage,
     TaskRunningMessage,

@@ -15,6 +15,7 @@ use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
+use time_source::SystemTimeSourceDefault;
 use url::Url;
 
 // Create repo/bar dataset in a repo and check it appears in searches

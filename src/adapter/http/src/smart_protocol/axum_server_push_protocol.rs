@@ -13,16 +13,16 @@ use std::time::Duration;
 
 use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
-use kamu::domain::{
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_core::{
     AppendDatasetMetadataBatchUseCase,
     BlockRef,
     CorruptedSourceError,
     CreateDatasetError,
     CreateDatasetUseCase,
     Dataset,
-    ErrorIntoInternal,
+    GetRefError,
     HashedMetadataBlock,
-    ResultIntoInternal,
 };
 use opendatafabric::{AsTypedBlock, DatasetRef};
 use url::Url;
@@ -198,7 +198,7 @@ impl AxumServerPushProtocolInstance {
                 .await
             {
                 Ok(head) => Some(head),
-                Err(kamu::domain::GetRefError::NotFound(_)) => None,
+                Err(GetRefError::NotFound(_)) => None,
                 Err(e) => return Err(PushServerError::Internal(e.int_err())),
             }
         } else {

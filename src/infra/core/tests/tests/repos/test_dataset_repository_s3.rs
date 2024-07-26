@@ -29,9 +29,9 @@ use kamu_core::{
     DatasetRepository,
     DeleteDatasetUseCase,
     DependencyGraphService,
-    SystemTimeSourceDefault,
 };
 use messaging_outbox::OutboxImmediateImpl;
+use time_source::SystemTimeSourceDefault;
 
 use super::test_dataset_repository_shared;
 

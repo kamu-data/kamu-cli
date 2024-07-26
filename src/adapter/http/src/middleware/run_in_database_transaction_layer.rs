@@ -15,7 +15,7 @@ use axum::response::{IntoResponse, Response};
 use database_common::DatabaseTransactionRunner;
 use futures::Future;
 use http_common::IntoApiError;
-use kamu::domain::InternalError;
+use internal_error::InternalError;
 use tower::{Layer, Service};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

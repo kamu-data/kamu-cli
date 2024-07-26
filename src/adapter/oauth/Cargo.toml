@@ -21,6 +21,7 @@ workspace = true
 doctest = false
 
 [dependencies]
+internal-error = { workspace = true }
 opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
 kamu-accounts = { workspace = true }

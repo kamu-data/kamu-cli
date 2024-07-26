@@ -10,10 +10,10 @@
 use std::sync::Arc;
 
 use chrono::Duration;
-use kamu_core::SystemTimeSource;
 use kamu_task_system::*;
 use messaging_outbox::{post_outbox_message, Outbox};
 use opendatafabric::DatasetID;
+use time_source::SystemTimeSource;
 use tokio::task::yield_now;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

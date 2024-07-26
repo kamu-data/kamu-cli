@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use opendatafabric::{Multicodec, Multihash};
 use tokio::io::{AsyncRead, AsyncWriteExt};

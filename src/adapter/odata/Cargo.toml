@@ -25,6 +25,7 @@ doctest = false
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 http-common = { workspace = true }
+internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 opendatafabric = { workspace = true }
@@ -43,6 +44,7 @@ tracing = "0.1"
 
 [dev-dependencies]
 messaging-outbox = { workspace = true }
+time-source = { workspace = true }
 
 hyper = { version = "0.14", default-features = false }
 indoc = { version = "2" }

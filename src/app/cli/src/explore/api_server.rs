@@ -20,11 +20,12 @@ use dill::{Catalog, CatalogBuilder};
 use http_common::ApiError;
 use indoc::indoc;
 use internal_error::*;
-use kamu::domain::{Protocols, ServerUrlConfig, SystemTimeSource};
+use kamu::domain::{Protocols, ServerUrlConfig};
 use kamu_adapter_http::e2e::e2e_router;
 use kamu_flow_system_inmem::domain::FlowService;
 use kamu_task_system_inmem::domain::TaskExecutor;
 use messaging_outbox::OutboxTransactionalProcessor;
+use time_source::SystemTimeSource;
 use tokio::sync::Notify;
 use url::Url;
 

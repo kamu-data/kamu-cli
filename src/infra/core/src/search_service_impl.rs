@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::*;
 use serde_json::json;

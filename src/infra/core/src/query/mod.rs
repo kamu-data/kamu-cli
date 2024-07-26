@@ -25,6 +25,7 @@ use datafusion::logical_expr::LogicalPlan;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::prelude::*;
 use futures::stream::{self, StreamExt, TryStreamExt};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::*;
 

@@ -24,6 +24,7 @@ use kamu_data_utils::testing::{assert_data_eq, assert_schema_eq};
 use kamu_ingest_datafusion::*;
 use odf::{AsTypedBlock, DatasetAlias};
 use opendatafabric as odf;
+use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TODO: This test belongs in kamu-ingest-datafusion crate.

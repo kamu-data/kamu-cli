@@ -14,7 +14,7 @@ use std::time::Duration as StdDuration;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use futures::FutureExt;
-use kamu_core::{FakeSystemTimeSource, SystemTimeSource};
+use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::time::timeout;
 
 #[tokio::test]

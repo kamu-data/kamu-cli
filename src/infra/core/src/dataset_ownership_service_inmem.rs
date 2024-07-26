@@ -11,6 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dill::*;
+use internal_error::InternalError;
 use kamu_accounts::{AuthenticationService, CurrentAccountSubject};
 use kamu_core::messages::{DatasetCreatedMessage, DatasetDeletedMessage};
 use kamu_core::*;

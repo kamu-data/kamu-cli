@@ -12,9 +12,10 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::*;
+use internal_error::ErrorIntoInternal;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_core::auth::*;
-use kamu_core::{AccessError, ErrorIntoInternal};
+use kamu_core::AccessError;
 use opendatafabric::DatasetHandle;
 use oso::Oso;
 

@@ -11,6 +11,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use dill::{component, interface};
+use internal_error::ResultIntoInternal;
 use kamu_core::{
     AppendDatasetMetadataBatchUseCase,
     AppendError,
@@ -20,7 +21,6 @@ use kamu_core::{
     DatasetDependenciesUpdatedMessage,
     GetSummaryOpts,
     HashedMetadataBlock,
-    ResultIntoInternal,
     SetRefOpts,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };

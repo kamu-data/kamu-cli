@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
 use dill::*;
-use kamu_core::{FakeSystemTimeSource, InternalError};
+use internal_error::InternalError;
 use kamu_flow_system::{
     FlowKey,
     FlowOutcome,
@@ -29,6 +29,7 @@ use kamu_flow_system::{
 };
 use messaging_outbox::MessageConsumerT;
 use opendatafabric::DatasetID;
+use time_source::FakeSystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

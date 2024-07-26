@@ -20,8 +20,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use http_common::*;
-use kamu::domain::*;
+use internal_error::ResultIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_core::*;
 use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::{DatasetRef, Multihash};

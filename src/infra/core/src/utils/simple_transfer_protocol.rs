@@ -11,6 +11,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
 use futures::{stream, Future, StreamExt, TryStreamExt};
+use internal_error::ErrorIntoInternal;
 use kamu_core::sync_service::DatasetNotFoundError;
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;

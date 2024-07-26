@@ -20,6 +20,7 @@ use mockall::predicate::eq;
 use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
 use opendatafabric::serde::DatasetSnapshotSerializer;
 use opendatafabric::*;
+use time_source::SystemTimeSourceDefault;
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 

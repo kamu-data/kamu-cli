@@ -8,11 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use dill::{component, interface, Catalog};
-use kamu_core::{
-    InternalError,
-    MESSAGE_KAMU_CORE_DATASET_DELETED,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-};
+use internal_error::InternalError;
+use kamu_core::{MESSAGE_KAMU_CORE_DATASET_DELETED, MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE};
 use kamu_flow_system::{
     FlowConfigurationUpdatedMessage,
     FlowServiceExecutedTimeSlotMessage,

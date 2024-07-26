@@ -21,6 +21,7 @@ workspace = true
 doctest = false
 
 [dependencies]
+internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 opendatafabric = { workspace = true }
 kamu-accounts = { workspace = true }
@@ -35,6 +36,7 @@ oso-derive = "0.27"
 
 [dev-dependencies]
 kamu = { workspace = true }
+time-source = { workspace = true }
 
 tempfile = "3"
 test-log = { version = "0.2", features = ["trace"] }

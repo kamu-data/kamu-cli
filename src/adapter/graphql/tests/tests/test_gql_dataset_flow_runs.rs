@@ -49,7 +49,6 @@ use kamu_core::{
     DependencyGraphRepository,
     PollingIngestService,
     PullResult,
-    SystemTimeSourceDefault,
     TransformService,
 };
 use kamu_flow_system::{
@@ -72,6 +71,7 @@ use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::{TaskMessageConsumerMediator, TaskSchedulerImpl};
 use messaging_outbox::{post_outbox_message, Outbox, OutboxImmediateImpl};
 use opendatafabric::{AccountID, DatasetID, DatasetKind, Multihash};
+use time_source::SystemTimeSourceDefault;
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 

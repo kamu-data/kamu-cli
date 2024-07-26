@@ -11,7 +11,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::*;
 use thiserror::Error;
 use tokio_stream::Stream;

@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::services::sync_service::DatasetNotFoundError;
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;

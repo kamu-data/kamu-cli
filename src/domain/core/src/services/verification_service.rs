@@ -10,6 +10,7 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
+use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::*;
 use thiserror::Error;
 

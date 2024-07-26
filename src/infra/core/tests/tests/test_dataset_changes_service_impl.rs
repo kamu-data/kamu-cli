@@ -26,7 +26,6 @@ use kamu_core::{
     DatasetChangesService,
     DatasetIntervalIncrement,
     DatasetRepository,
-    SystemTimeSourceDefault,
 };
 use opendatafabric::{
     Checkpoint,
@@ -38,6 +37,7 @@ use opendatafabric::{
     Multihash,
 };
 use tempfile::TempDir;
+use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

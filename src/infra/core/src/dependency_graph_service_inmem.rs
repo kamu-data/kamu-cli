@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::messages::{
     DatasetCreatedMessage,
     DatasetDeletedMessage,

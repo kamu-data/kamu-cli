@@ -17,6 +17,7 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use tempfile::TempDir;
+use time_source::SystemTimeSourceDefault;
 
 #[test_log::test(tokio::test)]
 async fn test_reset_dataset_with_2revisions_drop_last() {

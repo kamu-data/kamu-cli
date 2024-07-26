@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;

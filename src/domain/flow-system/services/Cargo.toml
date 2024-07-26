@@ -24,12 +24,14 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
+internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-task-system = { workspace = true }
 opendatafabric = { workspace = true }
+time-source = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
