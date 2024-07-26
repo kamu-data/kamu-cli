@@ -9,16 +9,19 @@
 
 use std::sync::Arc;
 
+use database_common::{DatabasePaginationOpts, DatabaseTransactionRunner};
 use dill::*;
 use event_bus::EventBus;
 use kamu_core::{
     CompactionOptions,
     CompactionService,
     DatasetRepository,
+    PollingIngestOptions,
     PullOptions,
     PullService,
     SystemTimeSource,
 };
+use kamu_datasets_services::domain::DatasetEnvVarService;
 use kamu_task_system::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,9 +102,34 @@ impl TaskExecutor for TaskExecutorImpl {
 
             let outcome = match &task.logical_plan {
                 LogicalPlan::UpdateDataset(upd) => {
+                    let dataset_env_vars = DatabaseTransactionRunner::new(self.catalog.clone())
+                        .transactional_with(
+                            |dataset_env_vars_svc: Arc<dyn DatasetEnvVarService>| async move {
+                                let dataset_env_vars = dataset_env_vars_svc
+                                    .get_all_dataset_env_vars_by_dataset_id(
+                                        &upd.dataset_id,
+                                        &DatabasePaginationOpts {
+                                            limit: 10,
+                                            offset: 0,
+                                        },
+                                    )
+                                    .await
+                                    .int_err()?;
+                                Ok(dataset_env_vars.list)
+                            },
+                        )
+                        .await?;
+                    let pull_options = PullOptions {
+                        ingest_options: PollingIngestOptions {
+                            dataset_env_vars,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    };
+
                     let pull_svc = self.catalog.get_one::<dyn PullService>().int_err()?;
                     let maybe_pull_result = pull_svc
-                        .pull(&upd.dataset_id.as_any_ref(), PullOptions::default(), None)
+                        .pull(&upd.dataset_id.as_any_ref(), pull_options, None)
                         .await;
 
                     match maybe_pull_result {

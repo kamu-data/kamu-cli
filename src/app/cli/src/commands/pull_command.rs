@@ -138,6 +138,7 @@ impl PullCommand {
                     ingest_options: PollingIngestOptions {
                         fetch_uncacheable: self.fetch_uncacheable,
                         exhaust_sources: true,
+                        dataset_env_vars: vec![],
                     },
                     sync_options: SyncOptions {
                         force: self.force,

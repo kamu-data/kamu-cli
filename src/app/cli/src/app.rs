@@ -359,6 +359,8 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 
+    b.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>();
+
     // No GitHub login possible for single-tenant workspace
     if multi_tenant_workspace {
         if is_e2e_testing {
@@ -578,7 +580,7 @@ pub fn register_config_in_catalog(
     let dataset_env_vars_config = config.dataset_env_vars.as_ref().unwrap();
     match dataset_env_vars_config.mode.as_ref().unwrap() {
         DatasetEnvVarsType::Static => {
-            catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceStaticImpl>()
+            catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceStaticImpl>()
         }
         DatasetEnvVarsType::Storage => {
             assert!(
@@ -592,7 +594,7 @@ pub fn register_config_in_catalog(
             {
                 panic!("Invalid dataset env var encryption key");
             }
-            catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>()
+            catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceImpl>()
         }
     };
 }

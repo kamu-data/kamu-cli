@@ -17,7 +17,7 @@ use container_runtime::*;
 use futures::TryStreamExt;
 use kamu_core::engine::ProcessError;
 use kamu_core::*;
-use kamu_datasets_services::domain::{DatasetEnvVarService, GetDatasetEnvVarError};
+use kamu_datasets_services::domain::{DatasetEnvVar, DatasetKeyValueService};
 use opendatafabric::*;
 use secrecy::ExposeSecret;
 use url::Url;
@@ -113,7 +113,7 @@ pub struct FetchService {
     source_config: Arc<SourceConfig>,
     mqtt_source_config: Arc<MqttSourceConfig>,
     eth_source_config: Arc<EthereumSourceConfig>,
-    dataset_env_var_service: Arc<dyn DatasetEnvVarService>,
+    dataset_key_value_svc: Arc<dyn DatasetKeyValueService>,
     run_info_dir: Arc<RunInfoDir>,
 }
 
@@ -127,7 +127,7 @@ impl FetchService {
         source_config: Option<Arc<SourceConfig>>,
         mqtt_source_config: Option<Arc<MqttSourceConfig>>,
         eth_source_config: Option<Arc<EthereumSourceConfig>>,
-        dataset_env_var_service: Arc<dyn DatasetEnvVarService>,
+        dataset_key_value_svc: Arc<dyn DatasetKeyValueService>,
         run_info_dir: Arc<RunInfoDir>,
     ) -> Self {
         Self {
@@ -135,7 +135,7 @@ impl FetchService {
             source_config: source_config.unwrap_or_default(),
             mqtt_source_config: mqtt_source_config.unwrap_or_default(),
             eth_source_config: eth_source_config.unwrap_or_default(),
-            dataset_env_var_service,
+            dataset_key_value_svc,
             run_info_dir,
         }
     }
@@ -148,15 +148,16 @@ impl FetchService {
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         system_time: &DateTime<Utc>,
+        dataset_env_vars: &[DatasetEnvVar],
         maybe_listener: Option<Arc<dyn FetchProgressListener>>,
     ) -> Result<FetchResult, PollingIngestError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullFetchProgressListener));
 
         match fetch_step {
             FetchStep::Url(furl) => {
-                let url = self.template_url(&furl.url, &dataset_handle.id).await?;
+                let url = self.template_url(&furl.url, dataset_env_vars).await?;
                 let headers = self
-                    .template_headers(&furl.headers, &dataset_handle.id)
+                    .template_headers(&furl.headers, dataset_env_vars)
                     .await?;
 
                 match url.scheme() {
@@ -206,15 +207,21 @@ impl FetchService {
                 &listener,
             ),
             FetchStep::Mqtt(fetch) => {
-                self.fetch_mqtt(dataset_handle, fetch, target_path, &listener)
-                    .await
+                self.fetch_mqtt(
+                    dataset_handle,
+                    fetch,
+                    target_path,
+                    dataset_env_vars,
+                    &listener,
+                )
+                .await
             }
             FetchStep::EthereumLogs(fetch) => {
                 self.fetch_ethereum_logs(
                     fetch,
                     prev_source_state,
                     target_path,
-                    &dataset_handle.id,
+                    dataset_env_vars,
                     &listener,
                 )
                 .await
@@ -225,16 +232,16 @@ impl FetchService {
     async fn template_url(
         &self,
         url_tpl: &str,
-        dataset_id: &DatasetID,
+        dataset_env_vars: &[DatasetEnvVar],
     ) -> Result<Url, PollingIngestError> {
-        let url = self.template_string(url_tpl, dataset_id).await?;
+        let url = self.template_string(url_tpl, dataset_env_vars).await?;
         Ok(Url::parse(&url).int_err()?)
     }
 
     async fn template_headers(
         &self,
         headers_tpl: &Option<Vec<RequestHeader>>,
-        dataset_id: &DatasetID,
+        dataset_env_vars: &[DatasetEnvVar],
     ) -> Result<Vec<RequestHeader>, PollingIngestError> {
         let mut res = Vec::new();
         let empty = Vec::new();
@@ -242,7 +249,7 @@ impl FetchService {
             let hdr = RequestHeader {
                 name: htpl.name.clone(),
                 value: self
-                    .template_string(&htpl.value, dataset_id)
+                    .template_string(&htpl.value, dataset_env_vars)
                     .await?
                     .into_owned(),
             };
@@ -254,7 +261,7 @@ impl FetchService {
     async fn template_string<'a>(
         &self,
         s: &'a str,
-        dataset_id: &'a DatasetID,
+        dataset_env_vars: &'a [DatasetEnvVar],
     ) -> Result<Cow<'a, str>, PollingIngestError> {
         let mut s = Cow::from(s);
         let re_tpl = regex::Regex::new(r"\$\{\{([^}]*)\}\}").unwrap();
@@ -266,24 +273,13 @@ impl FetchService {
 
                 if let Some(cenv) = re_env.captures(ctpl.get(1).unwrap().as_str().trim()) {
                     let env_name = cenv.get(1).unwrap().as_str();
-                    let env_value = self
-                        .dataset_env_var_service
-                        .get_dataset_env_var_value_by_key_and_dataset_id(env_name, dataset_id)
+                    let dataset_env_var_secret_value = self
+                        .dataset_key_value_svc
+                        .get_dataset_env_var_value_by_key(env_name, dataset_env_vars)
                         .await
-                        .map_err(|err| match err {
-                            GetDatasetEnvVarError::NotFound(_) => {
-                                PollingIngestError::ParameterNotFound(IngestParameterNotFound {
-                                    name: env_name.to_string(),
-                                })
-                            }
-                            GetDatasetEnvVarError::Internal(err) => {
-                                PollingIngestError::Internal(err)
-                            }
-                        })?
-                        .expose_secret()
-                        .to_owned();
-
-                    s.to_mut().replace_range(tpl_range, &env_value);
+                        .int_err()?;
+                    s.to_mut()
+                        .replace_range(tpl_range, dataset_env_var_secret_value.expose_secret());
                 } else {
                     return Err(format!(
                         "Invalid pattern '{}' encountered in string: {}",
@@ -863,6 +859,7 @@ impl FetchService {
         dataset_handle: &DatasetHandle,
         fetch: &FetchStepMqtt,
         target_path: &Path,
+        dataset_env_vars: &[DatasetEnvVar],
         listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, PollingIngestError> {
         use std::io::Write as _;
@@ -878,7 +875,7 @@ impl FetchService {
 
         // TODO: Reconsider password propagation
         if let (Some(username), Some(password)) = (&fetch.username, &fetch.password) {
-            let password = self.template_string(password, &dataset_handle.id).await?;
+            let password = self.template_string(password, dataset_env_vars).await?;
             opts.set_credentials(username, password);
         }
 
@@ -978,7 +975,7 @@ impl FetchService {
         fetch: &FetchStepEthereumLogs,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
-        dataset_id: &DatasetID,
+        dataset_env_vars: &[DatasetEnvVar],
         listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, PollingIngestError> {
         use alloy::providers::{Provider, ProviderBuilder};
@@ -1013,7 +1010,7 @@ impl FetchService {
 
         // Setup node RPC client
         let node_url = if let Some(url) = &fetch.node_url {
-            self.template_url(url, dataset_id).await?
+            self.template_url(url, dataset_env_vars).await?
         } else if let Some(ep) = self
             .eth_source_config
             .get_endpoint_by_chain_id(fetch.chain_id.unwrap())

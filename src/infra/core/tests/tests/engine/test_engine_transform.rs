@@ -23,7 +23,7 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets_services::DatasetEnvVarServiceStaticImpl;
+use kamu_datasets_services::DatasetKeyValueServiceStaticImpl;
 use opendatafabric::*;
 
 struct DatasetHelper {
@@ -246,7 +246,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .add::<PollingIngestServiceImpl>()
         .add::<TransformServiceImpl>()
         .add::<CompactionServiceImpl>()
-        .add::<DatasetEnvVarServiceStaticImpl>()
+        .add::<DatasetKeyValueServiceStaticImpl>()
         .add_value(SystemTimeSourceStub::new_set(
             Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
         ))

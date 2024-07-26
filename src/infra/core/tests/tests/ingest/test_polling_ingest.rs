@@ -20,7 +20,7 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets_services::DatasetEnvVarServiceStaticImpl;
+use kamu_datasets_services::DatasetKeyValueServiceStaticImpl;
 use opendatafabric::*;
 use tempfile::TempDir;
 
@@ -1119,7 +1119,7 @@ impl IngestTestHarness {
             .add::<DataFormatRegistryImpl>()
             .add::<FetchService>()
             .add::<PollingIngestServiceImpl>()
-            .add::<DatasetEnvVarServiceStaticImpl>()
+            .add::<DatasetKeyValueServiceStaticImpl>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
