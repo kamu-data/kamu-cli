@@ -13,7 +13,7 @@ pub const DATAFUSION: &str = "ghcr.io/kamu-data/engine-datafusion:0.7.2";
 pub const RISINGWAVE: &str = "ghcr.io/kamu-data/engine-risingwave:0.2.0-risingwave_1.7.0-alpha";
 
 pub const LIVY: &str = SPARK;
-pub const JUPYTER: &str = "ghcr.io/kamu-data/jupyter:0.6.1";
+pub const JUPYTER: &str = "ghcr.io/kamu-data/jupyter:0.6.2";
 
 // Test Images
 pub const HTTPD: &str = "docker.io/httpd:2.4";

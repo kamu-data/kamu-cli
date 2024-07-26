@@ -19,18 +19,20 @@ def resolve_dataset_ref(dataset_ref):
             return data_path
     else:
         # Multi-tenant
-        # Assuming layout <account_name>/<dataset_id>/info/alias
-        account_path, name = dataset_ref.split("/", 1)
-        if os.path.isdir(account_path):
-            for dataset_id in os.listdir(account_path):
-                alias_path = os.path.join(account_path, dataset_id, "info", "alias")
+        # Assumptions:
+        # - Layout of the data directory is `<account_name>/<dataset_id>/info/alias`
+        # - Alias file contains `<account_name>/<dataset_name>`
+        account_name, dataset_name = dataset_ref.split("/", 1)
+        if os.path.isdir(account_name):
+            for dataset_id in os.listdir(account_name):
+                alias_path = os.path.join(account_name, dataset_id, "info", "alias")
                 if not os.path.exists(alias_path):
                     continue
                 with open(alias_path) as f:
                     alias = f.read().strip()
-                if alias != name:
+                if alias != dataset_ref:
                     continue
-                return os.path.join(account_path, dataset_id, "data")
+                return os.path.join(account_name, dataset_id, "data")
 
     raise Exception(f"Dataset {{dataset_ref}} not found")
 
