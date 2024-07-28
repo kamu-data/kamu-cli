@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use chrono::Duration;
 use kamu_task_system::*;
-use messaging_outbox::{post_outbox_message, MessageRelevance, Outbox};
+use messaging_outbox::{MessageRelevance, Outbox, OutboxExt};
 use opendatafabric::DatasetID;
 use time_source::SystemTimeSource;
 use tokio::task::yield_now;
@@ -60,35 +60,35 @@ impl TaskDriver {
 
         // Note: we can omit transaction, since this is a test-only abstraction
         // with assummed immediate delivery
-        post_outbox_message(
-            self.outbox.as_ref(),
-            MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
-            TaskRunningMessage {
-                event_time: start_time + self.args.run_since_start,
-                task_id: self.args.task_id,
-            },
-            MessageRelevance::Essential,
-        )
-        .await
-        .unwrap();
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                TaskRunningMessage {
+                    event_time: start_time + self.args.run_since_start,
+                    task_id: self.args.task_id,
+                },
+                MessageRelevance::Essential,
+            )
+            .await
+            .unwrap();
 
         if let Some((finish_in, with_outcome)) = self.args.finish_in_with {
             self.time_source.sleep(finish_in).await;
 
             // Note: we can omit transaction, since this is a test-only abstraction
             // with assummed immediate delivery
-            post_outbox_message(
-                self.outbox.as_ref(),
-                MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
-                TaskFinishedMessage {
-                    event_time: start_time + self.args.run_since_start + finish_in,
-                    task_id: self.args.task_id,
-                    outcome: with_outcome,
-                },
-                MessageRelevance::Essential,
-            )
-            .await
-            .unwrap();
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                    TaskFinishedMessage {
+                        event_time: start_time + self.args.run_since_start + finish_in,
+                        task_id: self.args.task_id,
+                        outcome: with_outcome,
+                    },
+                    MessageRelevance::Essential,
+                )
+                .await
+                .unwrap();
         }
     }
 

@@ -13,8 +13,8 @@ use chrono::Duration;
 
 #[derive(Debug)]
 pub struct OutboxConfig {
-    /// Defines discretion for main scheduling loop: how often new data is
-    /// checked and processed
+    /// Defines discretization of the main scheduling loop: how often new data
+    /// is checked and processed
     pub awaiting_step: Duration,
     /// Defines maximum number of messages attempted to read in 1 step
     pub batch_size: i64,
@@ -54,7 +54,7 @@ impl OutboxConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MessageRelevance {
     Essential = 50,
     Diagnostic = 10,

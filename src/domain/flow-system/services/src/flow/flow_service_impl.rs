@@ -21,7 +21,7 @@ use kamu_core::messages::DatasetDeletedMessage;
 use kamu_core::{DatasetChangesService, DatasetOwnershipService, DependencyGraphService};
 use kamu_flow_system::*;
 use kamu_task_system::*;
-use messaging_outbox::{post_outbox_message, MessageConsumerT, MessageRelevance, Outbox};
+use messaging_outbox::{MessageConsumerT, MessageRelevance, Outbox, OutboxExt};
 use opendatafabric::{AccountID, DatasetID};
 use time_source::SystemTimeSource;
 use tokio_stream::StreamExt;
@@ -917,16 +917,16 @@ impl FlowService for FlowServiceImpl {
                     .await?;
 
                     // Publish progress event
-                    post_outbox_message(
-                        outbox.as_ref(),
-                        MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
-                        FlowServiceUpdatedMessage {
-                            update_time: start_time,
-                            update_details: FlowServiceUpdateDetails::Loaded,
-                        },
-                        MessageRelevance::Diagnostic,
-                    )
-                    .await?;
+                    outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
+                            FlowServiceUpdatedMessage {
+                                update_time: start_time,
+                                update_details: FlowServiceUpdateDetails::Loaded,
+                            },
+                            MessageRelevance::Diagnostic,
+                        )
+                        .await?;
 
                     Ok(())
                 },
@@ -956,16 +956,16 @@ impl FlowService for FlowServiceImpl {
                 // Publish progress event
                 DatabaseTransactionRunner::new(self.catalog.clone())
                     .transactional_with(|outbox: Arc<dyn Outbox>| async move {
-                        post_outbox_message(
-                            outbox.as_ref(),
-                            MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
-                            FlowServiceUpdatedMessage {
-                                update_time: nearest_activation_time,
-                                update_details: FlowServiceUpdateDetails::ExecutedTimeslot,
-                            },
-                            MessageRelevance::Diagnostic,
-                        )
-                        .await
+                        outbox
+                            .post_message(
+                                MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
+                                FlowServiceUpdatedMessage {
+                                    update_time: nearest_activation_time,
+                                    update_details: FlowServiceUpdateDetails::ExecutedTimeslot,
+                                },
+                                MessageRelevance::Diagnostic,
+                            )
+                            .await
                     })
                     .await?;
             }
@@ -1300,16 +1300,16 @@ impl MessageConsumerT<TaskRunningMessage> for FlowServiceImpl {
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
             let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-            post_outbox_message(
-                outbox.as_ref(),
-                MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
-                FlowServiceUpdatedMessage {
-                    update_time: message.event_time,
-                    update_details: FlowServiceUpdateDetails::FlowRunning,
-                },
-                MessageRelevance::Diagnostic,
-            )
-            .await?;
+            outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
+                    FlowServiceUpdatedMessage {
+                        update_time: message.event_time,
+                        update_details: FlowServiceUpdateDetails::FlowRunning,
+                    },
+                    MessageRelevance::Diagnostic,
+                )
+                .await?;
         }
 
         Ok(())
@@ -1382,16 +1382,16 @@ impl MessageConsumerT<TaskFinishedMessage> for FlowServiceImpl {
             }
 
             let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-            post_outbox_message(
-                outbox.as_ref(),
-                MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
-                FlowServiceUpdatedMessage {
-                    update_time: message.event_time,
-                    update_details: FlowServiceUpdateDetails::FlowFinished,
-                },
-                MessageRelevance::Diagnostic,
-            )
-            .await?;
+            outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
+                    FlowServiceUpdatedMessage {
+                        update_time: message.event_time,
+                        update_details: FlowServiceUpdateDetails::FlowFinished,
+                    },
+                    MessageRelevance::Diagnostic,
+                )
+                .await?;
 
             // TODO: retry logic in case of failed outcome
         }

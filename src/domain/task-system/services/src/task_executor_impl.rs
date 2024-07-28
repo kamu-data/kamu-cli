@@ -19,7 +19,7 @@ use kamu_core::{
     PullService,
 };
 use kamu_task_system::*;
-use messaging_outbox::{post_outbox_message, MessageRelevance, Outbox};
+use messaging_outbox::{MessageRelevance, Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,16 +62,16 @@ impl TaskExecutorImpl {
                         "Executing task",
                     );
 
-                    post_outbox_message(
-                        outbox.as_ref(),
-                        MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
-                        TaskRunningMessage {
-                            event_time: self.time_source.now(),
-                            task_id,
-                        },
-                        MessageRelevance::Essential,
-                    )
-                    .await?;
+                    outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                            TaskRunningMessage {
+                                event_time: self.time_source.now(),
+                                task_id,
+                            },
+                            MessageRelevance::Essential,
+                        )
+                        .await?;
 
                     Ok(task)
                 },
@@ -175,17 +175,17 @@ impl TaskExecutorImpl {
                         .int_err()?;
                     task.save(event_store.as_ref()).await.int_err()?;
 
-                    post_outbox_message(
-                        outbox.as_ref(),
-                        MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
-                        TaskFinishedMessage {
-                            event_time: self.time_source.now(),
-                            task_id: task.task_id,
-                            outcome: task_outcome,
-                        },
-                        MessageRelevance::Essential,
-                    )
-                    .await
+                    outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                            TaskFinishedMessage {
+                                event_time: self.time_source.now(),
+                                task_id: task.task_id,
+                                outcome: task_outcome,
+                            },
+                            MessageRelevance::Essential,
+                        )
+                        .await
                 },
             )
             .await?;

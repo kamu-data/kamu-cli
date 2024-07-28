@@ -24,7 +24,7 @@ use kamu_core::{
     SetRefOpts,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use messaging_outbox::{post_outbox_message, MessageRelevance, Outbox};
+use messaging_outbox::{MessageRelevance, Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -109,16 +109,16 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
                 .await
                 .int_err()?;
 
-            post_outbox_message(
-                self.outbox.as_ref(),
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-                DatasetDependenciesUpdatedMessage {
-                    dataset_id: summary.id.clone(),
-                    new_upstream_ids,
-                },
-                MessageRelevance::Essential,
-            )
-            .await?;
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                    DatasetDependenciesUpdatedMessage {
+                        dataset_id: summary.id.clone(),
+                        new_upstream_ids,
+                    },
+                    MessageRelevance::Essential,
+                )
+                .await?;
         }
 
         Ok(())

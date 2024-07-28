@@ -27,22 +27,34 @@ pub trait Outbox: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[inline]
-pub async fn post_outbox_message<M: Message>(
-    outbox: &dyn Outbox,
-    publisher_name: &str,
-    message: M,
-    relevance: MessageRelevance,
-) -> Result<(), InternalError> {
-    let message_as_json = serde_json::to_value(&message).unwrap();
-    outbox
-        .post_message_as_json(
+#[async_trait::async_trait]
+pub trait OutboxExt {
+    async fn post_message<M: Message>(
+        &self,
+        publisher_name: &str,
+        message: M,
+        relevance: MessageRelevance,
+    ) -> Result<(), InternalError>;
+}
+
+#[async_trait::async_trait]
+impl<T: Outbox + ?Sized> OutboxExt for T {
+    #[inline]
+    async fn post_message<M: Message>(
+        &self,
+        publisher_name: &str,
+        message: M,
+        relevance: MessageRelevance,
+    ) -> Result<(), InternalError> {
+        let message_as_json = serde_json::to_value(&message).unwrap();
+        self.post_message_as_json(
             publisher_name,
             message.type_name(),
             message_as_json,
             relevance,
         )
         .await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

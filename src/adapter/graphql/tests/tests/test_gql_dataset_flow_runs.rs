@@ -69,13 +69,7 @@ use kamu_flow_system_services::{
 use kamu_task_system::{self as ts, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::{TaskMessageConsumerMediator, TaskSchedulerImpl};
-use messaging_outbox::{
-    post_outbox_message,
-    MessageRelevance,
-    Outbox,
-    OutboxConfig,
-    OutboxImmediateImpl,
-};
+use messaging_outbox::{MessageRelevance, Outbox, OutboxConfig, OutboxExt, OutboxImmediateImpl};
 use opendatafabric::{AccountID, DatasetID, DatasetKind, Multihash};
 use time_source::SystemTimeSourceDefault;
 
@@ -2754,17 +2748,17 @@ impl FlowRunsHarness {
         task.save(task_event_store.as_ref()).await.unwrap();
 
         let outbox = self.catalog_authorized.get_one::<dyn Outbox>().unwrap();
-        post_outbox_message(
-            outbox.as_ref(),
-            MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
-            ts::TaskRunningMessage {
-                event_time,
-                task_id,
-            },
-            MessageRelevance::Essential,
-        )
-        .await
-        .unwrap();
+        outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                ts::TaskRunningMessage {
+                    event_time,
+                    task_id,
+                },
+                MessageRelevance::Essential,
+            )
+            .await
+            .unwrap();
     }
 
     async fn mimic_task_completed(
@@ -2791,18 +2785,18 @@ impl FlowRunsHarness {
         task.save(task_event_store.as_ref()).await.unwrap();
 
         let outbox = self.catalog_authorized.get_one::<dyn Outbox>().unwrap();
-        post_outbox_message(
-            outbox.as_ref(),
-            MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
-            ts::TaskFinishedMessage {
-                event_time,
-                task_id,
-                outcome: task_outcome,
-            },
-            MessageRelevance::Essential,
-        )
-        .await
-        .unwrap();
+        outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                ts::TaskFinishedMessage {
+                    event_time,
+                    task_id,
+                    outcome: task_outcome,
+                },
+                MessageRelevance::Essential,
+            )
+            .await
+            .unwrap();
     }
 
     fn extract_flow_id_from_trigger_response(response_json: &serde_json::Value) -> &str {

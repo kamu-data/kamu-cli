@@ -20,7 +20,7 @@ use kamu_core::{
     DatasetDependenciesUpdatedMessage,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use messaging_outbox::{post_outbox_message, MessageRelevance, Outbox};
+use messaging_outbox::{MessageRelevance, Outbox, OutboxExt};
 use opendatafabric::DatasetSnapshot;
 
 use crate::DatasetRepositoryWriter;
@@ -73,13 +73,13 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             },
         };
 
-        post_outbox_message(
-            self.outbox.as_ref(),
-            MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-            message_created,
-            MessageRelevance::Essential,
-        )
-        .await?;
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                message_created,
+                MessageRelevance::Essential,
+            )
+            .await?;
 
         if !new_upstream_ids.is_empty() {
             let message_dependencies_updated = DatasetDependenciesUpdatedMessage {
@@ -87,13 +87,13 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                 new_upstream_ids,
             };
 
-            post_outbox_message(
-                self.outbox.as_ref(),
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-                message_dependencies_updated,
-                MessageRelevance::Essential,
-            )
-            .await?;
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                    message_dependencies_updated,
+                    MessageRelevance::Essential,
+                )
+                .await?;
         }
 
         Ok(create_dataset_result)

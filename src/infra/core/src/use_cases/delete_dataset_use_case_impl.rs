@@ -19,7 +19,7 @@ use kamu_core::{
     GetDatasetError,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use messaging_outbox::{post_outbox_message, MessageRelevance, Outbox};
+use messaging_outbox::{MessageRelevance, Outbox, OutboxExt};
 use opendatafabric::DatasetRef;
 
 use crate::DatasetRepositoryWriter;
@@ -70,13 +70,13 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
             dataset_id: dataset_handle.id,
         };
 
-        post_outbox_message(
-            self.outbox.as_ref(),
-            MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-            message,
-            MessageRelevance::Essential,
-        )
-        .await?;
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                message,
+                MessageRelevance::Essential,
+            )
+            .await?;
 
         Ok(())
     }

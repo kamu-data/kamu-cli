@@ -14,7 +14,7 @@ use dill::*;
 use futures::TryStreamExt;
 use kamu_core::messages::DatasetDeletedMessage;
 use kamu_flow_system::*;
-use messaging_outbox::{post_outbox_message, MessageConsumerT, MessageRelevance, Outbox};
+use messaging_outbox::{MessageConsumerT, MessageRelevance, Outbox, OutboxExt};
 use opendatafabric::DatasetID;
 use time_source::SystemTimeSource;
 
@@ -61,13 +61,13 @@ impl FlowConfigurationServiceImpl {
             rule: state.rule.clone(),
         };
 
-        post_outbox_message(
-            self.outbox.as_ref(),
-            MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
-            message,
-            MessageRelevance::Essential,
-        )
-        .await
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+                message,
+                MessageRelevance::Essential,
+            )
+            .await
     }
 
     fn get_dataset_flow_keys(

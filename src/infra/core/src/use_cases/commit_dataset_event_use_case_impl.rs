@@ -21,7 +21,7 @@ use kamu_core::{
     DatasetRepository,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use messaging_outbox::{post_outbox_message, MessageRelevance, Outbox};
+use messaging_outbox::{MessageRelevance, Outbox, OutboxExt};
 use opendatafabric::{DatasetHandle, MetadataEvent};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,13 +74,13 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
                 new_upstream_ids: commit_result.new_upstream_ids.clone(),
             };
 
-            post_outbox_message(
-                self.outbox.as_ref(),
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-                event,
-                MessageRelevance::Essential,
-            )
-            .await?;
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                    event,
+                    MessageRelevance::Essential,
+                )
+                .await?;
         }
 
         Ok(commit_result)

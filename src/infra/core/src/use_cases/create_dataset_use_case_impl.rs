@@ -18,7 +18,7 @@ use kamu_core::{
     CreateDatasetUseCase,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use messaging_outbox::{post_outbox_message, MessageRelevance, Outbox};
+use messaging_outbox::{MessageRelevance, Outbox, OutboxExt};
 use opendatafabric::{DatasetAlias, MetadataBlockTyped, Seed};
 
 use crate::DatasetRepositoryWriter;
@@ -69,13 +69,13 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             },
         };
 
-        post_outbox_message(
-            self.outbox.as_ref(),
-            MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-            message,
-            MessageRelevance::Essential,
-        )
-        .await?;
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                message,
+                MessageRelevance::Essential,
+            )
+            .await?;
 
         Ok(create_result)
     }
