@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use chrono::prelude::*;
@@ -52,7 +53,7 @@ async fn test_fetch_url_file() {
                 None,
                 &target_path,
                 &Utc::now(),
-                &[],
+                &HashMap::new(),
                 None
             )
             .await,
@@ -72,7 +73,7 @@ async fn test_fetch_url_file() {
             None,
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await
@@ -93,7 +94,7 @@ async fn test_fetch_url_file() {
             update.source_state.as_ref(),
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await
@@ -111,7 +112,7 @@ async fn test_fetch_url_file() {
             update.source_state.as_ref(),
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await
@@ -145,7 +146,7 @@ async fn test_fetch_url_http_unreachable() {
                 None,
                 &target_path,
                 &Utc::now(),
-                &[],
+                &HashMap::new(),
                 None
             )
             .await,
@@ -180,7 +181,7 @@ async fn test_fetch_url_http_not_found() {
                 None,
                 &target_path,
                 &Utc::now(),
-                &[],
+                &HashMap::new(),
                 None
             )
             .await,
@@ -222,7 +223,7 @@ async fn test_fetch_url_http_ok() {
             None,
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             Some(listener.clone()),
         )
         .await
@@ -256,7 +257,7 @@ async fn test_fetch_url_http_ok() {
             update.source_state.as_ref(),
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await
@@ -275,7 +276,7 @@ async fn test_fetch_url_http_ok() {
             update.source_state.as_ref(),
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await
@@ -295,7 +296,7 @@ async fn test_fetch_url_http_ok() {
                 update.source_state.as_ref(),
                 &target_path,
                 &Utc::now(),
-                &[],
+                &HashMap::new(),
                 None
             )
             .await,
@@ -342,7 +343,7 @@ async fn test_fetch_url_http_env_interpolation() {
                 None,
                 &target_path,
                 &Utc::now(),
-                &[],
+                &HashMap::new(),
                 Some(listener.clone())
             )
             .await,
@@ -360,7 +361,7 @@ async fn test_fetch_url_http_env_interpolation() {
             None,
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             Some(listener.clone()),
         )
         .await
@@ -419,7 +420,7 @@ async fn test_fetch_url_ftp_ok() {
             None,
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             Some(listener.clone()),
         )
         .await
@@ -478,7 +479,7 @@ async fn test_fetch_files_glob() {
                 None,
                 &target_path,
                 &Utc::now(),
-                &[],
+                &HashMap::new(),
                 None
             )
             .await,
@@ -498,7 +499,7 @@ async fn test_fetch_files_glob() {
             None,
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await
@@ -527,7 +528,7 @@ async fn test_fetch_files_glob() {
             update.source_state.as_ref(),
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await
@@ -545,7 +546,7 @@ async fn test_fetch_files_glob() {
             update.source_state.as_ref(),
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await
@@ -566,7 +567,7 @@ async fn test_fetch_files_glob() {
             update.source_state.as_ref(),
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await
@@ -607,7 +608,7 @@ async fn test_fetch_files_glob() {
             update.source_state.as_ref(),
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await
@@ -636,7 +637,7 @@ async fn test_fetch_files_glob() {
             update5.source_state.as_ref(),
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await
@@ -692,7 +693,7 @@ async fn test_fetch_mqtt_empty() {
             None,
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             Some(listener.clone()),
         )
         .await
@@ -755,7 +756,7 @@ async fn test_fetch_mqtt_one_record() {
             None,
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             Some(listener.clone()),
         )
         .await
@@ -801,7 +802,7 @@ async fn test_fetch_container_ok() {
             None,
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             Some(listener.clone()),
         )
         .await
@@ -851,7 +852,7 @@ async fn test_fetch_container_batch_size_default() {
             None,
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await
@@ -890,7 +891,7 @@ async fn test_fetch_container_batch_size_set() {
             None,
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await
@@ -929,7 +930,7 @@ async fn test_fetch_container_batch_size_invalid_format() {
             None,
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await;
@@ -965,7 +966,7 @@ async fn test_fetch_container_has_more_no_data() {
             None,
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await
@@ -1009,7 +1010,7 @@ async fn test_fetch_container_has_more_data_is_less_than_a_batch() {
             None,
             &target_path,
             &Utc::now(),
-            &[],
+            &HashMap::new(),
             None,
         )
         .await
@@ -1072,7 +1073,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
                 None,
                 &target_path,
                 &Utc::now(),
-                &[],
+                &HashMap::new(),
                 None,
             )
             .await
@@ -1128,7 +1129,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
                 prev_source_state.as_ref(),
                 &target_path,
                 &Utc::now(),
-                &[],
+                &HashMap::new(),
                 None,
             )
             .await
@@ -1183,7 +1184,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
                 prev_source_state.as_ref(),
                 &target_path,
                 &Utc::now(),
-                &[],
+                &HashMap::new(),
                 None,
             )
             .await
@@ -1234,7 +1235,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
                 prev_source_state.as_ref(),
                 &target_path,
                 &Utc::now(),
-                &[],
+                &HashMap::new(),
                 None,
             )
             .await

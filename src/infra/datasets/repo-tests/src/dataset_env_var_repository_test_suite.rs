@@ -277,7 +277,7 @@ pub async fn test_modify_dataset_env_vars(catalog: &Catalog) {
     assert_eq!(db_dataset_env_var.secret_nonce, new_nonce);
     assert_eq!(
         db_dataset_env_var
-            .get_exposed_value(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY)
+            .get_exposed_decrypted_value(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY)
             .unwrap(),
         std::str::from_utf8(new_value.as_slice()).unwrap()
     );

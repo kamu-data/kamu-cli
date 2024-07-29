@@ -66,10 +66,10 @@ impl DatasetEnvVars {
         let dataset_env_var_listing = dataset_env_var_service
             .get_all_dataset_env_vars_by_dataset_id(
                 &self.dataset_handle.id,
-                &DatabasePaginationOpts {
+                Some(DatabasePaginationOpts {
                     offset: (page * per_page),
                     limit: per_page,
-                },
+                }),
             )
             .await
             .int_err()?;

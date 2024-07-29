@@ -7,9 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
+
 use dill::*;
 use kamu_core::ErrorIntoInternal;
-use kamu_datasets::{DatasetEnvVar, DatasetKeyValueService, GetDatasetEnvVarError};
+use kamu_datasets::{
+    DatasetEnvVar,
+    DatasetEnvVarValue,
+    DatasetKeyValueService,
+    FindDatasetEnvVarError,
+};
 use secrecy::Secret;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,14 +37,14 @@ impl DatasetKeyValueServiceStaticImpl {
 
 #[async_trait::async_trait]
 impl DatasetKeyValueService for DatasetKeyValueServiceStaticImpl {
-    async fn get_dataset_env_var_value_by_key<'a>(
+    async fn find_dataset_env_var_value_by_key<'a>(
         &self,
         dataset_env_var_key: &str,
-        _dataset_env_vars: &'a [DatasetEnvVar],
-    ) -> Result<Secret<String>, GetDatasetEnvVarError> {
+        _dataset_env_vars: &'a HashMap<String, DatasetEnvVar>,
+    ) -> Result<DatasetEnvVarValue, FindDatasetEnvVarError> {
         match std::env::var(dataset_env_var_key) {
-            Ok(value_string) => Ok(Secret::new(value_string)),
-            Err(err) => Err(GetDatasetEnvVarError::Internal(err.int_err())),
+            Ok(value_string) => Ok(DatasetEnvVarValue::Secret(Secret::new(value_string))),
+            Err(err) => Err(FindDatasetEnvVarError::Internal(err.int_err())),
         }
     }
 }

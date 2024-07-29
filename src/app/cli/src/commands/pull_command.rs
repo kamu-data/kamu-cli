@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -138,7 +139,7 @@ impl PullCommand {
                     ingest_options: PollingIngestOptions {
                         fetch_uncacheable: self.fetch_uncacheable,
                         exhaust_sources: true,
-                        dataset_env_vars: vec![],
+                        dataset_env_vars: HashMap::new(),
                     },
                     sync_options: SyncOptions {
                         force: self.force,

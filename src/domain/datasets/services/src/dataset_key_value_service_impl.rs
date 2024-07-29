@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use dill::*;
@@ -14,9 +15,10 @@ use kamu_core::ErrorIntoInternal;
 use kamu_datasets::{
     DatasetEnvVar,
     DatasetEnvVarNotFoundError,
+    DatasetEnvVarValue,
     DatasetEnvVarsConfig,
     DatasetKeyValueService,
-    GetDatasetEnvVarError,
+    FindDatasetEnvVarError,
 };
 use secrecy::{ExposeSecret, Secret};
 
@@ -49,22 +51,22 @@ impl DatasetKeyValueServiceImpl {
 
 #[async_trait::async_trait]
 impl DatasetKeyValueService for DatasetKeyValueServiceImpl {
-    async fn get_dataset_env_var_value_by_key<'a>(
+    async fn find_dataset_env_var_value_by_key<'a>(
         &self,
         dataset_env_var_key: &str,
-        dataset_env_vars: &'a [DatasetEnvVar],
-    ) -> Result<Secret<String>, GetDatasetEnvVarError> {
-        if let Some(existing_dataset_env_var) = dataset_env_vars
-            .iter()
-            .find(|dataset_env_var| dataset_env_var.key == dataset_env_var_key)
-        {
-            return Ok(Secret::new(
-                existing_dataset_env_var
-                    .get_exposed_value(self.dataset_env_var_encryption_key.expose_secret())
-                    .map_err(|err| GetDatasetEnvVarError::Internal(err.int_err()))?,
-            ));
+        dataset_env_vars: &'a HashMap<String, DatasetEnvVar>,
+    ) -> Result<DatasetEnvVarValue, FindDatasetEnvVarError> {
+        if let Some(existing_dataset_env_var) = dataset_env_vars.get(dataset_env_var_key) {
+            let exposed_value = existing_dataset_env_var
+                .get_exposed_decrypted_value(self.dataset_env_var_encryption_key.expose_secret())
+                .map_err(|err| FindDatasetEnvVarError::Internal(err.int_err()))?;
+            return if existing_dataset_env_var.secret_nonce.is_some() {
+                Ok(DatasetEnvVarValue::Secret(Secret::new(exposed_value)))
+            } else {
+                return Ok(DatasetEnvVarValue::Regular(exposed_value));
+            };
         }
-        Err(GetDatasetEnvVarError::NotFound(
+        Err(FindDatasetEnvVarError::NotFound(
             DatasetEnvVarNotFoundError {
                 dataset_env_var_key: dataset_env_var_key.to_string(),
             },

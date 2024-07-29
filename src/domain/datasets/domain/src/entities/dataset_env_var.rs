@@ -93,7 +93,7 @@ impl DatasetEnvVar {
         }
     }
 
-    pub fn get_exposed_value(
+    pub fn get_exposed_decrypted_value(
         &self,
         encryption_key: &str,
     ) -> Result<String, DatasetEnvVarEncryptionError> {
@@ -173,6 +173,15 @@ impl From<DatasetEnvVarRowModel> for DatasetEnvVar {
 pub enum DatasetEnvVarValue {
     Secret(Secret<String>),
     Regular(String),
+}
+
+impl DatasetEnvVarValue {
+    pub fn get_exposed_value(&self) -> &str {
+        match self {
+            Self::Regular(value) => value,
+            Self::Secret(secret_value) => secret_value.expose_secret(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -288,7 +297,7 @@ mod tests {
         .unwrap();
 
         let original_value = new_env_var
-            .get_exposed_value(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY)
+            .get_exposed_decrypted_value(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY)
             .unwrap();
         assert_eq!(secret_value, original_value.as_str());
     }
@@ -306,7 +315,7 @@ mod tests {
         .unwrap();
 
         let original_value = new_env_var
-            .get_exposed_value(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY)
+            .get_exposed_decrypted_value(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY)
             .unwrap();
         assert_eq!(value, original_value.as_str());
     }

@@ -7,17 +7,33 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use secrecy::Secret;
+use std::collections::HashMap;
 
-use crate::{DatasetEnvVar, GetDatasetEnvVarError};
+use internal_error::InternalError;
+use thiserror::Error;
+
+use crate::{DatasetEnvVar, DatasetEnvVarNotFoundError, DatasetEnvVarValue};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DatasetKeyValueService: Sync + Send {
-    async fn get_dataset_env_var_value_by_key<'a>(
+    async fn find_dataset_env_var_value_by_key<'a>(
         &self,
         dataset_env_var_key: &str,
-        dataset_env_vars: &'a [DatasetEnvVar],
-    ) -> Result<Secret<String>, GetDatasetEnvVarError>;
+        dataset_env_vars: &'a HashMap<String, DatasetEnvVar>,
+    ) -> Result<DatasetEnvVarValue, FindDatasetEnvVarError>;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum FindDatasetEnvVarError {
+    #[error(transparent)]
+    NotFound(DatasetEnvVarNotFoundError),
+
+    #[error(transparent)]
+    Internal(InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

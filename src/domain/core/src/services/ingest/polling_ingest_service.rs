@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::backtrace::Backtrace;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -61,7 +62,7 @@ pub struct PollingIngestOptions {
     pub exhaust_sources: bool,
     /// Dataset env vars to use if such presented in dataset metadata
     /// to use during fetch phase
-    pub dataset_env_vars: Vec<DatasetEnvVar>,
+    pub dataset_env_vars: HashMap<String, DatasetEnvVar>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

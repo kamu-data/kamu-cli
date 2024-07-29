@@ -86,29 +86,12 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
         Ok(dataset_env_var)
     }
 
-    async fn get_dataset_env_var_value_by_key_and_dataset_id(
-        &self,
-        dataset_env_var_key: &str,
-        dataset_id: &DatasetID,
-    ) -> Result<Secret<String>, GetDatasetEnvVarError> {
-        let existing_env_var = self
-            .dataset_env_var_repository
-            .get_dataset_env_var_by_key_and_dataset_id(dataset_env_var_key, dataset_id)
-            .await?;
-
-        Ok(Secret::new(
-            existing_env_var
-                .get_exposed_value(self.dataset_env_var_encryption_key.expose_secret())
-                .map_err(|err| GetDatasetEnvVarError::Internal(err.int_err()))?,
-        ))
-    }
-
     async fn get_exposed_value(
         &self,
         dataset_env_var: &DatasetEnvVar,
     ) -> Result<String, InternalError> {
         dataset_env_var
-            .get_exposed_value(self.dataset_env_var_encryption_key.expose_secret())
+            .get_exposed_decrypted_value(self.dataset_env_var_encryption_key.expose_secret())
             .int_err()
     }
 
@@ -124,7 +107,7 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
     async fn get_all_dataset_env_vars_by_dataset_id(
         &self,
         dataset_id: &DatasetID,
-        pagination: &DatabasePaginationOpts,
+        pagination: Option<DatabasePaginationOpts>,
     ) -> Result<DatasetEnvVarListing, GetDatasetEnvVarError> {
         let total_count = self
             .dataset_env_var_repository
@@ -136,10 +119,17 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
                 list: vec![],
             });
         }
+        let database_pagination = pagination.unwrap_or(DatabasePaginationOpts {
+            // We assume that it is impossible to reach dataset env vars count bigger
+            // than max i64 value
+            #[allow(clippy::cast_possible_wrap)]
+            limit: total_count as i64,
+            offset: 0,
+        });
 
         let dataset_env_var_list = self
             .dataset_env_var_repository
-            .get_all_dataset_env_vars_by_dataset_id(dataset_id, pagination)
+            .get_all_dataset_env_vars_by_dataset_id(dataset_id, &database_pagination)
             .await?;
         Ok(DatasetEnvVarListing {
             list: dataset_env_var_list,

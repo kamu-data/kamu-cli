@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
@@ -19,7 +20,6 @@ use kamu_core::engine::ProcessError;
 use kamu_core::*;
 use kamu_datasets_services::domain::{DatasetEnvVar, DatasetKeyValueService};
 use opendatafabric::*;
-use secrecy::ExposeSecret;
 use url::Url;
 
 use super::*;
@@ -148,7 +148,7 @@ impl FetchService {
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         system_time: &DateTime<Utc>,
-        dataset_env_vars: &[DatasetEnvVar],
+        dataset_env_vars: &HashMap<String, DatasetEnvVar>,
         maybe_listener: Option<Arc<dyn FetchProgressListener>>,
     ) -> Result<FetchResult, PollingIngestError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullFetchProgressListener));
@@ -232,7 +232,7 @@ impl FetchService {
     async fn template_url(
         &self,
         url_tpl: &str,
-        dataset_env_vars: &[DatasetEnvVar],
+        dataset_env_vars: &HashMap<String, DatasetEnvVar>,
     ) -> Result<Url, PollingIngestError> {
         let url = self.template_string(url_tpl, dataset_env_vars).await?;
         Ok(Url::parse(&url).int_err()?)
@@ -241,7 +241,7 @@ impl FetchService {
     async fn template_headers(
         &self,
         headers_tpl: &Option<Vec<RequestHeader>>,
-        dataset_env_vars: &[DatasetEnvVar],
+        dataset_env_vars: &HashMap<String, DatasetEnvVar>,
     ) -> Result<Vec<RequestHeader>, PollingIngestError> {
         let mut res = Vec::new();
         let empty = Vec::new();
@@ -261,7 +261,7 @@ impl FetchService {
     async fn template_string<'a>(
         &self,
         s: &'a str,
-        dataset_env_vars: &'a [DatasetEnvVar],
+        dataset_env_vars: &'a HashMap<String, DatasetEnvVar>,
     ) -> Result<Cow<'a, str>, PollingIngestError> {
         let mut s = Cow::from(s);
         let re_tpl = regex::Regex::new(r"\$\{\{([^}]*)\}\}").unwrap();
@@ -275,11 +275,11 @@ impl FetchService {
                     let env_name = cenv.get(1).unwrap().as_str();
                     let dataset_env_var_secret_value = self
                         .dataset_key_value_svc
-                        .get_dataset_env_var_value_by_key(env_name, dataset_env_vars)
+                        .find_dataset_env_var_value_by_key(env_name, dataset_env_vars)
                         .await
                         .int_err()?;
                     s.to_mut()
-                        .replace_range(tpl_range, dataset_env_var_secret_value.expose_secret());
+                        .replace_range(tpl_range, dataset_env_var_secret_value.get_exposed_value());
                 } else {
                     return Err(format!(
                         "Invalid pattern '{}' encountered in string: {}",
@@ -859,7 +859,7 @@ impl FetchService {
         dataset_handle: &DatasetHandle,
         fetch: &FetchStepMqtt,
         target_path: &Path,
-        dataset_env_vars: &[DatasetEnvVar],
+        dataset_env_vars: &HashMap<String, DatasetEnvVar>,
         listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, PollingIngestError> {
         use std::io::Write as _;
@@ -975,7 +975,7 @@ impl FetchService {
         fetch: &FetchStepEthereumLogs,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
-        dataset_env_vars: &[DatasetEnvVar],
+        dataset_env_vars: &HashMap<String, DatasetEnvVar>,
         listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, PollingIngestError> {
         use alloy::providers::{Provider, ProviderBuilder};
