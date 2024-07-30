@@ -13,14 +13,16 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_push_ingest_from_file_ledger
+    fixture = kamu_cli_e2e_repo_tests::test_push_ingest_from_file_ledger,
+    extra_test_groups = "engine, ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_push_ingest_from_file_snapshot_with_event_time
+    fixture = kamu_cli_e2e_repo_tests::test_push_ingest_from_file_snapshot_with_event_time,
+    extra_test_groups = "engine, ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
