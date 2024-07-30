@@ -46,30 +46,56 @@ fn kamu_cli_e2e_test_impl(harness_method: Ident, input: TokenStream) -> TokenStr
 
     let options = options.unwrap_or_else(|| parse_str("Options::default()").unwrap());
 
-    let mut test_groups = match storage.to_string().as_str() {
-        "inmem" => quote! { e2e },
-        "postgres" => quote! { e2e, database, postgres },
-        "mysql" => quote! { e2e, database, mysql },
-        "sqlite" => quote! { e2e, database, sqlite },
+    let extra_test_groups = if let Some(extra_test_groups) = extra_test_groups {
+        quote! { #extra_test_groups }
+    } else {
+        quote! {}
+    };
+
+    let output = match storage.to_string().as_str() {
+        "inmem" => quote! {
+           #[test_group::group(e2e, #extra_test_groups)]
+           #[test_log::test(tokio::test)]
+           async fn #test_function_name () {
+               KamuCliApiServerHarness::inmem ( #options )
+                   . #harness_method ( #fixture )
+                   .await;
+           }
+        },
+        "postgres" => quote! {
+            #[test_group::group(e2e, database, postgres, #extra_test_groups)]
+            #[test_log::test(sqlx::test(migrations = "../../../../../migrations/postgres"))]
+            async fn #test_function_name (pg_pool: sqlx::PgPool) {
+                KamuCliApiServerHarness::postgres(&pg_pool, #options )
+                    . #harness_method ( #fixture )
+                    .await;
+            }
+        },
+        "mysql" => quote! {
+            // flaky: when running in parallel, errors occur with table not found (or sporadic deadlocks),
+            //        restarting again solves the problem.
+            #[test_group::group(e2e, database, mysql, flaky, #extra_test_groups)]
+            #[test_log::test(sqlx::test(migrations = "../../../../../migrations/mysql"))]
+            async fn #test_function_name (mysql_pool: sqlx::MySqlPool) {
+                KamuCliApiServerHarness::mysql(&mysql_pool, #options )
+                    . #harness_method ( #fixture )
+                    .await;
+            }
+        },
+        "sqlite" => quote! {
+            #[test_group::group(e2e, database, sqlite, #extra_test_groups)]
+            #[test_log::test(sqlx::test(migrations = "../../../../../migrations/sqlite"))]
+            async fn #test_function_name (sqlite_pool: sqlx::SqlitePool) {
+                KamuCliApiServerHarness::sqlite(&sqlite_pool, #options )
+                    . #harness_method ( #fixture )
+                    .await;
+            }
+        },
         unexpected => {
             panic!(
                 "Unexpected E2E test storage: \"{unexpected}\"!\nAllowable values: \"inmem\", \
                  \"postgres\", \"mysql\", and \"sqlite\"."
             );
-        }
-    };
-
-    if let Some(extra_test_groups) = extra_test_groups {
-        test_groups.extend(quote! { , #extra_test_groups })
-    };
-
-    let output = quote! {
-        #[test_group::group( #test_groups )]
-        #[test_log::test(tokio::test)]
-        async fn #test_function_name () {
-            KamuCliApiServerHarness:: #storage ( #options )
-                . #harness_method ( #fixture )
-                .await;
         }
     };
 
