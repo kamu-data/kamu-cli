@@ -10,7 +10,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::{parse_macro_input, parse_str, Expr, Ident, Path, Token};
+use syn::{parse_macro_input, parse_str, Expr, Ident, LitStr, Path, Token};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,7 +45,7 @@ fn kamu_cli_e2e_test_impl(harness_method: Ident, input: TokenStream) -> TokenStr
     let options = options.unwrap_or_else(|| parse_str("Options::default()").unwrap());
 
     let extra_test_groups = if let Some(extra_test_groups) = extra_test_groups {
-        quote! { #extra_test_groups }
+        parse_str(extra_test_groups.value().as_str()).unwrap()
     } else {
         quote! {}
     };
@@ -108,7 +108,7 @@ struct InputArgs {
     pub storage: Ident,
     pub fixture: Path,
     pub options: Option<Expr>,
-    pub extra_test_groups: Option<Expr>,
+    pub extra_test_groups: Option<LitStr>,
 }
 
 impl Parse for InputArgs {
@@ -140,7 +140,7 @@ impl Parse for InputArgs {
                     options = Some(value);
                 }
                 "extra_test_groups" => {
-                    let value: Expr = input.parse()?;
+                    let value: LitStr = input.parse()?;
 
                     extra_test_groups = Some(value);
                 }
