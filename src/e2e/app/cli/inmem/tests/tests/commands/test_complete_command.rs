@@ -12,23 +12,24 @@ use kamu_cli_e2e_common::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
-    inmem,
-    kamu_cli_e2e_repo_tests,
-    test_complete_subcommand,
-    Options::default().with_no_workspace()
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_complete_subcommand,
+    options = Options::default().with_no_workspace()
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
-    inmem,
-    kamu_cli_e2e_repo_tests,
-    test_complete_config,
-    Options::default().with_no_workspace()
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_complete_config,
+    options = Options::default().with_no_workspace()
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_cli_execute_command_e2e_test!(inmem, kamu_cli_e2e_repo_tests, test_complete_dataset_name);
+kamu_cli_execute_command_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_complete_dataset_name
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
