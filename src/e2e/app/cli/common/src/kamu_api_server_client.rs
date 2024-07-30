@@ -39,13 +39,7 @@ pub struct KamuApiServerClient {
 
 impl KamuApiServerClient {
     pub fn new(server_base_url: Url) -> Self {
-        let http_client = reqwest::Client::builder()
-            // .tcp_keepalive(Some(Duration::from_secs(60)))
-            // .timeout(Duration::from_secs(60))
-            .pool_max_idle_per_host(0)
-            .connection_verbose(true)
-            .build()
-            .unwrap();
+        let http_client = reqwest::Client::new();
 
         Self {
             http_client,
@@ -97,25 +91,14 @@ impl KamuApiServerClient {
         expected_response_body: Option<ExpectedResponseBody>,
     ) {
         let endpoint = self.server_base_url.join(endpoint).unwrap();
-
-        let client = reqwest::Client::builder()
-            .pool_max_idle_per_host(0)
-            .http1_allow_obsolete_multiline_headers_in_responses(true)
-            .timeout(Duration::from_secs(2))
-            // .http2_prior_knowledge()
-            .build()
-            .unwrap();
-
         let mut request_builder = match method {
-            Method::GET => client.get(endpoint),
-            Method::POST => client.post(endpoint),
-            Method::PUT => client.put(endpoint),
+            Method::GET => self.http_client.get(endpoint),
+            Method::POST => self.http_client.post(endpoint),
+            Method::PUT => self.http_client.put(endpoint),
             _ => {
                 unimplemented!()
             }
         };
-
-        request_builder = request_builder.timeout(Duration::from_secs(5));
 
         if let Some(token) = token {
             request_builder = request_builder.bearer_auth(token);
