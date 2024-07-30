@@ -104,14 +104,14 @@ jobs:
     name: Test / ${{ matrix.name }}
     runs-on: ${{ matrix.runs-on }}
     services:
-      #      postgres:
-      #        image: ${{ matrix.database && 'postgres:16' || '' }}
-      #        env:
-      #          POSTGRES_USER: root
-      #          POSTGRES_PASSWORD: root
-      #          POSTGRES_DB: kamu-test
-      #        ports:
-      #          - 5432:5432
+      postgres:
+        image: ${{ matrix.database && 'postgres:16' || '' }}
+        env:
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: kamu-test
+        ports:
+          - 5432:5432
       mariadb:
         image: ${{ matrix.database && 'mariadb:11' || '' }}
         env:
@@ -165,12 +165,12 @@ jobs:
         # platform(target) is a workaround for Windows only issue in cargo-nextest upon proc macro crates
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'platform(target) & test(::sqlite::) ${{ matrix.nextest-exclusions-database-set-part }}'
 
-      #      - name: Postgres database tests
-      #        if: matrix.database
-      #        env:
-      #          SQLX_OFFLINE: false
-      #          DATABASE_URL: postgres://root:root@localhost:5432/kamu-test
-      #        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::) ${{ matrix.nextest-exclusions-database-set-part }}'
+      - name: Postgres database tests
+        if: matrix.database
+        env:
+          SQLX_OFFLINE: false
+          DATABASE_URL: postgres://root:root@localhost:5432/kamu-test
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::) ${{ matrix.nextest-exclusions-database-set-part }}'
 
       - name: MariaDB database tests
         if: matrix.database
