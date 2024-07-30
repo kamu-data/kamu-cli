@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_core::{CompactionResult, PullResult};
-use kamu_task_system as ts;
+use kamu_task_system::{self as ts, UpdateDatasetTaskError};
 use opendatafabric::{DatasetID, Multihash};
 use ts::TaskError;
 
@@ -66,11 +66,13 @@ impl From<&TaskError> for FlowError {
     fn from(value: &TaskError) -> Self {
         match value {
             TaskError::Empty => Self::Failed,
-            TaskError::RootDatasetCompacted(err) => {
-                Self::RootDatasetCompacted(FlowRootDatasetCompactedError {
-                    dataset_id: err.dataset_id.clone(),
-                })
-            }
+            TaskError::UpdateDatasetError(update_dataset_error) => match update_dataset_error {
+                UpdateDatasetTaskError::RootDatasetCompacted(err) => {
+                    Self::RootDatasetCompacted(FlowRootDatasetCompactedError {
+                        dataset_id: err.dataset_id.clone(),
+                    })
+                }
+            },
         }
     }
 }

@@ -18,9 +18,11 @@ use kamu_core::{
     CompactionService,
     DatasetRepository,
     PollingIngestOptions,
+    PullError,
     PullOptions,
     PullService,
     SystemTimeSource,
+    TransformError,
 };
 use kamu_datasets::{DatasetEnvVar, DatasetEnvVarService};
 use kamu_task_system::*;
@@ -123,7 +125,16 @@ impl TaskExecutorImpl {
             Ok(pull_result) => Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
                 pull_result.into(),
             ))),
-            Err(_) => Ok(TaskOutcome::Failed(TaskError::Empty)),
+            Err(err) => match err {
+                PullError::TransformError(TransformError::InvalidInterval(_)) => {
+                    Ok(TaskOutcome::Failed(TaskError::UpdateDatasetError(
+                        UpdateDatasetTaskError::RootDatasetCompacted(RootDatasetCompactedError {
+                            dataset_id: update_dataset_args.dataset_id.clone(),
+                        }),
+                    )))
+                }
+                _ => Ok(TaskOutcome::Failed(TaskError::Empty)),
+            },
         }
     }
 

@@ -778,25 +778,6 @@ impl FlowServiceImpl {
         }
     }
 
-    fn get_task_outcome(&self, flow: &Flow, task_outcome: TaskOutcome) -> TaskOutcome {
-        if let TaskOutcome::Failed(task_error) = &task_outcome {
-            if task_error == &TaskError::Empty {
-                for trigger in &flow.triggers {
-                    if let FlowTrigger::InputDatasetFlow(trigger) = trigger {
-                        if let FlowResult::DatasetCompact(_) = &trigger.flow_result {
-                            return TaskOutcome::Failed(TaskError::RootDatasetCompacted(
-                                RootDatasetCompactedError {
-                                    dataset_id: trigger.dataset_id.clone(),
-                                },
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-        task_outcome
-    }
-
     async fn make_downstream_dependencies_flow_plans(
         &self,
         fk_dataset: &FlowKeyDataset,
@@ -1312,8 +1293,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceImpl {
             let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
                 .await
                 .int_err()?;
-            let event_outcome = self.get_task_outcome(&flow, event.outcome.clone());
-            flow.on_task_finished(event.event_time, event.task_id, event_outcome.clone())
+            flow.on_task_finished(event.event_time, event.task_id, event.outcome.clone())
                 .int_err()?;
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
@@ -1339,7 +1319,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceImpl {
 
             // In case of success:
             //  - enqueue next auto-polling flow cycle
-            if event_outcome.is_success() {
+            if event.outcome.is_success() {
                 self.try_enqueue_scheduled_auto_polling_flow_if_enabled(
                     finish_time,
                     &flow.flow_key,

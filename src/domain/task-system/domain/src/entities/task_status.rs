@@ -81,6 +81,11 @@ impl From<CompactionResult> for TaskCompactionDatasetResult {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskError {
     Empty,
+    UpdateDatasetError(UpdateDatasetTaskError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UpdateDatasetTaskError {
     RootDatasetCompacted(RootDatasetCompactedError),
 }
 
