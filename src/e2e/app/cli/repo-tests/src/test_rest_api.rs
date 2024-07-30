@@ -105,8 +105,6 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
         )
         .await;
 
-    dbg!("-------------------------------- before ingest");
-
     // 4. Ingest data
     kamu_api_server_client
         .rest_api_call_assert(

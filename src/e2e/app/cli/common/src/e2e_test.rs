@@ -7,15 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
 use std::future::Future;
 use std::path::PathBuf;
-use std::time::Duration;
 
-use futures::FutureExt;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
 use reqwest::Url;
-use tokio::task::JoinHandle;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
 
@@ -87,14 +83,6 @@ pub async fn api_server_e2e_test<ServerRunFut, Fixture, FixtureFut>(
 
         panic!("{panic_message}");
     }
-
-    // match tokio::join!(wrapped_server_run_fut, test_fut) {
-    //     (_, Err(test_res)) => {}
-    //     _ => {}
-    // }
-
-    // assert_matches!(tokio::try_join!(wrapped_server_run_fut, test_fut),
-    // Ok(_));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

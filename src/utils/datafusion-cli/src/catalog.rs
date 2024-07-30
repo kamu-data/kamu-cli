@@ -155,8 +155,6 @@ impl SchemaProvider for DynamicFileSchemaProvider {
         let scheme = table_url.scheme();
         let url = table_url.as_ref();
 
-        dbg!(&table_url);
-
         // If the store is already registered for this URL then `get_store`
         // will return `Ok` which means we don't need to register it again. However,
         // if `get_store` returns an `Err` then it means the corresponding store is

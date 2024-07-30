@@ -75,9 +75,6 @@ impl datafusion::datasource::object_store::ObjectStoreRegistry for ObjectStoreRe
     fn get_store(&self, url: &Url) -> datafusion::error::Result<Arc<dyn ObjectStore>> {
         let s = Self::get_url_key(url);
 
-        dbg!("@@@ get_store:", &s);
-        dbg!("@@@ get_store:", &url);
-
         // Try get existing store
         let store = self.object_stores.get(&s).map(|o| o.value().clone());
 

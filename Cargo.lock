@@ -5325,7 +5325,6 @@ name = "kamu-cli-e2e-common"
 version = "0.191.5"
 dependencies = [
  "chrono",
- "futures",
  "indoc 2.0.5",
  "internal-error",
  "kamu-cli-e2e-common-macros",
@@ -5438,7 +5437,6 @@ version = "0.191.4"
 dependencies = [
  "async-trait",
  "datafusion",
- "internal-error",
  "kamu-cli-puppet",
  "kamu-data-utils",
  "opendatafabric",
