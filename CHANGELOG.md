@@ -11,7 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     The crate contains basic functionality: calling commands.
   - Added `kamu-cli-puppet-ext` crate containing extensions based on `kamu-cli-puppet` command calls
   - Removed past `kamu-cli` wrapper that ran in-process.
-  - Some of `kamu-cli` tests that are inherently E2E are moved and adapted to E2E scope
+  - Some of `kamu-cli` tests that are inherently E2E are moved and adapted to E2E scope (inmem area)
+  - For convenience, the test run macros are now procedural
+  - Various Windows-related tweaks & fixes
 
 ## Unreleased
 ### Fixed
