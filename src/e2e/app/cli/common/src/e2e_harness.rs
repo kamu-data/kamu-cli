@@ -75,8 +75,8 @@ impl KamuCliApiServerHarnessOptions {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct KamuCliApiServerHarness {
-    kamu_config: Option<String>,
     options: KamuCliApiServerHarnessOptions,
+    kamu_config: Option<String>,
 }
 
 impl KamuCliApiServerHarness {

@@ -18,7 +18,7 @@ use syn::{parse_macro_input, parse_str, Expr, Ident, LitStr, Path, Token};
 pub fn kamu_cli_run_api_server_e2e_test(input: TokenStream) -> TokenStream {
     let harness_method = parse_str("run_api_server").unwrap();
 
-    kamu_cli_e2e_test_impl(harness_method, input)
+    kamu_cli_e2e_test_impl(&harness_method, input)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,12 +27,12 @@ pub fn kamu_cli_run_api_server_e2e_test(input: TokenStream) -> TokenStream {
 pub fn kamu_cli_execute_command_e2e_test(input: TokenStream) -> TokenStream {
     let harness_method = parse_str("execute_command").unwrap();
 
-    kamu_cli_e2e_test_impl(harness_method, input)
+    kamu_cli_e2e_test_impl(&harness_method, input)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn kamu_cli_e2e_test_impl(harness_method: Ident, input: TokenStream) -> TokenStream {
+fn kamu_cli_e2e_test_impl(harness_method: &Ident, input: TokenStream) -> TokenStream {
     let InputArgs {
         storage,
         fixture,

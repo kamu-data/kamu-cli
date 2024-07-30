@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::time::Duration;
-
 use internal_error::{InternalError, ResultIntoInternal};
 use reqwest::{Method, Response, StatusCode, Url};
 use serde::Deserialize;
