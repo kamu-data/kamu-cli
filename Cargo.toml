@@ -64,6 +64,7 @@ members = [
     "src/app/cli",
     # E2E
     "src/e2e/app/cli/common",
+    "src/e2e/app/cli/common-macros",
     "src/e2e/app/cli/repo-tests",
     "src/e2e/app/cli/inmem",
     "src/e2e/app/cli/postgres",
@@ -145,6 +146,7 @@ kamu-adapter-oauth = { version = "0.191.5", path = "src/adapter/oauth", default-
 
 # E2E
 kamu-cli-e2e-common = { version = "0.191.5", path = "src/e2e/app/cli/common", default-features = false }
+kamu-cli-e2e-common-macros = { version = "0.191.5", path = "src/e2e/app/cli/common-macros", default-features = false }
 kamu-cli-e2e-repo-tests = { version = "0.191.5", path = "src/e2e/app/cli/repo-tests", default-features = false }
 
 [workspace.package]

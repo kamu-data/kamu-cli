@@ -1,0 +1,151 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use proc_macro::TokenStream;
+use quote::quote;
+use syn::parse::{Parse, ParseStream};
+use syn::{parse_macro_input, parse_str, Expr, Ident, Path, Token};
+
+// TODO: unit-tests
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[proc_macro]
+pub fn kamu_cli_run_api_server_e2e_test(input: TokenStream) -> TokenStream {
+    let harness_method = parse_str("run_api_server").unwrap();
+
+    kamu_cli_e2e_test_impl(harness_method, input)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[proc_macro]
+pub fn kamu_cli_execute_command_e2e_test(input: TokenStream) -> TokenStream {
+    let harness_method = parse_str("execute_command").unwrap();
+
+    kamu_cli_e2e_test_impl(harness_method, input)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn kamu_cli_e2e_test_impl(harness_method: Ident, input: TokenStream) -> TokenStream {
+    let InputArgs {
+        storage,
+        fixture,
+        options,
+        extra_test_groups,
+    } = parse_macro_input!(input as InputArgs);
+
+    let test_function_name = fixture.segments.last().unwrap().ident.clone();
+
+    let options = options.unwrap_or_else(|| parse_str("Options::default()").unwrap());
+
+    let mut test_groups = match storage.to_string().as_str() {
+        "inmem" => quote! { e2e },
+        "postgres" => quote! { e2e, database, postgres },
+        "mysql" => quote! { e2e, database, mysql },
+        "sqlite" => quote! { e2e, database, sqlite },
+        unexpected => {
+            panic!(
+                "Unexpected E2E test storage: \"{unexpected}\"!\nAllowable values: \"inmem\", \
+                 \"postgres\", \"mysql\", and \"sqlite\"."
+            );
+        }
+    };
+
+    if let Some(extra_test_groups) = extra_test_groups {
+        test_groups.extend(quote! { , #extra_test_groups })
+    };
+
+    let output = quote! {
+        #[test_group::group( #test_groups )]
+        #[test_log::test(tokio::test)]
+        async fn #test_function_name () {
+            KamuCliApiServerHarness:: #storage ( #options )
+                . #harness_method ( #fixture )
+                .await;
+        }
+    };
+
+    output.into()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct InputArgs {
+    pub storage: Ident,
+    pub fixture: Path,
+    pub options: Option<Expr>,
+    pub extra_test_groups: Option<Expr>,
+}
+
+impl Parse for InputArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut storage = None;
+        let mut fixture = None;
+        let mut options = None;
+        let mut extra_test_groups = None;
+
+        while !input.is_empty() {
+            let key: Ident = input.parse()?;
+
+            input.parse::<Token![=]>()?;
+
+            match key.to_string().as_str() {
+                "storage" => {
+                    let value: Ident = input.parse()?;
+
+                    storage = Some(value);
+                }
+                "fixture" => {
+                    let value: Path = input.parse()?;
+
+                    fixture = Some(value);
+                }
+                "options" => {
+                    let value: Expr = input.parse()?;
+
+                    options = Some(value);
+                }
+                "extra_test_groups" => {
+                    let value: Expr = input.parse()?;
+
+                    extra_test_groups = Some(value);
+                }
+                unexpected_key => panic!(
+                    "Unexpected key: {unexpected_key}\nAllowable values: \"storage\", \
+                     \"fixture\", \"options\", and \"extra_test_groups\"."
+                ),
+            };
+
+            if input.peek(Token![,]) {
+                input.parse::<Token![,]>()?;
+            }
+        }
+
+        let Some(storage) = storage else {
+            panic!("Mandatory parameter \"storage\" not found");
+        };
+
+        let Some(fixture) = fixture else {
+            panic!("Mandatory parameter \"fixture\" not found");
+        };
+
+        Ok(InputArgs {
+            storage,
+            fixture,
+            options,
+            extra_test_groups,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
