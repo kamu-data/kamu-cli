@@ -76,15 +76,15 @@ impl KamuCliApiServerHarnessOptions {
 
 pub struct KamuCliApiServerHarness {
     kamu_config: Option<String>,
-    options: Option<KamuCliApiServerHarnessOptions>,
+    options: KamuCliApiServerHarnessOptions,
 }
 
 impl KamuCliApiServerHarness {
-    pub fn inmem(options: Option<KamuCliApiServerHarnessOptions>) -> Self {
-        Self::new(None, options)
+    pub fn inmem(options: KamuCliApiServerHarnessOptions) -> Self {
+        Self::new(options, None)
     }
 
-    pub fn postgres(pg_pool: &PgPool, options: Option<KamuCliApiServerHarnessOptions>) -> Self {
+    pub fn postgres(pg_pool: &PgPool, options: KamuCliApiServerHarnessOptions) -> Self {
         let db = pg_pool.connect_options();
         let kamu_config = format!(
             indoc::indoc!(
@@ -109,10 +109,10 @@ impl KamuCliApiServerHarness {
             database = db.get_database().unwrap(),
         );
 
-        Self::new(Some(kamu_config), options)
+        Self::new(options, Some(kamu_config))
     }
 
-    pub fn mysql(mysql_pool: &MySqlPool, options: Option<KamuCliApiServerHarnessOptions>) -> Self {
+    pub fn mysql(mysql_pool: &MySqlPool, options: KamuCliApiServerHarnessOptions) -> Self {
         let db = mysql_pool.connect_options();
         let kamu_config = format!(
             indoc::indoc!(
@@ -137,13 +137,10 @@ impl KamuCliApiServerHarness {
             database = db.get_database().unwrap(),
         );
 
-        Self::new(Some(kamu_config), options)
+        Self::new(options, Some(kamu_config))
     }
 
-    pub fn sqlite(
-        sqlite_pool: &SqlitePool,
-        options: Option<KamuCliApiServerHarnessOptions>,
-    ) -> Self {
+    pub fn sqlite(sqlite_pool: &SqlitePool, options: KamuCliApiServerHarnessOptions) -> Self {
         // Ugly way to get the path as the settings have a not-so-good signature:
         // SqliteConnectOptions::get_filename(self) -> Cow<'static, Path>
         //                                    ^^^^
@@ -174,13 +171,13 @@ impl KamuCliApiServerHarness {
             path = database_path
         );
 
-        Self::new(Some(kamu_config), options)
+        Self::new(options, Some(kamu_config))
     }
 
-    fn new(kamu_config: Option<String>, options: Option<KamuCliApiServerHarnessOptions>) -> Self {
+    fn new(options: KamuCliApiServerHarnessOptions, kamu_config: Option<String>) -> Self {
         Self {
-            kamu_config,
             options,
+            kamu_config,
         }
     }
 
@@ -212,7 +209,7 @@ impl KamuCliApiServerHarness {
             potential_workspace,
             env_vars,
             frozen_system_time: freeze_system_time,
-        } = self.options.unwrap_or_default();
+        } = self.options;
 
         let mut kamu = match potential_workspace {
             PotentialWorkspace::NoWorkspace => KamuCliPuppet::new("."),
