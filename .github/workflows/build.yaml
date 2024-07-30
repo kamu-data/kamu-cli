@@ -116,11 +116,11 @@ jobs:
         ports:
           - 3306:3306
     steps:
-      #      - name: Setup IPFS
-      #        uses: ibnesayeed/setup-ipfs@master
-      #        if: matrix.ipfs
-      #        with:
-      #          ipfs_version: "0.19"
+      - name: Setup IPFS
+        uses: ibnesayeed/setup-ipfs@master
+        if: matrix.ipfs
+        with:
+          ipfs_version: "0.19"
 
       - uses: actions/checkout@v4
 
@@ -146,14 +146,9 @@ jobs:
         run: |
           cargo test ${{ matrix.cargo-flags }} --no-run
 
-      #      - name: Pull test images
-      #        if: matrix.container-runtime != ''
-      #        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::setup::)' --no-capture
-
-      - name: test_rest_api_request_dataset_tail
-        env:
-          RUST_LOG: trace
-        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::e2e::test_rest_api_request_dataset_tail)' --no-capture
+      - name: Pull test images
+        if: matrix.container-runtime != ''
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::setup::)' --no-capture
 
       - name: Run main set of tests
         run: cargo nextest run ${{ matrix.nextest-flags }} ${{ matrix.nextest-exclusions }} -v
