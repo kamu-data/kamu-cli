@@ -22,7 +22,7 @@ use kamu_core::{
     PullService,
     SystemTimeSource,
 };
-use kamu_datasets_services::domain::{DatasetEnvVar, DatasetEnvVarService};
+use kamu_datasets::{DatasetEnvVar, DatasetEnvVarService};
 use kamu_task_system::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
