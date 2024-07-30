@@ -8,11 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use std::backtrace::Backtrace;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use container_runtime::ImagePullError;
+use kamu_datasets::DatasetEnvVar;
 use opendatafabric::*;
 use thiserror::Error;
 
@@ -58,6 +60,9 @@ pub struct PollingIngestOptions {
     /// Pull sources that yield multiple data files until they are
     /// fully exhausted
     pub exhaust_sources: bool,
+    /// Dataset env vars to use if such presented in dataset metadata
+    /// to use during fetch phase
+    pub dataset_env_vars: HashMap<String, DatasetEnvVar>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

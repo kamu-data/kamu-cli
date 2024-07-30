@@ -7,18 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
+use database_common::DatabaseTransactionRunner;
 use dill::*;
 use event_bus::EventBus;
 use kamu_core::{
     CompactionOptions,
     CompactionService,
     DatasetRepository,
+    PollingIngestOptions,
     PullOptions,
     PullService,
     SystemTimeSource,
 };
+use kamu_datasets::{DatasetEnvVar, DatasetEnvVarService};
 use kamu_task_system::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,6 +79,84 @@ impl TaskExecutorImpl {
             })
             .await
     }
+
+    async fn update_dataset_logical_plan(
+        &self,
+        update_dataset_args: &UpdateDataset,
+    ) -> Result<TaskOutcome, InternalError> {
+        let dataset_env_vars = DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |dataset_env_vars_svc: Arc<dyn DatasetEnvVarService>| async move {
+                    let dataset_env_vars = dataset_env_vars_svc
+                        .get_all_dataset_env_vars_by_dataset_id(
+                            &update_dataset_args.dataset_id,
+                            None,
+                        )
+                        .await
+                        .int_err()?;
+                    Ok(dataset_env_vars.list)
+                },
+            )
+            .await?;
+        let dataset_env_vars_hash_map = dataset_env_vars
+            .into_iter()
+            .map(|dataset_env_var| (dataset_env_var.key.clone(), dataset_env_var))
+            .collect::<HashMap<String, DatasetEnvVar>>();
+        let pull_options = PullOptions {
+            ingest_options: PollingIngestOptions {
+                dataset_env_vars: dataset_env_vars_hash_map,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let pull_svc = self.catalog.get_one::<dyn PullService>().int_err()?;
+        let maybe_pull_result = pull_svc
+            .pull(
+                &update_dataset_args.dataset_id.as_any_ref(),
+                pull_options,
+                None,
+            )
+            .await;
+
+        match maybe_pull_result {
+            Ok(pull_result) => Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
+                pull_result.into(),
+            ))),
+            Err(_) => Ok(TaskOutcome::Failed(TaskError::Empty)),
+        }
+    }
+
+    async fn hard_compaction_logical_plan(
+        &self,
+        hard_compaction_args: &HardCompactionDataset,
+    ) -> Result<TaskOutcome, InternalError> {
+        let compaction_svc = self.catalog.get_one::<dyn CompactionService>().int_err()?;
+        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().int_err()?;
+        let dataset_handle = dataset_repo
+            .resolve_dataset_ref(&hard_compaction_args.dataset_id.as_local_ref())
+            .await
+            .int_err()?;
+
+        let compaction_result = compaction_svc
+            .compact_dataset(
+                &dataset_handle,
+                CompactionOptions {
+                    max_slice_size: hard_compaction_args.max_slice_size,
+                    max_slice_records: hard_compaction_args.max_slice_records,
+                    keep_metadata_only: hard_compaction_args.keep_metadata_only,
+                },
+                None,
+            )
+            .await;
+
+        match compaction_result {
+            Ok(result) => Ok(TaskOutcome::Success(TaskResult::CompactionDatasetResult(
+                result.into(),
+            ))),
+            Err(_) => Ok(TaskOutcome::Failed(TaskError::Empty)),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,19 +180,7 @@ impl TaskExecutor for TaskExecutorImpl {
             self.publish_task_running(task.task_id).await?;
 
             let outcome = match &task.logical_plan {
-                LogicalPlan::UpdateDataset(upd) => {
-                    let pull_svc = self.catalog.get_one::<dyn PullService>().int_err()?;
-                    let maybe_pull_result = pull_svc
-                        .pull(&upd.dataset_id.as_any_ref(), PullOptions::default(), None)
-                        .await;
-
-                    match maybe_pull_result {
-                        Ok(pull_result) => TaskOutcome::Success(TaskResult::UpdateDatasetResult(
-                            pull_result.into(),
-                        )),
-                        Err(_) => TaskOutcome::Failed(TaskError::Empty),
-                    }
-                }
+                LogicalPlan::UpdateDataset(upd) => self.update_dataset_logical_plan(upd).await?,
                 LogicalPlan::Probe(Probe {
                     busy_time,
                     end_with_outcome,
@@ -123,46 +193,9 @@ impl TaskExecutor for TaskExecutorImpl {
                         .clone()
                         .unwrap_or(TaskOutcome::Success(TaskResult::Empty))
                 }
-                LogicalPlan::HardCompactionDataset(HardCompactionDataset {
-                    dataset_id,
-                    max_slice_size,
-                    max_slice_records,
-                    keep_metadata_only,
-                }) => {
-                    let compaction_svc =
-                        self.catalog.get_one::<dyn CompactionService>().int_err()?;
-                    let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().int_err()?;
-                    let dataset_handle = dataset_repo
-                        .resolve_dataset_ref(&dataset_id.as_local_ref())
-                        .await
-                        .int_err()?;
-
-                    let compaction_result = compaction_svc
-                        .compact_dataset(
-                            &dataset_handle,
-                            CompactionOptions {
-                                max_slice_size: *max_slice_size,
-                                max_slice_records: *max_slice_records,
-                                keep_metadata_only: *keep_metadata_only,
-                            },
-                            None,
-                        )
-                        .await;
-
-                    match compaction_result {
-                        Ok(result) => {
-                            TaskOutcome::Success(TaskResult::CompactionDatasetResult(result.into()))
-                        }
-                        Err(err) => {
-                            tracing::info!(
-                                %task_id,
-                                logical_plan = ?task.logical_plan,
-                                err = ?err,
-                                "Task failed",
-                            );
-                            TaskOutcome::Failed(TaskError::Empty)
-                        }
-                    }
+                LogicalPlan::HardCompactionDataset(hard_compaction_args) => {
+                    self.hard_compaction_logical_plan(hard_compaction_args)
+                        .await?
                 }
             };
 

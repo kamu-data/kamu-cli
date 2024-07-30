@@ -35,7 +35,7 @@ kamu-data-utils = { workspace = true }
 opendatafabric = { workspace = true }
 event-bus = { workspace = true }
 kamu-accounts = { workspace = true }
-kamu-datasets-services = { workspace = true }
+kamu-datasets = { workspace = true }
 kamu-core = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 random-names = { workspace = true }
@@ -144,6 +144,7 @@ libc = "0.2" # For getting uid:gid
 database-common = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
+kamu-datasets-services = { workspace = true }
 
 criterion = { version = "0.5", features = ["async_tokio"] }
 filetime = "0.2"

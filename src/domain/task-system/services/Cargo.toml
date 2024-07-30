@@ -22,9 +22,11 @@ doctest = false
 
 
 [dependencies]
+database-common = { workspace = true }
 event-bus = { workspace = true }
 opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
+kamu-datasets = { workspace = true }
 kamu-task-system = { workspace = true }
 
 async-stream = "0.3"

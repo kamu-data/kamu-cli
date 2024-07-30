@@ -375,6 +375,7 @@ impl PollingIngestServiceImpl {
                 prev_source_state.as_ref(),
                 &target_path,
                 &args.system_time,
+                &args.options.dataset_env_vars,
                 Some(Arc::new(FetchProgressListenerBridge::new(
                     args.listener.clone(),
                 ))),

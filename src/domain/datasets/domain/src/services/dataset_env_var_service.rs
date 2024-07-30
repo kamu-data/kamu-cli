@@ -10,7 +10,6 @@
 use database_common::DatabasePaginationOpts;
 use internal_error::InternalError;
 use opendatafabric::DatasetID;
-use secrecy::Secret;
 use uuid::Uuid;
 
 use crate::{
@@ -33,12 +32,6 @@ pub trait DatasetEnvVarService: Sync + Send {
         dataset_id: &DatasetID,
     ) -> Result<DatasetEnvVar, SaveDatasetEnvVarError>;
 
-    async fn get_dataset_env_var_value_by_key_and_dataset_id(
-        &self,
-        dataset_env_var_key: &str,
-        dataset_id: &DatasetID,
-    ) -> Result<Secret<String>, GetDatasetEnvVarError>;
-
     async fn get_dataset_env_var_by_id(
         &self,
         dataset_env_var_id: &Uuid,
@@ -52,7 +45,7 @@ pub trait DatasetEnvVarService: Sync + Send {
     async fn get_all_dataset_env_vars_by_dataset_id(
         &self,
         dataset_id: &DatasetID,
-        pagination: &DatabasePaginationOpts,
+        pagination: Option<DatabasePaginationOpts>,
     ) -> Result<DatasetEnvVarListing, GetDatasetEnvVarError>;
 
     async fn delete_dataset_env_var(

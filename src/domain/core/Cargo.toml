@@ -23,6 +23,7 @@ doctest = false
 
 [dependencies]
 kamu-accounts = { workspace = true }
+kamu-datasets = { workspace = true }
 container-runtime = { workspace = true }
 internal-error = { workspace = true }
 opendatafabric = { workspace = true }
