@@ -97,7 +97,7 @@ jobs:
             nextest-flags: --cargo-profile ci
             # platform(target) is a workaround for Windows only issue in cargo-nextest upon proc macro crates
             nextest-exclusions-main-set-tests: -E 'platform(target) & !(test(::containerized::) | test(::datafusion::) | test(::database::))'
-            nextest-exclusions-database-set: '& !(test(::datafusion::)))'
+            nextest-exclusions-database-set: '& !(test(::datafusion::))'
             container-runtime: ''
             ipfs: false
             database: false
