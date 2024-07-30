@@ -5328,6 +5328,7 @@ dependencies = [
  "futures",
  "indoc 2.0.5",
  "internal-error",
+ "kamu-cli-e2e-common-macros",
  "kamu-cli-puppet",
  "kamu-cli-puppet-ext",
  "opendatafabric",
@@ -5339,6 +5340,14 @@ dependencies = [
  "sqlx",
  "tokio",
  "tokio-retry",
+]
+
+[[package]]
+name = "kamu-cli-e2e-common-macros"
+version = "0.191.4"
+dependencies = [
+ "quote",
+ "syn 2.0.72",
 ]
 
 [[package]]
@@ -5365,6 +5374,7 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "tokio",
 ]
 
 [[package]]
@@ -5378,6 +5388,7 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "tokio",
 ]
 
 [[package]]
@@ -5408,6 +5419,7 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "tokio",
 ]
 
 [[package]]
