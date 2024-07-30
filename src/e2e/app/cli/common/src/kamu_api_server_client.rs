@@ -132,7 +132,10 @@ impl KamuApiServerClient {
         let response = self.graphql_api_call_impl(query, maybe_token).await;
         let response_body = response.json::<GraphQLResponseBody>().await.unwrap();
 
-        response_body.data.unwrap()
+        match response_body.data {
+            Some(response_body) => response_body,
+            None => panic!("Unexpected response body: {response_body:?}"),
+        }
     }
 
     pub async fn graphql_api_call_assert(
