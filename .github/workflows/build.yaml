@@ -163,21 +163,21 @@ jobs:
           SQLX_OFFLINE: false
           DATABASE_URL: sqlite://kamu.sqlite.db
         # platform(target) is a workaround for Windows only issue in cargo-nextest upon proc macro crates
-        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'platform(target) & test(::sqlite::) ${{nextest-exclusions-database-set}}'
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'platform(target) & test(::sqlite::) ${{ matrix.nextest-exclusions-database-set }}'
 
       #      - name: Postgres database tests
       #        if: matrix.database
       #        env:
       #          SQLX_OFFLINE: false
       #          DATABASE_URL: postgres://root:root@localhost:5432/kamu-test
-      #        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::) ${{nextest-exclusions-database-set}}'
+      #        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::) ${{ matrix.nextest-exclusions-database-set }}'
 
       - name: MariaDB database tests
         if: matrix.database
         env:
           SQLX_OFFLINE: false
           DATABASE_URL: mariadb://root:root@localhost:3306/kamu-test
-        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::mysql::) ${{nextest-exclusions-database-set}}'
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::mysql::) ${{ matrix.nextest-exclusions-database-set }}'
 
       # Not running on windows due to line ending differences
       - name: Check generated files
