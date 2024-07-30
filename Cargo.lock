@@ -5343,7 +5343,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-common-macros"
-version = "0.191.4"
+version = "0.191.5"
 dependencies = [
  "quote",
  "syn 2.0.72",
@@ -5423,7 +5423,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-puppet"
-version = "0.191.4"
+version = "0.191.5"
 dependencies = [
  "assert_cmd",
  "chrono",
@@ -5433,7 +5433,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-puppet-ext"
-version = "0.191.4"
+version = "0.191.5"
 dependencies = [
  "async-trait",
  "datafusion",
