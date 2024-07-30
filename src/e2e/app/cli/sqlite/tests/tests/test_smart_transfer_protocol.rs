@@ -19,7 +19,8 @@ kamu_cli_run_api_server_e2e_test!(
     // use the projected date (the current day) as a workaround.
     options = Options::default()
         .with_multi_tenant()
-        .with_today_as_frozen_system_time()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
