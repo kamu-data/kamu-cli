@@ -12,8 +12,6 @@ use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::{parse_macro_input, parse_str, Expr, Ident, Path, Token};
 
-// TODO: unit-tests
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[proc_macro]

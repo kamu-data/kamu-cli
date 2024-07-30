@@ -23,7 +23,7 @@ proc-macro = true
 
 [dependencies]
 quote = "1"
-syn = { version = "2", default-features = false }
+syn = "2"
 
 
 [dev-dependencies]
