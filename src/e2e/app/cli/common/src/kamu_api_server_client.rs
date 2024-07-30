@@ -202,14 +202,10 @@ impl KamuApiServerClient {
     }
 
     async fn graphql_api_call_impl(&self, query: &str, maybe_token: Option<String>) -> Response {
-        dbg!(2.1);
-
         let endpoint = self.server_base_url.join("graphql").unwrap();
         let request_data = serde_json::json!({
            "query": query
         });
-
-        dbg!(2.2);
 
         let mut request_builder = self.http_client.post(endpoint).json(&request_data);
 
@@ -217,13 +213,7 @@ impl KamuApiServerClient {
             request_builder = request_builder.bearer_auth(token);
         }
 
-        dbg!(2.3);
-
-        let a = request_builder.send().await.unwrap();
-
-        dbg!(2.4);
-
-        a
+        request_builder.send().await.unwrap()
     }
 
     async fn graphql_api_call_assert_impl(
@@ -232,11 +222,7 @@ impl KamuApiServerClient {
         expected_response: Result<&str, &str>,
         maybe_token: Option<String>,
     ) {
-        dbg!(2);
-
         let response = self.graphql_api_call_impl(query, maybe_token).await;
-
-        dbg!(3);
 
         pretty_assertions::assert_eq!(StatusCode::OK, response.status());
 

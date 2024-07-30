@@ -184,7 +184,7 @@ impl KamuCliApiServerHarness {
     pub async fn run_api_server<Fixture, FixtureResult>(self, fixture: Fixture)
     where
         Fixture: FnOnce(KamuApiServerClient) -> FixtureResult,
-        FixtureResult: Future<Output = ()>,
+        FixtureResult: Future<Output = ()> + Send + 'static,
     {
         let kamu = self.into_kamu().await;
 

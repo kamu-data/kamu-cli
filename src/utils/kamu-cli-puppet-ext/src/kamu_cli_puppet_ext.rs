@@ -13,7 +13,6 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
-use internal_error::InternalError;
 use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
 use opendatafabric::serde::DatasetSnapshotSerializer;
@@ -36,7 +35,7 @@ pub trait KamuCliPuppetExt {
     where
         T: Into<String> + Send;
 
-    async fn start_api_server(self, e2e_data_file_path: PathBuf) -> Result<String, InternalError>;
+    async fn start_api_server(self, e2e_data_file_path: PathBuf) -> ServerOutput;
 
     async fn assert_last_data_slice(
         &self,
@@ -136,7 +135,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         stdout.lines().map(ToString::to_string).collect()
     }
 
-    async fn start_api_server(self, e2e_data_file_path: PathBuf) -> Result<String, InternalError> {
+    async fn start_api_server(self, e2e_data_file_path: PathBuf) -> ServerOutput {
         let host = Ipv4Addr::LOCALHOST.to_string();
 
         let assert = self
@@ -151,15 +150,14 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             .await
             .success();
 
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+        let stdout = std::str::from_utf8(&assert.get_output().stdout)
+            .unwrap()
+            .to_owned();
+        let stderr = std::str::from_utf8(&assert.get_output().stderr)
+            .unwrap()
+            .to_owned();
 
-        let mut res = format!("stdout:\n{stdout}\n");
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        res += format!("stderr:\n{stderr}\n").as_str();
-
-        Ok(res)
+        ServerOutput { stdout, stderr }
     }
 
     async fn assert_last_data_slice(
@@ -201,6 +199,13 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         kamu_data_utils::testing::assert_data_eq(df.clone(), expected_data).await;
         kamu_data_utils::testing::assert_schema_eq(df.schema(), expected_schema);
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct ServerOutput {
+    pub stdout: String,
+    pub stderr: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

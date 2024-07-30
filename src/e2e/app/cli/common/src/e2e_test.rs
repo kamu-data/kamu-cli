@@ -11,6 +11,7 @@ use std::future::Future;
 use std::path::PathBuf;
 
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_cli_puppet_ext::ServerOutput;
 use reqwest::Url;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
@@ -24,62 +25,38 @@ pub async fn api_server_e2e_test<ServerRunFut, Fixture, FixtureFut>(
     server_run_fut: ServerRunFut,
     fixture: Fixture,
 ) where
-    ServerRunFut: Future<Output = Result<String, InternalError>> + Send + 'static,
-    Fixture: FnOnce(KamuApiServerClient) -> FixtureFut + Send + 'static,
+    ServerRunFut: Future<Output = ServerOutput>,
+    Fixture: FnOnce(KamuApiServerClient) -> FixtureFut,
     FixtureFut: Future<Output = ()> + Send + 'static,
 {
-    let wrapped_server_run_fut = async move {
-        dbg!("@@@ wrapped_server_run_fut 1");
-
-        let a = server_run_fut.await;
-
-        dbg!("@@@ wrapped_server_run_fut 2");
-
-        a
-    };
-
     let test_fut = async move {
-        dbg!("@@@ test_fut 1");
-
         let base_url = get_server_api_base_url(e2e_data_file_path).await?;
-
-        dbg!("@@@ test_fut 2");
-
         let kamu_api_server_client = KamuApiServerClient::new(base_url);
-
-        dbg!("@@@ test_fut 3");
 
         kamu_api_server_client.ready().await?;
 
-        dbg!("@@@ test_fut 4");
-
-        // tokio::spawn() is used to catch panic, otherwise the test will hang
-        let a = tokio::spawn(fixture(kamu_api_server_client.clone())).await;
-
-        dbg!("@@@ test_fut 5");
+        let fixture_res = {
+            // tokio::spawn() is used to catch panic, otherwise the test will hang
+            tokio::spawn(fixture(kamu_api_server_client.clone())).await
+        };
 
         kamu_api_server_client.shutdown().await?;
 
-        dbg!("@@@ test_fut 6");
-
-        a.int_err()
+        fixture_res.int_err()
     };
 
-    let (server_res, test_res) = tokio::join!(wrapped_server_run_fut, test_fut);
+    let (server_output, test_res) = tokio::join!(server_run_fut, test_fut);
 
     if let Err(e) = test_res {
         let mut panic_message = format!("Fixture execution error:\n{e:?}\n");
 
-        match server_res {
-            Ok(s) => {
-                panic_message += "Server output:\n";
-                panic_message += s.as_str();
-            }
-            Err(e) => {
-                panic_message += "Server execution error:\n";
-                panic_message += format!("{e}").as_str();
-            }
-        }
+        panic_message += "Server output:\n";
+        panic_message += "stdout:\n";
+        panic_message += server_output.stdout.as_str();
+        panic_message += "\n";
+        panic_message += "stderr:\n";
+        panic_message += server_output.stderr.as_str();
+        panic_message += "\n";
 
         panic!("{panic_message}");
     }
