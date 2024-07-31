@@ -8,5 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod kamu_cli_puppet;
+#[cfg(feature = "extensions")]
+mod kamu_cli_puppet_ext;
 
 pub use kamu_cli_puppet::*;
+#[cfg(feature = "extensions")]
+pub mod extensions {
+    pub use crate::kamu_cli_puppet_ext::*;
+}

@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use kamu::testing::MetadataFactory;
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
-use kamu_cli_puppet_ext::KamuCliPuppetExt;
 use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

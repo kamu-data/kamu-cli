@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli-puppet"
-description = "Basic controller for kamu-cli process control"
+description = "Controller for kamu-cli process"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -21,11 +21,35 @@ workspace = true
 doctest = false
 
 
+[features]
+default = []
+extensions = [
+    # Internal
+    "dep:kamu-data-utils",
+    "dep:opendatafabric",
+    # External
+    "dep:async-trait",
+    "dep:datafusion",
+    "dep:serde",
+    "dep:serde_json",
+]
+
+
 [dependencies]
+# No features
 assert_cmd = "2"
 chrono = { version = "0.4", default-features = false, features = ["alloc"] }
 tempfile = "3"
-tokio = { version = "1", default-features = false }
+tokio = { version = "1", default-features = false, features = ["rt"] }
+
+# Feature: extensions
+kamu-data-utils = { optional = true, workspace = true }
+opendatafabric = { optional = true, workspace = true }
+
+async-trait = { optional = true, version = "0.1" }
+datafusion = { optional = true, version = "39", default-features = false }
+serde = { optional = true, version = "1", default-features = false, features = ["derive"] }
+serde_json = { optional = true, version = "1" }
 
 
 [dev-dependencies]

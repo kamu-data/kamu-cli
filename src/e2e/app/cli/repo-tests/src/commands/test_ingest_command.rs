@@ -11,8 +11,8 @@ use std::path::Path;
 
 use chrono::{TimeZone, Utc};
 use indoc::indoc;
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
-use kamu_cli_puppet_ext::KamuCliPuppetExt;
 use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

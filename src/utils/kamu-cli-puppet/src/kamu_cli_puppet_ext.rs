@@ -14,11 +14,12 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
-use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::serde::yaml::{DatasetKindDef, YamlDatasetSnapshotSerializer};
 use opendatafabric::serde::DatasetSnapshotSerializer;
 use opendatafabric::{DatasetID, DatasetKind, DatasetName, DatasetRef, DatasetSnapshot, Multihash};
 use serde::Deserialize;
+
+use crate::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

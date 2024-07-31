@@ -24,8 +24,7 @@ doctest = false
 [dependencies]
 internal-error = { workspace = true }
 kamu-cli-e2e-common-macros = { workspace = true }
-kamu-cli-puppet = { workspace = true }
-kamu-cli-puppet-ext = { workspace = true }
+kamu-cli-puppet = { workspace = true, default-features = false }
 opendatafabric = { workspace = true }
 
 chrono = { version = "0.4", default-features = false, features = ["now"] }

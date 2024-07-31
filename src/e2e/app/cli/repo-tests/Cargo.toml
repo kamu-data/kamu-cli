@@ -29,8 +29,7 @@ kamu = { workspace = true }
 # We add a dependency to ensure kamu-cli is up to date before calling tests
 kamu-cli = { workspace = true }
 kamu-cli-e2e-common = { workspace = true }
-kamu-cli-puppet = { workspace = true }
-kamu-cli-puppet-ext = { workspace = true }
+kamu-cli-puppet = { workspace = true, default-features = false, features = ["extensions"] }
 opendatafabric = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }

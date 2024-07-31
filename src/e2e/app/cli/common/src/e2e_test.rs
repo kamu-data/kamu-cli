@@ -11,7 +11,7 @@ use std::future::Future;
 use std::path::PathBuf;
 
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_cli_puppet_ext::ServerOutput;
+use kamu_cli_puppet::extensions::ServerOutput;
 use reqwest::Url;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;

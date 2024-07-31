@@ -13,7 +13,6 @@ members = [
     "src/utils/http-common",
     "src/utils/internal-error",
     "src/utils/kamu-cli-puppet",
-    "src/utils/kamu-cli-puppet-ext",
     "src/utils/multiformats",
     "src/utils/random-names",
     "src/utils/repo-tools",
@@ -90,7 +89,6 @@ event-sourcing-macros = { version = "0.191.5", path = "src/utils/event-sourcing-
 http-common = { version = "0.191.5", path = "src/utils/http-common", default-features = false }
 internal-error = { version = "0.191.5", path = "src/utils/internal-error", default-features = false }
 kamu-cli-puppet = { version = "0.191.5", path = "src/utils/kamu-cli-puppet", default-features = false }
-kamu-cli-puppet-ext = { version = "0.191.5", path = "src/utils/kamu-cli-puppet-ext", default-features = false }
 kamu-data-utils = { version = "0.191.5", path = "src/utils/data-utils", default-features = false }
 kamu-datafusion-cli = { version = "0.191.5", path = "src/utils/datafusion-cli", default-features = false }
 multiformats = { version = "0.191.5", path = "src/utils/multiformats", default-features = false }

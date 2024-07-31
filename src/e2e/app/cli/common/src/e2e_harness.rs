@@ -10,8 +10,8 @@
 use std::future::Future;
 
 use chrono::{DateTime, NaiveTime, Utc};
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::{KamuCliPuppet, NewWorkspaceOptions};
-use kamu_cli_puppet_ext::KamuCliPuppetExt;
 use regex::Regex;
 use sqlx::{MySqlPool, PgPool, SqlitePool};
 
