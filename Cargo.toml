@@ -19,7 +19,7 @@ members = [
     "src/utils/tracing-perfetto",
     # Domain
     "src/domain/accounts/domain",
-    "src/domain/auth-rebac",
+    "src/domain/auth-rebac/domain",
     "src/domain/core",
     "src/domain/datasets/domain",
     "src/domain/flow-system/domain",
