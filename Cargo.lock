@@ -5436,10 +5436,13 @@ name = "kamu-cli-puppet-ext"
 version = "0.191.5"
 dependencies = [
  "async-trait",
+ "chrono",
  "datafusion",
  "kamu-cli-puppet",
  "kamu-data-utils",
  "opendatafabric",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 

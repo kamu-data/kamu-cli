@@ -69,9 +69,14 @@ pub async fn test_add_recursive(kamu: KamuCliPuppet) {
     .await
     .success();
 
-    let datasets = kamu.get_dataset_names().await;
+    let dataset_names = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name)
+        .collect::<Vec<_>>();
 
-    assert_eq!(datasets, ["commented", "plain"]);
+    assert_eq!(dataset_names, ["commented", "plain"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

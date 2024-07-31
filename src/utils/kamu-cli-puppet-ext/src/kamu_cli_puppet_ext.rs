@@ -12,17 +12,19 @@ use std::net::Ipv4Addr;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
+use opendatafabric::serde::yaml::{DatasetKindDef, YamlDatasetSnapshotSerializer};
 use opendatafabric::serde::DatasetSnapshotSerializer;
-use opendatafabric::{DatasetName, DatasetRef, DatasetSnapshot};
+use opendatafabric::{DatasetID, DatasetKind, DatasetName, DatasetRef, DatasetSnapshot, Multihash};
+use serde::Deserialize;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
 pub trait KamuCliPuppetExt {
-    async fn get_dataset_names(&self) -> Vec<String>;
+    async fn list_datasets(&self) -> Vec<DatasetRecord>;
 
     async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot);
 
@@ -49,19 +51,15 @@ pub trait KamuCliPuppetExt {
 
 #[async_trait]
 impl KamuCliPuppetExt for KamuCliPuppet {
-    async fn get_dataset_names(&self) -> Vec<String> {
+    async fn list_datasets(&self) -> Vec<DatasetRecord> {
         let assert = self
-            .execute(["list", "--output-format", "csv"])
+            .execute(["list", "--wide", "--output-format", "json"])
             .await
             .success();
 
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
-        stdout
-            .lines()
-            .skip(1) // Skip header
-            .map(|line| line.split(',').next().unwrap().to_string())
-            .collect()
+        serde_json::from_str(stdout).unwrap()
     }
 
     async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot) {
@@ -206,6 +204,24 @@ impl KamuCliPuppetExt for KamuCliPuppet {
 pub struct ServerOutput {
     pub stdout: String,
     pub stderr: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase", deny_unknown_fields)]
+pub struct DatasetRecord {
+    #[serde(rename = "ID")]
+    pub id: DatasetID,
+    pub name: DatasetName,
+    #[serde(with = "DatasetKindDef")]
+    pub kind: DatasetKind,
+    pub head: Multihash,
+    pub pulled: Option<DateTime<Utc>>,
+    pub records: usize,
+    pub blocks: usize,
+    pub size: usize,
+    pub watermark: Option<DateTime<Utc>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
