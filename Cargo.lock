@@ -5205,6 +5205,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-auth-rebac"
+version = "0.191.5"
+dependencies = [
+ "async-trait",
+ "internal-error",
+ "opendatafabric",
+ "thiserror",
+]
+
+[[package]]
 name = "kamu-cli"
 version = "0.193.1"
 dependencies = [
