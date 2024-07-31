@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod repos;
+mod services;
 
 pub use repos::*;
+pub use services::*;

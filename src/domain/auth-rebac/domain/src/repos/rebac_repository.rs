@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
-
 use internal_error::InternalError;
 use opendatafabric::DidOdf;
 use thiserror::Error;
@@ -58,7 +56,7 @@ pub trait RebacRepository: Send + Sync {
         &self,
         entity_type: EntityType,
         entity_id: &EntityId,
-    ) -> Result<HashMap<PropertyName, PropertyValue>, GetEntityPropertiesError>;
+    ) -> Result<Vec<EntityRelation>, GetEntityRelationsError>;
 
     async fn insert_entities_relation(
         &self,
@@ -80,11 +78,21 @@ pub trait RebacRepository: Send + Sync {
 
     async fn get_entity_relations(
         &self,
-        subject_entity_type: EntityType,
-        subject_entity_id: &EntityId,
-    ) -> Result<HashMap<Relation, Vec<(EntityType, EntityId)>>, GetEntityRelationsError>;
+        entity_type: EntityType,
+        entity_id: &EntityId,
+    ) -> Result<Vec<EntityRelation>, GetEntityRelationsError>;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct EntityRelation {
+    pub relation: Relation,
+    pub entity_type: EntityType,
+    pub entity_id: EntityId,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
