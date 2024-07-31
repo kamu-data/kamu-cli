@@ -2381,6 +2381,312 @@ async fn test_history_of_completed_flow() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_execute_transfrom_flow_error_after_compaction() {
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
+        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 12,
+                updated_watermark: None,
+            },
+        )),
+        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
+    })
+    .await;
+
+    let create_result = harness.create_root_dataset().await;
+    let create_derived_result = harness.create_derived_dataset().await;
+
+    let mutation_code = FlowRunsHarness::trigger_flow_with_compaction_config_mutation(
+        &create_result.dataset_handle.id,
+        "HARD_COMPACTION",
+        10000,
+        1_000_000,
+    );
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "triggerFlow": {
+                                "__typename": "TriggerFlowSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "__typename": "Flow",
+                                    "flowId": "0",
+                                    "status": "WAITING",
+                                    "outcome": null
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+    let schedule_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
+    let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
+    let running_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
+    harness.mimic_task_running(flow_task_id, running_time).await;
+    let complete_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
+
+    let new_head = Multihash::from_digest_sha3_256(b"new-slice");
+    harness
+        .mimic_task_completed(
+            flow_task_id,
+            complete_time,
+            ts::TaskOutcome::Success(ts::TaskResult::CompactionDatasetResult(
+                ts::TaskCompactionDatasetResult {
+                    compaction_result: CompactionResult::Success {
+                        old_head: Multihash::from_digest_sha3_256(b"old-slice"),
+                        new_head: new_head.clone(),
+                        old_num_blocks: 5,
+                        new_num_blocks: 4,
+                    },
+                },
+            )),
+        )
+        .await;
+
+    let request_code = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id);
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetHardCompaction",
+                                            "datasetId": create_result.dataset_handle.id.to_string(),
+                                            "compactionResult": {
+                                                "originalBlocksCount": 5,
+                                                "resultingBlocksCount": 4,
+                                                "newHead": new_head
+                                            },
+                                        },
+                                        "status": "FINISHED",
+                                        "outcome": {
+                                            "message": "SUCCESS"
+                                        },
+                                        "timing": {
+                                            "awaitingExecutorSince": schedule_time.to_rfc3339(),
+                                            "runningSince": running_time.to_rfc3339(),
+                                            "finishedAt": complete_time.to_rfc3339(),
+                                        },
+                                        "tasks": [
+                                            {
+                                                "taskId": "0",
+                                                "status": "FINISHED",
+                                                "outcome": "SUCCESS",
+                                            }
+                                        ],
+                                        "initiator": {
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                                        },
+                                        "primaryTrigger": {
+                                            "__typename": "FlowTriggerManual",
+                                            "initiator": {
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                                            }
+                                        },
+                                        "startCondition": null,
+                                        "configSnapshot": {
+                                            "__typename": "FlowConfigurationCompactionRule",
+                                            "compactionRule": {
+                                                "maxSliceRecords": 10000,
+                                                "maxSliceSize": 1_000_000,
+                                            }
+                                        },
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let mutation_code = FlowRunsHarness::trigger_flow_mutation(
+        &create_derived_result.dataset_handle.id,
+        "EXECUTE_TRANSFORM",
+    );
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "triggerFlow": {
+                                "__typename": "TriggerFlowSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "__typename": "Flow",
+                                    "flowId": "1",
+                                    "status": "WAITING",
+                                    "outcome": null
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let schedule_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
+    let flow_task_id = harness.mimic_flow_scheduled("1", schedule_time).await;
+    let running_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
+    harness.mimic_task_running(flow_task_id, running_time).await;
+    let complete_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
+    harness
+        .mimic_task_completed(
+            flow_task_id,
+            complete_time,
+            ts::TaskOutcome::Failed(ts::TaskError::UpdateDatasetError(
+                ts::UpdateDatasetTaskError::RootDatasetCompacted(ts::RootDatasetCompactedError {
+                    dataset_id: create_result.dataset_handle.id.clone(),
+                }),
+            )),
+        )
+        .await;
+
+    let request_code = FlowRunsHarness::list_flows_query(&create_derived_result.dataset_handle.id);
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "1",
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetExecuteTransform",
+                                            "datasetId": create_derived_result.dataset_handle.id.to_string(),
+                                            "transformResult": null,
+                                        },
+                                        "status": "FINISHED",
+                                        "outcome": {
+                                            "reason": {
+                                                "message": "Root dataset was compacted",
+                                                "rootDataset": {
+                                                    "id": create_result.dataset_handle.id.to_string()
+                                                }
+                                            }
+                                        },
+                                        "timing": {
+                                            "awaitingExecutorSince": schedule_time.to_rfc3339(),
+                                            "runningSince": running_time.to_rfc3339(),
+                                            "finishedAt": null,
+                                        },
+                                        "tasks": [
+                                            {
+                                                "taskId": "1",
+                                                "status": "FINISHED",
+                                                "outcome": "FAILED",
+                                            }
+                                        ],
+                                        "initiator": {
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                                        },
+                                        "primaryTrigger": {
+                                            "__typename": "FlowTriggerManual",
+                                            "initiator": {
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                                            }
+                                        },
+                                        "startCondition": null,
+                                        "configSnapshot": null
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_anonymous_operation_fails() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dependency_graph_mock: None,
