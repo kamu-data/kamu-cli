@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use aes_gcm::aead::consts::U12;
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::aead::{Aead, AeadCore, KeyInit, OsRng};
@@ -85,11 +83,11 @@ impl DatasetEnvVar {
 
     pub fn try_asm_256_gcm_from_str(
         encryption_key: &str,
-    ) -> Result<AesGcm<Aes256, U12>, ParseEncyptionKey> {
+    ) -> Result<AesGcm<Aes256, U12>, ParseEncryptionKey> {
         let key_bytes = encryption_key.as_bytes();
         match std::panic::catch_unwind(|| Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key_bytes))) {
             Ok(aes_gcm) => Ok(aes_gcm),
-            Err(_) => Err(ParseEncyptionKey::InvalidEncryptionKeyLength),
+            Err(_) => Err(ParseEncryptionKey::InvalidEncryptionKeyLength),
         }
     }
 
@@ -197,18 +195,18 @@ pub enum DatasetEnvVarEncryptionError {
 }
 
 #[derive(Error, Debug)]
-pub enum ParseEncyptionKey {
+pub enum ParseEncryptionKey {
     #[error("Invalid encryption key length")]
     InvalidEncryptionKeyLength,
     #[error(transparent)]
     InternalError(#[from] InternalError),
 }
 
-impl From<ParseEncyptionKey> for DatasetEnvVarEncryptionError {
-    fn from(value: ParseEncyptionKey) -> Self {
+impl From<ParseEncryptionKey> for DatasetEnvVarEncryptionError {
+    fn from(value: ParseEncryptionKey) -> Self {
         match value {
-            ParseEncyptionKey::InvalidEncryptionKeyLength => Self::InvalidEncryptionKey,
-            ParseEncyptionKey::InternalError(err) => Self::InternalError(err),
+            ParseEncryptionKey::InvalidEncryptionKeyLength => Self::InvalidEncryptionKey,
+            ParseEncryptionKey::InternalError(err) => Self::InternalError(err),
         }
     }
 }
