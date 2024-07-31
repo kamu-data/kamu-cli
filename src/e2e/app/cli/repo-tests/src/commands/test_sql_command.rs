@@ -38,3 +38,14 @@ pub async fn test_datafusion_cli(kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_datafusion_cli_not_launched_in_root_ws(kamu: KamuCliPuppet) {
+    // This test checks that workspace was not created in root (kamu-cli) directory.
+    //
+    // The workspace search functionality checks for parent folders,
+    // so there is no problem that the process working directory is one of the
+    // subdirectories (kamu-cli/src/e2e/app/cli/inmem)
+    kamu.execute(["list"]).await.failure();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
