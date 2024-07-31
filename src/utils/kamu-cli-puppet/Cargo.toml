@@ -22,7 +22,6 @@ doctest = false
 
 
 [features]
-default = []
 extensions = [
     # Internal
     "dep:kamu-data-utils",
