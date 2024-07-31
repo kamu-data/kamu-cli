@@ -40,6 +40,7 @@ To regenerate this schema from existing code, use the following command:
 **Options:**
 
 * `-v` — Sets the level of verbosity (repeat for more)
+* `--no-color` — Disable color output in the terminal
 * `-q`, `--quiet` — Suppress all non-essential output
 * `--trace` — Record and visualize the command execution as perfetto.dev trace
 
