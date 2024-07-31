@@ -6742,7 +6742,7 @@ name = "opendatafabric"
 version = "0.191.5"
 dependencies = [
  "arrow",
- "base64 0.21.7",
+ "base64 0.22.1",
  "bitflags 2.6.0",
  "chrono",
  "digest 0.10.7",
