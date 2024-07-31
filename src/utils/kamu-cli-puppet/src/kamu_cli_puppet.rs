@@ -111,7 +111,9 @@ impl KamuCliPuppet {
         let mut command = assert_cmd::Command::cargo_bin("kamu-cli").unwrap();
 
         command.env("RUST_LOG", "trace");
+
         command.arg("-v");
+        command.arg("--no-color");
 
         command.current_dir(self.workspace_path.clone());
 
