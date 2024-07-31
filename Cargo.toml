@@ -98,6 +98,7 @@ kamu-datafusion-cli = { version = "0.191.5", path = "src/utils/datafusion-cli", 
 messaging-outbox = { version = "0.191.5", path = "src/utils/messaging-outbox", default-features = false }
 multiformats = { version = "0.191.5", path = "src/utils/multiformats", default-features = false }
 random-names = { version = "0.191.5", path = "src/utils/random-names", default-features = false }
+time-source = { version = "0.191.5", path = "src/utils/time-source", default-features = false }
 tracing-perfetto = { version = "0.191.5", path = "src/utils/tracing-perfetto", default-features = false }
 
 # Domain

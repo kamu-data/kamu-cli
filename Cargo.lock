@@ -3580,21 +3580,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "event-bus"
-version = "0.191.5"
-dependencies = [
- "async-trait",
- "dill",
- "futures",
- "internal-error",
- "test-log",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "event-listener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5438,6 +5423,7 @@ dependencies = [
  "internal-error",
  "kamu-accounts",
  "kamu-datasets",
+ "messaging-outbox",
  "object_store",
  "opendatafabric",
  "pathdiff",
@@ -5804,7 +5790,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-messaging-outbox-inmem"
-version = "0.191.4"
+version = "0.191.5"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5819,7 +5805,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-messaging-outbox-postgres"
-version = "0.191.4"
+version = "0.191.5"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5837,7 +5823,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-messaging-outbox-sqlite"
-version = "0.191.4"
+version = "0.191.5"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6344,7 +6330,7 @@ dependencies = [
 
 [[package]]
 name = "messaging-outbox"
-version = "0.191.4"
+version = "0.191.5"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9298,7 +9284,7 @@ dependencies = [
 
 [[package]]
 name = "time-source"
-version = "0.191.4"
+version = "0.191.5"
 dependencies = [
  "async-trait",
  "chrono",

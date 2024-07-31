@@ -20,7 +20,6 @@ use kamu_core::{
     PullError,
     PullOptions,
     PullService,
-    SystemTimeSource,
     TransformError,
 };
 use kamu_datasets::{DatasetEnvVar, DatasetEnvVarService};
@@ -83,9 +82,7 @@ impl TaskExecutorImpl {
 
     async fn execute_task(&self, task: &Task) -> Result<TaskOutcome, InternalError> {
         let task_outcome = match &task.logical_plan {
-            LogicalPlan::UpdateDataset(upd) => {
-                self.update_dataset_logical_plan(upd).await?,
-            }
+            LogicalPlan::UpdateDataset(upd) => self.update_dataset_logical_plan(upd).await?,
             LogicalPlan::Probe(Probe {
                 busy_time,
                 end_with_outcome,
@@ -98,14 +95,9 @@ impl TaskExecutorImpl {
                     .clone()
                     .unwrap_or(TaskOutcome::Success(TaskResult::Empty))
             }
-            LogicalPlan::HardCompactionDataset(HardCompactionDataset {
-                dataset_id,
-                max_slice_size,
-                max_slice_records,
-                keep_metadata_only,
-            }) => {
+            LogicalPlan::HardCompactionDataset(hard_compaction_args) => {
                 self.hard_compaction_logical_plan(hard_compaction_args)
-                        .await?
+                    .await?
             }
         };
 

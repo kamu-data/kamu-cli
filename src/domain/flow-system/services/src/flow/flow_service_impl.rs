@@ -1342,8 +1342,12 @@ impl MessageConsumerT<TaskProgressMessage> for FlowServiceImpl {
                     let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
                         .await
                         .int_err()?;
-                    flow.on_task_finished(event.event_time, event.task_id, event.outcome.clone())
-                        .int_err()?;
+                    flow.on_task_finished(
+                        message.event_time,
+                        message.task_id,
+                        message.outcome.clone(),
+                    )
+                    .int_err()?;
                     flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
                     {
@@ -1368,7 +1372,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowServiceImpl {
 
                     // In case of success:
                     //  - enqueue next auto-polling flow cycle
-                    if event.outcome.is_success() {
+                    if message.outcome.is_success() {
                         self.try_enqueue_scheduled_auto_polling_flow_if_enabled(
                             finish_time,
                             &flow.flow_key,
