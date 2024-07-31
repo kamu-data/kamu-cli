@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Added
+- `kamu --no-color` to disable color output in the terminal.
 ### Changed
 - E2E: Reorganized work with tests that call `kamu-cli`:
   - Added `kamu-cli-puppet` crate to allow `kamu-cli` to be run as a separate process from tests.

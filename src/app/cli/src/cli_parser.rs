@@ -42,6 +42,10 @@ pub fn cli() -> Command {
                 .short('v')
                 .action(ArgAction::Count)
                 .help("Sets the level of verbosity (repeat for more)"),
+            Arg::new("no-color")
+                .long("no-color")
+                .action(ArgAction::SetTrue)
+                .help("Disable color output in the terminal"),
             Arg::new("quiet")
                 .long("quiet")
                 .short('q')
