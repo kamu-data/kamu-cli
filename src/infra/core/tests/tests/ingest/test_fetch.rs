@@ -387,7 +387,7 @@ async fn test_fetch_url_http_env_interpolation() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(feature = "ftp")]
-#[test_group::group(containerized)]
+#[test_group::group(containerized, flaky)]
 #[tokio::test]
 async fn test_fetch_url_ftp_ok() {
     let harness = FetchTestHarness::new();
