@@ -865,9 +865,8 @@ impl FlowServiceImpl {
             DatasetFlowType::HardCompaction => {
                 if let Some(config_snapshot) = &maybe_config_snapshot
                     && let FlowConfigurationSnapshot::Compaction(compaction_rule) = config_snapshot
-                    && let CompactionRule::MetadataOnly(metadata_only_rule) = compaction_rule
                 {
-                    if metadata_only_rule.recursive {
+                    if compaction_rule.recursive() {
                         DownstreamDependencyTriggerType::TriggerOwnUnconditionally
                     } else {
                         DownstreamDependencyTriggerType::Empty

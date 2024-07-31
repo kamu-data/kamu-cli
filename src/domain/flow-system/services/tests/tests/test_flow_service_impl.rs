@@ -617,7 +617,7 @@ async fn test_manual_trigger_compaction_with_config() {
             foo_id.clone(),
             DatasetFlowType::HardCompaction,
             CompactionRule::Full(
-                CompactionRuleFull::new_checked(max_slice_size, max_slice_records).unwrap(),
+                CompactionRuleFull::new_checked(max_slice_size, max_slice_records, false).unwrap(),
             ),
         )
         .await;

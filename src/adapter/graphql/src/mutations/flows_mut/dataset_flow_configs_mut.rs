@@ -185,6 +185,7 @@ impl DatasetFlowConfigsMut {
                 match CompactionRuleFull::new_checked(
                     compaction_input.max_slice_size,
                     compaction_input.max_slice_records,
+                    compaction_input.recursive,
                 ) {
                     Ok(rule) => CompactionRule::Full(rule),
                     Err(e) => {
