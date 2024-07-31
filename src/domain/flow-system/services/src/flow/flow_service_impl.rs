@@ -824,6 +824,11 @@ impl FlowServiceImpl {
                     .dataset_ownership_service
                     .get_dataset_owners(&fk_dataset.dataset_id)
                     .await?;
+                // Currently we trigger Hard compaction recursively only in keep metadata only
+                // mode
+                let config_snapshot = FlowConfigurationSnapshot::Compaction(
+                    CompactionRule::MetadataOnly(CompactionRuleMetadataOnly { recursive: true }),
+                );
 
                 for dependent_dataset_id in dependent_dataset_ids {
                     for owner_account_id in &dataset_owner_account_ids {
@@ -839,7 +844,7 @@ impl FlowServiceImpl {
                                 )
                                 .into(),
                                 flow_trigger_context: FlowTriggerContext::Unconditional,
-                                maybe_config_snapshot: maybe_config_snapshot.cloned(),
+                                maybe_config_snapshot: Some(config_snapshot.clone()),
                             });
                             break;
                         }

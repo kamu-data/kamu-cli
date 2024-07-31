@@ -249,6 +249,7 @@ type CommitResultSuccess implements CommitResult & UpdateReadmeResult {
 input CompactionConditionFull {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
+	recursive: Boolean!
 }
 
 input CompactionConditionInput @oneOf {
@@ -263,6 +264,7 @@ input CompactionConditionMetadataOnly {
 type CompactionFull {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
+	recursive: Boolean!
 }
 
 type CompactionMetadataOnly {

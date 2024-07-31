@@ -655,6 +655,7 @@ async fn test_crud_compaction_root_dataset() {
         "HARD_COMPACTION",
         1_000_000,
         10000,
+        false,
     );
 
     let res = schema
@@ -683,7 +684,8 @@ async fn test_crud_compaction_root_dataset() {
                                     "compaction": {
                                         "__typename": "CompactionFull",
                                         "maxSliceSize": 1_000_000,
-                                        "maxSliceRecords": 10000
+                                        "maxSliceRecords": 10000,
+                                        "recursive": false
                                     }
                                 }
                             }
@@ -779,10 +781,16 @@ async fn test_compaction_config_validation() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
     for test_case in [
-        (0, 1_000_000, "Maximum slice size must be a positive number"),
+        (
+            0,
+            1_000_000,
+            false,
+            "Maximum slice size must be a positive number",
+        ),
         (
             1_000_000,
             0,
+            false,
             "Maximum slice records must be a positive number",
         ),
     ] {
@@ -791,6 +799,7 @@ async fn test_compaction_config_validation() {
             "HARD_COMPACTION",
             test_case.0,
             test_case.1,
+            test_case.2,
         );
 
         let response = schema
@@ -809,7 +818,7 @@ async fn test_compaction_config_validation() {
                                 "configs": {
                                     "setConfigCompaction": {
                                         "__typename": "FlowInvalidCompactionConfig",
-                                        "message": test_case.2,
+                                        "message": test_case.3,
                                     }
                                 }
                             }
@@ -1322,6 +1331,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         "HARD_COMPACTION",
         1000,
         1000,
+        false,
     );
 
     let res = schema
@@ -1781,6 +1791,7 @@ impl FlowConfigHarness {
         dataset_flow_type: &str,
         max_slice_size: u64,
         max_slice_records: u64,
+        recursive: bool,
     ) -> String {
         indoc!(
             r#"
@@ -1795,6 +1806,7 @@ impl FlowConfigHarness {
                                         full: {
                                             maxSliceSize: <max_slice_size>,
                                             maxSliceRecords: <max_slice_records>,
+                                            recursive: <recursive>
                                         }
                                     }
                                 ) {
@@ -1818,6 +1830,7 @@ impl FlowConfigHarness {
                                                     ... on CompactionFull {
                                                         maxSliceSize
                                                         maxSliceRecords
+                                                        recursive
                                                     }
                                                     ... on CompactionMetadataOnly {
                                                         recursive
@@ -1838,6 +1851,7 @@ impl FlowConfigHarness {
         .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<max_slice_records>", &max_slice_records.to_string())
         .replace("<max_slice_size>", &max_slice_size.to_string())
+        .replace("<recursive>", if recursive { "true" } else { "false" })
     }
 
     fn quick_flow_config_query(id: &DatasetID, dataset_flow_type: &str) -> String {
