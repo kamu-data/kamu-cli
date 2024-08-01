@@ -20,7 +20,7 @@ pub enum EntityType {
     Account,
 }
 
-pub type EntityId = DidOdf;
+pub type EntityId = String;
 
 pub enum PropertyName {
     DatasetAllowsAnonymousRead,
