@@ -55,7 +55,7 @@ ed25519-dalek = { version = "2", default-features = false, features = [
 rand = "0.8"
 
 # Serialization
-base64 = { version = "0.22", default-features = false }
+base64 = { version = "0.22", default-features = false, features = ["std"] }
 flatbuffers = "24"
 hex = "0.4"
 serde = { version = "1", features = ["derive"] }
