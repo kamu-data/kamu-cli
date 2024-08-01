@@ -11,11 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New recursive flag for `CompactionConditionFull` input to trigger
   Hard compaction with keep metadata only mode for each derived dataset 
 - E2E: Reorganized work with tests that call `kamu-cli`:
-  - Added `kamu-cli-puppet` crate to allow `kamu-cli` to be run as a separate process from tests.
-    The crate contains basic functionality: calling commands.
-  - Added `kamu-cli-puppet-ext` crate containing extensions based on `kamu-cli-puppet` command calls
+  - Added `kamu-cli-puppet` crate to allow `kamu-cli` to be run as a separate process from tests
   - Removed past `kamu-cli` wrapper that ran in-process.
-  - Some of `kamu-cli` tests that are inherently E2E are moved and adapted to E2E scope (inmem area)
+  - Some of `kamu-cli` tests that are inherently E2E are moved and adapted to E2E scope (in-mem area)
   - For convenience, the test run macros are now procedural
   - Various Windows-related tweaks & fixes
 ### Fixed
