@@ -7,21 +7,37 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use internal_error::InternalError;
-use opendatafabric::DidOdf;
+use reusable::{reusable, reuse};
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: derives
-
+#[derive(Debug, Copy, Clone)]
 pub enum EntityType {
     Dataset,
     Account,
 }
 
-pub type EntityId = String;
+#[reusable(entity)]
+pub struct Entity<'a> {
+    pub entity_type: EntityType,
+    pub entity_id: Cow<'a, str>,
+}
 
+#[reuse(entity)]
+pub struct EntityWithRelation<'a> {
+    pub relation: Relation,
+}
+
+pub type ObjectEntity<'a> = Entity<'a>;
+pub type ObjectEntityWithRelation<'a> = EntityWithRelation<'a>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum PropertyName {
     DatasetAllowsAnonymousRead,
     DatasetAllowsPublicRead,
@@ -29,6 +45,12 @@ pub enum PropertyName {
 
 pub type PropertyValue = String;
 
+pub struct Property<'a> {
+    pub name: PropertyName,
+    pub value: Cow<'a, str>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Relation {
     AccountDatasetReader,
 }
@@ -37,58 +59,57 @@ pub enum Relation {
 
 #[async_trait::async_trait]
 pub trait RebacRepository: Send + Sync {
+    // Properties
+
     async fn set_entity_property(
         &self,
-        entity_type: EntityType,
-        entity_id: &EntityId,
-        property_name: &PropertyName,
-        property_value: &PropertyValue,
+        entity: &Entity,
+        property: &Property,
     ) -> Result<(), UpsertEntityPropertyError>;
 
     async fn delete_entity_property(
         &self,
-        entity_type: EntityType,
-        entity_id: &EntityId,
-        property_name: &PropertyName,
+        entity: &Entity,
+        property_name: PropertyName,
     ) -> Result<(), DeleteEntityPropertyError>;
 
     async fn get_entity_properties(
         &self,
-        entity_type: EntityType,
-        entity_id: &EntityId,
-    ) -> Result<Vec<ObjectEntityWithRelation>, GetEntityRelationsError>;
+        entity: &Entity,
+    ) -> Result<Vec<Property>, GetEntityRelationsError>;
+
+    // Relations
 
     async fn insert_entities_relation(
         &self,
-        subject_entity_type: EntityType,
-        subject_entity_id: &EntityId,
+        subject_entity: &Entity,
         relationship: &Relation,
-        object_entity_type: EntityType,
-        object_entity_id: &EntityId,
+        object_entity: &Entity,
     ) -> Result<(), InsertEntitiesRelationError>;
 
     async fn delete_entities_relation(
         &self,
-        subject_entity_type: EntityType,
-        subject_entity_id: &EntityId,
+        subject_entity: &Entity,
         relationship: &Relation,
-        object_entity_type: EntityType,
-        object_entity_id: &EntityId,
+        object_entity: &Entity,
     ) -> Result<(), DeleteEntitiesRelationError>;
 
-    async fn get_entity_relations(
+    async fn get_subject_entity_relations(
         &self,
-        subject_entity_type: EntityType,
-        subject_entity_id: &EntityId,
+        subject_entity: &Entity,
     ) -> Result<Vec<ObjectEntityWithRelation>, GetEntityRelationsError>;
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    async fn get_subject_entity_relations_by_object_type(
+        &self,
+        subject_entity: &Entity,
+        object_entity_type: EntityType,
+    ) -> Result<Vec<ObjectEntityWithRelation>, GetEntityRelationsError>;
 
-pub struct ObjectEntityWithRelation {
-    pub entity_type: EntityType,
-    pub entity_id: EntityId,
-    pub relation: Relation,
+    async fn get_relations_between_entities(
+        &self,
+        subject_entity: &Entity,
+        object_entity: &Entity,
+    ) -> Result<Vec<Relation>, GetEntityRelationsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

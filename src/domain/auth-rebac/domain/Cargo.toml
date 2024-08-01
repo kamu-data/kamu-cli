@@ -26,6 +26,7 @@ internal-error = { workspace = true }
 opendatafabric = { workspace = true }
 
 async-trait = "0.1"
+reusable = "0.1"
 thiserror = { version = "1", default-features = false }
 
 
