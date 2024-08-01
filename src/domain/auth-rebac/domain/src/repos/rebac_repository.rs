@@ -56,7 +56,7 @@ pub trait RebacRepository: Send + Sync {
         &self,
         entity_type: EntityType,
         entity_id: &EntityId,
-    ) -> Result<Vec<EntityRelation>, GetEntityRelationsError>;
+    ) -> Result<Vec<ObjectEntityWithRelation>, GetEntityRelationsError>;
 
     async fn insert_entities_relation(
         &self,
@@ -78,17 +78,17 @@ pub trait RebacRepository: Send + Sync {
 
     async fn get_entity_relations(
         &self,
-        entity_type: EntityType,
-        entity_id: &EntityId,
-    ) -> Result<Vec<EntityRelation>, GetEntityRelationsError>;
+        subject_entity_type: EntityType,
+        subject_entity_id: &EntityId,
+    ) -> Result<Vec<ObjectEntityWithRelation>, GetEntityRelationsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct EntityRelation {
-    pub relation: Relation,
+pub struct ObjectEntityWithRelation {
     pub entity_type: EntityType,
     pub entity_id: EntityId,
+    pub relation: Relation,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
