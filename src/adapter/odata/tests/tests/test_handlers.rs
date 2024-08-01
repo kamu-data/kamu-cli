@@ -343,7 +343,6 @@ impl TestHarness {
                 .add::<ObjectStoreBuilderLocalFs>()
                 .add::<DataFormatRegistryImpl>()
                 .add::<DummyOutboxImpl>()
-                .add::<DependencyGraphServiceInMemory>()
                 .add_value(CurrentAccountSubject::new_test())
                 .add_value(dataset_action_authorizer)
                 .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()

@@ -52,7 +52,6 @@ impl TransformTestHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add_value(RunInfoDir::new(run_info_dir))
-            .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
@@ -254,12 +253,14 @@ async fn test_get_next_operation() {
 async fn test_transform_enforces_authorization() {
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new()
         .expect_check_read_dataset(
-            DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
+            &DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
             1,
+            true,
         )
         .expect_check_write_dataset(
-            DatasetAlias::new(None, DatasetName::new_unchecked("bar")),
+            &DatasetAlias::new(None, DatasetName::new_unchecked("bar")),
             1,
+            true,
         );
 
     let harness = TransformTestHarness::new_custom(

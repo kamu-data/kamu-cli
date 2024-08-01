@@ -16,22 +16,11 @@ use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
     DatasetRepositoryS3,
     DatasetRepositoryWriter,
-    DeleteDatasetUseCaseImpl,
-    DependencyGraphRepositoryInMemory,
-    DependencyGraphServiceInMemory,
     S3RegistryCache,
 };
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
-use kamu_core::auth::AlwaysHappyDatasetActionAuthorizer;
-use kamu_core::{
-    CreateDatasetFromSnapshotUseCase,
-    DatasetLifecycleMessage,
-    DatasetRepository,
-    DeleteDatasetUseCase,
-    DependencyGraphService,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-};
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
+use kamu_core::{CreateDatasetFromSnapshotUseCase, DatasetRepository};
+use messaging_outbox::{Outbox, OutboxImmediateImpl};
 use time_source::SystemTimeSourceDefault;
 
 use super::test_dataset_repository_shared;
@@ -39,10 +28,9 @@ use super::test_dataset_repository_shared;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct S3RepoHarness {
-    catalog: dill::Catalog,
+    _catalog: dill::Catalog,
     dataset_repo: Arc<DatasetRepositoryS3>,
     create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
-    delete_dataset: Arc<dyn DeleteDatasetUseCase>,
 }
 
 impl S3RepoHarness {
@@ -57,9 +45,7 @@ impl S3RepoHarness {
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
-            .add::<AlwaysHappyDatasetActionAuthorizer>()
             .add_builder(
                 DatasetRepositoryS3::builder()
                     .with_s3_context(s3_context)
@@ -67,13 +53,7 @@ impl S3RepoHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()
-            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<DeleteDatasetUseCaseImpl>();
-
-        register_message_dispatcher::<DatasetLifecycleMessage>(
-            &mut b,
-            MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-        );
+            .add::<CreateDatasetFromSnapshotUseCaseImpl>();
 
         if registry_caching {
             b.add::<S3RegistryCache>();
@@ -84,27 +64,12 @@ impl S3RepoHarness {
         let dataset_repo = catalog.get_one().unwrap();
 
         let create_dataset_from_snapshot = catalog.get_one().unwrap();
-        let delete_dataset = catalog.get_one().unwrap();
 
         Self {
-            catalog,
+            _catalog: catalog,
             dataset_repo,
             create_dataset_from_snapshot,
-            delete_dataset,
         }
-    }
-
-    pub async fn dependencies_eager_initialization(&self) {
-        let dependency_graph_service = self
-            .catalog
-            .get_one::<dyn DependencyGraphService>()
-            .unwrap();
-        dependency_graph_service
-            .eager_initialization(&DependencyGraphRepositoryInMemory::new(
-                self.dataset_repo.clone(),
-            ))
-            .await
-            .unwrap();
     }
 }
 
@@ -272,12 +237,10 @@ async fn test_rename_unauthorized() {
 async fn test_delete_dataset() {
     let s3 = LocalS3Server::new().await;
     let harness = S3RepoHarness::create(&s3, false, false).await;
-    harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset(
         harness.dataset_repo.as_ref(),
         harness.create_dataset_from_snapshot.as_ref(),
-        harness.delete_dataset.as_ref(),
         None,
     )
     .await;
@@ -290,30 +253,11 @@ async fn test_delete_dataset() {
 async fn test_delete_dataset_multi_tenant() {
     let s3 = LocalS3Server::new().await;
     let harness = S3RepoHarness::create(&s3, true, false).await;
-    harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset(
         harness.dataset_repo.as_ref(),
         harness.create_dataset_from_snapshot.as_ref(),
-        harness.delete_dataset.as_ref(),
         Some(DEFAULT_ACCOUNT_NAME.clone()),
-    )
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[ignore = "Need to migrate authorization to use case level tests"]
-#[test_group::group(containerized)]
-#[tokio::test]
-async fn test_delete_unauthorized() {
-    let s3: LocalS3Server = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, true, false).await;
-    harness.dependencies_eager_initialization().await;
-
-    test_dataset_repository_shared::test_delete_dataset_unauthorized(
-        harness.dataset_repo.as_ref(),
-        None,
     )
     .await;
 }

@@ -10,17 +10,11 @@
 use std::sync::Arc;
 
 use dill::Component;
-use domain::{DatasetRepository, DependencyGraphService};
+use domain::DatasetRepository;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
-use kamu_core::auth::AlwaysHappyDatasetActionAuthorizer;
-use kamu_core::{
-    CreateDatasetFromSnapshotUseCase,
-    DatasetLifecycleMessage,
-    DeleteDatasetUseCase,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-};
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
+use kamu_core::CreateDatasetFromSnapshotUseCase;
+use messaging_outbox::{Outbox, OutboxImmediateImpl};
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 
@@ -29,10 +23,9 @@ use super::test_dataset_repository_shared;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct LocalFsRepoHarness {
-    catalog: dill::Catalog,
+    _catalog: dill::Catalog,
     dataset_repo: Arc<DatasetRepositoryLocalFs>,
     create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
-    delete_dataset: Arc<dyn DeleteDatasetUseCase>,
 }
 
 impl LocalFsRepoHarness {
@@ -47,7 +40,6 @@ impl LocalFsRepoHarness {
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
@@ -56,41 +48,19 @@ impl LocalFsRepoHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<AlwaysHappyDatasetActionAuthorizer>()
-            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<DeleteDatasetUseCaseImpl>();
-
-        register_message_dispatcher::<DatasetLifecycleMessage>(
-            &mut b,
-            MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-        );
+            .add::<CreateDatasetFromSnapshotUseCaseImpl>();
 
         let catalog = b.build();
 
         let dataset_repo = catalog.get_one().unwrap();
 
         let create_dataset_from_snapshot = catalog.get_one().unwrap();
-        let delete_dataset = catalog.get_one().unwrap();
 
         Self {
-            catalog,
+            _catalog: catalog,
             dataset_repo,
             create_dataset_from_snapshot,
-            delete_dataset,
         }
-    }
-
-    pub async fn dependencies_eager_initialization(&self) {
-        let dependency_graph_service = self
-            .catalog
-            .get_one::<dyn DependencyGraphService>()
-            .unwrap();
-        dependency_graph_service
-            .eager_initialization(&DependencyGraphRepositoryInMemory::new(
-                self.dataset_repo.clone(),
-            ))
-            .await
-            .unwrap();
     }
 }
 
@@ -217,12 +187,10 @@ async fn test_rename_unauthorized() {
 async fn test_delete_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
     let harness = LocalFsRepoHarness::create(&tempdir, false);
-    harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset(
         harness.dataset_repo.as_ref(),
         harness.create_dataset_from_snapshot.as_ref(),
-        harness.delete_dataset.as_ref(),
         None,
     )
     .await;
@@ -234,29 +202,11 @@ async fn test_delete_dataset() {
 async fn test_delete_dataset_multi_tenant() {
     let tempdir = tempfile::tempdir().unwrap();
     let harness = LocalFsRepoHarness::create(&tempdir, true);
-    harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset(
         harness.dataset_repo.as_ref(),
         harness.create_dataset_from_snapshot.as_ref(),
-        harness.delete_dataset.as_ref(),
         Some(DEFAULT_ACCOUNT_NAME.clone()),
-    )
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[ignore = "Need to migrate authorization to use case level tests"]
-#[tokio::test]
-async fn test_delete_unauthorized() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, true);
-    harness.dependencies_eager_initialization().await;
-
-    test_dataset_repository_shared::test_delete_dataset_unauthorized(
-        harness.dataset_repo.as_ref(),
-        None,
     )
     .await;
 }

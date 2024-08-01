@@ -29,7 +29,6 @@ use crate::*;
 pub struct DatasetRepositoryS3 {
     s3_context: S3Context,
     current_account_subject: Arc<CurrentAccountSubject>,
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
     multi_tenant: bool,
     registry_cache: Option<Arc<S3RegistryCache>>,
     metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
@@ -52,7 +51,6 @@ impl DatasetRepositoryS3 {
     pub fn new(
         s3_context: S3Context,
         current_account_subject: Arc<CurrentAccountSubject>,
-        dependency_graph_service: Arc<dyn DependencyGraphService>,
         multi_tenant: bool,
         registry_cache: Option<Arc<S3RegistryCache>>,
         metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
@@ -61,7 +59,6 @@ impl DatasetRepositoryS3 {
         Self {
             s3_context,
             current_account_subject,
-            dependency_graph_service,
             multi_tenant,
             registry_cache,
             metadata_cache_local_fs_path,
@@ -524,39 +521,10 @@ impl DatasetRepositoryWriter for DatasetRepositoryS3 {
         Ok(())
     }
 
-    async fn delete_dataset(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError> {
-        let dataset_handle = match self.resolve_dataset_ref(dataset_ref).await {
-            Ok(dataset_handle) => dataset_handle,
-            Err(GetDatasetError::NotFound(e)) => return Err(DeleteDatasetError::NotFound(e)),
-            Err(GetDatasetError::Internal(e)) => return Err(DeleteDatasetError::Internal(e)),
-        };
-
-        use tokio_stream::StreamExt;
-        let downstream_dataset_ids: Vec<_> = self
-            .dependency_graph_service
-            .get_downstream_dependencies(&dataset_handle.id)
-            .await
-            .int_err()?
-            .collect()
-            .await;
-
-        if !downstream_dataset_ids.is_empty() {
-            let mut children = Vec::with_capacity(downstream_dataset_ids.len());
-            for downstream_dataset_id in downstream_dataset_ids {
-                let hdl = self
-                    .resolve_dataset_ref(&downstream_dataset_id.as_local_ref())
-                    .await
-                    .int_err()?;
-                children.push(hdl);
-            }
-
-            return Err(DanglingReferenceError {
-                dataset_handle,
-                children,
-            }
-            .into());
-        }
-
+    async fn delete_dataset(
+        &self,
+        dataset_handle: &DatasetHandle,
+    ) -> Result<(), DeleteDatasetError> {
         self.delete_dataset_s3_objects(&dataset_handle.id)
             .await
             .map_err(DeleteDatasetError::Internal)?;

@@ -63,10 +63,10 @@ fn construct_authorizer(
     d2_alias: &DatasetAlias,
 ) -> impl auth::DatasetActionAuthorizer {
     MockDatasetActionAuthorizer::new()
-        .expect_check_read_dataset(d1_alias.clone(), authorization_expectations.d1_reads)
-        .expect_check_read_dataset(d2_alias.clone(), authorization_expectations.d2_reads)
-        .expect_check_write_dataset(d1_alias.clone(), authorization_expectations.d1_writes)
-        .expect_check_write_dataset(d2_alias.clone(), authorization_expectations.d2_writes)
+        .expect_check_read_dataset(d1_alias, authorization_expectations.d1_reads, true)
+        .expect_check_read_dataset(d2_alias, authorization_expectations.d2_reads, true)
+        .expect_check_write_dataset(d1_alias, authorization_expectations.d1_writes, true)
+        .expect_check_write_dataset(d2_alias, authorization_expectations.d2_writes, true)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,7 +93,6 @@ async fn do_test_sync(
 
     let catalog = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add::<DependencyGraphServiceInMemory>()
         .add_value(ipfs_gateway)
         .add_value(ipfs_client)
         .add_value(CurrentAccountSubject::new_test())

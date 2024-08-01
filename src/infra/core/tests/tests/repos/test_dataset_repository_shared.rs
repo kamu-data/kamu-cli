@@ -491,69 +491,6 @@ pub async fn test_delete_dataset<
 >(
     repo: &TDatasetRepository,
     create_dataset_from_snapshot: &dyn CreateDatasetFromSnapshotUseCase,
-    delete_dataset: &dyn DeleteDatasetUseCase,
-    account_name: Option<AccountName>,
-) {
-    let alias_foo = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("bar"));
-
-    let snapshot_root = MetadataFactory::dataset_snapshot()
-        .name(alias_foo.clone())
-        .kind(DatasetKind::Root)
-        .push_event(MetadataFactory::set_polling_source().build())
-        .build();
-
-    let snapshot_derived = MetadataFactory::dataset_snapshot()
-        .name(alias_bar.clone())
-        .kind(DatasetKind::Derivative)
-        .push_event(
-            MetadataFactory::set_transform()
-                .inputs_from_refs(["foo"])
-                .build(),
-        )
-        .build();
-
-    let _create_result_root = create_dataset_from_snapshot
-        .execute(snapshot_root)
-        .await
-        .unwrap();
-    let create_result_derived = create_dataset_from_snapshot
-        .execute(snapshot_derived)
-        .await
-        .unwrap();
-
-    assert_matches!(
-        delete_dataset.execute(&alias_foo.as_local_ref()).await,
-        Err(DeleteDatasetError::DanglingReference(e)) if e.children == vec![create_result_derived.dataset_handle.clone()]
-    );
-
-    assert!(repo.get_dataset(&alias_foo.as_local_ref()).await.is_ok());
-    assert!(repo.get_dataset(&alias_bar.as_local_ref()).await.is_ok());
-
-    delete_dataset
-        .execute(&alias_bar.as_local_ref())
-        .await
-        .unwrap();
-    delete_dataset
-        .execute(&alias_foo.as_local_ref())
-        .await
-        .unwrap();
-
-    assert_matches!(
-        repo.get_dataset(&alias_foo.as_local_ref())
-            .await
-            .err()
-            .unwrap(),
-        GetDatasetError::NotFound(_),
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_delete_dataset_unauthorized<
-    TDatasetRepository: DatasetRepository + DatasetRepositoryWriter,
->(
-    repo: &TDatasetRepository,
     account_name: Option<AccountName>,
 ) {
     let alias_foo = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
@@ -564,14 +501,24 @@ pub async fn test_delete_dataset_unauthorized<
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    repo.create_dataset_from_snapshot(snapshot).await.unwrap();
-
-    assert_matches!(
-        repo.delete_dataset(&alias_foo.as_local_ref()).await,
-        Err(DeleteDatasetError::Access(_))
-    );
+    let create_result = create_dataset_from_snapshot
+        .execute(snapshot)
+        .await
+        .unwrap();
 
     assert!(repo.get_dataset(&alias_foo.as_local_ref()).await.is_ok());
+
+    repo.delete_dataset(&create_result.dataset_handle)
+        .await
+        .unwrap();
+
+    assert_matches!(
+        repo.get_dataset(&alias_foo.as_local_ref())
+            .await
+            .err()
+            .unwrap(),
+        GetDatasetError::NotFound(_),
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

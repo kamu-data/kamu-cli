@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::DatasetRef;
+use opendatafabric::{DatasetHandle, DatasetRef};
 
 use crate::DeleteDatasetError;
 
@@ -15,7 +15,12 @@ use crate::DeleteDatasetError;
 
 #[async_trait::async_trait]
 pub trait DeleteDatasetUseCase: Send + Sync {
-    async fn execute(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError>;
+    async fn execute_via_ref(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError>;
+
+    async fn execute_via_handle(
+        &self,
+        dataset_handle: &DatasetHandle,
+    ) -> Result<(), DeleteDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

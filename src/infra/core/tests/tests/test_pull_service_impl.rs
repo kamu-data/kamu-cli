@@ -151,7 +151,6 @@ async fn create_graph_remote(
     let remote_dataset_repo = DatasetRepositoryLocalFs::new(
         tmp_repo_dir.path().to_owned(),
         Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(DependencyGraphServiceInMemory::new(None)),
         false,
         Arc::new(SystemTimeSourceDefault),
     );
@@ -717,8 +716,9 @@ async fn test_set_watermark() {
     let harness = PullTestHarness::new_with_authorizer(
         tmp_dir.path(),
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(
-            DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
+            &DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
             4,
+            true,
         ),
         false,
     );
@@ -869,7 +869,6 @@ impl PullTestHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
-            .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(dataset_action_authorizer)
             .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()

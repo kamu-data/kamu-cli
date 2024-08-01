@@ -31,7 +31,10 @@ pub trait DatasetRepositoryWriter: Sync + Send {
         new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError>;
 
-    async fn delete_dataset(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError>;
+    async fn delete_dataset(
+        &self,
+        dataset_handle: &DatasetHandle,
+    ) -> Result<(), DeleteDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

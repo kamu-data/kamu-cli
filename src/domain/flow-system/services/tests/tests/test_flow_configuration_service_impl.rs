@@ -673,7 +673,7 @@ impl FlowConfigurationHarness {
         // Do the actual deletion
         let delete_dataset = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
         delete_dataset
-            .execute(&(dataset_id.as_local_ref()))
+            .execute_via_ref(&(dataset_id.as_local_ref()))
             .await
             .unwrap();
     }

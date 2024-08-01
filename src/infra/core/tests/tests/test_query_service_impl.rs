@@ -125,7 +125,6 @@ fn create_catalog_with_local_workspace(
 
     dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add::<DependencyGraphServiceInMemory>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(datasets_dir)
@@ -153,7 +152,6 @@ async fn create_catalog_with_s3_workspace(
 
     dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add::<DependencyGraphServiceInMemory>()
         .add_builder(
             DatasetRepositoryS3::builder()
                 .with_s3_context(s3_context.clone())
@@ -261,7 +259,7 @@ fn prepare_test_catalog() -> (TempDir, Catalog) {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true),
     );
     (tempdir, catalog)
 }
@@ -270,7 +268,7 @@ async fn prepare_test_s3_catalog() -> (LocalS3Server, Catalog) {
     let s3 = LocalS3Server::new().await;
     let catalog = create_catalog_with_s3_workspace(
         &s3,
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true),
     )
     .await;
     (s3, catalog)
@@ -388,7 +386,7 @@ async fn test_dataset_tail_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(4),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(4, true),
     );
     test_dataset_tail_common(catalog, &tempdir).await;
 }
@@ -399,7 +397,7 @@ async fn test_dataset_tail_s3() {
     let s3 = LocalS3Server::new().await;
     let catalog = create_catalog_with_s3_workspace(
         &s3,
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(4),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(4, true),
     )
     .await;
     test_dataset_tail_common(catalog, &s3.tmp_dir).await;
@@ -412,7 +410,7 @@ async fn test_dataset_tail_empty_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true),
     );
 
     let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
@@ -501,7 +499,7 @@ async fn test_dataset_sql_authorized_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true),
     );
     test_dataset_sql_authorized_common(catalog, &tempdir).await;
 }
@@ -512,7 +510,7 @@ async fn test_dataset_sql_authorized_s3() {
     let s3 = LocalS3Server::new().await;
     let catalog = create_catalog_with_s3_workspace(
         &s3,
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true),
     )
     .await;
     test_dataset_sql_authorized_common(catalog, &s3.tmp_dir).await;

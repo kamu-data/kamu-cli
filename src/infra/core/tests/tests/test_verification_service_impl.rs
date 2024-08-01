@@ -23,6 +23,8 @@ use time_source::SystemTimeSourceDefault;
 
 use super::test_pull_service_impl::TestTransformService;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_verify_data_consistency() {
     let tempdir = tempfile::tempdir().unwrap();
@@ -33,10 +35,9 @@ async fn test_verify_data_consistency() {
 
     let catalog = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add::<DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(
-            MockDatasetActionAuthorizer::new().expect_check_read_dataset(dataset_alias.clone(), 3),
+            MockDatasetActionAuthorizer::new().expect_check_read_dataset(&dataset_alias, 3, true),
         )
         .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
         .add_builder(
@@ -210,3 +211,5 @@ async fn test_verify_data_consistency() {
         } if block_hash == head && expected == data_logical_hash,
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

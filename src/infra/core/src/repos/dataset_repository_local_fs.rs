@@ -25,7 +25,6 @@ use crate::*;
 
 pub struct DatasetRepositoryLocalFs {
     storage_strategy: Box<dyn DatasetStorageStrategy>,
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
     thrash_lock: tokio::sync::Mutex<()>,
     system_time_source: Arc<dyn SystemTimeSource>,
 }
@@ -37,7 +36,6 @@ impl DatasetRepositoryLocalFs {
     pub fn new(
         root: PathBuf,
         current_account_subject: Arc<CurrentAccountSubject>,
-        dependency_graph_service: Arc<dyn DependencyGraphService>,
         multi_tenant: bool,
         system_time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
@@ -50,7 +48,6 @@ impl DatasetRepositoryLocalFs {
             } else {
                 Box::new(DatasetSingleTenantStorageStrategy::new(root))
             },
-            dependency_graph_service,
             thrash_lock: tokio::sync::Mutex::new(()),
             system_time_source,
         }
@@ -59,7 +56,6 @@ impl DatasetRepositoryLocalFs {
     pub fn create(
         root: impl Into<PathBuf>,
         current_account_subject: Arc<CurrentAccountSubject>,
-        dependency_graph_service: Arc<dyn DependencyGraphService>,
         multi_tenant: bool,
         system_time_source: Arc<dyn SystemTimeSource>,
     ) -> Result<Self, std::io::Error> {
@@ -68,7 +64,6 @@ impl DatasetRepositoryLocalFs {
         Ok(Self::new(
             root,
             current_account_subject,
-            dependency_graph_service,
             multi_tenant,
             system_time_source,
         ))
@@ -346,39 +341,10 @@ impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
     }
 
     // TODO: PERF: Need fast inverse dependency lookup
-    async fn delete_dataset(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError> {
-        let dataset_handle = match self.resolve_dataset_ref(dataset_ref).await {
-            Ok(h) => Ok(h),
-            Err(GetDatasetError::NotFound(e)) => Err(DeleteDatasetError::NotFound(e)),
-            Err(GetDatasetError::Internal(e)) => Err(DeleteDatasetError::Internal(e)),
-        }?;
-
-        use tokio_stream::StreamExt;
-        let downstream_dataset_ids: Vec<_> = self
-            .dependency_graph_service
-            .get_downstream_dependencies(&dataset_handle.id)
-            .await
-            .int_err()?
-            .collect()
-            .await;
-
-        if !downstream_dataset_ids.is_empty() {
-            let mut children = Vec::with_capacity(downstream_dataset_ids.len());
-            for downstream_dataset_id in downstream_dataset_ids {
-                let hdl = self
-                    .resolve_dataset_ref(&downstream_dataset_id.as_local_ref())
-                    .await
-                    .int_err()?;
-                children.push(hdl);
-            }
-
-            return Err(DanglingReferenceError {
-                dataset_handle,
-                children,
-            }
-            .into());
-        }
-
+    async fn delete_dataset(
+        &self,
+        dataset_handle: &DatasetHandle,
+    ) -> Result<(), DeleteDatasetError> {
         // // Update repo info
         // let mut repo_info = self.read_repo_info().await?;
         // let index = repo_info
@@ -390,7 +356,7 @@ impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
         // repo_info.datasets.remove(index);
         // self.write_repo_info(repo_info).await?;
 
-        let dataset_dir = self.storage_strategy.get_dataset_path(&dataset_handle);
+        let dataset_dir = self.storage_strategy.get_dataset_path(dataset_handle);
         tokio::fs::remove_dir_all(dataset_dir).await.int_err()?;
 
         Ok(())

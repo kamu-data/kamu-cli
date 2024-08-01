@@ -18,9 +18,9 @@ use kamu::utils::datasets_filtering::{
     matches_local_ref_pattern,
     matches_remote_ref_pattern,
 };
-use kamu::{DatasetRepositoryLocalFs, DatasetRepositoryWriter, DependencyGraphServiceInMemory};
+use kamu::{DatasetRepositoryLocalFs, DatasetRepositoryWriter};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
-use kamu_core::{auth, DatasetRepository};
+use kamu_core::DatasetRepository;
 use opendatafabric::{
     AccountName,
     DatasetAlias,
@@ -283,8 +283,6 @@ impl DatasetFilteringHarness {
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceInMemory>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();

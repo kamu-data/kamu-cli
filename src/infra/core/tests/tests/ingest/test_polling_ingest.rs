@@ -1029,8 +1029,9 @@ async fn test_ingest_polling_preprocess_with_flink() {
 async fn test_ingest_checks_auth() {
     let harness = IngestTestHarness::new_with_authorizer(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(
-            DatasetAlias::new(None, DatasetName::new_unchecked("foo.bar")),
+            &DatasetAlias::new(None, DatasetName::new_unchecked("foo.bar")),
             1,
+            true,
         ),
     );
     let src_path = harness.temp_dir.path().join("data.json");
@@ -1099,7 +1100,6 @@ impl IngestTestHarness {
             .add::<ContainerRuntime>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
-            .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(dataset_action_authorizer)
             .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()

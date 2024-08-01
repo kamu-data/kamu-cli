@@ -133,7 +133,7 @@ impl Command for DeleteCommand {
         }
 
         for dataset_ref in &dataset_refs {
-            match self.delete_dataset.execute(dataset_ref).await {
+            match self.delete_dataset.execute_via_ref(dataset_ref).await {
                 Ok(_) => Ok(()),
                 Err(DeleteDatasetError::DanglingReference(e)) => Err(CLIError::failure(e)),
                 Err(DeleteDatasetError::Access(e)) => Err(CLIError::failure(e)),

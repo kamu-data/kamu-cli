@@ -226,7 +226,6 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .add_value(CacheDir::new(cache_dir))
         .add::<ContainerRuntime>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
-        .add::<kamu::DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
             DatasetRepositoryLocalFs::builder()

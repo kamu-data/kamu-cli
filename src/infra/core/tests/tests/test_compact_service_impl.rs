@@ -1081,7 +1081,6 @@ impl CompactTestHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add_value(RunInfoDir::new(run_info_dir))
-            .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
@@ -1135,7 +1134,6 @@ impl CompactTestHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add_builder(run_info_dir.clone())
-            .add::<DependencyGraphServiceInMemory>()
             .add_builder(
                 DatasetRepositoryS3::builder()
                     .with_s3_context(s3_context.clone())

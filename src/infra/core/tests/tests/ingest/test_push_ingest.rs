@@ -480,12 +480,6 @@ struct IngestTestHarness {
 
 impl IngestTestHarness {
     fn new() -> Self {
-        Self::new_with_authorizer(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new())
-    }
-
-    fn new_with_authorizer<TDatasetAuthorizer: auth::DatasetActionAuthorizer + 'static>(
-        dataset_action_authorizer: TDatasetAuthorizer,
-    ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = temp_dir.path().join("run");
         let cache_dir = temp_dir.path().join("cache");
@@ -497,10 +491,8 @@ impl IngestTestHarness {
         let catalog = dill::CatalogBuilder::new()
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CacheDir::new(cache_dir))
-            .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
-            .add_value(dataset_action_authorizer)
-            .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
+            .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)

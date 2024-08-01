@@ -153,7 +153,7 @@ pub(crate) async fn create_dataset_from_snapshot_impl<
             Err(e) => {
                 // Attempt to clean up dataset
                 let _ = dataset_repo
-                    .delete_dataset(&create_result.dataset_handle.as_local_ref())
+                    .delete_dataset(&create_result.dataset_handle)
                     .await;
                 Err(e)
             }

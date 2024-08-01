@@ -12,15 +12,9 @@ use std::sync::Arc;
 use chrono::Utc;
 use dill::Component;
 use kamu::testing::MetadataFactory;
-use kamu::{
-    DatasetChangesServiceImpl,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
-    DependencyGraphServiceInMemory,
-};
+use kamu::{DatasetChangesServiceImpl, DatasetRepositoryLocalFs, DatasetRepositoryWriter};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
-    auth,
     CommitOpts,
     CreateDatasetResult,
     DatasetChangesService,
@@ -824,9 +818,7 @@ impl DatasetChangesHarness {
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DatasetChangesServiceImpl>()
-            .add::<DependencyGraphServiceInMemory>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();

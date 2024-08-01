@@ -17,7 +17,7 @@ use datafusion::prelude::*;
 use dill::Component;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
-use kamu::{DatasetRepositoryLocalFs, DatasetRepositoryWriter, DependencyGraphServiceInMemory};
+use kamu::{DatasetRepositoryLocalFs, DatasetRepositoryWriter};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_data_utils::testing::{assert_data_eq, assert_schema_eq};
@@ -941,8 +941,6 @@ impl Harness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
-            .add::<DependencyGraphServiceInMemory>()
-            .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(CurrentAccountSubject::new_test())
             .add_builder(
                 DatasetRepositoryLocalFs::builder()

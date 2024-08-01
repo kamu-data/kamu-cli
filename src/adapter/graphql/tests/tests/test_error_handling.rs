@@ -9,9 +9,9 @@
 
 use dill::Component;
 use indoc::indoc;
-use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu::DatasetRepositoryLocalFs;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{auth, DatasetRepository};
+use kamu_core::DatasetRepository;
 use time_source::SystemTimeSourceDefault;
 
 #[test_log::test(tokio::test)]
@@ -61,8 +61,6 @@ async fn test_internal_error() {
     let cat = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
         .add_value(CurrentAccountSubject::new_test())
-        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .add::<DependencyGraphServiceInMemory>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))

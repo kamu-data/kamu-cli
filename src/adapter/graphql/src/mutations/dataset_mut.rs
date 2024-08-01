@@ -91,7 +91,7 @@ impl DatasetMut {
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteResult> {
         let delete_dataset = from_catalog::<dyn domain::DeleteDatasetUseCase>(ctx).unwrap();
         match delete_dataset
-            .execute(&self.dataset_handle.as_local_ref())
+            .execute_via_handle(&self.dataset_handle)
             .await
         {
             Ok(_) => Ok(DeleteResult::Success(DeleteResultSuccess {
