@@ -27,6 +27,32 @@ pub struct Entity<'a> {
     pub entity_id: Cow<'a, str>,
 }
 
+impl<'a> Entity<'a> {
+    pub fn new(entity_type: EntityType, entity_id: impl Into<Cow<'a, str>>) -> Self {
+        Self {
+            entity_type,
+            entity_id: entity_id.into(),
+        }
+    }
+
+    pub fn new_account(entity_id: impl Into<Cow<'a, str>>) -> Self {
+        Self::new(EntityType::Account, entity_id)
+    }
+
+    pub fn new_dataset(entity_id: impl Into<Cow<'a, str>>) -> Self {
+        Self::new(EntityType::Dataset, entity_id)
+    }
+}
+
+impl<'a> From<EntityWithRelation<'a>> for Entity<'a> {
+    fn from(v: EntityWithRelation<'a>) -> Self {
+        Self {
+            entity_type: v.entity_type,
+            entity_id: v.entity_id,
+        }
+    }
+}
+
 #[reuse(entity)]
 pub struct EntityWithRelation<'a> {
     pub relation: Relation,
@@ -76,21 +102,21 @@ pub trait RebacRepository: Send + Sync {
     async fn get_entity_properties(
         &self,
         entity: &Entity,
-    ) -> Result<Vec<Property>, GetEntityRelationsError>;
+    ) -> Result<Vec<Property>, GetEntityPropertiesError>;
 
     // Relations
 
     async fn insert_entities_relation(
         &self,
         subject_entity: &Entity,
-        relationship: &Relation,
+        relationship: Relation,
         object_entity: &Entity,
     ) -> Result<(), InsertEntitiesRelationError>;
 
     async fn delete_entities_relation(
         &self,
         subject_entity: &Entity,
-        relationship: &Relation,
+        relationship: Relation,
         object_entity: &Entity,
     ) -> Result<(), DeleteEntitiesRelationError>;
 

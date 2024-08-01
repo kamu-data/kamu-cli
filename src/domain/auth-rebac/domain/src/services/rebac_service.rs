@@ -44,7 +44,7 @@ pub trait RebacService: Send + Sync {
 
     async fn get_account_properties(
         &self,
-        dataset_id: &DatasetID,
+        account_id: &AccountID,
     ) -> Result<HashMap<PropertyName, PropertyValue>, GetEntityPropertiesError>;
 
     // Dataset
