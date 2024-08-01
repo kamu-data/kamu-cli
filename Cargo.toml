@@ -27,9 +27,10 @@ members = [
     "src/domain/task-system/domain",
     # Domain service layer
     "src/domain/accounts/services",
+    "src/domain/auth-rebac/services",
     "src/domain/datasets/services",
-    "src/domain/task-system/services",
     "src/domain/flow-system/services",
+    "src/domain/task-system/services",
     # Infra
     "src/infra/core",
     "src/infra/ingest-datafusion",
@@ -97,18 +98,20 @@ random-names = { version = "0.193.1", path = "src/utils/random-names", default-f
 tracing-perfetto = { version = "0.193.1", path = "src/utils/tracing-perfetto", default-features = false }
 
 # Domain
-opendatafabric = { version = "0.193.1", path = "src/domain/opendatafabric", default-features = false }
-kamu-core = { version = "0.193.1", path = "src/domain/core", default-features = false }
 kamu-accounts = { version = "0.193.1", path = "src/domain/accounts/domain", default-features = false }
-kamu-task-system = { version = "0.193.1", path = "src/domain/task-system/domain", default-features = false }
-kamu-flow-system = { version = "0.193.1", path = "src/domain/flow-system/domain", default-features = false }
+kamu-auth-rebac = { version = "0.193.1", path = "src/domain/auth-rebac/domain", default-features = false }
+kamu-core = { version = "0.193.1", path = "src/domain/core", default-features = false }
 kamu-datasets = { version = "0.193.1", path = "src/domain/datasets/domain", default-features = false }
+kamu-flow-system = { version = "0.193.1", path = "src/domain/flow-system/domain", default-features = false }
+kamu-task-system = { version = "0.193.1", path = "src/domain/task-system/domain", default-features = false }
+opendatafabric = { version = "0.193.1", path = "src/domain/opendatafabric", default-features = false }
 
 # Domain service layer
 kamu-accounts-services = { version = "0.193.1", path = "src/domain/accounts/services", default-features = false }
+kamu-auth-rebac-services = { version = "0.193.1", path = "src/domain/auth-rebac/services", default-features = false }
 kamu-datasets-services = { version = "0.193.1", path = "src/domain/datasets/services", default-features = false }
-kamu-task-system-services = { version = "0.193.1", path = "src/domain/task-system/services", default-features = false }
 kamu-flow-system-services = { version = "0.193.1", path = "src/domain/flow-system/services", default-features = false }
+kamu-task-system-services = { version = "0.193.1", path = "src/domain/task-system/services", default-features = false }
 
 # Infra
 kamu = { version = "0.193.1", path = "src/infra/core", default-features = false }
