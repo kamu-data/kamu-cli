@@ -17,6 +17,8 @@ use crate::{
     GetEntityPropertiesError,
     GetEntityRelationsError,
     InsertEntitiesRelationError,
+    ObjectEntity,
+    Property,
     PropertyName,
     PropertyValue,
     Relation,
@@ -31,14 +33,13 @@ pub trait RebacService: Send + Sync {
     async fn set_account_property(
         &self,
         account_id: &AccountID,
-        property_name: &PropertyName,
-        property_value: &PropertyValue,
+        property: &Property,
     ) -> Result<(), UpsertEntityPropertyError>;
 
     async fn unset_account_property(
         &self,
         account_id: &AccountID,
-        property_name: &PropertyName,
+        property_name: PropertyName,
     ) -> Result<(), DeleteEntityPropertyError>;
 
     async fn get_account_properties(
@@ -50,14 +51,13 @@ pub trait RebacService: Send + Sync {
     async fn set_dataset_property(
         &self,
         dataset_id: &DatasetID,
-        property_name: &PropertyName,
-        property_value: &PropertyValue,
+        property: &Property,
     ) -> Result<(), UpsertEntityPropertyError>;
 
     async fn unset_dataset_property(
         &self,
         dataset_id: &DatasetID,
-        property_name: &PropertyName,
+        property_name: PropertyName,
     ) -> Result<(), DeleteEntityPropertyError>;
 
     async fn get_dataset_properties(
@@ -69,26 +69,21 @@ pub trait RebacService: Send + Sync {
     async fn insert_account_dataset_relation(
         &self,
         account_id: &AccountID,
-        relationship: &Relation,
+        relationship: Relation,
         dataset_id: &DatasetID,
     ) -> Result<(), InsertEntitiesRelationError>;
 
     async fn delete_account_dataset_relation(
         &self,
         account_id: &AccountID,
-        relationship: &Relation,
+        relationship: Relation,
         dataset_id: &DatasetID,
     ) -> Result<(), DeleteEntitiesRelationError>;
 
     async fn get_account_dataset_relations(
         &self,
         account_id: &AccountID,
-    ) -> Result<HashMap<Relation, Vec<DatasetID>>, GetEntityRelationsError>;
-
-    async fn get_dataset_account_relations(
-        &self,
-        dataset_id: &DatasetID,
-    ) -> Result<HashMap<Relation, Vec<DatasetID>>, GetEntityRelationsError>;
+    ) -> Result<HashMap<Relation, Vec<ObjectEntity>>, GetEntityRelationsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
