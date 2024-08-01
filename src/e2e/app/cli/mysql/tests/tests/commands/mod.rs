@@ -7,5 +7,4 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod kamu;
-pub use kamu::*;
+mod test_system_generate_token_command;

@@ -526,6 +526,14 @@ pub fn get_command(
                 submatches.get_flag("verify"),
                 submatches.get_flag("keep-metadata-only"),
             )),
+            Some(("e2e", submatches)) => Box::new(SystemE2ECommand::new(
+                submatches
+                    .get_one::<String>("action")
+                    .map(String::as_str)
+                    .unwrap(),
+                submatches.get_one::<DatasetRef>("dataset").cloned(),
+                cli_catalog.get_one()?,
+            )),
             _ => return Err(CommandInterpretationFailed.into()),
         },
         Some(("tail", submatches)) => Box::new(TailCommand::new(

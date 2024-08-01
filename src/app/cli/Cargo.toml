@@ -181,9 +181,9 @@ libc = "0.2" # For getting uid:gid
 
 
 [dev-dependencies]
-assert_cmd = "2"
+kamu-cli-puppet = { workspace = true, default-features = false, features = ["extensions"] }
+
 pretty_assertions = { version = "1" }
-test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 
 

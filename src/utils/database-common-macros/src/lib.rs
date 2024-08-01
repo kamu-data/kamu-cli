@@ -230,7 +230,7 @@ impl Parse for CatalogItem {
         let item_type: Type = input.parse()?;
         let return_value_action = Self::parse_return_value_action(input)?;
 
-        Ok(CatalogItem {
+        Ok(Self {
             item_name,
             item_type,
             return_value_action,

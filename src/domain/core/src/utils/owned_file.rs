@@ -22,7 +22,9 @@ pub struct OwnedFile {
 impl OwnedFile {
     pub fn new(path: impl Into<PathBuf>) -> Self {
         let path = path.into();
-        assert!(path.exists());
+
+        assert!(path.exists(), "path: {}", path.display());
+
         Self { path: Some(path) }
     }
 

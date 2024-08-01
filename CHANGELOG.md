@@ -5,11 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-### Fixed
-- Return `RootDatasetCompacted` error for manual triggered `EXECUTE_TRANSFROM` flows 
+### Added
+- `kamu --no-color` to disable color output in the terminal.
 ### Changed
 - New recursive flag for `CompactionConditionFull` input to trigger
   Hard compaction with keep metadata only mode for each derived dataset 
+- E2E: Reorganized work with tests that call `kamu-cli`:
+  - Added `kamu-cli-puppet` crate to allow `kamu-cli` to be run as a separate process from tests
+  - Removed past `kamu-cli` wrapper that ran in-process.
+  - Some of `kamu-cli` tests that are inherently E2E are moved and adapted to E2E scope (in-mem area)
+  - For convenience, the test run macros are now procedural
+  - Various Windows-related tweaks & fixes
+### Fixed
+- Return `RootDatasetCompacted` error for manual triggered `EXECUTE_TRANSFROM` flows
 
 ## [0.191.5] - 2024-07-30
 ### Fixed

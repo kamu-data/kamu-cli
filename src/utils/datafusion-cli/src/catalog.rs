@@ -160,7 +160,7 @@ impl SchemaProvider for DynamicFileSchemaProvider {
         // if `get_store` returns an `Err` then it means the corresponding store is
         // not registered yet and we need to register it
         match state.runtime_env().object_store_registry.get_store(url) {
-            Ok(_) => { /*Nothing to do here, store for this URL is already registered*/ }
+            Ok(_) => { /* Nothing to do here, store for this URL is already registered */ }
             Err(_) => {
                 // Register the store for this URL. Here we don't have access
                 // to any command options so the only choice is to use an empty collection

@@ -129,7 +129,9 @@ pub async fn run(
         let output_config = configure_output_format(&matches, &workspace_svc);
         base_catalog_builder.add_value(output_config.clone());
 
-        let guards = configure_logging(&output_config, &workspace_layout);
+        let no_color_output = matches.get_flag("no-color");
+        let guards = configure_logging(&output_config, &workspace_layout, no_color_output);
+
         tracing::info!(
             version = VERSION,
             args = ?std::env::args().collect::<Vec<_>>(),
@@ -622,12 +624,21 @@ fn prepare_run_dir(run_dir: &Path) {
     }
 }
 
-fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceLayout) -> Guards {
+fn configure_logging(
+    output_config: &OutputConfig,
+    workspace_layout: &WorkspaceLayout,
+    no_color_output: bool,
+) -> Guards {
     use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
     use tracing_log::LogTracer;
     use tracing_subscriber::fmt::format::FmtSpan;
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::EnvFilter;
+
+    if no_color_output {
+        console::set_colors_enabled(false);
+        console::set_colors_enabled_stderr(false);
+    }
 
     // Setup custom panic hook
     std::panic::update_hook(move |prev, info| {

@@ -12,6 +12,7 @@ members = [
     "src/utils/event-sourcing-macros",
     "src/utils/http-common",
     "src/utils/internal-error",
+    "src/utils/kamu-cli-puppet",
     "src/utils/multiformats",
     "src/utils/random-names",
     "src/utils/repo-tools",
@@ -62,6 +63,7 @@ members = [
     "src/app/cli",
     # E2E
     "src/e2e/app/cli/common",
+    "src/e2e/app/cli/common-macros",
     "src/e2e/app/cli/repo-tests",
     "src/e2e/app/cli/inmem",
     "src/e2e/app/cli/postgres",
@@ -86,6 +88,7 @@ event-sourcing = { version = "0.191.5", path = "src/utils/event-sourcing", defau
 event-sourcing-macros = { version = "0.191.5", path = "src/utils/event-sourcing-macros", default-features = false }
 http-common = { version = "0.191.5", path = "src/utils/http-common", default-features = false }
 internal-error = { version = "0.191.5", path = "src/utils/internal-error", default-features = false }
+kamu-cli-puppet = { version = "0.191.5", path = "src/utils/kamu-cli-puppet", default-features = false }
 kamu-data-utils = { version = "0.191.5", path = "src/utils/data-utils", default-features = false }
 kamu-datafusion-cli = { version = "0.191.5", path = "src/utils/datafusion-cli", default-features = false }
 multiformats = { version = "0.191.5", path = "src/utils/multiformats", default-features = false }
@@ -141,6 +144,7 @@ kamu-adapter-oauth = { version = "0.191.5", path = "src/adapter/oauth", default-
 
 # E2E
 kamu-cli-e2e-common = { version = "0.191.5", path = "src/e2e/app/cli/common", default-features = false }
+kamu-cli-e2e-common-macros = { version = "0.191.5", path = "src/e2e/app/cli/common-macros", default-features = false }
 kamu-cli-e2e-repo-tests = { version = "0.191.5", path = "src/e2e/app/cli/repo-tests", default-features = false }
 
 [workspace.package]
@@ -225,7 +229,7 @@ incremental = false
 debug = "line-tables-only"
 
 
-# Use this section to test or apply emergency ovverides to dependencies
+# Use this section to test or apply emergency overides to dependencies
 # See: https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html
 [patch.crates-io]
 # datafusion = { git = 'https://github.com/apache/datafusion.git', tag = '39.0.0-rc1' }
@@ -234,3 +238,4 @@ debug = "line-tables-only"
 # datafusion-expr = { git = 'https://github.com/apache/datafusion.git', tag = '39.0.0-rc1' }
 datafusion-odata = { git = 'https://github.com/kamu-data/datafusion-odata.git', branch = 'axum-0.6' }
 # datafusion-ethers = { git = "https://github.com/kamu-data/datafusion-ethers.git", tag = "v39.0.0" }
+# object_store = { git = 'https://github.com/s373r/arrow-rs', branch = 'add-debug-logs', package = "object_store" }

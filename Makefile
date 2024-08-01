@@ -17,7 +17,7 @@ MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite
 lint:
 	cargo fmt --check
 	cargo test -p kamu-repo-tools
-	cargo deny check
+	cargo deny check --hide-inclusion-graph
 	# cargo udeps --all-targets
 	cargo clippy --workspace --all-targets -- -D warnings
 	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare --check);)

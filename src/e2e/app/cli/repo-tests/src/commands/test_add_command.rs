@@ -7,18 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use futures::TryStreamExt;
-use kamu::domain;
 use kamu::testing::MetadataFactory;
-use kamu_cli::testing::Kamu;
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_add_recursive() {
-    let kamu = Kamu::new_workspace_tmp().await;
-
+pub async fn test_add_recursive(kamu: KamuCliPuppet) {
     // Plain manifest
     let snapshot = MetadataFactory::dataset_snapshot().name("plain").build();
     let manifest = odf::serde::yaml::YamlDatasetSnapshotSerializer
@@ -71,23 +67,16 @@ async fn test_add_recursive() {
         kamu.workspace_path().as_os_str().to_str().unwrap(),
     ])
     .await
-    .unwrap();
+    .success();
 
-    let dataset_repo = kamu
-        .catalog()
-        .get_one::<dyn domain::DatasetRepository>()
-        .unwrap();
-
-    let mut datasets: Vec<_> = dataset_repo
-        .get_all_datasets()
-        .map_ok(|h| h.alias.to_string())
-        .try_collect()
+    let dataset_names = kamu
+        .list_datasets()
         .await
-        .unwrap();
+        .into_iter()
+        .map(|dataset| dataset.name)
+        .collect::<Vec<_>>();
 
-    datasets.sort();
-
-    assert_eq!(datasets, ["commented", "plain"]);
+    assert_eq!(dataset_names, ["commented", "plain"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

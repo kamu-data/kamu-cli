@@ -62,7 +62,8 @@ jobs:
             runs-on: ubuntu-latest
             cargo-flags: --profile ci --features ftp
             nextest-flags: --cargo-profile ci --features ftp
-            nextest-exclusions: -E '!(test(::database::) | test(::spark::)| test(::flink::))'
+            nextest-exclusions-main-set-tests: -E '!(test(::database::) | test(::spark::)| test(::flink::))'
+            nextest-exclusions-database-set-part: ''
             container-runtime: podman
             ipfs: true
             database: true
@@ -72,7 +73,8 @@ jobs:
             runs-on: macos-13
             cargo-flags: --profile ci --features ftp
             nextest-flags: --cargo-profile ci --features ftp
-            nextest-exclusions: -E '!(test(::containerized::) | test(::database::))'
+            nextest-exclusions-main-set-tests: -E '!(test(::containerized::) | test(::database::))'
+            nextest-exclusions-database-set-part: ''
             container-runtime: ''
             ipfs: false
             database: false
@@ -82,7 +84,8 @@ jobs:
             runs-on: macos-14
             cargo-flags: --profile ci
             nextest-flags: --cargo-profile ci
-            nextest-exclusions: -E '!(test(::containerized::) | test(::database::))'
+            nextest-exclusions-main-set-tests: -E '!(test(::containerized::) | test(::database::))'
+            nextest-exclusions-database-set-part: ''
             container-runtime: ''
             ipfs: false
             database: false
@@ -93,7 +96,8 @@ jobs:
             cargo-flags: --profile ci
             nextest-flags: --cargo-profile ci
             # platform(target) is a workaround for Windows only issue in cargo-nextest upon proc macro crates
-            nextest-exclusions: -E 'platform(target) & !(test(::containerized::) | test(::datafusion::) | test(::database::))'
+            nextest-exclusions-main-set-tests: -E 'platform(target) & !(test(::containerized::) | test(::datafusion::) | test(::database::))'
+            nextest-exclusions-database-set-part: '& !(test(::datafusion::))'
             container-runtime: ''
             ipfs: false
             database: false
@@ -151,7 +155,7 @@ jobs:
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::setup::)' --no-capture
 
       - name: Run main set of tests
-        run: cargo nextest run ${{ matrix.nextest-flags }} ${{ matrix.nextest-exclusions }} -v
+        run: cargo nextest run ${{ matrix.nextest-flags }} ${{ matrix.nextest-exclusions-main-set-tests }} -v
 
         # Note: SQLite does not require a container and may run on any platform
       - name: SQLite database tests
@@ -159,21 +163,21 @@ jobs:
           SQLX_OFFLINE: false
           DATABASE_URL: sqlite://kamu.sqlite.db
         # platform(target) is a workaround for Windows only issue in cargo-nextest upon proc macro crates
-        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'platform(target) & test(::sqlite::)'
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'platform(target) & test(::sqlite::) ${{ matrix.nextest-exclusions-database-set-part }}'
 
       - name: Postgres database tests
         if: matrix.database
         env:
           SQLX_OFFLINE: false
           DATABASE_URL: postgres://root:root@localhost:5432/kamu-test
-        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::)'
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::) ${{ matrix.nextest-exclusions-database-set-part }}'
 
       - name: MariaDB database tests
         if: matrix.database
         env:
           SQLX_OFFLINE: false
           DATABASE_URL: mariadb://root:root@localhost:3306/kamu-test
-        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::mysql::)'
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::mysql::) ${{ matrix.nextest-exclusions-database-set-part }}'
 
       # Not running on windows due to line ending differences
       - name: Check generated files

@@ -11,16 +11,13 @@ use std::path::Path;
 
 use chrono::{TimeZone, Utc};
 use indoc::indoc;
-use kamu_cli::testing::Kamu;
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized, engine, ingest, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_push_ingest_from_file_ledger() {
-    let mut kamu = Kamu::new_workspace_tmp().await;
-
+pub async fn test_push_ingest_from_file_ledger(mut kamu: KamuCliPuppet) {
     kamu.set_system_time(Some(Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap()));
 
     kamu.add_dataset(DatasetSnapshot {
@@ -45,8 +42,7 @@ async fn test_push_ingest_from_file_ledger() {
         }
         .into()],
     })
-    .await
-    .unwrap();
+    .await;
 
     let data_path = kamu.workspace_path().join("data.csv");
     std::fs::write(
@@ -69,7 +65,7 @@ async fn test_push_ingest_from_file_ledger() {
         path(&data_path),
     ])
     .await
-    .unwrap();
+    .success();
 
     kamu.assert_last_data_slice(
         &DatasetName::new_unchecked("population"),
@@ -100,11 +96,7 @@ async fn test_push_ingest_from_file_ledger() {
     .await;
 }
 
-#[test_group::group(containerized, engine, ingest, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_push_ingest_from_file_snapshot_with_event_time() {
-    let mut kamu = Kamu::new_workspace_tmp().await;
-
+pub async fn test_push_ingest_from_file_snapshot_with_event_time(mut kamu: KamuCliPuppet) {
     kamu.set_system_time(Some(Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap()));
 
     kamu.add_dataset(DatasetSnapshot {
@@ -129,8 +121,7 @@ async fn test_push_ingest_from_file_snapshot_with_event_time() {
         }
         .into()],
     })
-    .await
-    .unwrap();
+    .await;
 
     let data_path = kamu.workspace_path().join("data.csv");
     std::fs::write(
@@ -156,7 +147,7 @@ async fn test_push_ingest_from_file_snapshot_with_event_time() {
         path(&data_path),
     ])
     .await
-    .unwrap();
+    .success();
 
     kamu.assert_last_data_slice(
         &DatasetName::new_unchecked("population"),

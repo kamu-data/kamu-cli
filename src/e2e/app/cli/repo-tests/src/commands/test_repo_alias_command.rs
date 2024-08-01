@@ -7,14 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli::testing::Kamu;
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_repository_pull_aliases_commands() {
-    let kamu = Kamu::new_workspace_tmp().await;
+pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
     kamu.add_dataset(DatasetSnapshot {
         name: "foo".try_into().unwrap(),
         kind: DatasetKind::Root,
@@ -36,8 +35,8 @@ async fn test_repository_pull_aliases_commands() {
         }
         .into()],
     })
-    .await
-    .unwrap();
+    .await;
+
     let dataset_aliases = vec![
         "http://pull.example.com/".to_string(),
         "http://pull.example1.com/".to_string(),
@@ -45,10 +44,9 @@ async fn test_repository_pull_aliases_commands() {
     ];
 
     for dataset_alias in &dataset_aliases {
-        let cmd_result = kamu
-            .execute(["repo", "alias", "add", "foo", dataset_alias, "--pull"])
-            .await;
-        assert!(cmd_result.is_ok());
+        kamu.execute(["repo", "alias", "add", "foo", dataset_alias, "--pull"])
+            .await
+            .success();
     }
 
     let (pull_aliases, _push_aliases) = kamu
@@ -57,27 +55,27 @@ async fn test_repository_pull_aliases_commands() {
     assert_eq!(pull_aliases, dataset_aliases);
 
     // Test remove single pull alias
-    let cmd_result = kamu
-        .execute(["repo", "alias", "rm", "foo", dataset_aliases[2].as_str()])
-        .await;
-    assert!(cmd_result.is_ok());
+    kamu.execute(["repo", "alias", "rm", "foo", dataset_aliases[2].as_str()])
+        .await
+        .success();
+
     let (pull_aliases, _push_aliases) = kamu
         .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
         .await;
     assert_eq!(pull_aliases, dataset_aliases[..2]);
 
     // Test remove all pull aliases
-    let cmd_result = kamu.execute(["repo", "alias", "rm", "--all", "foo"]).await;
-    assert!(cmd_result.is_ok());
+    kamu.execute(["repo", "alias", "rm", "--all", "foo"])
+        .await
+        .success();
+
     let (pull_aliases, _push_aliases) = kamu
         .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
         .await;
     assert!(pull_aliases.is_empty());
 }
 
-#[test_log::test(tokio::test)]
-async fn test_repository_push_aliases_commands() {
-    let kamu = Kamu::new_workspace_tmp().await;
+pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
     kamu.add_dataset(DatasetSnapshot {
         name: "foo".try_into().unwrap(),
         kind: DatasetKind::Root,
@@ -99,8 +97,8 @@ async fn test_repository_push_aliases_commands() {
         }
         .into()],
     })
-    .await
-    .unwrap();
+    .await;
+
     let dataset_aliases = vec![
         "http://push.example.com/".to_string(),
         "http://push.example1.com/".to_string(),
@@ -108,10 +106,9 @@ async fn test_repository_push_aliases_commands() {
     ];
 
     for dataset_alias in &dataset_aliases {
-        let cmd_result = kamu
-            .execute(["repo", "alias", "add", "foo", dataset_alias, "--push"])
-            .await;
-        assert!(cmd_result.is_ok());
+        kamu.execute(["repo", "alias", "add", "foo", dataset_alias, "--push"])
+            .await
+            .success();
     }
 
     let (_pull_aliases, push_aliases) = kamu
@@ -120,17 +117,19 @@ async fn test_repository_push_aliases_commands() {
     assert_eq!(push_aliases, dataset_aliases);
 
     // Test remove single push alias
-    let cmd_result = kamu
-        .execute(["repo", "alias", "rm", "foo", dataset_aliases[2].as_str()])
-        .await;
-    assert!(cmd_result.is_ok());
+    kamu.execute(["repo", "alias", "rm", "foo", dataset_aliases[2].as_str()])
+        .await
+        .success();
+
     let (_pull_aliases, push_aliases) = kamu
         .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
         .await;
     assert_eq!(push_aliases, dataset_aliases[..2]);
     // Test remove all push aliases
-    let cmd_result = kamu.execute(["repo", "alias", "rm", "--all", "foo"]).await;
-    assert!(cmd_result.is_ok());
+    kamu.execute(["repo", "alias", "rm", "--all", "foo"])
+        .await
+        .success();
+
     let (_pull_aliases, push_aliases) = kamu
         .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
         .await;

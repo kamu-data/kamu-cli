@@ -7,11 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
 use std::future::Future;
 use std::path::PathBuf;
 
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_cli_puppet::extensions::ServerOutput;
 use reqwest::Url;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
@@ -25,24 +25,41 @@ pub async fn api_server_e2e_test<ServerRunFut, Fixture, FixtureFut>(
     server_run_fut: ServerRunFut,
     fixture: Fixture,
 ) where
-    ServerRunFut: Future<Output = Result<(), InternalError>>,
+    ServerRunFut: Future<Output = ServerOutput>,
     Fixture: FnOnce(KamuApiServerClient) -> FixtureFut,
-    FixtureFut: Future<Output = ()>,
+    FixtureFut: Future<Output = ()> + Send + 'static,
 {
     let test_fut = async move {
         let base_url = get_server_api_base_url(e2e_data_file_path).await?;
         let kamu_api_server_client = KamuApiServerClient::new(base_url);
 
         kamu_api_server_client.ready().await?;
-        {
-            fixture(kamu_api_server_client.clone()).await;
-        }
+
+        let fixture_res = {
+            // tokio::spawn() is used to catch panic, otherwise the test will hang
+            tokio::spawn(fixture(kamu_api_server_client.clone())).await
+        };
+
         kamu_api_server_client.shutdown().await?;
 
-        Ok::<_, InternalError>(())
+        fixture_res.int_err()
     };
 
-    assert_matches!(tokio::try_join!(server_run_fut, test_fut), Ok(_));
+    let (server_output, test_res) = tokio::join!(server_run_fut, test_fut);
+
+    if let Err(e) = test_res {
+        let mut panic_message = format!("Fixture execution error:\n{e:?}\n");
+
+        panic_message += "Server output:\n";
+        panic_message += "stdout:\n";
+        panic_message += server_output.stdout.as_str();
+        panic_message += "\n";
+        panic_message += "stderr:\n";
+        panic_message += server_output.stderr.as_str();
+        panic_message += "\n";
+
+        panic!("{panic_message}");
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

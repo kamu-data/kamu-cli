@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::MediaType;
 use reqwest::{Method, Response, StatusCode, Url};
 use serde::Deserialize;
 use tokio_retry::strategy::FixedInterval;
@@ -107,12 +106,15 @@ impl KamuApiServerClient {
             request_builder = match request_body {
                 RequestBody::Json(value) => request_builder.json(&value),
                 RequestBody::NdJson(value) => request_builder
-                    .header("Content-Type", MediaType::NDJSON.0)
+                    .header("Content-Type", "application/x-ndjson")
                     .body(value),
             }
         };
 
-        let response = request_builder.send().await.unwrap();
+        let response = match request_builder.send().await {
+            Ok(response_body) => response_body,
+            Err(e) => panic!("Unexpected send error: {e:?}"),
+        };
 
         pretty_assertions::assert_eq!(expected_status, response.status());
 
@@ -130,7 +132,10 @@ impl KamuApiServerClient {
         let response = self.graphql_api_call_impl(query, maybe_token).await;
         let response_body = response.json::<GraphQLResponseBody>().await.unwrap();
 
-        response_body.data.unwrap()
+        match response_body.data {
+            Some(response_body) => response_body,
+            None => panic!("Unexpected response body: {response_body:?}"),
+        }
     }
 
     pub async fn graphql_api_call_assert(
@@ -206,7 +211,10 @@ impl KamuApiServerClient {
         pretty_assertions::assert_eq!(StatusCode::OK, response.status());
 
         let pretty_response_body: GraphQLPrettyResponseBody =
-            response.json::<GraphQLResponseBody>().await.unwrap().into();
+            match response.json::<GraphQLResponseBody>().await {
+                Ok(response_body) => response_body.into(),
+                Err(e) => panic!("Unexpected parsing error: {e:?}"),
+            };
 
         match (
             pretty_response_body.errors,

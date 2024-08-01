@@ -42,6 +42,10 @@ pub fn cli() -> Command {
                 .short('v')
                 .action(ArgAction::Count)
                 .help("Sets the level of verbosity (repeat for more)"),
+            Arg::new("no-color")
+                .long("no-color")
+                .action(ArgAction::SetTrue)
+                .help("Disable color output in the terminal"),
             Arg::new("quiet")
                 .long("quiet")
                 .short('q')
@@ -1321,6 +1325,22 @@ pub fn cli() -> Command {
                                     kamu system compact --hard my.dataset
                                 "#
                             )),
+                        Command::new("e2e")
+                            .about("Hidden command, used exclusively in E2E tests")
+                            .hide(true)
+                            .args([
+                                Arg::new("action")
+                                    .long("action")
+                                    .required(true)
+                                    .value_name("ACT")
+                                    .value_parser([
+                                        "get-last-data-block-path",
+                                    ]),
+                                Arg::new("dataset")
+                                    .long("dataset")
+                                    .value_parser(value_parse_dataset_ref_local)
+                                    .help("Local dataset reference"),
+                            ]),
                     ]),
                 tabular_output_params(
                     Command::new("tail")

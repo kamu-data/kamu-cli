@@ -8,14 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod test_access_token_registry_svc;
-mod test_add_command;
-mod test_complete_command;
-mod test_datafusion_cli;
 mod test_di_graph;
 mod test_generate_cli_markdown;
-mod test_ingest_command;
 mod test_new_dataset_command;
 mod test_output;
-mod test_repository_alias_commands;
 mod test_system_info_command;
 mod test_workspace_svc;

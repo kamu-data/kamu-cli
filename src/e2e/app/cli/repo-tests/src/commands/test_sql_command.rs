@@ -7,23 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use assert_cmd::Command;
 use indoc::indoc;
-use kamu_cli::testing::Kamu;
+use kamu_cli_puppet::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(engine, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_datafusion_cli() {
-    let kamu = Kamu::new_workspace_tmp().await;
-
-    let assert = Command::cargo_bin(env!("CARGO_PKG_NAME"))
-        .unwrap()
-        .current_dir(kamu.workspace_path())
-        .arg("sql")
-        .write_stdin("select 1;")
-        .assert();
+pub async fn test_datafusion_cli(kamu: KamuCliPuppet) {
+    let assert = kamu
+        .execute_with_input(["sql"], "select 1;")
+        .await
+        .success();
 
     let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
@@ -42,19 +35,17 @@ async fn test_datafusion_cli() {
         ),
         "Unexpected output:\n{stdout}",
     );
-
-    assert.success();
 }
 
-#[test_group::group(engine, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_datafusion_cli_not_launched_in_root_ws() {
-    // this test checks that workspace was not created in root directory
-    Command::cargo_bin(env!("CARGO_PKG_NAME"))
-        .unwrap()
-        .arg("list")
-        .assert()
-        .failure();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_datafusion_cli_not_launched_in_root_ws(kamu: KamuCliPuppet) {
+    // This test checks that workspace was not created in root (kamu-cli) directory.
+    //
+    // The workspace search functionality checks for parent folders,
+    // so there is no problem that the process working directory is one of the
+    // subdirectories (kamu-cli/src/e2e/app/cli/inmem)
+    kamu.execute(["list"]).await.failure();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
