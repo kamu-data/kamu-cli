@@ -17,13 +17,13 @@ use super::{CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct E2ECommand {
+pub struct SystemE2ECommand {
     action: String,
     dataset_ref: Option<DatasetRef>,
     dataset_repo: Arc<dyn DatasetRepository>,
 }
 
-impl E2ECommand {
+impl SystemE2ECommand {
     pub fn new<S>(
         action: S,
         dataset_ref: Option<DatasetRef>,
@@ -41,7 +41,7 @@ impl E2ECommand {
 }
 
 #[async_trait::async_trait(?Send)]
-impl Command for E2ECommand {
+impl Command for SystemE2ECommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         match self.action.as_str() {
             "get-last-data-block-path" => {

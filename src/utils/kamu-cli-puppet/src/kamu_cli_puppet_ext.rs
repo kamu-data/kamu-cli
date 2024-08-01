@@ -167,6 +167,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
     ) {
         let assert = self
             .execute([
+                "system",
                 "e2e",
                 "--action",
                 "get-last-data-block-path",
