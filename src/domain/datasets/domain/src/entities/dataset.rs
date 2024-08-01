@@ -12,13 +12,13 @@ use opendatafabric::{AccountID, DatasetAlias, DatasetID};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Dataset {
+pub struct DatasetEntry {
     pub id: DatasetID,
     pub owner_id: AccountID,
     pub alias: DatasetAlias,
 }
 
-impl Dataset {
+impl DatasetEntry {
     pub fn new(id: DatasetID, owner_id: AccountID, alias: DatasetAlias) -> Self {
         Self {
             id,

@@ -11,20 +11,20 @@ use internal_error::InternalError;
 use opendatafabric::{AccountID, DatasetAlias, DatasetID};
 use thiserror::Error;
 
-use crate::Dataset;
+use crate::DatasetEntry;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DatasetRepository: Send + Sync {
-    async fn get_dataset(&self, dataset_id: &DatasetID) -> Result<Dataset, GetDatasetError>;
+pub trait DatasetEntryRepository: Send + Sync {
+    async fn get_dataset(&self, dataset_id: &DatasetID) -> Result<DatasetEntry, GetDatasetError>;
 
     async fn get_datasets_by_owner_id(
         &self,
         owner_id: &AccountID,
-    ) -> Result<Vec<Dataset>, GetDatasetError>;
+    ) -> Result<Vec<DatasetEntry>, GetDatasetError>;
 
-    async fn save_dataset(&self, dataset: &Dataset) -> Result<(), SaveDatasetError>;
+    async fn save_dataset(&self, dataset: &DatasetEntry) -> Result<(), SaveDatasetError>;
 
     async fn update_dataset_alias(
         &self,
