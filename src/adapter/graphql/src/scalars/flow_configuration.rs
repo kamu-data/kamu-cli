@@ -101,6 +101,7 @@ pub enum FlowConfigurationCompaction {
 pub struct CompactionFull {
     pub max_slice_size: u64,
     pub max_slice_records: u64,
+    pub recursive: bool,
 }
 
 impl From<CompactionRuleFull> for CompactionFull {
@@ -108,6 +109,7 @@ impl From<CompactionRuleFull> for CompactionFull {
         Self {
             max_slice_records: value.max_slice_records(),
             max_slice_size: value.max_slice_size(),
+            recursive: value.recursive(),
         }
     }
 }
@@ -264,6 +266,7 @@ pub enum CompactionConditionInput {
 pub struct CompactionConditionFull {
     pub max_slice_size: u64,
     pub max_slice_records: u64,
+    pub recursive: bool,
 }
 
 #[derive(InputObject)]
@@ -306,6 +309,7 @@ impl FlowRunConfiguration {
                         CompactionRuleFull::new_checked(
                             compaction_input.max_slice_size,
                             compaction_input.max_slice_records,
+                            compaction_input.recursive,
                         )
                         .map_err(|_| FlowInvalidRunConfigurations {
                             error: "Invalid compaction flow run configuration".to_string(),

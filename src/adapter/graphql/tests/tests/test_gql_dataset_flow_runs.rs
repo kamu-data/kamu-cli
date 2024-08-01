@@ -2404,6 +2404,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
         "HARD_COMPACTION",
         10000,
         1_000_000,
+        false,
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -2530,6 +2531,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                             "compactionRule": {
                                                 "maxSliceRecords": 10000,
                                                 "maxSliceSize": 1_000_000,
+                                                "recursive": false
                                             }
                                         },
                                     }
@@ -2749,6 +2751,7 @@ async fn test_config_snapshot_returned_correctly() {
         "HARD_COMPACTION",
         10000,
         1_000_000,
+        false,
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -2834,6 +2837,7 @@ async fn test_config_snapshot_returned_correctly() {
                                             "compactionRule": {
                                                 "maxSliceRecords": 10000,
                                                 "maxSliceSize": 1_000_000,
+                                                "recursive": false
                                             }
                                         },
                                     }
@@ -3237,6 +3241,7 @@ impl FlowRunsHarness {
                                                     ... on CompactionFull {
                                                         maxSliceRecords
                                                         maxSliceSize
+                                                        recursive
                                                     }
                                                     ... on CompactionMetadataOnly {
                                                         recursive
@@ -3375,6 +3380,7 @@ impl FlowRunsHarness {
         dataset_flow_type: &str,
         max_slice_records: u64,
         max_slice_size: u64,
+        recursive: bool,
     ) -> String {
         indoc!(
             r#"
@@ -3389,7 +3395,8 @@ impl FlowRunsHarness {
                                         compaction: {
                                             full: {
                                                 maxSliceRecords: <max_slice_records>,
-                                                maxSliceSize: <max_slice_size>
+                                                maxSliceSize: <max_slice_size>,
+                                                recursive: <recursive>
                                             }
                                         }
                                     }
@@ -3436,6 +3443,7 @@ impl FlowRunsHarness {
         .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<max_slice_records>", &max_slice_records.to_string())
         .replace("<max_slice_size>", &max_slice_size.to_string())
+        .replace("<recursive>", if recursive { "true" } else { "false" })
     }
 
     fn cancel_scheduled_tasks_mutation(id: &DatasetID, flow_id: &str) -> String {

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Fixed
 - Return `RootDatasetCompacted` error for manual triggered `EXECUTE_TRANSFROM` flows 
+### Changed
+- New recursive flag for `CompactionConditionFull` input to trigger
+  Hard compaction with keep metadata only mode for each derived dataset 
 
 ## [0.191.5] - 2024-07-30
 ### Fixed
