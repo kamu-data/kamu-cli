@@ -2404,6 +2404,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
         "HARD_COMPACTION",
         10000,
         1_000_000,
+        false,
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
