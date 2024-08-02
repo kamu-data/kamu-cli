@@ -37,11 +37,13 @@ impl TasksMut {
         &self,
         ctx: &Context<'_>,
         dataset_id: DatasetID,
+        fetch_uncacheable: bool,
     ) -> Result<Task> {
         let task_sched = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
         let task_state = task_sched
             .create_task(ts::LogicalPlan::UpdateDataset(ts::UpdateDataset {
                 dataset_id: dataset_id.into(),
+                fetch_uncacheable,
             }))
             .await
             .int_err()?;

@@ -7,16 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::*;
+use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FlowConfigurationSnapshot {
-    Batching(BatchingRule),
-    Compaction(CompactionRule),
-    Schedule(Schedule),
-    Ingest(IngestRule),
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IngestRule {
+    pub featch_uncacheable: bool,
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

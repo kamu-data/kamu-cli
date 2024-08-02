@@ -198,6 +198,8 @@ impl FlowServiceImpl {
                     // Such as compaction is very dangerous operation we
                     // skip running it during activation flow configurations
                     FlowConfigurationRule::CompactionRule(_) => (),
+                    // We will trigger it once schedule options will be activated
+                    FlowConfigurationRule::IngestRule(_) => (),
                 }
             }
             FlowKey::System(system_flow_key) => {
@@ -287,7 +289,7 @@ impl FlowServiceImpl {
     ) -> Result<(), InternalError> {
         if let FlowKey::Dataset(fk_dataset) = &flow.flow_key {
             let dependent_dataset_flow_plans = self
-                .make_downstream_dependencies_flow_plans(fk_dataset, flow.config_snapshot.as_ref())
+                .make_downstream_dependencies_flow_plans(fk_dataset, flow.config_snapshots.as_ref())
                 .await?;
             if dependent_dataset_flow_plans.is_empty() {
                 return Ok(());
@@ -305,7 +307,7 @@ impl FlowServiceImpl {
                     &dependent_dataset_flow_plan.flow_key,
                     trigger.clone(),
                     dependent_dataset_flow_plan.flow_trigger_context,
-                    dependent_dataset_flow_plan.maybe_config_snapshot,
+                    dependent_dataset_flow_plan.maybe_config_snapshots,
                 )
                 .await?;
             }
@@ -321,7 +323,7 @@ impl FlowServiceImpl {
         flow_key: &FlowKey,
         trigger: FlowTrigger,
         context: FlowTriggerContext,
-        config_snapshot_maybe: Option<FlowConfigurationSnapshot>,
+        config_snapshots_maybe: Option<Vec<FlowConfigurationSnapshot>>,
     ) -> Result<FlowState, InternalError> {
         // Query previous runs stats to determine activation time
         let flow_run_stats = self.flow_run_stats(flow_key).await?;
@@ -395,8 +397,8 @@ impl FlowServiceImpl {
             // Otherwise, initiate a new flow, and enqueue it in the time wheel
             None => {
                 // Initiate new flow
-                let config_snapshot_maybe = if config_snapshot_maybe.is_some() {
-                    config_snapshot_maybe
+                let config_snapshots_maybe = if config_snapshots_maybe.is_some() {
+                    config_snapshots_maybe
                 } else {
                     self.state
                         .lock()
@@ -404,8 +406,9 @@ impl FlowServiceImpl {
                         .active_configs
                         .try_get_config_snapshot_by_key(flow_key)
                 };
+                println!("@@ configs: {:?}", config_snapshots_maybe);
                 let mut flow = self
-                    .make_new_flow(flow_key.clone(), trigger, config_snapshot_maybe)
+                    .make_new_flow(flow_key.clone(), trigger, config_snapshots_maybe)
                     .await?;
 
                 match context {
@@ -504,14 +507,19 @@ impl FlowServiceImpl {
                         // Compute increment since the first trigger by this dataset.
                         // Note: there might have been multiple updates since that time.
                         // We are only recording the first trigger of particular dataset.
-                        let increment = self
-                            .dataset_changes_service
-                            .get_increment_since(&trigger.dataset_id, update.old_head.as_ref())
-                            .await
-                            .int_err()?;
+                        if let FlowResultDatasetUpdate::Changed(update_result) = update {
+                            let increment = self
+                                .dataset_changes_service
+                                .get_increment_since(
+                                    &trigger.dataset_id,
+                                    update_result.old_head.as_ref(),
+                                )
+                                .await
+                                .int_err()?;
 
-                        accumulated_records_count += increment.num_records;
-                        watermark_modified |= increment.updated_watermark.is_some();
+                            accumulated_records_count += increment.num_records;
+                            watermark_modified |= increment.updated_watermark.is_some();
+                        }
                     }
                 }
             }
@@ -620,7 +628,7 @@ impl FlowServiceImpl {
         &self,
         flow_key: FlowKey,
         trigger: FlowTrigger,
-        config_snapshot: Option<FlowConfigurationSnapshot>,
+        config_snapshot: Option<Vec<FlowConfigurationSnapshot>>,
     ) -> Result<Flow, InternalError> {
         let flow = Flow::new(
             self.time_source.now(),
@@ -674,7 +682,7 @@ impl FlowServiceImpl {
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
         let logical_plan =
-            self.make_task_logical_plan(&flow.flow_key, flow.config_snapshot.as_ref());
+            self.make_task_logical_plan(&flow.flow_key, flow.config_snapshots.as_ref());
 
         let task = self
             .task_scheduler
@@ -734,13 +742,23 @@ impl FlowServiceImpl {
     pub fn make_task_logical_plan(
         &self,
         flow_key: &FlowKey,
-        config_snapshot: Option<&FlowConfigurationSnapshot>,
+        maybe_config_snapshots: Option<&Vec<FlowConfigurationSnapshot>>,
     ) -> LogicalPlan {
         match flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
                 DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
+                    let mut fetch_uncacheable = false;
+                    if let Some(config_snapshots) = maybe_config_snapshots
+                        && let Some(FlowConfigurationSnapshot::Ingest(ingest_rule)) =
+                            config_snapshots.iter().find(|config_snapshot| {
+                                matches!(config_snapshot, FlowConfigurationSnapshot::Ingest(_))
+                            })
+                    {
+                        fetch_uncacheable = ingest_rule.featch_uncacheable;
+                    }
                     LogicalPlan::UpdateDataset(UpdateDataset {
                         dataset_id: flow_key.dataset_id.clone(),
+                        fetch_uncacheable,
                     })
                 }
                 DatasetFlowType::HardCompaction => {
@@ -748,8 +766,11 @@ impl FlowServiceImpl {
                     let mut max_slice_records: Option<u64> = None;
                     let mut keep_metadata_only = false;
 
-                    if let Some(config_rule) = config_snapshot
-                        && let FlowConfigurationSnapshot::Compaction(compaction_rule) = config_rule
+                    if let Some(config_snapshots) = maybe_config_snapshots
+                        && let Some(FlowConfigurationSnapshot::Compaction(compaction_rule)) =
+                            config_snapshots.iter().find(|config_snapshot| {
+                                matches!(config_snapshot, FlowConfigurationSnapshot::Compaction(_))
+                            })
                     {
                         max_slice_size = compaction_rule.max_slice_size();
                         max_slice_records = compaction_rule.max_slice_records();
@@ -781,7 +802,7 @@ impl FlowServiceImpl {
     async fn make_downstream_dependencies_flow_plans(
         &self,
         fk_dataset: &FlowKeyDataset,
-        maybe_config_snapshot: Option<&FlowConfigurationSnapshot>,
+        maybe_config_snapshots: Option<&Vec<FlowConfigurationSnapshot>>,
     ) -> Result<Vec<DownstreamDependencyFlowPlan>, InternalError> {
         // ToDo: extend dependency graph with possibility to fetch downstream
         // dependencies by owner
@@ -798,7 +819,7 @@ impl FlowServiceImpl {
             return Ok(plans);
         }
 
-        match self.classify_dependent_trigger_type(fk_dataset.flow_type, maybe_config_snapshot) {
+        match self.classify_dependent_trigger_type(fk_dataset.flow_type, maybe_config_snapshots) {
             DownstreamDependencyTriggerType::TriggerAllEnabled => {
                 let guard = self.state.lock().unwrap();
                 for dataset_id in dependent_dataset_ids {
@@ -813,7 +834,7 @@ impl FlowServiceImpl {
                             )
                             .into(),
                             flow_trigger_context: FlowTriggerContext::Batching(batching_rule),
-                            maybe_config_snapshot: None,
+                            maybe_config_snapshots: None,
                         });
                     };
                 }
@@ -844,7 +865,7 @@ impl FlowServiceImpl {
                                 )
                                 .into(),
                                 flow_trigger_context: FlowTriggerContext::Unconditional,
-                                maybe_config_snapshot: Some(config_snapshot.clone()),
+                                maybe_config_snapshots: Some(vec![config_snapshot.clone()]),
                             });
                             break;
                         }
@@ -861,15 +882,18 @@ impl FlowServiceImpl {
     fn classify_dependent_trigger_type(
         &self,
         dataset_flow_type: DatasetFlowType,
-        maybe_config_snapshot: Option<&FlowConfigurationSnapshot>,
+        maybe_config_snapshots: Option<&Vec<FlowConfigurationSnapshot>>,
     ) -> DownstreamDependencyTriggerType {
         match dataset_flow_type {
             DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
                 DownstreamDependencyTriggerType::TriggerAllEnabled
             }
             DatasetFlowType::HardCompaction => {
-                if let Some(config_snapshot) = &maybe_config_snapshot
-                    && let FlowConfigurationSnapshot::Compaction(compaction_rule) = config_snapshot
+                if let Some(config_snapshots) = maybe_config_snapshots
+                    && let Some(FlowConfigurationSnapshot::Compaction(compaction_rule)) =
+                        config_snapshots.iter().find(|config_snapshot| {
+                            matches!(config_snapshot, FlowConfigurationSnapshot::Compaction(_))
+                        })
                 {
                     if compaction_rule.recursive() {
                         DownstreamDependencyTriggerType::TriggerOwnUnconditionally
@@ -953,7 +977,7 @@ impl FlowService for FlowServiceImpl {
         trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
         initiator_account_id: AccountID,
-        config_snapshot_maybe: Option<FlowConfigurationSnapshot>,
+        config_snapshots_maybe: Option<Vec<FlowConfigurationSnapshot>>,
     ) -> Result<FlowState, RequestFlowError> {
         let activation_time = self.round_time(trigger_time)?;
 
@@ -964,7 +988,7 @@ impl FlowService for FlowServiceImpl {
                 initiator_account_id,
             }),
             FlowTriggerContext::Unconditional,
-            config_snapshot_maybe,
+            config_snapshots_maybe,
         )
         .await
         .map_err(RequestFlowError::Internal)
@@ -1465,7 +1489,7 @@ pub enum FlowTriggerContext {
 pub struct DownstreamDependencyFlowPlan {
     pub flow_key: FlowKey,
     pub flow_trigger_context: FlowTriggerContext,
-    pub maybe_config_snapshot: Option<FlowConfigurationSnapshot>,
+    pub maybe_config_snapshots: Option<Vec<FlowConfigurationSnapshot>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -14,6 +14,7 @@ use kamu_flow_system::{
     CompactionRuleMetadataOnly,
     FlowConfigurationRule,
     FlowConfigurationSnapshot,
+    IngestRule,
     Schedule,
     ScheduleCron,
     ScheduleTimeDelta,
@@ -87,6 +88,19 @@ impl From<BatchingRule> for FlowConfigurationBatching {
         Self {
             min_records_to_await: value.min_records_to_await(),
             max_batching_interval: (*value.max_batching_interval()).into(),
+        }
+    }
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowConfigurationIngest {
+    pub fetch_uncacheable: bool,
+}
+
+impl From<IngestRule> for FlowConfigurationIngest {
+    fn from(value: IngestRule) -> Self {
+        Self {
+            fetch_uncacheable: value.featch_uncacheable,
         }
     }
 }
@@ -211,6 +225,7 @@ pub enum FlowRunConfiguration {
     Schedule(ScheduleInput),
     Batching(BatchingConditionInput),
     Compaction(CompactionConditionInput),
+    Ingest(IngestConditionInput),
 }
 
 #[derive(OneofObject)]
@@ -274,6 +289,21 @@ pub struct CompactionConditionMetadataOnly {
     pub recursive: bool,
 }
 
+#[derive(InputObject, Clone)]
+pub struct IngestConditionInput {
+    pub featch_uncacheable: bool,
+}
+
+impl From<IngestConditionInput> for IngestRule {
+    fn from(value: IngestConditionInput) -> Self {
+        Self {
+            featch_uncacheable: value.featch_uncacheable,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl FlowRunConfiguration {
     pub fn try_into_snapshot(
         &self,
@@ -296,6 +326,15 @@ impl FlowRunConfiguration {
                         error: "Invalid batching flow run configuration".to_string(),
                     })?,
                 )
+            }
+            Self::Ingest(ingest_input) => {
+                if dataset_flow_type != DatasetFlowType::Ingest {
+                    return Err(FlowInvalidRunConfigurations {
+                        error: "Incompatible flow run configuration and dataset flow type"
+                            .to_string(),
+                    });
+                };
+                FlowConfigurationSnapshot::Ingest(ingest_input.clone().into())
             }
             Self::Compaction(compaction_input) => {
                 if dataset_flow_type != DatasetFlowType::HardCompaction {

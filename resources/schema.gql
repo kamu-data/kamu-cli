@@ -554,6 +554,7 @@ type DatasetFlowConfigs {
 type DatasetFlowConfigsMut {
 	setConfigSchedule(datasetFlowType: DatasetFlowType!, paused: Boolean!, schedule: ScheduleInput!): SetFlowConfigResult!
 	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, batching: BatchingConditionInput!): SetFlowBatchingConfigResult!
+	setConfigIngest(datasetFlowType: DatasetFlowType!, ingestArgs: IngestConditionInput!): SetFlowCompactionConfigResult!
 	setConfigCompaction(datasetFlowType: DatasetFlowType!, compactionArgs: CompactionConditionInput!): SetFlowCompactionConfigResult!
 	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
 	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
@@ -572,7 +573,7 @@ type DatasetFlowRuns {
 }
 
 type DatasetFlowRunsMut {
-	triggerFlow(datasetFlowType: DatasetFlowType!, flowRunConfiguration: FlowRunConfiguration): TriggerFlowResult!
+	triggerFlow(datasetFlowType: DatasetFlowType!, flowRunConfigurations: [FlowRunConfiguration!]): TriggerFlowResult!
 	cancelScheduledTasks(flowId: FlowID!): CancelScheduledTasksResult!
 }
 
@@ -929,7 +930,7 @@ type Flow {
 	"""
 	Flow config snapshot
 	"""
-	configSnapshot: FlowConfigurationSnapshot
+	configSnapshots: [FlowConfigurationSnapshot!]
 }
 
 type FlowAbortedResult {
@@ -954,13 +955,17 @@ type FlowConfigurationCompactionRule {
 	compactionRule: FlowConfigurationCompaction!
 }
 
+type FlowConfigurationIngest {
+	fetchUncacheable: Boolean!
+}
+
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
 
 type FlowConfigurationScheduleRule {
 	scheduleRule: FlowConfigurationSchedule!
 }
 
-union FlowConfigurationSnapshot = FlowConfigurationBatching | FlowConfigurationScheduleRule | FlowConfigurationCompactionRule
+union FlowConfigurationSnapshot = FlowConfigurationBatching | FlowConfigurationScheduleRule | FlowConfigurationCompactionRule | FlowConfigurationIngest
 
 type FlowConnection {
 	"""
@@ -1024,10 +1029,16 @@ type FlowDescriptionSystemGC {
 	dummy: Boolean!
 }
 
-type FlowDescriptionUpdateResult {
+union FlowDescriptionUpdateResult = FlowDescriptionUpdateResultUpToDate | FlowDescriptionUpdateResultSuccess
+
+type FlowDescriptionUpdateResultSuccess {
 	numBlocks: Int!
 	numRecords: Int!
 	updatedWatermark: DateTime
+}
+
+type FlowDescriptionUpdateResultUpToDate {
+	uncacheable: Boolean!
 }
 
 type FlowEdge {
@@ -1119,6 +1130,7 @@ input FlowRunConfiguration @oneOf {
 	schedule: ScheduleInput
 	batching: BatchingConditionInput
 	compaction: CompactionConditionInput
+	ingest: IngestConditionInput
 }
 
 union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionBatching | FlowStartConditionExecutor
@@ -1203,6 +1215,10 @@ type GetFlowSuccess implements GetFlowResult {
 	message: String!
 }
 
+
+input IngestConditionInput {
+	featchUncacheable: Boolean!
+}
 
 input InitiatorFilterInput @oneOf {
 	system: Boolean
@@ -1827,7 +1843,7 @@ type TasksMut {
 	Schedules a task to update the specified dataset by performing polling
 	ingest or a derivative transformation
 	"""
-	createUpdateDatasetTask(datasetId: DatasetID!): Task!
+	createUpdateDatasetTask(datasetId: DatasetID!, fetchUncacheable: Boolean!): Task!
 	"""
 	Schedules a task to update the specified dataset by performing polling
 	ingest or a derivative transformation

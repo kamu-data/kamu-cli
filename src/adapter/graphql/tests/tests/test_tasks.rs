@@ -80,6 +80,7 @@ async fn test_task_get_existing() {
         cancellation_requested: false,
         logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
             dataset_id: DatasetID::new_seeded_ed25519(b"foo"),
+            fetch_uncacheable: false,
         }),
         created_at: Utc::now(),
         ran_at: None,
@@ -144,6 +145,7 @@ async fn test_task_list_by_dataset() {
         cancellation_requested: false,
         logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
             dataset_id: dataset_id.clone(),
+            fetch_uncacheable: false,
         }),
         created_at: Utc::now(),
         ran_at: None,
@@ -221,6 +223,7 @@ async fn test_task_create_update_dataset() {
 
     let expected_logical_plan = LogicalPlan::UpdateDataset(UpdateDataset {
         dataset_id: dataset_id.clone(),
+        fetch_uncacheable: false,
     });
     let returned_task = TaskState {
         task_id: TaskID::new(123),

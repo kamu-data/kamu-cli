@@ -153,10 +153,12 @@ mod tests {
                 dataset_id: TEST_DATASET_ID.clone(),
                 flow_type: DatasetFlowType::Ingest,
                 flow_id: FlowID::new(5),
-                flow_result: FlowResult::DatasetUpdate(FlowResultDatasetUpdate {
-                    old_head: None,
-                    new_head: Multihash::from_digest_sha3_256(b"some-slice")
-                })
+                flow_result: FlowResult::DatasetUpdate(FlowResultDatasetUpdate::Changed(
+                    FlowResultDatasetUpdateChanged {
+                        old_head: None,
+                        new_head: Multihash::from_digest_sha3_256(b"some-slice")
+                    }
+                ))
             });
     }
 

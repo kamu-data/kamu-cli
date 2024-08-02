@@ -10,6 +10,7 @@
 use chrono::{DateTime, Utc};
 use futures::TryStreamExt;
 use kamu_core::{DatasetChangesService, PollingIngestService};
+use kamu_flow_system::FlowResultDatasetUpdate;
 use {kamu_flow_system as fs, kamu_task_system as ts, opendatafabric as odf};
 
 use super::{FlowConfigurationSnapshot, FlowEvent, FlowOutcome, FlowStartCondition, FlowTrigger};
@@ -209,8 +210,11 @@ impl Flow {
     }
 
     /// Flow config snapshot
-    async fn config_snapshot(&self) -> Option<FlowConfigurationSnapshot> {
-        self.flow_state.config_snapshot.clone().map(Into::into)
+    async fn config_snapshots(&self) -> Option<Vec<FlowConfigurationSnapshot>> {
+        self.flow_state
+            .config_snapshots
+            .clone()
+            .map(|config_snapshots| config_snapshots.into_iter().map(Into::into).collect())
     }
 }
 
@@ -270,8 +274,19 @@ struct FlowDescriptionDatasetHardCompaction {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Union)]
+enum FlowDescriptionUpdateResult {
+    UpToDate(FlowDescriptionUpdateResultUpToDate),
+    Success(FlowDescriptionUpdateResultSuccess),
+}
+
 #[derive(SimpleObject)]
-struct FlowDescriptionUpdateResult {
+struct FlowDescriptionUpdateResultUpToDate {
+    uncacheable: bool,
+}
+
+#[derive(SimpleObject)]
+struct FlowDescriptionUpdateResultSuccess {
     num_blocks: u64,
     num_records: u64,
     updated_watermark: Option<DateTime<Utc>>,
@@ -287,22 +302,29 @@ impl FlowDescriptionUpdateResult {
             match outcome {
                 fs::FlowOutcome::Success(result) => match result {
                     fs::FlowResult::Empty | fs::FlowResult::DatasetCompact(_) => Ok(None),
-                    fs::FlowResult::DatasetUpdate(update) => {
-                        let increment = dataset_changes_service
-                            .get_increment_between(
-                                dataset_id,
-                                update.old_head.as_ref(),
-                                &update.new_head,
-                            )
-                            .await
-                            .int_err()?;
+                    fs::FlowResult::DatasetUpdate(update) => match update {
+                        FlowResultDatasetUpdate::Changed(update_result) => {
+                            let increment = dataset_changes_service
+                                .get_increment_between(
+                                    dataset_id,
+                                    update_result.old_head.as_ref(),
+                                    &update_result.new_head,
+                                )
+                                .await
+                                .int_err()?;
 
-                        Ok(Some(Self {
-                            num_blocks: increment.num_blocks,
-                            num_records: increment.num_records,
-                            updated_watermark: increment.updated_watermark,
-                        }))
-                    }
+                            Ok(Some(Self::Success(FlowDescriptionUpdateResultSuccess {
+                                num_blocks: increment.num_blocks,
+                                num_records: increment.num_records,
+                                updated_watermark: increment.updated_watermark,
+                            })))
+                        }
+                        FlowResultDatasetUpdate::UpToDate(up_to_date_result) => {
+                            Ok(Some(Self::UpToDate(FlowDescriptionUpdateResultUpToDate {
+                                uncacheable: up_to_date_result.uncacheable,
+                            })))
+                        }
+                    },
                 },
                 _ => Ok(None),
             }

@@ -32,7 +32,7 @@ pub struct FlowState {
     /// Flow outcome
     pub outcome: Option<FlowOutcome>,
     /// Flow config snapshot on the moment when flow was initiated
-    pub config_snapshot: Option<FlowConfigurationSnapshot>,
+    pub config_snapshots: Option<Vec<FlowConfigurationSnapshot>>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -84,7 +84,7 @@ impl Projection for FlowState {
                     flow_id,
                     flow_key,
                     trigger,
-                    config_snapshot,
+                    config_snapshots,
                 }) => Ok(Self {
                     flow_id,
                     flow_key,
@@ -96,7 +96,7 @@ impl Projection for FlowState {
                         finished_at: None,
                     },
                     task_ids: vec![],
-                    config_snapshot,
+                    config_snapshots,
                     outcome: None,
                 }),
                 _ => Err(ProjectionError::new(None, event)),

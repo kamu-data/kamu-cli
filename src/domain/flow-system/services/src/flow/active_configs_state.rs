@@ -20,6 +20,7 @@ pub(crate) struct ActiveConfigsState {
     system_schedules: HashMap<SystemFlowType, Schedule>,
     dataset_batching_rules: HashMap<FlowKeyDataset, BatchingRule>,
     dataset_compaction_rules: HashMap<FlowKeyDataset, CompactionRule>,
+    dataset_ingest_rules: HashMap<FlowKeyDataset, IngestRule>,
 }
 
 impl ActiveConfigsState {
@@ -32,6 +33,9 @@ impl ActiveConfigsState {
         match rule {
             FlowConfigurationRule::Schedule(schedule) => {
                 self.dataset_schedules.insert(key, schedule);
+            }
+            FlowConfigurationRule::IngestRule(ingest_rule) => {
+                self.dataset_ingest_rules.insert(key, ingest_rule);
             }
             FlowConfigurationRule::BatchingRule(batching) => {
                 self.dataset_batching_rules.insert(key, batching);
@@ -92,6 +96,16 @@ impl ActiveConfigsState {
             .copied()
     }
 
+    pub fn try_get_dataset_ingest_rule(
+        &self,
+        dataset_id: &DatasetID,
+        flow_type: DatasetFlowType,
+    ) -> Option<IngestRule> {
+        self.dataset_ingest_rules
+            .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
+            .copied()
+    }
+
     pub fn try_get_dataset_compaction_rule(
         &self,
         dataset_id: &DatasetID,
@@ -105,27 +119,42 @@ impl ActiveConfigsState {
     pub fn try_get_config_snapshot_by_key(
         &self,
         flow_key: &FlowKey,
-    ) -> Option<FlowConfigurationSnapshot> {
+    ) -> Option<Vec<FlowConfigurationSnapshot>> {
         match flow_key {
             FlowKey::System(_) => self
                 .try_get_flow_schedule(flow_key)
-                .map(FlowConfigurationSnapshot::Schedule),
+                .map(|schedule| vec![FlowConfigurationSnapshot::Schedule(schedule)]),
             FlowKey::Dataset(dataset_flow_key) => match dataset_flow_key.flow_type {
                 DatasetFlowType::ExecuteTransform => self
                     .try_get_dataset_batching_rule(
                         &dataset_flow_key.dataset_id,
                         dataset_flow_key.flow_type,
                     )
-                    .map(FlowConfigurationSnapshot::Batching),
-                DatasetFlowType::Ingest => self
-                    .try_get_flow_schedule(flow_key)
-                    .map(FlowConfigurationSnapshot::Schedule),
+                    .map(|batching_rule| vec![FlowConfigurationSnapshot::Batching(batching_rule)]),
+                DatasetFlowType::Ingest => {
+                    let mut result = vec![];
+                    if let Some(schedule) = self.try_get_flow_schedule(flow_key) {
+                        result.push(FlowConfigurationSnapshot::Schedule(schedule))
+                    };
+                    if let Some(ingest_rule) = self.try_get_dataset_ingest_rule(
+                        &dataset_flow_key.dataset_id,
+                        dataset_flow_key.flow_type,
+                    ) {
+                        result.push(FlowConfigurationSnapshot::Ingest(ingest_rule))
+                    }
+                    if result.is_empty() {
+                        return None;
+                    }
+                    Some(result)
+                }
                 DatasetFlowType::HardCompaction => self
                     .try_get_dataset_compaction_rule(
                         &dataset_flow_key.dataset_id,
                         dataset_flow_key.flow_type,
                     )
-                    .map(FlowConfigurationSnapshot::Compaction),
+                    .map(|compating_rule| {
+                        vec![FlowConfigurationSnapshot::Compaction(compating_rule)]
+                    }),
             },
         }
     }

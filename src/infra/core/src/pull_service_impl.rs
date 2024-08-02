@@ -663,7 +663,7 @@ impl PullService for PullServiceImpl {
                 | WriteWatermarkError::CommitError(CommitError::MetadataAppendError(
                     AppendError::InvalidBlock(AppendValidationError::WatermarkIsNotMonotonic),
                 )),
-            ) => Ok(PullResult::UpToDate),
+            ) => Ok(PullResult::UpToDate(UpToDateResult::UpToDate)),
             Err(e) => Err(e.int_err().into()),
         }
     }
