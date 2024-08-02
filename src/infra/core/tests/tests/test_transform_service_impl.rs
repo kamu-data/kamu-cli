@@ -139,7 +139,7 @@ impl TransformTestHarness {
     ) -> Multihash {
         let ds = self
             .dataset_repo
-            .get_dataset(&dataset_ref.into())
+            .find_dataset_by_ref(&dataset_ref.into())
             .await
             .unwrap();
         ds.as_metadata_chain()
@@ -155,7 +155,7 @@ impl TransformTestHarness {
     ) -> (Multihash, MetadataBlockTyped<AddData>) {
         let ds = self
             .dataset_repo
-            .get_dataset(&alias.as_local_ref())
+            .find_dataset_by_ref(&alias.as_local_ref())
             .await
             .unwrap();
         let chain = ds.as_metadata_chain();
@@ -601,11 +601,7 @@ async fn test_get_verification_plan_one_to_one() {
         .await
         .unwrap();
 
-    let deriv_ds = harness
-        .dataset_repo
-        .get_dataset(&deriv_hdl.as_local_ref())
-        .await
-        .unwrap();
+    let deriv_ds = harness.dataset_repo.get_dataset_by_handle(&deriv_hdl);
     let deriv_chain = deriv_ds.as_metadata_chain();
 
     assert_eq!(plan.len(), 3);

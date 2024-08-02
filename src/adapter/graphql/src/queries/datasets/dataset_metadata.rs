@@ -33,13 +33,9 @@ impl DatasetMetadata {
     }
 
     #[graphql(skip)]
-    async fn get_dataset(&self, ctx: &Context<'_>) -> Result<std::sync::Arc<dyn domain::Dataset>> {
+    fn get_dataset(&self, ctx: &Context<'_>) -> std::sync::Arc<dyn domain::Dataset> {
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = dataset_repo
-            .get_dataset(&self.dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
-        Ok(dataset)
+        dataset_repo.get_dataset_by_handle(&self.dataset_handle)
     }
 
     /// Access to the temporal metadata chain of the dataset
@@ -49,7 +45,7 @@ impl DatasetMetadata {
 
     /// Last recorded watermark
     async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
-        let dataset = self.get_dataset(ctx).await?;
+        let dataset = self.get_dataset(ctx);
 
         Ok(dataset
             .as_metadata_chain()
@@ -197,7 +193,7 @@ impl DatasetMetadata {
 
     /// Current descriptive information about the dataset
     async fn current_info(&self, ctx: &Context<'_>) -> Result<SetInfo> {
-        let dataset = self.get_dataset(ctx).await?;
+        let dataset = self.get_dataset(ctx);
 
         Ok(dataset
             .as_metadata_chain()
@@ -217,7 +213,7 @@ impl DatasetMetadata {
     /// Current readme file as discovered from attachments associated with the
     /// dataset
     async fn current_readme(&self, ctx: &Context<'_>) -> Result<Option<String>> {
-        let dataset = self.get_dataset(ctx).await?;
+        let dataset = self.get_dataset(ctx);
 
         Ok(dataset
             .as_metadata_chain()
@@ -238,7 +234,7 @@ impl DatasetMetadata {
 
     /// Current license associated with the dataset
     async fn current_license(&self, ctx: &Context<'_>) -> Result<Option<SetLicense>> {
-        let dataset = self.get_dataset(ctx).await?;
+        let dataset = self.get_dataset(ctx);
 
         Ok(dataset
             .as_metadata_chain()
@@ -251,7 +247,7 @@ impl DatasetMetadata {
 
     /// Current vocabulary associated with the dataset
     async fn current_vocab(&self, ctx: &Context<'_>) -> Result<Option<SetVocab>> {
-        let dataset = self.get_dataset(ctx).await?;
+        let dataset = self.get_dataset(ctx);
 
         Ok(dataset
             .as_metadata_chain()

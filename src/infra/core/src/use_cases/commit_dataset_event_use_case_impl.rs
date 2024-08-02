@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::ResultIntoInternal;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::{
     CommitDatasetEventUseCase,
@@ -60,11 +59,7 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
             .check_action_allowed(dataset_handle, DatasetAction::Write)
             .await?;
 
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
 
         let commit_result = dataset.commit_event(event, opts).await?;
 

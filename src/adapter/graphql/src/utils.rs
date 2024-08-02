@@ -33,16 +33,9 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn get_dataset(
-    ctx: &Context<'_>,
-    dataset_handle: &DatasetHandle,
-) -> Result<Arc<dyn Dataset>, InternalError> {
+pub(crate) fn get_dataset(ctx: &Context<'_>, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset> {
     let dataset_repo = from_catalog::<dyn DatasetRepository>(ctx).unwrap();
-    let dataset = dataset_repo
-        .get_dataset(&dataset_handle.as_local_ref())
-        .await
-        .int_err()?;
-    Ok(dataset)
+    dataset_repo.get_dataset_by_handle(dataset_handle)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

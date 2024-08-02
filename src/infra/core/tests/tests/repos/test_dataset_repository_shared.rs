@@ -27,7 +27,7 @@ pub async fn test_create_dataset<
     let dataset_alias = DatasetAlias::new(account_name, DatasetName::new_unchecked("foo"));
 
     assert_matches!(
-        repo.get_dataset(&dataset_alias.as_local_ref())
+        repo.find_dataset_by_ref(&dataset_alias.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -47,7 +47,7 @@ pub async fn test_create_dataset<
 
     // We should see the dataset
     assert!(repo
-        .get_dataset(&dataset_alias.as_local_ref())
+        .find_dataset_by_ref(&dataset_alias.as_local_ref())
         .await
         .is_ok());
 
@@ -78,7 +78,7 @@ pub async fn test_create_and_get_case_insensetive_dataset<
         DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("Foo"));
 
     assert_matches!(
-        repo.get_dataset(&dataset_alias_to_create.as_local_ref())
+        repo.find_dataset_by_ref(&dataset_alias_to_create.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -105,7 +105,7 @@ pub async fn test_create_and_get_case_insensetive_dataset<
 
     // We should see the dataset
     assert!(repo
-        .get_dataset(&dataset_alias_in_another_registry.as_local_ref())
+        .find_dataset_by_ref(&dataset_alias_in_another_registry.as_local_ref())
         .await
         .is_ok());
 
@@ -172,7 +172,7 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
     );
 
     assert_matches!(
-        repo.get_dataset(&dataset_alias_my.as_local_ref())
+        repo.find_dataset_by_ref(&dataset_alias_my.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -180,7 +180,7 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
     );
 
     assert_matches!(
-        repo.get_dataset(&dataset_alias_her.as_local_ref())
+        repo.find_dataset_by_ref(&dataset_alias_her.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -217,12 +217,12 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
     // We should see the datasets
 
     assert!(repo
-        .get_dataset(&dataset_alias_my.as_local_ref())
+        .find_dataset_by_ref(&dataset_alias_my.as_local_ref())
         .await
         .is_ok());
 
     assert!(repo
-        .get_dataset(&dataset_alias_her.as_local_ref())
+        .find_dataset_by_ref(&dataset_alias_her.as_local_ref())
         .await
         .is_ok());
 
@@ -265,7 +265,7 @@ pub async fn test_create_dataset_from_snapshot<
     let dataset_alias = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
 
     assert_matches!(
-        repo.get_dataset(&dataset_alias.as_local_ref())
+        repo.find_dataset_by_ref(&dataset_alias.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -285,7 +285,7 @@ pub async fn test_create_dataset_from_snapshot<
         .create_dataset_result;
 
     let dataset = repo
-        .get_dataset(&create_result.dataset_handle.into())
+        .find_dataset_by_ref(&create_result.dataset_handle.into())
         .await
         .unwrap();
 
@@ -355,7 +355,10 @@ pub async fn test_rename_dataset<
     .await
     .unwrap();
 
-    let baz = repo.get_dataset(&alias_baz.as_local_ref()).await.unwrap();
+    let baz = repo
+        .find_dataset_by_ref(&alias_baz.as_local_ref())
+        .await
+        .unwrap();
 
     use futures::StreamExt;
     assert_eq!(baz.as_metadata_chain().iter_blocks().count().await, 2);
@@ -421,12 +424,12 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
     .unwrap();
 
     let my_bar = repo
-        .get_dataset(&DatasetRef::try_from("my/bar").unwrap())
+        .find_dataset_by_ref(&DatasetRef::try_from("my/bar").unwrap())
         .await
         .unwrap();
 
     let her_bar = repo
-        .get_dataset(&DatasetRef::try_from("her/bar").unwrap())
+        .find_dataset_by_ref(&DatasetRef::try_from("her/bar").unwrap())
         .await
         .unwrap();
 
@@ -479,14 +482,17 @@ pub async fn test_delete_dataset<
         .await
         .unwrap();
 
-    assert!(repo.get_dataset(&alias_foo.as_local_ref()).await.is_ok());
+    assert!(repo
+        .find_dataset_by_ref(&alias_foo.as_local_ref())
+        .await
+        .is_ok());
 
     repo.delete_dataset(&create_result.dataset_handle)
         .await
         .unwrap();
 
     assert_matches!(
-        repo.get_dataset(&alias_foo.as_local_ref())
+        repo.find_dataset_by_ref(&alias_foo.as_local_ref())
             .await
             .err()
             .unwrap(),

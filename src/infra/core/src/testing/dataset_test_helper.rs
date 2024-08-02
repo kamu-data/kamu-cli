@@ -87,7 +87,10 @@ impl DatasetTestHelper {
     ) -> Multihash {
         let tmp_dir = tempfile::tempdir().unwrap();
 
-        let ds = dataset_repo.get_dataset(&dataset_ref.into()).await.unwrap();
+        let ds = dataset_repo
+            .find_dataset_by_ref(&dataset_ref.into())
+            .await
+            .unwrap();
 
         let prev_data = ds
             .as_metadata_chain()

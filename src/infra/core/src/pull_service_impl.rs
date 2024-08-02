@@ -200,9 +200,7 @@ impl PullServiceImpl {
 
             let summary = self
                 .dataset_repo
-                .get_dataset(&local_handle.as_local_ref())
-                .await
-                .int_err()?
+                .get_dataset_by_handle(&local_handle)
                 .get_summary(GetSummaryOpts::default())
                 .await
                 .int_err()?;
@@ -629,7 +627,7 @@ impl PullService for PullServiceImpl {
             .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
             .await?;
 
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
+        let dataset = self.dataset_repo.find_dataset_by_ref(dataset_ref).await?;
         let summary = dataset
             .get_summary(GetSummaryOpts::default())
             .await

@@ -351,13 +351,17 @@ impl DatasetRepository for DatasetRepositoryS3 {
         })
     }
 
-    async fn get_dataset(
+    async fn find_dataset_by_ref(
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
         let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
         let dataset = self.get_dataset_impl(&dataset_handle.id);
         Ok(dataset)
+    }
+
+    fn get_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset> {
+        self.get_dataset_impl(&dataset_handle.id)
     }
 }
 
@@ -389,10 +393,7 @@ impl DatasetRepositoryWriter for DatasetRepositoryS3 {
         // - Dataset existed before (has valid head) - we should error out with name
         //   collision
         if let Some(existing_dataset_handle) = maybe_existing_dataset_handle {
-            let existing_dataset = self
-                .get_dataset(&existing_dataset_handle.as_local_ref())
-                .await
-                .int_err()?;
+            let existing_dataset = self.get_dataset_by_handle(&existing_dataset_handle);
 
             match existing_dataset
                 .as_metadata_chain()

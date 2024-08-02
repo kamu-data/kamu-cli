@@ -96,7 +96,7 @@ impl QueryServiceImpl {
                 inputs: BTreeMap::new(),
             };
             for id in aliases.values() {
-                let dataset = self.dataset_repo.get_dataset(&id.into()).await?;
+                let dataset = self.dataset_repo.find_dataset_by_ref(&id.into()).await?;
 
                 // TODO: Do we leak any info by not checking read permissions here?
                 let hash = dataset
@@ -153,11 +153,7 @@ impl QueryServiceImpl {
                     tracing::warn!(?dataset_ref, "Ignoring table with unresolvable alias");
                     continue;
                 };
-                let dataset = self
-                    .dataset_repo
-                    .get_dataset(&hdl.as_local_ref())
-                    .await
-                    .int_err()?;
+                let dataset = self.dataset_repo.get_dataset_by_handle(&hdl);
                 let hash = dataset
                     .as_metadata_chain()
                     .resolve_ref(&BlockRef::Head)
@@ -186,10 +182,7 @@ impl QueryServiceImpl {
             .check_action_allowed(&dataset_handle, DatasetAction::Read)
             .await?;
 
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
 
         let summary = dataset
             .get_summary(GetSummaryOpts::default())
@@ -235,10 +228,7 @@ impl QueryServiceImpl {
             .check_action_allowed(&dataset_handle, DatasetAction::Read)
             .await?;
 
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
 
         let schema_opt = dataset
             .as_metadata_chain()
@@ -266,10 +256,7 @@ impl QueryServiceImpl {
             .check_action_allowed(&dataset_handle, DatasetAction::Read)
             .await?;
 
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
 
         // TODO: Update to use SetDataSchema event
         let maybe_last_data_slice_hash = dataset

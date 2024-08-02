@@ -74,10 +74,7 @@ impl PushIngestServiceImpl {
             .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
             .await?;
 
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
 
         let operation_id = get_random_name(None, 10);
         let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
@@ -415,7 +412,7 @@ impl PushIngestService for PushIngestServiceImpl {
         use futures::TryStreamExt;
 
         // TODO: Support source disabling and evolution
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
+        let dataset = self.dataset_repo.find_dataset_by_ref(dataset_ref).await?;
         let stream = dataset
             .as_metadata_chain()
             .iter_blocks()

@@ -106,9 +106,7 @@ async fn test_add_data_differences() {
 
     let dataset = harness
         .dataset_repo
-        .get_dataset(&foo_result.dataset_handle.as_local_ref())
-        .await
-        .unwrap();
+        .get_dataset_by_handle(&foo_result.dataset_handle);
 
     // Commit SetDataSchema and 2 data nodes
 
@@ -295,9 +293,7 @@ async fn test_execute_transform_differences() {
 
     let bar_dataset = harness
         .dataset_repo
-        .get_dataset(&bar_result.dataset_handle.as_local_ref())
-        .await
-        .unwrap();
+        .get_dataset_by_handle(&bar_result.dataset_handle);
 
     // Commit SetDataSchema and 2 trasnform data nodes
 
@@ -483,9 +479,7 @@ async fn test_multiple_watermarks_within_interval() {
 
     let dataset = harness
         .dataset_repo
-        .get_dataset(&foo_result.dataset_handle.as_local_ref())
-        .await
-        .unwrap();
+        .get_dataset_by_handle(&foo_result.dataset_handle);
 
     // Commit SetDataSchema and 2 data nodes each having a watermark
 
@@ -626,9 +620,7 @@ async fn test_older_watermark_before_interval() {
 
     let dataset = harness
         .dataset_repo
-        .get_dataset(&foo_result.dataset_handle.as_local_ref())
-        .await
-        .unwrap();
+        .get_dataset_by_handle(&foo_result.dataset_handle);
 
     // Commit SetDataSchema and 3 data nodes, with #1,3 containing watermark
 

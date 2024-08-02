@@ -78,10 +78,7 @@ impl PollingIngestServiceImpl {
             .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
             .await?;
 
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
 
         let listener =
             get_listener(&dataset_handle).unwrap_or_else(|| Arc::new(NullPollingIngestListener));
@@ -588,7 +585,7 @@ impl PollingIngestService for PollingIngestServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError> {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
+        let dataset = self.dataset_repo.find_dataset_by_ref(dataset_ref).await?;
 
         // TODO: Support source evolution
         Ok(dataset

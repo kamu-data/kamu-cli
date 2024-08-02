@@ -122,7 +122,7 @@ async fn test_verify_data_consistency() {
 
     // Commit data
     let dataset = dataset_repo
-        .get_dataset(&dataset_alias.as_local_ref())
+        .find_dataset_by_ref(&dataset_alias.as_local_ref())
         .await
         .unwrap();
 

@@ -120,9 +120,7 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
         for input in request.inputs {
             let input_dataset = self
                 .dataset_repo
-                .get_dataset(&input.dataset_handle.as_local_ref())
-                .await
-                .int_err()?;
+                .get_dataset_by_handle(&input.dataset_handle);
 
             let mut schema_file = None;
             let mut data_paths = Vec::new();
@@ -301,9 +299,7 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
         for input in request.inputs {
             let input_dataset = self
                 .dataset_repo
-                .get_dataset(&input.dataset_handle.as_local_ref())
-                .await
-                .int_err()?;
+                .get_dataset_by_handle(&input.dataset_handle);
 
             let mut schema_file = None;
             let mut data_paths = Vec::new();

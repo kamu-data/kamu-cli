@@ -143,7 +143,7 @@ where
 
                 let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
-                let dataset = match dataset_repo.get_dataset(&dataset_ref).await {
+                let dataset = match dataset_repo.find_dataset_by_ref(&dataset_ref).await {
                     Ok(ds) => ds,
                     Err(GetDatasetError::NotFound(err)) => {
                         tracing::warn!("Dataset not found: {:?}", err);

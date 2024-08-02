@@ -28,10 +28,7 @@ impl DatasetData {
     /// Total number of records in this dataset
     async fn num_records_total(&self, ctx: &Context<'_>) -> Result<u64> {
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = dataset_repo
-            .get_dataset(&self.dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
+        let dataset = dataset_repo.get_dataset_by_handle(&self.dataset_handle);
         let summary = dataset
             .get_summary(GetSummaryOpts::default())
             .await
@@ -43,10 +40,7 @@ impl DatasetData {
     /// caching
     async fn estimated_size(&self, ctx: &Context<'_>) -> Result<u64> {
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = dataset_repo
-            .get_dataset(&self.dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
+        let dataset = dataset_repo.get_dataset_by_handle(&self.dataset_handle);
         let summary = dataset
             .get_summary(GetSummaryOpts::default())
             .await

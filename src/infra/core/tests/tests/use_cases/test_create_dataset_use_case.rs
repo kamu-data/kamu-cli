@@ -91,7 +91,9 @@ impl CreateUseCaseHarness {
 
     async fn check_dataset_exists(&self, alias: &DatasetAlias) -> Result<(), GetDatasetError> {
         let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().unwrap();
-        dataset_repo.get_dataset(&alias.as_local_ref()).await?;
+        dataset_repo
+            .find_dataset_by_ref(&alias.as_local_ref())
+            .await?;
         Ok(())
     }
 

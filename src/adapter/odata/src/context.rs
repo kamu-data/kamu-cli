@@ -79,10 +79,7 @@ impl ServiceContext for ODataServiceContext {
 
         let mut collections: Vec<Arc<dyn CollectionContext>> = Vec::new();
         for dataset_handle in datasets {
-            let dataset = repo
-                .get_dataset(&dataset_handle.as_local_ref())
-                .await
-                .unwrap();
+            let dataset = repo.get_dataset_by_handle(&dataset_handle);
 
             collections.push(Arc::new(ODataCollectionContext {
                 catalog: self.catalog.clone(),

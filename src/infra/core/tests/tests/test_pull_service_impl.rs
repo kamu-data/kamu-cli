@@ -919,7 +919,7 @@ impl PullTestHarness {
     async fn num_blocks(&self, dataset_alias: &DatasetAlias) -> usize {
         let ds = self
             .dataset_repo
-            .get_dataset(&dataset_alias.as_local_ref())
+            .find_dataset_by_ref(&dataset_alias.as_local_ref())
             .await
             .unwrap();
 

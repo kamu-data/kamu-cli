@@ -83,12 +83,6 @@ impl DatasetRepositoryLocalFs {
         ))
     }
 
-    // TODO: Make dataset factory (and thus the hashing algo) configurable
-    fn get_dataset_impl(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset> {
-        let layout = DatasetLayout::new(self.storage_strategy.get_dataset_path(dataset_handle));
-        Self::build_dataset(layout)
-    }
-
     // TODO: Used only for testing, but should be removed it in future to discourage
     // file-based access
     pub async fn get_dataset_layout(
@@ -179,13 +173,18 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         self.storage_strategy.get_datasets_by_owner(account_name)
     }
 
-    async fn get_dataset(
+    async fn find_dataset_by_ref(
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
         let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_impl(&dataset_handle);
+        let dataset = self.get_dataset_by_handle(&dataset_handle);
         Ok(dataset)
+    }
+
+    fn get_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset> {
+        let layout = DatasetLayout::new(self.storage_strategy.get_dataset_path(dataset_handle));
+        Self::build_dataset(layout)
     }
 }
 
@@ -212,10 +211,7 @@ impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
         // - Dataset existed before (has valid head) - we should error out with name
         //   collision
         if let Some(existing_dataset_handle) = maybe_existing_dataset_handle {
-            let existing_dataset = self
-                .get_dataset(&existing_dataset_handle.as_local_ref())
-                .await
-                .int_err()?;
+            let existing_dataset = self.get_dataset_by_handle(&existing_dataset_handle);
 
             match existing_dataset
                 .as_metadata_chain()

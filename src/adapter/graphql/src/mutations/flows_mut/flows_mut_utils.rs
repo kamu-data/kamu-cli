@@ -71,7 +71,7 @@ pub(crate) async fn ensure_expected_dataset_kind(
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
     match dataset_flow_type.dataset_kind_restriction() {
         Some(expected_kind) => {
-            let dataset = utils::get_dataset(ctx, dataset_handle).await?;
+            let dataset = utils::get_dataset(ctx, dataset_handle);
 
             let dataset_kind = dataset
                 .get_summary(GetSummaryOpts::default())

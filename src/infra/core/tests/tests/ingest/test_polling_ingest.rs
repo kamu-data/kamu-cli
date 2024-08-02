@@ -1157,7 +1157,7 @@ impl IngestTestHarness {
     async fn dataset_data_helper(&self, dataset_alias: &DatasetAlias) -> DatasetDataHelper {
         let dataset = self
             .dataset_repo
-            .get_dataset(&dataset_alias.as_local_ref())
+            .find_dataset_by_ref(&dataset_alias.as_local_ref())
             .await
             .unwrap();
 

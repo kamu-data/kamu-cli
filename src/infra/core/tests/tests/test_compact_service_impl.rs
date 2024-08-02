@@ -1174,7 +1174,11 @@ impl CompactTestHarness {
     }
 
     async fn get_dataset_head(&self, dataset_ref: &DatasetRef) -> Multihash {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.unwrap();
+        let dataset = self
+            .dataset_repo
+            .find_dataset_by_ref(dataset_ref)
+            .await
+            .unwrap();
 
         dataset
             .as_metadata_chain()
@@ -1184,7 +1188,11 @@ impl CompactTestHarness {
     }
 
     async fn get_dataset_blocks(&self, dataset_ref: &DatasetRef) -> Vec<MetadataBlock> {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.unwrap();
+        let dataset = self
+            .dataset_repo
+            .find_dataset_by_ref(dataset_ref)
+            .await
+            .unwrap();
         let head = self.get_dataset_head(dataset_ref).await;
 
         dataset
@@ -1264,7 +1272,11 @@ impl CompactTestHarness {
     }
 
     async fn dataset_data_helper(&self, dataset_ref: &DatasetRef) -> DatasetDataHelper {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.unwrap();
+        let dataset = self
+            .dataset_repo
+            .find_dataset_by_ref(dataset_ref)
+            .await
+            .unwrap();
 
         DatasetDataHelper::new_with_context(dataset, self.ctx.clone())
     }
@@ -1305,7 +1317,11 @@ impl CompactTestHarness {
     }
 
     async fn commit_set_licence_block(&self, dataset_ref: &DatasetRef, head: &Multihash) {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.unwrap();
+        let dataset = self
+            .dataset_repo
+            .find_dataset_by_ref(dataset_ref)
+            .await
+            .unwrap();
         let event = SetLicense {
             short_name: "sl1".to_owned(),
             name: "set_license1".to_owned(),

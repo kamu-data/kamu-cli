@@ -59,10 +59,12 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
 
     fn get_datasets_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_>;
 
-    async fn get_dataset(
+    async fn find_dataset_by_ref(
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError>;
+
+    fn get_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,7 +112,7 @@ where
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<Arc<dyn Dataset>>, InternalError> {
-        match self.get_dataset(dataset_ref).await {
+        match self.find_dataset_by_ref(dataset_ref).await {
             Ok(ds) => Ok(Some(ds)),
             Err(GetDatasetError::NotFound(_)) => Ok(None),
             Err(GetDatasetError::Internal(e)) => Err(e),

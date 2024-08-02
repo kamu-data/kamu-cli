@@ -175,7 +175,7 @@ impl ResetTestHarness {
     }
 
     async fn get_dataset_head(&self, dataset_handle: &DatasetHandle) -> Multihash {
-        let dataset = self.resolve_dataset(dataset_handle).await;
+        let dataset = self.resolve_dataset(dataset_handle);
         dataset
             .as_metadata_chain()
             .resolve_ref(&BlockRef::Head)
@@ -184,17 +184,14 @@ impl ResetTestHarness {
     }
 
     async fn get_dataset_summary(&self, dataset_handle: &DatasetHandle) -> DatasetSummary {
-        let dataset = self.resolve_dataset(dataset_handle).await;
+        let dataset = self.resolve_dataset(dataset_handle);
         dataset
             .get_summary(GetSummaryOpts::default())
             .await
             .unwrap()
     }
 
-    async fn resolve_dataset(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset> {
-        self.dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await
-            .unwrap()
+    fn resolve_dataset(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset> {
+        self.dataset_repo.get_dataset_by_handle(dataset_handle)
     }
 }

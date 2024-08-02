@@ -33,14 +33,10 @@ impl DatasetMetadataMut {
     }
 
     #[graphql(skip)]
-    async fn get_dataset(&self, ctx: &Context<'_>) -> Result<std::sync::Arc<dyn domain::Dataset>> {
+    fn get_dataset(&self, ctx: &Context<'_>) -> std::sync::Arc<dyn domain::Dataset> {
         // TODO: cut off this dependency - extract a higher level use case
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = dataset_repo
-            .get_dataset(&self.dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
-        Ok(dataset)
+        dataset_repo.get_dataset_by_handle(&self.dataset_handle)
     }
 
     /// Access to the mutable metadata chain of the dataset
@@ -55,7 +51,7 @@ impl DatasetMetadataMut {
         ctx: &Context<'_>,
         content: Option<String>,
     ) -> Result<UpdateReadmeResult> {
-        let dataset = self.get_dataset(ctx).await?;
+        let dataset = self.get_dataset(ctx);
 
         let old_attachments = dataset
             .as_metadata_chain()
