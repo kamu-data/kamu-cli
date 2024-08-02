@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Return `RootDatasetCompacted` error for manual triggered `EXECUTE_TRANSFROM` flows
 - Using new Spark image that fixes serialization errors when working with large GIS datasets
+- Fixed container runtime for systems using SELinux
 
 ## [0.191.5] - 2024-07-30
 ### Fixed
