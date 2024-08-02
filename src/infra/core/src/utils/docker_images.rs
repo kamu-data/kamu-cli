@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub const SPARK: &str = "ghcr.io/kamu-data/engine-spark:0.23.0-spark_3.5.0";
+pub const SPARK: &str = "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0";
 pub const FLINK: &str = "ghcr.io/kamu-data/engine-flink:0.18.2-flink_1.16.0-scala_2.12-java8";
 pub const DATAFUSION: &str = "ghcr.io/kamu-data/engine-datafusion:0.7.2";
 pub const RISINGWAVE: &str = "ghcr.io/kamu-data/engine-risingwave:0.2.0-risingwave_1.7.0-alpha";
