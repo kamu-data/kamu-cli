@@ -12,16 +12,22 @@ use std::assert_matches::assert_matches;
 use itertools::Itertools;
 use kamu::domain::*;
 use kamu::testing::MetadataFactory;
+use kamu::DatasetRepositoryWriter;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_create_dataset(repo: &dyn DatasetRepository, account_name: Option<AccountName>) {
+pub async fn test_create_dataset<
+    TDatasetRepository: DatasetRepository + DatasetRepositoryWriter,
+>(
+    repo: &TDatasetRepository,
+    account_name: Option<AccountName>,
+) {
     let dataset_alias = DatasetAlias::new(account_name, DatasetName::new_unchecked("foo"));
 
     assert_matches!(
-        repo.get_dataset(&dataset_alias.as_local_ref())
+        repo.find_dataset_by_ref(&dataset_alias.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -41,7 +47,7 @@ pub async fn test_create_dataset(repo: &dyn DatasetRepository, account_name: Opt
 
     // We should see the dataset
     assert!(repo
-        .get_dataset(&dataset_alias.as_local_ref())
+        .find_dataset_by_ref(&dataset_alias.as_local_ref())
         .await
         .is_ok());
 
@@ -62,15 +68,17 @@ pub async fn test_create_dataset(repo: &dyn DatasetRepository, account_name: Opt
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_create_and_get_case_insensetive_dataset(
-    repo: &dyn DatasetRepository,
+pub async fn test_create_and_get_case_insensetive_dataset<
+    TDatasetRepository: DatasetRepository + DatasetRepositoryWriter,
+>(
+    repo: &TDatasetRepository,
     account_name: Option<AccountName>,
 ) {
     let dataset_alias_to_create =
         DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("Foo"));
 
     assert_matches!(
-        repo.get_dataset(&dataset_alias_to_create.as_local_ref())
+        repo.find_dataset_by_ref(&dataset_alias_to_create.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -97,7 +105,7 @@ pub async fn test_create_and_get_case_insensetive_dataset(
 
     // We should see the dataset
     assert!(repo
-        .get_dataset(&dataset_alias_in_another_registry.as_local_ref())
+        .find_dataset_by_ref(&dataset_alias_in_another_registry.as_local_ref())
         .await
         .is_ok());
 
@@ -116,7 +124,11 @@ pub async fn test_create_and_get_case_insensetive_dataset(
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result = repo.create_dataset_from_snapshot(snapshot).await.unwrap();
+    let create_result = repo
+        .create_dataset_from_snapshot(snapshot)
+        .await
+        .unwrap()
+        .create_dataset_result;
 
     // Assert dataset_name eq to new alias and account_name eq to old existing one
     assert_eq!(
@@ -145,7 +157,11 @@ pub async fn test_create_and_get_case_insensetive_dataset(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_create_dataset_same_name_multiple_tenants(repo: &dyn DatasetRepository) {
+pub async fn test_create_dataset_same_name_multiple_tenants<
+    TDatasetRepository: DatasetRepository + DatasetRepositoryWriter,
+>(
+    repo: &TDatasetRepository,
+) {
     let dataset_alias_my = DatasetAlias::new(
         Some(AccountName::new_unchecked("my")),
         DatasetName::new_unchecked("foo"),
@@ -156,7 +172,7 @@ pub async fn test_create_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
     );
 
     assert_matches!(
-        repo.get_dataset(&dataset_alias_my.as_local_ref())
+        repo.find_dataset_by_ref(&dataset_alias_my.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -164,7 +180,7 @@ pub async fn test_create_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
     );
 
     assert_matches!(
-        repo.get_dataset(&dataset_alias_her.as_local_ref())
+        repo.find_dataset_by_ref(&dataset_alias_her.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -186,12 +202,14 @@ pub async fn test_create_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
     let create_result_my = repo
         .create_dataset_from_snapshot(snapshot_my.clone())
         .await
-        .unwrap();
+        .unwrap()
+        .create_dataset_result;
 
     let create_result_her = repo
         .create_dataset_from_snapshot(snapshot_her.clone())
         .await
-        .unwrap();
+        .unwrap()
+        .create_dataset_result;
 
     assert_eq!(create_result_her.dataset_handle.alias, dataset_alias_her);
     assert_eq!(create_result_my.dataset_handle.alias, dataset_alias_my);
@@ -199,12 +217,12 @@ pub async fn test_create_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
     // We should see the datasets
 
     assert!(repo
-        .get_dataset(&dataset_alias_my.as_local_ref())
+        .find_dataset_by_ref(&dataset_alias_my.as_local_ref())
         .await
         .is_ok());
 
     assert!(repo
-        .get_dataset(&dataset_alias_her.as_local_ref())
+        .find_dataset_by_ref(&dataset_alias_her.as_local_ref())
         .await
         .is_ok());
 
@@ -238,14 +256,16 @@ pub async fn test_create_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_create_dataset_from_snapshot(
-    repo: &dyn DatasetRepository,
+pub async fn test_create_dataset_from_snapshot<
+    TDatasetRepository: DatasetRepository + DatasetRepositoryWriter,
+>(
+    repo: &TDatasetRepository,
     account_name: Option<AccountName>,
 ) {
     let dataset_alias = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
 
     assert_matches!(
-        repo.get_dataset(&dataset_alias.as_local_ref())
+        repo.find_dataset_by_ref(&dataset_alias.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -261,10 +281,11 @@ pub async fn test_create_dataset_from_snapshot(
     let create_result = repo
         .create_dataset_from_snapshot(snapshot.clone())
         .await
-        .unwrap();
+        .unwrap()
+        .create_dataset_result;
 
     let dataset = repo
-        .get_dataset(&create_result.dataset_handle.into())
+        .find_dataset_by_ref(&create_result.dataset_handle.into())
         .await
         .unwrap();
 
@@ -284,47 +305,60 @@ pub async fn test_create_dataset_from_snapshot(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_rename_dataset(repo: &dyn DatasetRepository, account_name: Option<AccountName>) {
+pub async fn test_rename_dataset<
+    TDatasetRepository: DatasetRepository + DatasetRepositoryWriter,
+>(
+    repo: &TDatasetRepository,
+    account_name: Option<AccountName>,
+) {
     let alias_foo = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
     let alias_bar = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("bar"));
     let alias_baz = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("baz"));
 
-    let snapshots = vec![
-        MetadataFactory::dataset_snapshot()
-            .name(alias_foo.clone())
-            .kind(DatasetKind::Root)
-            .push_event(MetadataFactory::set_polling_source().build())
-            .build(),
-        MetadataFactory::dataset_snapshot()
-            .name(alias_bar.clone())
-            .kind(DatasetKind::Derivative)
-            .push_event(
-                MetadataFactory::set_transform()
-                    .inputs_from_refs(["foo"])
-                    .build(),
-            )
-            .build(),
-    ];
+    let snapshot_foo = MetadataFactory::dataset_snapshot()
+        .name(alias_foo.clone())
+        .kind(DatasetKind::Root)
+        .push_event(MetadataFactory::set_polling_source().build())
+        .build();
 
-    repo.create_datasets_from_snapshots(snapshots).await;
+    let snapshot_bar = MetadataFactory::dataset_snapshot()
+        .name(alias_bar.clone())
+        .kind(DatasetKind::Derivative)
+        .push_event(
+            MetadataFactory::set_transform()
+                .inputs_from_refs(["foo"])
+                .build(),
+        )
+        .build();
 
-    assert_matches!(
-        repo.rename_dataset(&alias_baz.as_local_ref(), &alias_foo.dataset_name)
-            .await,
-        Err(RenameDatasetError::NotFound(_))
-    );
-
-    assert_matches!(
-        repo.rename_dataset(&alias_foo.as_local_ref(), &alias_bar.dataset_name)
-            .await,
-        Err(RenameDatasetError::NameCollision(_))
-    );
-
-    repo.rename_dataset(&alias_foo.as_local_ref(), &alias_baz.dataset_name)
+    let create_result_foo = repo
+        .create_dataset_from_snapshot(snapshot_foo)
+        .await
+        .unwrap();
+    repo.create_dataset_from_snapshot(snapshot_bar)
         .await
         .unwrap();
 
-    let baz = repo.get_dataset(&alias_baz.as_local_ref()).await.unwrap();
+    assert_matches!(
+        repo.rename_dataset(
+            &create_result_foo.create_dataset_result.dataset_handle,
+            &alias_bar.dataset_name
+        )
+        .await,
+        Err(RenameDatasetError::NameCollision(_))
+    );
+
+    repo.rename_dataset(
+        &create_result_foo.create_dataset_result.dataset_handle,
+        &alias_baz.dataset_name,
+    )
+    .await
+    .unwrap();
+
+    let baz = repo
+        .find_dataset_by_ref(&alias_baz.as_local_ref())
+        .await
+        .unwrap();
 
     use futures::StreamExt;
     assert_eq!(baz.as_metadata_chain().iter_blocks().count().await, 2);
@@ -332,7 +366,11 @@ pub async fn test_rename_dataset(repo: &dyn DatasetRepository, account_name: Opt
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_rename_dataset_same_name_multiple_tenants(repo: &dyn DatasetRepository) {
+pub async fn test_rename_dataset_same_name_multiple_tenants<
+    TDatasetRepository: DatasetRepository + DatasetRepositoryWriter,
+>(
+    repo: &TDatasetRepository,
+) {
     let account_my = AccountName::new_unchecked("my");
     let account_her = AccountName::new_unchecked("her");
 
@@ -352,7 +390,8 @@ pub async fn test_rename_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
                 .build(),
         )
         .await
-        .unwrap();
+        .unwrap()
+        .create_dataset_result;
 
     let create_result_her_bar = repo
         .create_dataset_from_snapshot(
@@ -363,9 +402,10 @@ pub async fn test_rename_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
                 .build(),
         )
         .await
-        .unwrap();
+        .unwrap()
+        .create_dataset_result;
 
-    let _create_result_my_baz = repo
+    let create_result_my_baz = repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(dataset_alias_my_baz.clone())
@@ -377,19 +417,19 @@ pub async fn test_rename_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
         .unwrap();
 
     repo.rename_dataset(
-        &dataset_alias_my_foo.as_local_ref(),
+        &create_result_my_foo.dataset_handle,
         &DatasetName::new_unchecked("bar"),
     )
     .await
     .unwrap();
 
     let my_bar = repo
-        .get_dataset(&DatasetRef::try_from("my/bar").unwrap())
+        .find_dataset_by_ref(&DatasetRef::try_from("my/bar").unwrap())
         .await
         .unwrap();
 
     let her_bar = repo
-        .get_dataset(&DatasetRef::try_from("her/bar").unwrap())
+        .find_dataset_by_ref(&DatasetRef::try_from("her/bar").unwrap())
         .await
         .unwrap();
 
@@ -412,7 +452,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
 
     assert_matches!(
         repo.rename_dataset(
-            &dataset_alias_my_baz.as_local_ref(),
+            &create_result_my_baz.create_dataset_result.dataset_handle,
             &DatasetName::new_unchecked("bar")
         )
         .await,
@@ -422,12 +462,14 @@ pub async fn test_rename_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_rename_dataset_unauthorized(
-    repo: &dyn DatasetRepository,
+pub async fn test_delete_dataset<
+    TDatasetRepository: DatasetRepository + DatasetRepositoryWriter,
+>(
+    repo: &TDatasetRepository,
+    create_dataset_from_snapshot: &dyn CreateDatasetFromSnapshotUseCase,
     account_name: Option<AccountName>,
 ) {
     let alias_foo = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("bar"));
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
@@ -435,64 +477,22 @@ pub async fn test_rename_dataset_unauthorized(
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    repo.create_dataset_from_snapshot(snapshot).await.unwrap();
-
-    let result = repo
-        .rename_dataset(&alias_foo.as_local_ref(), &alias_bar.dataset_name)
-        .await;
-
-    assert_matches!(result, Err(RenameDatasetError::Access(_)));
-    assert!(repo.get_dataset(&alias_foo.as_local_ref()).await.is_ok());
-    assert!(repo.get_dataset(&alias_bar.as_local_ref()).await.is_err());
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_delete_dataset(repo: &dyn DatasetRepository, account_name: Option<AccountName>) {
-    let alias_foo = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("bar"));
-
-    let snapshots = vec![
-        MetadataFactory::dataset_snapshot()
-            .name(alias_foo.clone())
-            .kind(DatasetKind::Root)
-            .push_event(MetadataFactory::set_polling_source().build())
-            .build(),
-        MetadataFactory::dataset_snapshot()
-            .name(alias_bar.clone())
-            .kind(DatasetKind::Derivative)
-            .push_event(
-                MetadataFactory::set_transform()
-                    .inputs_from_refs(["foo"])
-                    .build(),
-            )
-            .build(),
-    ];
-
-    let handles: Vec<_> = repo
-        .create_datasets_from_snapshots(snapshots)
-        .await
-        .into_iter()
-        .map(|(_, r)| r.unwrap().dataset_handle)
-        .collect();
-
-    assert_matches!(
-        repo.delete_dataset(&alias_foo.as_local_ref()).await,
-        Err(DeleteDatasetError::DanglingReference(e)) if e.children == vec![handles[1].clone()]
-    );
-
-    assert!(repo.get_dataset(&alias_foo.as_local_ref()).await.is_ok());
-    assert!(repo.get_dataset(&alias_bar.as_local_ref()).await.is_ok());
-
-    repo.delete_dataset(&alias_bar.as_local_ref())
+    let create_result = create_dataset_from_snapshot
+        .execute(snapshot)
         .await
         .unwrap();
-    repo.delete_dataset(&alias_foo.as_local_ref())
+
+    assert!(repo
+        .find_dataset_by_ref(&alias_foo.as_local_ref())
+        .await
+        .is_ok());
+
+    repo.delete_dataset(&create_result.dataset_handle)
         .await
         .unwrap();
 
     assert_matches!(
-        repo.get_dataset(&alias_foo.as_local_ref())
+        repo.find_dataset_by_ref(&alias_foo.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -501,51 +501,37 @@ pub async fn test_delete_dataset(repo: &dyn DatasetRepository, account_name: Opt
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-pub async fn test_delete_dataset_unauthorized(
-    repo: &dyn DatasetRepository,
-    account_name: Option<AccountName>,
-) {
-    let alias_foo = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
 
-    let snapshot = MetadataFactory::dataset_snapshot()
-        .name(alias_foo.clone())
+pub async fn test_iterate_datasets<
+    TDatasetRepository: DatasetRepository + DatasetRepositoryWriter,
+>(
+    repo: &TDatasetRepository,
+) {
+    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+
+    let snapshot_foo = MetadataFactory::dataset_snapshot()
+        .name("foo")
         .kind(DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    repo.create_dataset_from_snapshot(snapshot).await.unwrap();
+    let snapshot_bar = MetadataFactory::dataset_snapshot()
+        .name("bar")
+        .kind(DatasetKind::Derivative)
+        .push_event(
+            MetadataFactory::set_transform()
+                .inputs_from_refs(["foo"])
+                .build(),
+        )
+        .build();
 
-    assert_matches!(
-        repo.delete_dataset(&alias_foo.as_local_ref()).await,
-        Err(DeleteDatasetError::Access(_))
-    );
-
-    assert!(repo.get_dataset(&alias_foo.as_local_ref()).await.is_ok());
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_iterate_datasets(repo: &dyn DatasetRepository) {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
-
-    let snapshots = vec![
-        MetadataFactory::dataset_snapshot()
-            .name("foo")
-            .kind(DatasetKind::Root)
-            .push_event(MetadataFactory::set_polling_source().build())
-            .build(),
-        MetadataFactory::dataset_snapshot()
-            .name("bar")
-            .kind(DatasetKind::Derivative)
-            .push_event(
-                MetadataFactory::set_transform()
-                    .inputs_from_refs(["foo"])
-                    .build(),
-            )
-            .build(),
-    ];
-    let _: Vec<_> = repo.create_datasets_from_snapshots(snapshots).await;
+    repo.create_dataset_from_snapshot(snapshot_foo)
+        .await
+        .unwrap();
+    repo.create_dataset_from_snapshot(snapshot_bar)
+        .await
+        .unwrap();
 
     // All
     check_expected_datasets(
@@ -571,7 +557,11 @@ pub async fn test_iterate_datasets(repo: &dyn DatasetRepository) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_iterate_datasets_multi_tenant(repo: &dyn DatasetRepository) {
+pub async fn test_iterate_datasets_multi_tenant<
+    TDatasetRepository: DatasetRepository + DatasetRepositoryWriter,
+>(
+    repo: &TDatasetRepository,
+) {
     let account_my = AccountName::new_unchecked("my");
     let account_her = AccountName::new_unchecked("her");
 
@@ -584,41 +574,49 @@ pub async fn test_iterate_datasets_multi_tenant(repo: &dyn DatasetRepository) {
     let alias_my_baz =
         DatasetAlias::new(Some(account_my.clone()), DatasetName::new_unchecked("baz"));
 
-    let my_snapshots = vec![
-        MetadataFactory::dataset_snapshot()
-            .name("my/foo")
-            .kind(DatasetKind::Root)
-            .push_event(MetadataFactory::set_polling_source().build())
-            .build(),
-        MetadataFactory::dataset_snapshot()
-            .name("my/baz")
-            .kind(DatasetKind::Derivative)
-            .push_event(
-                MetadataFactory::set_transform()
-                    .inputs_from_refs_and_aliases([("my/foo", "foo")])
-                    .build(),
-            )
-            .build(),
-    ];
-    let her_snapshots: Vec<DatasetSnapshot> = vec![
-        MetadataFactory::dataset_snapshot()
-            .name("her/foo")
-            .kind(DatasetKind::Root)
-            .push_event(MetadataFactory::set_polling_source().build())
-            .build(),
-        MetadataFactory::dataset_snapshot()
-            .name("her/bar")
-            .kind(DatasetKind::Derivative)
-            .push_event(
-                MetadataFactory::set_transform()
-                    .inputs_from_refs_and_aliases([("her/foo", "foo")])
-                    .build(),
-            )
-            .build(),
-    ];
+    let snapshot_my_foo = MetadataFactory::dataset_snapshot()
+        .name("my/foo")
+        .kind(DatasetKind::Root)
+        .push_event(MetadataFactory::set_polling_source().build())
+        .build();
+    let snapshot_my_baz = MetadataFactory::dataset_snapshot()
+        .name("my/baz")
+        .kind(DatasetKind::Derivative)
+        .push_event(
+            MetadataFactory::set_transform()
+                .inputs_from_refs_and_aliases([("my/foo", "foo")])
+                .build(),
+        )
+        .build();
 
-    let _: Vec<_> = repo.create_datasets_from_snapshots(my_snapshots).await;
-    let _: Vec<_> = repo.create_datasets_from_snapshots(her_snapshots).await;
+    let snapshot_her_foo = MetadataFactory::dataset_snapshot()
+        .name("her/foo")
+        .kind(DatasetKind::Root)
+        .push_event(MetadataFactory::set_polling_source().build())
+        .build();
+    let snapshot_her_bar = MetadataFactory::dataset_snapshot()
+        .name("her/bar")
+        .kind(DatasetKind::Derivative)
+        .push_event(
+            MetadataFactory::set_transform()
+                .inputs_from_refs_and_aliases([("her/foo", "foo")])
+                .build(),
+        )
+        .build();
+
+    repo.create_dataset_from_snapshot(snapshot_my_foo)
+        .await
+        .unwrap();
+    repo.create_dataset_from_snapshot(snapshot_my_baz)
+        .await
+        .unwrap();
+
+    repo.create_dataset_from_snapshot(snapshot_her_foo)
+        .await
+        .unwrap();
+    repo.create_dataset_from_snapshot(snapshot_her_bar)
+        .await
+        .unwrap();
 
     check_expected_datasets(
         vec![

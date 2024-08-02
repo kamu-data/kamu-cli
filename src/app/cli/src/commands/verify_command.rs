@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use futures::{StreamExt, TryStreamExt};
+use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use opendatafabric::*;
@@ -184,11 +185,7 @@ impl VerifyCommand {
                     continue;
                 }
 
-                let dataset = self
-                    .dataset_repo
-                    .get_dataset(&dataset_handle.as_local_ref())
-                    .await
-                    .unwrap();
+                let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
                 let summary = dataset
                     .get_summary(GetSummaryOpts::default())
                     .await

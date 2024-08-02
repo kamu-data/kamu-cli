@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use opendatafabric::*;
 
@@ -103,10 +104,7 @@ impl IngestCommand {
             )));
         }
 
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
         let dataset_kind = dataset
             .get_summary(GetSummaryOpts::default())
             .await

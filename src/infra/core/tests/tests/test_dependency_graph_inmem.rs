@@ -11,33 +11,16 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use dill::Component;
-use event_bus::EventBus;
 use futures::{future, StreamExt, TryStreamExt};
 use internal_error::ResultIntoInternal;
 use kamu::testing::MetadataFactory;
-use kamu::{
-    DatasetRepositoryLocalFs,
-    DependencyGraphRepositoryInMemory,
-    DependencyGraphServiceInMemory,
-};
+use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{
-    auth,
-    DatasetDependencies,
-    DatasetRepository,
-    DependencyGraphRepository,
-    DependencyGraphService,
-    SystemTimeSourceDefault,
-};
-use opendatafabric::{
-    AccountName,
-    DatasetAlias,
-    DatasetID,
-    DatasetKind,
-    DatasetName,
-    MetadataEvent,
-};
+use kamu_core::*;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
+use opendatafabric::*;
 use tempfile::TempDir;
+use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -293,9 +276,12 @@ async fn test_service_dataset_deleted() {
         "[foo-bar, foo-baz] -> foo-bar-foo-baz -> []"
     );
 
-    harness
-        .dataset_repo
-        .delete_dataset(
+    let delete_dataset = harness
+        .catalog
+        .get_one::<dyn DeleteDatasetUseCase>()
+        .unwrap();
+    delete_dataset
+        .execute_via_ref(
             &DatasetAlias::new(None, DatasetName::new_unchecked("foo-bar-foo-baz")).as_local_ref(),
         )
         .await
@@ -575,7 +561,7 @@ async fn test_get_recursive_upstream_dependencies() {
 
 struct DependencyGraphHarness {
     _workdir: TempDir,
-    _catalog: dill::Catalog,
+    catalog: dill::Catalog,
     dataset_repo: Arc<dyn DatasetRepository>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dependency_graph_repository: Arc<dyn DependencyGraphRepository>,
@@ -587,19 +573,33 @@ impl DependencyGraphHarness {
         let datasets_dir = workdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<SystemTimeSourceDefault>()
-            .add::<EventBus>()
+        let mut b = dill::CatalogBuilder::new();
+        b.add::<SystemTimeSourceDefault>()
+            .add_builder(
+                messaging_outbox::OutboxImmediateImpl::builder()
+                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+            )
+            .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
                     .with_multi_tenant(multi_tenant),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
-            .build();
+            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+            .add::<CommitDatasetEventUseCaseImpl>()
+            .add::<DeleteDatasetUseCaseImpl>();
+
+        register_message_dispatcher::<DatasetLifecycleMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+        );
+
+        let catalog = b.build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
@@ -611,7 +611,7 @@ impl DependencyGraphHarness {
 
         Self {
             _workdir: workdir,
-            _catalog: catalog,
+            catalog,
             dataset_repo,
             dependency_graph_service,
             dependency_graph_repository,
@@ -864,8 +864,13 @@ impl DependencyGraphHarness {
     }
 
     async fn create_root_dataset(&self, account_name: Option<AccountName>, dataset_name: &str) {
-        self.dataset_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot = self
+            .catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(DatasetAlias::new(
                         account_name,
@@ -885,8 +890,13 @@ impl DependencyGraphHarness {
         dataset_name: &str,
         input_aliases: Vec<DatasetAlias>,
     ) {
-        self.dataset_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot = self
+            .catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(DatasetAlias::new(
                         account_name,
@@ -913,9 +923,9 @@ impl DependencyGraphHarness {
         let dataset_alias =
             DatasetAlias::new(account_name, DatasetName::new_unchecked(dataset_name));
 
-        let dataset = self
+        let dataset_handle = self
             .dataset_repo
-            .get_dataset(&dataset_alias.as_local_ref())
+            .resolve_dataset_ref(&dataset_alias.as_local_ref())
             .await
             .unwrap();
 
@@ -928,8 +938,13 @@ impl DependencyGraphHarness {
             ));
         }
 
-        dataset
-            .commit_event(
+        let commit_dataset_event = self
+            .catalog
+            .get_one::<dyn CommitDatasetEventUseCase>()
+            .unwrap();
+        commit_dataset_event
+            .execute(
+                &dataset_handle,
                 MetadataEvent::SetTransform(
                     MetadataFactory::set_transform()
                         .inputs_from_refs_and_aliases(id_aliases)
@@ -1116,3 +1131,5 @@ async fn create_large_dataset_graph() -> DependencyGraphHarness {
 
     dependency_harness
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

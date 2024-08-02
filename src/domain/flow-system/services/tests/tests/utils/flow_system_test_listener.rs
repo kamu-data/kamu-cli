@@ -12,20 +12,17 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
 use dill::*;
-use event_bus::AsyncEventHandler;
-use kamu_core::{FakeSystemTimeSource, InternalError};
-use kamu_flow_system::{
-    FlowKey,
-    FlowOutcome,
-    FlowPaginationOpts,
-    FlowService,
-    FlowServiceEvent,
-    FlowStartCondition,
-    FlowState,
-    FlowStatus,
-    FlowTrigger,
+use internal_error::InternalError;
+use kamu_flow_system::*;
+use kamu_flow_system_services::MESSAGE_PRODUCER_KAMU_FLOW_SERVICE;
+use messaging_outbox::{
+    MessageConsumer,
+    MessageConsumerMeta,
+    MessageConsumerT,
+    MessageConsumptionDurability,
 };
 use opendatafabric::DatasetID;
+use time_source::FakeSystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,7 +42,13 @@ struct FlowSystemTestListenerState {
 
 #[component(pub)]
 #[scope(Singleton)]
-#[interface(dyn AsyncEventHandler<FlowServiceEvent>)]
+#[interface(dyn MessageConsumer)]
+#[interface(dyn MessageConsumerT<FlowServiceUpdatedMessage>)]
+#[meta(MessageConsumerMeta {
+    consumer_name: "FlowSystemTestListener",
+    feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_SERVICE],
+    durability: MessageConsumptionDurability::BestEffort,
+})]
 impl FlowSystemTestListener {
     pub(crate) fn new(
         flow_service: Arc<dyn FlowService>,
@@ -58,7 +61,7 @@ impl FlowSystemTestListener {
         }
     }
 
-    pub(crate) async fn make_a_snapshot(&self, event_time: DateTime<Utc>) {
+    pub(crate) async fn make_a_snapshot(&self, update_time: DateTime<Utc>) {
         use futures::TryStreamExt;
         let flows: Vec<_> = self
             .flow_service
@@ -82,7 +85,7 @@ impl FlowSystemTestListener {
         }
 
         let mut state = self.state.lock().unwrap();
-        state.snapshots.push((event_time, flow_states_map));
+        state.snapshots.push((update_time, flow_states_map));
     }
 
     pub(crate) fn define_dataset_display_name(&self, id: DatasetID, display_name: String) {
@@ -229,10 +232,16 @@ impl std::fmt::Display for FlowSystemTestListener {
     }
 }
 
+impl MessageConsumer for FlowSystemTestListener {}
+
 #[async_trait::async_trait]
-impl AsyncEventHandler<FlowServiceEvent> for FlowSystemTestListener {
-    async fn handle(&self, event: &FlowServiceEvent) -> Result<(), InternalError> {
-        self.make_a_snapshot(event.event_time()).await;
+impl MessageConsumerT<FlowServiceUpdatedMessage> for FlowSystemTestListener {
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: &FlowServiceUpdatedMessage,
+    ) -> Result<(), InternalError> {
+        self.make_a_snapshot(message.update_time).await;
         Ok(())
     }
 }

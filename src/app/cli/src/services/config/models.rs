@@ -54,6 +54,10 @@ pub struct CLIConfig {
     /// Dataset environment variables configuration
     #[merge(strategy = merge_recursive)]
     pub dataset_env_vars: Option<DatasetEnvVarsConfig>,
+
+    /// Messaging outbox configuration
+    #[merge(strategy = merge_recursive)]
+    pub outbox: Option<OutboxConfig>,
 }
 
 impl CLIConfig {
@@ -67,6 +71,7 @@ impl CLIConfig {
             database: None,
             uploads: None,
             dataset_env_vars: None,
+            outbox: None,
         }
     }
 
@@ -84,6 +89,7 @@ impl CLIConfig {
             database: Some(DatabaseConfig::sample()),
             uploads: Some(UploadsConfig::sample()),
             dataset_env_vars: Some(DatasetEnvVarsConfig::sample()),
+            outbox: Some(OutboxConfig::sample()),
         }
     }
 }
@@ -99,6 +105,7 @@ impl Default for CLIConfig {
             database: None,
             uploads: Some(UploadsConfig::default()),
             dataset_env_vars: Some(DatasetEnvVarsConfig::default()),
+            outbox: Some(OutboxConfig::default()),
         }
     }
 }
@@ -634,6 +641,32 @@ impl Default for UploadsConfig {
     fn default() -> Self {
         Self {
             max_file_size_in_mb: Some(50),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct OutboxConfig {
+    pub awaiting_step_secs: Option<i64>,
+    pub batch_size: Option<i64>,
+}
+
+impl OutboxConfig {
+    pub fn sample() -> Self {
+        Default::default()
+    }
+}
+
+impl Default for OutboxConfig {
+    fn default() -> Self {
+        Self {
+            awaiting_step_secs: Some(1),
+            batch_size: Some(20),
         }
     }
 }

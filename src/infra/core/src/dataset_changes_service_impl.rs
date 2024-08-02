@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::{
     BlockRef,
     Dataset,
@@ -21,7 +21,6 @@ use kamu_core::{
     GetDatasetError,
     GetIncrementError,
     GetRefError,
-    InternalError,
     MetadataChainExt,
     SearchSingleDataBlockVisitor,
 };
@@ -47,7 +46,7 @@ impl DatasetChangesServiceImpl {
         dataset_id: &DatasetID,
     ) -> Result<Arc<dyn Dataset>, GetIncrementError> {
         self.dataset_repo
-            .get_dataset(&dataset_id.as_local_ref())
+            .find_dataset_by_ref(&dataset_id.as_local_ref())
             .await
             .map_err(|e| match e {
                 GetDatasetError::NotFound(e) => GetIncrementError::DatasetNotFound(e),

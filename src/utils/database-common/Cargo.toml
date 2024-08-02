@@ -27,7 +27,7 @@ aws-sdk-secretsmanager = "0.35"
 aws-credential-types = "0.57"
 async-trait = "0.1"
 chrono = { version = "0.4", default-features = false }
-dill = "0.8"
+dill = "0.9"
 hex = "0.4"
 hmac = "0.12"
 internal-error = { workspace = true }

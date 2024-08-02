@@ -43,10 +43,7 @@ impl ResetService for ResetServiceImpl {
             .check_action_allowed(dataset_handle, auth::DatasetAction::Write)
             .await?;
 
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
 
         dataset
             .as_metadata_chain()

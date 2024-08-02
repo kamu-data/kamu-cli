@@ -13,7 +13,7 @@ use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::types::ObjectCannedAcl;
 use bytes::Bytes;
 use dill::*;
-use kamu::domain::{ErrorIntoInternal, InternalError};
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu::utils::s3_context::S3Context;
 use opendatafabric::AccountID;
 use tokio::io::AsyncRead;

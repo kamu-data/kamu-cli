@@ -9,7 +9,8 @@
 
 use base64::Engine;
 use bytes::Bytes;
-use kamu::domain::{InternalError, MediaType, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_core::MediaType;
 use opendatafabric::AccountID;
 use serde::{Deserialize, Serialize};
 use serde_json::json;

@@ -13,12 +13,14 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use dill::*;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use itertools::Itertools;
 use kamu_core::engine::*;
 use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::*;
 use random_names::get_random_name;
+use time_source::SystemTimeSource;
 
 pub struct TransformServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
@@ -117,10 +119,7 @@ impl TransformServiceImpl {
 
         let old_head = request.head.clone();
 
-        let dataset = dataset_repo
-            .get_dataset(&request.dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
+        let dataset = dataset_repo.get_dataset_by_handle(&request.dataset_handle);
 
         // Read new schema
         let new_schema = if let Some(out_data) = &response.new_data {
@@ -198,11 +197,7 @@ impl TransformServiceImpl {
         dataset_handle: &DatasetHandle,
         system_time: DateTime<Utc>,
     ) -> Result<Option<TransformRequestExt>, TransformError> {
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
 
         let output_chain = dataset.as_metadata_chain();
 
@@ -304,7 +299,11 @@ impl TransformServiceImpl {
     // TODO: Allow derivative datasets to function with inputs containing no data
     // This will require passing the schema explicitly instead of relying on a file
     async fn is_never_pulled(&self, dataset_ref: &DatasetRef) -> Result<bool, InternalError> {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
+        let dataset = self
+            .dataset_repo
+            .find_dataset_by_ref(dataset_ref)
+            .await
+            .int_err()?;
 
         Ok(dataset
             .as_metadata_chain()
@@ -331,11 +330,7 @@ impl TransformServiceImpl {
             .resolve_dataset_ref(&dataset_id.as_local_ref())
             .await
             .int_err()?;
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
         let input_chain = dataset.as_metadata_chain();
 
         // Determine last processed input block and offset
@@ -395,11 +390,7 @@ impl TransformServiceImpl {
             .check_action_allowed(&dataset_handle, auth::DatasetAction::Read)
             .await?;
 
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
         let input_chain = dataset.as_metadata_chain();
 
         // Collect unprocessed input blocks
@@ -481,7 +472,11 @@ impl TransformServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<DatasetVocabulary, InternalError> {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
+        let dataset = self
+            .dataset_repo
+            .find_dataset_by_ref(dataset_ref)
+            .await
+            .int_err()?;
 
         Ok(dataset
             .as_metadata_chain()
@@ -501,10 +496,7 @@ impl TransformServiceImpl {
         dataset_handle: &DatasetHandle,
         block_range: (Option<Multihash>, Option<Multihash>),
     ) -> Result<Vec<VerificationStep>, VerificationError> {
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
         let metadata_chain = dataset.as_metadata_chain();
 
         let head = match block_range.1 {
@@ -763,7 +755,7 @@ impl TransformService for TransformServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError> {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
+        let dataset = self.dataset_repo.find_dataset_by_ref(dataset_ref).await?;
 
         // TODO: Support transform evolution
         Ok(dataset
@@ -830,10 +822,7 @@ impl TransformService for TransformServiceImpl {
         // VerificationService. But permissions for input datasets have to be
         // checked here
 
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
 
         let verification_plan = self
             .get_verification_plan(&dataset_handle, block_range)

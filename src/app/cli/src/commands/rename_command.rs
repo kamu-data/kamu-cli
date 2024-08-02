@@ -15,14 +15,14 @@ use opendatafabric::*;
 use super::{CLIError, Command};
 
 pub struct RenameCommand {
-    dataset_repo: Arc<dyn DatasetRepository>,
+    rename_dataset: Arc<dyn RenameDatasetUseCase>,
     dataset_ref: DatasetRef,
     new_name: DatasetName,
 }
 
 impl RenameCommand {
     pub fn new<N>(
-        dataset_repo: Arc<dyn DatasetRepository>,
+        rename_dataset: Arc<dyn RenameDatasetUseCase>,
         dataset_ref: DatasetRef,
         new_name: N,
     ) -> Self
@@ -31,7 +31,7 @@ impl RenameCommand {
         <N as TryInto<DatasetName>>::Error: std::fmt::Debug,
     {
         Self {
-            dataset_repo,
+            rename_dataset,
             dataset_ref,
             new_name: new_name.try_into().unwrap(),
         }
@@ -42,8 +42,8 @@ impl RenameCommand {
 impl Command for RenameCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         match self
-            .dataset_repo
-            .rename_dataset(&self.dataset_ref, &self.new_name)
+            .rename_dataset
+            .execute(&self.dataset_ref, &self.new_name)
             .await
         {
             Ok(_) => Ok(()),

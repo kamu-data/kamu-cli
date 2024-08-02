@@ -13,11 +13,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use dill::*;
-use event_bus::EventBus;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
 use opendatafabric::*;
+use time_source::SystemTimeSource;
 use tokio::sync::Mutex;
 use url::Url;
 
@@ -29,9 +29,6 @@ use crate::*;
 pub struct DatasetRepositoryS3 {
     s3_context: S3Context,
     current_account_subject: Arc<CurrentAccountSubject>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
-    event_bus: Arc<EventBus>,
     multi_tenant: bool,
     registry_cache: Option<Arc<S3RegistryCache>>,
     metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
@@ -54,9 +51,6 @@ impl DatasetRepositoryS3 {
     pub fn new(
         s3_context: S3Context,
         current_account_subject: Arc<CurrentAccountSubject>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        dependency_graph_service: Arc<dyn DependencyGraphService>,
-        event_bus: Arc<EventBus>,
         multi_tenant: bool,
         registry_cache: Option<Arc<S3RegistryCache>>,
         metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
@@ -65,9 +59,6 @@ impl DatasetRepositoryS3 {
         Self {
             s3_context,
             current_account_subject,
-            dataset_action_authorizer,
-            dependency_graph_service,
-            event_bus,
             multi_tenant,
             registry_cache,
             metadata_cache_local_fs_path,
@@ -89,7 +80,6 @@ impl DatasetRepositoryS3 {
         // configurability
         if let Some(metadata_cache_local_fs_path) = &self.metadata_cache_local_fs_path {
             Arc::new(DatasetImpl::new(
-                self.event_bus.clone(),
                 MetadataChainImpl::new(
                     MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
                         ObjectRepositoryCachingLocalFs::new(
@@ -130,7 +120,6 @@ impl DatasetRepositoryS3 {
             ))
         } else {
             Arc::new(DatasetImpl::new(
-                self.event_bus.clone(),
                 MetadataChainImpl::new(
                     MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
                         ObjectRepositoryS3Sha3::new(S3Context::new(
@@ -362,7 +351,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
         })
     }
 
-    async fn get_dataset(
+    async fn find_dataset_by_ref(
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
@@ -371,6 +360,13 @@ impl DatasetRepository for DatasetRepositoryS3 {
         Ok(dataset)
     }
 
+    fn get_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset> {
+        self.get_dataset_impl(&dataset_handle.id)
+    }
+}
+
+#[async_trait]
+impl DatasetRepositoryWriter for DatasetRepositoryS3 {
     async fn create_dataset(
         &self,
         dataset_alias: &DatasetAlias,
@@ -397,10 +393,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
         // - Dataset existed before (has valid head) - we should error out with name
         //   collision
         if let Some(existing_dataset_handle) = maybe_existing_dataset_handle {
-            let existing_dataset = self
-                .get_dataset(&existing_dataset_handle.as_local_ref())
-                .await
-                .int_err()?;
+            let existing_dataset = self.get_dataset_by_handle(&existing_dataset_handle);
 
             match existing_dataset
                 .as_metadata_chain()
@@ -472,18 +465,6 @@ impl DatasetRepository for DatasetRepositoryS3 {
             cache.datasets.push(dataset_handle.clone());
         }
 
-        self.event_bus
-            .dispatch_event(events::DatasetEventCreated {
-                dataset_id: dataset_handle.id.clone(),
-                owner_account_id: match self.current_account_subject.as_ref() {
-                    CurrentAccountSubject::Anonymous(_) => {
-                        panic!("Anonymous account cannot create dataset");
-                    }
-                    CurrentAccountSubject::Logged(l) => l.account_id.clone(),
-                },
-            })
-            .await?;
-
         tracing::info!(
             id = %dataset_handle.id,
             alias = %dataset_handle.alias,
@@ -501,39 +482,31 @@ impl DatasetRepository for DatasetRepositoryS3 {
     async fn create_dataset_from_snapshot(
         &self,
         snapshot: DatasetSnapshot,
-    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
-        create_dataset_from_snapshot_impl(
-            self,
-            self.event_bus.as_ref(),
-            snapshot,
-            self.system_time_source.now(),
-        )
-        .await
+    ) -> Result<CreateDatasetFromSnapshotResult, CreateDatasetFromSnapshotError> {
+        create_dataset_from_snapshot_impl(self, snapshot, self.system_time_source.now()).await
     }
 
     async fn rename_dataset(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_handle: &DatasetHandle,
         new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError> {
-        let old_handle = self.resolve_dataset_ref(dataset_ref).await?;
+        let dataset = self.get_dataset_impl(&dataset_handle.id);
 
-        let dataset = self.get_dataset_impl(&old_handle.id);
+        let new_alias =
+            DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
 
-        let new_alias = DatasetAlias::new(old_handle.alias.account_name.clone(), new_name.clone());
-
-        // Check against possible name collisions
+        // Note: should collision check be moved to use case level?
         match self.resolve_dataset_ref(&new_alias.as_local_ref()).await {
             Ok(_) => Err(RenameDatasetError::NameCollision(NameCollisionError {
-                alias: DatasetAlias::new(old_handle.alias.account_name.clone(), new_name.clone()),
+                alias: DatasetAlias::new(
+                    dataset_handle.alias.account_name.clone(),
+                    new_name.clone(),
+                ),
             })),
             Err(GetDatasetError::Internal(e)) => Err(RenameDatasetError::Internal(e)),
             Err(GetDatasetError::NotFound(_)) => Ok(()),
         }?;
-
-        self.dataset_action_authorizer
-            .check_action_allowed(&old_handle, DatasetAction::Write)
-            .await?;
 
         // It's safe to rename dataset
         self.save_dataset_alias(dataset.as_ref(), &new_alias)
@@ -542,52 +515,19 @@ impl DatasetRepository for DatasetRepositoryS3 {
         // Update cache if enabled
         if let Some(cache) = &self.registry_cache {
             let mut cache = cache.state.lock().await;
-            cache.datasets.retain(|h| h.id != old_handle.id);
+            cache.datasets.retain(|h| h.id != dataset_handle.id);
             cache
                 .datasets
-                .push(DatasetHandle::new(old_handle.id, new_alias));
+                .push(DatasetHandle::new(dataset_handle.id.clone(), new_alias));
         }
 
         Ok(())
     }
 
-    async fn delete_dataset(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError> {
-        let dataset_handle = match self.resolve_dataset_ref(dataset_ref).await {
-            Ok(dataset_handle) => dataset_handle,
-            Err(GetDatasetError::NotFound(e)) => return Err(DeleteDatasetError::NotFound(e)),
-            Err(GetDatasetError::Internal(e)) => return Err(DeleteDatasetError::Internal(e)),
-        };
-
-        use tokio_stream::StreamExt;
-        let downstream_dataset_ids: Vec<_> = self
-            .dependency_graph_service
-            .get_downstream_dependencies(&dataset_handle.id)
-            .await
-            .int_err()?
-            .collect()
-            .await;
-
-        if !downstream_dataset_ids.is_empty() {
-            let mut children = Vec::with_capacity(downstream_dataset_ids.len());
-            for downstream_dataset_id in downstream_dataset_ids {
-                let hdl = self
-                    .resolve_dataset_ref(&downstream_dataset_id.as_local_ref())
-                    .await
-                    .int_err()?;
-                children.push(hdl);
-            }
-
-            return Err(DanglingReferenceError {
-                dataset_handle,
-                children,
-            }
-            .into());
-        }
-
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle, DatasetAction::Write)
-            .await?;
-
+    async fn delete_dataset(
+        &self,
+        dataset_handle: &DatasetHandle,
+    ) -> Result<(), DeleteDatasetError> {
         self.delete_dataset_s3_objects(&dataset_handle.id)
             .await
             .map_err(DeleteDatasetError::Internal)?;
@@ -597,12 +537,6 @@ impl DatasetRepository for DatasetRepositoryS3 {
             let mut cache = cache.state.lock().await;
             cache.datasets.retain(|h| h.id != dataset_handle.id);
         }
-
-        self.event_bus
-            .dispatch_event(events::DatasetEventDeleted {
-                dataset_id: dataset_handle.id,
-            })
-            .await?;
 
         Ok(())
     }

@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::*;
 
@@ -47,10 +48,7 @@ impl VerificationServiceImpl {
         check_logical_hashes: bool,
         listener: Arc<dyn VerificationListener>,
     ) -> Result<(), VerificationError> {
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
 
         let chain = dataset.as_metadata_chain();
 
@@ -201,10 +199,7 @@ impl VerificationServiceImpl {
         block_range: (Option<Multihash>, Option<Multihash>),
         listener: Arc<dyn VerificationListener>,
     ) -> Result<(), VerificationError> {
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
 
         let chain = dataset.as_metadata_chain();
 
@@ -277,14 +272,7 @@ impl VerificationService for VerificationServiceImpl {
             Err(e) => return VerificationResult::err(dataset_handle, e),
         };
 
-        let dataset = match self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await
-        {
-            Ok(v) => v,
-            Err(e) => return VerificationResult::err(dataset_handle, e),
-        };
+        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
 
         let dataset_kind = match dataset.get_summary(GetSummaryOpts::default()).await {
             Ok(summary) => summary.kind,

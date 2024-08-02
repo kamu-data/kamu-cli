@@ -12,12 +12,14 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use datafusion::prelude::{DataFrame, SessionContext};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
 use random_names::get_random_name;
+use time_source::SystemTimeSource;
 
 use super::*;
 
@@ -76,10 +78,7 @@ impl PollingIngestServiceImpl {
             .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
             .await?;
 
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
 
         let listener =
             get_listener(&dataset_handle).unwrap_or_else(|| Arc::new(NullPollingIngestListener));
@@ -586,7 +585,7 @@ impl PollingIngestService for PollingIngestServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError> {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
+        let dataset = self.dataset_repo.find_dataset_by_ref(dataset_ref).await?;
 
         // TODO: Support source evolution
         Ok(dataset

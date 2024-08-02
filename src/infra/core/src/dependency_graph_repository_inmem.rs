@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use internal_error::ResultIntoInternal;
 use kamu_core::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,9 +40,7 @@ impl DependencyGraphRepository for DependencyGraphRepositoryInMemory {
 
                 let summary = self
                     .dataset_repo
-                    .get_dataset(&dataset_handle.as_local_ref())
-                    .await
-                    .int_err()?
+                    .get_dataset_by_handle(&dataset_handle)
                     .get_summary(GetSummaryOpts::default())
                     .await
                     .int_err()?;

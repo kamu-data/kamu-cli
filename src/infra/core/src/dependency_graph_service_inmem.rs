@@ -11,14 +11,14 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dill::*;
-use event_bus::AsyncEventHandler;
-use internal_error::InternalError;
-use kamu_core::events::{
-    DatasetEventCreated,
-    DatasetEventDeleted,
-    DatasetEventDependenciesUpdated,
-};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
+use messaging_outbox::{
+    MessageConsumer,
+    MessageConsumerMeta,
+    MessageConsumerT,
+    MessageConsumptionDurability,
+};
 use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use petgraph::visit::{depth_first_search, Bfs, DfsEvent, Reversed};
@@ -70,9 +70,13 @@ impl State {
 
 #[component(pub)]
 #[interface(dyn DependencyGraphService)]
-#[interface(dyn AsyncEventHandler<DatasetEventCreated>)]
-#[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
-#[interface(dyn AsyncEventHandler<DatasetEventDependenciesUpdated>)]
+#[interface(dyn MessageConsumer)]
+#[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
+#[meta(MessageConsumerMeta {
+    consumer_name: MESSAGE_CONSUMER_KAMU_CORE_DEPENDENCY_GRAPH_SERVICE,
+    feeding_producers: &[MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE],
+    durability: MessageConsumptionDurability::BestEffort,
+ })]
 #[scope(Singleton)]
 impl DependencyGraphServiceInMemory {
     pub fn new(repository: Option<Arc<dyn DependencyGraphRepository>>) -> Self {
@@ -373,63 +377,58 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventCreated> for DependencyGraphServiceInMemory {
-    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
-    async fn handle(&self, event: &DatasetEventCreated) -> Result<(), InternalError> {
-        let mut state = self.state.write().await;
-        state.get_or_create_dataset_node(&event.dataset_id);
-        Ok(())
-    }
-}
+impl MessageConsumer for DependencyGraphServiceInMemory {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventDeleted> for DependencyGraphServiceInMemory {
-    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
-    async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
+impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceInMemory {
+    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: &DatasetLifecycleMessage,
+    ) -> Result<(), InternalError> {
         let mut state = self.state.write().await;
 
-        let node_index = state.get_dataset_node(&event.dataset_id).int_err()?;
+        match message {
+            DatasetLifecycleMessage::Created(message) => {
+                state.get_or_create_dataset_node(&message.dataset_id);
+            }
 
-        state.datasets_graph.remove_node(node_index);
-        state.dataset_node_indices.remove(&event.dataset_id);
+            DatasetLifecycleMessage::Deleted(message) => {
+                let node_index = state.get_dataset_node(&message.dataset_id).int_err()?;
 
-        Ok(())
-    }
-}
+                state.datasets_graph.remove_node(node_index);
+                state.dataset_node_indices.remove(&message.dataset_id);
+            }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            DatasetLifecycleMessage::DependenciesUpdated(message) => {
+                let node_index = state.get_dataset_node(&message.dataset_id).int_err()?;
 
-#[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventDependenciesUpdated> for DependencyGraphServiceInMemory {
-    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
-    async fn handle(&self, event: &DatasetEventDependenciesUpdated) -> Result<(), InternalError> {
-        let mut state = self.state.write().await;
-
-        let node_index = state.get_dataset_node(&event.dataset_id).int_err()?;
-
-        let existing_upstream_ids: HashSet<_> = state
-            .datasets_graph
-            .neighbors_directed(node_index, Direction::Incoming)
-            .map(|node_index| {
-                state
+                let existing_upstream_ids: HashSet<_> = state
                     .datasets_graph
-                    .node_weight(node_index)
-                    .unwrap()
-                    .clone()
-            })
-            .collect();
+                    .neighbors_directed(node_index, Direction::Incoming)
+                    .map(|node_index| {
+                        state
+                            .datasets_graph
+                            .node_weight(node_index)
+                            .unwrap()
+                            .clone()
+                    })
+                    .collect();
 
-        let new_upstream_ids: HashSet<_> = event.new_upstream_ids.iter().cloned().collect();
+                let new_upstream_ids: HashSet<_> =
+                    message.new_upstream_ids.iter().cloned().collect();
 
-        for obsolete_upstream_id in existing_upstream_ids.difference(&new_upstream_ids) {
-            self.remove_dependency(&mut state, obsolete_upstream_id, &event.dataset_id);
-        }
+                for obsolete_upstream_id in existing_upstream_ids.difference(&new_upstream_ids) {
+                    self.remove_dependency(&mut state, obsolete_upstream_id, &message.dataset_id);
+                }
 
-        for added_id in new_upstream_ids.difference(&existing_upstream_ids) {
-            self.add_dependency(&mut state, added_id, &event.dataset_id);
+                for added_id in new_upstream_ids.difference(&existing_upstream_ids) {
+                    self.add_dependency(&mut state, added_id, &message.dataset_id);
+                }
+            }
         }
 
         Ok(())

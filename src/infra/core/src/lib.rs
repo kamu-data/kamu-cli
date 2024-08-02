@@ -23,6 +23,7 @@ pub mod ingest;
 mod query;
 mod repos;
 pub mod testing; // TODO: Put under feature flag
+mod use_cases;
 pub mod utils;
 
 mod compaction_service_impl;
@@ -66,4 +67,5 @@ pub use resource_loader_impl::*;
 pub use search_service_impl::*;
 pub use sync_service_impl::*;
 pub use transform_service_impl::*;
+pub use use_cases::*;
 pub use verification_service_impl::*;

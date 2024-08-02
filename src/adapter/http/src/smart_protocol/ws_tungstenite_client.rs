@@ -10,16 +10,16 @@
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 
+use database_common::DatabaseTransactionRunner;
 use dill::*;
-use event_bus::EventBus;
 use futures::SinkExt;
-use kamu::domain::events::DatasetEventDependenciesUpdated;
-use kamu::domain::*;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu::utils::smart_transfer_protocol::{
     DatasetFactoryFn,
     SmartTransferProtocolClient,
     TransferOptions,
 };
+use kamu_core::*;
 use opendatafabric::{AsTypedBlock, Multihash};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -38,7 +38,7 @@ use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct WsSmartTransferProtocolClient {
-    event_bus: Arc<EventBus>,
+    catalog: Catalog,
     dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>,
 }
 
@@ -48,11 +48,11 @@ pub struct WsSmartTransferProtocolClient {
 #[interface(dyn SmartTransferProtocolClient)]
 impl WsSmartTransferProtocolClient {
     pub fn new(
-        event_bus: Arc<EventBus>,
+        catalog: Catalog,
         dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>,
     ) -> Self {
         Self {
-            event_bus,
+            catalog,
             dataset_credential_resolver,
         }
     }
@@ -640,29 +640,23 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     .await?;
             }
 
-            let response = dataset_append_metadata(
-                dst.as_ref(),
-                new_blocks,
-                transfer_options.force_update_if_diverged,
-            )
-            .await
-            .map_err(|e| {
-                tracing::debug!("Appending dataset metadata failed with error: {}", e);
-                SyncError::Internal(e.int_err())
-            })?;
-
-            // TODO: encapsulate this inside dataset/chain
-            if !response.new_upstream_ids.is_empty() {
-                let summary = dst.get_summary(GetSummaryOpts::default()).await.int_err()?;
-
-                self.event_bus
-                    .dispatch_event(DatasetEventDependenciesUpdated {
-                        dataset_id: summary.id.clone(),
-                        new_upstream_ids: response.new_upstream_ids,
-                    })
-                    .await
-                    .int_err()?;
-            }
+            let dst_dataset = dst.clone();
+            DatabaseTransactionRunner::new(self.catalog.clone())
+                .transactional_with(
+                    |append_dataset_metadata_batch: Arc<
+                        dyn AppendDatasetMetadataBatchUseCase,
+                    >| async move {
+                        append_dataset_metadata_batch
+                            .execute(
+                                dst_dataset.as_ref(),
+                                new_blocks,
+                                transfer_options.force_update_if_diverged,
+                            )
+                            .await
+                    },
+                )
+                .await
+                .int_err()?;
 
             let new_dst_head = dst
                 .as_metadata_chain()

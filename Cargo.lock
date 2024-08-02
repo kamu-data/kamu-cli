@@ -3266,9 +3266,9 @@ dependencies = [
 
 [[package]]
 name = "dill"
-version = "0.8.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3a18eaae0c1d3dc669fa6388383dfce0420742a916950cbef6d090d13cb52a0"
+checksum = "e48b1532a27b1a81c94cb1099786888c942548f13f1992c8359cb84149d05e66"
 dependencies = [
  "dill-impl",
  "multimap",
@@ -3277,9 +3277,9 @@ dependencies = [
 
 [[package]]
 name = "dill-impl"
-version = "0.8.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f2abd05d581140fcd1e4256e5c4006273515b00696ba11a883f11c7b3dc52fa"
+checksum = "f3b9ec65933903d7e376ef6888d499fe24e5edf90d26723d483fbf6dda571ea7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3580,21 +3580,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "event-bus"
-version = "0.191.5"
-dependencies = [
- "async-trait",
- "dill",
- "futures",
- "internal-error",
- "test-log",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "event-listener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3609,6 +3594,7 @@ dependencies = [
  "event-sourcing-macros",
  "futures",
  "internal-error",
+ "serde",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -4282,6 +4268,7 @@ version = "0.191.5"
 dependencies = [
  "axum",
  "http 0.2.12",
+ "internal-error",
  "kamu-core",
  "thiserror",
  "tracing",
@@ -4781,7 +4768,6 @@ dependencies = [
  "datafusion-functions-json",
  "digest 0.10.7",
  "dill",
- "event-bus",
  "filetime",
  "flatbuffers",
  "flate2",
@@ -4803,6 +4789,7 @@ dependencies = [
  "kamu-ingest-datafusion",
  "libc",
  "like",
+ "messaging-outbox",
  "mockall",
  "nanoid",
  "object_store",
@@ -4826,6 +4813,7 @@ dependencies = [
  "test-group",
  "test-log",
  "thiserror",
+ "time-source",
  "tokio",
  "tokio-stream",
  "tokio-util",
@@ -4953,7 +4941,6 @@ dependencies = [
  "jsonwebtoken",
  "kamu-accounts",
  "kamu-accounts-inmem",
- "kamu-core",
  "opendatafabric",
  "password-hash 0.5.0",
  "random-names",
@@ -4961,6 +4948,7 @@ dependencies = [
  "serde_json",
  "test-log",
  "thiserror",
+ "time-source",
  "tokio",
  "tracing",
  "uuid",
@@ -4992,15 +4980,17 @@ version = "0.191.5"
 dependencies = [
  "async-trait",
  "dill",
- "event-bus",
+ "internal-error",
  "kamu",
  "kamu-accounts",
  "kamu-core",
+ "messaging-outbox",
  "opendatafabric",
  "oso",
  "oso-derive",
  "tempfile",
  "test-log",
+ "time-source",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -5041,7 +5031,6 @@ dependencies = [
  "database-common",
  "datafusion",
  "dill",
- "event-bus",
  "event-sourcing",
  "futures",
  "indoc 2.0.5",
@@ -5061,6 +5050,7 @@ dependencies = [
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
+ "messaging-outbox",
  "mockall",
  "opendatafabric",
  "secrecy",
@@ -5070,6 +5060,7 @@ dependencies = [
  "test-group",
  "test-log",
  "thiserror",
+ "time-source",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -5094,7 +5085,6 @@ dependencies = [
  "database-common-macros",
  "datafusion",
  "dill",
- "event-bus",
  "flate2",
  "fs_extra",
  "futures",
@@ -5102,13 +5092,16 @@ dependencies = [
  "http-common",
  "hyper 0.14.30",
  "indoc 2.0.5",
+ "internal-error",
  "kamu",
  "kamu-accounts",
  "kamu-accounts-inmem",
  "kamu-accounts-services",
+ "kamu-core",
  "kamu-data-utils",
  "kamu-datasets-services",
  "kamu-ingest-datafusion",
+ "messaging-outbox",
  "mockall",
  "opendatafabric",
  "paste",
@@ -5122,6 +5115,7 @@ dependencies = [
  "test-group",
  "test-log",
  "thiserror",
+ "time-source",
  "tokio",
  "tokio-stream",
  "tokio-tungstenite 0.20.1",
@@ -5142,13 +5136,12 @@ dependencies = [
  "chrono",
  "dill",
  "http 0.2.12",
+ "internal-error",
  "kamu-accounts",
- "kamu-core",
  "opendatafabric",
  "reqwest 0.11.27",
  "serde",
  "serde_json",
- "tempfile",
  "thiserror",
  "tokio",
  "tracing",
@@ -5165,21 +5158,23 @@ dependencies = [
  "datafusion",
  "datafusion-odata",
  "dill",
- "event-bus",
  "futures",
  "http 0.2.12",
  "http-common",
  "hyper 0.14.30",
  "indoc 2.0.5",
+ "internal-error",
  "kamu",
  "kamu-accounts",
  "kamu-core",
+ "messaging-outbox",
  "opendatafabric",
  "reqwest 0.11.27",
  "serde",
  "tempfile",
  "test-group",
  "test-log",
+ "time-source",
  "tokio",
  "tower-http",
  "tracing",
@@ -5210,7 +5205,6 @@ dependencies = [
  "dill",
  "dirs",
  "duration-string",
- "event-bus",
  "fs_extra",
  "futures",
  "glob",
@@ -5245,11 +5239,17 @@ dependencies = [
  "kamu-datasets-services",
  "kamu-datasets-sqlite",
  "kamu-flow-system-inmem",
+ "kamu-flow-system-postgres",
  "kamu-flow-system-services",
+ "kamu-flow-system-sqlite",
+ "kamu-messaging-outbox-inmem",
+ "kamu-messaging-outbox-postgres",
+ "kamu-messaging-outbox-sqlite",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
  "libc",
  "merge",
+ "messaging-outbox",
  "mime",
  "mime_guess",
  "minus",
@@ -5272,6 +5272,7 @@ dependencies = [
  "tempfile",
  "test-log",
  "thiserror",
+ "time-source",
  "tokio",
  "tokio-stream",
  "tokio-util",
@@ -5422,6 +5423,7 @@ dependencies = [
  "internal-error",
  "kamu-accounts",
  "kamu-datasets",
+ "messaging-outbox",
  "object_store",
  "opendatafabric",
  "pathdiff",
@@ -5564,13 +5566,13 @@ dependencies = [
  "database-common",
  "dill",
  "internal-error",
- "kamu-core",
  "kamu-datasets",
  "opendatafabric",
  "secrecy",
  "serde",
  "serde_json",
  "thiserror",
+ "time-source",
  "tokio",
  "tracing",
  "uuid",
@@ -5612,6 +5614,7 @@ dependencies = [
  "kamu-core",
  "kamu-task-system",
  "lazy_static",
+ "messaging-outbox",
  "opendatafabric",
  "serde",
  "serde_with",
@@ -5694,9 +5697,9 @@ dependencies = [
  "database-common",
  "database-common-macros",
  "dill",
- "event-bus",
  "futures",
  "indoc 2.0.5",
+ "internal-error",
  "kamu",
  "kamu-accounts",
  "kamu-accounts-inmem",
@@ -5707,14 +5710,17 @@ dependencies = [
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
+ "messaging-outbox",
  "mockall",
  "opendatafabric",
  "pretty_assertions",
  "serde",
+ "serde_json",
  "serde_with",
  "tempfile",
  "test-log",
  "thiserror",
+ "time-source",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -5783,6 +5789,56 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-messaging-outbox-inmem"
+version = "0.191.5"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dill",
+ "internal-error",
+ "messaging-outbox",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
+name = "kamu-messaging-outbox-postgres"
+version = "0.191.5"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "futures",
+ "internal-error",
+ "messaging-outbox",
+ "sqlx",
+ "thiserror",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-messaging-outbox-sqlite"
+version = "0.191.5"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "futures",
+ "internal-error",
+ "messaging-outbox",
+ "sqlx",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "kamu-repo-tools"
 version = "0.191.5"
 dependencies = [
@@ -5806,6 +5862,7 @@ dependencies = [
  "enum-variants",
  "event-sourcing",
  "kamu-core",
+ "messaging-outbox",
  "opendatafabric",
  "serde",
  "thiserror",
@@ -5869,14 +5926,17 @@ dependencies = [
  "chrono",
  "database-common",
  "dill",
- "event-bus",
  "futures",
+ "internal-error",
  "kamu-core",
  "kamu-datasets",
  "kamu-task-system",
  "kamu-task-system-inmem",
+ "messaging-outbox",
  "opendatafabric",
+ "serde_json",
  "test-log",
+ "time-source",
  "tokio",
  "tracing",
 ]
@@ -6269,6 +6329,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "messaging-outbox"
+version = "0.191.5"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "futures",
+ "internal-error",
+ "mockall",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "time-source",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6400,9 +6480,9 @@ dependencies = [
 
 [[package]]
 name = "multimap"
-version = "0.9.1"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1a5d38b9b352dbd913288736af36af41c48d61b1a8cd34bcecd727561b7d511"
+checksum = "defc4c55412d89136f966bbb339008b474350e5e6e78d2714439c386b3137a03"
 dependencies = [
  "serde",
 ]
@@ -9200,6 +9280,17 @@ checksum = "3f252a68540fde3a3877aeea552b832b40ab9a69e318efd078774a01ddee1ccf"
 dependencies = [
  "num-conv",
  "time-core",
+]
+
+[[package]]
+name = "time-source"
+version = "0.191.5"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dill",
+ "futures",
+ "tokio",
 ]
 
 [[package]]

@@ -9,7 +9,8 @@
 
 use std::fmt::{self, Display};
 
-use kamu::domain::{InternalError, InvalidIntervalError, RefCASError, RefCollisionError};
+use internal_error::InternalError;
+use kamu_core::{InvalidIntervalError, RefCASError, RefCollisionError};
 use thiserror::Error;
 
 use super::phases::*;

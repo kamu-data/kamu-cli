@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::BoxedError;
+use internal_error::BoxedError;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use thiserror::Error;

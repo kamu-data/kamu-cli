@@ -13,7 +13,7 @@ use std::sync::Arc;
 use chrono::{Duration, Utc};
 use futures::TryStreamExt;
 use kamu_flow_system::*;
-use kamu_flow_system_inmem::FlowEventStoreInMem;
+use kamu_flow_system_inmem::FlowEventStoreInMemory;
 use kamu_task_system::{TaskOutcome, TaskResult, TaskSystemEventStore};
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use opendatafabric::{AccountID, DatasetID};
@@ -834,7 +834,7 @@ async fn test_system_flow_pagination_with_filters() {
 
 fn make_event_stores() -> (Arc<dyn FlowEventStore>, Arc<dyn TaskSystemEventStore>) {
     (
-        Arc::new(FlowEventStoreInMem::new()),
+        Arc::new(FlowEventStoreInMemory::new()),
         Arc::new(TaskSystemEventStoreInMemory::new()),
     )
 }

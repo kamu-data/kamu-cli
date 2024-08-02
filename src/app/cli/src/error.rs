@@ -11,6 +11,7 @@ use std::backtrace::Backtrace;
 use std::fmt::Display;
 use std::path::PathBuf;
 
+use internal_error::{BoxedError, InternalError};
 use kamu::domain::engine::normalize_logs;
 use kamu::domain::*;
 use kamu_data_utils::data::format::WriterError;

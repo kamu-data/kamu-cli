@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use aws_credential_types::provider::SharedCredentialsProvider;
 use dill::*;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
 use object_store::aws::{AmazonS3Builder, AwsCredential};
 use object_store::CredentialProvider;

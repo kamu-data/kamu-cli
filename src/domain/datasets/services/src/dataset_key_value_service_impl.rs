@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use dill::*;
-use kamu_core::ErrorIntoInternal;
+use internal_error::ErrorIntoInternal;
 use kamu_datasets::{
     DatasetEnvVar,
     DatasetEnvVarNotFoundError,

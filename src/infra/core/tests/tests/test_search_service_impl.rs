@@ -10,12 +10,12 @@
 use std::path::Path;
 
 use dill::Component;
-use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
+use time_source::SystemTimeSourceDefault;
 use url::Url;
 
 // Create repo/bar dataset in a repo and check it appears in searches
@@ -28,8 +28,6 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
 
     let catalog = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add::<EventBus>()
-        .add::<DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
             DatasetRepositoryLocalFs::builder()
@@ -37,6 +35,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(RemoteRepositoryRegistryImpl::create(tmp_workspace_dir.join("repos")).unwrap())
         .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
@@ -50,7 +49,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .build();
 
     let remote_repo_reg = catalog.get_one::<dyn RemoteRepositoryRegistry>().unwrap();
-    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
     let search_svc = catalog.get_one::<dyn SearchService>().unwrap();
 
@@ -60,7 +59,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .unwrap();
 
     // Add and sync dataset
-    dataset_repo
+    dataset_repo_writer
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(dataset_local_alias.clone())

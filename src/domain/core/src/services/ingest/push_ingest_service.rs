@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
 use tokio::io::AsyncRead;

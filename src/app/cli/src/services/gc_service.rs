@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
-use kamu::domain::*;
+use internal_error::{InternalError, ResultIntoInternal};
 
 use crate::WorkspaceLayout;
 

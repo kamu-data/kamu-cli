@@ -33,16 +33,9 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn get_dataset(
-    ctx: &Context<'_>,
-    dataset_handle: &DatasetHandle,
-) -> Result<Arc<dyn Dataset>, InternalError> {
+pub(crate) fn get_dataset(ctx: &Context<'_>, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset> {
     let dataset_repo = from_catalog::<dyn DatasetRepository>(ctx).unwrap();
-    let dataset = dataset_repo
-        .get_dataset(&dataset_handle.as_local_ref())
-        .await
-        .int_err()?;
-    Ok(dataset)
+    dataset_repo.get_dataset_by_handle(dataset_handle)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,14 +84,20 @@ pub(crate) async fn check_dataset_write_access(
         .check_action_allowed(dataset_handle, kamu_core::auth::DatasetAction::Write)
         .await
         .map_err(|e| match e {
-            DatasetActionUnauthorizedError::Access(_) => GqlError::Gql(
-                async_graphql::Error::new("Dataset access error")
-                    .extend_with(|_, eev| eev.set("alias", dataset_handle.alias.to_string())),
-            ),
+            DatasetActionUnauthorizedError::Access(_) => make_dataset_access_error(dataset_handle),
             DatasetActionUnauthorizedError::Internal(e) => GqlError::Internal(e),
         })?;
 
     Ok(())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn make_dataset_access_error(dataset_handle: &DatasetHandle) -> GqlError {
+    GqlError::Gql(
+        async_graphql::Error::new("Dataset access error")
+            .extend_with(|_, eev| eev.set("alias", dataset_handle.alias.to_string())),
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

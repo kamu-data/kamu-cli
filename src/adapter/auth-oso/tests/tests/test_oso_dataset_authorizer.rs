@@ -11,16 +11,17 @@ use std::assert_matches::assert_matches;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use dill::Component;
-use event_bus::EventBus;
+use dill::{Catalog, Component};
 use kamu::testing::MetadataFactory;
-use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu::{CreateDatasetUseCaseImpl, DatasetRepositoryLocalFs, DatasetRepositoryWriter};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_auth_oso::{KamuAuthOso, OsoDatasetAuthorizer};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::{AccessError, DatasetRepository, SystemTimeSourceDefault};
+use kamu_core::{AccessError, CreateDatasetUseCase, DatasetRepository};
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle, DatasetKind};
 use tempfile::TempDir;
+use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -95,7 +96,7 @@ async fn test_guest_can_read_but_not_write() {
 #[allow(dead_code)]
 pub struct DatasetAuthorizerHarness {
     tempdir: TempDir,
-    dataset_repository: Arc<dyn DatasetRepository>,
+    catalog: Catalog,
     dataset_authorizer: Arc<dyn DatasetActionAuthorizer>,
 }
 
@@ -107,7 +108,7 @@ impl DatasetAuthorizerHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
-            .add::<EventBus>()
+            .add::<DummyOutboxImpl>()
             .add_value(CurrentAccountSubject::logged(
                 AccountID::new_seeded_ed25519(current_account_name.as_bytes()),
                 AccountName::new_unchecked(current_account_name),
@@ -115,28 +116,30 @@ impl DatasetAuthorizerHarness {
             ))
             .add::<KamuAuthOso>()
             .add::<OsoDatasetAuthorizer>()
-            .add::<DependencyGraphServiceInMemory>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
                     .with_multi_tenant(true),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<CreateDatasetUseCaseImpl>()
             .build();
 
-        let dataset_repository = catalog.get_one::<dyn DatasetRepository>().unwrap();
         let dataset_authorizer = catalog.get_one::<dyn DatasetActionAuthorizer>().unwrap();
 
         Self {
             tempdir,
-            dataset_repository,
+            catalog,
             dataset_authorizer,
         }
     }
 
     pub async fn create_dataset(&self, alias: &DatasetAlias) -> DatasetHandle {
-        self.dataset_repository
-            .create_dataset(
+        let create_dataset = self.catalog.get_one::<dyn CreateDatasetUseCase>().unwrap();
+
+        create_dataset
+            .execute(
                 alias,
                 MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                     .build_typed(),

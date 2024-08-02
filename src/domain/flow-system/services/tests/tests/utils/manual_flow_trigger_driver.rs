@@ -11,9 +11,9 @@ use std::sync::Arc;
 
 use chrono::Duration;
 use kamu_accounts::DEFAULT_ACCOUNT_ID;
-use kamu_core::SystemTimeSource;
 use kamu_flow_system::{FlowKey, FlowService};
 use opendatafabric::AccountID;
+use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

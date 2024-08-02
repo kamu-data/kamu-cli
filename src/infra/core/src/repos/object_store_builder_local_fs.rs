@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
+use internal_error::InternalError;
 use kamu_core::*;
 use url::Url;
 

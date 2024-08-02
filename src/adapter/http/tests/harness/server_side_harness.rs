@@ -12,12 +12,19 @@
 use std::sync::Arc;
 
 use chrono::Utc;
+use internal_error::InternalError;
 use kamu::domain::auth::{
     AlwaysHappyDatasetActionAuthorizer,
     DatasetAction,
     DatasetActionAuthorizer,
 };
-use kamu::domain::{CompactionService, DatasetRepository, InternalError, SystemTimeSourceStub};
+use kamu::domain::{
+    CommitDatasetEventUseCase,
+    CompactionService,
+    CreateDatasetFromSnapshotUseCase,
+    CreateDatasetUseCase,
+    DatasetRepository,
+};
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::DatasetLayout;
 use kamu_accounts::{
@@ -29,6 +36,7 @@ use kamu_accounts::{
 };
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle};
 use reqwest::Url;
+use time_source::SystemTimeSourceStub;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,8 +47,15 @@ pub(crate) const SERVER_ACCOUNT_NAME: &str = "kamu-server";
 #[async_trait::async_trait]
 pub(crate) trait ServerSideHarness {
     fn operating_account_name(&self) -> Option<AccountName>;
-
     fn cli_dataset_repository(&self) -> Arc<dyn DatasetRepository>;
+
+    fn cli_create_dataset_use_case(&self) -> Arc<dyn CreateDatasetUseCase>;
+
+    fn cli_create_dataset_from_snapshot_use_case(
+        &self,
+    ) -> Arc<dyn CreateDatasetFromSnapshotUseCase>;
+
+    fn cli_commit_dataset_event_use_case(&self) -> Arc<dyn CommitDatasetEventUseCase>;
 
     fn cli_compaction_service(&self) -> Arc<dyn CompactionService>;
 

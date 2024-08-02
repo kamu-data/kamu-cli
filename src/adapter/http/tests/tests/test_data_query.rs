@@ -60,8 +60,8 @@ impl Harness {
             DatasetName::new_unchecked("population"),
         );
         let create_result = server_harness
-            .cli_dataset_repository()
-            .create_dataset(
+            .cli_create_dataset_use_case()
+            .execute(
                 &alias,
                 MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                     .system_time(system_time)

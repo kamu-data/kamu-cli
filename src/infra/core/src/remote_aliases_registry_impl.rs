@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
@@ -73,7 +74,7 @@ impl RemoteAliasesRegistry for RemoteAliasesRegistryImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError> {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
+        let dataset = self.dataset_repo.find_dataset_by_ref(dataset_ref).await?;
         let config = Self::read_config(dataset.clone()).await?;
         Ok(Box::new(RemoteAliasesImpl::new(dataset, config)))
     }
