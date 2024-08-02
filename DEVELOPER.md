@@ -67,7 +67,9 @@ Prerequisites:
   * Install MariaDB command line client `mariadb`: 
     * deb: `sudo apt install -y mariadb-client`
     * rpm: `sudo dnf install -y mariadb`
-  * Install `sqlx-cli`: `cargo binstall sqlx-cli -y`
+  <!-- Installation using `cargo install` (rather than `cargo binstall`) is used intentionally -->
+  <!-- Details: https://github.com/launchbadge/sqlx/issues/3396 -->
+  * Install `sqlx-cli`: `cargo install sqlx-cli`
 
 Clone the repository:
 ```shell
