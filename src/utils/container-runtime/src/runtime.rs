@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 
-use once_cell::sync::OnceCell;
 use random_names::get_random_name;
 use tokio::process::Command;
 
@@ -532,6 +531,8 @@ fn is_selinux_present() -> bool {
 
 #[cfg(target_os = "linux")]
 fn is_selinux_present() -> bool {
+    use once_cell::sync::OnceCell;
+
     static FLAG: OnceCell<bool> = OnceCell::new();
 
     *FLAG.get_or_init(|| {
