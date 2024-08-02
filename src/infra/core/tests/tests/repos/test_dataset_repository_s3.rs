@@ -216,22 +216,6 @@ async fn test_rename_dataset_same_name_multiple_tenants() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[ignore = "Need to migrate authorization to use case level tests"]
-#[test_group::group(containerized)]
-#[tokio::test]
-async fn test_rename_unauthorized() {
-    let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, true, false).await;
-
-    test_dataset_repository_shared::test_rename_dataset_unauthorized(
-        harness.dataset_repo.as_ref(),
-        None,
-    )
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[test_group::group(containerized)]
 #[tokio::test]
 async fn test_delete_dataset() {

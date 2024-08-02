@@ -58,7 +58,7 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
             .await?;
 
         self.dataset_repo_writer
-            .rename_dataset(dataset_ref, new_name)
+            .rename_dataset(&dataset_handle, new_name)
             .await?;
 
         Ok(())

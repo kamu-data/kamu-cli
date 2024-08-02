@@ -168,21 +168,6 @@ async fn test_rename_dataset_same_name_multiple_tenants() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[ignore = "Need to migrate authorization to use case level tests"]
-#[tokio::test]
-async fn test_rename_unauthorized() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, true);
-
-    test_dataset_repository_shared::test_rename_dataset_unauthorized(
-        harness.dataset_repo.as_ref(),
-        None,
-    )
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[tokio::test]
 async fn test_delete_dataset() {
     let tempdir = tempfile::tempdir().unwrap();

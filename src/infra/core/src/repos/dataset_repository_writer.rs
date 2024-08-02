@@ -27,7 +27,7 @@ pub trait DatasetRepositoryWriter: Sync + Send {
 
     async fn rename_dataset(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_handle: &DatasetHandle,
         new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError>;
 

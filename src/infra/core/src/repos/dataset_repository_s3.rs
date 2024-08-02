@@ -487,19 +487,21 @@ impl DatasetRepositoryWriter for DatasetRepositoryS3 {
 
     async fn rename_dataset(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_handle: &DatasetHandle,
         new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError> {
-        let old_handle = self.resolve_dataset_ref(dataset_ref).await?;
+        let dataset = self.get_dataset_impl(&dataset_handle.id);
 
-        let dataset = self.get_dataset_impl(&old_handle.id);
+        let new_alias =
+            DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
 
-        let new_alias = DatasetAlias::new(old_handle.alias.account_name.clone(), new_name.clone());
-
-        // Check against possible name collisions
+        // Note: should collision check be moved to use case level?
         match self.resolve_dataset_ref(&new_alias.as_local_ref()).await {
             Ok(_) => Err(RenameDatasetError::NameCollision(NameCollisionError {
-                alias: DatasetAlias::new(old_handle.alias.account_name.clone(), new_name.clone()),
+                alias: DatasetAlias::new(
+                    dataset_handle.alias.account_name.clone(),
+                    new_name.clone(),
+                ),
             })),
             Err(GetDatasetError::Internal(e)) => Err(RenameDatasetError::Internal(e)),
             Err(GetDatasetError::NotFound(_)) => Ok(()),
@@ -512,10 +514,10 @@ impl DatasetRepositoryWriter for DatasetRepositoryS3 {
         // Update cache if enabled
         if let Some(cache) = &self.registry_cache {
             let mut cache = cache.state.lock().await;
-            cache.datasets.retain(|h| h.id != old_handle.id);
+            cache.datasets.retain(|h| h.id != dataset_handle.id);
             cache
                 .datasets
-                .push(DatasetHandle::new(old_handle.id, new_alias));
+                .push(DatasetHandle::new(dataset_handle.id.clone(), new_alias));
         }
 
         Ok(())

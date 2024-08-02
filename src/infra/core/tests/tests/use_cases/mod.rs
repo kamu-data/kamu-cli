@@ -8,3 +8,4 @@
 // by the Apache License, Version 2.0.
 
 mod test_delete_dataset_use_case;
+mod test_rename_dataset_use_case;

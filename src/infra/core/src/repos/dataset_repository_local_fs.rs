@@ -311,13 +311,13 @@ impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
 
     async fn rename_dataset(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_handle: &DatasetHandle,
         new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError> {
-        let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
-
         let new_alias =
             DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
+
+        // Note: should collision check be moved to use case level?
         match self
             .storage_strategy
             .resolve_dataset_alias(&new_alias)
@@ -334,13 +334,12 @@ impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
         }?;
 
         self.storage_strategy
-            .handle_dataset_renamed(&dataset_handle, new_name)
+            .handle_dataset_renamed(dataset_handle, new_name)
             .await?;
 
         Ok(())
     }
 
-    // TODO: PERF: Need fast inverse dependency lookup
     async fn delete_dataset(
         &self,
         dataset_handle: &DatasetHandle,

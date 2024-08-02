@@ -331,7 +331,8 @@ pub async fn test_rename_dataset<
         )
         .build();
 
-    repo.create_dataset_from_snapshot(snapshot_foo)
+    let create_result_foo = repo
+        .create_dataset_from_snapshot(snapshot_foo)
         .await
         .unwrap();
     repo.create_dataset_from_snapshot(snapshot_bar)
@@ -339,20 +340,20 @@ pub async fn test_rename_dataset<
         .unwrap();
 
     assert_matches!(
-        repo.rename_dataset(&alias_baz.as_local_ref(), &alias_foo.dataset_name)
-            .await,
-        Err(RenameDatasetError::NotFound(_))
-    );
-
-    assert_matches!(
-        repo.rename_dataset(&alias_foo.as_local_ref(), &alias_bar.dataset_name)
-            .await,
+        repo.rename_dataset(
+            &create_result_foo.create_dataset_result.dataset_handle,
+            &alias_bar.dataset_name
+        )
+        .await,
         Err(RenameDatasetError::NameCollision(_))
     );
 
-    repo.rename_dataset(&alias_foo.as_local_ref(), &alias_baz.dataset_name)
-        .await
-        .unwrap();
+    repo.rename_dataset(
+        &create_result_foo.create_dataset_result.dataset_handle,
+        &alias_baz.dataset_name,
+    )
+    .await
+    .unwrap();
 
     let baz = repo.get_dataset(&alias_baz.as_local_ref()).await.unwrap();
 
@@ -401,7 +402,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
         .unwrap()
         .create_dataset_result;
 
-    let _create_result_my_baz = repo
+    let create_result_my_baz = repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(dataset_alias_my_baz.clone())
@@ -413,7 +414,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
         .unwrap();
 
     repo.rename_dataset(
-        &dataset_alias_my_foo.as_local_ref(),
+        &create_result_my_foo.dataset_handle,
         &DatasetName::new_unchecked("bar"),
     )
     .await
@@ -448,40 +449,12 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
 
     assert_matches!(
         repo.rename_dataset(
-            &dataset_alias_my_baz.as_local_ref(),
+            &create_result_my_baz.create_dataset_result.dataset_handle,
             &DatasetName::new_unchecked("bar")
         )
         .await,
         Err(RenameDatasetError::NameCollision(_))
     );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_rename_dataset_unauthorized<
-    TDatasetRepository: DatasetRepository + DatasetRepositoryWriter,
->(
-    repo: &TDatasetRepository,
-    account_name: Option<AccountName>,
-) {
-    let alias_foo = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("bar"));
-
-    let snapshot = MetadataFactory::dataset_snapshot()
-        .name(alias_foo.clone())
-        .kind(DatasetKind::Root)
-        .push_event(MetadataFactory::set_polling_source().build())
-        .build();
-
-    repo.create_dataset_from_snapshot(snapshot).await.unwrap();
-
-    let result = repo
-        .rename_dataset(&alias_foo.as_local_ref(), &alias_bar.dataset_name)
-        .await;
-
-    assert_matches!(result, Err(RenameDatasetError::Access(_)));
-    assert!(repo.get_dataset(&alias_foo.as_local_ref()).await.is_ok());
-    assert!(repo.get_dataset(&alias_bar.as_local_ref()).await.is_err());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
