@@ -15,13 +15,14 @@ use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum EntityType {
     Dataset,
     Account,
 }
 
 #[reusable(entity)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Entity<'a> {
     pub entity_type: EntityType,
     pub entity_id: Cow<'a, str>,
@@ -76,6 +77,15 @@ pub struct Property<'a> {
     pub value: Cow<'a, str>,
 }
 
+impl<'a> Property<'a> {
+    pub fn new(name: PropertyName, value: impl Into<Cow<'a, str>>) -> Self {
+        Self {
+            name,
+            value: value.into(),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Relation {
     AccountDatasetReader,
@@ -123,19 +133,19 @@ pub trait RebacRepository: Send + Sync {
     async fn get_subject_entity_relations(
         &self,
         subject_entity: &Entity,
-    ) -> Result<Vec<ObjectEntityWithRelation>, GetEntityRelationsError>;
+    ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsError>;
 
     async fn get_subject_entity_relations_by_object_type(
         &self,
         subject_entity: &Entity,
         object_entity_type: EntityType,
-    ) -> Result<Vec<ObjectEntityWithRelation>, GetEntityRelationsError>;
+    ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsByObjectTypeError>;
 
     async fn get_relations_between_entities(
         &self,
         subject_entity: &Entity,
         object_entity: &Entity,
-    ) -> Result<Vec<Relation>, GetEntityRelationsError>;
+    ) -> Result<Vec<Relation>, GetRelationsBetweenEntitiesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -153,18 +163,51 @@ pub enum UpsertEntityPropertyError {
 #[derive(Error, Debug)]
 pub enum DeleteEntityPropertyError {
     #[error(transparent)]
-    NotFound(EntityPropertyNotFoundError),
+    EntityNotFound(EntityNotFoundError),
+
+    #[error(transparent)]
+    PropertyNotFound(EntityPropertyNotFoundError),
 
     #[error(transparent)]
     Internal(InternalError),
 }
 
+impl DeleteEntityPropertyError {
+    pub fn entity_not_found(entity: &Entity) -> Self {
+        Self::EntityNotFound(entity.into())
+    }
+
+    pub fn property_not_found(entity: &Entity, property_name: PropertyName) -> Self {
+        Self::PropertyNotFound(EntityPropertyNotFoundError {
+            entity_type: entity.entity_type,
+            entity_id: entity.entity_id.to_string(),
+            property_name,
+        })
+    }
+}
+
+#[derive(Error, Debug)]
+#[error("Entity not found: {self}")]
+pub struct EntityNotFoundError {
+    pub entity_type: EntityType,
+    pub entity_id: String,
+}
+
+impl From<&Entity<'_>> for EntityNotFoundError {
+    fn from(entity: &Entity<'_>) -> Self {
+        Self {
+            entity_type: entity.entity_type,
+            entity_id: entity.entity_id.to_string(),
+        }
+    }
+}
+
 #[derive(Error, Debug)]
 #[error("Entity property not found: {self}")]
 pub struct EntityPropertyNotFoundError {
-    pub entity_type: String,
+    pub entity_type: EntityType,
     pub entity_id: String,
-    pub property_name: String,
+    pub property_name: PropertyName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -172,17 +215,16 @@ pub struct EntityPropertyNotFoundError {
 #[derive(Error, Debug)]
 pub enum GetEntityPropertiesError {
     #[error(transparent)]
-    NotFound(EntityPropertiesNotFoundError),
+    NotFound(EntityNotFoundError),
 
     #[error(transparent)]
     Internal(InternalError),
 }
 
-#[derive(Error, Debug)]
-#[error("Entity properties not found: {self}")]
-pub struct EntityPropertiesNotFoundError {
-    pub entity_type: String,
-    pub entity_id: String,
+impl GetEntityPropertiesError {
+    pub fn entity_not_found(entity: &Entity<'_>) -> Self {
+        Self::NotFound(entity.into())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -196,13 +238,29 @@ pub enum InsertEntitiesRelationError {
     Internal(InternalError),
 }
 
+impl InsertEntitiesRelationError {
+    pub fn duplicate(
+        subject_entity: &Entity,
+        relationship: Relation,
+        object_entity: &Entity,
+    ) -> Self {
+        Self::Duplicate(InsertEntitiesRelationDuplicateError {
+            subject_entity_type: subject_entity.entity_type,
+            subject_entity_id: subject_entity.entity_id.to_string(),
+            relationship,
+            object_entity_type: object_entity.entity_type,
+            object_entity_id: object_entity.entity_id.to_string(),
+        })
+    }
+}
+
 #[derive(Error, Debug)]
 #[error("Duplicate entity relation not inserted: {self}")]
 pub struct InsertEntitiesRelationDuplicateError {
-    pub subject_entity_type: String,
+    pub subject_entity_type: EntityType,
     pub subject_entity_id: String,
-    pub relationship: String,
-    pub object_entity_type: String,
+    pub relationship: Relation,
+    pub object_entity_type: EntityType,
     pub object_entity_id: String,
 }
 
@@ -217,25 +275,117 @@ pub enum DeleteEntitiesRelationError {
     Internal(InternalError),
 }
 
+impl DeleteEntitiesRelationError {
+    pub fn not_found(
+        subject_entity: &Entity,
+        relationship: Relation,
+        object_entity: &Entity,
+    ) -> Self {
+        Self::NotFound(EntitiesRelationNotFoundError {
+            subject_entity_type: subject_entity.entity_type,
+            subject_entity_id: subject_entity.entity_id.to_string(),
+            relationship,
+            object_entity_type: object_entity.entity_type,
+            object_entity_id: object_entity.entity_id.to_string(),
+        })
+    }
+}
+
 #[derive(Error, Debug)]
 #[error("Entities relation not found: {self}")]
 pub struct EntitiesRelationNotFoundError {
-    pub subject_entity_type: String,
+    pub subject_entity_type: EntityType,
     pub subject_entity_id: String,
-    pub relationship: String,
-    pub object_entity_type: String,
+    pub relationship: Relation,
+    pub object_entity_type: EntityType,
     pub object_entity_id: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetEntityRelationsError {
+pub enum SubjectEntityRelationsError {
     #[error(transparent)]
-    NotFound(EntityPropertiesNotFoundError),
+    NotFound(ObjectEntitiesRelationsNotFoundError),
 
     #[error(transparent)]
     Internal(InternalError),
+}
+
+impl SubjectEntityRelationsError {
+    pub fn not_found(subject_entity: &Entity) -> Self {
+        Self::NotFound(ObjectEntitiesRelationsNotFoundError {
+            subject_entity_type: subject_entity.entity_type,
+            subject_entity_id: subject_entity.entity_id.to_string(),
+        })
+    }
+}
+
+#[derive(Error, Debug)]
+#[error("Object entities relations not found: {self}")]
+pub struct ObjectEntitiesRelationsNotFoundError {
+    pub subject_entity_type: EntityType,
+    pub subject_entity_id: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum SubjectEntityRelationsByObjectTypeError {
+    #[error(transparent)]
+    NotFound(ObjectEntitiesRelationsByObjectTypeNotFoundError),
+
+    #[error(transparent)]
+    Internal(InternalError),
+}
+
+impl SubjectEntityRelationsByObjectTypeError {
+    pub fn not_found(subject_entity: &Entity, object_entity_type: EntityType) -> Self {
+        Self::NotFound(ObjectEntitiesRelationsByObjectTypeNotFoundError {
+            subject_entity_type: subject_entity.entity_type,
+            subject_entity_id: subject_entity.entity_id.to_string(),
+            object_entity_type,
+        })
+    }
+}
+
+#[derive(Error, Debug)]
+#[error("Object entities relations by object type not found: {self}")]
+pub struct ObjectEntitiesRelationsByObjectTypeNotFoundError {
+    pub subject_entity_type: EntityType,
+    pub subject_entity_id: String,
+    pub object_entity_type: EntityType,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetRelationsBetweenEntitiesError {
+    #[error(transparent)]
+    NotFound(RelationsBetweenEntitiesNotFoundError),
+
+    #[error(transparent)]
+    Internal(InternalError),
+}
+
+impl GetRelationsBetweenEntitiesError {
+    pub fn not_found(subject_entity: &Entity, object_entity: &Entity) -> Self {
+        Self::NotFound(RelationsBetweenEntitiesNotFoundError {
+            subject_entity_type: subject_entity.entity_type,
+            subject_entity_id: subject_entity.entity_id.to_string(),
+            object_entity_type: object_entity.entity_type,
+            object_entity_id: object_entity.entity_id.to_string(),
+        })
+    }
+}
+
+#[derive(Error, Debug)]
+#[error("Relations between entities not found: {self}")]
+pub struct RelationsBetweenEntitiesNotFoundError {
+    pub subject_entity_type: EntityType,
+    pub subject_entity_id: String,
+    pub object_entity_type: EntityType,
+    pub object_entity_id: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

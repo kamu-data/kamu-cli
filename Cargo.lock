@@ -5238,6 +5238,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-auth-rebac-inmem"
+version = "0.191.5"
+dependencies = [
+ "async-trait",
+ "dill 0.9.0",
+ "kamu-auth-rebac",
+ "tokio",
+]
+
+[[package]]
 name = "kamu-auth-rebac-services"
 version = "0.191.5"
 dependencies = [

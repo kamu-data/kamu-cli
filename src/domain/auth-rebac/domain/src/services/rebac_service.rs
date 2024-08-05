@@ -15,13 +15,13 @@ use crate::{
     DeleteEntitiesRelationError,
     DeleteEntityPropertyError,
     GetEntityPropertiesError,
-    GetEntityRelationsError,
     InsertEntitiesRelationError,
     ObjectEntity,
     Property,
     PropertyName,
     PropertyValue,
     Relation,
+    SubjectEntityRelationsError,
     UpsertEntityPropertyError,
 };
 
@@ -83,7 +83,7 @@ pub trait RebacService: Send + Sync {
     async fn get_account_dataset_relations(
         &self,
         account_id: &AccountID,
-    ) -> Result<HashMap<Relation, Vec<ObjectEntity>>, GetEntityRelationsError>;
+    ) -> Result<HashMap<Relation, Vec<ObjectEntity>>, SubjectEntityRelationsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
