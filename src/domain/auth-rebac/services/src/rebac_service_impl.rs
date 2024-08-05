@@ -16,7 +16,6 @@ use kamu_auth_rebac::{
     DeleteEntityPropertyError,
     Entity,
     GetEntityPropertiesError,
-    GetEntityRelationsError,
     InsertEntitiesRelationError,
     ObjectEntity,
     Property,
@@ -25,6 +24,7 @@ use kamu_auth_rebac::{
     RebacRepository,
     RebacService,
     Relation,
+    SubjectEntityRelationsError,
     UpsertEntityPropertyError,
 };
 use opendatafabric::{AccountID, DatasetID};
@@ -168,7 +168,7 @@ impl RebacService for RebacServiceImpl {
     async fn get_account_dataset_relations(
         &self,
         account_id: &AccountID,
-    ) -> Result<HashMap<Relation, Vec<ObjectEntity>>, GetEntityRelationsError> {
+    ) -> Result<HashMap<Relation, Vec<ObjectEntity>>, SubjectEntityRelationsError> {
         let account_id = account_id.as_did_str().to_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
 
