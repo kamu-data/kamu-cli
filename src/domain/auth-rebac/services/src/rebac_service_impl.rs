@@ -24,8 +24,8 @@ use kamu_auth_rebac::{
     RebacRepository,
     RebacService,
     Relation,
+    SetEntityPropertyError,
     SubjectEntityRelationsError,
-    UpsertEntityPropertyError,
 };
 use opendatafabric::{AccountID, DatasetID};
 
@@ -49,7 +49,7 @@ impl RebacService for RebacServiceImpl {
         &self,
         account_id: &AccountID,
         property: &Property,
-    ) -> Result<(), UpsertEntityPropertyError> {
+    ) -> Result<(), SetEntityPropertyError> {
         let account_id = account_id.as_did_str().to_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
 
@@ -90,7 +90,7 @@ impl RebacService for RebacServiceImpl {
         &self,
         dataset_id: &DatasetID,
         property: &Property,
-    ) -> Result<(), UpsertEntityPropertyError> {
+    ) -> Result<(), SetEntityPropertyError> {
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_id_entity = Entity::new_dataset(dataset_id.as_str());
 

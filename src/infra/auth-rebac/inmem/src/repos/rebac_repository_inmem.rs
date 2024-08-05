@@ -26,9 +26,9 @@ use kamu_auth_rebac::{
     PropertyValue,
     RebacRepository,
     Relation,
+    SetEntityPropertyError,
     SubjectEntityRelationsByObjectTypeError,
     SubjectEntityRelationsError,
-    UpsertEntityPropertyError,
 };
 use tokio::sync::{RwLock, RwLockReadGuard};
 
@@ -99,7 +99,7 @@ impl RebacRepository for RebacRepositoryInMem {
         &self,
         entity: &Entity,
         property: &Property,
-    ) -> Result<(), UpsertEntityPropertyError> {
+    ) -> Result<(), SetEntityPropertyError> {
         let mut entities_properties_map = self.entities_properties_map.write().await;
 
         let entity_hash = EntityHasher::entity_hash(entity);
