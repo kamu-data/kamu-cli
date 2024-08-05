@@ -172,18 +172,24 @@ impl ContainerRuntime {
             });
         args.volumes.into_iter().for_each(|v| {
             cmd.arg("-v");
-            match v.access {
-                VolumeAccess::ReadOnly => cmd.arg(format!(
-                    "{}:{}:ro",
-                    Self::format_host_path(v.source),
-                    Self::format_container_path(&v.dest),
-                )),
-                VolumeAccess::ReadWrite => cmd.arg(format!(
-                    "{}:{}",
-                    Self::format_host_path(v.source),
-                    Self::format_container_path(&v.dest),
-                )),
+
+            let mut volume = format!(
+                "{}:{}",
+                Self::format_host_path(v.source),
+                Self::format_container_path(&v.dest),
+            );
+
+            let is_readonly = matches!(v.access, VolumeAccess::ReadOnly);
+            let has_selinux = is_selinux_present();
+
+            match (is_readonly, has_selinux) {
+                (true, true) => volume += ":ro,Z",
+                (false, true) => volume += ":Z",
+                (true, false) => volume += ":ro",
+                (false, false) => { /* no labels needed */ }
             };
+
+            cmd.arg(volume);
         });
         args.user.map(|v| cmd.arg(format!("--user={v}")));
         args.work_dir
@@ -508,8 +514,48 @@ impl ContainerRuntime {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Copy, Clone)]
 pub enum Signal {
     TERM,
     KILL,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(not(target_os = "linux"))]
+fn is_selinux_present() -> bool {
+    false
+}
+
+#[cfg(target_os = "linux")]
+fn is_selinux_present() -> bool {
+    use once_cell::sync::OnceCell;
+
+    static FLAG: OnceCell<bool> = OnceCell::new();
+
+    *FLAG.get_or_init(|| {
+        let output = std::process::Command::new("command")
+            .arg("-v")
+            .arg("sestatus")
+            .output();
+
+        match output {
+            Ok(output) => {
+                let is_present = output.status.success();
+
+                tracing::debug!("SELinux present: {is_present}");
+
+                is_present
+            }
+            Err(e) => {
+                tracing::warn!(error = ?e, "Error detecting SELinux presence");
+
+                false
+            }
+        }
+    })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
