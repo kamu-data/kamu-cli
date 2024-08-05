@@ -21,8 +21,8 @@ use crate::{
     PropertyName,
     PropertyValue,
     Relation,
+    SetEntityPropertyError,
     SubjectEntityRelationsError,
-    UpsertEntityPropertyError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,7 +34,7 @@ pub trait RebacService: Send + Sync {
         &self,
         account_id: &AccountID,
         property: &Property,
-    ) -> Result<(), UpsertEntityPropertyError>;
+    ) -> Result<(), SetEntityPropertyError>;
 
     async fn unset_account_property(
         &self,
@@ -52,7 +52,7 @@ pub trait RebacService: Send + Sync {
         &self,
         dataset_id: &DatasetID,
         property: &Property,
-    ) -> Result<(), UpsertEntityPropertyError>;
+    ) -> Result<(), SetEntityPropertyError>;
 
     async fn unset_dataset_property(
         &self,

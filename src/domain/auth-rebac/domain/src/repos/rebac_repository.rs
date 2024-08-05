@@ -72,6 +72,7 @@ pub enum PropertyName {
 
 pub type PropertyValue = String;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Property<'a> {
     pub name: PropertyName,
     pub value: Cow<'a, str>,
@@ -101,7 +102,7 @@ pub trait RebacRepository: Send + Sync {
         &self,
         entity: &Entity,
         property: &Property,
-    ) -> Result<(), UpsertEntityPropertyError>;
+    ) -> Result<(), SetEntityPropertyError>;
 
     async fn delete_entity_property(
         &self,
@@ -153,7 +154,7 @@ pub trait RebacRepository: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum UpsertEntityPropertyError {
+pub enum SetEntityPropertyError {
     #[error(transparent)]
     Internal(InternalError),
 }

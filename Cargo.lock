@@ -5248,6 +5248,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-auth-rebac-repo-tests"
+version = "0.191.5"
+dependencies = [
+ "dill 0.9.0",
+ "kamu-auth-rebac",
+]
+
+[[package]]
 name = "kamu-auth-rebac-services"
 version = "0.191.5"
 dependencies = [

@@ -56,6 +56,7 @@ members = [
     "src/infra/task-system/sqlite",
     ## ReBAC
     "src/infra/auth-rebac/inmem",
+    "src/infra/auth-rebac/repo-tests",
     # Adapters
     "src/adapter/auth-oso",
     "src/adapter/flight-sql",
@@ -141,6 +142,7 @@ kamu-task-system-sqlite = { version = "0.193.1", path = "src/infra/task-system/s
 kamu-task-system-repo-tests = { version = "0.193.1", path = "src/infra/task-system/repo-tests", default-features = false }
 ## ReBAC
 kamu-auth-rebac-inmem = { version = "0.193.1", path = "src/infra/auth-rebac/inmem", default-features = false }
+kamu-auth-rebac-repo-tests = { version = "0.193.1", path = "src/infra/auth-rebac/repo-tests", default-features = false }
 
 # Adapters
 kamu-adapter-auth-oso = { version = "0.193.1", path = "src/adapter/auth-oso", default-features = false }
