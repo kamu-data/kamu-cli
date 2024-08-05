@@ -16,8 +16,9 @@ use kamu_flow_system::{
     FlowConfigurationRule,
     FlowConfigurationService,
     FlowKeyDataset,
+    IngestRule,
     Schedule,
-    ScheduleTimeDelta,
+    ScheduleCronError,
     SetFlowConfigurationError,
 };
 use opendatafabric as odf;
@@ -47,12 +48,12 @@ impl DatasetFlowConfigsMut {
     }
 
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn set_config_schedule(
+    async fn set_config_ingest(
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
         paused: bool,
-        schedule: ScheduleInput,
+        ingest: IngestConditionInput,
     ) -> Result<SetFlowConfigResult> {
         if !ensure_set_config_flow_supported(dataset_flow_type, std::any::type_name::<Schedule>()) {
             return Ok(SetFlowConfigResult::TypeIsNotSupported(
@@ -73,15 +74,9 @@ impl DatasetFlowConfigsMut {
         }
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
-        let configuration_rule = match schedule {
-            ScheduleInput::TimeDelta(td) => {
-                Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
-            }
-            ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
-                Schedule::try_from_5component_cron_expression(&cron_5component_expression)
-                    .map_err(|e| GqlError::Gql(e.into()))?
-            }
-        };
+        let configuration_rule: IngestRule = ingest
+            .try_into()
+            .map_err(|e: ScheduleCronError| GqlError::Gql(e.into()))?;
 
         let res = flow_config_service
             .set_configuration(
@@ -89,7 +84,7 @@ impl DatasetFlowConfigsMut {
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 paused,
-                FlowConfigurationRule::Schedule(configuration_rule),
+                FlowConfigurationRule::IngestRule(configuration_rule),
             )
             .await
             .map_err(|e| match e {

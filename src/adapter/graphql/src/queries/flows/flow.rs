@@ -210,11 +210,8 @@ impl Flow {
     }
 
     /// Flow config snapshot
-    async fn config_snapshots(&self) -> Option<Vec<FlowConfigurationSnapshot>> {
-        self.flow_state
-            .config_snapshots
-            .clone()
-            .map(|config_snapshots| config_snapshots.into_iter().map(Into::into).collect())
+    async fn config_snapshot(&self) -> Option<FlowConfigurationSnapshot> {
+        self.flow_state.config_snapshot.clone().map(Into::into)
     }
 }
 

@@ -25,7 +25,7 @@ impl Flow {
         flow_id: FlowID,
         flow_key: FlowKey,
         trigger: FlowTrigger,
-        config_snapshots: Option<Vec<FlowConfigurationSnapshot>>,
+        config_snapshot: Option<FlowConfigurationSnapshot>,
     ) -> Self {
         Self(
             Aggregate::new(
@@ -35,7 +35,7 @@ impl Flow {
                     flow_id,
                     flow_key,
                     trigger,
-                    config_snapshots,
+                    config_snapshot,
                 },
             )
             .unwrap(),

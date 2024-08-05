@@ -253,24 +253,6 @@ impl FlowHarness {
             .unwrap();
     }
 
-    pub async fn set_dataset_flow_schedule(
-        &self,
-        request_time: DateTime<Utc>,
-        dataset_id: DatasetID,
-        dataset_flow_type: DatasetFlowType,
-        schedule: Schedule,
-    ) {
-        self.flow_configuration_service
-            .set_configuration(
-                request_time,
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                false,
-                FlowConfigurationRule::Schedule(schedule),
-            )
-            .await
-            .unwrap();
-    }
-
     pub async fn set_dataset_flow_ingest(
         &self,
         request_time: DateTime<Utc>,

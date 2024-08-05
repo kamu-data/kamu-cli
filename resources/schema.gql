@@ -552,9 +552,8 @@ type DatasetFlowConfigs {
 }
 
 type DatasetFlowConfigsMut {
-	setConfigSchedule(datasetFlowType: DatasetFlowType!, paused: Boolean!, schedule: ScheduleInput!): SetFlowConfigResult!
+	setConfigIngest(datasetFlowType: DatasetFlowType!, paused: Boolean!, ingest: IngestConditionInput!): SetFlowConfigResult!
 	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, batching: BatchingConditionInput!): SetFlowBatchingConfigResult!
-	setConfigIngest(datasetFlowType: DatasetFlowType!, ingestArgs: IngestConditionInput!): SetFlowCompactionConfigResult!
 	setConfigCompaction(datasetFlowType: DatasetFlowType!, compactionArgs: CompactionConditionInput!): SetFlowCompactionConfigResult!
 	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
 	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
@@ -573,7 +572,7 @@ type DatasetFlowRuns {
 }
 
 type DatasetFlowRunsMut {
-	triggerFlow(datasetFlowType: DatasetFlowType!, flowRunConfigurations: [FlowRunConfiguration!]): TriggerFlowResult!
+	triggerFlow(datasetFlowType: DatasetFlowType!, flowRunConfiguration: FlowRunConfiguration): TriggerFlowResult!
 	cancelScheduledTasks(flowId: FlowID!): CancelScheduledTasksResult!
 }
 
@@ -930,7 +929,7 @@ type Flow {
 	"""
 	Flow config snapshot
 	"""
-	configSnapshots: [FlowConfigurationSnapshot!]
+	configSnapshot: FlowConfigurationSnapshot
 }
 
 type FlowAbortedResult {
@@ -939,7 +938,7 @@ type FlowAbortedResult {
 
 type FlowConfiguration {
 	paused: Boolean!
-	schedule: FlowConfigurationSchedule
+	ingest: FlowConfigurationIngest
 	batching: FlowConfigurationBatching
 	compaction: FlowConfigurationCompaction
 }
@@ -956,6 +955,7 @@ type FlowConfigurationCompactionRule {
 }
 
 type FlowConfigurationIngest {
+	schedule: FlowConfigurationSchedule!
 	fetchUncacheable: Boolean!
 }
 
@@ -1217,7 +1217,8 @@ type GetFlowSuccess implements GetFlowResult {
 
 
 input IngestConditionInput {
-	featchUncacheable: Boolean!
+	fetchUncacheable: Boolean!
+	schedule: ScheduleInput!
 }
 
 input InitiatorFilterInput @oneOf {

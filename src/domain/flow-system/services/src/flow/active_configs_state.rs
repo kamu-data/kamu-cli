@@ -16,7 +16,6 @@ use opendatafabric::DatasetID;
 
 #[derive(Default)]
 pub(crate) struct ActiveConfigsState {
-    dataset_schedules: HashMap<FlowKeyDataset, Schedule>,
     system_schedules: HashMap<SystemFlowType, Schedule>,
     dataset_batching_rules: HashMap<FlowKeyDataset, BatchingRule>,
     dataset_compaction_rules: HashMap<FlowKeyDataset, CompactionRule>,
@@ -31,8 +30,8 @@ impl ActiveConfigsState {
     ) {
         let key = flow_key.clone();
         match rule {
-            FlowConfigurationRule::Schedule(schedule) => {
-                self.dataset_schedules.insert(key, schedule);
+            FlowConfigurationRule::Schedule(_) => {
+                unreachable!()
             }
             FlowConfigurationRule::IngestRule(ingest_rule) => {
                 self.dataset_ingest_rules.insert(key, ingest_rule);
@@ -68,7 +67,7 @@ impl ActiveConfigsState {
     }
 
     fn drop_dataset_flow_config(&mut self, flow_key: BorrowedFlowKeyDataset) {
-        self.dataset_schedules.remove(flow_key.as_trait());
+        self.dataset_ingest_rules.remove(flow_key.as_trait());
         self.dataset_batching_rules.remove(flow_key.as_trait());
         self.dataset_compaction_rules.remove(flow_key.as_trait());
     }
@@ -76,12 +75,12 @@ impl ActiveConfigsState {
     pub fn try_get_flow_schedule(&self, flow_key: &FlowKey) -> Option<Schedule> {
         match flow_key {
             FlowKey::Dataset(flow_key) => self
-                .dataset_schedules
+                .dataset_ingest_rules
                 .get(
                     BorrowedFlowKeyDataset::new(&flow_key.dataset_id, flow_key.flow_type)
                         .as_trait(),
                 )
-                .cloned(),
+                .map(|ingest_rule| ingest_rule.schedule_condition.clone()),
             FlowKey::System(flow_key) => self.system_schedules.get(&flow_key.flow_type).cloned(),
         }
     }
@@ -103,7 +102,7 @@ impl ActiveConfigsState {
     ) -> Option<IngestRule> {
         self.dataset_ingest_rules
             .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
-            .copied()
+            .cloned()
     }
 
     pub fn try_get_dataset_compaction_rule(
@@ -119,42 +118,30 @@ impl ActiveConfigsState {
     pub fn try_get_config_snapshot_by_key(
         &self,
         flow_key: &FlowKey,
-    ) -> Option<Vec<FlowConfigurationSnapshot>> {
+    ) -> Option<FlowConfigurationSnapshot> {
         match flow_key {
             FlowKey::System(_) => self
                 .try_get_flow_schedule(flow_key)
-                .map(|schedule| vec![FlowConfigurationSnapshot::Schedule(schedule)]),
+                .map(FlowConfigurationSnapshot::Schedule),
             FlowKey::Dataset(dataset_flow_key) => match dataset_flow_key.flow_type {
                 DatasetFlowType::ExecuteTransform => self
                     .try_get_dataset_batching_rule(
                         &dataset_flow_key.dataset_id,
                         dataset_flow_key.flow_type,
                     )
-                    .map(|batching_rule| vec![FlowConfigurationSnapshot::Batching(batching_rule)]),
-                DatasetFlowType::Ingest => {
-                    let mut result = vec![];
-                    if let Some(schedule) = self.try_get_flow_schedule(flow_key) {
-                        result.push(FlowConfigurationSnapshot::Schedule(schedule))
-                    };
-                    if let Some(ingest_rule) = self.try_get_dataset_ingest_rule(
+                    .map(FlowConfigurationSnapshot::Batching),
+                DatasetFlowType::Ingest => self
+                    .try_get_dataset_ingest_rule(
                         &dataset_flow_key.dataset_id,
                         dataset_flow_key.flow_type,
-                    ) {
-                        result.push(FlowConfigurationSnapshot::Ingest(ingest_rule))
-                    }
-                    if result.is_empty() {
-                        return None;
-                    }
-                    Some(result)
-                }
+                    )
+                    .map(FlowConfigurationSnapshot::Ingest),
                 DatasetFlowType::HardCompaction => self
                     .try_get_dataset_compaction_rule(
                         &dataset_flow_key.dataset_id,
                         dataset_flow_key.flow_type,
                     )
-                    .map(|compating_rule| {
-                        vec![FlowConfigurationSnapshot::Compaction(compating_rule)]
-                    }),
+                    .map(FlowConfigurationSnapshot::Compaction),
             },
         }
     }

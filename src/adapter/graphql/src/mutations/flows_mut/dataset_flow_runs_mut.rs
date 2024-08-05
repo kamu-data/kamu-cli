@@ -42,7 +42,7 @@ impl DatasetFlowRunsMut {
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
-        flow_run_configurations: Option<Vec<FlowRunConfiguration>>,
+        flow_run_configuration: Option<FlowRunConfiguration>,
     ) -> Result<TriggerFlowResult> {
         if let Some(e) =
             ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
@@ -64,16 +64,11 @@ impl DatasetFlowRunsMut {
         let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
         let logged_account = utils::get_logged_account(ctx);
 
-        let flow_run_snapshot = if let Some(flow_run_configs) = flow_run_configurations {
-            let mut config_snapshots = vec![];
-            for flow_run_config in flow_run_configs {
-                match flow_run_config.try_into_snapshot(dataset_flow_type) {
-                    Ok(snapshot) => config_snapshots.push(snapshot),
-                    Err(err) => return Ok(TriggerFlowResult::InvalidRunConfigurations(err)),
-                }
+        let flow_run_snapshot = if let Some(flow_run_config) = flow_run_configuration {
+            match flow_run_config.try_into_snapshot(dataset_flow_type) {
+                Ok(snapshot) => Some(snapshot),
+                Err(err) => return Ok(TriggerFlowResult::InvalidRunConfigurations(err)),
             }
-
-            Some(config_snapshots)
         } else {
             None
         };

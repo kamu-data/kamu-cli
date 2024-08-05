@@ -252,7 +252,7 @@ async fn test_task_create_update_dataset() {
         r#"
         mutation {{
             tasks {{
-                createUpdateDatasetTask (datasetId: "{dataset_id}") {{
+                createUpdateDatasetTask (datasetId: "{dataset_id}", fetchUncacheable: false) {{
                     taskId
                 }}
             }}
