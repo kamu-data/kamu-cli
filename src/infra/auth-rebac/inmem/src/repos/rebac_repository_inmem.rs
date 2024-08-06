@@ -173,9 +173,7 @@ impl RebacRepository for RebacRepositoryInMem {
 
         let mut state = self.entities_relations_state.write().await;
 
-        let is_duplicate = state
-            .index_subject_entity_object_entity
-            .contains_key(&row_id);
+        let is_duplicate = state.rows.contains_key(&row_id);
 
         if is_duplicate {
             return Err(InsertEntitiesRelationError::duplicate(
@@ -252,9 +250,39 @@ impl RebacRepository for RebacRepositoryInMem {
             ));
         }
 
-        state.index_subject_entity.remove(&row_id);
-        state.index_subject_entity_object_type.remove(&row_id);
-        state.index_subject_entity_object_entity.remove(&row_id);
+        {
+            let index_hash = &EntityHasher::subject_entity_index_hash(subject_entity);
+
+            let row_ids = state.index_subject_entity.get_mut(index_hash).unwrap();
+
+            assert!(row_ids.remove(&row_id));
+        }
+        {
+            let index_hash = &EntityHasher::subject_entity_object_type_index_hash(
+                subject_entity,
+                object_entity.entity_type,
+            );
+
+            let row_ids = state
+                .index_subject_entity_object_type
+                .get_mut(index_hash)
+                .unwrap();
+
+            assert!(row_ids.remove(&row_id));
+        }
+        {
+            let index_hash = &EntityHasher::subject_entity_object_entity_index_hash(
+                subject_entity,
+                object_entity,
+            );
+
+            let row_ids = state
+                .index_subject_entity_object_entity
+                .get_mut(index_hash)
+                .unwrap();
+
+            assert!(row_ids.remove(&row_id));
+        }
 
         Ok(())
     }
@@ -346,6 +374,7 @@ impl RebacRepository for RebacRepositoryInMem {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 struct EntityRow {
     pub entity_type: EntityType,
     pub entity_id: String,
@@ -360,6 +389,7 @@ impl<'a> From<Entity<'a>> for EntityRow {
     }
 }
 
+#[derive(Debug)]
 struct EntitiesRelationsRow {
     #[allow(dead_code)]
     subject_entity: EntityRow,
