@@ -25,17 +25,4 @@ doctest = false
 kamu-auth-rebac = { workspace = true }
 
 dill = "0.9"
-
-
-#database-common = { workspace = true }
-#opendatafabric = { workspace = true }
-#kamu-accounts = { workspace = true }
-#kamu-adapter-oauth = { workspace = true }
-#
-#argon2 = { version = "0.5" }
-#chrono = { version = "0.4", default-features = false }
-#dill = "0.8"
-#password-hash = { version = "0.5", default-features = false }
-#uuid = "1"
-#rand = "0.8"
-
+tokio = { version = "1", default-features = false, features = ["macros"] }
