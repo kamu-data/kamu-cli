@@ -116,7 +116,7 @@ pub async fn test_try_delete_nonexistent_property_from_entity(catalog: &Catalog)
         delete_res,
         Err(DeleteEntityPropertyError::PropertyNotFound(e))
             if e.entity_type == EntityType::Dataset
-                && e.entity_id == *"foo"
+                && e.entity_id == *"bar"
                 && e.property_name == PropertyName::DatasetAllowsPublicRead
     );
 }
@@ -137,7 +137,7 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
         assert_matches!(set_res, Ok(_));
     }
 
-    let public_read_property = Property::new(PropertyName::DatasetAllowsAnonymousRead, "true");
+    let public_read_property = Property::new(PropertyName::DatasetAllowsPublicRead, "true");
 
     {
         let set_res = rebac_repo
@@ -194,7 +194,7 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_try_insert_duplicate_entities_relation(catalog: &Catalog) {
+pub async fn test_try_insert_duplicate_entities_relation(catalog: &Catalog) {
     let rebac_repo = catalog.get_one::<dyn RebacRepository>().unwrap();
 
     let account = Entity::new_account("kamu");
@@ -227,7 +227,7 @@ async fn test_try_insert_duplicate_entities_relation(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_delete_entities_relation(catalog: &Catalog) {
+pub async fn test_delete_entities_relation(catalog: &Catalog) {
     let rebac_repo = catalog.get_one::<dyn RebacRepository>().unwrap();
 
     let account = Entity::new_account("kamu");
@@ -266,7 +266,7 @@ async fn test_delete_entities_relation(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_get_relations_crossover_test(catalog: &Catalog) {
+pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
     let rebac_repo = catalog.get_one::<dyn RebacRepository>().unwrap();
 
     // 1. Prepare
@@ -310,7 +310,7 @@ async fn test_get_relations_crossover_test(catalog: &Catalog) {
     // 3. Deletions
 
     {
-        let account = ObjectEntity::new_dataset("account");
+        let account = ObjectEntity::new_account("account");
         let dataset1 = ObjectEntity::new_dataset("dataset1");
 
         let delete_res = rebac_repo
@@ -334,7 +334,7 @@ async fn test_get_relations_crossover_test(catalog: &Catalog) {
         assert_get_relations(&rebac_repo, &state).await;
     }
     {
-        let account = ObjectEntity::new_dataset("account");
+        let account = ObjectEntity::new_account("account");
         let dataset2 = ObjectEntity::new_dataset("dataset2");
 
         let delete_res = rebac_repo
@@ -358,7 +358,7 @@ async fn test_get_relations_crossover_test(catalog: &Catalog) {
         assert_get_relations(&rebac_repo, &state).await;
     }
     {
-        let account = ObjectEntity::new_dataset("account");
+        let account = ObjectEntity::new_account("account");
         let dataset3 = ObjectEntity::new_dataset("dataset3");
 
         let delete_res = rebac_repo
@@ -379,7 +379,7 @@ async fn test_get_relations_crossover_test(catalog: &Catalog) {
         assert_get_relations(&rebac_repo, &state).await;
     }
     {
-        let account = ObjectEntity::new_dataset("account");
+        let account = ObjectEntity::new_account("account");
         let dataset1 = ObjectEntity::new_dataset("dataset1");
 
         let delete_res = rebac_repo
@@ -405,14 +405,18 @@ async fn test_get_relations_crossover_test(catalog: &Catalog) {
 
 async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &CrossoverTestState) {
     let account = Entity::new_account(state.account_id);
-    let object_entities = state.get_object_entities_with_relation();
+    let mut object_entities = state.get_object_entities_with_relation();
+
+    object_entities.sort();
 
     {
         let get_res = rebac_repo.get_subject_entity_relations(&account).await;
 
         match get_res {
-            Ok(actual_res) => {
-                assert_eq!(actual_res, object_entities);
+            Ok(mut actual_res) => {
+                actual_res.sort();
+
+                assert_eq!(object_entities, actual_res);
             }
             Err(actual_error) if object_entities.is_empty() => {
                 assert_matches!(
@@ -436,7 +440,9 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
                 .await;
 
             match get_res {
-                Ok(actual_res) => {
+                Ok(mut actual_res) => {
+                    actual_res.sort();
+
                     assert_eq!(actual_res, object_entities);
                 }
                 Err(actual_error) if object_entities.is_empty() => {
@@ -482,7 +488,9 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
             let expected_relations = relation_map.get(dataset_id).unwrap();
 
             match get_res {
-                Ok(actual_relations) => {
+                Ok(mut actual_relations) => {
+                    actual_relations.sort();
+
                     assert_eq!(&actual_relations, expected_relations);
                 }
                 Err(actual_error) if expected_relations.is_empty() => {
@@ -525,13 +533,6 @@ impl CrossoverTestState {
 
                 acc
             })
-    }
-
-    pub fn get_object_entities(&self) -> Vec<ObjectEntity> {
-        self.dataset_ids_for_check
-            .iter()
-            .map(|dataset_id| ObjectEntity::new_dataset(*dataset_id))
-            .collect()
     }
 
     pub fn get_object_entity_relation_map(&self) -> HashMap<DatasetId, Vec<Relation>> {

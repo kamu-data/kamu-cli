@@ -15,7 +15,7 @@ use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum EntityType {
     Dataset,
     Account,
@@ -55,7 +55,7 @@ impl<'a> From<EntityWithRelation<'a>> for Entity<'a> {
 }
 
 #[reuse(entity)]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EntityWithRelation<'a> {
     pub relation: Relation,
 }
@@ -110,7 +110,7 @@ impl<'a> Property<'a> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Relation {
     AccountDatasetReader,
     AccountDatasetEditor,

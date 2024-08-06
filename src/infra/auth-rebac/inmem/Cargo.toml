@@ -30,3 +30,6 @@ tokio = { version = "1", default-features = false, features = [] }
 
 
 [dev-dependencies]
+kamu-auth-rebac-repo-tests = { workspace = true }
+
+test-log = { version = "0.2", features = ["trace"] }

@@ -5244,6 +5244,8 @@ dependencies = [
  "async-trait",
  "dill 0.9.0",
  "kamu-auth-rebac",
+ "kamu-auth-rebac-repo-tests",
+ "test-log",
  "tokio",
 ]
 
