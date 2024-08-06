@@ -5253,6 +5253,7 @@ version = "0.191.5"
 dependencies = [
  "dill 0.9.0",
  "kamu-auth-rebac",
+ "tokio",
 ]
 
 [[package]]

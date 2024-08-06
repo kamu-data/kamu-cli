@@ -55,8 +55,31 @@ impl<'a> From<EntityWithRelation<'a>> for Entity<'a> {
 }
 
 #[reuse(entity)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EntityWithRelation<'a> {
     pub relation: Relation,
+}
+
+impl<'a> EntityWithRelation<'a> {
+    pub fn new(
+        entity_type: EntityType,
+        entity_id: impl Into<Cow<'a, str>>,
+        relation: Relation,
+    ) -> Self {
+        Self {
+            entity_type,
+            entity_id: entity_id.into(),
+            relation,
+        }
+    }
+
+    pub fn new_account(entity_id: impl Into<Cow<'a, str>>, relation: Relation) -> Self {
+        Self::new(EntityType::Account, entity_id, relation)
+    }
+
+    pub fn new_dataset(entity_id: impl Into<Cow<'a, str>>, relation: Relation) -> Self {
+        Self::new(EntityType::Dataset, entity_id, relation)
+    }
 }
 
 pub type ObjectEntity<'a> = Entity<'a>;
@@ -90,6 +113,7 @@ impl<'a> Property<'a> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Relation {
     AccountDatasetReader,
+    AccountDatasetEditor,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
