@@ -292,6 +292,7 @@ pub struct CompactionConditionMetadataOnly {
 
 #[derive(InputObject, Clone)]
 pub struct IngestConditionInput {
+    /// Flag indicates to ignore cache during ingest step for API calls
     pub fetch_uncacheable: bool,
     pub schedule: ScheduleInput,
 }

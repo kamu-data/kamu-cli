@@ -279,6 +279,7 @@ enum FlowDescriptionUpdateResult {
 
 #[derive(SimpleObject)]
 struct FlowDescriptionUpdateResultUpToDate {
+    /// The value indicates whether the api cache was used
     uncacheable: bool,
 }
 

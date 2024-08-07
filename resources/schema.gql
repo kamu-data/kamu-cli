@@ -1038,6 +1038,9 @@ type FlowDescriptionUpdateResultSuccess {
 }
 
 type FlowDescriptionUpdateResultUpToDate {
+	"""
+	The value indicates whether the api cache was used
+	"""
 	uncacheable: Boolean!
 }
 
@@ -1217,6 +1220,9 @@ type GetFlowSuccess implements GetFlowResult {
 
 
 input IngestConditionInput {
+	"""
+	Flag indicates to ignore cache during ingest step for API calls
+	"""
 	fetchUncacheable: Boolean!
 	schedule: ScheduleInput!
 }
@@ -1844,7 +1850,7 @@ type TasksMut {
 	Schedules a task to update the specified dataset by performing polling
 	ingest or a derivative transformation
 	"""
-	createUpdateDatasetTask(datasetId: DatasetID!, fetchUncacheable: Boolean!): Task!
+	createUpdateDatasetTask(datasetId: DatasetID!, fetchUncacheable: Boolean): Task!
 	"""
 	Schedules a task to update the specified dataset by performing polling
 	ingest or a derivative transformation
