@@ -17,62 +17,69 @@ use crate::DatasetEntry;
 
 #[async_trait::async_trait]
 pub trait DatasetEntryRepository: Send + Sync {
-    async fn get_dataset(&self, dataset_id: &DatasetID) -> Result<DatasetEntry, GetDatasetError>;
+    async fn get_dataset_entry(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<DatasetEntry, GetDatasetEntryError>;
 
-    async fn get_datasets_by_owner_id(
+    async fn get_dataset_entries_by_owner_id(
         &self,
         owner_id: &AccountID,
-    ) -> Result<Vec<DatasetEntry>, GetDatasetError>;
+    ) -> Result<Vec<DatasetEntry>, GetDatasetEntryError>;
 
-    async fn save_dataset(&self, dataset: &DatasetEntry) -> Result<(), SaveDatasetError>;
+    async fn save_dataset_entry(&self, dataset: &DatasetEntry)
+        -> Result<(), SaveDatasetEntryError>;
 
-    async fn update_dataset_alias(
+    async fn update_dataset_entry_alias(
         &self,
         dataset_id: &DatasetID,
         new_alias: &DatasetAlias,
-    ) -> Result<(), UpdateDatasetAliasError>;
+    ) -> Result<(), UpdateDatasetEntryAliasError>;
 
-    async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteDatasetError>;
+    async fn delete_dataset_entry(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<(), DeleteEntryDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetDatasetError {
+pub enum GetDatasetEntryError {
     #[error(transparent)]
-    NotFound(#[from] DatasetNotFoundError),
+    NotFound(#[from] DatasetEntryNotFoundError),
 
     #[error(transparent)]
     Internal(InternalError),
 }
 
 #[derive(Error, Debug)]
-pub enum DatasetNotFoundError {
-    #[error("Dataset not found by dataset_id: '{0}'")]
+pub enum DatasetEntryNotFoundError {
+    #[error("Dataset entry not found by dataset_id: '{0}'")]
     ByDatasetId(DatasetID),
 
-    #[error("Datasets not found by owner_id: '{0}'")]
+    #[error("Datasets entry not found by owner_id: '{0}'")]
     ByOwnerId(AccountID),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum SaveDatasetError {
+pub enum SaveDatasetEntryError {
     #[error(transparent)]
-    Duplicate(#[from] SaveDatasetErrorDuplicate),
+    Duplicate(#[from] SaveDatasetEntryErrorDuplicate),
 
     #[error(transparent)]
     Internal(InternalError),
 }
 
 #[derive(Error, Debug)]
-#[error("Dataset with dataset_id '{dataset_id}' already exists")]
-pub struct SaveDatasetErrorDuplicate {
+#[error("Dataset entry with dataset_id '{dataset_id}' already exists")]
+pub struct SaveDatasetEntryErrorDuplicate {
     pub dataset_id: DatasetID,
 }
 
-impl SaveDatasetErrorDuplicate {
+impl SaveDatasetEntryErrorDuplicate {
     pub fn new(dataset_id: DatasetID) -> Self {
         Self { dataset_id }
     }
@@ -81,25 +88,25 @@ impl SaveDatasetErrorDuplicate {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum UpdateDatasetAliasError {
+pub enum UpdateDatasetEntryAliasError {
     #[error(transparent)]
-    NotFound(#[from] DatasetNotFoundError),
+    NotFound(#[from] DatasetEntryNotFoundError),
 
     #[error(transparent)]
-    SameAlias(#[from] DatasetAliasSameError),
+    SameAlias(#[from] DatasetEntryAliasSameError),
 
     #[error(transparent)]
     Internal(InternalError),
 }
 
 #[derive(Error, Debug)]
-#[error("Dataset with dataset_id '{dataset_id}' same alias '{dataset_alias}' update attempt")]
-pub struct DatasetAliasSameError {
+#[error("Dataset entry with dataset_id '{dataset_id}' same alias '{dataset_alias}' update attempt")]
+pub struct DatasetEntryAliasSameError {
     pub dataset_id: DatasetID,
     pub dataset_alias: DatasetAlias,
 }
 
-impl DatasetAliasSameError {
+impl DatasetEntryAliasSameError {
     pub fn new(dataset_id: DatasetID, dataset_alias: DatasetAlias) -> Self {
         Self {
             dataset_id,
@@ -111,9 +118,9 @@ impl DatasetAliasSameError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum DeleteDatasetError {
+pub enum DeleteEntryDatasetError {
     #[error(transparent)]
-    NotFound(#[from] DatasetNotFoundError),
+    NotFound(#[from] DatasetEntryNotFoundError),
 
     #[error(transparent)]
     Internal(InternalError),
