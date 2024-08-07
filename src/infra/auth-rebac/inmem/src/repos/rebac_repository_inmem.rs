@@ -91,6 +91,21 @@ impl RebacRepositoryInMem {
 
         rows
     }
+
+    fn remove_row_id_from_index(
+        &self,
+        row_id: RowId,
+        index: &mut RowsIndex,
+        index_hash: IndexEntitiesRelationsRowHash,
+    ) {
+        let row_ids = index.get_mut(&index_hash).unwrap();
+
+        assert!(row_ids.remove(&row_id));
+
+        if row_ids.is_empty() {
+            index.remove(&index_hash);
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -251,37 +266,33 @@ impl RebacRepository for RebacRepositoryInMem {
         }
 
         {
-            let index_hash = &EntityHasher::subject_entity_index_hash(subject_entity);
+            let index_hash = EntityHasher::subject_entity_index_hash(subject_entity);
 
-            let row_ids = state.index_subject_entity.get_mut(index_hash).unwrap();
-
-            assert!(row_ids.remove(&row_id));
+            self.remove_row_id_from_index(row_id, &mut state.index_subject_entity, index_hash);
         }
         {
-            let index_hash = &EntityHasher::subject_entity_object_type_index_hash(
+            let index_hash = EntityHasher::subject_entity_object_type_index_hash(
                 subject_entity,
                 object_entity.entity_type,
             );
 
-            let row_ids = state
-                .index_subject_entity_object_type
-                .get_mut(index_hash)
-                .unwrap();
-
-            assert!(row_ids.remove(&row_id));
+            self.remove_row_id_from_index(
+                row_id,
+                &mut state.index_subject_entity_object_type,
+                index_hash,
+            );
         }
         {
-            let index_hash = &EntityHasher::subject_entity_object_entity_index_hash(
+            let index_hash = EntityHasher::subject_entity_object_entity_index_hash(
                 subject_entity,
                 object_entity,
             );
 
-            let row_ids = state
-                .index_subject_entity_object_entity
-                .get_mut(index_hash)
-                .unwrap();
-
-            assert!(row_ids.remove(&row_id));
+            self.remove_row_id_from_index(
+                row_id,
+                &mut state.index_subject_entity_object_entity,
+                index_hash,
+            );
         }
 
         Ok(())
