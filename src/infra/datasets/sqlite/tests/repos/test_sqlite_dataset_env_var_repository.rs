@@ -10,6 +10,7 @@
 use database_common::{DatabaseTransactionRunner, SqliteTransactionManager};
 use dill::{Catalog, CatalogBuilder};
 use internal_error::InternalError;
+use kamu_datasets_repo_tests::dataset_env_var_repo;
 use kamu_datasets_sqlite::SqliteDatasetEnvVarRepository;
 use sqlx::SqlitePool;
 
@@ -22,7 +23,7 @@ async fn test_missing_dataset_env_var_not_found(sqlite_pool: SqlitePool) {
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
-            kamu_datasets_repo_tests::test_missing_dataset_env_var_not_found(&catalog).await;
+            dataset_env_var_repo::test_missing_dataset_env_var_not_found(&catalog).await;
             Ok::<_, InternalError>(())
         })
         .await
@@ -38,7 +39,7 @@ async fn test_insert_and_get_dataset_env_var(sqlite_pool: SqlitePool) {
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
-            kamu_datasets_repo_tests::test_insert_and_get_dataset_env_var(&catalog).await;
+            dataset_env_var_repo::test_insert_and_get_dataset_env_var(&catalog).await;
             Ok::<_, InternalError>(())
         })
         .await
@@ -54,7 +55,7 @@ async fn test_insert_and_get_multiple_dataset_env_vars(sqlite_pool: SqlitePool) 
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
-            kamu_datasets_repo_tests::test_insert_and_get_multiple_dataset_env_vars(&catalog).await;
+            dataset_env_var_repo::test_insert_and_get_multiple_dataset_env_vars(&catalog).await;
             Ok::<_, InternalError>(())
         })
         .await
@@ -70,7 +71,7 @@ async fn test_delete_dataset_env_vars(sqlite_pool: SqlitePool) {
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
-            kamu_datasets_repo_tests::test_delete_dataset_env_vars(&catalog).await;
+            dataset_env_var_repo::test_delete_dataset_env_vars(&catalog).await;
             Ok::<_, InternalError>(())
         })
         .await
@@ -86,7 +87,7 @@ async fn test_modify_dataset_env_vars(sqlite_pool: SqlitePool) {
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
-            kamu_datasets_repo_tests::test_modify_dataset_env_vars(&catalog).await;
+            dataset_env_var_repo::test_modify_dataset_env_vars(&catalog).await;
             Ok::<_, InternalError>(())
         })
         .await

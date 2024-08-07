@@ -15,4 +15,6 @@ mod dataset_env_var_repository_test_suite;
 pub mod dataset_entry_repo {
     pub use crate::dataset_entry_repository_test_suite::*;
 }
-pub use dataset_env_var_repository_test_suite::*;
+pub mod dataset_env_var_repo {
+    pub use crate::dataset_env_var_repository_test_suite::*;
+}

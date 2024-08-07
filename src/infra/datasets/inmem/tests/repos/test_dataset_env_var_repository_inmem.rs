@@ -9,13 +9,15 @@
 
 use dill::{Catalog, CatalogBuilder};
 use kamu_datasets_inmem::DatasetEnvVarRepositoryInMemory;
+use kamu_datasets_repo_tests::dataset_env_var_repo;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_missing_dataset_env_var_not_found() {
     let harness = InmemDatasetEnvVarRepositoryHarness::new();
-    kamu_datasets_repo_tests::test_missing_dataset_env_var_not_found(&harness.catalog).await;
+
+    dataset_env_var_repo::test_missing_dataset_env_var_not_found(&harness.catalog).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -23,7 +25,8 @@ async fn test_missing_dataset_env_var_not_found() {
 #[test_log::test(tokio::test)]
 async fn test_insert_and_get_dataset_env_var() {
     let harness = InmemDatasetEnvVarRepositoryHarness::new();
-    kamu_datasets_repo_tests::test_insert_and_get_dataset_env_var(&harness.catalog).await;
+
+    dataset_env_var_repo::test_insert_and_get_dataset_env_var(&harness.catalog).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -31,7 +34,8 @@ async fn test_insert_and_get_dataset_env_var() {
 #[test_log::test(tokio::test)]
 async fn test_insert_and_get_multiple_dataset_env_vars() {
     let harness = InmemDatasetEnvVarRepositoryHarness::new();
-    kamu_datasets_repo_tests::test_insert_and_get_multiple_dataset_env_vars(&harness.catalog).await;
+
+    dataset_env_var_repo::test_insert_and_get_multiple_dataset_env_vars(&harness.catalog).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +43,8 @@ async fn test_insert_and_get_multiple_dataset_env_vars() {
 #[test_log::test(tokio::test)]
 async fn test_delete_dataset_env_vars() {
     let harness = InmemDatasetEnvVarRepositoryHarness::new();
-    kamu_datasets_repo_tests::test_delete_dataset_env_vars(&harness.catalog).await;
+
+    dataset_env_var_repo::test_delete_dataset_env_vars(&harness.catalog).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,7 +52,8 @@ async fn test_delete_dataset_env_vars() {
 #[test_log::test(tokio::test)]
 async fn test_modify_dataset_env_vars() {
     let harness = InmemDatasetEnvVarRepositoryHarness::new();
-    kamu_datasets_repo_tests::test_modify_dataset_env_vars(&harness.catalog).await;
+
+    dataset_env_var_repo::test_modify_dataset_env_vars(&harness.catalog).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
