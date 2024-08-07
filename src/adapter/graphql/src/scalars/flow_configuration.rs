@@ -235,6 +235,7 @@ pub enum FlowRunConfiguration {
     Schedule(ScheduleInput),
     Batching(BatchingConditionInput),
     Compaction(CompactionConditionInput),
+    Reset(ResetConditionInput),
 }
 
 #[derive(OneofObject)]
@@ -278,6 +279,19 @@ impl From<&TimeDeltaInput> for chrono::Duration {
 pub struct BatchingConditionInput {
     pub min_records_to_await: u64,
     pub max_batching_interval: TimeDeltaInput,
+}
+
+#[derive(InputObject)]
+pub struct ResetConditionInput {
+    pub new_head_hash: Multihash,
+}
+
+impl From<&ResetConditionInput> for ResetRule {
+    fn from(value: &ResetConditionInput) -> Self {
+        Self {
+            new_head_hash: value.new_head_hash.clone().into(),
+        }
+    }
 }
 
 #[derive(OneofObject)]
@@ -364,6 +378,15 @@ impl FlowRunConfiguration {
                             })?
                     }
                 })
+            }
+            Self::Reset(reset_input) => {
+                if dataset_flow_type != DatasetFlowType::Reset {
+                    return Err(FlowInvalidRunConfigurations {
+                        error: "Incompatible flow run configuration and dataset flow type"
+                            .to_string(),
+                    });
+                };
+                FlowConfigurationSnapshot::Reset(reset_input.into())
             }
         })
     }

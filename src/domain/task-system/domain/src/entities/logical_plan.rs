@@ -81,7 +81,7 @@ pub struct HardCompactionDataset {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResetDataset {
     pub dataset_id: DatasetID,
-    pub new_head_hash: Option<Multihash>,
+    pub new_head_hash: Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

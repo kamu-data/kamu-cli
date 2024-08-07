@@ -99,7 +99,7 @@ impl TaskDriver {
                 assert_eq!(&ud.dataset_id, self.args.dataset_id.as_ref().unwrap());
             }
             LogicalPlan::Probe(_) => assert!(self.args.dataset_id.is_none()),
-            LogicalPlan::HardCompactionDataset(_) => (),
+            LogicalPlan::HardCompactionDataset(_) | LogicalPlan::Reset(_) => (),
         }
     }
 }

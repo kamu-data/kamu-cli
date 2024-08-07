@@ -85,7 +85,7 @@ impl From<&TaskError> for FlowError {
             TaskError::ResetDatasetError(reset_dataset_error) => match reset_dataset_error {
                 ResetDatasetTaskError::NewHeadHashNotFound(err) => {
                     Self::NewHeadHashNotFound(FlowResetNewHeadHashNotFoundError {
-                        head_hash: err.head_hash,
+                        head_hash: err.head_hash.clone(),
                     })
                 }
             },
