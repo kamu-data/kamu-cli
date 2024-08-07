@@ -11,7 +11,7 @@ use opendatafabric::{AccountID, DatasetAlias, DatasetID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DatasetEntry {
     pub id: DatasetID,
     pub owner_id: AccountID,
