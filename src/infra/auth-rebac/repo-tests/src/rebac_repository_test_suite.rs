@@ -292,7 +292,6 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
             ),
         ]),
     };
-    // TODO: try Map<DatasetId, [Relation]>?
 
     {
         let account = Entity::new_account(state.account_id);
