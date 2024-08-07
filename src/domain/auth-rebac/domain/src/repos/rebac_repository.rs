@@ -212,7 +212,7 @@ impl DeleteEntityPropertyError {
 }
 
 #[derive(Error, Debug)]
-#[error("Entity not found: {self}")]
+#[error("Entity not found: entity_type='{entity_type:?}', entity_id='{entity_id}'")]
 pub struct EntityNotFoundError {
     pub entity_type: EntityType,
     pub entity_id: String,
@@ -228,7 +228,10 @@ impl From<&Entity<'_>> for EntityNotFoundError {
 }
 
 #[derive(Error, Debug)]
-#[error("Entity property not found: {self}")]
+#[error(
+    "Entity property not found: entity_type='{entity_type:?}', entity_id='{entity_id}', \
+     property_name='{property_name:?}'"
+)]
 pub struct EntityPropertyNotFoundError {
     pub entity_type: EntityType,
     pub entity_id: String,
@@ -280,7 +283,11 @@ impl InsertEntitiesRelationError {
 }
 
 #[derive(Error, Debug)]
-#[error("Duplicate entity relation not inserted: {self}")]
+#[error(
+    "Duplicate entity relation not inserted: subject_entity_type='{subject_entity_type:?}', \
+     subject_entity_id='{subject_entity_id}', relationship='{relationship:?}', \
+     object_entity_type='{object_entity_type:?}', object_entity_id='{object_entity_id}'"
+)]
 pub struct InsertEntitiesRelationDuplicateError {
     pub subject_entity_type: EntityType,
     pub subject_entity_id: String,
@@ -317,7 +324,11 @@ impl DeleteEntitiesRelationError {
 }
 
 #[derive(Error, Debug)]
-#[error("Entities relation not found: {self}")]
+#[error(
+    "Entities relation not found: subject_entity_type='{subject_entity_type:?}', \
+     subject_entity_id='{subject_entity_id}', relationship='{relationship:?}', \
+     object_entity_type='{object_entity_type:?}', object_entity_id='{object_entity_id}'"
+)]
 pub struct EntitiesRelationNotFoundError {
     pub subject_entity_type: EntityType,
     pub subject_entity_id: String,
@@ -347,7 +358,10 @@ impl SubjectEntityRelationsError {
 }
 
 #[derive(Error, Debug)]
-#[error("Object entities relations not found: {self}")]
+#[error(
+    "Object entities relations not found: subject_entity_type='{subject_entity_type:?}', \
+     subject_entity_id='{subject_entity_id}'"
+)]
 pub struct ObjectEntitiesRelationsNotFoundError {
     pub subject_entity_type: EntityType,
     pub subject_entity_id: String,
@@ -375,7 +389,11 @@ impl SubjectEntityRelationsByObjectTypeError {
 }
 
 #[derive(Error, Debug)]
-#[error("Object entities relations by object type not found: {self}")]
+#[error(
+    "Object entities relations by object type not found: \
+     subject_entity_type='{subject_entity_type:?}', subject_entity_id='{subject_entity_id}', \
+     object_entity_type='{object_entity_type:?}'"
+)]
 pub struct ObjectEntitiesRelationsByObjectTypeNotFoundError {
     pub subject_entity_type: EntityType,
     pub subject_entity_id: String,
@@ -405,7 +423,11 @@ impl GetRelationsBetweenEntitiesError {
 }
 
 #[derive(Error, Debug)]
-#[error("Relations between entities not found: {self}")]
+#[error(
+    "Relations between entities not found: subject_entity_type='{subject_entity_type:?}', \
+     subject_entity_id='{subject_entity_id}', object_entity_type='{object_entity_type:?}', \
+     object_entity_id='{object_entity_id}'"
+)]
 pub struct RelationsBetweenEntitiesNotFoundError {
     pub subject_entity_type: EntityType,
     pub subject_entity_id: String,
