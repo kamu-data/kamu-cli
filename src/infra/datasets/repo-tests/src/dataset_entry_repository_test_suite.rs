@@ -60,12 +60,9 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
     let (_, owner_id_1) = AccountID::new_generated_ed25519();
     let (_, owner_id_2) = AccountID::new_generated_ed25519();
 
-    let dataset_entry_acc_1_1 =
-        new_dataset_entry_with_alias(owner_id_1.clone(), "kamu", "dataset1");
-    let dataset_entry_acc_1_2 =
-        new_dataset_entry_with_alias(owner_id_1.clone(), "kamu", "dataset2");
-    let dataset_entry_acc_2_3 =
-        new_dataset_entry_with_alias(owner_id_2.clone(), "user", "dataset3");
+    let dataset_entry_acc_1_1 = new_dataset_entry_with(owner_id_1.clone(), "kamu", "dataset1");
+    let dataset_entry_acc_1_2 = new_dataset_entry_with(owner_id_1.clone(), "kamu", "dataset2");
+    let dataset_entry_acc_2_3 = new_dataset_entry_with(owner_id_2.clone(), "user", "dataset3");
     {
         let save_res = dataset_entry_repo
             .save_dataset(&dataset_entry_acc_1_1)
@@ -108,7 +105,7 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
     }
     {
         let get_res = dataset_entry_repo
-            .get_datasets_by_owner_id(&owner_id_1)
+            .get_datasets_by_owner_id(&owner_id_2)
             .await;
         let expected_dataset_entries = vec![dataset_entry_acc_2_3];
 
@@ -207,10 +204,10 @@ pub async fn test_delete_dataset_entry(catalog: &Catalog) {
 
     let dataset_entry = new_dataset_entry();
     {
-        let save_res = dataset_entry_repo.delete_dataset(&dataset_entry.id).await;
+        let delete_res = dataset_entry_repo.delete_dataset(&dataset_entry.id).await;
 
         assert_matches!(
-            save_res,
+            delete_res,
             Err(DeleteDatasetError::NotFound(DatasetNotFoundError::ByDatasetId(actual_dataset_id)))
                 if actual_dataset_id == dataset_entry.id
         );
@@ -218,11 +215,7 @@ pub async fn test_delete_dataset_entry(catalog: &Catalog) {
     {
         let save_res = dataset_entry_repo.save_dataset(&dataset_entry).await;
 
-        assert_matches!(
-            save_res,
-            Err(SaveDatasetError::Duplicate(e))
-                if e.dataset_id == dataset_entry.id
-        );
+        assert_matches!(save_res, Ok(_));
     }
 }
 
@@ -235,7 +228,7 @@ fn dataset_alias(account_name: &str, dataset_name: &str) -> DatasetAlias {
     DatasetAlias::new(Some(account_name), dataset_name)
 }
 
-fn new_dataset_entry_with_alias(
+fn new_dataset_entry_with(
     owner_id: AccountID,
     account_name: &str,
     dataset_name: &str,
@@ -249,7 +242,7 @@ fn new_dataset_entry_with_alias(
 fn new_dataset_entry() -> DatasetEntry {
     let (_, owner_id) = AccountID::new_generated_ed25519();
 
-    new_dataset_entry_with_alias(owner_id, "kamu", "dataset")
+    new_dataset_entry_with(owner_id, "kamu", "dataset")
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
