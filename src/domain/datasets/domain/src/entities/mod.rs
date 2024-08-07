@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dataset;
+mod dataset_entry;
 mod dataset_env_var;
 
-pub use dataset::*;
+pub use dataset_entry::*;
 pub use dataset_env_var::*;
