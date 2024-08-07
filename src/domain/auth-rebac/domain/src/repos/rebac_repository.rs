@@ -87,7 +87,7 @@ pub type ObjectEntityWithRelation<'a> = EntityWithRelation<'a>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum PropertyName {
     DatasetAllowsAnonymousRead,
     DatasetAllowsPublicRead,
@@ -95,7 +95,7 @@ pub enum PropertyName {
 
 pub type PropertyValue = String;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Property<'a> {
     pub name: PropertyName,
     pub value: Cow<'a, str>,

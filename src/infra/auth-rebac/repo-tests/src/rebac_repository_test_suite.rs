@@ -149,13 +149,20 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
 
     {
         let get_res = rebac_repo.get_entity_properties(&entity).await;
-        let expected_properties = vec![anon_read_property, public_read_property.clone()];
+        let mut expected_properties = vec![anon_read_property, public_read_property.clone()];
 
-        assert_matches!(
-            get_res,
-            Ok(actual_properties)
-                if expected_properties == actual_properties
-        );
+        expected_properties.sort();
+
+        match get_res {
+            Ok(mut actual_properties) => {
+                actual_properties.sort();
+
+                assert_eq!(expected_properties, actual_properties);
+            }
+            Err(e) => {
+                panic!("A successful result was expected, but an error was received: {e}");
+            }
+        }
     }
 
     {
