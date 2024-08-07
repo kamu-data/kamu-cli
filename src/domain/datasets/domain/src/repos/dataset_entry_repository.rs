@@ -29,7 +29,7 @@ pub trait DatasetEntryRepository: Send + Sync {
     async fn update_dataset_alias(
         &self,
         dataset_id: &DatasetID,
-        new_alias: DatasetAlias,
+        new_alias: &DatasetAlias,
     ) -> Result<(), UpdateDatasetAliasError>;
 
     async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteDatasetError>;
@@ -40,7 +40,7 @@ pub trait DatasetEntryRepository: Send + Sync {
 #[derive(Error, Debug)]
 pub enum GetDatasetError {
     #[error(transparent)]
-    NotFound(DatasetNotFoundError),
+    NotFound(#[from] DatasetNotFoundError),
 
     #[error(transparent)]
     Internal(InternalError),
@@ -60,7 +60,7 @@ pub enum DatasetNotFoundError {
 #[derive(Error, Debug)]
 pub enum SaveDatasetError {
     #[error(transparent)]
-    Duplicate(SaveDatasetErrorDuplicate),
+    Duplicate(#[from] SaveDatasetErrorDuplicate),
 
     #[error(transparent)]
     Internal(InternalError),
@@ -72,15 +72,40 @@ pub struct SaveDatasetErrorDuplicate {
     pub dataset_id: DatasetID,
 }
 
+impl SaveDatasetErrorDuplicate {
+    pub fn new(dataset_id: DatasetID) -> Self {
+        Self { dataset_id }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
 pub enum UpdateDatasetAliasError {
     #[error(transparent)]
-    NotFound(DatasetNotFoundError),
+    NotFound(#[from] DatasetNotFoundError),
+
+    #[error(transparent)]
+    SameAlias(#[from] DatasetAliasSameError),
 
     #[error(transparent)]
     Internal(InternalError),
+}
+
+#[derive(Error, Debug)]
+#[error("Dataset with dataset_id '{dataset_id}' same alias '{dataset_alias}' update attempt")]
+pub struct DatasetAliasSameError {
+    pub dataset_id: DatasetID,
+    pub dataset_alias: DatasetAlias,
+}
+
+impl DatasetAliasSameError {
+    pub fn new(dataset_id: DatasetID, dataset_alias: DatasetAlias) -> Self {
+        Self {
+            dataset_id,
+            dataset_alias,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -88,7 +113,7 @@ pub enum UpdateDatasetAliasError {
 #[derive(Error, Debug)]
 pub enum DeleteDatasetError {
     #[error(transparent)]
-    NotFound(DatasetNotFoundError),
+    NotFound(#[from] DatasetNotFoundError),
 
     #[error(transparent)]
     Internal(InternalError),
