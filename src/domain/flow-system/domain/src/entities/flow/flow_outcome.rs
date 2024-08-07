@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_core::{CompactionResult, PullResult};
-use kamu_task_system::{self as ts, UpdateDatasetTaskError};
+use kamu_task_system::{self as ts, ResetDatasetTaskError, UpdateDatasetTaskError};
 use opendatafabric::{DatasetID, Multihash};
 use ts::TaskError;
 
@@ -40,13 +40,16 @@ pub enum FlowResult {
     Empty,
     DatasetUpdate(FlowResultDatasetUpdate),
     DatasetCompact(FlowResultDatasetCompact),
+    DatasetReset(FlowResultDatasetReset),
 }
 
 impl FlowResult {
     pub fn is_empty(&self) -> bool {
         match self {
             FlowResult::Empty => true,
-            FlowResult::DatasetUpdate(_) | FlowResult::DatasetCompact(_) => false,
+            FlowResult::DatasetUpdate(_)
+            | FlowResult::DatasetCompact(_)
+            | FlowResult::DatasetReset(_) => false,
         }
     }
 }
@@ -55,11 +58,17 @@ impl FlowResult {
 pub enum FlowError {
     Failed,
     RootDatasetCompacted(FlowRootDatasetCompactedError),
+    NewHeadHashNotFound(FlowResetNewHeadHashNotFoundError),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowRootDatasetCompactedError {
     pub dataset_id: DatasetID,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FlowResetNewHeadHashNotFoundError {
+    pub head_hash: Multihash,
 }
 
 impl From<&TaskError> for FlowError {
@@ -70,6 +79,13 @@ impl From<&TaskError> for FlowError {
                 UpdateDatasetTaskError::RootDatasetCompacted(err) => {
                     Self::RootDatasetCompacted(FlowRootDatasetCompactedError {
                         dataset_id: err.dataset_id.clone(),
+                    })
+                }
+            },
+            TaskError::ResetDatasetError(reset_dataset_error) => match reset_dataset_error {
+                ResetDatasetTaskError::NewHeadHashNotFound(err) => {
+                    Self::NewHeadHashNotFound(FlowResetNewHeadHashNotFoundError {
+                        head_hash: err.head_hash,
                     })
                 }
             },
@@ -90,6 +106,11 @@ pub struct FlowResultDatasetCompact {
     pub new_num_blocks: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FlowResultDatasetReset {
+    pub new_head: Multihash,
+}
+
 impl From<ts::TaskResult> for FlowResult {
     fn from(value: ts::TaskResult) -> Self {
         match value {
@@ -101,6 +122,11 @@ impl From<ts::TaskResult> for FlowResult {
                         Self::DatasetUpdate(FlowResultDatasetUpdate { old_head, new_head })
                     }
                 }
+            }
+            ts::TaskResult::ResetDatasetResult(task_reset_result) => {
+                Self::DatasetReset(FlowResultDatasetReset {
+                    new_head: task_reset_result.new_head,
+                })
             }
             ts::TaskResult::CompactionDatasetResult(task_compaction_result) => {
                 match task_compaction_result.compaction_result {

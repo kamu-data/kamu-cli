@@ -11,6 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::ResetRule;
 use crate::{BatchingRule, CompactionRule, Schedule};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, sqlx::Type)]
@@ -19,6 +20,7 @@ pub enum DatasetFlowType {
     Ingest,
     ExecuteTransform,
     HardCompaction,
+    Reset,
 }
 
 impl DatasetFlowType {
@@ -32,6 +34,7 @@ impl DatasetFlowType {
                 Some(opendatafabric::DatasetKind::Root)
             }
             DatasetFlowType::ExecuteTransform => Some(opendatafabric::DatasetKind::Derivative),
+            DatasetFlowType::Reset => None,
         }
     }
 
@@ -44,6 +47,7 @@ impl DatasetFlowType {
             DatasetFlowType::HardCompaction => {
                 flow_configuration_type == std::any::type_name::<CompactionRule>()
             }
+            DatasetFlowType::Reset => flow_configuration_type == std::any::type_name::<ResetRule>(),
         }
     }
 }

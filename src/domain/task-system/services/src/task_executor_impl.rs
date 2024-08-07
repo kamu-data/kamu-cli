@@ -14,13 +14,17 @@ use database_common::DatabaseTransactionRunner;
 use dill::*;
 use event_bus::EventBus;
 use kamu_core::{
+    BlockRef,
     CompactionOptions,
     CompactionService,
     DatasetRepository,
+    MetadataChainExt,
     PollingIngestOptions,
     PullError,
     PullOptions,
     PullService,
+    ResetError,
+    ResetService,
     SystemTimeSource,
     TransformError,
 };
@@ -138,6 +142,51 @@ impl TaskExecutorImpl {
         }
     }
 
+    async fn reset_dataset_logical_plan(
+        &self,
+        reset_dataset_args: &ResetDataset,
+    ) -> Result<TaskOutcome, InternalError> {
+        let reset_svc = self.catalog.get_one::<dyn ResetService>().int_err()?;
+        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().int_err()?;
+        let dataset_handle = dataset_repo
+            .resolve_dataset_ref(&reset_dataset_args.dataset_id.as_local_ref())
+            .await
+            .int_err()?;
+
+        let new_head_hash = if let Some(new_head_hash_arg) = &reset_dataset_args.new_head_hash {
+            Some(new_head_hash_arg.clone())
+        } else {
+            let dataset = dataset_repo
+                .get_dataset(&dataset_handle.as_local_ref())
+                .await
+                .int_err()?;
+            dataset
+                .as_metadata_chain()
+                .try_get_ref(&BlockRef::Head)
+                .await
+                .int_err()?
+        };
+        if let Some(head_hash) = new_head_hash {
+            let reset_result_maybe = reset_svc.reset_dataset(&dataset_handle, &head_hash).await;
+            return match reset_result_maybe {
+                Ok(_) => Ok(TaskOutcome::Success(TaskResult::ResetDatasetResult(
+                    TaskResetDatasetResult {
+                        new_head: head_hash.clone(),
+                    },
+                ))),
+                Err(err) => match err {
+                    ResetError::BlockNotFound(_) => Ok(TaskOutcome::Failed(
+                        TaskError::ResetDatasetError(ResetDatasetTaskError::NewHeadHashNotFound(
+                            NewHeadHashNotFoundError { head_hash },
+                        )),
+                    )),
+                    _ => Ok(TaskOutcome::Failed(TaskError::Empty)),
+                },
+            };
+        }
+        Ok(TaskOutcome::Failed(TaskError::Empty))
+    }
+
     async fn hard_compaction_logical_plan(
         &self,
         hard_compaction_args: &HardCompactionDataset,
@@ -207,6 +256,9 @@ impl TaskExecutor for TaskExecutorImpl {
                 LogicalPlan::HardCompactionDataset(hard_compaction_args) => {
                     self.hard_compaction_logical_plan(hard_compaction_args)
                         .await?
+                }
+                LogicalPlan::Reset(reset_args) => {
+                    self.reset_dataset_logical_plan(&reset_args).await?
                 }
             };
 

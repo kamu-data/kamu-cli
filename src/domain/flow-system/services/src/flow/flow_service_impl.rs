@@ -195,9 +195,10 @@ impl FlowServiceImpl {
                         self.enqueue_auto_polling_flow_unconditionally(start_time, &flow_key)
                             .await?;
                     }
-                    // Such as compaction is very dangerous operation we
-                    // skip running it during activation flow configurations
-                    FlowConfigurationRule::CompactionRule(_) => (),
+                    // Such as compaction and reset are very dangerous operations we
+                    // skip running them during activation flow configurations
+                    FlowConfigurationRule::CompactionRule(_)
+                    | FlowConfigurationRule::ResetRule(_) => (),
                 }
             }
             FlowKey::System(system_flow_key) => {
@@ -496,7 +497,7 @@ impl FlowServiceImpl {
         for trigger in &flow.triggers {
             if let FlowTrigger::InputDatasetFlow(trigger) = trigger {
                 match &trigger.flow_result {
-                    FlowResult::Empty => {}
+                    FlowResult::Empty | FlowResult::DatasetReset(_) => {}
                     FlowResult::DatasetCompact(_) => {
                         is_compacted = true;
                     }
@@ -764,6 +765,19 @@ impl FlowServiceImpl {
                         keep_metadata_only,
                     })
                 }
+                DatasetFlowType::Reset => {
+                    // ToDo add default head hash
+                    let mut new_head_hash = None;
+                    if let Some(config_rule) = config_snapshot
+                        && let FlowConfigurationSnapshot::Reset(reset_rule) = config_rule
+                    {
+                        new_head_hash = Some(reset_rule.new_head_hash.clone());
+                    };
+                    LogicalPlan::Reset(ResetDataset {
+                        dataset_id: flow_key.dataset_id.clone(),
+                        new_head_hash,
+                    })
+                }
             },
             FlowKey::System(flow_key) => {
                 match flow_key.flow_type {
@@ -880,6 +894,7 @@ impl FlowServiceImpl {
                     DownstreamDependencyTriggerType::TriggerAllEnabled
                 }
             }
+            DatasetFlowType::Reset => DownstreamDependencyTriggerType::Empty,
         }
     }
 }
