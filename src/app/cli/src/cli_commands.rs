@@ -29,6 +29,7 @@ pub fn get_command(
                 .get_many("manifest")
                 .unwrap_or_default()
                 .map(String::as_str),
+            submatches.get_one("name").cloned(),
             submatches.get_flag("recursive"),
             submatches.get_flag("replace"),
             submatches.get_flag("stdin"),

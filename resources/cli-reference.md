@@ -66,6 +66,7 @@ Add a new dataset or modify an existing one
 * `-r`, `--recursive` — Recursively search for all manifest in the specified directory
 * `--replace` — Delete and re-add datasets that already exist
 * `--stdin` — Read manifests from standard input
+* `--name <N>` — Overrides the name in a loaded manifest
 
 This command creates a new dataset from the provided DatasetSnapshot manifest.
 

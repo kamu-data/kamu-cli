@@ -97,6 +97,11 @@ pub fn cli() -> Command {
                             .long("stdin")
                             .action(ArgAction::SetTrue)
                             .help("Read manifests from standard input"),
+                        Arg::new("name")
+                            .long("name")
+                            .value_name("N")
+                            .value_parser(value_parser!(opendatafabric::DatasetAlias))
+                            .help("Overrides the name in a loaded manifest"),
                         Arg::new("manifest")
                             .action(ArgAction::Append)
                             .index(1)
