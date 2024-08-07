@@ -181,7 +181,7 @@ impl FlowHarness {
         }
     }
 
-    pub async fn create_root_dataset(&self, dataset_alias: DatasetAlias) -> CreateDatasetResult {
+    pub async fn create_dataset(&self, dataset_alias: DatasetAlias) -> CreateDatasetResult {
         self.dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -194,12 +194,19 @@ impl FlowHarness {
             .unwrap()
     }
 
+    pub async fn create_root_dataset(&self, dataset_alias: DatasetAlias) -> DatasetID {
+        let result = self.create_dataset(dataset_alias).await;
+
+        result.dataset_handle.id
+    }
+
     pub async fn create_derived_dataset(
         &self,
         dataset_alias: DatasetAlias,
         input_ids: Vec<DatasetID>,
-    ) -> CreateDatasetResult {
-        self.dataset_repo
+    ) -> DatasetID {
+        let result = self
+            .dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
                     .name(dataset_alias)
@@ -212,7 +219,9 @@ impl FlowHarness {
                     .build(),
             )
             .await
-            .unwrap()
+            .unwrap();
+
+        result.dataset_handle.id
     }
 
     pub async fn eager_initialization(&self) {
