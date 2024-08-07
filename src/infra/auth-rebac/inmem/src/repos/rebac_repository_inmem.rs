@@ -186,9 +186,9 @@ impl RebacRepository for RebacRepositoryInMem {
         let row_id =
             EntityHasher::entities_relations_row_hash(subject_entity, relationship, object_entity);
 
-        let mut state = self.entities_relations_state.write().await;
+        let mut writable_state = self.entities_relations_state.write().await;
 
-        let is_duplicate = state.rows.contains_key(&row_id);
+        let is_duplicate = writable_state.rows.contains_key(&row_id);
 
         if is_duplicate {
             return Err(InsertEntitiesRelationError::duplicate(
@@ -203,14 +203,14 @@ impl RebacRepository for RebacRepositoryInMem {
         let row =
             EntitiesRelationsRow::new(subject_entity.clone(), relationship, object_entity.clone());
 
-        state.rows.insert(row_id, row);
+        writable_state.rows.insert(row_id, row);
 
         // Update indexes
 
         {
             let index_hash = EntityHasher::subject_entity_index_hash(subject_entity);
 
-            state
+            writable_state
                 .index_subject_entity
                 .entry(index_hash)
                 .or_insert_with(HashSet::new)
@@ -222,7 +222,7 @@ impl RebacRepository for RebacRepositoryInMem {
                 object_entity.entity_type,
             );
 
-            state
+            writable_state
                 .index_subject_entity_object_type
                 .entry(index_hash)
                 .or_insert_with(HashSet::new)
@@ -234,7 +234,7 @@ impl RebacRepository for RebacRepositoryInMem {
                 object_entity,
             );
 
-            state
+            writable_state
                 .index_subject_entity_object_entity
                 .entry(index_hash)
                 .or_insert_with(HashSet::new)
@@ -253,9 +253,9 @@ impl RebacRepository for RebacRepositoryInMem {
         let row_id =
             EntityHasher::entities_relations_row_hash(subject_entity, relationship, object_entity);
 
-        let mut state = self.entities_relations_state.write().await;
+        let mut writable_state = self.entities_relations_state.write().await;
 
-        let not_found = state.rows.remove(&row_id).is_none();
+        let not_found = writable_state.rows.remove(&row_id).is_none();
 
         if not_found {
             return Err(DeleteEntitiesRelationError::not_found(
@@ -268,7 +268,11 @@ impl RebacRepository for RebacRepositoryInMem {
         {
             let index_hash = EntityHasher::subject_entity_index_hash(subject_entity);
 
-            self.remove_row_id_from_index(row_id, &mut state.index_subject_entity, index_hash);
+            self.remove_row_id_from_index(
+                row_id,
+                &mut writable_state.index_subject_entity,
+                index_hash,
+            );
         }
         {
             let index_hash = EntityHasher::subject_entity_object_type_index_hash(
@@ -278,7 +282,7 @@ impl RebacRepository for RebacRepositoryInMem {
 
             self.remove_row_id_from_index(
                 row_id,
-                &mut state.index_subject_entity_object_type,
+                &mut writable_state.index_subject_entity_object_type,
                 index_hash,
             );
         }
@@ -290,7 +294,7 @@ impl RebacRepository for RebacRepositoryInMem {
 
             self.remove_row_id_from_index(
                 row_id,
-                &mut state.index_subject_entity_object_entity,
+                &mut writable_state.index_subject_entity_object_entity,
                 index_hash,
             );
         }
@@ -304,15 +308,15 @@ impl RebacRepository for RebacRepositoryInMem {
     ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsError> {
         let index_hash = EntityHasher::subject_entity_index_hash(subject_entity);
 
-        let state = self.entities_relations_state.read().await;
+        let readable_state = self.entities_relations_state.read().await;
 
-        let maybe_row_ids = state.index_subject_entity.get(&index_hash);
+        let maybe_row_ids = readable_state.index_subject_entity.get(&index_hash);
 
         let Some(row_ids) = maybe_row_ids else {
             return Err(SubjectEntityRelationsError::not_found(subject_entity));
         };
 
-        let rows = self.get_entities_relations_by_row_ids(row_ids, &state);
+        let rows = self.get_entities_relations_by_row_ids(row_ids, &readable_state);
         let res = rows
             .into_iter()
             .map(|row| ObjectEntityWithRelation {
@@ -333,9 +337,11 @@ impl RebacRepository for RebacRepositoryInMem {
         let index_hash =
             EntityHasher::subject_entity_object_type_index_hash(subject_entity, object_entity_type);
 
-        let state = self.entities_relations_state.read().await;
+        let readable_state = self.entities_relations_state.read().await;
 
-        let maybe_row_ids = state.index_subject_entity_object_type.get(&index_hash);
+        let maybe_row_ids = readable_state
+            .index_subject_entity_object_type
+            .get(&index_hash);
 
         let Some(row_ids) = maybe_row_ids else {
             return Err(SubjectEntityRelationsByObjectTypeError::not_found(
@@ -344,7 +350,7 @@ impl RebacRepository for RebacRepositoryInMem {
             ));
         };
 
-        let rows = self.get_entities_relations_by_row_ids(row_ids, &state);
+        let rows = self.get_entities_relations_by_row_ids(row_ids, &readable_state);
         let res = rows
             .into_iter()
             .map(|row| ObjectEntityWithRelation {
@@ -365,9 +371,11 @@ impl RebacRepository for RebacRepositoryInMem {
         let index_hash =
             EntityHasher::subject_entity_object_entity_index_hash(subject_entity, object_entity);
 
-        let state = self.entities_relations_state.read().await;
+        let readable_state = self.entities_relations_state.read().await;
 
-        let maybe_row_ids = state.index_subject_entity_object_entity.get(&index_hash);
+        let maybe_row_ids = readable_state
+            .index_subject_entity_object_entity
+            .get(&index_hash);
 
         let Some(row_ids) = maybe_row_ids else {
             return Err(GetRelationsBetweenEntitiesError::not_found(
@@ -376,7 +384,7 @@ impl RebacRepository for RebacRepositoryInMem {
             ));
         };
 
-        let rows = self.get_entities_relations_by_row_ids(row_ids, &state);
+        let rows = self.get_entities_relations_by_row_ids(row_ids, &readable_state);
         let res = rows.into_iter().map(|row| row.relationship).collect();
 
         Ok(res)
