@@ -12,15 +12,15 @@ use std::sync::Arc;
 
 use dill::{component, interface, scope, Singleton};
 use kamu_datasets::{
-    DatasetAliasSameError,
     DatasetEntry,
+    DatasetEntryAliasSameError,
+    DatasetEntryNotFoundError,
     DatasetEntryRepository,
-    DatasetNotFoundError,
-    DeleteDatasetError,
-    GetDatasetError,
-    SaveDatasetError,
-    SaveDatasetErrorDuplicate,
-    UpdateDatasetAliasError,
+    DeleteEntryDatasetError,
+    GetDatasetEntryError,
+    SaveDatasetEntryError,
+    SaveDatasetEntryErrorDuplicate,
+    UpdateDatasetEntryAliasError,
 };
 use opendatafabric::{AccountID, DatasetAlias, DatasetID};
 use tokio::sync::RwLock;
@@ -61,27 +61,30 @@ impl DatasetEntryRepositoryInMemory {
 
 #[async_trait::async_trait]
 impl DatasetEntryRepository for DatasetEntryRepositoryInMemory {
-    async fn get_dataset(&self, dataset_id: &DatasetID) -> Result<DatasetEntry, GetDatasetError> {
+    async fn get_dataset_entry(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<DatasetEntry, GetDatasetEntryError> {
         let readable_state = self.state.read().await;
 
-        let maybe_dataset = readable_state.rows.get(dataset_id);
+        let maybe_dataset_entry = readable_state.rows.get(dataset_id);
 
-        let Some(dataset) = maybe_dataset else {
-            return Err(DatasetNotFoundError::ByDatasetId(dataset_id.clone()).into());
+        let Some(dataset_entry) = maybe_dataset_entry else {
+            return Err(DatasetEntryNotFoundError::ByDatasetId(dataset_id.clone()).into());
         };
 
-        Ok(dataset.clone())
+        Ok(dataset_entry.clone())
     }
 
-    async fn get_datasets_by_owner_id(
+    async fn get_dataset_entries_by_owner_id(
         &self,
         owner_id: &AccountID,
-    ) -> Result<Vec<DatasetEntry>, GetDatasetError> {
+    ) -> Result<Vec<DatasetEntry>, GetDatasetEntryError> {
         // TODO: PERF: Slow implementation -- to reconsider if it starts to cause us
         //             trouble
         let readable_state = self.state.read().await;
 
-        let datasets = readable_state
+        let dataset_entries = readable_state
             .rows
             .values()
             .fold(vec![], |mut acc, dataset| {
@@ -92,20 +95,23 @@ impl DatasetEntryRepository for DatasetEntryRepositoryInMemory {
                 acc
             });
 
-        if datasets.is_empty() {
-            return Err(DatasetNotFoundError::ByOwnerId(owner_id.clone()).into());
+        if dataset_entries.is_empty() {
+            return Err(DatasetEntryNotFoundError::ByOwnerId(owner_id.clone()).into());
         }
 
-        Ok(datasets)
+        Ok(dataset_entries)
     }
 
-    async fn save_dataset(&self, dataset: &DatasetEntry) -> Result<(), SaveDatasetError> {
+    async fn save_dataset_entry(
+        &self,
+        dataset: &DatasetEntry,
+    ) -> Result<(), SaveDatasetEntryError> {
         let mut writable_state = self.state.write().await;
 
         let is_duplicate = writable_state.rows.contains_key(&dataset.id);
 
         if is_duplicate {
-            return Err(SaveDatasetErrorDuplicate::new(dataset.id.clone()).into());
+            return Err(SaveDatasetEntryErrorDuplicate::new(dataset.id.clone()).into());
         }
 
         writable_state
@@ -115,35 +121,40 @@ impl DatasetEntryRepository for DatasetEntryRepositoryInMemory {
         Ok(())
     }
 
-    async fn update_dataset_alias(
+    async fn update_dataset_entry_alias(
         &self,
         dataset_id: &DatasetID,
         new_alias: &DatasetAlias,
-    ) -> Result<(), UpdateDatasetAliasError> {
+    ) -> Result<(), UpdateDatasetEntryAliasError> {
         let mut writable_state = self.state.write().await;
 
-        let maybe_dataset = writable_state.rows.get_mut(dataset_id);
+        let maybe_dataset_entry = writable_state.rows.get_mut(dataset_id);
 
-        let Some(dataset) = maybe_dataset else {
-            return Err(DatasetNotFoundError::ByDatasetId(dataset_id.clone()).into());
+        let Some(dataset_entry) = maybe_dataset_entry else {
+            return Err(DatasetEntryNotFoundError::ByDatasetId(dataset_id.clone()).into());
         };
 
-        if dataset.alias == *new_alias {
-            return Err(DatasetAliasSameError::new(dataset_id.clone(), new_alias.clone()).into());
+        if dataset_entry.alias == *new_alias {
+            return Err(
+                DatasetEntryAliasSameError::new(dataset_id.clone(), new_alias.clone()).into(),
+            );
         }
 
-        dataset.alias = new_alias.clone();
+        dataset_entry.alias = new_alias.clone();
 
         Ok(())
     }
 
-    async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteDatasetError> {
+    async fn delete_dataset_entry(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<(), DeleteEntryDatasetError> {
         let mut writable_state = self.state.write().await;
 
         let not_found = writable_state.rows.remove(dataset_id).is_none();
 
         if not_found {
-            return Err(DatasetNotFoundError::ByDatasetId(dataset_id.clone()).into());
+            return Err(DatasetEntryNotFoundError::ByDatasetId(dataset_id.clone()).into());
         }
 
         Ok(())

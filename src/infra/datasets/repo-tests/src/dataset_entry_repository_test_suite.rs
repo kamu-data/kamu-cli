@@ -12,12 +12,12 @@ use std::assert_matches::assert_matches;
 use dill::Catalog;
 use kamu_datasets::{
     DatasetEntry,
+    DatasetEntryNotFoundError,
     DatasetEntryRepository,
-    DatasetNotFoundError,
-    DeleteDatasetError,
-    GetDatasetError,
-    SaveDatasetError,
-    UpdateDatasetAliasError,
+    DeleteEntryDatasetError,
+    GetDatasetEntryError,
+    SaveDatasetEntryError,
+    UpdateDatasetEntryAliasError,
 };
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetName};
 
@@ -28,21 +28,25 @@ pub async fn test_get_dataset_entry(catalog: &Catalog) {
 
     let dataset_entry = new_dataset_entry();
     {
-        let get_res = dataset_entry_repo.get_dataset(&dataset_entry.id).await;
+        let get_res = dataset_entry_repo
+            .get_dataset_entry(&dataset_entry.id)
+            .await;
 
         assert_matches!(
             get_res,
-            Err(GetDatasetError::NotFound(DatasetNotFoundError::ByDatasetId(actual_dataset_id)))
+            Err(GetDatasetEntryError::NotFound(DatasetEntryNotFoundError::ByDatasetId(actual_dataset_id)))
                 if actual_dataset_id == dataset_entry.id
         );
     }
     {
-        let save_res = dataset_entry_repo.save_dataset(&dataset_entry).await;
+        let save_res = dataset_entry_repo.save_dataset_entry(&dataset_entry).await;
 
         assert_matches!(save_res, Ok(_));
     }
     {
-        let get_res = dataset_entry_repo.get_dataset(&dataset_entry.id).await;
+        let get_res = dataset_entry_repo
+            .get_dataset_entry(&dataset_entry.id)
+            .await;
 
         assert_matches!(
             get_res,
@@ -65,28 +69,28 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
     let dataset_entry_acc_2_3 = new_dataset_entry_with(owner_id_2.clone(), "user", "dataset3");
     {
         let save_res = dataset_entry_repo
-            .save_dataset(&dataset_entry_acc_1_1)
+            .save_dataset_entry(&dataset_entry_acc_1_1)
             .await;
 
         assert_matches!(save_res, Ok(_));
     }
     {
         let save_res = dataset_entry_repo
-            .save_dataset(&dataset_entry_acc_1_2)
+            .save_dataset_entry(&dataset_entry_acc_1_2)
             .await;
 
         assert_matches!(save_res, Ok(_));
     }
     {
         let save_res = dataset_entry_repo
-            .save_dataset(&dataset_entry_acc_2_3)
+            .save_dataset_entry(&dataset_entry_acc_2_3)
             .await;
 
         assert_matches!(save_res, Ok(_));
     }
     {
         let get_res = dataset_entry_repo
-            .get_datasets_by_owner_id(&owner_id_1)
+            .get_dataset_entries_by_owner_id(&owner_id_1)
             .await;
         let mut expected_dataset_entries = vec![dataset_entry_acc_1_1, dataset_entry_acc_1_2];
 
@@ -105,7 +109,7 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
     }
     {
         let get_res = dataset_entry_repo
-            .get_datasets_by_owner_id(&owner_id_2)
+            .get_dataset_entries_by_owner_id(&owner_id_2)
             .await;
         let expected_dataset_entries = vec![dataset_entry_acc_2_3];
 
@@ -124,16 +128,16 @@ pub async fn test_try_save_duplicate_dataset_entry(catalog: &Catalog) {
 
     let dataset_entry = new_dataset_entry();
     {
-        let save_res = dataset_entry_repo.save_dataset(&dataset_entry).await;
+        let save_res = dataset_entry_repo.save_dataset_entry(&dataset_entry).await;
 
         assert_matches!(save_res, Ok(_));
     }
     {
-        let save_res = dataset_entry_repo.save_dataset(&dataset_entry).await;
+        let save_res = dataset_entry_repo.save_dataset_entry(&dataset_entry).await;
 
         assert_matches!(
             save_res,
-            Err(SaveDatasetError::Duplicate(e))
+            Err(SaveDatasetEntryError::Duplicate(e))
                 if e.dataset_id == dataset_entry.id
         );
     }
@@ -146,19 +150,19 @@ pub async fn test_try_set_same_dataset_alias(catalog: &Catalog) {
 
     let dataset_entry = new_dataset_entry();
     {
-        let save_res = dataset_entry_repo.save_dataset(&dataset_entry).await;
+        let save_res = dataset_entry_repo.save_dataset_entry(&dataset_entry).await;
 
         assert_matches!(save_res, Ok(_));
     }
     let same_alias = dataset_entry.alias;
     {
         let update_res = dataset_entry_repo
-            .update_dataset_alias(&dataset_entry.id, &same_alias)
+            .update_dataset_entry_alias(&dataset_entry.id, &same_alias)
             .await;
 
         assert_matches!(
             update_res,
-            Err(UpdateDatasetAliasError::SameAlias(e))
+            Err(UpdateDatasetEntryAliasError::SameAlias(e))
                 if e.dataset_id == dataset_entry.id
                     && e.dataset_alias == same_alias
         );
@@ -174,23 +178,23 @@ pub async fn test_update_same_dataset_alias(catalog: &Catalog) {
     let new_alias = dataset_alias("kamu", "new-alias");
     {
         let update_res = dataset_entry_repo
-            .update_dataset_alias(&dataset_entry.id, &new_alias)
+            .update_dataset_entry_alias(&dataset_entry.id, &new_alias)
             .await;
 
         assert_matches!(
             update_res,
-            Err(UpdateDatasetAliasError::NotFound(DatasetNotFoundError::ByDatasetId(actual_dataset_id)))
+            Err(UpdateDatasetEntryAliasError::NotFound(DatasetEntryNotFoundError::ByDatasetId(actual_dataset_id)))
                 if actual_dataset_id == dataset_entry.id
         );
     }
     {
-        let save_res = dataset_entry_repo.save_dataset(&dataset_entry).await;
+        let save_res = dataset_entry_repo.save_dataset_entry(&dataset_entry).await;
 
         assert_matches!(save_res, Ok(_));
     }
     {
         let update_res = dataset_entry_repo
-            .update_dataset_alias(&dataset_entry.id, &new_alias)
+            .update_dataset_entry_alias(&dataset_entry.id, &new_alias)
             .await;
 
         assert_matches!(update_res, Ok(_));
@@ -204,16 +208,18 @@ pub async fn test_delete_dataset_entry(catalog: &Catalog) {
 
     let dataset_entry = new_dataset_entry();
     {
-        let delete_res = dataset_entry_repo.delete_dataset(&dataset_entry.id).await;
+        let delete_res = dataset_entry_repo
+            .delete_dataset_entry(&dataset_entry.id)
+            .await;
 
         assert_matches!(
             delete_res,
-            Err(DeleteDatasetError::NotFound(DatasetNotFoundError::ByDatasetId(actual_dataset_id)))
+            Err(DeleteEntryDatasetError::NotFound(DatasetEntryNotFoundError::ByDatasetId(actual_dataset_id)))
                 if actual_dataset_id == dataset_entry.id
         );
     }
     {
-        let save_res = dataset_entry_repo.save_dataset(&dataset_entry).await;
+        let save_res = dataset_entry_repo.save_dataset_entry(&dataset_entry).await;
 
         assert_matches!(save_res, Ok(_));
     }
