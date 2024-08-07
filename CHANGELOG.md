@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `Reset` flow in GQL Api which can be triggered manually for `Root` and `Derivative` datasets
 - Private Datasets, preparation work:
   - Added in-mem implementation of ReBAC repository
+  - Added in-mem implementation of `DatasetEntryRepository`
 
 ## [0.193.1] - 2024-08-09
 ### Fixed
