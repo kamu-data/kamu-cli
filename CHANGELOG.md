@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Private Datasets, preparation work:
   - Added in-mem implementation of ReBAC repository
+  - Added in-mem implementation of `DatasetEntryRepository`
 
 ## [0.193.0] - 2024-08-07
 ### Added
