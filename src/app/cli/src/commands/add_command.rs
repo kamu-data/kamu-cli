@@ -83,12 +83,12 @@ impl AddCommand {
             .map(|r| std::path::Path::new(r).join("**").join("*.yaml"))
             .flat_map(|p| {
                 glob::glob(p.to_str().unwrap())
-                    .unwrap_or_else(|e| panic!("Failed to read glob {}: {}", p.display(), e))
+                    .unwrap_or_else(|e| panic!("Failed to read glob {}: {e}", p.display()))
             })
             .map(Result::unwrap)
             .filter(|p| {
                 self.is_snapshot_file(p)
-                    .unwrap_or_else(|e| panic!("Error while reading file {}: {}", p.display(), e))
+                    .unwrap_or_else(|e| panic!("Error while reading file {}: {e}", p.display()))
             });
 
         let mut res = Vec::new();
@@ -206,7 +206,7 @@ impl AddCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for AddCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn before_run(&self) -> Result<(), CLIError> {
         if self.stdin && !self.snapshot_refs.is_empty() {
             return Err(CLIError::usage_error(
                 "Cannot specify --stdin and positional arguments at the same time",
@@ -223,6 +223,10 @@ impl Command for AddCommand {
             ));
         }
 
+        Ok(())
+    }
+
+    async fn run(&mut self) -> Result<(), CLIError> {
         let load_results = if self.recursive {
             self.load_recursive().await
         } else if self.stdin {
@@ -282,7 +286,8 @@ impl Command for AddCommand {
                     return Err(CLIError::Aborted);
                 }
 
-                // TODO: delete permissions should be checked in multi-tenant scenario
+                // TODO: Private Datasets: delete permissions should be checked in multi-tenant
+                //                         scenario
                 for hdl in already_exist {
                     self.delete_dataset.execute_via_handle(&hdl).await?;
                 }

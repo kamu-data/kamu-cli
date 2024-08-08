@@ -192,6 +192,7 @@ pub async fn run(
                 } else if current_account.is_explicit() && !is_multi_tenant_workspace {
                     Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
                 } else {
+                    command.before_run().await?;
                     command.run().await
                 }
             }
