@@ -53,6 +53,7 @@ async fn test_verify_data_consistency() {
 
     let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let publicly_available = true;
 
     dataset_repo
         .create_dataset_from_snapshot(
@@ -62,6 +63,7 @@ async fn test_verify_data_consistency() {
                 .push_event(MetadataFactory::set_polling_source().build())
                 .push_event(MetadataFactory::set_data_schema().build())
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();
@@ -78,6 +80,7 @@ async fn test_verify_data_consistency() {
                 )
                 .push_event(MetadataFactory::set_data_schema().build())
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();

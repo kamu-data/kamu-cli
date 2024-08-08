@@ -25,7 +25,7 @@ pub struct AddCommand {
     recursive: bool,
     replace: bool,
     stdin: bool,
-    public: bool,
+    publicly_available: bool,
     output_config: Arc<OutputConfig>,
     multi_tenant: bool,
 }
@@ -39,7 +39,7 @@ impl AddCommand {
         recursive: bool,
         replace: bool,
         stdin: bool,
-        public: bool,
+        publicly_available: bool,
         output_config: Arc<OutputConfig>,
         multi_tenant: bool,
     ) -> Self
@@ -54,7 +54,7 @@ impl AddCommand {
             recursive,
             replace,
             stdin,
-            public,
+            publicly_available,
             output_config,
             multi_tenant,
         }
@@ -155,7 +155,7 @@ impl Command for AddCommand {
                 "Name override can be used only when adding a single manifest",
             ));
         }
-        if !self.multi_tenant && self.public {
+        if !self.multi_tenant && self.publicly_available {
             return Err(CLIError::usage_error(format!(
                 "Only multi-tenant repositories support the '{}' argument",
                 *cli_arguments::add::PUBLIC
@@ -237,7 +237,7 @@ impl Command for AddCommand {
 
         let mut add_results = self
             .dataset_repo
-            .create_datasets_from_snapshots(snapshots)
+            .create_datasets_from_snapshots(snapshots, self.publicly_available)
             .await;
 
         add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(id_b));

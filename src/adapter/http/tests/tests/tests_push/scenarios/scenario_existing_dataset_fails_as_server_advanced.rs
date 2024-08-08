@@ -43,6 +43,7 @@ impl<TServerHarness: ServerSideHarness>
         let server_repo = server_harness.cli_dataset_repository();
         let client_repo = client_harness.dataset_repository();
 
+        let publicly_available = true;
         let client_create_result = client_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -54,6 +55,7 @@ impl<TServerHarness: ServerSideHarness>
                     .push_event(MetadataFactory::set_polling_source().build())
                     .push_event(MetadataFactory::set_data_schema().build())
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();

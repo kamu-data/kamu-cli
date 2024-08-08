@@ -380,6 +380,7 @@ impl TestHarness {
     }
 
     async fn create_simple_dataset(&self) -> CreateDatasetResult {
+        let publicly_available = true;
         let ds = self
             .dataset_repo
             .create_dataset_from_snapshot(
@@ -406,6 +407,7 @@ impl TestHarness {
                         ..Default::default()
                     })
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();

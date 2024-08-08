@@ -98,9 +98,10 @@ impl TransformTestHarness {
             .push_event(MetadataFactory::set_data_schema().build())
             .build();
 
+        let publicly_available = true;
         let create_result = self
             .dataset_repo
-            .create_dataset_from_snapshot(snap)
+            .create_dataset_from_snapshot(snap, publicly_available)
             .await
             .unwrap();
         create_result.dataset_handle
@@ -121,9 +122,10 @@ impl TransformTestHarness {
             .push_event(MetadataFactory::set_data_schema().build())
             .build();
 
+        let publicly_available = true;
         let create_result = self
             .dataset_repo
-            .create_dataset_from_snapshot(snap)
+            .create_dataset_from_snapshot(snap, publicly_available)
             .await
             .unwrap();
         (create_result.dataset_handle, transform)
@@ -636,6 +638,7 @@ async fn test_transform_with_compaction_retry() {
     );
     let root_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
+    let publicly_available = true;
     let foo_created_result = harness
         .dataset_repo
         .create_dataset_from_snapshot(
@@ -664,6 +667,7 @@ async fn test_transform_with_compaction_retry() {
                     ..Default::default()
                 })
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();

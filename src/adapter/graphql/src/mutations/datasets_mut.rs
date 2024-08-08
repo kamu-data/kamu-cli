@@ -99,7 +99,7 @@ impl DatasetsMut {
 
     // TODO: Multi-tenancy
     // TODO: Multi-tenant resolution for derivative dataset inputs (should it only
-    // work by ID?)
+    //       work by ID?)
     #[allow(unused_variables)]
     #[graphql(skip)]
     async fn create_from_snapshot_impl(
@@ -109,7 +109,11 @@ impl DatasetsMut {
     ) -> Result<CreateDatasetFromSnapshotResult> {
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
-        let result = match dataset_repo.create_dataset_from_snapshot(snapshot).await {
+        // TODO: read param from input
+        let result = match dataset_repo
+            .create_dataset_from_snapshot(snapshot, false)
+            .await
+        {
             Ok(result) => {
                 let dataset = Dataset::from_ref(ctx, &result.dataset_handle.as_local_ref()).await?;
                 CreateDatasetFromSnapshotResult::Success(CreateDatasetResultSuccess { dataset })

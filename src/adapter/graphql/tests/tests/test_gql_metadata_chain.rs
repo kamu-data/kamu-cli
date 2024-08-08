@@ -171,12 +171,14 @@ async fn metadata_chain_append_event() {
         .catalog_authorized
         .get_one::<dyn DatasetRepository>()
         .unwrap();
+    let publicly_available = true;
     let create_result = dataset_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();
@@ -254,12 +256,14 @@ async fn metadata_update_readme_new() {
         .catalog_authorized
         .get_one::<dyn DatasetRepository>()
         .unwrap();
+    let publicly_available = true;
     let create_result = dataset_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();

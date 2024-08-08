@@ -60,6 +60,8 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .unwrap();
 
     // Add and sync dataset
+    let publicly_available = true;
+
     dataset_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
@@ -67,6 +69,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
                 .kind(DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();

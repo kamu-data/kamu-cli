@@ -20,6 +20,9 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_auth_rebac::RebacService;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use opendatafabric::*;
 
 macro_rules! n {
@@ -110,6 +113,8 @@ async fn create_graph(
     repo: &DatasetRepositoryLocalFs,
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
 ) {
+    let publicly_available = true;
+
     for (dataset_alias, deps) in datasets {
         repo.create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
@@ -128,6 +133,7 @@ async fn create_graph(
                         .into()
                 })
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();
@@ -143,6 +149,7 @@ async fn create_graph_remote(
     event_bus: Arc<EventBus>,
     dataset_repo: Arc<dyn DatasetRepository>,
     reg: Arc<RemoteRepositoryRegistryImpl>,
+    rebac_svc: Arc<dyn RebacService>,
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
     to_import: Vec<DatasetAlias>,
 ) {
@@ -156,6 +163,7 @@ async fn create_graph_remote(
         Arc::new(EventBus::new(Arc::new(CatalogBuilder::new().build()))),
         false,
         Arc::new(SystemTimeSourceDefault),
+        rebac_svc,
     );
 
     create_graph(&remote_dataset_repo, datasets).await;
@@ -366,6 +374,7 @@ async fn test_pull_batching_complex_with_remote() {
         harness.event_bus.clone(),
         harness.dataset_repo.clone(),
         harness.remote_repo_reg.clone(),
+        harness.rebac_svc.clone(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names![]),
@@ -849,6 +858,7 @@ struct PullTestHarness {
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_svc: Arc<dyn PullService>,
     event_bus: Arc<EventBus>,
+    rebac_svc: Arc<dyn RebacService>,
 }
 
 impl PullTestHarness {
@@ -893,6 +903,8 @@ impl PullTestHarness {
             .add_builder(TestSyncService::builder().with_calls(calls.clone()))
             .bind::<dyn SyncService, TestSyncService>()
             .add::<PullServiceImpl>()
+            .add::<RebacRepositoryInMem>()
+            .add::<RebacServiceImpl>()
             .build();
 
         let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
@@ -900,6 +912,7 @@ impl PullTestHarness {
         let remote_alias_reg = catalog.get_one::<dyn RemoteAliasesRegistry>().unwrap();
         let pull_svc = catalog.get_one::<dyn PullService>().unwrap();
         let event_bus = catalog.get_one::<EventBus>().unwrap();
+        let rebac_svc = catalog.get_one::<dyn RebacService>().unwrap();
 
         Self {
             calls,
@@ -908,15 +921,19 @@ impl PullTestHarness {
             remote_alias_reg,
             pull_svc,
             event_bus,
+            rebac_svc,
         }
     }
 
     async fn create_dataset(&self, dataset_alias: &DatasetAlias) {
+        let publicly_available = true;
+
         self.dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
                     .name(DatasetAlias::new(None, dataset_alias.dataset_name.clone()))
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();
@@ -1195,11 +1212,14 @@ impl SyncService for TestSyncService {
                 .unwrap()
             {
                 None => {
+                    let publicly_available = true;
+
                     self.dataset_repo
                         .create_dataset_from_snapshot(
                             MetadataFactory::dataset_snapshot()
                                 .name(local_ref.alias().unwrap().clone())
                                 .build(),
+                            publicly_available,
                         )
                         .await
                         .unwrap();

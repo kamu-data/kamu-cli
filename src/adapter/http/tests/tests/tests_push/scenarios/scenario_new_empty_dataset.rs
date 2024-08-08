@@ -36,6 +36,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewEmptyDatasetScenario<TServer
 
         let client_repo = client_harness.dataset_repository();
 
+        let publicly_available = true;
         let client_create_result = client_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -45,6 +46,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewEmptyDatasetScenario<TServer
                     ))
                     .kind(DatasetKind::Root)
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();

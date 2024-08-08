@@ -300,6 +300,8 @@ impl DatasetFilteringHarness {
         account_name: Option<AccountName>,
         dataset_name: &str,
     ) -> DatasetHandle {
+        let publicly_available = true;
+
         self.dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -310,6 +312,7 @@ impl DatasetFilteringHarness {
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap()

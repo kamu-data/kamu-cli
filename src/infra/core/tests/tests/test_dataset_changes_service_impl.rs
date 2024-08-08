@@ -873,6 +873,8 @@ impl DatasetChangesHarness {
         dataset_name: &str,
         input_dataset_names: Vec<&str>,
     ) -> CreateDatasetResult {
+        let publicly_available = true;
+
         self.dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -887,6 +889,7 @@ impl DatasetChangesHarness {
                             .build(),
                     )
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap()

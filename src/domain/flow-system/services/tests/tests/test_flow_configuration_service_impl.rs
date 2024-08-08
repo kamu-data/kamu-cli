@@ -617,6 +617,7 @@ impl FlowConfigurationHarness {
         flow_configuration.into()
     }
     async fn create_root_dataset(&self, dataset_name: &str) -> DatasetID {
+        let publicly_available = true;
         let result = self
             .dataset_repo
             .create_dataset_from_snapshot(
@@ -625,6 +626,7 @@ impl FlowConfigurationHarness {
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();

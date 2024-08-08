@@ -244,6 +244,7 @@ impl DatasetOwnershipHarness {
             .await
             .unwrap()
             .unwrap();
+        let publicly_available = true;
         let created_dataset = self
             .dataset_repo
             .create_dataset_from_snapshot(
@@ -255,6 +256,7 @@ impl DatasetOwnershipHarness {
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();
@@ -278,6 +280,7 @@ impl DatasetOwnershipHarness {
             .await
             .unwrap()
             .unwrap();
+        let publicly_available = true;
         let created_dataset = self
             .dataset_repo
             .create_dataset_from_snapshot(
@@ -293,6 +296,7 @@ impl DatasetOwnershipHarness {
                             .build(),
                     )
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();

@@ -54,6 +54,7 @@ async fn setup_repo() -> RepoFixture {
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
+    let publicly_available = true;
     let created_dataset = dataset_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
@@ -61,6 +62,7 @@ async fn setup_repo() -> RepoFixture {
                 .kind(DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();

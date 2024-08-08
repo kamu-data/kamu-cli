@@ -182,6 +182,7 @@ impl FlowHarness {
     }
 
     pub async fn create_root_dataset(&self, dataset_alias: DatasetAlias) -> DatasetID {
+        let publicly_available = true;
         let result = self
             .dataset_repo
             .create_dataset_from_snapshot(
@@ -190,6 +191,7 @@ impl FlowHarness {
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();
@@ -202,6 +204,7 @@ impl FlowHarness {
         dataset_alias: DatasetAlias,
         input_ids: Vec<DatasetID>,
     ) -> DatasetID {
+        let publicly_available = true;
         let create_result = self
             .dataset_repo
             .create_dataset_from_snapshot(
@@ -214,6 +217,7 @@ impl FlowHarness {
                             .build(),
                     )
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();

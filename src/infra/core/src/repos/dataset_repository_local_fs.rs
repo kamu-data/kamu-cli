@@ -15,6 +15,7 @@ use dill::*;
 use domain::auth::{DatasetAction, DatasetActionAuthorizer};
 use event_bus::EventBus;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_auth_rebac::RebacService;
 use kamu_core::*;
 use opendatafabric::*;
 use url::Url;
@@ -30,7 +31,9 @@ pub struct DatasetRepositoryLocalFs {
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     event_bus: Arc<EventBus>,
     thrash_lock: tokio::sync::Mutex<()>,
+    multi_tenant: bool,
     system_time_source: Arc<dyn SystemTimeSource>,
+    rebac_service: Arc<dyn RebacService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,6 +48,7 @@ impl DatasetRepositoryLocalFs {
         event_bus: Arc<EventBus>,
         multi_tenant: bool,
         system_time_source: Arc<dyn SystemTimeSource>,
+        rebac_service: Arc<dyn RebacService>,
     ) -> Self {
         Self {
             current_account_subject: current_account_subject.clone(),
@@ -64,7 +68,9 @@ impl DatasetRepositoryLocalFs {
             dependency_graph_service,
             event_bus,
             thrash_lock: tokio::sync::Mutex::new(()),
+            multi_tenant,
             system_time_source,
+            rebac_service,
         }
     }
 
@@ -336,12 +342,21 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
     async fn create_dataset_from_snapshot(
         &self,
         snapshot: DatasetSnapshot,
+        publicly_available: bool,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
+        let maybe_rebac_service = if self.multi_tenant {
+            Some(self.rebac_service.as_ref())
+        } else {
+            None
+        };
+
         create_dataset_from_snapshot_impl(
             self,
+            maybe_rebac_service,
             self.event_bus.as_ref(),
             snapshot,
             self.system_time_source.now(),
+            publicly_available,
         )
         .await
     }

@@ -864,6 +864,8 @@ impl DependencyGraphHarness {
     }
 
     async fn create_root_dataset(&self, account_name: Option<AccountName>, dataset_name: &str) {
+        let publicly_available = true;
+
         self.dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -874,6 +876,7 @@ impl DependencyGraphHarness {
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();
@@ -885,6 +888,8 @@ impl DependencyGraphHarness {
         dataset_name: &str,
         input_aliases: Vec<DatasetAlias>,
     ) {
+        let publicly_available = true;
+
         self.dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -899,6 +904,7 @@ impl DependencyGraphHarness {
                             .build(),
                     )
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();
