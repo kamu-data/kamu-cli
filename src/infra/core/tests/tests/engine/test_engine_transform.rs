@@ -297,9 +297,10 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .build();
 
     let root_alias = root_snapshot.name.clone();
+    let publicly_available = true;
 
     dataset_repo
-        .create_dataset_from_snapshot(root_snapshot)
+        .create_dataset_from_snapshot(root_snapshot, publicly_available)
         .await
         .unwrap();
 
@@ -328,9 +329,10 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .build();
 
     let deriv_alias = deriv_snapshot.name.clone();
+    let publicly_available = true;
 
     let dataset = dataset_repo
-        .create_dataset_from_snapshot(deriv_snapshot)
+        .create_dataset_from_snapshot(deriv_snapshot, publicly_available)
         .await
         .unwrap()
         .create_dataset_result

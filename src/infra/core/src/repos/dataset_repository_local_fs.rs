@@ -14,6 +14,7 @@ use async_trait::async_trait;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_auth_rebac::RebacService;
 use kamu_core::*;
 use opendatafabric::*;
 use time_source::SystemTimeSource;
@@ -26,7 +27,9 @@ use crate::*;
 pub struct DatasetRepositoryLocalFs {
     storage_strategy: Box<dyn DatasetStorageStrategy>,
     thrash_lock: tokio::sync::Mutex<()>,
+    multi_tenant: bool,
     system_time_source: Arc<dyn SystemTimeSource>,
+    rebac_service: Arc<dyn RebacService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,6 +41,7 @@ impl DatasetRepositoryLocalFs {
         current_account_subject: Arc<CurrentAccountSubject>,
         multi_tenant: bool,
         system_time_source: Arc<dyn SystemTimeSource>,
+        rebac_service: Arc<dyn RebacService>,
     ) -> Self {
         Self {
             storage_strategy: if multi_tenant {
@@ -49,7 +53,9 @@ impl DatasetRepositoryLocalFs {
                 Box::new(DatasetSingleTenantStorageStrategy::new(root))
             },
             thrash_lock: tokio::sync::Mutex::new(()),
+            multi_tenant,
             system_time_source,
+            rebac_service,
         }
     }
 

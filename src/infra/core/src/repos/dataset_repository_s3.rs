@@ -15,6 +15,8 @@ use chrono::{DateTime, Utc};
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_auth_rebac::RebacService;
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
 use opendatafabric::*;
 use time_source::SystemTimeSource;
@@ -33,6 +35,7 @@ pub struct DatasetRepositoryS3 {
     registry_cache: Option<Arc<S3RegistryCache>>,
     metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
     system_time_source: Arc<dyn SystemTimeSource>,
+    rebac_service: Arc<dyn RebacService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,6 +58,7 @@ impl DatasetRepositoryS3 {
         registry_cache: Option<Arc<S3RegistryCache>>,
         metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
         system_time_source: Arc<dyn SystemTimeSource>,
+        rebac_service: Arc<dyn RebacService>,
     ) -> Self {
         Self {
             s3_context,
@@ -63,6 +67,7 @@ impl DatasetRepositoryS3 {
             registry_cache,
             metadata_cache_local_fs_path,
             system_time_source,
+            rebac_service,
         }
     }
 

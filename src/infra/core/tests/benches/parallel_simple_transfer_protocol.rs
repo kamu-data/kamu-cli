@@ -78,8 +78,9 @@ async fn setup_dataset(
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
+    let publicly_available = true;
     let _ = dataset_repo
-        .create_dataset_from_snapshot(snapshot)
+        .create_dataset_from_snapshot(snapshot, publicly_available)
         .await
         .unwrap()
         .create_dataset_result

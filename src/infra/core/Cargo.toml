@@ -32,6 +32,7 @@ query-extensions-json = ["dep:datafusion-functions-json"]
 
 [dependencies]
 # Kamu
+# TODO: resort
 internal-error = { workspace = true }
 container-runtime = { workspace = true }
 kamu-data-utils = { workspace = true }
@@ -43,6 +44,7 @@ kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
 random-names = { workspace = true }
 time-source = { workspace = true }
+kamu-auth-rebac = { workspace = true }
 
 # Serialization
 flatbuffers = "24"
@@ -151,6 +153,8 @@ libc = "0.2" # For getting uid:gid
 database-common = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
+kamu-auth-rebac-inmem = { workspace = true }
+kamu-auth-rebac-services = { workspace = true }
 kamu-datasets-services = { workspace = true }
 
 criterion = { version = "0.5", features = ["async_tokio"] }
