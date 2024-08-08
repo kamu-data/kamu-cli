@@ -29,7 +29,7 @@ async fn test_reset_dataset_with_2revisions_drop_last() {
 
     let result = harness
         .reset_svc
-        .reset_dataset(&test_case.dataset_handle, &test_case.hash_seed_block)
+        .reset_dataset(&test_case.dataset_handle, &test_case.hash_seed_block, None)
         .await;
     assert!(result.is_ok());
 
@@ -53,6 +53,7 @@ async fn test_reset_dataset_with_2revisions_without_changes() {
         .reset_dataset(
             &test_case.dataset_handle,
             &test_case.hash_polling_source_block,
+            None,
         )
         .await;
     assert!(result.is_ok());
@@ -74,9 +75,29 @@ async fn test_reset_dataset_to_non_existing_block_fails() {
 
     let result = harness
         .reset_svc
-        .reset_dataset(&test_case.dataset_handle, &a_hash_not_present_in_chain)
+        .reset_dataset(
+            &test_case.dataset_handle,
+            &a_hash_not_present_in_chain,
+            None,
+        )
         .await;
     assert_matches!(result, Err(ResetError::BlockNotFound(_)));
+}
+
+#[test_log::test(tokio::test)]
+async fn test_reset_dataset_with_wrong_head() {
+    let harness = ResetTestHarness::new();
+    let test_case = harness.a_chain_with_2_blocks().await;
+
+    let result = harness
+        .reset_svc
+        .reset_dataset(
+            &test_case.dataset_handle,
+            &test_case.hash_seed_block,
+            Some(test_case.hash_seed_block.clone()),
+        )
+        .await;
+    assert_matches!(result, Err(ResetError::OldHeadMismatch(_)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

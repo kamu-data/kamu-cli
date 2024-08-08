@@ -168,7 +168,6 @@ pub(crate) async fn ensure_flow_preconditions(
                     }
                 }
             }
-            ()
         }
     }
     Ok(None)

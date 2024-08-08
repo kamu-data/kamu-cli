@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Added
-- New `Reset` flow in GQL Api which can be triggered manually for `Root` and `Derived` datasets
+- New `Reset` flow in GQL Api which can be triggered manually for `Root` and `Derivative` datasets
 
 ## [0.192.0] - 2024-08-07
 ### Added

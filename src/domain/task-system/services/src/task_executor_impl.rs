@@ -152,7 +152,11 @@ impl TaskExecutorImpl {
             .int_err()?;
 
         let reset_result_maybe = reset_svc
-            .reset_dataset(&dataset_handle, &reset_dataset_args.new_head_hash)
+            .reset_dataset(
+                &dataset_handle,
+                &reset_dataset_args.new_head_hash,
+                Some(reset_dataset_args.old_head_hash.clone()),
+            )
             .await;
         match reset_result_maybe {
             Ok(_) => Ok(TaskOutcome::Success(TaskResult::ResetDatasetResult(
