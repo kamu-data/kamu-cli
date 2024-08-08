@@ -5228,7 +5228,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac"
-version = "0.192.0"
+version = "0.193.0"
 dependencies = [
  "async-trait",
  "internal-error",
@@ -5239,7 +5239,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-inmem"
-version = "0.192.0"
+version = "0.193.0"
 dependencies = [
  "async-trait",
  "dill 0.9.0",
@@ -5251,7 +5251,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-repo-tests"
-version = "0.192.0"
+version = "0.193.0"
 dependencies = [
  "dill 0.9.0",
  "kamu-auth-rebac",
@@ -5260,7 +5260,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-services"
-version = "0.192.0"
+version = "0.193.0"
 dependencies = [
  "async-trait",
  "dill 0.9.0",
