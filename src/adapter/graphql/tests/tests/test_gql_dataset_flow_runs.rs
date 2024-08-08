@@ -375,6 +375,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
                                             "ingestResult": {
+                                                "__typename": "FlowDescriptionUpdateResultSuccess",
                                                 "numBlocks": 1,
                                                 "numRecords": 12,
                                             },
@@ -597,6 +598,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             "__typename": "FlowDescriptionDatasetExecuteTransform",
                                             "datasetId": create_derived_result.dataset_handle.id.to_string(),
                                             "transformResult": {
+                                                "__typename": "FlowDescriptionUpdateResultSuccess",
                                                 "numBlocks": 1,
                                                 "numRecords": 5,
                                             },
@@ -3120,24 +3122,42 @@ impl FlowRunsHarness {
                                             ... on FlowDescriptionDatasetExecuteTransform {
                                                 datasetId
                                                 transformResult {
-                                                    numBlocks
-                                                    numRecords
+                                                    __typename
+                                                    ... on FlowDescriptionUpdateResultUpToDate {
+                                                        uncacheable
+                                                    }
+                                                    ... on FlowDescriptionUpdateResultSuccess {
+                                                        numBlocks
+                                                        numRecords
+                                                    }
                                                 }
                                             }
                                             ... on FlowDescriptionDatasetPollingIngest {
                                                 datasetId
                                                 ingestResult {
-                                                    numBlocks
-                                                    numRecords
-                                                }
+                                                    __typename
+                                                    ... on FlowDescriptionUpdateResultUpToDate {
+                                                        uncacheable
+                                                    }
+                                                    ... on FlowDescriptionUpdateResultSuccess {
+                                                        numBlocks
+                                                        numRecords
+                                                    }
+                                            }
                                             }
                                             ... on FlowDescriptionDatasetPushIngest {
                                                 datasetId
                                                 sourceName
                                                 inputRecordsCount
                                                 ingestResult {
-                                                    numBlocks
-                                                    numRecords
+                                                    __typename
+                                                    ... on FlowDescriptionUpdateResultUpToDate {
+                                                        uncacheable
+                                                    }
+                                                    ... on FlowDescriptionUpdateResultSuccess {
+                                                        numBlocks
+                                                        numRecords
+                                                    }
                                                 }
                                             }
                                         }
@@ -3226,8 +3246,9 @@ impl FlowRunsHarness {
                                                 minRecordsToAwait
                                                 __typename
                                             }
-                                            ... on FlowConfigurationScheduleRule {
-                                                scheduleRule {
+                                            ... on FlowConfigurationIngest {
+                                                fetchUncacheable
+                                                schedule {
                                                     ... on TimeDelta {
                                                         every
                                                         unit

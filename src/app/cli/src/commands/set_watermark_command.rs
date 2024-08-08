@@ -107,7 +107,7 @@ impl Command for SetWatermarkCommand {
             .set_watermark(&dataset_ref, watermark.into())
             .await
         {
-            Ok(PullResult::UpToDate) => {
+            Ok(PullResult::UpToDate(_)) => {
                 eprintln!("{}", console::style("Watermark was up-to-date").yellow());
                 Ok(())
             }

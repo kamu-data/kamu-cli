@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{CompactionResult, PullResult};
+use kamu_core::{CompactionResult, PullResult, UpToDateResult};
 use opendatafabric::DatasetID;
 use serde::{Deserialize, Serialize};
 
@@ -57,9 +57,23 @@ pub struct TaskUpdateDatasetResult {
     pub pull_result: PullResult,
 }
 
-impl From<PullResult> for TaskUpdateDatasetResult {
-    fn from(value: PullResult) -> Self {
-        Self { pull_result: value }
+impl TaskUpdateDatasetResult {
+    pub fn from_pull_result(pull_result: &PullResult, fetch_uncacheable: bool) -> Self {
+        match pull_result {
+            PullResult::Updated { .. } => TaskUpdateDatasetResult {
+                pull_result: pull_result.clone(),
+            },
+            PullResult::UpToDate(up_to_date_result) => match up_to_date_result {
+                UpToDateResult::UpToDate => TaskUpdateDatasetResult {
+                    pull_result: pull_result.clone(),
+                },
+                UpToDateResult::IngestUpToDate { uncacheable } => TaskUpdateDatasetResult {
+                    pull_result: PullResult::UpToDate(UpToDateResult::IngestUpToDate {
+                        uncacheable: *uncacheable && fetch_uncacheable,
+                    }),
+                },
+            },
+        }
     }
 }
 

@@ -228,7 +228,7 @@ impl Command for PullCommand {
         for res in &pull_results {
             match &res.result {
                 Ok(r) => match r {
-                    PullResult::UpToDate => up_to_date += 1,
+                    PullResult::UpToDate(_) => up_to_date += 1,
                     PullResult::Updated { .. } => updated += 1,
                 },
                 Err(_) => errors += 1,

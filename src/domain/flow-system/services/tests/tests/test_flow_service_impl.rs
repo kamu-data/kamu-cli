@@ -40,11 +40,14 @@ async fn test_read_initial_config_and_queue_without_waiting() {
         })
         .await;
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(60).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(60).unwrap().into(),
+            },
         )
         .await;
     harness.eager_initialization().await;
@@ -69,7 +72,8 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     run_since_start: Duration::try_milliseconds(10).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                      dataset_id: foo_id.clone()
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
                     }),
                 });
                 let foo_task0_handle = foo_task0_driver.run();
@@ -81,7 +85,8 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     run_since_start: Duration::try_milliseconds(90).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                      dataset_id: foo_id.clone()
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
                     }),
                 });
                 let foo_task1_handle = foo_task1_driver.run();
@@ -164,14 +169,17 @@ async fn test_cron_config() {
         })
         .await;
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Schedule::Cron(ScheduleCron {
-                source_5component_cron_expression: String::from("<irrelevant>"),
-                cron_schedule: cron::Schedule::from_str("*/5 * * * * *").unwrap(),
-            }),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Schedule::Cron(ScheduleCron {
+                    source_5component_cron_expression: String::from("<irrelevant>"),
+                    cron_schedule: cron::Schedule::from_str("*/5 * * * * *").unwrap(),
+                }),
+            },
         )
         .await;
     harness.eager_initialization().await;
@@ -196,7 +204,8 @@ async fn test_cron_config() {
                     run_since_start: Duration::try_seconds(6).unwrap(),
                     finish_in_with: Some((Duration::try_seconds(1).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                      dataset_id: foo_id.clone()
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
                     }),
                 });
                 let foo_task0_handle = foo_task0_driver.run();
@@ -263,11 +272,14 @@ async fn test_manual_trigger() {
 
     // Note: only "foo" has auto-schedule, "bar" hasn't
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(90).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(90).unwrap().into(),
+            },
         )
         .await;
     harness.eager_initialization().await;
@@ -299,7 +311,8 @@ async fn test_manual_trigger() {
                     run_since_start: Duration::try_milliseconds(10).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                      dataset_id: foo_id.clone()
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
                     }),
                 });
                 let task0_handle = task0_driver.run();
@@ -311,7 +324,8 @@ async fn test_manual_trigger() {
                     run_since_start: Duration::try_milliseconds(60).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                      dataset_id: foo_id.clone()
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
                     }),
                 });
                 let task1_handle = task1_driver.run();
@@ -323,7 +337,8 @@ async fn test_manual_trigger() {
                     run_since_start: Duration::try_milliseconds(100).unwrap(),
                     finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                      dataset_id: bar_id.clone()
+                      dataset_id: bar_id.clone(),
+                      fetch_uncacheable: false
                     }),
                 });
                 let task2_handle = task2_driver.run();
@@ -365,6 +380,216 @@ async fn test_manual_trigger() {
                     //  - no next flow enqueued
 
                     // Stop at 180ms: "foo" flow 3 gets scheduled at 160ms
+                    harness.advance_time(Duration::try_milliseconds(180).unwrap()).await;
+                };
+
+                tokio::join!(task0_handle, task1_handle, task2_handle, trigger0_handle, trigger1_handle, main_handle)
+            } => Ok(())
+    }
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling
+
+            #1: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+
+            #2: +10ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #3: +20ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=110ms)
+                Flow ID = 0 Finished Success
+
+            #4: +40ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=40ms)
+                Flow ID = 0 Finished Success
+
+            #5: +60ms:
+              "foo" Ingest:
+                Flow ID = 1 Running(task=1)
+                Flow ID = 0 Finished Success
+
+            #6: +70ms:
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #7: +80ms:
+              "bar" Ingest:
+                Flow ID = 3 Waiting Manual Executor(task=2, since=80ms)
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #8: +100ms:
+              "bar" Ingest:
+                Flow ID = 3 Running(task=2)
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #9: +110ms:
+              "bar" Ingest:
+                Flow ID = 3 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #10: +160ms:
+              "bar" Ingest:
+                Flow ID = 3 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Executor(task=3, since=160ms)
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            "#
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_ingest_trigger_with_ingest_config() {
+    let harness = FlowHarness::new().await;
+
+    let foo_id = harness
+        .create_root_dataset(DatasetAlias {
+            dataset_name: DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let bar_id = harness
+        .create_root_dataset(DatasetAlias {
+            dataset_name: DatasetName::new_unchecked("bar"),
+            account_name: None,
+        })
+        .await;
+
+    harness
+        .set_dataset_flow_ingest(
+            harness.now_datetime(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            IngestRule {
+                fetch_uncacheable: true,
+                schedule_condition: Duration::try_milliseconds(90).unwrap().into(),
+            },
+        )
+        .await;
+    harness.eager_initialization().await;
+
+    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
+    let bar_flow_key: FlowKey = FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest).into();
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+        // Run API service
+        res = harness.flow_service.run(start_time) => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+                // Task 0: "foo" start running at 10ms, finish at 20ms
+                let task0_driver = harness.task_driver(TaskDriverArgs {
+                    task_id: TaskID::new(0),
+                    dataset_id: Some(foo_id.clone()),
+                    run_since_start: Duration::try_milliseconds(10).unwrap(),
+                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: true
+                    }),
+                });
+                let task0_handle = task0_driver.run();
+
+                // Task 1: "for" start running at 60ms, finish at 70ms
+                let task1_driver = harness.task_driver(TaskDriverArgs {
+                    task_id: TaskID::new(1),
+                    dataset_id: Some(foo_id.clone()),
+                    run_since_start: Duration::try_milliseconds(60).unwrap(),
+                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: true
+                    }),
+                });
+                let task1_handle = task1_driver.run();
+
+                // Task 2: "bar" start running at 100ms, finish at 110ms
+                let task2_driver = harness.task_driver(TaskDriverArgs {
+                    task_id: TaskID::new(2),
+                    dataset_id: Some(bar_id.clone()),
+                    run_since_start: Duration::try_milliseconds(100).unwrap(),
+                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                      dataset_id: bar_id.clone(),
+                      fetch_uncacheable: false
+                    }),
+                });
+                let task2_handle = task2_driver.run();
+
+                // Manual trigger for "foo" at 40ms
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                    flow_key: foo_flow_key,
+                    run_since_start: Duration::try_milliseconds(40).unwrap(),
+                    initiator_id: None,
+                });
+                let trigger0_handle = trigger0_driver.run();
+
+                // Manual trigger for "bar" at 80ms
+                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                    flow_key: bar_flow_key,
+                    run_since_start: Duration::try_milliseconds(80).unwrap(),
+                    initiator_id: None,
+                });
+                let trigger1_handle = trigger1_driver.run();
+
+                // Main simulation script
+                let main_handle = async {
+                    // "foo":
+                    //  - flow 0 => task 0 gets scheduled immediately at 0ms
+                    //  - flow 0 => task 0 starts at 10ms and finishes running at 20ms
+                    //  - next flow => enqueued at 20ms to trigger in 1 period of 90ms - at 110ms
+                    // "bar": silent
+
+                    // Moment 40ms - manual foo trigger happens here:
+                    //  - flow 1 gets a 2nd trigger and is rescheduled to 40ms (20ms finish + 20ms throttling <= 40ms now)
+                    //  - task 1 starts at 60ms, finishes at 70ms (leave some gap to fight with random order)
+                    //  - flow 3 queued for 70 + 90 = 160ms
+                    //  - "bar": still silent
+
+                    // Moment 80ms - manual bar trigger happens here:
+                    //  - flow 2 immediately scheduled
+                    //  - task 2 gets scheduled at 80ms
+                    //  - task 2 starts at 100ms and finishes at 110ms (ensure gap to fight against task execution order)
+                    //  - no next flow enqueued
+
+                    // Stop at 180ms: "foo" flow 3 gets scheduled at 110ms
                     harness.advance_time(Duration::try_milliseconds(180).unwrap()).await;
                 };
 
@@ -1484,19 +1709,25 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
         })
         .await;
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(50).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+            },
         )
         .await;
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(80).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(80).unwrap().into(),
+            },
         )
         .await;
     harness.eager_initialization().await;
@@ -1525,7 +1756,8 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                  dataset_id: foo_id.clone()
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
                 }),
             });
             let task0_handle = task0_driver.run();
@@ -1537,7 +1769,8 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 run_since_start: Duration::try_milliseconds(20).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                  dataset_id: bar_id.clone()
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
                 }),
             });
             let task1_handle = task1_driver.run();
@@ -1569,7 +1802,10 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 //    - get queued for 100ms (last success at 30ms + period of 70ms)
                 harness.advance_time(Duration::try_milliseconds(30).unwrap()).await;
                 harness.resume_dataset_flow(start_time + Duration::try_milliseconds(80).unwrap(), foo_id.clone(), DatasetFlowType::Ingest).await;
-                harness.set_dataset_flow_schedule(start_time + Duration::try_milliseconds(80).unwrap(), bar_id.clone(), DatasetFlowType::Ingest, Duration::try_milliseconds(70).unwrap().into()).await;
+                harness.set_dataset_flow_ingest(start_time + Duration::try_milliseconds(80).unwrap(), bar_id.clone(), DatasetFlowType::Ingest, IngestRule {
+                  fetch_uncacheable: false,
+                  schedule_condition: Duration::try_milliseconds(70).unwrap().into(),
+              }).await;
                 test_flow_listener
                     .make_a_snapshot(start_time + Duration::try_milliseconds(80).unwrap())
                     .await;
@@ -1691,20 +1927,26 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
         .await;
 
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(100).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(100).unwrap().into(),
+            },
         )
         .await;
 
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(60).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(60).unwrap().into(),
+            },
         )
         .await;
 
@@ -1736,7 +1978,8 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                  dataset_id: foo_id.clone()
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
                 }),
           });
           let task0_handle = task0_driver.run();
@@ -1748,7 +1991,8 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 run_since_start: Duration::try_milliseconds(20).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                  dataset_id: bar_id.clone()
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
                 }),
           });
           let task1_handle = task1_driver.run();
@@ -1904,19 +2148,25 @@ async fn test_dataset_deleted() {
         .await;
 
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(50).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+            },
         )
         .await;
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(70).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(70).unwrap().into(),
+            },
         )
         .await;
     harness.eager_initialization().await;
@@ -1945,7 +2195,8 @@ async fn test_dataset_deleted() {
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                  dataset_id: foo_id.clone()
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
                 }),
             });
             let task0_handle = task0_driver.run();
@@ -1957,7 +2208,8 @@ async fn test_dataset_deleted() {
                 run_since_start: Duration::try_milliseconds(20).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                  dataset_id: bar_id.clone()
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
                 }),
             });
             let task1_handle = task1_driver.run();
@@ -2096,11 +2348,14 @@ async fn test_task_completions_trigger_next_loop_on_success() {
 
     for dataset_id in [&foo_id, &bar_id, &baz_id] {
         harness
-            .set_dataset_flow_schedule(
+            .set_dataset_flow_ingest(
                 harness.now_datetime(),
                 dataset_id.clone(),
                 DatasetFlowType::Ingest,
-                Duration::try_milliseconds(40).unwrap().into(),
+                IngestRule {
+                    fetch_uncacheable: false,
+                    schedule_condition: Duration::try_milliseconds(40).unwrap().into(),
+                },
             )
             .await;
     }
@@ -2134,7 +2389,8 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                  dataset_id: foo_id.clone()
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
                 }),
             });
             let task0_handle = task0_driver.run();
@@ -2146,7 +2402,8 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 run_since_start: Duration::try_milliseconds(20).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Failed(TaskError::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                  dataset_id: bar_id.clone()
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
                 }),
             });
             let task1_handle = task1_driver.run();
@@ -2158,7 +2415,8 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 run_since_start: Duration::try_milliseconds(30).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Cancelled)),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                  dataset_id: baz_id.clone()
+                  dataset_id: baz_id.clone(),
+                  fetch_uncacheable: false
                 }),
             });
             let task2_handle = task2_driver.run();
@@ -2309,11 +2567,14 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
         .await;
 
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(80).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(80).unwrap().into(),
+            },
         )
         .await;
 
@@ -2354,7 +2615,8 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 run_since_start: Duration::try_milliseconds(10).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                  dataset_id: foo_id.clone()
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
                 }),
             });
             let task0_handle = task0_driver.run();
@@ -2372,7 +2634,8 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                   },
                 })))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                  dataset_id: bar_id.clone()
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
                 }),
             });
             let task1_handle = task1_driver.run();
@@ -2390,7 +2653,8 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                   },
                 })))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                  dataset_id: foo_id.clone()
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
                 }),
             });
             let task2_handle = task2_driver.run();
@@ -2402,7 +2666,8 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 run_since_start: Duration::try_milliseconds(130).unwrap(),
                 finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-                  dataset_id: bar_id.clone()
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
                 }),
             });
             let task3_handle = task3_driver.run();
@@ -2599,7 +2864,8 @@ async fn test_throttling_manual_triggers() {
             run_since_start: Duration::try_milliseconds(40).unwrap(),
             finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: foo_id.clone()
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task0_handle = task0_driver.run();
@@ -2694,20 +2960,26 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         .await;
 
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(50).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+            },
         )
         .await;
 
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(150).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(150).unwrap().into(),
+            },
         )
         .await;
 
@@ -2754,7 +3026,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: foo_id.clone()
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task0_handle = task0_driver.run();
@@ -2771,7 +3044,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: bar_id.clone()
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task1_handle = task1_driver.run();
@@ -2783,7 +3057,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             run_since_start: Duration::try_milliseconds(30).unwrap(),
             finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: baz_id.clone()
+              dataset_id: baz_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task2_handle = task2_driver.run();
@@ -2800,7 +3075,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: foo_id.clone()
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task3_handle = task3_driver.run();
@@ -2812,7 +3088,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             run_since_start: Duration::try_milliseconds(160).unwrap(),
             finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: baz_id.clone()
+              dataset_id: baz_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task4_handle = task4_driver.run();
@@ -2829,7 +3106,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: bar_id.clone()
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task5_handle = task5_driver.run();
@@ -3160,11 +3438,14 @@ async fn test_batching_condition_records_reached() {
         .await;
 
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(50).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+            },
         )
         .await;
 
@@ -3210,7 +3491,8 @@ async fn test_batching_condition_records_reached() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: foo_id.clone()
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task0_handle = task0_driver.run();
@@ -3227,7 +3509,8 @@ async fn test_batching_condition_records_reached() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: bar_id.clone()
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task1_handle = task1_driver.run();
@@ -3244,7 +3527,8 @@ async fn test_batching_condition_records_reached() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: foo_id.clone()
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task2_handle = task2_driver.run();
@@ -3261,7 +3545,8 @@ async fn test_batching_condition_records_reached() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: foo_id.clone()
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task3_handle = task3_driver.run();
@@ -3278,7 +3563,8 @@ async fn test_batching_condition_records_reached() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: bar_id.clone()
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task4_handle = task4_driver.run();
@@ -3474,11 +3760,14 @@ async fn test_batching_condition_timeout() {
         .await;
 
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(50).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+            },
         )
         .await;
 
@@ -3524,7 +3813,8 @@ async fn test_batching_condition_timeout() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: foo_id.clone()
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task0_handle = task0_driver.run();
@@ -3541,7 +3831,8 @@ async fn test_batching_condition_timeout() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: bar_id.clone()
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task1_handle = task1_driver.run();
@@ -3558,7 +3849,8 @@ async fn test_batching_condition_timeout() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: foo_id.clone()
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task2_handle = task2_driver.run();
@@ -3577,7 +3869,8 @@ async fn test_batching_condition_timeout() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: bar_id.clone()
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task4_handle = task4_driver.run();
@@ -3741,11 +4034,14 @@ async fn test_batching_condition_watermark() {
         .await;
 
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(40).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(40).unwrap().into(),
+            },
         )
         .await;
 
@@ -3791,7 +4087,8 @@ async fn test_batching_condition_watermark() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: foo_id.clone()
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task0_handle = task0_driver.run();
@@ -3808,7 +4105,8 @@ async fn test_batching_condition_watermark() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: bar_id.clone()
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task1_handle = task1_driver.run();
@@ -3825,7 +4123,8 @@ async fn test_batching_condition_watermark() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: foo_id.clone()
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task2_handle = task2_driver.run();
@@ -3844,7 +4143,8 @@ async fn test_batching_condition_watermark() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: bar_id.clone()
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task4_handle = task4_driver.run();
@@ -4063,20 +4363,26 @@ async fn test_batching_condition_with_2_inputs() {
         .await;
 
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(80).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(80).unwrap().into(),
+            },
         )
         .await;
 
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_ingest(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::try_milliseconds(120).unwrap().into(),
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(120).unwrap().into(),
+            },
         )
         .await;
 
@@ -4123,7 +4429,8 @@ async fn test_batching_condition_with_2_inputs() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: foo_id.clone()
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task0_handle = task0_driver.run();
@@ -4140,7 +4447,8 @@ async fn test_batching_condition_with_2_inputs() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: bar_id.clone()
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task1_handle = task1_driver.run();
@@ -4157,7 +4465,8 @@ async fn test_batching_condition_with_2_inputs() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: baz_id.clone()
+              dataset_id: baz_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task2_handle = task2_driver.run();
@@ -4174,7 +4483,8 @@ async fn test_batching_condition_with_2_inputs() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: foo_id.clone()
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task3_handle = task3_driver.run();
@@ -4191,7 +4501,8 @@ async fn test_batching_condition_with_2_inputs() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: bar_id.clone()
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task4_handle = task4_driver.run();
@@ -4208,7 +4519,8 @@ async fn test_batching_condition_with_2_inputs() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: foo_id.clone()
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task5_handle = task5_driver.run();
@@ -4225,7 +4537,8 @@ async fn test_batching_condition_with_2_inputs() {
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-              dataset_id: baz_id.clone()
+              dataset_id: baz_id.clone(),
+              fetch_uncacheable: false
             }),
         });
         let task6_handle = task6_driver.run();

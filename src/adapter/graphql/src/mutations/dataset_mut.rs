@@ -129,7 +129,7 @@ impl DatasetMut {
             .set_watermark(&self.dataset_handle.as_local_ref(), watermark)
             .await
         {
-            Ok(domain::PullResult::UpToDate) => {
+            Ok(domain::PullResult::UpToDate(_)) => {
                 Ok(SetWatermarkResult::UpToDate(SetWatermarkUpToDate {
                     _dummy: String::new(),
                 }))

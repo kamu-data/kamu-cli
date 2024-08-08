@@ -187,17 +187,23 @@ impl FlowServiceImpl {
                     .add_dataset_flow_config(dataset_flow_key, rule.clone());
 
                 match &rule {
-                    FlowConfigurationRule::Schedule(schedule) => {
-                        self.enqueue_scheduled_auto_polling_flow(start_time, &flow_key, schedule)
-                            .await?;
-                    }
                     FlowConfigurationRule::BatchingRule(_) => {
                         self.enqueue_auto_polling_flow_unconditionally(start_time, &flow_key)
                             .await?;
                     }
                     // Such as compaction is very dangerous operation we
-                    // skip running it during activation flow configurations
-                    FlowConfigurationRule::CompactionRule(_) => (),
+                    // skip running it during activation flow configurations.
+                    // And schedule will be used only for system flows
+                    FlowConfigurationRule::CompactionRule(_)
+                    | FlowConfigurationRule::Schedule(_) => (),
+                    FlowConfigurationRule::IngestRule(ingest_rule) => {
+                        self.enqueue_scheduled_auto_polling_flow(
+                            start_time,
+                            &flow_key,
+                            &ingest_rule.schedule_condition,
+                        )
+                        .await?;
+                    }
                 }
             }
             FlowKey::System(system_flow_key) => {
@@ -504,14 +510,19 @@ impl FlowServiceImpl {
                         // Compute increment since the first trigger by this dataset.
                         // Note: there might have been multiple updates since that time.
                         // We are only recording the first trigger of particular dataset.
-                        let increment = self
-                            .dataset_changes_service
-                            .get_increment_since(&trigger.dataset_id, update.old_head.as_ref())
-                            .await
-                            .int_err()?;
+                        if let FlowResultDatasetUpdate::Changed(update_result) = update {
+                            let increment = self
+                                .dataset_changes_service
+                                .get_increment_since(
+                                    &trigger.dataset_id,
+                                    update_result.old_head.as_ref(),
+                                )
+                                .await
+                                .int_err()?;
 
-                        accumulated_records_count += increment.num_records;
-                        watermark_modified |= increment.updated_watermark.is_some();
+                            accumulated_records_count += increment.num_records;
+                            watermark_modified |= increment.updated_watermark.is_some();
+                        }
                     }
                 }
             }
@@ -734,13 +745,20 @@ impl FlowServiceImpl {
     pub fn make_task_logical_plan(
         &self,
         flow_key: &FlowKey,
-        config_snapshot: Option<&FlowConfigurationSnapshot>,
+        maybe_config_snapshot: Option<&FlowConfigurationSnapshot>,
     ) -> LogicalPlan {
         match flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
                 DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
+                    let mut fetch_uncacheable = false;
+                    if let Some(config_snapshot) = maybe_config_snapshot
+                        && let FlowConfigurationSnapshot::Ingest(ingest_rule) = config_snapshot
+                    {
+                        fetch_uncacheable = ingest_rule.fetch_uncacheable;
+                    }
                     LogicalPlan::UpdateDataset(UpdateDataset {
                         dataset_id: flow_key.dataset_id.clone(),
+                        fetch_uncacheable,
                     })
                 }
                 DatasetFlowType::HardCompaction => {
@@ -748,8 +766,9 @@ impl FlowServiceImpl {
                     let mut max_slice_records: Option<u64> = None;
                     let mut keep_metadata_only = false;
 
-                    if let Some(config_rule) = config_snapshot
-                        && let FlowConfigurationSnapshot::Compaction(compaction_rule) = config_rule
+                    if let Some(config_snapshot) = maybe_config_snapshot
+                        && let FlowConfigurationSnapshot::Compaction(compaction_rule) =
+                            config_snapshot
                     {
                         max_slice_size = compaction_rule.max_slice_size();
                         max_slice_records = compaction_rule.max_slice_records();

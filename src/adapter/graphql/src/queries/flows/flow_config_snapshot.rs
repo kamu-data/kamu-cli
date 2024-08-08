@@ -18,6 +18,7 @@ pub enum FlowConfigurationSnapshot {
     Batching(FlowConfigurationBatching),
     Schedule(FlowConfigurationScheduleRule),
     Compaction(FlowConfigurationCompactionRule),
+    Ingest(FlowConfigurationIngest),
 }
 
 #[derive(SimpleObject)]
@@ -35,6 +36,7 @@ pub struct FlowConfigurationCompactionRule {
 impl From<fs::FlowConfigurationSnapshot> for FlowConfigurationSnapshot {
     fn from(value: fs::FlowConfigurationSnapshot) -> Self {
         match value {
+            fs::FlowConfigurationSnapshot::Ingest(ingest_rule) => Self::Ingest(ingest_rule.into()),
             fs::FlowConfigurationSnapshot::Batching(batching_rule) => {
                 Self::Batching(batching_rule.into())
             }

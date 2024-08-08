@@ -552,7 +552,7 @@ type DatasetFlowConfigs {
 }
 
 type DatasetFlowConfigsMut {
-	setConfigSchedule(datasetFlowType: DatasetFlowType!, paused: Boolean!, schedule: ScheduleInput!): SetFlowConfigResult!
+	setConfigIngest(datasetFlowType: DatasetFlowType!, paused: Boolean!, ingest: IngestConditionInput!): SetFlowConfigResult!
 	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, batching: BatchingConditionInput!): SetFlowBatchingConfigResult!
 	setConfigCompaction(datasetFlowType: DatasetFlowType!, compactionArgs: CompactionConditionInput!): SetFlowCompactionConfigResult!
 	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
@@ -938,7 +938,7 @@ type FlowAbortedResult {
 
 type FlowConfiguration {
 	paused: Boolean!
-	schedule: FlowConfigurationSchedule
+	ingest: FlowConfigurationIngest
 	batching: FlowConfigurationBatching
 	compaction: FlowConfigurationCompaction
 }
@@ -954,13 +954,18 @@ type FlowConfigurationCompactionRule {
 	compactionRule: FlowConfigurationCompaction!
 }
 
+type FlowConfigurationIngest {
+	schedule: FlowConfigurationSchedule!
+	fetchUncacheable: Boolean!
+}
+
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
 
 type FlowConfigurationScheduleRule {
 	scheduleRule: FlowConfigurationSchedule!
 }
 
-union FlowConfigurationSnapshot = FlowConfigurationBatching | FlowConfigurationScheduleRule | FlowConfigurationCompactionRule
+union FlowConfigurationSnapshot = FlowConfigurationBatching | FlowConfigurationScheduleRule | FlowConfigurationCompactionRule | FlowConfigurationIngest
 
 type FlowConnection {
 	"""
@@ -1024,10 +1029,19 @@ type FlowDescriptionSystemGC {
 	dummy: Boolean!
 }
 
-type FlowDescriptionUpdateResult {
+union FlowDescriptionUpdateResult = FlowDescriptionUpdateResultUpToDate | FlowDescriptionUpdateResultSuccess
+
+type FlowDescriptionUpdateResultSuccess {
 	numBlocks: Int!
 	numRecords: Int!
 	updatedWatermark: DateTime
+}
+
+type FlowDescriptionUpdateResultUpToDate {
+	"""
+	The value indicates whether the api cache was used
+	"""
+	uncacheable: Boolean!
 }
 
 type FlowEdge {
@@ -1119,6 +1133,7 @@ input FlowRunConfiguration @oneOf {
 	schedule: ScheduleInput
 	batching: BatchingConditionInput
 	compaction: CompactionConditionInput
+	ingest: IngestConditionInput
 }
 
 union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionBatching | FlowStartConditionExecutor
@@ -1203,6 +1218,14 @@ type GetFlowSuccess implements GetFlowResult {
 	message: String!
 }
 
+
+input IngestConditionInput {
+	"""
+	Flag indicates to ignore cache during ingest step for API calls
+	"""
+	fetchUncacheable: Boolean!
+	schedule: ScheduleInput!
+}
 
 input InitiatorFilterInput @oneOf {
 	system: Boolean
@@ -1827,7 +1850,7 @@ type TasksMut {
 	Schedules a task to update the specified dataset by performing polling
 	ingest or a derivative transformation
 	"""
-	createUpdateDatasetTask(datasetId: DatasetID!): Task!
+	createUpdateDatasetTask(datasetId: DatasetID!, fetchUncacheable: Boolean): Task!
 	"""
 	Schedules a task to update the specified dataset by performing polling
 	ingest or a derivative transformation

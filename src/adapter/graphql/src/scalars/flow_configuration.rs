@@ -14,8 +14,10 @@ use kamu_flow_system::{
     CompactionRuleMetadataOnly,
     FlowConfigurationRule,
     FlowConfigurationSnapshot,
+    IngestRule,
     Schedule,
     ScheduleCron,
+    ScheduleCronError,
     ScheduleTimeDelta,
 };
 
@@ -27,7 +29,7 @@ use crate::prelude::*;
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfiguration {
     pub paused: bool,
-    pub schedule: Option<FlowConfigurationSchedule>,
+    pub ingest: Option<FlowConfigurationIngest>,
     pub batching: Option<FlowConfigurationBatching>,
     pub compaction: Option<FlowConfigurationCompaction>,
 }
@@ -41,15 +43,8 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
             } else {
                 None
             },
-            schedule: if let FlowConfigurationRule::Schedule(schedule) = &value.rule {
-                match schedule {
-                    Schedule::TimeDelta(time_delta) => Some(FlowConfigurationSchedule::TimeDelta(
-                        time_delta.every.into(),
-                    )),
-                    Schedule::Cron(cron) => {
-                        Some(FlowConfigurationSchedule::Cron(cron.clone().into()))
-                    }
-                }
+            ingest: if let FlowConfigurationRule::IngestRule(ingest_rule) = &value.rule {
+                Some(ingest_rule.clone().into())
             } else {
                 None
             },
@@ -65,6 +60,26 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
                 }
             } else {
                 None
+            },
+        }
+    }
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowConfigurationIngest {
+    pub schedule: FlowConfigurationSchedule,
+    pub fetch_uncacheable: bool,
+}
+
+impl From<IngestRule> for FlowConfigurationIngest {
+    fn from(value: IngestRule) -> Self {
+        Self {
+            fetch_uncacheable: value.fetch_uncacheable,
+            schedule: match value.schedule_condition {
+                Schedule::TimeDelta(time_delta) => {
+                    FlowConfigurationSchedule::TimeDelta(time_delta.every.into())
+                }
+                Schedule::Cron(cron) => FlowConfigurationSchedule::Cron(cron.clone().into()),
             },
         }
     }
@@ -211,9 +226,10 @@ pub enum FlowRunConfiguration {
     Schedule(ScheduleInput),
     Batching(BatchingConditionInput),
     Compaction(CompactionConditionInput),
+    Ingest(IngestConditionInput),
 }
 
-#[derive(OneofObject)]
+#[derive(OneofObject, Clone)]
 pub enum ScheduleInput {
     TimeDelta(TimeDeltaInput),
     /// Supported CRON syntax: min hour dayOfMonth month dayOfWeek
@@ -274,6 +290,34 @@ pub struct CompactionConditionMetadataOnly {
     pub recursive: bool,
 }
 
+#[derive(InputObject, Clone)]
+pub struct IngestConditionInput {
+    /// Flag indicates to ignore cache during ingest step for API calls
+    pub fetch_uncacheable: bool,
+    pub schedule: ScheduleInput,
+}
+
+impl TryFrom<IngestConditionInput> for IngestRule {
+    type Error = ScheduleCronError;
+
+    fn try_from(value: IngestConditionInput) -> std::result::Result<Self, Self::Error> {
+        let schedule = match value.schedule {
+            ScheduleInput::TimeDelta(td) => {
+                Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
+            }
+            ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
+                Schedule::try_from_5component_cron_expression(&cron_5component_expression)?
+            }
+        };
+        Ok(Self {
+            fetch_uncacheable: value.fetch_uncacheable,
+            schedule_condition: schedule,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl FlowRunConfiguration {
     pub fn try_into_snapshot(
         &self,
@@ -296,6 +340,19 @@ impl FlowRunConfiguration {
                         error: "Invalid batching flow run configuration".to_string(),
                     })?,
                 )
+            }
+            Self::Ingest(ingest_input) => {
+                if dataset_flow_type != DatasetFlowType::Ingest {
+                    return Err(FlowInvalidRunConfigurations {
+                        error: "Incompatible flow run configuration and dataset flow type"
+                            .to_string(),
+                    });
+                };
+                FlowConfigurationSnapshot::Ingest(ingest_input.clone().try_into().map_err(
+                    |_| FlowInvalidRunConfigurations {
+                        error: "Invalid ingest flow run configuration".to_string(),
+                    },
+                )?)
             }
             Self::Compaction(compaction_input) => {
                 if dataset_flow_type != DatasetFlowType::HardCompaction {

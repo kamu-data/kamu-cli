@@ -97,7 +97,7 @@ pub(crate) async fn test_smart_pull_existing_up_to_date_dataset<
             .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref), false)
             .await;
 
-        assert_eq!(PullResult::UpToDate {}, pull_result);
+        assert_eq!(PullResult::UpToDate(UpToDateResult::UpToDate), pull_result);
 
         DatasetTestHelper::assert_datasets_in_sync(
             &scenario.server_dataset_layout,

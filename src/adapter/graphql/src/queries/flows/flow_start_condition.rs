@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use kamu_core::{DatasetChangesService, DatasetIntervalIncrement};
-use kamu_flow_system as fs;
+use kamu_flow_system::{self as fs};
 
 use crate::prelude::*;
 
@@ -46,18 +46,18 @@ impl FlowStartCondition {
 
                 // For each dataset trigger, add accumulated changes since trigger first fired
                 for trigger in matching_triggers {
-                    if let fs::FlowTrigger::InputDatasetFlow(dataset_trigger) = trigger {
-                        if let fs::FlowResult::DatasetUpdate(dataset_update) =
+                    if let fs::FlowTrigger::InputDatasetFlow(dataset_trigger) = trigger
+                        && let fs::FlowResult::DatasetUpdate(dataset_update) =
                             &dataset_trigger.flow_result
-                        {
-                            total_increment += dataset_changes_service
-                                .get_increment_since(
-                                    &dataset_trigger.dataset_id,
-                                    dataset_update.old_head.as_ref(),
-                                )
-                                .await
-                                .int_err()?;
-                        }
+                        && let fs::FlowResultDatasetUpdate::Changed(update_result) = dataset_update
+                    {
+                        total_increment += dataset_changes_service
+                            .get_increment_since(
+                                &dataset_trigger.dataset_id,
+                                update_result.old_head.as_ref(),
+                            )
+                            .await
+                            .int_err()?;
                     }
                 }
 
