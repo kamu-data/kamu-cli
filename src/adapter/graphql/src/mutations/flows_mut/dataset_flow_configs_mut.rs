@@ -67,7 +67,7 @@ impl DatasetFlowConfigsMut {
 
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
         if let Some(e) =
-            ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type).await?
+            ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type, &None).await?
         {
             return Ok(SetFlowConfigResult::PreconditionsNotMet(e));
         }
@@ -139,7 +139,7 @@ impl DatasetFlowConfigsMut {
 
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
         if let Some(e) =
-            ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type).await?
+            ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type, &None).await?
         {
             return Ok(SetFlowBatchingConfigResult::PreconditionsNotMet(e));
         }

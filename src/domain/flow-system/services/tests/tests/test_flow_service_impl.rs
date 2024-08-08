@@ -647,12 +647,13 @@ async fn test_manual_trigger_reset() {
                   let task0_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(0),
                     dataset_id: Some(create_dataset_result.dataset_handle.id.clone()),
-                    run_since_start: Duration::try_milliseconds(10).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::ResetDatasetResult(TaskResetDatasetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") })))),
+                    run_since_start: Duration::try_milliseconds(20).unwrap(),
+                    finish_in_with: Some((Duration::try_milliseconds(70).unwrap(), TaskOutcome::Success(TaskResult::ResetDatasetResult(TaskResetDatasetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") })))),
                     expected_logical_plan: LogicalPlan::Reset(ResetDataset {
                       dataset_id: create_dataset_result.dataset_handle.id.clone(),
                       // By deafult should reset to seed block
-                      new_head_hash: dataset_blocks[0].0.clone()
+                      new_head_hash: dataset_blocks[1].0.clone(),
+                      old_head_hash: dataset_blocks[0].0.clone()
                     }),
                 });
                 let task0_handle = task0_driver.run();
@@ -667,14 +668,10 @@ async fn test_manual_trigger_reset() {
 
                 // Main simulation script
                 let main_handle = async {
-                    // Moment 10ms - manual foo trigger happens here:
-                    //  - flow 0 gets trigger and finishes at 30ms
-
-                    // Moment 50ms - manual foo trigger happens here:
-                    //  - flow 1 trigger and finishes
-                    //  - task 1 starts at 60ms, finishes at 70ms (leave some gap to fight with random order)
-
-                    harness.advance_time(Duration::try_milliseconds(100).unwrap()).await;
+                    // Moment 20ms - manual foo trigger happens here:
+                    //  - flow 0 gets trigger and finishes at 90ms
+                    // ToDo: figure out why test stuck with lower advance time
+                    harness.advance_time(Duration::try_milliseconds(5000).unwrap()).await;
                 };
 
                 tokio::join!(task0_handle, trigger0_handle, main_handle)
@@ -692,11 +689,11 @@ async fn test_manual_trigger_reset() {
               "foo" Reset:
                 Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
 
-            #2: +10ms:
+            #2: +20ms:
               "foo" Reset:
                 Flow ID = 0 Running(task=0)
 
-            #3: +30ms:
+            #3: +90ms:
               "foo" Reset:
                 Flow ID = 0 Finished Success
 

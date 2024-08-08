@@ -82,6 +82,7 @@ pub struct HardCompactionDataset {
 pub struct ResetDataset {
     pub dataset_id: DatasetID,
     pub new_head_hash: Multihash,
+    pub old_head_hash: Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

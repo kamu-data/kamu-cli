@@ -63,7 +63,7 @@ use kamu_flow_system::{
 };
 use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
 use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceImpl};
-use kamu_task_system::{self as ts, NewHeadHashNotFoundError, ResetDatasetTaskError};
+use kamu_task_system::{self as ts};
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use kamu_task_system_services::TaskSchedulerImpl;
 use opendatafabric::{AccountID, DatasetID, DatasetKind, Multihash};
@@ -450,6 +450,7 @@ async fn test_trigger_reset_root_dataset_flow() {
 
     let mutation_code = FlowRunsHarness::trigger_reset_flow_mutation(
         &create_root_result.dataset_handle.id,
+        &root_dataset_blocks[1].0,
         &root_dataset_blocks[0].0,
         "RESET",
     );
@@ -506,7 +507,7 @@ async fn test_trigger_reset_root_dataset_flow() {
             complete_time,
             ts::TaskOutcome::Success(ts::TaskResult::ResetDatasetResult(
                 ts::TaskResetDatasetResult {
-                    new_head: root_dataset_blocks[0].0.clone(),
+                    new_head: root_dataset_blocks[1].0.clone(),
                 },
             )),
         )
@@ -535,7 +536,7 @@ async fn test_trigger_reset_root_dataset_flow() {
                                             "__typename": "FlowDescriptionDatasetReset",
                                             "datasetId": create_root_result.dataset_handle.id.to_string(),
                                             "resetResult": {
-                                                "newHead": &root_dataset_blocks[0].0,
+                                                "newHead": &root_dataset_blocks[1].0,
                                             },
                                         },
                                         "status": "FINISHED",
@@ -567,7 +568,8 @@ async fn test_trigger_reset_root_dataset_flow() {
                                         },
                                         "startCondition": null,
                                         "configSnapshot": {
-                                            "newHeadHash": &root_dataset_blocks[0].0,
+                                            "newHeadHash": &root_dataset_blocks[1].0,
+                                            "oldHeadHash": &root_dataset_blocks[0].0,
                                         }
                                     }
                                 ],
@@ -600,11 +602,13 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
 
     let create_root_result = harness.create_root_dataset().await;
 
-    let invalid_head = Multihash::from_digest_sha3_256(b"invalid_head");
+    let new_invalid_head = Multihash::from_digest_sha3_256(b"new_invalid_head");
+    let old_invalid_head = Multihash::from_digest_sha3_256(b"old_invalid_head");
 
     let mutation_code = FlowRunsHarness::trigger_reset_flow_mutation(
         &create_root_result.dataset_handle.id,
-        &invalid_head,
+        &new_invalid_head,
+        &old_invalid_head,
         "RESET",
     );
 
@@ -625,14 +629,8 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
                     "flows": {
                         "runs": {
                             "triggerFlow": {
-                                "__typename": "TriggerFlowSuccess",
-                                "message": "Success",
-                                "flow": {
-                                    "__typename": "Flow",
-                                    "flowId": "0",
-                                    "status": "WAITING",
-                                    "outcome": null
-                                }
+                                "__typename": "FlowPreconditionsNotMet",
+                                "message": "Flow didn't met preconditions: 'New head hash not found'"
                             }
                         }
                     }
@@ -641,39 +639,30 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
         })
     );
 
-    let schedule_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
+    let root_dataset_blocks: Vec<_> = create_root_result
+        .dataset
+        .as_metadata_chain()
+        .iter_blocks_interval(&create_root_result.head, None, false)
+        .try_collect()
+        .await
         .unwrap();
-    let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
 
-    let running_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
-    harness.mimic_task_running(flow_task_id, running_time).await;
+    let mutation_code = FlowRunsHarness::trigger_reset_flow_mutation(
+        &create_root_result.dataset_handle.id,
+        &root_dataset_blocks[0].0,
+        &root_dataset_blocks[1].0,
+        "RESET",
+    );
 
-    let complete_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
-    harness
-        .mimic_task_completed(
-            flow_task_id,
-            complete_time,
-            ts::TaskOutcome::Failed(ts::TaskError::ResetDatasetError(
-                ResetDatasetTaskError::NewHeadHashNotFound(NewHeadHashNotFoundError {
-                    head_hash: invalid_head.clone(),
-                }),
-            )),
-        )
-        .await;
-
-    let request_code = FlowRunsHarness::list_flows_query(&create_root_result.dataset_handle.id);
+    let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
         .execute(
-            async_graphql::Request::new(request_code.clone())
+            async_graphql::Request::new(mutation_code.clone())
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
 
+    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -681,56 +670,9 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "listFlows": {
-                                "nodes": [
-                                    {
-                                        "flowId": "0",
-                                        "description": {
-                                            "__typename": "FlowDescriptionDatasetReset",
-                                            "datasetId": create_root_result.dataset_handle.id.to_string(),
-                                            "resetResult": null,
-                                        },
-                                        "status": "FINISHED",
-                                        "outcome": {
-                                            "reason": {
-                                                "message": "New head hash to reset not found",
-                                            }
-                                        },
-                                        "timing": {
-                                            "awaitingExecutorSince": schedule_time.to_rfc3339(),
-                                            "runningSince": running_time.to_rfc3339(),
-                                            "finishedAt": null,
-                                        },
-                                        "tasks": [
-                                            {
-                                                "taskId": "0",
-                                                "status": "FINISHED",
-                                                "outcome": "FAILED",
-                                            }
-                                        ],
-                                        "initiator": {
-                                            "id": harness.logged_account_id().to_string(),
-                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
-                                        },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
-                                            "initiator": {
-                                                "id": harness.logged_account_id().to_string(),
-                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
-                                            }
-                                        },
-                                        "startCondition": null,
-                                        "configSnapshot": {
-                                            "newHeadHash": &invalid_head
-                                        }
-                                    }
-                                ],
-                                "pageInfo": {
-                                    "hasPreviousPage": false,
-                                    "hasNextPage": false,
-                                    "currentPage": 0,
-                                    "totalPages": 1,
-                                }
+                            "triggerFlow": {
+                                "__typename": "FlowPreconditionsNotMet",
+                                "message": "Flow didn't met preconditions: 'Provided head hash is already a head block'"
                             }
                         }
                     }
@@ -3559,6 +3501,7 @@ impl FlowRunsHarness {
                                             }
                                              ... on FlowConfigurationReset {
                                                 newHeadHash
+                                                oldHeadHash
                                             }
                                             ... on FlowConfigurationCompactionRule {
                                                 compactionRule {
@@ -3702,6 +3645,7 @@ impl FlowRunsHarness {
     fn trigger_reset_flow_mutation(
         id: &DatasetID,
         new_head_hash: &Multihash,
+        old_head_hash: &Multihash,
         dataset_flow_type: &str,
     ) -> String {
         indoc!(
@@ -3715,7 +3659,8 @@ impl FlowRunsHarness {
                                     datasetFlowType: "<dataset_flow_type>",
                                     flowRunConfiguration: {
                                         reset: {
-                                            newHeadHash: "<new_head_hash>"
+                                            newHeadHash: "<new_head_hash>",
+                                            oldHeadHash: "<old_head_hash>"
                                         }
                                     }
                                 ) {
@@ -3760,6 +3705,7 @@ impl FlowRunsHarness {
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<new_head_hash>", &new_head_hash.to_string())
+        .replace("<old_head_hash>", &old_head_hash.to_string())
     }
 
     fn trigger_flow_with_compaction_config_mutation(

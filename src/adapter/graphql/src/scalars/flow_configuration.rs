@@ -103,12 +103,14 @@ impl From<BatchingRule> for FlowConfigurationBatching {
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfigurationReset {
     pub new_head_hash: Multihash,
+    pub old_head_hash: Multihash,
 }
 
 impl From<ResetRule> for FlowConfigurationReset {
     fn from(value: ResetRule) -> Self {
         Self {
             new_head_hash: value.new_head_hash.into(),
+            old_head_hash: value.old_head_hash.into(),
         }
     }
 }
@@ -284,12 +286,14 @@ pub struct BatchingConditionInput {
 #[derive(InputObject)]
 pub struct ResetConditionInput {
     pub new_head_hash: Multihash,
+    pub old_head_hash: Multihash,
 }
 
 impl From<&ResetConditionInput> for ResetRule {
     fn from(value: &ResetConditionInput) -> Self {
         Self {
             new_head_hash: value.new_head_hash.clone().into(),
+            old_head_hash: value.old_head_hash.clone().into(),
         }
     }
 }

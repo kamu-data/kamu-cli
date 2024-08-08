@@ -25,6 +25,7 @@ use kamu_core::{
     DependencyGraphService,
     InternalError,
     MetadataChainExt,
+    SearchSeedVisitor,
     SystemTimeSource,
 };
 use kamu_flow_system::*;
@@ -773,10 +774,13 @@ impl FlowServiceImpl {
                     }))
                 }
                 DatasetFlowType::Reset => {
-                    let new_head_hash = if let Some(config_rule) = config_snapshot
+                    let (new_head_hash, old_head_hash) = if let Some(config_rule) = config_snapshot
                         && let FlowConfigurationSnapshot::Reset(reset_rule) = config_rule
                     {
-                        Some(reset_rule.new_head_hash.clone())
+                        (
+                            reset_rule.new_head_hash.clone(),
+                            reset_rule.old_head_hash.clone(),
+                        )
                     } else {
                         let dataset_handle = self
                             .dataset_repo
@@ -788,15 +792,28 @@ impl FlowServiceImpl {
                             .get_dataset(&dataset_handle.as_local_ref())
                             .await
                             .int_err()?;
-                        dataset
+                        let current_head = dataset
                             .as_metadata_chain()
                             .try_get_ref(&BlockRef::Head)
                             .await
+                            .int_err()?;
+                        if current_head.is_none() {
+                            return InternalError::bail("Dataset don't have any blocks").int_err();
+                        }
+
+                        let seed = dataset
+                            .as_metadata_chain()
+                            .accept_one(SearchSeedVisitor::new())
+                            .await
                             .int_err()?
+                            .into_hashed_block();
+
+                        (seed.unwrap().0, current_head.unwrap())
                     };
                     Ok(LogicalPlan::Reset(ResetDataset {
                         dataset_id: flow_key.dataset_id.clone(),
-                        new_head_hash: new_head_hash.unwrap(),
+                        new_head_hash,
+                        old_head_hash,
                     }))
                 }
             },
