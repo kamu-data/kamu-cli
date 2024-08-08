@@ -22,7 +22,7 @@ use kamu_datasets::{
     SaveDatasetEntryErrorDuplicate,
     UpdateDatasetEntryAliasError,
 };
-use opendatafabric::{AccountID, DatasetAlias, DatasetID};
+use opendatafabric::{AccountID, DatasetID, DatasetName};
 use tokio::sync::RwLock;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -124,7 +124,7 @@ impl DatasetEntryRepository for DatasetEntryRepositoryInMemory {
     async fn update_dataset_entry_alias(
         &self,
         dataset_id: &DatasetID,
-        new_alias: &DatasetAlias,
+        new_alias: &DatasetName,
     ) -> Result<(), UpdateDatasetEntryAliasError> {
         let mut writable_state = self.state.write().await;
 

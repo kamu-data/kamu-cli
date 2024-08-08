@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::{AccountID, DatasetAlias, DatasetID};
+use opendatafabric::{AccountID, DatasetID, DatasetName};
 use thiserror::Error;
 
 use crate::DatasetEntry;
@@ -33,7 +33,7 @@ pub trait DatasetEntryRepository: Send + Sync {
     async fn update_dataset_entry_alias(
         &self,
         dataset_id: &DatasetID,
-        new_alias: &DatasetAlias,
+        new_alias: &DatasetName,
     ) -> Result<(), UpdateDatasetEntryAliasError>;
 
     async fn delete_dataset_entry(
@@ -103,11 +103,11 @@ pub enum UpdateDatasetEntryAliasError {
 #[error("Dataset entry with dataset_id '{dataset_id}' same alias '{dataset_alias}' update attempt")]
 pub struct DatasetEntryAliasSameError {
     pub dataset_id: DatasetID,
-    pub dataset_alias: DatasetAlias,
+    pub dataset_alias: DatasetName,
 }
 
 impl DatasetEntryAliasSameError {
-    pub fn new(dataset_id: DatasetID, dataset_alias: DatasetAlias) -> Self {
+    pub fn new(dataset_id: DatasetID, dataset_alias: DatasetName) -> Self {
         Self {
             dataset_id,
             dataset_alias,
