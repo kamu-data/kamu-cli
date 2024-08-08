@@ -19,7 +19,7 @@ use kamu_datasets::{
     SaveDatasetEntryError,
     UpdateDatasetEntryAliasError,
 };
-use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetName};
+use opendatafabric::{AccountID, DatasetID, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,9 +64,9 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
     let (_, owner_id_1) = AccountID::new_generated_ed25519();
     let (_, owner_id_2) = AccountID::new_generated_ed25519();
 
-    let dataset_entry_acc_1_1 = new_dataset_entry_with(owner_id_1.clone(), "kamu", "dataset1");
-    let dataset_entry_acc_1_2 = new_dataset_entry_with(owner_id_1.clone(), "kamu", "dataset2");
-    let dataset_entry_acc_2_3 = new_dataset_entry_with(owner_id_2.clone(), "user", "dataset3");
+    let dataset_entry_acc_1_1 = new_dataset_entry_with(owner_id_1.clone(), "dataset1");
+    let dataset_entry_acc_1_2 = new_dataset_entry_with(owner_id_1.clone(), "dataset2");
+    let dataset_entry_acc_2_3 = new_dataset_entry_with(owner_id_2.clone(), "dataset3");
     {
         let save_res = dataset_entry_repo
             .save_dataset_entry(&dataset_entry_acc_1_1)
@@ -175,7 +175,7 @@ pub async fn test_update_same_dataset_alias(catalog: &Catalog) {
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
     let dataset_entry = new_dataset_entry();
-    let new_alias = dataset_alias("kamu", "new-alias");
+    let new_alias = DatasetName::new_unchecked("new-alias");
     {
         let update_res = dataset_entry_repo
             .update_dataset_entry_alias(&dataset_entry.id, &new_alias)
@@ -227,28 +227,17 @@ pub async fn test_delete_dataset_entry(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn dataset_alias(account_name: &str, dataset_name: &str) -> DatasetAlias {
-    let account_name = AccountName::new_unchecked(account_name);
-    let dataset_name = DatasetName::new_unchecked(dataset_name);
-
-    DatasetAlias::new(Some(account_name), dataset_name)
-}
-
-fn new_dataset_entry_with(
-    owner_id: AccountID,
-    account_name: &str,
-    dataset_name: &str,
-) -> DatasetEntry {
+fn new_dataset_entry_with(owner_id: AccountID, dataset_name: &str) -> DatasetEntry {
     let (_, dataset_id) = DatasetID::new_generated_ed25519();
-    let alias = dataset_alias(account_name, dataset_name);
+    let dataset_alias = DatasetName::new_unchecked(dataset_name);
 
-    DatasetEntry::new(dataset_id, owner_id, alias)
+    DatasetEntry::new(dataset_id, owner_id, dataset_alias)
 }
 
 fn new_dataset_entry() -> DatasetEntry {
     let (_, owner_id) = AccountID::new_generated_ed25519();
 
-    new_dataset_entry_with(owner_id, "kamu", "dataset")
+    new_dataset_entry_with(owner_id, "dataset")
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

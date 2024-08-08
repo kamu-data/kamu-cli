@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::{AccountID, DatasetAlias, DatasetID};
+use opendatafabric::{AccountID, DatasetID, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -15,11 +15,11 @@ use opendatafabric::{AccountID, DatasetAlias, DatasetID};
 pub struct DatasetEntry {
     pub id: DatasetID,
     pub owner_id: AccountID,
-    pub alias: DatasetAlias,
+    pub alias: DatasetName,
 }
 
 impl DatasetEntry {
-    pub fn new(id: DatasetID, owner_id: AccountID, alias: DatasetAlias) -> Self {
+    pub fn new(id: DatasetID, owner_id: AccountID, alias: DatasetName) -> Self {
         Self {
             id,
             owner_id,
