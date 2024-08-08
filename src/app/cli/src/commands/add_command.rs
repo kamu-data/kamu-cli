@@ -14,7 +14,7 @@ use kamu::domain::*;
 use opendatafabric::*;
 
 use super::{common, BatchError, CLIError, Command};
-use crate::OutputConfig;
+use crate::{cli_arguments, OutputConfig};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -221,6 +221,12 @@ impl Command for AddCommand {
             return Err(CLIError::usage_error(
                 "Name override can be used only when adding a single manifest",
             ));
+        }
+        if !self.multi_tenant && self.public {
+            return Err(CLIError::usage_error(format!(
+                "Only multi-tenant repositories support the '{}' argument",
+                *cli_arguments::add::PUBLIC
+            )));
         }
 
         Ok(())
