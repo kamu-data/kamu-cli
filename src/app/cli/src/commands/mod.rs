@@ -118,6 +118,11 @@ pub trait Command {
         true
     }
 
+    /// Method to override, which is convenient to use for various pre-checks
+    async fn before_run(&self) -> Result<(), CLIError> {
+        Ok(())
+    }
+
     async fn run(&mut self) -> Result<(), CLIError>;
 }
 
