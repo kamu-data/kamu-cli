@@ -74,28 +74,6 @@ impl DatasetRepositoryLocalFs {
         }
     }
 
-    pub fn create(
-        root: impl Into<PathBuf>,
-        current_account_subject: Arc<CurrentAccountSubject>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        dependency_graph_service: Arc<dyn DependencyGraphService>,
-        event_bus: Arc<EventBus>,
-        multi_tenant: bool,
-        system_time_source: Arc<dyn SystemTimeSource>,
-    ) -> Result<Self, std::io::Error> {
-        let root = root.into();
-        std::fs::create_dir_all(&root)?;
-        Ok(Self::new(
-            root,
-            current_account_subject,
-            dataset_action_authorizer,
-            dependency_graph_service,
-            event_bus,
-            multi_tenant,
-            system_time_source,
-        ))
-    }
-
     fn build_dataset(layout: DatasetLayout, event_bus: Arc<EventBus>) -> Arc<dyn Dataset> {
         Arc::new(DatasetImpl::new(
             event_bus,
