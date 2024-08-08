@@ -25,7 +25,9 @@ pub struct AddCommand {
     recursive: bool,
     replace: bool,
     stdin: bool,
+    public: bool,
     output_config: Arc<OutputConfig>,
+    multi_tenant: bool,
 }
 
 impl AddCommand {
@@ -37,7 +39,9 @@ impl AddCommand {
         recursive: bool,
         replace: bool,
         stdin: bool,
+        public: bool,
         output_config: Arc<OutputConfig>,
+        multi_tenant: bool,
     ) -> Self
     where
         I: Iterator<Item = &'s str>,
@@ -50,7 +54,9 @@ impl AddCommand {
             recursive,
             replace,
             stdin,
+            public,
             output_config,
+            multi_tenant,
         }
     }
 
