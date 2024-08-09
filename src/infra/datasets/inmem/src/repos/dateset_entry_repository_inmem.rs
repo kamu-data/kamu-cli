@@ -20,7 +20,7 @@ use kamu_datasets::{
     GetDatasetEntryError,
     SaveDatasetEntryError,
     SaveDatasetEntryErrorDuplicate,
-    UpdateDatasetEntryAliasError,
+    UpdateDatasetEntryNameError,
 };
 use opendatafabric::{AccountID, DatasetID, DatasetName};
 use tokio::sync::RwLock;
@@ -121,11 +121,11 @@ impl DatasetEntryRepository for DatasetEntryRepositoryInMemory {
         Ok(())
     }
 
-    async fn update_dataset_entry_alias(
+    async fn update_dataset_entry_name(
         &self,
         dataset_id: &DatasetID,
-        new_alias: &DatasetName,
-    ) -> Result<(), UpdateDatasetEntryAliasError> {
+        new_name: &DatasetName,
+    ) -> Result<(), UpdateDatasetEntryNameError> {
         let mut writable_state = self.state.write().await;
 
         let maybe_dataset_entry = writable_state.rows.get_mut(dataset_id);
@@ -134,13 +134,13 @@ impl DatasetEntryRepository for DatasetEntryRepositoryInMemory {
             return Err(DatasetEntryNotFoundError::ByDatasetId(dataset_id.clone()).into());
         };
 
-        if dataset_entry.alias == *new_alias {
+        if dataset_entry.name == *new_name {
             return Err(
-                DatasetEntryAliasSameError::new(dataset_id.clone(), new_alias.clone()).into(),
+                DatasetEntryAliasSameError::new(dataset_id.clone(), new_name.clone()).into(),
             );
         }
 
-        dataset_entry.alias = new_alias.clone();
+        dataset_entry.name = new_name.clone();
 
         Ok(())
     }

@@ -15,16 +15,12 @@ use opendatafabric::{AccountID, DatasetID, DatasetName};
 pub struct DatasetEntry {
     pub id: DatasetID,
     pub owner_id: AccountID,
-    pub alias: DatasetName,
+    pub name: DatasetName,
 }
 
 impl DatasetEntry {
-    pub fn new(id: DatasetID, owner_id: AccountID, alias: DatasetName) -> Self {
-        Self {
-            id,
-            owner_id,
-            alias,
-        }
+    pub fn new(id: DatasetID, owner_id: AccountID, name: DatasetName) -> Self {
+        Self { id, owner_id, name }
     }
 }
 
