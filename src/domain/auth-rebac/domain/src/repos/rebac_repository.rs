@@ -87,26 +87,81 @@ pub type ObjectEntityWithRelation<'a> = EntityWithRelation<'a>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: delete
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum PropertyName {
+pub enum PropertyNameOld {
     DatasetAllowsAnonymousRead,
     DatasetAllowsPublicRead,
 }
 
-pub type PropertyValue = String;
+// TODO: delete
+pub type PropertyValueOld = String;
 
+// TODO: delete
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Property<'a> {
-    pub name: PropertyName,
+pub struct PropertyOld<'a> {
+    pub name: PropertyNameOld,
     pub value: Cow<'a, str>,
 }
 
-impl<'a> Property<'a> {
-    pub fn new(name: PropertyName, value: impl Into<Cow<'a, str>>) -> Self {
+// TODO: delete
+impl<'a> PropertyOld<'a> {
+    pub fn new(name: PropertyNameOld, value: impl Into<Cow<'a, str>>) -> Self {
         Self {
             name,
             value: value.into(),
         }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum PropertyName {
+    Dataset(DatasetPropertyName),
+    Account(AccountPropertyName),
+}
+
+pub type PropertyValue<'a> = Cow<'a, str>;
+
+impl PropertyName {
+    pub fn dataset_allows_anonymous_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
+        let value = if allows { "true" } else { "false" };
+
+        (
+            Self::Dataset(DatasetPropertyName::AllowsAnonymousRead),
+            value.into(),
+        )
+    }
+
+    pub fn dataset_allows_public_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
+        let value = if allows { "true" } else { "false" };
+
+        (
+            Self::Dataset(DatasetPropertyName::AllowsPublicRead),
+            value.into(),
+        )
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum DatasetPropertyName {
+    AllowsAnonymousRead,
+    AllowsPublicRead,
+}
+
+impl From<DatasetPropertyName> for PropertyName {
+    fn from(value: DatasetPropertyName) -> PropertyName {
+        PropertyName::Dataset(value)
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum AccountPropertyName {
+    // TBA
+}
+
+impl From<AccountPropertyName> for PropertyName {
+    fn from(value: AccountPropertyName) -> PropertyName {
+        PropertyName::Account(value)
     }
 }
 
@@ -125,7 +180,8 @@ pub trait RebacRepository: Send + Sync {
     async fn set_entity_property(
         &self,
         entity: &Entity,
-        property: &Property,
+        property: PropertyName,
+        property_value: &PropertyValue,
     ) -> Result<(), SetEntityPropertyError>;
 
     async fn delete_entity_property(
@@ -137,7 +193,7 @@ pub trait RebacRepository: Send + Sync {
     async fn get_entity_properties(
         &self,
         entity: &Entity,
-    ) -> Result<Vec<Property>, GetEntityPropertiesError>;
+    ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError>;
 
     // Relations
 

@@ -17,9 +17,9 @@ use crate::{
     GetEntityPropertiesError,
     InsertEntitiesRelationError,
     ObjectEntity,
-    Property,
-    PropertyName,
-    PropertyValue,
+    PropertyNameOld,
+    PropertyOld,
+    PropertyValueOld,
     Relation,
     SetEntityPropertyError,
     SubjectEntityRelationsError,
@@ -33,37 +33,37 @@ pub trait RebacService: Send + Sync {
     async fn set_account_property(
         &self,
         account_id: &AccountID,
-        property: &Property,
+        property: &PropertyOld,
     ) -> Result<(), SetEntityPropertyError>;
 
     async fn unset_account_property(
         &self,
         account_id: &AccountID,
-        property_name: PropertyName,
+        property_name: PropertyNameOld,
     ) -> Result<(), DeleteEntityPropertyError>;
 
     async fn get_account_properties(
         &self,
         account_id: &AccountID,
-    ) -> Result<HashMap<PropertyName, PropertyValue>, GetEntityPropertiesError>;
+    ) -> Result<HashMap<PropertyNameOld, PropertyValueOld>, GetEntityPropertiesError>;
 
     // Dataset
     async fn set_dataset_property(
         &self,
         dataset_id: &DatasetID,
-        property: &Property,
+        property: &PropertyOld,
     ) -> Result<(), SetEntityPropertyError>;
 
     async fn unset_dataset_property(
         &self,
         dataset_id: &DatasetID,
-        property_name: PropertyName,
+        property_name: PropertyNameOld,
     ) -> Result<(), DeleteEntityPropertyError>;
 
     async fn get_dataset_properties(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<HashMap<PropertyName, PropertyValue>, GetEntityPropertiesError>;
+    ) -> Result<HashMap<PropertyNameOld, PropertyValueOld>, GetEntityPropertiesError>;
 
     // Relations
     async fn insert_account_dataset_relation(

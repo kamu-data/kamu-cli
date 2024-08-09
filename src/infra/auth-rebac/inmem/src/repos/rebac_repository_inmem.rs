@@ -21,7 +21,6 @@ use kamu_auth_rebac::{
     GetRelationsBetweenEntitiesError,
     InsertEntitiesRelationError,
     ObjectEntityWithRelation,
-    Property,
     PropertyName,
     PropertyValue,
     RebacRepository,
@@ -35,7 +34,7 @@ use tokio::sync::{RwLock, RwLockReadGuard};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type EntityHash = u64;
-type EntityProperties = HashMap<PropertyName, PropertyValue>;
+type EntityProperties = HashMap<PropertyName, PropertyValue<'static>>;
 
 type EntitiesPropertiesMap = HashMap<EntityHash, EntityProperties>;
 
@@ -113,19 +112,17 @@ impl RebacRepository for RebacRepositoryInMem {
     async fn set_entity_property(
         &self,
         entity: &Entity,
-        property: &Property,
+        property_name: PropertyName,
+        property_value: &PropertyValue,
     ) -> Result<(), SetEntityPropertyError> {
-        let mut entities_properties_map = self.entities_properties_map.write().await;
+        let mut writable_entities_properties_map = self.entities_properties_map.write().await;
 
         let entity_hash = EntityHasher::entity_hash(entity);
-        let entity_properties = entities_properties_map
+        let entity_properties = writable_entities_properties_map
             .entry(entity_hash)
             .or_insert_with(EntityProperties::new);
 
-        entity_properties
-            .entry(property.name)
-            .and_modify(|property_value| *property_value = property.value.to_string())
-            .or_insert_with(|| property.value.to_string());
+        entity_properties.insert(property_name, property_value.clone().into_owned().into());
 
         Ok(())
     }
@@ -159,7 +156,7 @@ impl RebacRepository for RebacRepositoryInMem {
     async fn get_entity_properties(
         &self,
         entity: &Entity,
-    ) -> Result<Vec<Property>, GetEntityPropertiesError> {
+    ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError> {
         let entities_properties_map = self.entities_properties_map.read().await;
 
         let entity_hash = EntityHasher::entity_hash(entity);
@@ -171,7 +168,7 @@ impl RebacRepository for RebacRepositoryInMem {
 
         let properties = entity_properties
             .iter()
-            .map(|(name, value)| Property::new(*name, value.to_owned()))
+            .map(|(name, value)| (*name, value.clone()))
             .collect::<Vec<_>>();
 
         Ok(properties)
