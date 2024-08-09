@@ -14,6 +14,7 @@ use std::vec;
 
 use dill::Catalog;
 use kamu_auth_rebac::{
+    DatasetPropertyName,
     DeleteEntitiesRelationError,
     DeleteEntityPropertyError,
     Entity,
@@ -23,7 +24,6 @@ use kamu_auth_rebac::{
     InsertEntitiesRelationError,
     ObjectEntity,
     ObjectEntityWithRelation,
-    Property,
     PropertyName,
     RebacRepository,
     Relation,
@@ -54,10 +54,10 @@ pub async fn test_set_property(catalog: &Catalog) {
     let rebac_repo = catalog.get_one::<dyn RebacRepository>().unwrap();
 
     let entity = Entity::new_dataset("bar");
-    let anon_read_property = Property::new(PropertyName::DatasetAllowsAnonymousRead, "true");
+    let anon_read_property = PropertyName::dataset_allows_anonymous_read(true);
 
     let set_res = rebac_repo
-        .set_entity_property(&entity, &anon_read_property)
+        .set_entity_property(&entity, anon_read_property.0, &anon_read_property.1)
         .await;
 
     assert_matches!(set_res, Ok(_));
@@ -82,7 +82,7 @@ pub async fn test_try_delete_property_from_nonexistent_entity(catalog: &Catalog)
     let delete_res = rebac_repo
         .delete_entity_property(
             &nonexistent_entity,
-            PropertyName::DatasetAllowsAnonymousRead,
+            DatasetPropertyName::AllowsAnonymousRead.into(),
         )
         .await;
 
@@ -100,16 +100,16 @@ pub async fn test_try_delete_nonexistent_property_from_entity(catalog: &Catalog)
     let rebac_repo = catalog.get_one::<dyn RebacRepository>().unwrap();
 
     let entity = Entity::new_dataset("bar");
-    let anon_read_property = Property::new(PropertyName::DatasetAllowsAnonymousRead, "true");
+    let anon_read_property = PropertyName::dataset_allows_anonymous_read(true);
 
     let set_res = rebac_repo
-        .set_entity_property(&entity, &anon_read_property)
+        .set_entity_property(&entity, anon_read_property.0, &anon_read_property.1)
         .await;
 
     assert_matches!(set_res, Ok(_));
 
     let delete_res = rebac_repo
-        .delete_entity_property(&entity, PropertyName::DatasetAllowsPublicRead)
+        .delete_entity_property(&entity, DatasetPropertyName::AllowsPublicRead.into())
         .await;
 
     assert_matches!(
@@ -117,7 +117,7 @@ pub async fn test_try_delete_nonexistent_property_from_entity(catalog: &Catalog)
         Err(DeleteEntityPropertyError::PropertyNotFound(e))
             if e.entity_type == EntityType::Dataset
                 && e.entity_id == *"bar"
-                && e.property_name == PropertyName::DatasetAllowsPublicRead
+                && e.property_name == DatasetPropertyName::AllowsPublicRead.into()
     );
 }
 
@@ -127,21 +127,21 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
     let rebac_repo = catalog.get_one::<dyn RebacRepository>().unwrap();
 
     let entity = Entity::new_dataset("bar");
-    let anon_read_property = Property::new(PropertyName::DatasetAllowsAnonymousRead, "true");
+    let anon_read_property = PropertyName::dataset_allows_anonymous_read(true);
 
     {
         let set_res = rebac_repo
-            .set_entity_property(&entity, &anon_read_property)
+            .set_entity_property(&entity, anon_read_property.0, &anon_read_property.1)
             .await;
 
         assert_matches!(set_res, Ok(_));
     }
 
-    let public_read_property = Property::new(PropertyName::DatasetAllowsPublicRead, "true");
+    let public_read_property = PropertyName::dataset_allows_public_read(true);
 
     {
         let set_res = rebac_repo
-            .set_entity_property(&entity, &public_read_property)
+            .set_entity_property(&entity, public_read_property.0, &public_read_property.1)
             .await;
 
         assert_matches!(set_res, Ok(_));
@@ -167,7 +167,7 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
 
     {
         let delete_res = rebac_repo
-            .delete_entity_property(&entity, PropertyName::DatasetAllowsAnonymousRead)
+            .delete_entity_property(&entity, DatasetPropertyName::AllowsAnonymousRead.into())
             .await;
 
         assert_matches!(delete_res, Ok(_));
@@ -175,7 +175,7 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
 
     {
         let delete_res = rebac_repo
-            .delete_entity_property(&entity, PropertyName::DatasetAllowsAnonymousRead)
+            .delete_entity_property(&entity, DatasetPropertyName::AllowsAnonymousRead.into())
             .await;
 
         assert_matches!(
@@ -183,7 +183,7 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
             Err(DeleteEntityPropertyError::PropertyNotFound(e))
                 if e.entity_type == EntityType::Dataset
                     && e.entity_id == *"bar"
-                    && e.property_name == PropertyName::DatasetAllowsAnonymousRead
+                    && e.property_name == DatasetPropertyName::AllowsAnonymousRead.into()
         );
     }
 

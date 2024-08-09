@@ -18,9 +18,9 @@ use kamu_auth_rebac::{
     GetEntityPropertiesError,
     InsertEntitiesRelationError,
     ObjectEntity,
-    Property,
-    PropertyName,
-    PropertyValue,
+    PropertyNameOld,
+    PropertyOld,
+    PropertyValueOld,
     RebacRepository,
     RebacService,
     Relation,
@@ -48,7 +48,7 @@ impl RebacService for RebacServiceImpl {
     async fn set_account_property(
         &self,
         account_id: &AccountID,
-        property: &Property,
+        property: &PropertyOld,
     ) -> Result<(), SetEntityPropertyError> {
         let account_id = account_id.as_did_str().to_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
@@ -61,7 +61,7 @@ impl RebacService for RebacServiceImpl {
     async fn unset_account_property(
         &self,
         account_id: &AccountID,
-        property_name: PropertyName,
+        property_name: PropertyNameOld,
     ) -> Result<(), DeleteEntityPropertyError> {
         let account_id = account_id.as_did_str().to_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
@@ -74,7 +74,7 @@ impl RebacService for RebacServiceImpl {
     async fn get_account_properties(
         &self,
         account_id: &AccountID,
-    ) -> Result<HashMap<PropertyName, PropertyValue>, GetEntityPropertiesError> {
+    ) -> Result<HashMap<PropertyNameOld, PropertyValueOld>, GetEntityPropertiesError> {
         let account_id = account_id.as_did_str().to_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
 
@@ -89,7 +89,7 @@ impl RebacService for RebacServiceImpl {
     async fn set_dataset_property(
         &self,
         dataset_id: &DatasetID,
-        property: &Property,
+        property: &PropertyOld,
     ) -> Result<(), SetEntityPropertyError> {
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_id_entity = Entity::new_dataset(dataset_id.as_str());
@@ -102,7 +102,7 @@ impl RebacService for RebacServiceImpl {
     async fn unset_dataset_property(
         &self,
         dataset_id: &DatasetID,
-        property_name: PropertyName,
+        property_name: PropertyNameOld,
     ) -> Result<(), DeleteEntityPropertyError> {
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_id_entity = Entity::new_dataset(dataset_id.as_str());
@@ -115,7 +115,7 @@ impl RebacService for RebacServiceImpl {
     async fn get_dataset_properties(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<HashMap<PropertyName, PropertyValue>, GetEntityPropertiesError> {
+    ) -> Result<HashMap<PropertyNameOld, PropertyValueOld>, GetEntityPropertiesError> {
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_id_entity = Entity::new_dataset(dataset_id.as_str());
 
@@ -192,8 +192,8 @@ impl RebacService for RebacServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn represent_properties_as_a_map(
-    properties: Vec<Property>,
-) -> HashMap<PropertyName, PropertyValue> {
+    properties: Vec<PropertyOld>,
+) -> HashMap<PropertyNameOld, PropertyValueOld> {
     let mut res = HashMap::with_capacity(properties.len());
 
     for property in properties {
