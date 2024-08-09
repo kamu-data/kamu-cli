@@ -34,7 +34,7 @@ pub async fn test_get_dataset_entry(catalog: &Catalog) {
 
         assert_matches!(
             get_res,
-            Err(GetDatasetEntryError::NotFound(DatasetEntryNotFoundError::ByDatasetId(actual_dataset_id)))
+            Err(GetDatasetEntryError::NotFound(DatasetEntryNotFoundError { dataset_id: actual_dataset_id }))
                 if actual_dataset_id == dataset_entry.id
         );
     }
@@ -63,6 +63,30 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
 
     let (_, owner_id_1) = AccountID::new_generated_ed25519();
     let (_, owner_id_2) = AccountID::new_generated_ed25519();
+    {
+        let get_res = dataset_entry_repo
+            .get_dataset_entries_by_owner_id(&owner_id_1)
+            .await;
+        let expected_dataset_entries = vec![];
+
+        assert_matches!(
+            get_res,
+            Ok(actual_dataset_entries)
+                if actual_dataset_entries == expected_dataset_entries
+        );
+    }
+    {
+        let get_res = dataset_entry_repo
+            .get_dataset_entries_by_owner_id(&owner_id_2)
+            .await;
+        let expected_dataset_entries = vec![];
+
+        assert_matches!(
+            get_res,
+            Ok(actual_dataset_entries)
+                if actual_dataset_entries == expected_dataset_entries
+        );
+    }
 
     let dataset_entry_acc_1_1 = new_dataset_entry_with(owner_id_1.clone(), "dataset1");
     let dataset_entry_acc_1_2 = new_dataset_entry_with(owner_id_1.clone(), "dataset2");
@@ -145,19 +169,19 @@ pub async fn test_try_save_duplicate_dataset_entry(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_update_same_dataset_alias(catalog: &Catalog) {
+pub async fn test_update_dataset_entry_name(catalog: &Catalog) {
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
     let dataset_entry = new_dataset_entry();
-    let new_alias = DatasetName::new_unchecked("new-alias");
+    let new_name = DatasetName::new_unchecked("new-alias");
     {
         let update_res = dataset_entry_repo
-            .update_dataset_entry_name(&dataset_entry.id, &new_alias)
+            .update_dataset_entry_name(&dataset_entry.id, &new_name)
             .await;
 
         assert_matches!(
             update_res,
-            Err(UpdateDatasetEntryNameError::NotFound(DatasetEntryNotFoundError::ByDatasetId(actual_dataset_id)))
+            Err(UpdateDatasetEntryNameError::NotFound(DatasetEntryNotFoundError { dataset_id: actual_dataset_id }))
                 if actual_dataset_id == dataset_entry.id
         );
     }
@@ -168,7 +192,7 @@ pub async fn test_update_same_dataset_alias(catalog: &Catalog) {
     }
     {
         let update_res = dataset_entry_repo
-            .update_dataset_entry_name(&dataset_entry.id, &new_alias)
+            .update_dataset_entry_name(&dataset_entry.id, &new_name)
             .await;
 
         assert_matches!(update_res, Ok(_));
@@ -188,7 +212,7 @@ pub async fn test_delete_dataset_entry(catalog: &Catalog) {
 
         assert_matches!(
             delete_res,
-            Err(DeleteEntryDatasetError::NotFound(DatasetEntryNotFoundError::ByDatasetId(actual_dataset_id)))
+            Err(DeleteEntryDatasetError::NotFound(DatasetEntryNotFoundError { dataset_id: actual_dataset_id }))
                 if actual_dataset_id == dataset_entry.id
         );
     }

@@ -54,12 +54,15 @@ pub enum GetDatasetEntryError {
 }
 
 #[derive(Error, Debug)]
-pub enum DatasetEntryNotFoundError {
-    #[error("Dataset entry not found by dataset_id: '{0}'")]
-    ByDatasetId(DatasetID),
+#[error("Dataset entry with dataset_id '{dataset_id}' not found")]
+pub struct DatasetEntryNotFoundError {
+    pub dataset_id: DatasetID,
+}
 
-    #[error("Datasets entry not found by owner_id: '{0}'")]
-    ByOwnerId(AccountID),
+impl DatasetEntryNotFoundError {
+    pub fn new(dataset_id: DatasetID) -> Self {
+        Self { dataset_id }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
