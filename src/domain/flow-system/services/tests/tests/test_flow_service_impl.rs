@@ -617,6 +617,17 @@ async fn test_manual_trigger_reset() {
         .unwrap();
 
     harness.eager_initialization().await;
+    harness
+        .set_dataset_flow_reset_rule(
+            harness.now_datetime(),
+            create_dataset_result.dataset_handle.id.clone(),
+            DatasetFlowType::Reset,
+            ResetRule {
+                new_head_hash: dataset_blocks[1].0.clone(),
+                old_head_hash: dataset_blocks[0].0.clone(),
+            },
+        )
+        .await;
 
     let foo_flow_key: FlowKey = FlowKeyDataset::new(
         create_dataset_result.dataset_handle.id.clone(),
@@ -643,12 +654,12 @@ async fn test_manual_trigger_reset() {
 
         // Run simulation script and task drivers
         _ = async {
-                  // Task 0: "foo" start running at 10ms, finish at 20ms
+                  // Task 0: "foo" start running at 20ms, finish at 110ms
                   let task0_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(0),
                     dataset_id: Some(create_dataset_result.dataset_handle.id.clone()),
                     run_since_start: Duration::try_milliseconds(20).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(70).unwrap(), TaskOutcome::Success(TaskResult::ResetDatasetResult(TaskResetDatasetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") })))),
+                    finish_in_with: Some((Duration::try_milliseconds(90).unwrap(), TaskOutcome::Success(TaskResult::ResetDatasetResult(TaskResetDatasetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") })))),
                     expected_logical_plan: LogicalPlan::Reset(ResetDataset {
                       dataset_id: create_dataset_result.dataset_handle.id.clone(),
                       // By deafult should reset to seed block
@@ -669,9 +680,8 @@ async fn test_manual_trigger_reset() {
                 // Main simulation script
                 let main_handle = async {
                     // Moment 20ms - manual foo trigger happens here:
-                    //  - flow 0 gets trigger and finishes at 90ms
-                    // ToDo: figure out why test stuck with lower advance time
-                    harness.advance_time(Duration::try_milliseconds(5000).unwrap()).await;
+                    //  - flow 0 gets trigger and finishes at 110ms
+                    harness.advance_time(Duration::try_milliseconds(250).unwrap()).await;
                 };
 
                 tokio::join!(task0_handle, trigger0_handle, main_handle)
@@ -693,7 +703,7 @@ async fn test_manual_trigger_reset() {
               "foo" Reset:
                 Flow ID = 0 Running(task=0)
 
-            #3: +90ms:
+            #3: +110ms:
               "foo" Reset:
                 Flow ID = 0 Finished Success
 

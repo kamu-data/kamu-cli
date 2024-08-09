@@ -782,14 +782,9 @@ impl FlowServiceImpl {
                             reset_rule.old_head_hash.clone(),
                         )
                     } else {
-                        let dataset_handle = self
-                            .dataset_repo
-                            .resolve_dataset_ref(&flow_key.dataset_id.as_local_ref())
-                            .await
-                            .int_err()?;
                         let dataset = self
                             .dataset_repo
-                            .get_dataset(&dataset_handle.as_local_ref())
+                            .get_dataset(&flow_key.dataset_id.as_local_ref())
                             .await
                             .int_err()?;
                         let current_head = dataset

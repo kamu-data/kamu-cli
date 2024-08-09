@@ -25,7 +25,12 @@ pub enum DatasetFlowType {
 
 impl DatasetFlowType {
     pub fn all() -> &'static [DatasetFlowType] {
-        &[Self::Ingest, Self::ExecuteTransform, Self::HardCompaction]
+        &[
+            Self::Ingest,
+            Self::ExecuteTransform,
+            Self::HardCompaction,
+            Self::Reset,
+        ]
     }
 
     pub fn dataset_kind_restriction(&self) -> Option<opendatafabric::DatasetKind> {
