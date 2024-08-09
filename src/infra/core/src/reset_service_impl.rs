@@ -38,6 +38,7 @@ impl ResetService for ResetServiceImpl {
         &self,
         dataset_handle: &DatasetHandle,
         block_hash: &Multihash,
+        old_head_maybe: Option<Multihash>,
     ) -> Result<(), ResetError> {
         self.dataset_action_authorizer
             .check_action_allowed(dataset_handle, auth::DatasetAction::Write)
@@ -47,6 +48,18 @@ impl ResetService for ResetServiceImpl {
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
+        if let Some(old_head) = old_head_maybe
+            && let Some(current_head) = dataset
+                .as_metadata_chain()
+                .try_get_ref(&BlockRef::Head)
+                .await?
+            && old_head != current_head
+        {
+            return Err(ResetError::OldHeadMismatch(OldHeadMismatchError {
+                current_head,
+                old_head,
+            }));
+        }
 
         dataset
             .as_metadata_chain()

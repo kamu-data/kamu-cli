@@ -18,6 +18,7 @@ pub enum FlowConfigurationSnapshot {
     Batching(FlowConfigurationBatching),
     Schedule(FlowConfigurationScheduleRule),
     Compaction(FlowConfigurationCompactionRule),
+    Reset(FlowConfigurationReset),
 }
 
 #[derive(SimpleObject)]
@@ -38,6 +39,7 @@ impl From<fs::FlowConfigurationSnapshot> for FlowConfigurationSnapshot {
             fs::FlowConfigurationSnapshot::Batching(batching_rule) => {
                 Self::Batching(batching_rule.into())
             }
+            fs::FlowConfigurationSnapshot::Reset(reset_rule) => Self::Reset(reset_rule.into()),
             fs::FlowConfigurationSnapshot::Schedule(schedule) => {
                 Self::Schedule(FlowConfigurationScheduleRule {
                     schedule_rule: match schedule {

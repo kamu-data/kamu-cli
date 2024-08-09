@@ -52,8 +52,13 @@ impl DatasetFlowRunsMut {
 
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
-        if let Some(e) =
-            ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type).await?
+        if let Some(e) = ensure_flow_preconditions(
+            ctx,
+            &self.dataset_handle,
+            dataset_flow_type,
+            &flow_run_configuration,
+        )
+        .await?
         {
             return Ok(TriggerFlowResult::PreconditionsNotMet(e));
         }

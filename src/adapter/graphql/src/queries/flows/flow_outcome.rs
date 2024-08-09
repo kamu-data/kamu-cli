@@ -92,6 +92,11 @@ impl FlowOutcome {
                             ),
                         })
                     }
+                    FlowError::NewHeadHashNotFound(_) => Self::Failed(FlowFailedError {
+                        reason: FlowFailedReason::FlowFailed(FlowFailedMessage {
+                            message: "New head hash to reset not found".to_owned(),
+                        }),
+                    }),
                 },
                 kamu_flow_system::FlowOutcome::Aborted => Self::Aborted(FlowAbortedResult {
                     message: "ABORTED".to_owned(),

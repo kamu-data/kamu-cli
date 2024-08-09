@@ -14,6 +14,7 @@ use kamu_flow_system::{
     CompactionRuleMetadataOnly,
     FlowConfigurationRule,
     FlowConfigurationSnapshot,
+    ResetRule,
     Schedule,
     ScheduleCron,
     ScheduleTimeDelta,
@@ -30,6 +31,7 @@ pub struct FlowConfiguration {
     pub schedule: Option<FlowConfigurationSchedule>,
     pub batching: Option<FlowConfigurationBatching>,
     pub compaction: Option<FlowConfigurationCompaction>,
+    pub reset: Option<FlowConfigurationReset>,
 }
 
 impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
@@ -38,6 +40,11 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
             paused: !value.is_active(),
             batching: if let FlowConfigurationRule::BatchingRule(condition) = &value.rule {
                 Some((*condition).into())
+            } else {
+                None
+            },
+            reset: if let FlowConfigurationRule::ResetRule(condition) = &value.rule {
+                Some(condition.clone().into())
             } else {
                 None
             },
@@ -90,6 +97,25 @@ impl From<BatchingRule> for FlowConfigurationBatching {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowConfigurationReset {
+    pub new_head_hash: Multihash,
+    pub old_head_hash: Multihash,
+}
+
+impl From<ResetRule> for FlowConfigurationReset {
+    fn from(value: ResetRule) -> Self {
+        Self {
+            new_head_hash: value.new_head_hash.into(),
+            old_head_hash: value.old_head_hash.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Union, Clone, PartialEq, Eq)]
 pub enum FlowConfigurationCompaction {
@@ -211,6 +237,7 @@ pub enum FlowRunConfiguration {
     Schedule(ScheduleInput),
     Batching(BatchingConditionInput),
     Compaction(CompactionConditionInput),
+    Reset(ResetConditionInput),
 }
 
 #[derive(OneofObject)]
@@ -254,6 +281,21 @@ impl From<&TimeDeltaInput> for chrono::Duration {
 pub struct BatchingConditionInput {
     pub min_records_to_await: u64,
     pub max_batching_interval: TimeDeltaInput,
+}
+
+#[derive(InputObject)]
+pub struct ResetConditionInput {
+    pub new_head_hash: Multihash,
+    pub old_head_hash: Multihash,
+}
+
+impl From<&ResetConditionInput> for ResetRule {
+    fn from(value: &ResetConditionInput) -> Self {
+        Self {
+            new_head_hash: value.new_head_hash.clone().into(),
+            old_head_hash: value.old_head_hash.clone().into(),
+        }
+    }
 }
 
 #[derive(OneofObject)]
@@ -340,6 +382,15 @@ impl FlowRunConfiguration {
                             })?
                     }
                 })
+            }
+            Self::Reset(reset_input) => {
+                if dataset_flow_type != DatasetFlowType::Reset {
+                    return Err(FlowInvalidRunConfigurations {
+                        error: "Incompatible flow run configuration and dataset flow type"
+                            .to_string(),
+                    });
+                };
+                FlowConfigurationSnapshot::Reset(reset_input.into())
             }
         })
     }
