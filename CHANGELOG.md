@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - New `Reset` flow in GQL Api which can be triggered manually for `Root` and `Derivative` datasets
 
+## [0.193.1] - 2024-08-09
+### Fixed
+- Panic for `EXECUTE_TRANSFORM` flow without dataset env vars enabled feature
+
+## [0.193.0] - 2024-08-07
+### Added
+- `kamu add` command accepts optional `--name` argument to add a snapshot under a different name
+
 ## [0.192.0] - 2024-08-07
 ### Added
 - `kamu --no-color` to disable color output in the terminal.
