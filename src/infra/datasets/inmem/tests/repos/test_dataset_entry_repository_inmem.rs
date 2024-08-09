@@ -41,10 +41,10 @@ async fn test_try_save_duplicate_dataset_entry() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_update_same_dataset_alias() {
+async fn test_update_dataset_entry_name() {
     let harness = InmemDatasetEntryRepositoryHarness::new();
 
-    dataset_entry_repo::test_update_same_dataset_alias(&harness.catalog).await;
+    dataset_entry_repo::test_update_dataset_entry_name(&harness.catalog).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

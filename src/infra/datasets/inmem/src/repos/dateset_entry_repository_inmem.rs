@@ -69,7 +69,7 @@ impl DatasetEntryRepository for DatasetEntryRepositoryInMemory {
         let maybe_dataset_entry = readable_state.rows.get(dataset_id);
 
         let Some(dataset_entry) = maybe_dataset_entry else {
-            return Err(DatasetEntryNotFoundError::ByDatasetId(dataset_id.clone()).into());
+            return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
         };
 
         Ok(dataset_entry.clone())
@@ -93,10 +93,6 @@ impl DatasetEntryRepository for DatasetEntryRepositoryInMemory {
 
                 acc
             });
-
-        if dataset_entries.is_empty() {
-            return Err(DatasetEntryNotFoundError::ByOwnerId(owner_id.clone()).into());
-        }
 
         Ok(dataset_entries)
     }
@@ -130,7 +126,7 @@ impl DatasetEntryRepository for DatasetEntryRepositoryInMemory {
         let maybe_dataset_entry = writable_state.rows.get_mut(dataset_id);
 
         let Some(dataset_entry) = maybe_dataset_entry else {
-            return Err(DatasetEntryNotFoundError::ByDatasetId(dataset_id.clone()).into());
+            return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
         };
 
         dataset_entry.name = new_name.clone();
@@ -147,7 +143,7 @@ impl DatasetEntryRepository for DatasetEntryRepositoryInMemory {
         let not_found = writable_state.rows.remove(dataset_id).is_none();
 
         if not_found {
-            return Err(DatasetEntryNotFoundError::ByDatasetId(dataset_id.clone()).into());
+            return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
         }
 
         Ok(())
