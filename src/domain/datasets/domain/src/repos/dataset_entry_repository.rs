@@ -93,22 +93,7 @@ pub enum UpdateDatasetEntryNameError {
     NotFound(#[from] DatasetEntryNotFoundError),
 
     #[error(transparent)]
-    NameCollision(#[from] DatasetEntryNameCollisionError),
-
-    #[error(transparent)]
     Internal(InternalError),
-}
-
-#[derive(Error, Debug)]
-#[error("Dataset entry with name {dataset_name} already exists")]
-pub struct DatasetEntryNameCollisionError {
-    pub dataset_name: DatasetName,
-}
-
-impl DatasetEntryNameCollisionError {
-    pub fn new(dataset_name: DatasetName) -> Self {
-        Self { dataset_name }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
