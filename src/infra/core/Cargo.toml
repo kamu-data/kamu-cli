@@ -39,6 +39,7 @@ kamu-datasets = { workspace = true }
 kamu-core = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 random-names = { workspace = true }
+kamu-auth-rebac = { workspace = true }
 
 # Serialization
 flatbuffers = "24"
@@ -144,6 +145,8 @@ libc = "0.2" # For getting uid:gid
 database-common = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
+kamu-auth-rebac-inmem = { workspace = true }
+kamu-auth-rebac-services = { workspace = true }
 kamu-datasets-services = { workspace = true }
 
 criterion = { version = "0.5", features = ["async_tokio"] }

@@ -18,6 +18,8 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use opendatafabric::*;
 use tempfile::TempDir;
 
@@ -517,6 +519,8 @@ impl IngestTestHarness {
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<DataFormatRegistryImpl>()
             .add::<PushIngestServiceImpl>()
+            .add::<RebacRepositoryInMem>()
+            .add::<RebacServiceImpl>()
             .build();
 
         Self {
@@ -528,8 +532,10 @@ impl IngestTestHarness {
     }
 
     async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) {
+        let publicly_available = true;
+
         self.dataset_repo
-            .create_dataset_from_snapshot(dataset_snapshot)
+            .create_dataset_from_snapshot(dataset_snapshot, publicly_available)
             .await
             .unwrap();
     }

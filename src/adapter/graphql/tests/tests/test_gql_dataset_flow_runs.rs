@@ -38,6 +38,8 @@ use kamu_accounts::{
 };
 use kamu_accounts_inmem::AccessTokenRepositoryInMemory;
 use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{
     auth,
     CompactionResult,
@@ -2922,7 +2924,9 @@ impl FlowRunsHarness {
                 .add::<AccessTokenRepositoryInMemory>()
                 .add_value(JwtAuthenticationConfig::default())
                 .add::<DatasetOwnershipServiceInMemory>()
-                .add::<DatabaseTransactionRunner>();
+                .add::<DatabaseTransactionRunner>()
+                .add::<RebacRepositoryInMem>()
+                .add::<RebacServiceImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -2959,6 +2963,8 @@ impl FlowRunsHarness {
     }
 
     async fn create_root_dataset(&self) -> CreateDatasetResult {
+        let publicly_available = true;
+
         self.dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -2966,12 +2972,15 @@ impl FlowRunsHarness {
                     .name("foo")
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap()
     }
 
     async fn create_derived_dataset(&self) -> CreateDatasetResult {
+        let publicly_available = true;
+
         self.dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -2983,6 +2992,7 @@ impl FlowRunsHarness {
                             .build(),
                     )
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap()

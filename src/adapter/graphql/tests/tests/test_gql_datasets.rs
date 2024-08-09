@@ -15,6 +15,8 @@ use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::*;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use mockall::predicate::eq;
 use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
@@ -685,7 +687,9 @@ impl GraphQLDatasetsHarness {
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .add_value(mock_authentication_service)
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<RebacRepositoryInMem>()
+                .add::<RebacServiceImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -726,6 +730,8 @@ impl GraphQLDatasetsHarness {
             .catalog_authorized
             .get_one::<dyn DatasetRepository>()
             .unwrap();
+        let publicly_available = true;
+
         dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -733,6 +739,7 @@ impl GraphQLDatasetsHarness {
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap()
@@ -747,6 +754,8 @@ impl GraphQLDatasetsHarness {
             .catalog_authorized
             .get_one::<dyn DatasetRepository>()
             .unwrap();
+        let publicly_available = true;
+
         dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -758,6 +767,7 @@ impl GraphQLDatasetsHarness {
                             .build(),
                     )
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap()

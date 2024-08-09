@@ -533,36 +533,41 @@ impl DataIngestHarness {
     }
 
     async fn create_population_dataset(&self, with_schema: bool) -> CreateDatasetResult {
+        let publicly_available = true;
+
         self.server_harness
             .cli_dataset_repository()
-            .create_dataset_from_snapshot(DatasetSnapshot {
-                name: DatasetAlias::new(
-                    self.server_harness.operating_account_name(),
-                    DatasetName::new_unchecked("population"),
-                ),
-                kind: DatasetKind::Root,
-                metadata: if with_schema {
-                    vec![AddPushSource {
-                        source_name: "source1".to_string(),
-                        read: ReadStepNdJson {
-                            schema: Some(vec![
-                                "event_time TIMESTAMP".to_owned(),
-                                "city STRING".to_owned(),
-                                "population BIGINT".to_owned(),
-                            ]),
-                            ..Default::default()
+            .create_dataset_from_snapshot(
+                DatasetSnapshot {
+                    name: DatasetAlias::new(
+                        self.server_harness.operating_account_name(),
+                        DatasetName::new_unchecked("population"),
+                    ),
+                    kind: DatasetKind::Root,
+                    metadata: if with_schema {
+                        vec![AddPushSource {
+                            source_name: "source1".to_string(),
+                            read: ReadStepNdJson {
+                                schema: Some(vec![
+                                    "event_time TIMESTAMP".to_owned(),
+                                    "city STRING".to_owned(),
+                                    "population BIGINT".to_owned(),
+                                ]),
+                                ..Default::default()
+                            }
+                            .into(),
+                            preprocess: None,
+                            merge: MergeStrategy::Ledger(MergeStrategyLedger {
+                                primary_key: vec!["event_time".to_owned(), "city".to_owned()],
+                            }),
                         }
-                        .into(),
-                        preprocess: None,
-                        merge: MergeStrategy::Ledger(MergeStrategyLedger {
-                            primary_key: vec!["event_time".to_owned(), "city".to_owned()],
-                        }),
-                    }
-                    .into()]
-                } else {
-                    vec![]
+                        .into()]
+                    } else {
+                        vec![]
+                    },
                 },
-            })
+                publicly_available,
+            )
             .await
             .unwrap()
     }

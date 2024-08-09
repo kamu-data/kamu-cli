@@ -13,7 +13,7 @@ use kamu::domain::*;
 use opendatafabric::*;
 
 use super::{common, BatchError, CLIError, Command};
-use crate::OutputConfig;
+use crate::{cli_arguments, OutputConfig};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,7 +25,9 @@ pub struct AddCommand {
     recursive: bool,
     replace: bool,
     stdin: bool,
+    publicly_available: bool,
     output_config: Arc<OutputConfig>,
+    multi_tenant: bool,
 }
 
 impl AddCommand {
@@ -37,7 +39,9 @@ impl AddCommand {
         recursive: bool,
         replace: bool,
         stdin: bool,
+        publicly_available: bool,
         output_config: Arc<OutputConfig>,
+        multi_tenant: bool,
     ) -> Self
     where
         I: Iterator<Item = &'s str>,
@@ -50,7 +54,9 @@ impl AddCommand {
             recursive,
             replace,
             stdin,
+            publicly_available,
             output_config,
+            multi_tenant,
         }
     }
 
@@ -70,12 +76,12 @@ impl AddCommand {
             .map(|r| std::path::Path::new(r).join("**").join("*.yaml"))
             .flat_map(|p| {
                 glob::glob(p.to_str().unwrap())
-                    .unwrap_or_else(|e| panic!("Failed to read glob {}: {}", p.display(), e))
+                    .unwrap_or_else(|e| panic!("Failed to read glob {}: {e}", p.display()))
             })
             .map(Result::unwrap)
             .filter(|p| {
                 self.is_snapshot_file(p)
-                    .unwrap_or_else(|e| panic!("Error while reading file {}: {}", p.display(), e))
+                    .unwrap_or_else(|e| panic!("Error while reading file {}: {e}", p.display()))
             });
 
         let mut res = Vec::new();
@@ -133,7 +139,7 @@ impl AddCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for AddCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn before_run(&self) -> Result<(), CLIError> {
         if self.stdin && !self.snapshot_refs.is_empty() {
             return Err(CLIError::usage_error(
                 "Cannot specify --stdin and positional arguments at the same time",
@@ -149,7 +155,17 @@ impl Command for AddCommand {
                 "Name override can be used only when adding a single manifest",
             ));
         }
+        if !self.multi_tenant && self.publicly_available {
+            return Err(CLIError::usage_error(format!(
+                "Only multi-tenant repositories support the '{}' argument",
+                *cli_arguments::add::PUBLIC
+            )));
+        }
 
+        Ok(())
+    }
+
+    async fn run(&mut self) -> Result<(), CLIError> {
         let load_results = if self.recursive {
             self.load_recursive().await
         } else if self.stdin {
@@ -209,7 +225,8 @@ impl Command for AddCommand {
                     return Err(CLIError::Aborted);
                 }
 
-                // TODO: delete permissions should be checked in multi-tenant scenario
+                // TODO: Private Datasets: delete permissions should be checked in multi-tenant
+                //                         scenario
                 for hdl in already_exist {
                     self.dataset_repo
                         .delete_dataset(&hdl.as_local_ref())
@@ -220,7 +237,7 @@ impl Command for AddCommand {
 
         let mut add_results = self
             .dataset_repo
-            .create_datasets_from_snapshots(snapshots)
+            .create_datasets_from_snapshots(snapshots, self.publicly_available)
             .await;
 
         add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(id_b));

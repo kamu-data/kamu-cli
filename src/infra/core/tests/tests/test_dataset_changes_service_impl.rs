@@ -15,6 +15,8 @@ use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
 use kamu::{DatasetChangesServiceImpl, DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{
     auth,
     CommitOpts,
@@ -822,6 +824,8 @@ impl DatasetChangesHarness {
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DatasetChangesServiceImpl>()
             .add::<DependencyGraphServiceInMemory>()
+            .add::<RebacRepositoryInMem>()
+            .add::<RebacServiceImpl>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
@@ -873,6 +877,8 @@ impl DatasetChangesHarness {
         dataset_name: &str,
         input_dataset_names: Vec<&str>,
     ) -> CreateDatasetResult {
+        let publicly_available = true;
+
         self.dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -887,6 +893,7 @@ impl DatasetChangesHarness {
                             .build(),
                     )
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap()

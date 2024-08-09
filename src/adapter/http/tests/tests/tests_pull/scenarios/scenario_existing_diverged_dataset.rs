@@ -41,6 +41,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingDivergedDatasetScenario
         let server_account_name = server_harness.operating_account_name();
 
         let server_repo = server_harness.cli_dataset_repository();
+        let publicly_available = true;
         let server_create_result = server_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -52,6 +53,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingDivergedDatasetScenario
                     .push_event(MetadataFactory::set_polling_source().build())
                     .push_event(MetadataFactory::set_data_schema().build())
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();

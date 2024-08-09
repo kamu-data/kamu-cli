@@ -14,6 +14,8 @@ use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use opendatafabric::*;
 
@@ -44,7 +46,9 @@ async fn test_current_push_sources() {
             .add::<ObjectStoreRegistryImpl>()
             .add::<DataFormatRegistryImpl>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceInMemory>();
+            .add::<DependencyGraphServiceInMemory>()
+            .add::<RebacRepositoryInMem>()
+            .add::<RebacServiceImpl>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -56,12 +60,14 @@ async fn test_current_push_sources() {
     let dataset_repo = catalog_authorized
         .get_one::<dyn DatasetRepository>()
         .unwrap();
+    let publicly_available = true;
     let create_result = dataset_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .kind(DatasetKind::Root)
                 .name("foo")
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();

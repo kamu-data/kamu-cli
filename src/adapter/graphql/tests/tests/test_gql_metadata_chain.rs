@@ -15,6 +15,8 @@ use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use opendatafabric::serde::yaml::YamlMetadataEventSerializer;
 use opendatafabric::*;
@@ -171,12 +173,14 @@ async fn metadata_chain_append_event() {
         .catalog_authorized
         .get_one::<dyn DatasetRepository>()
         .unwrap();
+    let publicly_available = true;
     let create_result = dataset_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();
@@ -254,12 +258,14 @@ async fn metadata_update_readme_new() {
         .catalog_authorized
         .get_one::<dyn DatasetRepository>()
         .unwrap();
+    let publicly_available = true;
     let create_result = dataset_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();
@@ -522,7 +528,9 @@ impl GraphQLMetadataChainHarness {
                         .with_multi_tenant(is_multi_tenant),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<RebacRepositoryInMem>()
+                .add::<RebacServiceImpl>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

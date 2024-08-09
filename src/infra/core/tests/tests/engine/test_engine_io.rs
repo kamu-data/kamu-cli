@@ -19,8 +19,12 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_datasets_services::DatasetKeyValueServiceStaticImpl;
 use opendatafabric::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_engine_io_common(
     object_stores: Vec<Arc<dyn ObjectStoreBuilder>>,
@@ -118,9 +122,10 @@ async fn test_engine_io_common(
         .build();
 
     let root_alias = root_snapshot.name.clone();
+    let publicly_available = true;
 
     dataset_repo
-        .create_dataset_from_snapshot(root_snapshot)
+        .create_dataset_from_snapshot(root_snapshot, publicly_available)
         .await
         .unwrap();
 
@@ -149,9 +154,10 @@ async fn test_engine_io_common(
         .build();
 
     let deriv_alias = deriv_snapshot.name.clone();
+    let publicly_available = true;
 
     let dataset_deriv = dataset_repo
-        .create_dataset_from_snapshot(deriv_snapshot)
+        .create_dataset_from_snapshot(deriv_snapshot, publicly_available)
         .await
         .unwrap()
         .dataset;
@@ -247,6 +253,8 @@ async fn test_engine_io_common(
     assert_matches!(verify_result, Ok(()));
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized, engine, transform, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_engine_io_local_file_mount() {
@@ -271,6 +279,8 @@ async fn test_engine_io_local_file_mount() {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add::<RebacRepositoryInMem>()
+        .add::<RebacServiceImpl>()
         .build();
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
@@ -289,6 +299,8 @@ async fn test_engine_io_local_file_mount() {
     )
     .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized, engine, transform, datafusion)]
 #[test_log::test(tokio::test)]
@@ -314,6 +326,8 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
+        .add::<RebacRepositoryInMem>()
+        .add::<RebacServiceImpl>()
         .build();
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
@@ -337,3 +351,5 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
     )
     .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

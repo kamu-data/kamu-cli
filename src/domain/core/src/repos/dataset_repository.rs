@@ -68,6 +68,7 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
     async fn create_dataset_from_snapshot(
         &self,
         snapshot: DatasetSnapshot,
+        publicly_available: bool,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
 
     async fn rename_dataset(
@@ -109,6 +110,7 @@ pub trait DatasetRepositoryExt: DatasetRepository {
     async fn create_datasets_from_snapshots(
         &self,
         snapshots: Vec<DatasetSnapshot>,
+        publicly_available: bool,
     ) -> Vec<(
         DatasetAlias,
         Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
@@ -168,6 +170,7 @@ where
     async fn create_datasets_from_snapshots(
         &self,
         snapshots: Vec<DatasetSnapshot>,
+        publicly_available: bool,
     ) -> Vec<(
         DatasetAlias,
         Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
@@ -177,7 +180,9 @@ where
         let mut ret = Vec::new();
         for snapshot in snapshots_ordered {
             let alias = snapshot.name.clone();
-            let res = self.create_dataset_from_snapshot(snapshot).await;
+            let res = self
+                .create_dataset_from_snapshot(snapshot, publicly_available)
+                .await;
             ret.push((alias, res));
         }
         ret

@@ -21,6 +21,8 @@ use kamu::utils::datasets_filtering::{
 };
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{auth, DatasetRepository, SystemTimeSourceDefault};
 use opendatafabric::{
     AccountName,
@@ -284,6 +286,8 @@ impl DatasetFilteringHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
+            .add::<RebacRepositoryInMem>()
+            .add::<RebacServiceImpl>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
@@ -300,6 +304,8 @@ impl DatasetFilteringHarness {
         account_name: Option<AccountName>,
         dataset_name: &str,
     ) -> DatasetHandle {
+        let publicly_available = true;
+
         self.dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -310,6 +316,7 @@ impl DatasetFilteringHarness {
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap()

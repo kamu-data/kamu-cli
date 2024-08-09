@@ -18,10 +18,14 @@ use kamu::testing::*;
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use opendatafabric::*;
 use url::Url;
 
 use crate::utils::IpfsDaemon;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const FILE_DATA_ARRAY_SIZE: usize = 32;
 
@@ -112,6 +116,8 @@ async fn do_test_sync(
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
         .add::<DummySmartTransferProtocolClient>()
+        .add::<RebacRepositoryInMem>()
+        .add::<RebacServiceImpl>()
         .build();
 
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
@@ -149,8 +155,9 @@ async fn do_test_sync(
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
+    let publicly_available = true;
     let b1 = dataset_repo
-        .create_dataset_from_snapshot(snapshot)
+        .create_dataset_from_snapshot(snapshot, publicly_available)
         .await
         .unwrap()
         .head;

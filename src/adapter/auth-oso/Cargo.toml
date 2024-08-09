@@ -33,8 +33,10 @@ oso = "0.27"
 oso-derive = "0.27"
 
 [dev-dependencies]
-kamu = { workspace = true }
 event-bus = { workspace = true }
+kamu = { workspace = true }
+kamu-auth-rebac-inmem = { workspace = true }
+kamu-auth-rebac-services = { workspace = true }
 
 tempfile = "3"
 test-log = { version = "0.2", features = ["trace"] }

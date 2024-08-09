@@ -16,6 +16,8 @@ use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{auth, CreateDatasetResult, DatasetRepository, SystemTimeSourceDefault};
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_datasets_inmem::DatasetEnvVarRepositoryInMemory;
@@ -353,7 +355,9 @@ impl DatasetEnvVarsHarness {
                 .add::<DependencyGraphServiceInMemory>()
                 .add::<DatabaseTransactionRunner>()
                 .add::<DatasetEnvVarServiceImpl>()
-                .add::<DatasetEnvVarRepositoryInMemory>();
+                .add::<DatasetEnvVarRepositoryInMemory>()
+                .add::<RebacRepositoryInMem>()
+                .add::<RebacServiceImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -374,6 +378,8 @@ impl DatasetEnvVarsHarness {
     }
 
     async fn create_dataset(&self) -> CreateDatasetResult {
+        let publicly_available = true;
+
         self.dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -381,6 +387,7 @@ impl DatasetEnvVarsHarness {
                     .name("foo")
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap()

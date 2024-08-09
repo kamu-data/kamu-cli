@@ -44,6 +44,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingEvolvedDatasetScenario<
 
         let client_repo = client_harness.dataset_repository();
 
+        let publicly_available = true;
         let client_create_result = client_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -55,6 +56,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingEvolvedDatasetScenario<
                     .push_event(MetadataFactory::set_polling_source().build())
                     .push_event(MetadataFactory::set_data_schema().build())
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();

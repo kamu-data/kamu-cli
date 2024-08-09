@@ -116,7 +116,11 @@ pub async fn test_create_and_get_case_insensetive_dataset(
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result = repo.create_dataset_from_snapshot(snapshot).await.unwrap();
+    let publicly_available = true;
+    let create_result = repo
+        .create_dataset_from_snapshot(snapshot, publicly_available)
+        .await
+        .unwrap();
 
     // Assert dataset_name eq to new alias and account_name eq to old existing one
     assert_eq!(
@@ -183,13 +187,14 @@ pub async fn test_create_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
+    let publicly_available = true;
     let create_result_my = repo
-        .create_dataset_from_snapshot(snapshot_my.clone())
+        .create_dataset_from_snapshot(snapshot_my.clone(), publicly_available)
         .await
         .unwrap();
 
     let create_result_her = repo
-        .create_dataset_from_snapshot(snapshot_her.clone())
+        .create_dataset_from_snapshot(snapshot_her.clone(), publicly_available)
         .await
         .unwrap();
 
@@ -257,9 +262,10 @@ pub async fn test_create_dataset_from_snapshot(
         .kind(DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
+    let publicly_available = true;
 
     let create_result = repo
-        .create_dataset_from_snapshot(snapshot.clone())
+        .create_dataset_from_snapshot(snapshot.clone(), publicly_available)
         .await
         .unwrap();
 
@@ -276,8 +282,12 @@ pub async fn test_create_dataset_from_snapshot(
 
     assert_eq!(actual_head, create_result.head);
 
+    let publicly_available = true;
+
     assert_matches!(
-        repo.create_dataset_from_snapshot(snapshot).await.err(),
+        repo.create_dataset_from_snapshot(snapshot, publicly_available)
+            .await
+            .err(),
         Some(CreateDatasetFromSnapshotError::NameCollision(_))
     );
 }
@@ -305,8 +315,10 @@ pub async fn test_rename_dataset(repo: &dyn DatasetRepository, account_name: Opt
             )
             .build(),
     ];
+    let publicly_available = true;
 
-    repo.create_datasets_from_snapshots(snapshots).await;
+    repo.create_datasets_from_snapshots(snapshots, publicly_available)
+        .await;
 
     assert_matches!(
         repo.rename_dataset(&alias_baz.as_local_ref(), &alias_foo.dataset_name)
@@ -342,6 +354,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
         DatasetAlias::new(Some(account_her.clone()), DatasetName::new_unchecked("bar"));
     let dataset_alias_my_baz =
         DatasetAlias::new(Some(account_my.clone()), DatasetName::new_unchecked("baz"));
+    let publicly_available = true;
 
     let create_result_my_foo = repo
         .create_dataset_from_snapshot(
@@ -350,6 +363,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
                 .kind(DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();
@@ -361,6 +375,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
                 .kind(DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();
@@ -372,6 +387,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
                 .kind(DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();
@@ -434,8 +450,11 @@ pub async fn test_rename_dataset_unauthorized(
         .kind(DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
+    let publicly_available = true;
 
-    repo.create_dataset_from_snapshot(snapshot).await.unwrap();
+    repo.create_dataset_from_snapshot(snapshot, publicly_available)
+        .await
+        .unwrap();
 
     let result = repo
         .rename_dataset(&alias_foo.as_local_ref(), &alias_bar.dataset_name)
@@ -468,9 +487,10 @@ pub async fn test_delete_dataset(repo: &dyn DatasetRepository, account_name: Opt
             )
             .build(),
     ];
+    let publicly_available = true;
 
     let handles: Vec<_> = repo
-        .create_datasets_from_snapshots(snapshots)
+        .create_datasets_from_snapshots(snapshots, publicly_available)
         .await
         .into_iter()
         .map(|(_, r)| r.unwrap().dataset_handle)
@@ -512,8 +532,11 @@ pub async fn test_delete_dataset_unauthorized(
         .kind(DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
+    let publicly_available = true;
 
-    repo.create_dataset_from_snapshot(snapshot).await.unwrap();
+    repo.create_dataset_from_snapshot(snapshot, publicly_available)
+        .await
+        .unwrap();
 
     assert_matches!(
         repo.delete_dataset(&alias_foo.as_local_ref()).await,
@@ -545,7 +568,10 @@ pub async fn test_iterate_datasets(repo: &dyn DatasetRepository) {
             )
             .build(),
     ];
-    let _: Vec<_> = repo.create_datasets_from_snapshots(snapshots).await;
+    let publicly_available = true;
+    let _ = repo
+        .create_datasets_from_snapshots(snapshots, publicly_available)
+        .await;
 
     // All
     check_expected_datasets(
@@ -616,9 +642,14 @@ pub async fn test_iterate_datasets_multi_tenant(repo: &dyn DatasetRepository) {
             )
             .build(),
     ];
+    let publicly_available = true;
 
-    let _: Vec<_> = repo.create_datasets_from_snapshots(my_snapshots).await;
-    let _: Vec<_> = repo.create_datasets_from_snapshots(her_snapshots).await;
+    let _ = repo
+        .create_datasets_from_snapshots(my_snapshots, publicly_available)
+        .await;
+    let _ = repo
+        .create_datasets_from_snapshots(her_snapshots, publicly_available)
+        .await;
 
     check_expected_datasets(
         vec![

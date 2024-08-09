@@ -18,6 +18,8 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use opendatafabric::*;
 
 use super::test_api_server::TestAPIServer;
@@ -359,7 +361,9 @@ impl TestHarness {
                 .add::<EngineProvisionerNull>()
                 .add::<PushIngestServiceImpl>()
                 .add::<QueryServiceImpl>()
-                .add_value(ServerUrlConfig::new_test(None));
+                .add_value(ServerUrlConfig::new_test(None))
+                .add::<RebacRepositoryInMem>()
+                .add::<RebacServiceImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -380,6 +384,7 @@ impl TestHarness {
     }
 
     async fn create_simple_dataset(&self) -> CreateDatasetResult {
+        let publicly_available = true;
         let ds = self
             .dataset_repo
             .create_dataset_from_snapshot(
@@ -406,6 +411,7 @@ impl TestHarness {
                         ..Default::default()
                     })
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();

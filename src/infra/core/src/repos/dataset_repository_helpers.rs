@@ -12,6 +12,7 @@
 use chrono::{DateTime, Utc};
 use event_bus::EventBus;
 use internal_error::*;
+use kamu_auth_rebac::{Property, RebacService};
 use kamu_core::events::DatasetEventDependenciesUpdated;
 use kamu_core::*;
 use opendatafabric::*;
@@ -26,11 +27,19 @@ pub fn get_staging_name() -> String {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// General logic for creating a Dataset from a Snapshot.
+///
+/// # Arguments
+///
+/// * `maybe_rebac_service` - Pass `None` as argument if this is a single-tenant
+///   repository
 pub async fn create_dataset_from_snapshot_impl(
     dataset_repo: &dyn DatasetRepositoryExt,
+    maybe_rebac_service: Option<&dyn RebacService>,
     event_bus: &EventBus,
     mut snapshot: DatasetSnapshot,
     system_time: DateTime<Utc>,
+    publicly_available: bool,
 ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
     // Validate / resolve events
     for event in &mut snapshot.metadata {
@@ -161,6 +170,16 @@ pub async fn create_dataset_from_snapshot_impl(
         }?;
 
         sequence_number += 1;
+    }
+
+    if let Some(rebac_service) = maybe_rebac_service {
+        rebac_service
+            .set_dataset_property(
+                &create_result.dataset_handle.id,
+                &Property::new_dataset_allows_public_read(publicly_available),
+            )
+            .await
+            .int_err()?;
     }
 
     chain

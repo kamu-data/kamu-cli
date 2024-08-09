@@ -108,6 +108,12 @@ impl<'a> Property<'a> {
             value: value.into(),
         }
     }
+
+    pub fn new_dataset_allows_public_read(allows: bool) -> Self {
+        let value = if allows { "true" } else { "false" };
+
+        Self::new(PropertyName::DatasetAllowsPublicRead, value)
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

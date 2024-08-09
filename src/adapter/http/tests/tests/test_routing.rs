@@ -20,6 +20,8 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use opendatafabric::*;
 
 use crate::harness::await_client_server_flow;
@@ -50,10 +52,13 @@ async fn setup_repo() -> RepoFixture {
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<RebacRepositoryInMem>()
+        .add::<RebacServiceImpl>()
         .build();
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
+    let publicly_available = true;
     let created_dataset = dataset_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
@@ -61,6 +66,7 @@ async fn setup_repo() -> RepoFixture {
                 .kind(DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();

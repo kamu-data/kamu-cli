@@ -19,6 +19,8 @@ use kamu::domain::*;
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer, ParquetWriterHelper};
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use opendatafabric::*;
 
 use super::test_pull_service_impl::TestTransformService;
@@ -49,10 +51,13 @@ async fn test_verify_data_consistency() {
         .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
         .bind::<dyn TransformService, TestTransformService>()
         .add::<VerificationServiceImpl>()
+        .add::<RebacRepositoryInMem>()
+        .add::<RebacServiceImpl>()
         .build();
 
     let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let publicly_available = true;
 
     dataset_repo
         .create_dataset_from_snapshot(
@@ -62,6 +67,7 @@ async fn test_verify_data_consistency() {
                 .push_event(MetadataFactory::set_polling_source().build())
                 .push_event(MetadataFactory::set_data_schema().build())
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();
@@ -78,6 +84,7 @@ async fn test_verify_data_consistency() {
                 )
                 .push_event(MetadataFactory::set_data_schema().build())
                 .build(),
+            publicly_available,
         )
         .await
         .unwrap();

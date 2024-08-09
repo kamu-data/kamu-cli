@@ -21,6 +21,8 @@ use kamu::{
     S3RegistryCache,
 };
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{DatasetRepository, DependencyGraphService, SystemTimeSourceDefault};
 
 use super::test_dataset_repository_shared;
@@ -55,7 +57,9 @@ impl S3RepoHarness {
                     .with_s3_context(s3_context)
                     .with_multi_tenant(multi_tenant),
             )
-            .bind::<dyn DatasetRepository, DatasetRepositoryS3>();
+            .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
+            .add::<RebacRepositoryInMem>()
+            .add::<RebacServiceImpl>();
 
         if registry_caching {
             catalog.add::<S3RegistryCache>();

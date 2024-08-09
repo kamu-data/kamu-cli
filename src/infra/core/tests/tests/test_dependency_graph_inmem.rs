@@ -21,6 +21,8 @@ use kamu::{
     DependencyGraphServiceInMemory,
 };
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{
     auth,
     DatasetDependencies,
@@ -599,6 +601,8 @@ impl DependencyGraphHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
+            .add::<RebacRepositoryInMem>()
+            .add::<RebacServiceImpl>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
@@ -864,6 +868,8 @@ impl DependencyGraphHarness {
     }
 
     async fn create_root_dataset(&self, account_name: Option<AccountName>, dataset_name: &str) {
+        let publicly_available = true;
+
         self.dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -874,6 +880,7 @@ impl DependencyGraphHarness {
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();
@@ -885,6 +892,8 @@ impl DependencyGraphHarness {
         dataset_name: &str,
         input_aliases: Vec<DatasetAlias>,
     ) {
+        let publicly_available = true;
+
         self.dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -899,6 +908,7 @@ impl DependencyGraphHarness {
                             .build(),
                     )
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();

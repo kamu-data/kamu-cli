@@ -35,6 +35,8 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{auth, DatasetOwnershipService, DatasetRepository, SystemTimeSourceDefault};
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
 use tempfile::TempDir;
@@ -134,7 +136,9 @@ impl DatasetOwnershipHarness {
                 .add::<DependencyGraphServiceInMemory>()
                 .add::<DatabaseTransactionRunner>()
                 .add::<LoginPasswordAuthProvider>()
-                .add::<PredefinedAccountsRegistrator>();
+                .add::<PredefinedAccountsRegistrator>()
+                .add::<RebacRepositoryInMem>()
+                .add::<RebacServiceImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -244,6 +248,7 @@ impl DatasetOwnershipHarness {
             .await
             .unwrap()
             .unwrap();
+        let publicly_available = true;
         let created_dataset = self
             .dataset_repo
             .create_dataset_from_snapshot(
@@ -255,6 +260,7 @@ impl DatasetOwnershipHarness {
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();
@@ -278,6 +284,7 @@ impl DatasetOwnershipHarness {
             .await
             .unwrap()
             .unwrap();
+        let publicly_available = true;
         let created_dataset = self
             .dataset_repo
             .create_dataset_from_snapshot(
@@ -293,6 +300,7 @@ impl DatasetOwnershipHarness {
                             .build(),
                     )
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();

@@ -19,6 +19,8 @@ use futures::TryStreamExt;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
@@ -449,7 +451,9 @@ impl FlowConfigurationHarness {
                 .add_value(CurrentAccountSubject::new_test())
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<DependencyGraphServiceInMemory>()
-                .add::<FlowConfigEventsListener>();
+                .add::<FlowConfigEventsListener>()
+                .add::<RebacRepositoryInMem>()
+                .add::<RebacServiceImpl>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -617,6 +621,7 @@ impl FlowConfigurationHarness {
         flow_configuration.into()
     }
     async fn create_root_dataset(&self, dataset_name: &str) -> DatasetID {
+        let publicly_available = true;
         let result = self
             .dataset_repo
             .create_dataset_from_snapshot(
@@ -625,6 +630,7 @@ impl FlowConfigurationHarness {
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
+                publicly_available,
             )
             .await
             .unwrap();
