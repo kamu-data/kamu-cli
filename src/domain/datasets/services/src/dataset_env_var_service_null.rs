@@ -25,14 +25,13 @@ use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetEnvVarServiceStaticImpl {}
+pub struct DatasetEnvVarServiceNull {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn DatasetEnvVarService)]
-impl DatasetEnvVarServiceStaticImpl {
-    #[allow(clippy::needless_pass_by_value)]
+impl DatasetEnvVarServiceNull {
     pub fn new() -> Self {
         Self {}
     }
@@ -41,7 +40,7 @@ impl DatasetEnvVarServiceStaticImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DatasetEnvVarService for DatasetEnvVarServiceStaticImpl {
+impl DatasetEnvVarService for DatasetEnvVarServiceNull {
     async fn create_dataset_env_var(
         &self,
         _dataset_env_var_key: &str,

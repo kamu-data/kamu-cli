@@ -580,8 +580,8 @@ pub fn register_config_in_catalog(
     let dataset_env_vars_config = config.dataset_env_vars.as_ref().unwrap();
     match dataset_env_vars_config.mode.as_ref().unwrap() {
         DatasetEnvVarsType::Static => {
-            catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceStaticImpl>();
-            catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceStaticImpl>();
+            catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceSysEnv>();
+            catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceNull>();
         }
         DatasetEnvVarsType::Storage => {
             assert!(
