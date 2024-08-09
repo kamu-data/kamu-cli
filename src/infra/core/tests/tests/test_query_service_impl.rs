@@ -27,6 +27,8 @@ use kamu::testing::{
 use kamu::utils::s3_context::S3Context;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::*;
 use tempfile::TempDir;
@@ -138,6 +140,8 @@ fn create_catalog_with_local_workspace(
         .add_value(CurrentAccountSubject::new_test())
         .add_value(dataset_action_authorizer)
         .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
+        .add::<RebacRepositoryInMem>()
+        .add::<RebacServiceImpl>()
         .build()
 }
 
@@ -167,6 +171,8 @@ async fn create_catalog_with_s3_workspace(
         .add_value(CurrentAccountSubject::new_test())
         .add_value(dataset_action_authorizer)
         .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
+        .add::<RebacRepositoryInMem>()
+        .add::<RebacServiceImpl>()
         .build()
 }
 

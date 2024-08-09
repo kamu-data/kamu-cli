@@ -26,6 +26,8 @@ use kamu::{
 };
 use kamu_accounts::*;
 use messaging_outbox::DummyOutboxImpl;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetHandle, DatasetKind, DatasetName, DatasetRef};
 use time_source::SystemTimeSourceDefault;
@@ -238,7 +240,9 @@ impl ServerHarness {
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
                 .add::<CreateDatasetUseCaseImpl>()
-                .add::<DatabaseTransactionRunner>();
+                .add::<DatabaseTransactionRunner>()
+                .add::<RebacRepositoryInMem>()
+                .add::<RebacServiceImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

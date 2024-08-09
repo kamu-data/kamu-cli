@@ -15,9 +15,13 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use opendatafabric::*;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_reset_dataset_with_2revisions_drop_last() {
@@ -44,6 +48,8 @@ async fn test_reset_dataset_with_2revisions_drop_last() {
     assert_eq!(new_head, summary.last_block_hash);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_reset_dataset_with_2revisions_without_changes() {
     let harness = ResetTestHarness::new();
@@ -68,6 +74,8 @@ async fn test_reset_dataset_with_2revisions_without_changes() {
     let summary = harness.get_dataset_summary(&test_case.dataset_handle).await;
     assert_eq!(current_head, summary.last_block_hash);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_reset_dataset_to_non_existing_block_fails() {
@@ -179,6 +187,8 @@ impl ResetTestHarness {
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<ResetServiceImpl>()
+            .add::<RebacRepositoryInMem>()
+            .add::<RebacServiceImpl>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
@@ -245,3 +255,5 @@ impl ResetTestHarness {
         self.dataset_repo.get_dataset_by_handle(dataset_handle)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

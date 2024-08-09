@@ -36,6 +36,8 @@ oso-derive = "0.27"
 
 [dev-dependencies]
 kamu = { workspace = true }
+kamu-auth-rebac-inmem = { workspace = true }
+kamu-auth-rebac-services = { workspace = true }
 time-source = { workspace = true }
 
 tempfile = "3"
