@@ -30,11 +30,11 @@ pub trait DatasetEntryRepository: Send + Sync {
     async fn save_dataset_entry(&self, dataset: &DatasetEntry)
         -> Result<(), SaveDatasetEntryError>;
 
-    async fn update_dataset_entry_alias(
+    async fn update_dataset_entry_name(
         &self,
         dataset_id: &DatasetID,
-        new_alias: &DatasetName,
-    ) -> Result<(), UpdateDatasetEntryAliasError>;
+        new_name: &DatasetName,
+    ) -> Result<(), UpdateDatasetEntryNameError>;
 
     async fn delete_dataset_entry(
         &self,
@@ -88,7 +88,7 @@ impl SaveDatasetEntryErrorDuplicate {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum UpdateDatasetEntryAliasError {
+pub enum UpdateDatasetEntryNameError {
     #[error(transparent)]
     NotFound(#[from] DatasetEntryNotFoundError),
 

@@ -17,7 +17,7 @@ use kamu_datasets::{
     DeleteEntryDatasetError,
     GetDatasetEntryError,
     SaveDatasetEntryError,
-    UpdateDatasetEntryAliasError,
+    UpdateDatasetEntryNameError,
 };
 use opendatafabric::{AccountID, DatasetID, DatasetName};
 
@@ -154,17 +154,17 @@ pub async fn test_try_set_same_dataset_alias(catalog: &Catalog) {
 
         assert_matches!(save_res, Ok(_));
     }
-    let same_alias = dataset_entry.alias;
+    let same_name = dataset_entry.name;
     {
         let update_res = dataset_entry_repo
-            .update_dataset_entry_alias(&dataset_entry.id, &same_alias)
+            .update_dataset_entry_name(&dataset_entry.id, &same_name)
             .await;
 
         assert_matches!(
             update_res,
-            Err(UpdateDatasetEntryAliasError::SameAlias(e))
+            Err(UpdateDatasetEntryNameError::SameAlias(e))
                 if e.dataset_id == dataset_entry.id
-                    && e.dataset_alias == same_alias
+                    && e.dataset_name == same_name
         );
     }
 }
@@ -178,12 +178,12 @@ pub async fn test_update_same_dataset_alias(catalog: &Catalog) {
     let new_alias = DatasetName::new_unchecked("new-alias");
     {
         let update_res = dataset_entry_repo
-            .update_dataset_entry_alias(&dataset_entry.id, &new_alias)
+            .update_dataset_entry_name(&dataset_entry.id, &new_alias)
             .await;
 
         assert_matches!(
             update_res,
-            Err(UpdateDatasetEntryAliasError::NotFound(DatasetEntryNotFoundError::ByDatasetId(actual_dataset_id)))
+            Err(UpdateDatasetEntryNameError::NotFound(DatasetEntryNotFoundError::ByDatasetId(actual_dataset_id)))
                 if actual_dataset_id == dataset_entry.id
         );
     }
@@ -194,7 +194,7 @@ pub async fn test_update_same_dataset_alias(catalog: &Catalog) {
     }
     {
         let update_res = dataset_entry_repo
-            .update_dataset_entry_alias(&dataset_entry.id, &new_alias)
+            .update_dataset_entry_name(&dataset_entry.id, &new_alias)
             .await;
 
         assert_matches!(update_res, Ok(_));
