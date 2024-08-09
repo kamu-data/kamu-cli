@@ -21,13 +21,13 @@ use secrecy::Secret;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetKeyValueServiceStaticImpl {}
+pub struct DatasetKeyValueServiceSysEnv {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn DatasetKeyValueService)]
-impl DatasetKeyValueServiceStaticImpl {
+impl DatasetKeyValueServiceSysEnv {
     pub fn new() -> Self {
         Self {}
     }
@@ -36,7 +36,7 @@ impl DatasetKeyValueServiceStaticImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DatasetKeyValueService for DatasetKeyValueServiceStaticImpl {
+impl DatasetKeyValueService for DatasetKeyValueServiceSysEnv {
     async fn find_dataset_env_var_value_by_key<'a>(
         &self,
         dataset_env_var_key: &str,
