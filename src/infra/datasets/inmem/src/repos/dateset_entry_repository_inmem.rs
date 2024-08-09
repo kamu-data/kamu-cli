@@ -13,7 +13,6 @@ use std::sync::Arc;
 use dill::{component, interface, scope, Singleton};
 use kamu_datasets::{
     DatasetEntry,
-    DatasetEntryNameCollisionError,
     DatasetEntryNotFoundError,
     DatasetEntryRepository,
     DeleteEntryDatasetError,
@@ -133,10 +132,6 @@ impl DatasetEntryRepository for DatasetEntryRepositoryInMemory {
         let Some(dataset_entry) = maybe_dataset_entry else {
             return Err(DatasetEntryNotFoundError::ByDatasetId(dataset_id.clone()).into());
         };
-
-        if dataset_entry.name == *new_name {
-            return Err(DatasetEntryNameCollisionError::new(new_name.clone()).into());
-        }
 
         dataset_entry.name = new_name.clone();
 

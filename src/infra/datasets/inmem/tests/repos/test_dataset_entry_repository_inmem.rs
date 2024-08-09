@@ -41,15 +41,6 @@ async fn test_try_save_duplicate_dataset_entry() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_try_set_same_dataset_name() {
-    let harness = InmemDatasetEntryRepositoryHarness::new();
-
-    dataset_entry_repo::test_try_set_same_dataset_name(&harness.catalog).await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
 async fn test_update_same_dataset_alias() {
     let harness = InmemDatasetEntryRepositoryHarness::new();
 
