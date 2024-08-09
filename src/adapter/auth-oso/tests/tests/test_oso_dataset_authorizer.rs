@@ -17,6 +17,8 @@ use kamu::testing::MetadataFactory;
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_auth_oso::{KamuAuthOso, OsoDatasetAuthorizer};
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::{AccessError, DatasetRepository, SystemTimeSourceDefault};
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle, DatasetKind};
@@ -122,6 +124,8 @@ impl DatasetAuthorizerHarness {
                     .with_multi_tenant(true),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add::<RebacRepositoryInMem>()
+            .add::<RebacServiceImpl>()
             .build();
 
         let dataset_repository = catalog.get_one::<dyn DatasetRepository>().unwrap();

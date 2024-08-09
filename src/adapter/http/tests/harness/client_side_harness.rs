@@ -17,6 +17,8 @@ use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_http::SmartTransferProtocolClientWs;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_datasets_services::DatasetKeyValueServiceStaticImpl;
 use opendatafabric::{
     AccountID,
@@ -128,6 +130,9 @@ impl ClientSideHarness {
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
         b.add_value(IpfsGateway::default());
+
+        b.add::<RebacRepositoryInMem>();
+        b.add::<RebacServiceImpl>();
 
         let catalog = b.build();
 

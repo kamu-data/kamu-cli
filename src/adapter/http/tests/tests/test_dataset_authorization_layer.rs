@@ -20,6 +20,8 @@ use kamu::domain::{DatasetRepository, InternalError, ResultIntoInternal, SystemT
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_accounts::*;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetHandle, DatasetKind, DatasetName, DatasetRef};
 use url::Url;
@@ -229,6 +231,8 @@ impl ServerHarness {
                         .with_root(datasets_dir),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .add::<RebacRepositoryInMem>()
+                .add::<RebacServiceImpl>()
                 .add::<DatabaseTransactionRunner>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);

@@ -21,6 +21,8 @@ use kamu::{
     DependencyGraphServiceInMemory,
 };
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{
     auth,
     DatasetDependencies,
@@ -599,6 +601,8 @@ impl DependencyGraphHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
+            .add::<RebacRepositoryInMem>()
+            .add::<RebacServiceImpl>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();

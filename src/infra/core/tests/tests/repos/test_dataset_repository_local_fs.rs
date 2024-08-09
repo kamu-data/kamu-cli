@@ -15,6 +15,8 @@ use event_bus::EventBus;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::auth;
 use tempfile::TempDir;
 
@@ -49,6 +51,8 @@ impl LocalFsRepoHarness {
                     .with_multi_tenant(multi_tenant),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add::<RebacRepositoryInMem>()
+            .add::<RebacServiceImpl>()
             .build();
 
         let dataset_repo = catalog.get_one().unwrap();

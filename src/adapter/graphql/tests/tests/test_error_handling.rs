@@ -12,7 +12,11 @@ use event_bus::EventBus;
 use indoc::indoc;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_malformed_argument() {
@@ -54,6 +58,8 @@ async fn test_malformed_argument() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_internal_error() {
     let tempdir = tempfile::tempdir().unwrap();
@@ -70,6 +76,8 @@ async fn test_internal_error() {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add::<RebacRepositoryInMem>()
+        .add::<RebacServiceImpl>()
         .build();
 
     // Note: Not creating a repo to cause an error
@@ -109,6 +117,8 @@ async fn test_internal_error() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO: There seems to be an issue with libunwind in a version of XCode used on
 // GitHub's M1 runners which results in error:
 //   libunwind: stepWithCompactEncoding - invalid compact unwind encoding
@@ -133,3 +143,5 @@ async fn test_handler_panics() {
         )).data(dill::CatalogBuilder::new().build()))
         .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

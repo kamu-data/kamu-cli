@@ -13,6 +13,8 @@ use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use opendatafabric::*;
 
@@ -34,6 +36,8 @@ async fn test_search_query() {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add::<RebacRepositoryInMem>()
+        .add::<RebacServiceImpl>()
         .build();
 
     let dataset_repo = cat.get_one::<dyn DatasetRepository>().unwrap();

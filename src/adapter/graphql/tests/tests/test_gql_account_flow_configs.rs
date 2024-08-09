@@ -34,6 +34,8 @@ use kamu::{
 use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_accounts_inmem::AccessTokenRepositoryInMemory;
 use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use kamu_flow_system::FlowServiceRunConfig;
 use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
@@ -686,7 +688,9 @@ impl FlowConfigHarness {
                 .bind::<dyn PollingIngestService, MockPollingIngestService>()
                 .add::<DatasetOwnershipServiceInMemory>()
                 .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
-                .add::<DatabaseTransactionRunner>();
+                .add::<DatabaseTransactionRunner>()
+                .add::<RebacRepositoryInMem>()
+                .add::<RebacServiceImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

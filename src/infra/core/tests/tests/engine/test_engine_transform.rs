@@ -23,8 +23,12 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_datasets_services::DatasetKeyValueServiceStaticImpl;
 use opendatafabric::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DatasetHelper {
     dataset: Arc<dyn Dataset>,
@@ -209,6 +213,8 @@ impl DatasetHelper {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO: Remove `test_retractions` flag once RisingWave can handle them without
 // crashing
 async fn test_transform_common(transform: Transform, test_retractions: bool) {
@@ -251,6 +257,8 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
             Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
         ))
         .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+        .add::<RebacRepositoryInMem>()
+        .add::<RebacServiceImpl>()
         .build();
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
@@ -502,6 +510,8 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized, engine, transform, spark)]
 #[test_log::test(tokio::test)]
 async fn test_transform_with_engine_spark() {
@@ -521,6 +531,8 @@ async fn test_transform_with_engine_spark() {
     )
     .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized, engine, transform, flink)]
 #[test_log::test(tokio::test)]
@@ -544,6 +556,8 @@ async fn test_transform_with_engine_flink() {
     .await;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized, engine, transform, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_transform_with_engine_datafusion() {
@@ -563,6 +577,8 @@ async fn test_transform_with_engine_datafusion() {
     )
     .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // See: https://github.com/kamu-data/kamu-cli/issues/599
 #[test_group::group(containerized, engine, transform, risingwave)]
@@ -584,6 +600,8 @@ async fn test_transform_with_engine_risingwave() {
     )
     .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Accounts for engine-specific quirks in the schema
 fn normalize_schema(s: &DFSchema, engine: &str) -> DFSchema {
@@ -626,3 +644,5 @@ fn normalize_schema(s: &DFSchema, engine: &str) -> DFSchema {
 
     DFSchema::new_with_metadata(fields, s.metadata().clone()).unwrap()
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

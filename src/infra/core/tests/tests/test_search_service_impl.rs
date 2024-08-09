@@ -15,8 +15,12 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use opendatafabric::*;
 use url::Url;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Create repo/bar dataset in a repo and check it appears in searches
 async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
@@ -47,6 +51,8 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<SyncServiceImpl>()
         .add::<DummySmartTransferProtocolClient>()
         .add::<SearchServiceImpl>()
+        .add::<RebacRepositoryInMem>()
+        .add::<RebacServiceImpl>()
         .build();
 
     let remote_repo_reg = catalog.get_one::<dyn RemoteRepositoryRegistry>().unwrap();
@@ -128,6 +134,8 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_search_local_fs() {
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
@@ -137,6 +145,8 @@ async fn test_search_local_fs() {
     do_test_search(tmp_workspace_dir.path(), repo_url).await;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_search_s3() {
@@ -145,3 +155,5 @@ async fn test_search_s3() {
 
     do_test_search(tmp_workspace_dir.path(), s3.url).await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

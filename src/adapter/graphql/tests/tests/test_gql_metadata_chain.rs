@@ -15,6 +15,8 @@ use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use opendatafabric::serde::yaml::YamlMetadataEventSerializer;
 use opendatafabric::*;
@@ -526,7 +528,9 @@ impl GraphQLMetadataChainHarness {
                         .with_multi_tenant(is_multi_tenant),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<RebacRepositoryInMem>()
+                .add::<RebacServiceImpl>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

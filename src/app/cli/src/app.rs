@@ -20,6 +20,8 @@ use kamu_accounts::*;
 use kamu_accounts_services::PredefinedAccountsRegistrator;
 use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
+use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_datasets::{DatasetEnvVar, DatasetEnvVarsType};
 
 use crate::accounts::AccountService;
@@ -258,6 +260,8 @@ pub fn prepare_dependencies_graph_repository(
         .add_value(current_account_subject)
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<DependencyGraphServiceInMemory>()
+        .add::<RebacRepositoryInMem>()
+        .add::<RebacServiceImpl>()
         // Don't add its own initializer, leave optional dependency uninitialized
         .build();
 
@@ -387,6 +391,9 @@ pub fn configure_base_catalog(
     b.add::<UploadServiceLocal>();
 
     b.add::<DatabaseTransactionRunner>();
+
+    b.add::<RebacRepositoryInMem>();
+    b.add::<RebacServiceImpl>();
 
     b
 }
