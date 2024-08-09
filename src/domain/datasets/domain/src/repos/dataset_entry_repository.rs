@@ -93,25 +93,21 @@ pub enum UpdateDatasetEntryNameError {
     NotFound(#[from] DatasetEntryNotFoundError),
 
     #[error(transparent)]
-    SameAlias(#[from] DatasetEntryAliasSameError),
+    NameCollision(#[from] DatasetEntryNameCollisionError),
 
     #[error(transparent)]
     Internal(InternalError),
 }
 
 #[derive(Error, Debug)]
-#[error("Dataset entry with dataset_id '{dataset_id}' same alias '{dataset_alias}' update attempt")]
-pub struct DatasetEntryAliasSameError {
-    pub dataset_id: DatasetID,
-    pub dataset_alias: DatasetName,
+#[error("Dataset entry with name {dataset_name} already exists")]
+pub struct DatasetEntryNameCollisionError {
+    pub dataset_name: DatasetName,
 }
 
-impl DatasetEntryAliasSameError {
-    pub fn new(dataset_id: DatasetID, dataset_alias: DatasetName) -> Self {
-        Self {
-            dataset_id,
-            dataset_alias,
-        }
+impl DatasetEntryNameCollisionError {
+    pub fn new(dataset_name: DatasetName) -> Self {
+        Self { dataset_name }
     }
 }
 

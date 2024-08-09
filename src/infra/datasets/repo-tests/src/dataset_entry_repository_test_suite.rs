@@ -145,7 +145,7 @@ pub async fn test_try_save_duplicate_dataset_entry(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_try_set_same_dataset_alias(catalog: &Catalog) {
+pub async fn test_try_set_same_dataset_name(catalog: &Catalog) {
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
     let dataset_entry = new_dataset_entry();
@@ -162,9 +162,8 @@ pub async fn test_try_set_same_dataset_alias(catalog: &Catalog) {
 
         assert_matches!(
             update_res,
-            Err(UpdateDatasetEntryNameError::SameAlias(e))
-                if e.dataset_id == dataset_entry.id
-                    && e.dataset_name == same_name
+            Err(UpdateDatasetEntryNameError::NameCollision(e))
+                if e.dataset_name == same_name
         );
     }
 }
