@@ -13,11 +13,13 @@ use std::sync::Arc;
 use dill::{component, interface, scope, Singleton};
 use kamu_datasets::{
     DatasetEntry,
+    DatasetEntryByNameNotFoundError,
     DatasetEntryNameCollisionError,
     DatasetEntryNotFoundError,
     DatasetEntryRepository,
     DeleteEntryDatasetError,
     GetDatasetEntriesByOwnerIdError,
+    GetDatasetEntryByNameError,
     GetDatasetEntryError,
     SaveDatasetEntryError,
     SaveDatasetEntryErrorDuplicate,
@@ -77,12 +79,31 @@ impl DatasetEntryRepository for DatasetEntryRepositoryInMemory {
         Ok(dataset_entry.clone())
     }
 
+    async fn get_dataset_entry_by_name(
+        &self,
+        owner_id: &AccountID,
+        name: &DatasetName,
+    ) -> Result<DatasetEntry, GetDatasetEntryByNameError> {
+        let readable_state = self.state.read().await;
+
+        let maybe_dataset_entry = readable_state
+            .rows
+            .values()
+            .find(|dataset| dataset.owner_id == *owner_id && dataset.name == *name);
+
+        let Some(dataset_entry) = maybe_dataset_entry else {
+            return Err(
+                DatasetEntryByNameNotFoundError::new(owner_id.clone(), name.clone()).into(),
+            );
+        };
+
+        Ok(dataset_entry.clone())
+    }
+
     async fn get_dataset_entries_by_owner_id(
         &self,
         owner_id: &AccountID,
     ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByOwnerIdError> {
-        // TODO: PERF: Slow implementation -- to reconsider if it starts to cause us
-        //             trouble
         let readable_state = self.state.read().await;
 
         let dataset_entries = readable_state

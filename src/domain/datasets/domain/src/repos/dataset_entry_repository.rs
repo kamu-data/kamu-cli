@@ -22,6 +22,12 @@ pub trait DatasetEntryRepository: Send + Sync {
         dataset_id: &DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError>;
 
+    async fn get_dataset_entry_by_name(
+        &self,
+        owner_id: &AccountID,
+        name: &DatasetName,
+    ) -> Result<DatasetEntry, GetDatasetEntryByNameError>;
+
     async fn get_dataset_entries_by_owner_id(
         &self,
         owner_id: &AccountID,
@@ -62,6 +68,33 @@ pub struct DatasetEntryNotFoundError {
 impl DatasetEntryNotFoundError {
     pub fn new(dataset_id: DatasetID) -> Self {
         Self { dataset_id }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetDatasetEntryByNameError {
+    #[error(transparent)]
+    NotFound(#[from] DatasetEntryByNameNotFoundError),
+
+    #[error(transparent)]
+    Internal(InternalError),
+}
+
+#[derive(Error, Debug)]
+#[error("Dataset entry with owner_id '{owner_id}' and name '{dataset_name}' not found")]
+pub struct DatasetEntryByNameNotFoundError {
+    pub owner_id: AccountID,
+    pub dataset_name: DatasetName,
+}
+
+impl DatasetEntryByNameNotFoundError {
+    pub fn new(owner_id: AccountID, dataset_name: DatasetName) -> Self {
+        Self {
+            owner_id,
+            dataset_name,
+        }
     }
 }
 

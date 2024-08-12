@@ -23,6 +23,15 @@ async fn test_get_dataset_entry() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_get_dataset_entry_by_name() {
+    let harness = InmemDatasetEntryRepositoryHarness::new();
+
+    dataset_entry_repo::test_get_dataset_entry_by_name(&harness.catalog).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_get_dataset_entries_by_owner_id() {
     let harness = InmemDatasetEntryRepositoryHarness::new();
 

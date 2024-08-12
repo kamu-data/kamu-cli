@@ -12,9 +12,11 @@ use std::assert_matches::assert_matches;
 use dill::Catalog;
 use kamu_datasets::{
     DatasetEntry,
+    DatasetEntryByNameNotFoundError,
     DatasetEntryNotFoundError,
     DatasetEntryRepository,
     DeleteEntryDatasetError,
+    GetDatasetEntryByNameError,
     GetDatasetEntryError,
     SaveDatasetEntryError,
     UpdateDatasetEntryNameError,
@@ -46,6 +48,45 @@ pub async fn test_get_dataset_entry(catalog: &Catalog) {
     {
         let get_res = dataset_entry_repo
             .get_dataset_entry(&dataset_entry.id)
+            .await;
+
+        assert_matches!(
+            get_res,
+            Ok(actual_dataset_entry)
+                if actual_dataset_entry == dataset_entry
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_get_dataset_entry_by_name(catalog: &Catalog) {
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+
+    let dataset_entry = new_dataset_entry();
+    {
+        let get_res = dataset_entry_repo
+            .get_dataset_entry_by_name(&dataset_entry.owner_id, &dataset_entry.name)
+            .await;
+
+        assert_matches!(
+            get_res,
+            Err(GetDatasetEntryByNameError::NotFound(DatasetEntryByNameNotFoundError {
+                owner_id: actual_owner_id,
+                dataset_name: actual_dataset_name
+            }))
+                if actual_owner_id == dataset_entry.owner_id
+                    && actual_dataset_name == dataset_entry.name
+        );
+    }
+    {
+        let save_res = dataset_entry_repo.save_dataset_entry(&dataset_entry).await;
+
+        assert_matches!(save_res, Ok(_));
+    }
+    {
+        let get_res = dataset_entry_repo
+            .get_dataset_entry_by_name(&dataset_entry.owner_id, &dataset_entry.name)
             .await;
 
         assert_matches!(
