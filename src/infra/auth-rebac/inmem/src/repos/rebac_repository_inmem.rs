@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{HashMap, HashSet};
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::Hash;
 use std::sync::Arc;
 
 use dill::{component, interface, scope, Singleton};
@@ -29,46 +29,25 @@ use kamu_auth_rebac::{
     SubjectEntityRelationsByObjectTypeError,
     SubjectEntityRelationsError,
 };
-use tokio::sync::{RwLock, RwLockReadGuard};
+use tokio::sync::RwLock;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: remove
-type EntityHash = u64;
 type EntityProperties = HashMap<PropertyName, PropertyValue<'static>>;
-
 type EntitiesPropertiesMap = HashMap<Entity<'static>, EntityProperties>;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-type IndexEntitiesRelationsRowHash = u64;
-type RowId = u64; /* hash */
-
-type RowsIndex = HashMap<IndexEntitiesRelationsRowHash, HashSet<RowId>>;
-
-// From a usability point of view, we would prefer to store self-calculated
-// hashes rather than fight with the borrow checker during using indexes.
-#[derive(Default)]
-struct EntitiesRelationsState {
-    rows: HashMap<RowId, EntitiesRelationsRow>,
-    index_subject_entity: RowsIndex,
-    index_subject_entity_object_type: RowsIndex,
-    index_subject_entity_object_entity: RowsIndex,
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 struct State {
     entities_properties_map: EntitiesPropertiesMap,
+    entities_relations_rows: HashSet<EntitiesRelationsRow>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RebacRepositoryInMem {
     state: Arc<RwLock<State>>,
-    // TODO: absorb into state
-    entities_relations_state: Arc<RwLock<EntitiesRelationsState>>,
 }
 
 #[component(pub)]
@@ -78,41 +57,20 @@ impl RebacRepositoryInMem {
     pub fn new() -> Self {
         Self {
             state: Default::default(),
-            entities_relations_state: Arc::new(RwLock::new(EntitiesRelationsState::default())),
         }
     }
 
-    fn get_entities_relations_by_row_ids<'a>(
-        &self,
-        row_ids: &'a HashSet<RowId>,
-        rw_lock_read_guard: &'a RwLockReadGuard<'a, EntitiesRelationsState>,
-    ) -> Vec<&'a EntitiesRelationsRow> {
-        let mut rows = Vec::with_capacity(row_ids.len());
+    async fn get_rows<F, R>(&self, filter_map_predicate: F) -> Vec<R>
+    where
+        F: Fn(&EntitiesRelationsRow) -> Option<R>,
+    {
+        let readable_state = self.state.read().await;
 
-        for row_id in row_ids {
-            let Some(row) = rw_lock_read_guard.rows.get(row_id) else {
-                unreachable!()
-            };
-
-            rows.push(row);
-        }
-
-        rows
-    }
-
-    fn remove_row_id_from_index(
-        &self,
-        row_id: RowId,
-        index: &mut RowsIndex,
-        index_hash: IndexEntitiesRelationsRowHash,
-    ) {
-        let row_ids = index.get_mut(&index_hash).unwrap();
-
-        assert!(row_ids.remove(&row_id));
-
-        if row_ids.is_empty() {
-            index.remove(&index_hash);
-        }
+        readable_state
+            .entities_relations_rows
+            .iter()
+            .filter_map(filter_map_predicate)
+            .collect()
     }
 }
 
@@ -172,13 +130,13 @@ impl RebacRepository for RebacRepositoryInMem {
         let maybe_entity_properties = readable_state.entities_properties_map.get(entity);
 
         let Some(entity_properties) = maybe_entity_properties else {
-            return Err(GetEntityPropertiesError::entity_not_found(entity));
+            return Ok(vec![]);
         };
 
         let properties = entity_properties
             .iter()
             .map(|(name, value)| (*name, value.clone()))
-            .collect::<Vec<_>>();
+            .collect();
 
         Ok(properties)
     }
@@ -189,12 +147,10 @@ impl RebacRepository for RebacRepositoryInMem {
         relationship: Relation,
         object_entity: &Entity,
     ) -> Result<(), InsertEntitiesRelationError> {
-        let row_id =
-            EntityHasher::entities_relations_row_hash(subject_entity, relationship, object_entity);
+        let mut writable_state = self.state.write().await;
 
-        let mut writable_state = self.entities_relations_state.write().await;
-
-        let is_duplicate = writable_state.rows.contains_key(&row_id);
+        let row = EntitiesRelationsRow::new(subject_entity, relationship, object_entity);
+        let is_duplicate = writable_state.entities_relations_rows.contains(&row);
 
         if is_duplicate {
             return Err(InsertEntitiesRelationError::duplicate(
@@ -204,48 +160,7 @@ impl RebacRepository for RebacRepositoryInMem {
             ));
         }
 
-        // Save a row
-
-        let row =
-            EntitiesRelationsRow::new(subject_entity.clone(), relationship, object_entity.clone());
-
-        writable_state.rows.insert(row_id, row);
-
-        // Update indexes
-
-        {
-            let index_hash = EntityHasher::subject_entity_index_hash(subject_entity);
-
-            writable_state
-                .index_subject_entity
-                .entry(index_hash)
-                .or_insert_with(HashSet::new)
-                .insert(row_id);
-        }
-        {
-            let index_hash = EntityHasher::subject_entity_object_type_index_hash(
-                subject_entity,
-                object_entity.entity_type,
-            );
-
-            writable_state
-                .index_subject_entity_object_type
-                .entry(index_hash)
-                .or_insert_with(HashSet::new)
-                .insert(row_id);
-        }
-        {
-            let index_hash = EntityHasher::subject_entity_object_entity_index_hash(
-                subject_entity,
-                object_entity,
-            );
-
-            writable_state
-                .index_subject_entity_object_entity
-                .entry(index_hash)
-                .or_insert_with(HashSet::new)
-                .insert(row_id);
-        }
+        writable_state.entities_relations_rows.insert(row);
 
         Ok(())
     }
@@ -256,12 +171,10 @@ impl RebacRepository for RebacRepositoryInMem {
         relationship: Relation,
         object_entity: &Entity,
     ) -> Result<(), DeleteEntitiesRelationError> {
-        let row_id =
-            EntityHasher::entities_relations_row_hash(subject_entity, relationship, object_entity);
+        let mut writable_state = self.state.write().await;
 
-        let mut writable_state = self.entities_relations_state.write().await;
-
-        let not_found = writable_state.rows.remove(&row_id).is_none();
+        let row = EntitiesRelationsRow::new(subject_entity, relationship, object_entity);
+        let not_found = !writable_state.entities_relations_rows.remove(&row);
 
         if not_found {
             return Err(DeleteEntitiesRelationError::not_found(
@@ -271,40 +184,6 @@ impl RebacRepository for RebacRepositoryInMem {
             ));
         }
 
-        {
-            let index_hash = EntityHasher::subject_entity_index_hash(subject_entity);
-
-            self.remove_row_id_from_index(
-                row_id,
-                &mut writable_state.index_subject_entity,
-                index_hash,
-            );
-        }
-        {
-            let index_hash = EntityHasher::subject_entity_object_type_index_hash(
-                subject_entity,
-                object_entity.entity_type,
-            );
-
-            self.remove_row_id_from_index(
-                row_id,
-                &mut writable_state.index_subject_entity_object_type,
-                index_hash,
-            );
-        }
-        {
-            let index_hash = EntityHasher::subject_entity_object_entity_index_hash(
-                subject_entity,
-                object_entity,
-            );
-
-            self.remove_row_id_from_index(
-                row_id,
-                &mut writable_state.index_subject_entity_object_entity,
-                index_hash,
-            );
-        }
-
         Ok(())
     }
 
@@ -312,28 +191,18 @@ impl RebacRepository for RebacRepositoryInMem {
         &self,
         subject_entity: &Entity,
     ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsError> {
-        let index_hash = EntityHasher::subject_entity_index_hash(subject_entity);
-
-        let readable_state = self.entities_relations_state.read().await;
-
-        let maybe_row_ids = readable_state.index_subject_entity.get(&index_hash);
-
-        let Some(row_ids) = maybe_row_ids else {
-            return Err(SubjectEntityRelationsError::not_found(subject_entity));
-        };
-
-        let rows = self.get_entities_relations_by_row_ids(row_ids, &readable_state);
-        let res = rows
-            .into_iter()
-            .map(|row| {
-                let entity = Entity::new(
-                    row.object_entity.entity_type,
-                    row.object_entity.entity_id.clone(),
-                );
-
-                ObjectEntityWithRelation::new(entity, row.relationship)
+        let res = self
+            .get_rows(|row| {
+                if row.subject_entity == *subject_entity {
+                    Some(ObjectEntityWithRelation::new(
+                        row.object_entity.clone(),
+                        row.relationship,
+                    ))
+                } else {
+                    None
+                }
             })
-            .collect();
+            .await;
 
         Ok(res)
     }
@@ -343,34 +212,20 @@ impl RebacRepository for RebacRepositoryInMem {
         subject_entity: &Entity,
         object_entity_type: EntityType,
     ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsByObjectTypeError> {
-        let index_hash =
-            EntityHasher::subject_entity_object_type_index_hash(subject_entity, object_entity_type);
-
-        let readable_state = self.entities_relations_state.read().await;
-
-        let maybe_row_ids = readable_state
-            .index_subject_entity_object_type
-            .get(&index_hash);
-
-        let Some(row_ids) = maybe_row_ids else {
-            return Err(SubjectEntityRelationsByObjectTypeError::not_found(
-                subject_entity,
-                object_entity_type,
-            ));
-        };
-
-        let rows = self.get_entities_relations_by_row_ids(row_ids, &readable_state);
-        let res = rows
-            .into_iter()
-            .map(|row| {
-                let entity = Entity::new(
-                    row.object_entity.entity_type,
-                    row.object_entity.entity_id.clone(),
-                );
-
-                ObjectEntityWithRelation::new(entity, row.relationship)
+        let res = self
+            .get_rows(|row| {
+                if row.subject_entity == *subject_entity
+                    && row.object_entity.entity_type == object_entity_type
+                {
+                    Some(ObjectEntityWithRelation::new(
+                        row.object_entity.clone(),
+                        row.relationship,
+                    ))
+                } else {
+                    None
+                }
             })
-            .collect();
+            .await;
 
         Ok(res)
     }
@@ -380,24 +235,15 @@ impl RebacRepository for RebacRepositoryInMem {
         subject_entity: &Entity,
         object_entity: &Entity,
     ) -> Result<Vec<Relation>, GetRelationsBetweenEntitiesError> {
-        let index_hash =
-            EntityHasher::subject_entity_object_entity_index_hash(subject_entity, object_entity);
-
-        let readable_state = self.entities_relations_state.read().await;
-
-        let maybe_row_ids = readable_state
-            .index_subject_entity_object_entity
-            .get(&index_hash);
-
-        let Some(row_ids) = maybe_row_ids else {
-            return Err(GetRelationsBetweenEntitiesError::not_found(
-                subject_entity,
-                object_entity,
-            ));
-        };
-
-        let rows = self.get_entities_relations_by_row_ids(row_ids, &readable_state);
-        let res = rows.into_iter().map(|row| row.relationship).collect();
+        let res = self
+            .get_rows(|row| {
+                if row.subject_entity == *subject_entity && row.object_entity == *object_entity {
+                    Some(row.relationship)
+                } else {
+                    None
+                }
+            })
+            .await;
 
         Ok(res)
     }
@@ -405,103 +251,24 @@ impl RebacRepository for RebacRepositoryInMem {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-struct EntityRow {
-    pub entity_type: EntityType,
-    pub entity_id: String,
-}
-
-impl<'a> From<Entity<'a>> for EntityRow {
-    fn from(value: Entity<'a>) -> Self {
-        Self {
-            entity_type: value.entity_type,
-            entity_id: value.entity_id.to_string(),
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct EntitiesRelationsRow {
-    #[allow(dead_code)]
-    subject_entity: EntityRow,
+    subject_entity: Entity<'static>,
     relationship: Relation,
-    object_entity: EntityRow,
+    object_entity: Entity<'static>,
 }
 
 impl EntitiesRelationsRow {
     pub fn new(
-        subject_entity: Entity<'_>,
+        subject_entity: &Entity<'_>,
         relationship: Relation,
-        object_entity: Entity<'_>,
+        object_entity: &Entity<'_>,
     ) -> Self {
         Self {
-            subject_entity: subject_entity.into(),
+            subject_entity: subject_entity.clone().into_owned(),
             relationship,
-            object_entity: object_entity.into(),
+            object_entity: object_entity.clone().into_owned(),
         }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// EntityHasher
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// TODO: remove
-struct EntityHasher {}
-
-impl EntityHasher {
-    pub fn entity_hash(entity: &Entity) -> EntityHash {
-        let mut hasher = DefaultHasher::new();
-
-        entity.hash(&mut hasher);
-
-        hasher.finish()
-    }
-
-    pub fn entities_relations_row_hash(
-        subject_entity: &Entity,
-        relationship: Relation,
-        object_entity: &Entity,
-    ) -> RowId {
-        let mut hasher = DefaultHasher::new();
-
-        subject_entity.hash(&mut hasher);
-        relationship.hash(&mut hasher);
-        object_entity.hash(&mut hasher);
-
-        hasher.finish()
-    }
-
-    pub fn subject_entity_index_hash(subject_entity: &Entity) -> IndexEntitiesRelationsRowHash {
-        let mut hasher = DefaultHasher::new();
-
-        subject_entity.hash(&mut hasher);
-
-        hasher.finish()
-    }
-
-    pub fn subject_entity_object_type_index_hash(
-        subject_entity: &Entity,
-        object_entity_type: EntityType,
-    ) -> IndexEntitiesRelationsRowHash {
-        let mut hasher = DefaultHasher::new();
-
-        subject_entity.hash(&mut hasher);
-        object_entity_type.hash(&mut hasher);
-
-        hasher.finish()
-    }
-
-    pub fn subject_entity_object_entity_index_hash(
-        subject_entity: &Entity,
-        object_entity: &Entity,
-    ) -> IndexEntitiesRelationsRowHash {
-        let mut hasher = DefaultHasher::new();
-
-        subject_entity.hash(&mut hasher);
-        object_entity.hash(&mut hasher);
-
-        hasher.finish()
     }
 }
 
