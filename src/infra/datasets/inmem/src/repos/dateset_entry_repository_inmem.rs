@@ -17,6 +17,7 @@ use kamu_datasets::{
     DatasetEntryNotFoundError,
     DatasetEntryRepository,
     DeleteEntryDatasetError,
+    GetDatasetEntriesByOwnerIdError,
     GetDatasetEntryError,
     SaveDatasetEntryError,
     SaveDatasetEntryErrorDuplicate,
@@ -79,7 +80,7 @@ impl DatasetEntryRepository for DatasetEntryRepositoryInMemory {
     async fn get_dataset_entries_by_owner_id(
         &self,
         owner_id: &AccountID,
-    ) -> Result<Vec<DatasetEntry>, GetDatasetEntryError> {
+    ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByOwnerIdError> {
         // TODO: PERF: Slow implementation -- to reconsider if it starts to cause us
         //             trouble
         let readable_state = self.state.read().await;

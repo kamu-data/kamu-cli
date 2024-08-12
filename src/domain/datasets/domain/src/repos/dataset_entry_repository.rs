@@ -25,7 +25,7 @@ pub trait DatasetEntryRepository: Send + Sync {
     async fn get_dataset_entries_by_owner_id(
         &self,
         owner_id: &AccountID,
-    ) -> Result<Vec<DatasetEntry>, GetDatasetEntryError>;
+    ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByOwnerIdError>;
 
     async fn save_dataset_entry(&self, dataset: &DatasetEntry)
         -> Result<(), SaveDatasetEntryError>;
@@ -63,6 +63,14 @@ impl DatasetEntryNotFoundError {
     pub fn new(dataset_id: DatasetID) -> Self {
         Self { dataset_id }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetDatasetEntriesByOwnerIdError {
+    #[error(transparent)]
+    Internal(InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
