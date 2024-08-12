@@ -104,6 +104,31 @@ async fn test_reset_dataset_with_wrong_head() {
     assert_matches!(result, Err(ResetError::OldHeadMismatch(_)));
 }
 
+#[test_log::test(tokio::test)]
+async fn test_reset_dataset_with_default_seed_block() {
+    let harness = ResetTestHarness::new();
+    let test_case = harness.a_chain_with_2_blocks().await;
+
+    let current_head = harness.get_dataset_head(&test_case.dataset_handle).await;
+    assert_eq!(test_case.hash_polling_source_block, current_head);
+
+    let result = harness
+        .reset_svc
+        .reset_dataset(
+            &test_case.dataset_handle,
+            None,
+            Some(&test_case.hash_polling_source_block),
+        )
+        .await;
+    assert!(result.is_ok());
+
+    let new_head = harness.get_dataset_head(&test_case.dataset_handle).await;
+    assert_eq!(test_case.hash_seed_block, new_head);
+
+    let summary = harness.get_dataset_summary(&test_case.dataset_handle).await;
+    assert_eq!(new_head, summary.last_block_hash);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct ChainWith2BlocksTestCase {
