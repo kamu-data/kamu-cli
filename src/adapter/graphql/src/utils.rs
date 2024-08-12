@@ -113,7 +113,7 @@ pub(crate) async fn get_task(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn ensure_dataset_env_vars_mode(ctx: &Context<'_>) -> Result<(), GqlError> {
+pub(crate) fn ensure_dataset_env_vars_enabled(ctx: &Context<'_>) -> Result<(), GqlError> {
     let dataset_env_vars_config = from_catalog::<DatasetEnvVarsConfig>(ctx).unwrap();
     if !dataset_env_vars_config.as_ref().is_enabled() {
         return Err(GqlError::Gql(async_graphql::Error::new(
