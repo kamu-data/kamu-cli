@@ -14,11 +14,73 @@ use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait]
+pub trait RebacRepository: Send + Sync {
+    // Properties
+
+    async fn set_entity_property(
+        &self,
+        entity: &Entity,
+        property: PropertyName,
+        property_value: &PropertyValue,
+    ) -> Result<(), SetEntityPropertyError>;
+
+    async fn delete_entity_property(
+        &self,
+        entity: &Entity,
+        property_name: PropertyName,
+    ) -> Result<(), DeleteEntityPropertyError>;
+
+    async fn get_entity_properties(
+        &self,
+        entity: &Entity,
+    ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError>;
+
+    // Relations
+
+    async fn insert_entities_relation(
+        &self,
+        subject_entity: &Entity,
+        relationship: Relation,
+        object_entity: &Entity,
+    ) -> Result<(), InsertEntitiesRelationError>;
+
+    async fn delete_entities_relation(
+        &self,
+        subject_entity: &Entity,
+        relationship: Relation,
+        object_entity: &Entity,
+    ) -> Result<(), DeleteEntitiesRelationError>;
+
+    async fn get_subject_entity_relations(
+        &self,
+        subject_entity: &Entity,
+    ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsError>;
+
+    async fn get_subject_entity_relations_by_object_type(
+        &self,
+        subject_entity: &Entity,
+        object_entity_type: EntityType,
+    ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsByObjectTypeError>;
+
+    async fn get_relations_between_entities(
+        &self,
+        subject_entity: &Entity,
+        object_entity: &Entity,
+    ) -> Result<Vec<Relation>, GetRelationsBetweenEntitiesError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DTOs
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum EntityType {
     Dataset,
     Account,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Entity<'a> {
@@ -42,6 +104,8 @@ impl<'a> Entity<'a> {
         Self::new(EntityType::Dataset, entity_id)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EntityWithRelation<'a> {
@@ -131,64 +195,6 @@ impl From<AccountPropertyName> for PropertyName {
 pub enum Relation {
     AccountDatasetReader,
     AccountDatasetEditor,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-pub trait RebacRepository: Send + Sync {
-    // Properties
-
-    async fn set_entity_property(
-        &self,
-        entity: &Entity,
-        property: PropertyName,
-        property_value: &PropertyValue,
-    ) -> Result<(), SetEntityPropertyError>;
-
-    async fn delete_entity_property(
-        &self,
-        entity: &Entity,
-        property_name: PropertyName,
-    ) -> Result<(), DeleteEntityPropertyError>;
-
-    async fn get_entity_properties(
-        &self,
-        entity: &Entity,
-    ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError>;
-
-    // Relations
-
-    async fn insert_entities_relation(
-        &self,
-        subject_entity: &Entity,
-        relationship: Relation,
-        object_entity: &Entity,
-    ) -> Result<(), InsertEntitiesRelationError>;
-
-    async fn delete_entities_relation(
-        &self,
-        subject_entity: &Entity,
-        relationship: Relation,
-        object_entity: &Entity,
-    ) -> Result<(), DeleteEntitiesRelationError>;
-
-    async fn get_subject_entity_relations(
-        &self,
-        subject_entity: &Entity,
-    ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsError>;
-
-    async fn get_subject_entity_relations_by_object_type(
-        &self,
-        subject_entity: &Entity,
-        object_entity_type: EntityType,
-    ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsByObjectTypeError>;
-
-    async fn get_relations_between_entities(
-        &self,
-        subject_entity: &Entity,
-        object_entity: &Entity,
-    ) -> Result<Vec<Relation>, GetRelationsBetweenEntitiesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
