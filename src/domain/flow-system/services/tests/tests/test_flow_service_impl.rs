@@ -598,6 +598,123 @@ async fn test_manual_trigger_compaction() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_manual_trigger_reset() {
+    let harness = FlowHarness::new().await;
+
+    let create_dataset_result = harness
+        .create_dataset(DatasetAlias {
+            dataset_name: DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let dataset_blocks: Vec<_> = create_dataset_result
+        .dataset
+        .as_metadata_chain()
+        .iter_blocks_interval(&create_dataset_result.head, None, false)
+        .try_collect()
+        .await
+        .unwrap();
+
+    harness.eager_initialization().await;
+    harness
+        .set_dataset_flow_reset_rule(
+            harness.now_datetime(),
+            create_dataset_result.dataset_handle.id.clone(),
+            DatasetFlowType::Reset,
+            ResetRule {
+                new_head_hash: Some(dataset_blocks[1].0.clone()),
+                old_head_hash: dataset_blocks[0].0.clone(),
+            },
+        )
+        .await;
+
+    let foo_flow_key: FlowKey = FlowKeyDataset::new(
+        create_dataset_result.dataset_handle.id.clone(),
+        DatasetFlowType::Reset,
+    )
+    .into();
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(
+        create_dataset_result.dataset_handle.id.clone(),
+        "foo".to_string(),
+    );
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+        // Run API service
+        res = harness.flow_service.run(start_time) => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+                  // Task 0: "foo" start running at 20ms, finish at 110ms
+                  let task0_driver = harness.task_driver(TaskDriverArgs {
+                    task_id: TaskID::new(0),
+                    dataset_id: Some(create_dataset_result.dataset_handle.id.clone()),
+                    run_since_start: Duration::try_milliseconds(20).unwrap(),
+                    finish_in_with: Some((Duration::try_milliseconds(90).unwrap(), TaskOutcome::Success(TaskResult::ResetDatasetResult(TaskResetDatasetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") })))),
+                    expected_logical_plan: LogicalPlan::Reset(ResetDataset {
+                      dataset_id: create_dataset_result.dataset_handle.id.clone(),
+                      // By deafult should reset to seed block
+                      new_head_hash: Some(dataset_blocks[1].0.clone()),
+                      old_head_hash: dataset_blocks[0].0.clone()
+                    }),
+                });
+                let task0_handle = task0_driver.run();
+
+                // Manual trigger for "foo" at 10ms
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                    flow_key: foo_flow_key,
+                    run_since_start: Duration::try_milliseconds(10).unwrap(),
+                    initiator_id: None,
+                });
+                let trigger0_handle = trigger0_driver.run();
+
+                // Main simulation script
+                let main_handle = async {
+                    // Moment 20ms - manual foo trigger happens here:
+                    //  - flow 0 gets trigger and finishes at 110ms
+                    harness.advance_time(Duration::try_milliseconds(250).unwrap()).await;
+                };
+
+                tokio::join!(task0_handle, trigger0_handle, main_handle)
+            } => Ok(())
+    }
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+
+            #1: +10ms:
+              "foo" Reset:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
+
+            #2: +20ms:
+              "foo" Reset:
+                Flow ID = 0 Running(task=0)
+
+            #3: +110ms:
+              "foo" Reset:
+                Flow ID = 0 Finished Success
+
+            "#
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_manual_trigger_compaction_with_config() {
     let max_slice_size = 1_000_000u64;
     let max_slice_records = 1000u64;

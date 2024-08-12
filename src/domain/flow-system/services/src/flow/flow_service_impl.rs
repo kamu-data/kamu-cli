@@ -195,9 +195,10 @@ impl FlowServiceImpl {
                         self.enqueue_auto_polling_flow_unconditionally(start_time, &flow_key)
                             .await?;
                     }
-                    // Such as compaction is very dangerous operation we
-                    // skip running it during activation flow configurations
-                    FlowConfigurationRule::CompactionRule(_) => (),
+                    // Such as compaction and reset are very dangerous operations we
+                    // skip running them during activation flow configurations
+                    FlowConfigurationRule::CompactionRule(_)
+                    | FlowConfigurationRule::ResetRule(_) => (),
                 }
             }
             FlowKey::System(system_flow_key) => {
@@ -496,7 +497,7 @@ impl FlowServiceImpl {
         for trigger in &flow.triggers {
             if let FlowTrigger::InputDatasetFlow(trigger) = trigger {
                 match &trigger.flow_result {
-                    FlowResult::Empty => {}
+                    FlowResult::Empty | FlowResult::DatasetReset(_) => {}
                     FlowResult::DatasetCompact(_) => {
                         is_compacted = true;
                     }
@@ -674,7 +675,7 @@ impl FlowServiceImpl {
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
         let logical_plan =
-            self.make_task_logical_plan(&flow.flow_key, flow.config_snapshot.as_ref());
+            self.make_task_logical_plan(&flow.flow_key, flow.config_snapshot.as_ref())?;
 
         let task = self
             .task_scheduler
@@ -735,13 +736,13 @@ impl FlowServiceImpl {
         &self,
         flow_key: &FlowKey,
         config_snapshot: Option<&FlowConfigurationSnapshot>,
-    ) -> LogicalPlan {
+    ) -> Result<LogicalPlan, InternalError> {
         match flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
                 DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
-                    LogicalPlan::UpdateDataset(UpdateDataset {
+                    Ok(LogicalPlan::UpdateDataset(UpdateDataset {
                         dataset_id: flow_key.dataset_id.clone(),
-                    })
+                    }))
                 }
                 DatasetFlowType::HardCompaction => {
                     let mut max_slice_size: Option<u64> = None;
@@ -757,22 +758,34 @@ impl FlowServiceImpl {
                             matches!(compaction_rule, CompactionRule::MetadataOnly(_));
                     };
 
-                    LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                    Ok(LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                         dataset_id: flow_key.dataset_id.clone(),
                         max_slice_size,
                         max_slice_records,
                         keep_metadata_only,
-                    })
+                    }))
+                }
+                DatasetFlowType::Reset => {
+                    if let Some(config_rule) = config_snapshot
+                        && let FlowConfigurationSnapshot::Reset(reset_rule) = config_rule
+                    {
+                        return Ok(LogicalPlan::Reset(ResetDataset {
+                            dataset_id: flow_key.dataset_id.clone(),
+                            new_head_hash: reset_rule.new_head_hash.clone(),
+                            old_head_hash: reset_rule.old_head_hash.clone(),
+                        }));
+                    }
+                    InternalError::bail("Reset flow cannot be called without configuration")
                 }
             },
             FlowKey::System(flow_key) => {
                 match flow_key.flow_type {
                     // TODO: replace on correct logical plan
-                    SystemFlowType::GC => LogicalPlan::Probe(Probe {
+                    SystemFlowType::GC => Ok(LogicalPlan::Probe(Probe {
                         dataset_id: None,
                         busy_time: Some(std::time::Duration::from_secs(20)),
                         end_with_outcome: Some(TaskOutcome::Success(TaskResult::Empty)),
-                    }),
+                    })),
                 }
             }
         }
@@ -880,6 +893,7 @@ impl FlowServiceImpl {
                     DownstreamDependencyTriggerType::TriggerAllEnabled
                 }
             }
+            DatasetFlowType::Reset => DownstreamDependencyTriggerType::Empty,
         }
     }
 }

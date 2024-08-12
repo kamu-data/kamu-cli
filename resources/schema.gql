@@ -580,6 +580,7 @@ enum DatasetFlowType {
 	INGEST
 	EXECUTE_TRANSFORM
 	HARD_COMPACTION
+	RESET
 }
 
 type DatasetFlows {
@@ -941,6 +942,7 @@ type FlowConfiguration {
 	schedule: FlowConfigurationSchedule
 	batching: FlowConfigurationBatching
 	compaction: FlowConfigurationCompaction
+	reset: FlowConfigurationReset
 }
 
 type FlowConfigurationBatching {
@@ -954,13 +956,18 @@ type FlowConfigurationCompactionRule {
 	compactionRule: FlowConfigurationCompaction!
 }
 
+type FlowConfigurationReset {
+	newHeadHash: Multihash
+	oldHeadHash: Multihash!
+}
+
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
 
 type FlowConfigurationScheduleRule {
 	scheduleRule: FlowConfigurationSchedule!
 }
 
-union FlowConfigurationSnapshot = FlowConfigurationBatching | FlowConfigurationScheduleRule | FlowConfigurationCompactionRule
+union FlowConfigurationSnapshot = FlowConfigurationBatching | FlowConfigurationScheduleRule | FlowConfigurationCompactionRule | FlowConfigurationReset
 
 type FlowConnection {
 	"""
@@ -983,7 +990,7 @@ type FlowDatasetCompactedFailedError {
 	message: String!
 }
 
-union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionSystemGC
+union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionDatasetReset | FlowDescriptionSystemGC
 
 type FlowDescriptionDatasetExecuteTransform {
 	datasetId: DatasetID!
@@ -1009,6 +1016,11 @@ type FlowDescriptionDatasetPushIngest {
 	ingestResult: FlowDescriptionUpdateResult
 }
 
+type FlowDescriptionDatasetReset {
+	datasetId: DatasetID!
+	resetResult: FlowDescriptionResetResult
+}
+
 type FlowDescriptionHardCompactionNothingToDo {
 	dummy: String!
 	message: String!
@@ -1017,6 +1029,10 @@ type FlowDescriptionHardCompactionNothingToDo {
 type FlowDescriptionHardCompactionSuccess {
 	originalBlocksCount: Int!
 	resultingBlocksCount: Int!
+	newHead: Multihash!
+}
+
+type FlowDescriptionResetResult {
 	newHead: Multihash!
 }
 
@@ -1119,6 +1135,7 @@ input FlowRunConfiguration @oneOf {
 	schedule: ScheduleInput
 	batching: BatchingConditionInput
 	compaction: CompactionConditionInput
+	reset: ResetConditionInput
 }
 
 union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionBatching | FlowStartConditionExecutor
@@ -1538,6 +1555,11 @@ type RenameResultSuccess implements RenameResult {
 type RequestHeader {
 	name: String!
 	value: String!
+}
+
+input ResetConditionInput {
+	newHeadHash: Multihash
+	oldHeadHash: Multihash
 }
 
 type RestProtocolDesc {

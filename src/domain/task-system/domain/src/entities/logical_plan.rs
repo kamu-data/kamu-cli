@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use enum_variants::*;
-use opendatafabric::DatasetID;
+use opendatafabric::{DatasetID, Multihash};
 use serde::{Deserialize, Serialize};
 
 use crate::TaskOutcome;
@@ -23,8 +23,10 @@ pub enum LogicalPlan {
     UpdateDataset(UpdateDataset),
     /// A task that can be used for testing the scheduling system
     Probe(Probe),
-    /// Perform dataset hard compaction
+    /// Perform a dataset hard compaction
     HardCompactionDataset(HardCompactionDataset),
+    /// Perform a dataset resetting
+    Reset(ResetDataset),
 }
 
 impl LogicalPlan {
@@ -36,6 +38,7 @@ impl LogicalPlan {
             LogicalPlan::HardCompactionDataset(hard_compaction) => {
                 Some(&hard_compaction.dataset_id)
             }
+            LogicalPlan::Reset(reset) => Some(&reset.dataset_id),
         }
     }
 }
@@ -70,6 +73,16 @@ pub struct HardCompactionDataset {
     pub max_slice_size: Option<u64>,
     pub max_slice_records: Option<u64>,
     pub keep_metadata_only: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A task to perform the resetting of a dataset
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResetDataset {
+    pub dataset_id: DatasetID,
+    pub new_head_hash: Option<Multihash>,
+    pub old_head_hash: Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -18,8 +18,9 @@ pub trait ResetService: Send + Sync {
     async fn reset_dataset(
         &self,
         dataset_handle: &DatasetHandle,
-        block_hash: &Multihash,
-    ) -> Result<(), ResetError>;
+        block_hash: Option<&Multihash>,
+        old_head_maybe: Option<&Multihash>,
+    ) -> Result<Multihash, ResetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -58,6 +59,12 @@ pub enum ResetError {
         #[backtrace]
         InternalError,
     ),
+    #[error(transparent)]
+    OldHeadMismatch(
+        #[from]
+        #[backtrace]
+        OldHeadMismatchError,
+    ),
 }
 
 impl From<GetDatasetError> for ResetError {
@@ -87,4 +94,11 @@ impl From<SetRefError> for ResetError {
             SetRefError::Internal(e) => Self::Internal(e),
         }
     }
+}
+
+#[derive(Error, Debug)]
+#[error("Current head is {current_head} but expected head is {old_head}")]
+pub struct OldHeadMismatchError {
+    pub current_head: Multihash,
+    pub old_head: Multihash,
 }

@@ -52,8 +52,13 @@ impl DatasetFlowRunsMut {
 
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
-        if let Some(e) =
-            ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type).await?
+        if let Some(e) = ensure_flow_preconditions(
+            ctx,
+            &self.dataset_handle,
+            dataset_flow_type,
+            flow_run_configuration.as_ref(),
+        )
+        .await?
         {
             return Ok(TriggerFlowResult::PreconditionsNotMet(e));
         }
@@ -64,13 +69,16 @@ impl DatasetFlowRunsMut {
         let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
         let logged_account = utils::get_logged_account(ctx);
 
-        let flow_run_snapshot = if let Some(flow_run_config) = flow_run_configuration {
-            match flow_run_config.try_into_snapshot(dataset_flow_type) {
-                Ok(snapshot) => Some(snapshot),
-                Err(err) => return Ok(TriggerFlowResult::InvalidRunConfigurations(err)),
-            }
-        } else {
-            None
+        let flow_run_snapshot = match FlowRunConfiguration::try_into_snapshot(
+            ctx,
+            &dataset_flow_type,
+            &self.dataset_handle,
+            flow_run_configuration.as_ref(),
+        )
+        .await
+        {
+            Ok(snapshot) => snapshot,
+            Err(err) => return Ok(TriggerFlowResult::InvalidRunConfigurations(err)),
         };
 
         let flow_state = flow_service

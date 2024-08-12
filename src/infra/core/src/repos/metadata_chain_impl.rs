@@ -66,6 +66,10 @@ where
             .map_err(Into::into)
     }
 
+    async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
+        self.meta_block_repo.contains_block(hash).await
+    }
+
     fn iter_blocks_interval<'a>(
         &'a self,
         head_hash: &'a Multihash,

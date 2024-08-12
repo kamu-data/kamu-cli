@@ -29,7 +29,11 @@ async fn test_reset_dataset_with_2revisions_drop_last() {
 
     let result = harness
         .reset_svc
-        .reset_dataset(&test_case.dataset_handle, &test_case.hash_seed_block)
+        .reset_dataset(
+            &test_case.dataset_handle,
+            Some(&test_case.hash_seed_block),
+            None,
+        )
         .await;
     assert!(result.is_ok());
 
@@ -52,7 +56,8 @@ async fn test_reset_dataset_with_2revisions_without_changes() {
         .reset_svc
         .reset_dataset(
             &test_case.dataset_handle,
-            &test_case.hash_polling_source_block,
+            Some(&test_case.hash_polling_source_block),
+            None,
         )
         .await;
     assert!(result.is_ok());
@@ -74,9 +79,54 @@ async fn test_reset_dataset_to_non_existing_block_fails() {
 
     let result = harness
         .reset_svc
-        .reset_dataset(&test_case.dataset_handle, &a_hash_not_present_in_chain)
+        .reset_dataset(
+            &test_case.dataset_handle,
+            Some(&a_hash_not_present_in_chain),
+            None,
+        )
         .await;
     assert_matches!(result, Err(ResetError::BlockNotFound(_)));
+}
+
+#[test_log::test(tokio::test)]
+async fn test_reset_dataset_with_wrong_head() {
+    let harness = ResetTestHarness::new();
+    let test_case = harness.a_chain_with_2_blocks().await;
+
+    let result = harness
+        .reset_svc
+        .reset_dataset(
+            &test_case.dataset_handle,
+            Some(&test_case.hash_seed_block),
+            Some(&test_case.hash_seed_block),
+        )
+        .await;
+    assert_matches!(result, Err(ResetError::OldHeadMismatch(_)));
+}
+
+#[test_log::test(tokio::test)]
+async fn test_reset_dataset_with_default_seed_block() {
+    let harness = ResetTestHarness::new();
+    let test_case = harness.a_chain_with_2_blocks().await;
+
+    let current_head = harness.get_dataset_head(&test_case.dataset_handle).await;
+    assert_eq!(test_case.hash_polling_source_block, current_head);
+
+    let result = harness
+        .reset_svc
+        .reset_dataset(
+            &test_case.dataset_handle,
+            None,
+            Some(&test_case.hash_polling_source_block),
+        )
+        .await;
+    assert!(result.is_ok());
+
+    let new_head = harness.get_dataset_head(&test_case.dataset_handle).await;
+    assert_eq!(test_case.hash_seed_block, new_head);
+
+    let summary = harness.get_dataset_summary(&test_case.dataset_handle).await;
+    assert_eq!(new_head, summary.last_block_hash);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

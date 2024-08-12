@@ -21,6 +21,8 @@ use kamu_core::{
     PullError,
     PullOptions,
     PullService,
+    ResetError,
+    ResetService,
     SystemTimeSource,
     TransformError,
 };
@@ -138,6 +140,37 @@ impl TaskExecutorImpl {
         }
     }
 
+    async fn reset_dataset_logical_plan(
+        &self,
+        reset_dataset_args: &ResetDataset,
+    ) -> Result<TaskOutcome, InternalError> {
+        let reset_svc = self.catalog.get_one::<dyn ResetService>().int_err()?;
+        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().int_err()?;
+        let dataset_handle = dataset_repo
+            .resolve_dataset_ref(&reset_dataset_args.dataset_id.as_local_ref())
+            .await
+            .int_err()?;
+
+        let reset_result_maybe = reset_svc
+            .reset_dataset(
+                &dataset_handle,
+                reset_dataset_args.new_head_hash.as_ref(),
+                Some(&reset_dataset_args.old_head_hash),
+            )
+            .await;
+        match reset_result_maybe {
+            Ok(new_head) => Ok(TaskOutcome::Success(TaskResult::ResetDatasetResult(
+                TaskResetDatasetResult { new_head },
+            ))),
+            Err(err) => match err {
+                ResetError::BlockNotFound(_) => Ok(TaskOutcome::Failed(
+                    TaskError::ResetDatasetError(ResetDatasetTaskError::ResetHeadNotFound),
+                )),
+                _ => Ok(TaskOutcome::Failed(TaskError::Empty)),
+            },
+        }
+    }
+
     async fn hard_compaction_logical_plan(
         &self,
         hard_compaction_args: &HardCompactionDataset,
@@ -207,6 +240,9 @@ impl TaskExecutor for TaskExecutorImpl {
                 LogicalPlan::HardCompactionDataset(hard_compaction_args) => {
                     self.hard_compaction_logical_plan(hard_compaction_args)
                         .await?
+                }
+                LogicalPlan::Reset(reset_args) => {
+                    self.reset_dataset_logical_plan(reset_args).await?
                 }
             };
 
