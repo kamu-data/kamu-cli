@@ -774,6 +774,7 @@ impl FlowServiceImpl {
                             new_head_hash: reset_rule.new_head_hash.clone(),
                             old_head_hash: reset_rule.old_head_hash.clone(),
                             recursive_compaction: reset_rule.recursive_compaction,
+                            recursive: reset_rule.recursive,
                         }));
                     }
                     InternalError::bail("Reset flow cannot be called without configuration")
@@ -840,9 +841,28 @@ impl FlowServiceImpl {
                     .await?;
                 // Currently we trigger Hard compaction recursively only in keep metadata only
                 // mode
-                let config_snapshot = FlowConfigurationSnapshot::Compaction(
-                    CompactionRule::MetadataOnly(CompactionRuleMetadataOnly { recursive: true }),
-                );
+                let (flow_type, config_snapshot) = if let Some(config_snapshot) =
+                    maybe_config_snapshot
+                    && let FlowConfigurationSnapshot::Reset(reset_rule) = config_snapshot
+                    && reset_rule.recursive
+                {
+                    (
+                        DatasetFlowType::Reset,
+                        FlowConfigurationSnapshot::Reset(ResetRule {
+                            new_head_hash: None,
+                            old_head_hash: None,
+                            recursive_compaction: false,
+                            recursive: true,
+                        }),
+                    )
+                } else {
+                    (
+                        DatasetFlowType::HardCompaction,
+                        FlowConfigurationSnapshot::Compaction(CompactionRule::MetadataOnly(
+                            CompactionRuleMetadataOnly { recursive: true },
+                        )),
+                    )
+                };
 
                 for dependent_dataset_id in dependent_dataset_ids {
                     for owner_account_id in &dataset_owner_account_ids {
@@ -854,7 +874,7 @@ impl FlowServiceImpl {
                             plans.push(DownstreamDependencyFlowPlan {
                                 flow_key: FlowKeyDataset::new(
                                     dependent_dataset_id.clone(),
-                                    DatasetFlowType::HardCompaction,
+                                    flow_type,
                                 )
                                 .into(),
                                 flow_trigger_context: FlowTriggerContext::Unconditional,
