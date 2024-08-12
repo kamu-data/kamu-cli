@@ -9,6 +9,7 @@
 
 #![feature(error_generic_member_access)]
 #![feature(assert_matches)]
+#![feature(let_chains)]
 
 mod entities;
 mod repos;
