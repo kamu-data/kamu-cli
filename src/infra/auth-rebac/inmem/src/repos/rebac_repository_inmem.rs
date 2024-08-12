@@ -33,10 +33,11 @@ use tokio::sync::{RwLock, RwLockReadGuard};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: remove
 type EntityHash = u64;
 type EntityProperties = HashMap<PropertyName, PropertyValue<'static>>;
 
-type EntitiesPropertiesMap = HashMap<EntityHash, EntityProperties>;
+type EntitiesPropertiesMap = HashMap<Entity<'static>, EntityProperties>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -57,8 +58,16 @@ struct EntitiesRelationsState {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Default)]
+struct State {
+    entities_properties_map: EntitiesPropertiesMap,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct RebacRepositoryInMem {
-    entities_properties_map: Arc<RwLock<EntitiesPropertiesMap>>,
+    state: Arc<RwLock<State>>,
+    // TODO: absorb into state
     entities_relations_state: Arc<RwLock<EntitiesRelationsState>>,
 }
 
@@ -68,7 +77,7 @@ pub struct RebacRepositoryInMem {
 impl RebacRepositoryInMem {
     pub fn new() -> Self {
         Self {
-            entities_properties_map: Arc::new(RwLock::new(EntitiesPropertiesMap::new())),
+            state: Default::default(),
             entities_relations_state: Arc::new(RwLock::new(EntitiesRelationsState::default())),
         }
     }
@@ -115,11 +124,11 @@ impl RebacRepository for RebacRepositoryInMem {
         property_name: PropertyName,
         property_value: &PropertyValue,
     ) -> Result<(), SetEntityPropertyError> {
-        let mut writable_entities_properties_map = self.entities_properties_map.write().await;
+        let mut writable_state = self.state.write().await;
 
-        let entity_hash = EntityHasher::entity_hash(entity);
-        let entity_properties = writable_entities_properties_map
-            .entry(entity_hash)
+        let entity_properties = writable_state
+            .entities_properties_map
+            .entry(entity.clone().into_owned())
             .or_insert_with(EntityProperties::new);
 
         entity_properties.insert(property_name, property_value.clone().into_owned().into());
@@ -132,10 +141,11 @@ impl RebacRepository for RebacRepositoryInMem {
         entity: &Entity,
         property_name: PropertyName,
     ) -> Result<(), DeleteEntityPropertyError> {
-        let mut entities_properties_map = self.entities_properties_map.write().await;
+        let mut writable_state = self.state.write().await;
 
-        let entity_hash = EntityHasher::entity_hash(entity);
-        let maybe_entity_properties = entities_properties_map.get_mut(&entity_hash);
+        let maybe_entity_properties = writable_state
+            .entities_properties_map
+            .get_mut(&entity.clone().into_owned());
 
         let Some(entity_properties) = maybe_entity_properties else {
             return Err(DeleteEntityPropertyError::entity_not_found(entity));
@@ -157,10 +167,9 @@ impl RebacRepository for RebacRepositoryInMem {
         &self,
         entity: &Entity,
     ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError> {
-        let entities_properties_map = self.entities_properties_map.read().await;
+        let readable_state = self.state.read().await;
 
-        let entity_hash = EntityHasher::entity_hash(entity);
-        let maybe_entity_properties = entities_properties_map.get(&entity_hash);
+        let maybe_entity_properties = readable_state.entities_properties_map.get(entity);
 
         let Some(entity_properties) = maybe_entity_properties else {
             return Err(GetEntityPropertiesError::entity_not_found(entity));
@@ -437,6 +446,7 @@ impl EntitiesRelationsRow {
 // EntityHasher
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: remove
 struct EntityHasher {}
 
 impl EntityHasher {
