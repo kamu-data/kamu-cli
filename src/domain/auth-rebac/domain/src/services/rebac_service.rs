@@ -7,16 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::InternalError;
 use opendatafabric::{AccountID, DatasetID};
+use thiserror::Error;
 
 use crate::{
     AccountPropertyName,
     AccountToDatasetRelation,
     DatasetPropertyName,
     DeleteEntitiesRelationError,
-    DeleteEntityPropertyError,
+    EntityNotFoundError,
     GetEntityPropertiesError,
-    InsertEntitiesRelationError,
     ObjectEntityWithRelation,
     PropertyName,
     PropertyValue,
@@ -40,7 +41,7 @@ pub trait RebacService: Send + Sync {
         &self,
         account_id: &AccountID,
         property_name: AccountPropertyName,
-    ) -> Result<(), DeleteEntityPropertyError>;
+    ) -> Result<(), UnsetEntityPropertyError>;
 
     async fn get_account_properties(
         &self,
@@ -59,7 +60,7 @@ pub trait RebacService: Send + Sync {
         &self,
         dataset_id: &DatasetID,
         property_name: DatasetPropertyName,
-    ) -> Result<(), DeleteEntityPropertyError>;
+    ) -> Result<(), UnsetEntityPropertyError>;
 
     async fn get_dataset_properties(
         &self,
@@ -72,7 +73,7 @@ pub trait RebacService: Send + Sync {
         account_id: &AccountID,
         relationship: AccountToDatasetRelation,
         dataset_id: &DatasetID,
-    ) -> Result<(), InsertEntitiesRelationError>;
+    ) -> Result<(), InsertRelationError>;
 
     async fn delete_account_dataset_relation(
         &self,
@@ -85,6 +86,27 @@ pub trait RebacService: Send + Sync {
         &self,
         account_id: &AccountID,
     ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum UnsetEntityPropertyError {
+    #[error(transparent)]
+    NotFound(EntityNotFoundError),
+
+    #[error(transparent)]
+    Internal(InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum InsertRelationError {
+    #[error(transparent)]
+    Internal(InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

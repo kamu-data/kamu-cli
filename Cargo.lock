@@ -5241,6 +5241,7 @@ version = "0.193.0"
 dependencies = [
  "async-trait",
  "dill",
+ "futures",
  "kamu-auth-rebac",
  "opendatafabric",
 ]

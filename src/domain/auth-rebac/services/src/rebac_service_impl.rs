@@ -19,6 +19,7 @@ use kamu_auth_rebac::{
     Entity,
     GetEntityPropertiesError,
     InsertEntitiesRelationError,
+    InsertRelationError,
     ObjectEntityWithRelation,
     PropertyName,
     PropertyValue,
@@ -27,6 +28,7 @@ use kamu_auth_rebac::{
     Relation,
     SetEntityPropertyError,
     SubjectEntityRelationsError,
+    UnsetEntityPropertyError,
 };
 use opendatafabric::{AccountID, DatasetID};
 
@@ -64,12 +66,15 @@ impl RebacService for RebacServiceImpl {
         &self,
         account_id: &AccountID,
         property_name: AccountPropertyName,
-    ) -> Result<(), DeleteEntityPropertyError> {
+    ) -> Result<(), UnsetEntityPropertyError> {
+        use futures::FutureExt;
+
         let account_id = account_id.as_did_str().to_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
 
         self.rebac_repo
             .delete_entity_property(&account_entity, property_name.into())
+            .map(map_delete_entity_property_result)
             .await
     }
 
@@ -106,12 +111,15 @@ impl RebacService for RebacServiceImpl {
         &self,
         dataset_id: &DatasetID,
         property_name: DatasetPropertyName,
-    ) -> Result<(), DeleteEntityPropertyError> {
+    ) -> Result<(), UnsetEntityPropertyError> {
+        use futures::FutureExt;
+
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_id_entity = Entity::new_dataset(dataset_id.as_str());
 
         self.rebac_repo
             .delete_entity_property(&dataset_id_entity, property_name.into())
+            .map(map_delete_entity_property_result)
             .await
     }
 
@@ -135,7 +143,9 @@ impl RebacService for RebacServiceImpl {
         account_id: &AccountID,
         relationship: AccountToDatasetRelation,
         dataset_id: &DatasetID,
-    ) -> Result<(), InsertEntitiesRelationError> {
+    ) -> Result<(), InsertRelationError> {
+        use futures::FutureExt;
+
         let account_id = account_id.as_did_str().to_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
 
@@ -148,9 +158,16 @@ impl RebacService for RebacServiceImpl {
                 Relation::AccountToDataset(relationship),
                 &dataset_id_entity,
             )
-            .await?;
-
-        Ok(())
+            .map(|res| match res {
+                Ok(_) => Ok(()),
+                Err(err) => match err {
+                    InsertEntitiesRelationError::Duplicate(_) => Ok(()),
+                    InsertEntitiesRelationError::Internal(e) => {
+                        Err(InsertRelationError::Internal(e))
+                    }
+                },
+            })
+            .await
     }
 
     async fn delete_account_dataset_relation(
@@ -189,6 +206,23 @@ impl RebacService for RebacServiceImpl {
             .await?;
 
         Ok(object_entities)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn map_delete_entity_property_result(
+    res: Result<(), DeleteEntityPropertyError>,
+) -> Result<(), UnsetEntityPropertyError> {
+    match res {
+        Ok(_) => Ok(()),
+        Err(err) => match err {
+            DeleteEntityPropertyError::EntityNotFound(e) => {
+                Err(UnsetEntityPropertyError::NotFound(e))
+            }
+            DeleteEntityPropertyError::PropertyNotFound(_) => Ok(()),
+            DeleteEntityPropertyError::Internal(e) => Err(UnsetEntityPropertyError::Internal(e)),
+        },
     }
 }
 
