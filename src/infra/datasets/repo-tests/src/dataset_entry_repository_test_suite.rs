@@ -169,11 +169,36 @@ pub async fn test_try_save_duplicate_dataset_entry(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_try_set_same_dataset_name(catalog: &Catalog) {
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+
+    let dataset_entry = new_dataset_entry();
+    {
+        let save_res = dataset_entry_repo.save_dataset_entry(&dataset_entry).await;
+
+        assert_matches!(save_res, Ok(_));
+    }
+    let same_name = dataset_entry.name;
+    {
+        let update_res = dataset_entry_repo
+            .update_dataset_entry_name(&dataset_entry.id, &same_name)
+            .await;
+
+        assert_matches!(
+            update_res,
+            Err(UpdateDatasetEntryNameError::NameCollision(e))
+                if e.dataset_name == same_name
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_update_dataset_entry_name(catalog: &Catalog) {
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
     let dataset_entry = new_dataset_entry();
-    let new_name = DatasetName::new_unchecked("new-alias");
+    let new_name = DatasetName::new_unchecked("new-name");
     {
         let update_res = dataset_entry_repo
             .update_dataset_entry_name(&dataset_entry.id, &new_name)
