@@ -19,16 +19,12 @@ use kamu_auth_rebac::{
     DeleteEntityPropertyError,
     Entity,
     EntityType,
-    GetEntityPropertiesError,
-    GetRelationsBetweenEntitiesError,
     InsertEntitiesRelationError,
     ObjectEntity,
     ObjectEntityWithRelation,
     PropertyName,
     RebacRepository,
     Relation,
-    SubjectEntityRelationsByObjectTypeError,
-    SubjectEntityRelationsError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,8 +38,8 @@ pub async fn test_try_get_properties_from_nonexistent_entity(catalog: &Catalog) 
 
     assert_matches!(
         res,
-        Err(GetEntityPropertiesError::NotFound(e))
-            if e.entity == nonexistent_entity
+        Ok(actual_properties)
+            if actual_properties.is_empty()
     );
 }
 
@@ -232,7 +228,7 @@ pub async fn test_delete_entities_relation(catalog: &Catalog) {
     let rebac_repo = catalog.get_one::<dyn RebacRepository>().unwrap();
 
     let account = Entity::new_account("kamu");
-    let dataset = Entity::new_account("dataset");
+    let dataset = Entity::new_dataset("dataset");
     let relationship = Relation::account_is_a_dataset_reader();
 
     let insert_res = rebac_repo
@@ -416,13 +412,6 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
 
                 assert_eq!(object_entities, actual_res);
             }
-            Err(actual_error) if object_entities.is_empty() => {
-                assert_matches!(
-                    actual_error,
-                    SubjectEntityRelationsError::NotFound(e)
-                        if e.subject_entity == account
-                );
-            }
             unexpected_res => {
                 panic!("Unexpected result: {unexpected_res:?}");
             }
@@ -442,29 +431,21 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
 
                     assert_eq!(actual_res, object_entities);
                 }
-                Err(actual_error) if object_entities.is_empty() => {
-                    assert_matches!(
-                        actual_error,
-                        SubjectEntityRelationsByObjectTypeError::NotFound(e)
-                            if e.subject_entity == account
-                                && e.object_entity_type == EntityType::Dataset
-                    );
-                }
                 unexpected_res => {
                     panic!("Unexpected result: {unexpected_res:?}");
                 }
             }
         }
         {
+            // NOTE: We never have any EntityType::Account objects
             let actual_res = rebac_repo
                 .get_subject_entity_relations_by_object_type(&account, EntityType::Account)
                 .await;
 
             assert_matches!(
                 actual_res,
-                Err(SubjectEntityRelationsByObjectTypeError::NotFound(e))
-                    if e.subject_entity == account
-                        && e.object_entity_type == EntityType::Account
+                Ok(actual_object_relations)
+                    if actual_object_relations.is_empty()
             );
         }
     }
@@ -487,14 +468,6 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
                     actual_relations.sort();
 
                     assert_eq!(&actual_relations, expected_relations);
-                }
-                Err(actual_error) if expected_relations.is_empty() => {
-                    assert_matches!(
-                        actual_error,
-                        GetRelationsBetweenEntitiesError::NotFound(e)
-                            if e.subject_entity == account
-                                && e.object_entity == dataset
-                    );
                 }
                 unexpected_res => {
                     panic!("Unexpected result: {unexpected_res:?}");

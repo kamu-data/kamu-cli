@@ -276,18 +276,7 @@ pub struct EntityPropertyNotFoundError {
 #[derive(Error, Debug)]
 pub enum GetEntityPropertiesError {
     #[error(transparent)]
-    NotFound(EntityNotFoundError),
-
-    #[error(transparent)]
     Internal(InternalError),
-}
-
-impl GetEntityPropertiesError {
-    pub fn entity_not_found(entity: &Entity<'_>) -> Self {
-        Self::NotFound(EntityNotFoundError {
-            entity: entity.clone().into_owned(),
-        })
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -367,24 +356,7 @@ pub struct EntitiesRelationNotFoundError {
 #[derive(Error, Debug)]
 pub enum SubjectEntityRelationsError {
     #[error(transparent)]
-    NotFound(ObjectEntitiesRelationsNotFoundError),
-
-    #[error(transparent)]
     Internal(InternalError),
-}
-
-impl SubjectEntityRelationsError {
-    pub fn not_found(subject_entity: &Entity) -> Self {
-        Self::NotFound(ObjectEntitiesRelationsNotFoundError {
-            subject_entity: subject_entity.clone().into_owned(),
-        })
-    }
-}
-
-#[derive(Error, Debug)]
-#[error("Object entities relations not found: subject_entity='{subject_entity:?}' ")]
-pub struct ObjectEntitiesRelationsNotFoundError {
-    pub subject_entity: Entity<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -392,29 +364,7 @@ pub struct ObjectEntitiesRelationsNotFoundError {
 #[derive(Error, Debug)]
 pub enum SubjectEntityRelationsByObjectTypeError {
     #[error(transparent)]
-    NotFound(ObjectEntitiesRelationsByObjectTypeNotFoundError),
-
-    #[error(transparent)]
     Internal(InternalError),
-}
-
-impl SubjectEntityRelationsByObjectTypeError {
-    pub fn not_found(subject_entity: &Entity, object_entity_type: EntityType) -> Self {
-        Self::NotFound(ObjectEntitiesRelationsByObjectTypeNotFoundError {
-            subject_entity: subject_entity.clone().into_owned(),
-            object_entity_type,
-        })
-    }
-}
-
-#[derive(Error, Debug)]
-#[error(
-    "Object entities relations by object type not found: subject_entity='{subject_entity:?}', \
-     object_entity_type='{object_entity_type:?}'"
-)]
-pub struct ObjectEntitiesRelationsByObjectTypeNotFoundError {
-    pub subject_entity: Entity<'static>,
-    pub object_entity_type: EntityType,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -422,29 +372,7 @@ pub struct ObjectEntitiesRelationsByObjectTypeNotFoundError {
 #[derive(Error, Debug)]
 pub enum GetRelationsBetweenEntitiesError {
     #[error(transparent)]
-    NotFound(RelationsBetweenEntitiesNotFoundError),
-
-    #[error(transparent)]
     Internal(InternalError),
-}
-
-impl GetRelationsBetweenEntitiesError {
-    pub fn not_found(subject_entity: &Entity, object_entity: &Entity) -> Self {
-        Self::NotFound(RelationsBetweenEntitiesNotFoundError {
-            subject_entity: subject_entity.clone().into_owned(),
-            object_entity: object_entity.clone().into_owned(),
-        })
-    }
-}
-
-#[derive(Error, Debug)]
-#[error(
-    "Relations between entities not found: subject_entity='{subject_entity:?}', \
-     object_entity='{object_entity:?}'"
-)]
-pub struct RelationsBetweenEntitiesNotFoundError {
-    pub subject_entity: Entity<'static>,
-    pub object_entity: Entity<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
