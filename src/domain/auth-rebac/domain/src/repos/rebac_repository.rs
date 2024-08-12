@@ -87,33 +87,6 @@ pub type ObjectEntityWithRelation<'a> = EntityWithRelation<'a>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: delete
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum PropertyNameOld {
-    DatasetAllowsAnonymousRead,
-    DatasetAllowsPublicRead,
-}
-
-// TODO: delete
-pub type PropertyValueOld = String;
-
-// TODO: delete
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PropertyOld<'a> {
-    pub name: PropertyNameOld,
-    pub value: Cow<'a, str>,
-}
-
-// TODO: delete
-impl<'a> PropertyOld<'a> {
-    pub fn new(name: PropertyNameOld, value: impl Into<Cow<'a, str>>) -> Self {
-        Self {
-            name,
-            value: value.into(),
-        }
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum PropertyName {
     Dataset(DatasetPropertyName),
