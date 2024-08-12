@@ -43,8 +43,7 @@ pub async fn test_try_get_properties_from_nonexistent_entity(catalog: &Catalog) 
     assert_matches!(
         res,
         Err(GetEntityPropertiesError::NotFound(e))
-            if e.entity_type == EntityType::Dataset
-                && e.entity_id == *"foo"
+            if e.entity == nonexistent_entity
     );
 }
 
@@ -89,8 +88,7 @@ pub async fn test_try_delete_property_from_nonexistent_entity(catalog: &Catalog)
     assert_matches!(
         delete_res,
         Err(DeleteEntityPropertyError::EntityNotFound(e))
-            if e.entity_type == EntityType::Dataset
-                && e.entity_id == *"foo"
+            if e.entity == nonexistent_entity
     );
 }
 
@@ -115,8 +113,7 @@ pub async fn test_try_delete_nonexistent_property_from_entity(catalog: &Catalog)
     assert_matches!(
         delete_res,
         Err(DeleteEntityPropertyError::PropertyNotFound(e))
-            if e.entity_type == EntityType::Dataset
-                && e.entity_id == *"bar"
+            if e.entity == entity
                 && e.property_name == DatasetPropertyName::AllowsPublicRead.into()
     );
 }
@@ -181,8 +178,7 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
         assert_matches!(
             delete_res,
             Err(DeleteEntityPropertyError::PropertyNotFound(e))
-                if e.entity_type == EntityType::Dataset
-                    && e.entity_id == *"bar"
+                if e.entity == entity
                     && e.property_name == DatasetPropertyName::AllowsAnonymousRead.into()
         );
     }
@@ -223,11 +219,9 @@ pub async fn test_try_insert_duplicate_entities_relation(catalog: &Catalog) {
         assert_matches!(
             insert_res,
             Err(InsertEntitiesRelationError::Duplicate(e))
-                if e.subject_entity_type == account.entity_type
-                    && e.subject_entity_id == account.entity_id
+                if e.subject_entity == account
                     && e.relationship == relationship
-                    && e.object_entity_type == dataset.entity_type
-                    && e.object_entity_id == dataset.entity_id
+                    && e.object_entity == dataset
         );
     }
 }
@@ -262,11 +256,9 @@ pub async fn test_delete_entities_relation(catalog: &Catalog) {
         assert_matches!(
             delete_res,
             Err(DeleteEntitiesRelationError::NotFound(e))
-                if e.subject_entity_type == account.entity_type
-                    && e.subject_entity_id == account.entity_id
+                if e.subject_entity == account
                     && e.relationship == relationship
-                    && e.object_entity_type == dataset.entity_type
-                    && e.object_entity_id == dataset.entity_id
+                    && e.object_entity == dataset
         );
     }
 }
@@ -428,8 +420,7 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
                 assert_matches!(
                     actual_error,
                     SubjectEntityRelationsError::NotFound(e)
-                        if e.subject_entity_type == account.entity_type
-                            && e.subject_entity_id == account.entity_id
+                        if e.subject_entity == account
                 );
             }
             unexpected_res => {
@@ -455,8 +446,7 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
                     assert_matches!(
                         actual_error,
                         SubjectEntityRelationsByObjectTypeError::NotFound(e)
-                            if e.subject_entity_type == account.entity_type
-                                && e.subject_entity_id == account.entity_id
+                            if e.subject_entity == account
                                 && e.object_entity_type == EntityType::Dataset
                     );
                 }
@@ -473,8 +463,7 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
             assert_matches!(
                 actual_res,
                 Err(SubjectEntityRelationsByObjectTypeError::NotFound(e))
-                    if e.subject_entity_type == account.entity_type
-                        && e.subject_entity_id == account.entity_id
+                    if e.subject_entity == account
                         && e.object_entity_type == EntityType::Account
             );
         }
@@ -503,10 +492,8 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
                     assert_matches!(
                         actual_error,
                         GetRelationsBetweenEntitiesError::NotFound(e)
-                            if e.subject_entity_type == account.entity_type
-                                && e.subject_entity_id == account.entity_id
-                                && e.object_entity_type == EntityType::Dataset
-                                && e.object_entity_id == *dataset_id
+                            if e.subject_entity == account
+                                && e.object_entity == dataset
                     );
                 }
                 unexpected_res => {

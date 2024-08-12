@@ -103,6 +103,13 @@ impl<'a> Entity<'a> {
     pub fn new_dataset(entity_id: impl Into<Cow<'a, str>>) -> Self {
         Self::new(EntityType::Dataset, entity_id)
     }
+
+    pub fn into_owned(self) -> Entity<'static> {
+        Entity {
+            entity_type: self.entity_type,
+            entity_id: Cow::Owned(self.entity_id.into_owned()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -223,42 +230,29 @@ pub enum DeleteEntityPropertyError {
 
 impl DeleteEntityPropertyError {
     pub fn entity_not_found(entity: &Entity) -> Self {
-        Self::EntityNotFound(entity.into())
+        Self::EntityNotFound(EntityNotFoundError {
+            entity: entity.clone().into_owned(),
+        })
     }
 
     pub fn property_not_found(entity: &Entity, property_name: PropertyName) -> Self {
         Self::PropertyNotFound(EntityPropertyNotFoundError {
-            entity_type: entity.entity_type,
-            entity_id: entity.entity_id.to_string(),
+            entity: entity.clone().into_owned(),
             property_name,
         })
     }
 }
 
 #[derive(Error, Debug)]
-#[error("Entity not found: entity_type='{entity_type:?}', entity_id='{entity_id}'")]
+#[error("Entity not found: {entity:?}")]
 pub struct EntityNotFoundError {
-    pub entity_type: EntityType,
-    pub entity_id: String,
-}
-
-impl From<&Entity<'_>> for EntityNotFoundError {
-    fn from(entity: &Entity<'_>) -> Self {
-        Self {
-            entity_type: entity.entity_type,
-            entity_id: entity.entity_id.to_string(),
-        }
-    }
+    pub entity: Entity<'static>,
 }
 
 #[derive(Error, Debug)]
-#[error(
-    "Entity property not found: entity_type='{entity_type:?}', entity_id='{entity_id}', \
-     property_name='{property_name:?}'"
-)]
+#[error("Entity property not found: {entity:?}, property_name='{property_name:?}'")]
 pub struct EntityPropertyNotFoundError {
-    pub entity_type: EntityType,
-    pub entity_id: String,
+    pub entity: Entity<'static>,
     pub property_name: PropertyName,
 }
 
@@ -275,7 +269,9 @@ pub enum GetEntityPropertiesError {
 
 impl GetEntityPropertiesError {
     pub fn entity_not_found(entity: &Entity<'_>) -> Self {
-        Self::NotFound(entity.into())
+        Self::NotFound(EntityNotFoundError {
+            entity: entity.clone().into_owned(),
+        })
     }
 }
 
@@ -297,27 +293,22 @@ impl InsertEntitiesRelationError {
         object_entity: &Entity,
     ) -> Self {
         Self::Duplicate(InsertEntitiesRelationDuplicateError {
-            subject_entity_type: subject_entity.entity_type,
-            subject_entity_id: subject_entity.entity_id.to_string(),
+            subject_entity: subject_entity.clone().into_owned(),
             relationship,
-            object_entity_type: object_entity.entity_type,
-            object_entity_id: object_entity.entity_id.to_string(),
+            object_entity: object_entity.clone().into_owned(),
         })
     }
 }
 
 #[derive(Error, Debug)]
 #[error(
-    "Duplicate entity relation not inserted: subject_entity_type='{subject_entity_type:?}', \
-     subject_entity_id='{subject_entity_id}', relationship='{relationship:?}', \
-     object_entity_type='{object_entity_type:?}', object_entity_id='{object_entity_id}'"
+    "Duplicate entity relation not inserted: subject_entity='{subject_entity:?}', \
+     relationship='{relationship:?}', object_entity='{object_entity:?}'"
 )]
 pub struct InsertEntitiesRelationDuplicateError {
-    pub subject_entity_type: EntityType,
-    pub subject_entity_id: String,
+    pub subject_entity: Entity<'static>,
     pub relationship: Relation,
-    pub object_entity_type: EntityType,
-    pub object_entity_id: String,
+    pub object_entity: Entity<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -338,27 +329,22 @@ impl DeleteEntitiesRelationError {
         object_entity: &Entity,
     ) -> Self {
         Self::NotFound(EntitiesRelationNotFoundError {
-            subject_entity_type: subject_entity.entity_type,
-            subject_entity_id: subject_entity.entity_id.to_string(),
+            subject_entity: subject_entity.clone().into_owned(),
             relationship,
-            object_entity_type: object_entity.entity_type,
-            object_entity_id: object_entity.entity_id.to_string(),
+            object_entity: object_entity.clone().into_owned(),
         })
     }
 }
 
 #[derive(Error, Debug)]
 #[error(
-    "Entities relation not found: subject_entity_type='{subject_entity_type:?}', \
-     subject_entity_id='{subject_entity_id}', relationship='{relationship:?}', \
-     object_entity_type='{object_entity_type:?}', object_entity_id='{object_entity_id}'"
+    "Entities relation not found: subject_entity='{subject_entity:?}', \
+     relationship='{relationship:?}', object_entity='{object_entity:?}'"
 )]
 pub struct EntitiesRelationNotFoundError {
-    pub subject_entity_type: EntityType,
-    pub subject_entity_id: String,
+    pub subject_entity: Entity<'static>,
     pub relationship: Relation,
-    pub object_entity_type: EntityType,
-    pub object_entity_id: String,
+    pub object_entity: Entity<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -375,20 +361,15 @@ pub enum SubjectEntityRelationsError {
 impl SubjectEntityRelationsError {
     pub fn not_found(subject_entity: &Entity) -> Self {
         Self::NotFound(ObjectEntitiesRelationsNotFoundError {
-            subject_entity_type: subject_entity.entity_type,
-            subject_entity_id: subject_entity.entity_id.to_string(),
+            subject_entity: subject_entity.clone().into_owned(),
         })
     }
 }
 
 #[derive(Error, Debug)]
-#[error(
-    "Object entities relations not found: subject_entity_type='{subject_entity_type:?}', \
-     subject_entity_id='{subject_entity_id}'"
-)]
+#[error("Object entities relations not found: subject_entity='{subject_entity:?}' ")]
 pub struct ObjectEntitiesRelationsNotFoundError {
-    pub subject_entity_type: EntityType,
-    pub subject_entity_id: String,
+    pub subject_entity: Entity<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -405,8 +386,7 @@ pub enum SubjectEntityRelationsByObjectTypeError {
 impl SubjectEntityRelationsByObjectTypeError {
     pub fn not_found(subject_entity: &Entity, object_entity_type: EntityType) -> Self {
         Self::NotFound(ObjectEntitiesRelationsByObjectTypeNotFoundError {
-            subject_entity_type: subject_entity.entity_type,
-            subject_entity_id: subject_entity.entity_id.to_string(),
+            subject_entity: subject_entity.clone().into_owned(),
             object_entity_type,
         })
     }
@@ -414,13 +394,11 @@ impl SubjectEntityRelationsByObjectTypeError {
 
 #[derive(Error, Debug)]
 #[error(
-    "Object entities relations by object type not found: \
-     subject_entity_type='{subject_entity_type:?}', subject_entity_id='{subject_entity_id}', \
+    "Object entities relations by object type not found: subject_entity='{subject_entity:?}', \
      object_entity_type='{object_entity_type:?}'"
 )]
 pub struct ObjectEntitiesRelationsByObjectTypeNotFoundError {
-    pub subject_entity_type: EntityType,
-    pub subject_entity_id: String,
+    pub subject_entity: Entity<'static>,
     pub object_entity_type: EntityType,
 }
 
@@ -438,25 +416,20 @@ pub enum GetRelationsBetweenEntitiesError {
 impl GetRelationsBetweenEntitiesError {
     pub fn not_found(subject_entity: &Entity, object_entity: &Entity) -> Self {
         Self::NotFound(RelationsBetweenEntitiesNotFoundError {
-            subject_entity_type: subject_entity.entity_type,
-            subject_entity_id: subject_entity.entity_id.to_string(),
-            object_entity_type: object_entity.entity_type,
-            object_entity_id: object_entity.entity_id.to_string(),
+            subject_entity: subject_entity.clone().into_owned(),
+            object_entity: object_entity.clone().into_owned(),
         })
     }
 }
 
 #[derive(Error, Debug)]
 #[error(
-    "Relations between entities not found: subject_entity_type='{subject_entity_type:?}', \
-     subject_entity_id='{subject_entity_id}', object_entity_type='{object_entity_type:?}', \
-     object_entity_id='{object_entity_id}'"
+    "Relations between entities not found: subject_entity='{subject_entity:?}', \
+     object_entity='{object_entity:?}'"
 )]
 pub struct RelationsBetweenEntitiesNotFoundError {
-    pub subject_entity_type: EntityType,
-    pub subject_entity_id: String,
-    pub object_entity_type: EntityType,
-    pub object_entity_id: String,
+    pub subject_entity: Entity<'static>,
+    pub object_entity: Entity<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
