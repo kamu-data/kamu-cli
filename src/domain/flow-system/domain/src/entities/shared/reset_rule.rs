@@ -14,4 +14,5 @@ use serde::{Deserialize, Serialize};
 pub struct ResetRule {
     pub new_head_hash: Option<Multihash>,
     pub old_head_hash: Multihash,
+    pub recursive_compaction: bool,
 }

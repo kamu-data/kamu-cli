@@ -959,6 +959,7 @@ type FlowConfigurationCompactionRule {
 type FlowConfigurationReset {
 	newHeadHash: Multihash
 	oldHeadHash: Multihash!
+	recursiveCompaction: Boolean!
 }
 
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
@@ -1560,6 +1561,7 @@ type RequestHeader {
 input ResetConditionInput {
 	newHeadHash: Multihash
 	oldHeadHash: Multihash
+	recursiveCompaction: Boolean!
 }
 
 type RestProtocolDesc {

@@ -773,6 +773,7 @@ impl FlowServiceImpl {
                             dataset_id: flow_key.dataset_id.clone(),
                             new_head_hash: reset_rule.new_head_hash.clone(),
                             old_head_hash: reset_rule.old_head_hash.clone(),
+                            recursive_compaction: reset_rule.recursive_compaction,
                         }));
                     }
                     InternalError::bail("Reset flow cannot be called without configuration")
@@ -893,7 +894,16 @@ impl FlowServiceImpl {
                     DownstreamDependencyTriggerType::TriggerAllEnabled
                 }
             }
-            DatasetFlowType::Reset => DownstreamDependencyTriggerType::Empty,
+            DatasetFlowType::Reset => {
+                if let Some(config_snapshot) = &maybe_config_snapshot
+                    && let FlowConfigurationSnapshot::Reset(reset_rule) = config_snapshot
+                    && reset_rule.recursive_compaction
+                {
+                    DownstreamDependencyTriggerType::TriggerOwnUnconditionally
+                } else {
+                    DownstreamDependencyTriggerType::Empty
+                }
+            }
         }
     }
 }

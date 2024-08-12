@@ -86,7 +86,8 @@ impl AnyFlowType {
             AnyFlowType::Dataset(
                 DatasetFlowType::Ingest
                 | DatasetFlowType::ExecuteTransform
-                | DatasetFlowType::HardCompaction,
+                | DatasetFlowType::HardCompaction
+                | DatasetFlowType::Reset,
             ) => FlowSuccessFollowupMethod::TriggerDependent,
             _ => FlowSuccessFollowupMethod::Ignore,
         }
