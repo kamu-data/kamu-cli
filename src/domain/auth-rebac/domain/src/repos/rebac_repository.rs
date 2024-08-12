@@ -10,7 +10,6 @@
 use std::borrow::Cow;
 
 use internal_error::InternalError;
-use reusable::{reusable, reuse};
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,8 +20,7 @@ pub enum EntityType {
     Account,
 }
 
-#[reusable(entity)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Entity<'a> {
     pub entity_type: EntityType,
     pub entity_id: Cow<'a, str>,
@@ -45,40 +43,27 @@ impl<'a> Entity<'a> {
     }
 }
 
-impl<'a> From<EntityWithRelation<'a>> for Entity<'a> {
-    fn from(v: EntityWithRelation<'a>) -> Self {
-        Self {
-            entity_type: v.entity_type,
-            entity_id: v.entity_id,
-        }
-    }
-}
-
-#[reuse(entity)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EntityWithRelation<'a> {
+    pub entity: Entity<'a>,
     pub relation: Relation,
 }
 
 impl<'a> EntityWithRelation<'a> {
-    pub fn new(
-        entity_type: EntityType,
-        entity_id: impl Into<Cow<'a, str>>,
-        relation: Relation,
-    ) -> Self {
-        Self {
-            entity_type,
-            entity_id: entity_id.into(),
-            relation,
-        }
+    pub fn new(entity: Entity<'a>, relation: Relation) -> Self {
+        Self { entity, relation }
     }
 
     pub fn new_account(entity_id: impl Into<Cow<'a, str>>, relation: Relation) -> Self {
-        Self::new(EntityType::Account, entity_id, relation)
+        let account_entity = Entity::new_account(entity_id);
+
+        Self::new(account_entity, relation)
     }
 
     pub fn new_dataset(entity_id: impl Into<Cow<'a, str>>, relation: Relation) -> Self {
-        Self::new(EntityType::Dataset, entity_id, relation)
+        let dataset_entity = Entity::new_dataset(entity_id);
+
+        Self::new(dataset_entity, relation)
     }
 }
 
@@ -87,13 +72,15 @@ pub type ObjectEntityWithRelation<'a> = EntityWithRelation<'a>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub type PropertyValue<'a> = Cow<'a, str>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum PropertyName {
     Dataset(DatasetPropertyName),
     Account(AccountPropertyName),
 }
-
-pub type PropertyValue<'a> = Cow<'a, str>;
 
 impl PropertyName {
     pub fn dataset_allows_anonymous_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
@@ -137,6 +124,8 @@ impl From<AccountPropertyName> for PropertyName {
         PropertyName::Account(value)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Relation {

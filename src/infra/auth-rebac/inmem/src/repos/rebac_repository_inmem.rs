@@ -316,10 +316,13 @@ impl RebacRepository for RebacRepositoryInMem {
         let rows = self.get_entities_relations_by_row_ids(row_ids, &readable_state);
         let res = rows
             .into_iter()
-            .map(|row| ObjectEntityWithRelation {
-                entity_type: row.object_entity.entity_type,
-                entity_id: row.object_entity.entity_id.clone().into(),
-                relation: row.relationship,
+            .map(|row| {
+                let entity = Entity::new(
+                    row.object_entity.entity_type,
+                    row.object_entity.entity_id.clone(),
+                );
+
+                ObjectEntityWithRelation::new(entity, row.relationship)
             })
             .collect();
 
@@ -350,10 +353,13 @@ impl RebacRepository for RebacRepositoryInMem {
         let rows = self.get_entities_relations_by_row_ids(row_ids, &readable_state);
         let res = rows
             .into_iter()
-            .map(|row| ObjectEntityWithRelation {
-                entity_type: row.object_entity.entity_type,
-                entity_id: row.object_entity.entity_id.clone().into(),
-                relation: row.relationship,
+            .map(|row| {
+                let entity = Entity::new(
+                    row.object_entity.entity_type,
+                    row.object_entity.entity_id.clone(),
+                );
+
+                ObjectEntityWithRelation::new(entity, row.relationship)
             })
             .collect();
 

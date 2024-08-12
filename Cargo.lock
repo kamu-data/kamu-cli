@@ -5211,7 +5211,6 @@ dependencies = [
  "async-trait",
  "internal-error",
  "opendatafabric",
- "reusable",
  "thiserror",
 ]
 
