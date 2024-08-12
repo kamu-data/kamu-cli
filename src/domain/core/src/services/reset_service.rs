@@ -18,9 +18,9 @@ pub trait ResetService: Send + Sync {
     async fn reset_dataset(
         &self,
         dataset_handle: &DatasetHandle,
-        block_hash: &Multihash,
-        old_head_maybe: Option<Multihash>,
-    ) -> Result<(), ResetError>;
+        block_hash: Option<&Multihash>,
+        old_head_maybe: Option<&Multihash>,
+    ) -> Result<Multihash, ResetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

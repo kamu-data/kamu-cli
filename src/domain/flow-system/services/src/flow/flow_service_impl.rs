@@ -18,14 +18,10 @@ use event_bus::{AsyncEventHandler, EventBus};
 use futures::TryStreamExt;
 use kamu_core::events::DatasetEventDeleted;
 use kamu_core::{
-    BlockRef,
     DatasetChangesService,
     DatasetOwnershipService,
-    DatasetRepository,
     DependencyGraphService,
     InternalError,
-    MetadataChainExt,
-    SearchSeedVisitor,
     SystemTimeSource,
 };
 use kamu_flow_system::*;
@@ -48,7 +44,6 @@ pub struct FlowServiceImpl {
     task_scheduler: Arc<dyn TaskScheduler>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
-    dataset_repo: Arc<dyn DatasetRepository>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
 }
@@ -82,7 +77,6 @@ impl FlowServiceImpl {
         task_scheduler: Arc<dyn TaskScheduler>,
         flow_configuration_service: Arc<dyn FlowConfigurationService>,
         dataset_changes_service: Arc<dyn DatasetChangesService>,
-        dataset_repo: Arc<dyn DatasetRepository>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
     ) -> Self {
@@ -95,7 +89,6 @@ impl FlowServiceImpl {
             task_scheduler,
             flow_configuration_service,
             dataset_changes_service,
-            dataset_repo,
             dependency_graph_service,
             dataset_ownership_service,
         }
@@ -681,9 +674,8 @@ impl FlowServiceImpl {
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
-        let logical_plan = self
-            .make_task_logical_plan(&flow.flow_key, flow.config_snapshot.as_ref())
-            .await?;
+        let logical_plan =
+            self.make_task_logical_plan(&flow.flow_key, flow.config_snapshot.as_ref())?;
 
         let task = self
             .task_scheduler
@@ -740,7 +732,7 @@ impl FlowServiceImpl {
     }
 
     /// Creates task logical plan that corresponds to template
-    pub async fn make_task_logical_plan(
+    pub fn make_task_logical_plan(
         &self,
         flow_key: &FlowKey,
         config_snapshot: Option<&FlowConfigurationSnapshot>,
@@ -774,42 +766,16 @@ impl FlowServiceImpl {
                     }))
                 }
                 DatasetFlowType::Reset => {
-                    let (new_head_hash, old_head_hash) = if let Some(config_rule) = config_snapshot
+                    if let Some(config_rule) = config_snapshot
                         && let FlowConfigurationSnapshot::Reset(reset_rule) = config_rule
                     {
-                        (
-                            reset_rule.new_head_hash.clone(),
-                            reset_rule.old_head_hash.clone(),
-                        )
-                    } else {
-                        let dataset = self
-                            .dataset_repo
-                            .get_dataset(&flow_key.dataset_id.as_local_ref())
-                            .await
-                            .int_err()?;
-                        let current_head = dataset
-                            .as_metadata_chain()
-                            .try_get_ref(&BlockRef::Head)
-                            .await
-                            .int_err()?;
-                        if current_head.is_none() {
-                            return InternalError::bail("Dataset don't have any blocks").int_err();
-                        }
-
-                        let seed = dataset
-                            .as_metadata_chain()
-                            .accept_one(SearchSeedVisitor::new())
-                            .await
-                            .int_err()?
-                            .into_hashed_block();
-
-                        (seed.unwrap().0, current_head.unwrap())
-                    };
-                    Ok(LogicalPlan::Reset(ResetDataset {
-                        dataset_id: flow_key.dataset_id.clone(),
-                        new_head_hash,
-                        old_head_hash,
-                    }))
+                        return Ok(LogicalPlan::Reset(ResetDataset {
+                            dataset_id: flow_key.dataset_id.clone(),
+                            new_head_hash: reset_rule.new_head_hash.clone(),
+                            old_head_hash: reset_rule.old_head_hash.clone(),
+                        }));
+                    }
+                    InternalError::bail("Reset flow cannot be called without configuration")
                 }
             },
             FlowKey::System(flow_key) => {

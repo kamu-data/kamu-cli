@@ -57,6 +57,7 @@ pub enum TaskResult {
 pub struct TaskUpdateDatasetResult {
     pub pull_result: PullResult,
 }
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskResetDatasetResult {
     pub new_head: Multihash,
@@ -102,12 +103,7 @@ pub struct RootDatasetCompactedError {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResetDatasetTaskError {
-    NewHeadHashNotFound(NewHeadHashNotFoundError),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct NewHeadHashNotFoundError {
-    pub head_hash: Multihash,
+    ResetHeadNotFound,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

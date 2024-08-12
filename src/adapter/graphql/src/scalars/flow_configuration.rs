@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::MetadataChainExt;
 use kamu_flow_system::{
     BatchingRule,
     CompactionRule,
@@ -19,6 +20,7 @@ use kamu_flow_system::{
     ScheduleCron,
     ScheduleTimeDelta,
 };
+use opendatafabric::DatasetHandle;
 
 use crate::mutations::FlowInvalidRunConfigurations;
 use crate::prelude::*;
@@ -102,15 +104,15 @@ impl From<BatchingRule> for FlowConfigurationBatching {
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfigurationReset {
-    pub new_head_hash: Multihash,
+    pub new_head_hash: Option<Multihash>,
     pub old_head_hash: Multihash,
 }
 
 impl From<ResetRule> for FlowConfigurationReset {
     fn from(value: ResetRule) -> Self {
         Self {
-            new_head_hash: value.new_head_hash.into(),
-            old_head_hash: value.old_head_hash.into(),
+            new_head_hash: value.new_head_hash.map(Into::into),
+            old_head_hash: value.old_head_hash.clone().into(),
         }
     }
 }
@@ -285,17 +287,8 @@ pub struct BatchingConditionInput {
 
 #[derive(InputObject)]
 pub struct ResetConditionInput {
-    pub new_head_hash: Multihash,
-    pub old_head_hash: Multihash,
-}
-
-impl From<&ResetConditionInput> for ResetRule {
-    fn from(value: &ResetConditionInput) -> Self {
-        Self {
-            new_head_hash: value.new_head_hash.clone().into(),
-            old_head_hash: value.old_head_hash.clone().into(),
-        }
-    }
+    pub new_head_hash: Option<Multihash>,
+    pub old_head_hash: Option<Multihash>,
 }
 
 #[derive(OneofObject)]
@@ -317,82 +310,139 @@ pub struct CompactionConditionMetadataOnly {
 }
 
 impl FlowRunConfiguration {
-    pub fn try_into_snapshot(
-        &self,
-        dataset_flow_type: DatasetFlowType,
-    ) -> Result<FlowConfigurationSnapshot, FlowInvalidRunConfigurations> {
-        Ok(match self {
-            Self::Batching(batching_input) => {
-                if dataset_flow_type != DatasetFlowType::ExecuteTransform {
+    pub async fn try_into_snapshot(
+        ctx: &Context<'_>,
+        dataset_flow_type: &DatasetFlowType,
+        dataset_handle: &DatasetHandle,
+        flow_run_configuration_maybe: Option<&FlowRunConfiguration>,
+    ) -> Result<Option<FlowConfigurationSnapshot>, FlowInvalidRunConfigurations> {
+        match dataset_flow_type {
+            DatasetFlowType::Ingest => {
+                if let Some(flow_run_configuration) = flow_run_configuration_maybe {
+                    if let Self::Schedule(schedule_input) = flow_run_configuration {
+                        return Ok(Some(FlowConfigurationSnapshot::Schedule(
+                            match schedule_input {
+                                ScheduleInput::TimeDelta(td) => {
+                                    Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
+                                }
+                                ScheduleInput::Cron5ComponentExpression(
+                                    cron_5component_expression,
+                                ) => Schedule::try_from_5component_cron_expression(
+                                    cron_5component_expression,
+                                )
+                                .map_err(|_| {
+                                    FlowInvalidRunConfigurations {
+                                        error: "Invalid schedule flow run configuration"
+                                            .to_string(),
+                                    }
+                                })?,
+                            },
+                        )));
+                    }
                     return Err(FlowInvalidRunConfigurations {
                         error: "Incompatible flow run configuration and dataset flow type"
                             .to_string(),
                     });
-                };
-                FlowConfigurationSnapshot::Batching(
-                    BatchingRule::new_checked(
-                        batching_input.min_records_to_await,
-                        batching_input.max_batching_interval.clone().into(),
-                    )
+                }
+            }
+            DatasetFlowType::ExecuteTransform => {
+                if let Some(flow_run_configuration) = flow_run_configuration_maybe {
+                    if let Self::Batching(batching_input) = flow_run_configuration {
+                        return Ok(Some(FlowConfigurationSnapshot::Batching(
+                            BatchingRule::new_checked(
+                                batching_input.min_records_to_await,
+                                batching_input.max_batching_interval.clone().into(),
+                            )
+                            .map_err(|_| {
+                                FlowInvalidRunConfigurations {
+                                    error: "Invalid batching flow run configuration".to_string(),
+                                }
+                            })?,
+                        )));
+                    }
+                    return Err(FlowInvalidRunConfigurations {
+                        error: "Incompatible flow run configuration and dataset flow type"
+                            .to_string(),
+                    });
+                }
+            }
+            DatasetFlowType::HardCompaction => {
+                if let Some(flow_run_configuration) = flow_run_configuration_maybe {
+                    if let Self::Compaction(compaction_input) = flow_run_configuration {
+                        return Ok(Some(FlowConfigurationSnapshot::Compaction(
+                            match compaction_input {
+                                CompactionConditionInput::Full(compaction_input) => {
+                                    CompactionRule::Full(
+                                        CompactionRuleFull::new_checked(
+                                            compaction_input.max_slice_size,
+                                            compaction_input.max_slice_records,
+                                            compaction_input.recursive,
+                                        )
+                                        .map_err(|_| {
+                                            FlowInvalidRunConfigurations {
+                                                error: "Invalid compaction flow run configuration"
+                                                    .to_string(),
+                                            }
+                                        })?,
+                                    )
+                                }
+                                CompactionConditionInput::MetadataOnly(compaction_input) => {
+                                    CompactionRule::MetadataOnly(CompactionRuleMetadataOnly {
+                                        recursive: compaction_input.recursive,
+                                    })
+                                }
+                            },
+                        )));
+                    }
+                    return Err(FlowInvalidRunConfigurations {
+                        error: "Incompatible flow run configuration and dataset flow type"
+                            .to_string(),
+                    });
+                }
+            }
+            DatasetFlowType::Reset => {
+                let dataset_repo = from_catalog::<dyn kamu_core::DatasetRepository>(ctx).unwrap();
+
+                let dataset = dataset_repo
+                    .get_dataset(&dataset_handle.as_local_ref())
+                    .await
                     .map_err(|_| FlowInvalidRunConfigurations {
-                        error: "Invalid batching flow run configuration".to_string(),
-                    })?,
-                )
-            }
-            Self::Compaction(compaction_input) => {
-                if dataset_flow_type != DatasetFlowType::HardCompaction {
+                        error: "Cannot fetch default value".to_string(),
+                    })?;
+                // Assume unwrap safe such as we have checked this existance during
+                // validation step
+                let current_head_hash = dataset
+                    .as_metadata_chain()
+                    .try_get_ref(&kamu_core::BlockRef::Head)
+                    .await
+                    .map_err(|_| FlowInvalidRunConfigurations {
+                        error: "Cannot fetch default value".to_string(),
+                    })?
+                    .unwrap();
+                if let Some(flow_run_configuration) = flow_run_configuration_maybe {
+                    if let Self::Reset(reset_input) = flow_run_configuration {
+                        let old_head_hash = if let Some(old_head) = &reset_input.old_head_hash {
+                            old_head.clone().into()
+                        } else {
+                            current_head_hash
+                        };
+                        return Ok(Some(FlowConfigurationSnapshot::Reset(ResetRule {
+                            new_head_hash: reset_input.new_head_hash.clone().map(Into::into),
+                            old_head_hash,
+                        })));
+                    }
                     return Err(FlowInvalidRunConfigurations {
                         error: "Incompatible flow run configuration and dataset flow type"
                             .to_string(),
                     });
-                };
-                FlowConfigurationSnapshot::Compaction(match compaction_input {
-                    CompactionConditionInput::Full(compaction_input) => CompactionRule::Full(
-                        CompactionRuleFull::new_checked(
-                            compaction_input.max_slice_size,
-                            compaction_input.max_slice_records,
-                            compaction_input.recursive,
-                        )
-                        .map_err(|_| FlowInvalidRunConfigurations {
-                            error: "Invalid compaction flow run configuration".to_string(),
-                        })?,
-                    ),
-                    CompactionConditionInput::MetadataOnly(compaction_input) => {
-                        CompactionRule::MetadataOnly(CompactionRuleMetadataOnly {
-                            recursive: compaction_input.recursive,
-                        })
-                    }
-                })
+                }
+                return Ok(Some(FlowConfigurationSnapshot::Reset(ResetRule {
+                    new_head_hash: None,
+                    old_head_hash: current_head_hash,
+                })));
             }
-            Self::Schedule(schedule_input) => {
-                if dataset_flow_type != DatasetFlowType::Ingest {
-                    return Err(FlowInvalidRunConfigurations {
-                        error: "Incompatible flow run configuration and dataset flow type"
-                            .to_string(),
-                    });
-                };
-                FlowConfigurationSnapshot::Schedule(match schedule_input {
-                    ScheduleInput::TimeDelta(td) => {
-                        Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
-                    }
-                    ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
-                        Schedule::try_from_5component_cron_expression(cron_5component_expression)
-                            .map_err(|_| FlowInvalidRunConfigurations {
-                                error: "Invalid schedule flow run configuration".to_string(),
-                            })?
-                    }
-                })
-            }
-            Self::Reset(reset_input) => {
-                if dataset_flow_type != DatasetFlowType::Reset {
-                    return Err(FlowInvalidRunConfigurations {
-                        error: "Incompatible flow run configuration and dataset flow type"
-                            .to_string(),
-                    });
-                };
-                FlowConfigurationSnapshot::Reset(reset_input.into())
-            }
-        })
+        }
+        Ok(None)
     }
 }
 

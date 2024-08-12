@@ -154,24 +154,18 @@ impl TaskExecutorImpl {
         let reset_result_maybe = reset_svc
             .reset_dataset(
                 &dataset_handle,
-                &reset_dataset_args.new_head_hash,
-                Some(reset_dataset_args.old_head_hash.clone()),
+                reset_dataset_args.new_head_hash.as_ref(),
+                Some(&reset_dataset_args.old_head_hash),
             )
             .await;
         match reset_result_maybe {
-            Ok(_) => Ok(TaskOutcome::Success(TaskResult::ResetDatasetResult(
-                TaskResetDatasetResult {
-                    new_head: reset_dataset_args.new_head_hash.clone(),
-                },
+            Ok(new_head) => Ok(TaskOutcome::Success(TaskResult::ResetDatasetResult(
+                TaskResetDatasetResult { new_head },
             ))),
             Err(err) => match err {
-                ResetError::BlockNotFound(_) => {
-                    Ok(TaskOutcome::Failed(TaskError::ResetDatasetError(
-                        ResetDatasetTaskError::NewHeadHashNotFound(NewHeadHashNotFoundError {
-                            head_hash: reset_dataset_args.new_head_hash.clone(),
-                        }),
-                    )))
-                }
+                ResetError::BlockNotFound(_) => Ok(TaskOutcome::Failed(
+                    TaskError::ResetDatasetError(ResetDatasetTaskError::ResetHeadNotFound),
+                )),
                 _ => Ok(TaskOutcome::Failed(TaskError::Empty)),
             },
         }

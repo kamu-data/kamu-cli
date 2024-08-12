@@ -28,6 +28,9 @@ pub trait MetadataChain: Send + Sync {
     /// Returns the specified block
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
+    /// Returns true if chain contains block
+    async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError>;
+
     /// Iterates the chain in reverse order starting with specified block and
     /// following the previous block links. The interval returned is `[head,
     /// tail)` - tail is exclusive. If `tail` argument is provided but not

@@ -623,7 +623,7 @@ async fn test_manual_trigger_reset() {
             create_dataset_result.dataset_handle.id.clone(),
             DatasetFlowType::Reset,
             ResetRule {
-                new_head_hash: dataset_blocks[1].0.clone(),
+                new_head_hash: Some(dataset_blocks[1].0.clone()),
                 old_head_hash: dataset_blocks[0].0.clone(),
             },
         )
@@ -663,7 +663,7 @@ async fn test_manual_trigger_reset() {
                     expected_logical_plan: LogicalPlan::Reset(ResetDataset {
                       dataset_id: create_dataset_result.dataset_handle.id.clone(),
                       // By deafult should reset to seed block
-                      new_head_hash: dataset_blocks[1].0.clone(),
+                      new_head_hash: Some(dataset_blocks[1].0.clone()),
                       old_head_hash: dataset_blocks[0].0.clone()
                     }),
                 });

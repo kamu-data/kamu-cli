@@ -37,9 +37,9 @@ impl ResetService for ResetServiceImpl {
     async fn reset_dataset(
         &self,
         dataset_handle: &DatasetHandle,
-        block_hash: &Multihash,
-        old_head_maybe: Option<Multihash>,
-    ) -> Result<(), ResetError> {
+        new_head_maybe: Option<&Multihash>,
+        old_head_maybe: Option<&Multihash>,
+    ) -> Result<Multihash, ResetError> {
         self.dataset_action_authorizer
             .check_action_allowed(dataset_handle, auth::DatasetAction::Write)
             .await?;
@@ -48,16 +48,29 @@ impl ResetService for ResetServiceImpl {
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
+
+        let new_head = if let Some(new_head) = new_head_maybe {
+            new_head
+        } else {
+            &dataset
+                .as_metadata_chain()
+                .accept_one(SearchSeedVisitor::new())
+                .await
+                .int_err()?
+                .into_hashed_block()
+                .unwrap()
+                .0
+        };
         if let Some(old_head) = old_head_maybe
             && let Some(current_head) = dataset
                 .as_metadata_chain()
                 .try_get_ref(&BlockRef::Head)
                 .await?
-            && old_head != current_head
+            && old_head != &current_head
         {
             return Err(ResetError::OldHeadMismatch(OldHeadMismatchError {
                 current_head,
-                old_head,
+                old_head: old_head.clone(),
             }));
         }
 
@@ -65,7 +78,7 @@ impl ResetService for ResetServiceImpl {
             .as_metadata_chain()
             .set_ref(
                 &BlockRef::Head,
-                block_hash,
+                new_head,
                 SetRefOpts {
                     validate_block_present: true,
                     check_ref_is: None,
@@ -73,6 +86,6 @@ impl ResetService for ResetServiceImpl {
             )
             .await?;
 
-        Ok(())
+        Ok(new_head.clone())
     }
 }

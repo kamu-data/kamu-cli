@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{GetBlockError, GetSummaryOpts, MetadataChainExt};
+use kamu_core::{GetSummaryOpts, MetadataChainExt};
 use odf::DatasetHandle;
 use {kamu_flow_system as fs, opendatafabric as odf};
 
@@ -94,11 +94,12 @@ pub(crate) async fn ensure_expected_dataset_kind(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Check flow preconditions and set default configurations if needed
 pub(crate) async fn ensure_flow_preconditions(
     ctx: &Context<'_>,
     dataset_handle: &DatasetHandle,
     dataset_flow_type: DatasetFlowType,
-    flow_run_configuration: &Option<FlowRunConfiguration>,
+    flow_run_configuration: Option<&FlowRunConfiguration>,
 ) -> Result<Option<FlowPreconditionsNotMet>> {
     match dataset_flow_type {
         DatasetFlowType::Ingest => {
@@ -133,38 +134,39 @@ pub(crate) async fn ensure_flow_preconditions(
             if let Some(flow_configuration) = flow_run_configuration
                 && let FlowRunConfiguration::Reset(reset_configuration) = flow_configuration
             {
-                let dataset_repo = from_catalog::<dyn kamu_core::DatasetRepository>(ctx).unwrap();
+                if let Some(new_head_hash) = &reset_configuration.new_head_hash {
+                    let dataset_repo =
+                        from_catalog::<dyn kamu_core::DatasetRepository>(ctx).unwrap();
 
-                let dataset = dataset_repo
-                    .get_dataset(&dataset_handle.as_local_ref())
-                    .await
-                    .int_err()?;
-                let new_head_block_result = dataset
-                    .as_metadata_chain()
-                    .get_block(&reset_configuration.new_head_hash)
-                    .await;
+                    let dataset = dataset_repo
+                        .get_dataset(&dataset_handle.as_local_ref())
+                        .await
+                        .int_err()?;
+                    let current_head_hash_maybe = dataset
+                        .as_metadata_chain()
+                        .try_get_ref(&kamu_core::BlockRef::Head)
+                        .await
+                        .int_err()?;
+                    if current_head_hash_maybe.is_none() {
+                        return Ok(Some(FlowPreconditionsNotMet {
+                            preconditions: "Dataset does not contain any blocks".to_string(),
+                        }));
+                    }
+                    if !dataset
+                        .as_metadata_chain()
+                        .contains_block(new_head_hash)
+                        .await
+                        .int_err()?
+                    {
+                        return Ok(Some(FlowPreconditionsNotMet {
+                            preconditions: "New head hash not found".to_string(),
+                        }));
+                    };
 
-                match new_head_block_result {
-                    Err(err) => match err {
-                        GetBlockError::NotFound(_) => {
-                            return Ok(Some(FlowPreconditionsNotMet {
-                                preconditions: "New head hash not found".to_string(),
-                            }))
-                        }
-                        _ => return Err(err.int_err().into()),
-                    },
-                    Ok(existing_block) => {
-                        let current_head_hash = dataset
-                            .as_metadata_chain()
-                            .get_block_by_ref(&kamu_core::BlockRef::Head)
-                            .await
-                            .int_err()?;
-                        if existing_block == current_head_hash {
-                            return Ok(Some(FlowPreconditionsNotMet {
-                                preconditions: "Provided head hash is already a head block"
-                                    .to_string(),
-                            }));
-                        }
+                    if new_head_hash == &current_head_hash_maybe.unwrap().into() {
+                        return Ok(Some(FlowPreconditionsNotMet {
+                            preconditions: "Provided head hash is already a head block".to_string(),
+                        }));
                     }
                 }
             }

@@ -29,7 +29,11 @@ async fn test_reset_dataset_with_2revisions_drop_last() {
 
     let result = harness
         .reset_svc
-        .reset_dataset(&test_case.dataset_handle, &test_case.hash_seed_block, None)
+        .reset_dataset(
+            &test_case.dataset_handle,
+            Some(&test_case.hash_seed_block),
+            None,
+        )
         .await;
     assert!(result.is_ok());
 
@@ -52,7 +56,7 @@ async fn test_reset_dataset_with_2revisions_without_changes() {
         .reset_svc
         .reset_dataset(
             &test_case.dataset_handle,
-            &test_case.hash_polling_source_block,
+            Some(&test_case.hash_polling_source_block),
             None,
         )
         .await;
@@ -77,7 +81,7 @@ async fn test_reset_dataset_to_non_existing_block_fails() {
         .reset_svc
         .reset_dataset(
             &test_case.dataset_handle,
-            &a_hash_not_present_in_chain,
+            Some(&a_hash_not_present_in_chain),
             None,
         )
         .await;
@@ -93,8 +97,8 @@ async fn test_reset_dataset_with_wrong_head() {
         .reset_svc
         .reset_dataset(
             &test_case.dataset_handle,
-            &test_case.hash_seed_block,
-            Some(test_case.hash_seed_block.clone()),
+            Some(&test_case.hash_seed_block),
+            Some(&test_case.hash_seed_block),
         )
         .await;
     assert_matches!(result, Err(ResetError::OldHeadMismatch(_)));

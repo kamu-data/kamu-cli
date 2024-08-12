@@ -58,17 +58,12 @@ impl FlowResult {
 pub enum FlowError {
     Failed,
     RootDatasetCompacted(FlowRootDatasetCompactedError),
-    NewHeadHashNotFound(FlowResetNewHeadHashNotFoundError),
+    ResetHeadNotFound,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowRootDatasetCompactedError {
     pub dataset_id: DatasetID,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowResetNewHeadHashNotFoundError {
-    pub head_hash: Multihash,
 }
 
 impl From<&TaskError> for FlowError {
@@ -83,11 +78,7 @@ impl From<&TaskError> for FlowError {
                 }
             },
             TaskError::ResetDatasetError(reset_dataset_error) => match reset_dataset_error {
-                ResetDatasetTaskError::NewHeadHashNotFound(err) => {
-                    Self::NewHeadHashNotFound(FlowResetNewHeadHashNotFoundError {
-                        head_hash: err.head_hash.clone(),
-                    })
-                }
+                ResetDatasetTaskError::ResetHeadNotFound => Self::ResetHeadNotFound,
             },
         }
     }

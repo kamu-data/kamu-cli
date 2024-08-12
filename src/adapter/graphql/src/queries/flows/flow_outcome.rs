@@ -92,7 +92,7 @@ impl FlowOutcome {
                             ),
                         })
                     }
-                    FlowError::NewHeadHashNotFound(_) => Self::Failed(FlowFailedError {
+                    FlowError::ResetHeadNotFound => Self::Failed(FlowFailedError {
                         reason: FlowFailedReason::FlowFailed(FlowFailedMessage {
                             message: "New head hash to reset not found".to_owned(),
                         }),

@@ -64,7 +64,7 @@ impl Command for ResetCommand {
         }
 
         self.reset_svc
-            .reset_dataset(&dataset_handle, &self.block_hash, None)
+            .reset_dataset(&dataset_handle, Some(&self.block_hash), None)
             .await
             .map_err(CLIError::failure)?;
 

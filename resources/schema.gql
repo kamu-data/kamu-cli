@@ -957,7 +957,7 @@ type FlowConfigurationCompactionRule {
 }
 
 type FlowConfigurationReset {
-	newHeadHash: Multihash!
+	newHeadHash: Multihash
 	oldHeadHash: Multihash!
 }
 
@@ -1558,8 +1558,8 @@ type RequestHeader {
 }
 
 input ResetConditionInput {
-	newHeadHash: Multihash!
-	oldHeadHash: Multihash!
+	newHeadHash: Multihash
+	oldHeadHash: Multihash
 }
 
 type RestProtocolDesc {
