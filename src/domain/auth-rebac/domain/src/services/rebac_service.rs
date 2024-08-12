@@ -11,6 +11,7 @@ use opendatafabric::{AccountID, DatasetID};
 
 use crate::{
     AccountPropertyName,
+    AccountToDatasetRelation,
     DatasetPropertyName,
     DeleteEntitiesRelationError,
     DeleteEntityPropertyError,
@@ -19,7 +20,6 @@ use crate::{
     ObjectEntityWithRelation,
     PropertyName,
     PropertyValue,
-    Relation,
     SetEntityPropertyError,
     SubjectEntityRelationsError,
 };
@@ -70,14 +70,14 @@ pub trait RebacService: Send + Sync {
     async fn insert_account_dataset_relation(
         &self,
         account_id: &AccountID,
-        relationship: Relation,
+        relationship: AccountToDatasetRelation,
         dataset_id: &DatasetID,
     ) -> Result<(), InsertEntitiesRelationError>;
 
     async fn delete_account_dataset_relation(
         &self,
         account_id: &AccountID,
-        relationship: Relation,
+        relationship: AccountToDatasetRelation,
         dataset_id: &DatasetID,
     ) -> Result<(), DeleteEntitiesRelationError>;
 

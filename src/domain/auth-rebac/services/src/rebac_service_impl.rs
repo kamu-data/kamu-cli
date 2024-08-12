@@ -12,6 +12,7 @@ use std::sync::Arc;
 use dill::{component, interface};
 use kamu_auth_rebac::{
     AccountPropertyName,
+    AccountToDatasetRelation,
     DatasetPropertyName,
     DeleteEntitiesRelationError,
     DeleteEntityPropertyError,
@@ -132,7 +133,7 @@ impl RebacService for RebacServiceImpl {
     async fn insert_account_dataset_relation(
         &self,
         account_id: &AccountID,
-        relationship: Relation,
+        relationship: AccountToDatasetRelation,
         dataset_id: &DatasetID,
     ) -> Result<(), InsertEntitiesRelationError> {
         let account_id = account_id.as_did_str().to_stack_string();
@@ -142,7 +143,11 @@ impl RebacService for RebacServiceImpl {
         let dataset_id_entity = Entity::new_dataset(dataset_id.as_str());
 
         self.rebac_repo
-            .insert_entities_relation(&account_entity, relationship, &dataset_id_entity)
+            .insert_entities_relation(
+                &account_entity,
+                Relation::AccountToDataset(relationship),
+                &dataset_id_entity,
+            )
             .await?;
 
         Ok(())
@@ -151,7 +156,7 @@ impl RebacService for RebacServiceImpl {
     async fn delete_account_dataset_relation(
         &self,
         account_id: &AccountID,
-        relationship: Relation,
+        relationship: AccountToDatasetRelation,
         dataset_id: &DatasetID,
     ) -> Result<(), DeleteEntitiesRelationError> {
         let account_id = account_id.as_did_str().to_stack_string();
@@ -161,7 +166,11 @@ impl RebacService for RebacServiceImpl {
         let dataset_id_entity = Entity::new_dataset(dataset_id.as_str());
 
         self.rebac_repo
-            .delete_entities_relation(&account_entity, relationship, &dataset_id_entity)
+            .delete_entities_relation(
+                &account_entity,
+                Relation::AccountToDataset(relationship),
+                &dataset_id_entity,
+            )
             .await?;
 
         Ok(())

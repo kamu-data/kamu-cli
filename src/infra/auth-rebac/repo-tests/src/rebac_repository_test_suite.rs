@@ -202,7 +202,7 @@ pub async fn test_try_insert_duplicate_entities_relation(catalog: &Catalog) {
 
     let account = Entity::new_account("kamu");
     let dataset = Entity::new_account("dataset");
-    let relationship = Relation::AccountDatasetReader;
+    let relationship = Relation::account_is_a_dataset_reader();
 
     {
         let insert_res = rebac_repo
@@ -233,7 +233,7 @@ pub async fn test_delete_entities_relation(catalog: &Catalog) {
 
     let account = Entity::new_account("kamu");
     let dataset = Entity::new_account("dataset");
-    let relationship = Relation::AccountDatasetReader;
+    let relationship = Relation::account_is_a_dataset_reader();
 
     let insert_res = rebac_repo
         .insert_entities_relation(&account, relationship, &dataset)
@@ -275,11 +275,11 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
         dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
         relation_map: HashMap::from([
             (
-                Relation::AccountDatasetReader,
+                Relation::account_is_a_dataset_reader(),
                 ["dataset1", "dataset2"].into(),
             ),
             (
-                Relation::AccountDatasetEditor,
+                Relation::account_is_a_dataset_editor(),
                 ["dataset1", "dataset3"].into(),
             ),
         ]),
@@ -312,7 +312,7 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
         let dataset1 = ObjectEntity::new_dataset("dataset1");
 
         let delete_res = rebac_repo
-            .delete_entities_relation(&account, Relation::AccountDatasetReader, &dataset1)
+            .delete_entities_relation(&account, Relation::account_is_a_dataset_reader(), &dataset1)
             .await;
 
         assert_matches!(delete_res, Ok(()));
@@ -321,9 +321,9 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
             account_id: "account",
             dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
             relation_map: HashMap::from([
-                (Relation::AccountDatasetReader, ["dataset2"].into()),
+                (Relation::account_is_a_dataset_reader(), ["dataset2"].into()),
                 (
-                    Relation::AccountDatasetEditor,
+                    Relation::account_is_a_dataset_editor(),
                     ["dataset1", "dataset3"].into(),
                 ),
             ]),
@@ -336,7 +336,7 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
         let dataset2 = ObjectEntity::new_dataset("dataset2");
 
         let delete_res = rebac_repo
-            .delete_entities_relation(&account, Relation::AccountDatasetReader, &dataset2)
+            .delete_entities_relation(&account, Relation::account_is_a_dataset_reader(), &dataset2)
             .await;
 
         assert_matches!(delete_res, Ok(()));
@@ -345,9 +345,9 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
             account_id: "account",
             dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
             relation_map: HashMap::from([
-                (Relation::AccountDatasetReader, [].into()),
+                (Relation::account_is_a_dataset_reader(), [].into()),
                 (
-                    Relation::AccountDatasetEditor,
+                    Relation::account_is_a_dataset_editor(),
                     ["dataset1", "dataset3"].into(),
                 ),
             ]),
@@ -360,7 +360,7 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
         let dataset3 = ObjectEntity::new_dataset("dataset3");
 
         let delete_res = rebac_repo
-            .delete_entities_relation(&account, Relation::AccountDatasetEditor, &dataset3)
+            .delete_entities_relation(&account, Relation::account_is_a_dataset_editor(), &dataset3)
             .await;
 
         assert_matches!(delete_res, Ok(()));
@@ -369,8 +369,8 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
             account_id: "account",
             dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
             relation_map: HashMap::from([
-                (Relation::AccountDatasetReader, [].into()),
-                (Relation::AccountDatasetEditor, ["dataset1"].into()),
+                (Relation::account_is_a_dataset_reader(), [].into()),
+                (Relation::account_is_a_dataset_editor(), ["dataset1"].into()),
             ]),
         };
 
@@ -381,7 +381,7 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
         let dataset1 = ObjectEntity::new_dataset("dataset1");
 
         let delete_res = rebac_repo
-            .delete_entities_relation(&account, Relation::AccountDatasetEditor, &dataset1)
+            .delete_entities_relation(&account, Relation::account_is_a_dataset_editor(), &dataset1)
             .await;
 
         assert_matches!(delete_res, Ok(()));
@@ -390,8 +390,8 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
             account_id: "account",
             dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
             relation_map: HashMap::from([
-                (Relation::AccountDatasetReader, [].into()),
-                (Relation::AccountDatasetEditor, [].into()),
+                (Relation::account_is_a_dataset_reader(), [].into()),
+                (Relation::account_is_a_dataset_editor(), [].into()),
             ]),
         };
 
@@ -533,8 +533,8 @@ impl CrossoverTestState {
             .iter()
             .fold(HashMap::new(), |mut acc, dataset_id| {
                 let relations = [
-                    Relation::AccountDatasetReader,
-                    Relation::AccountDatasetEditor,
+                    Relation::account_is_a_dataset_reader(),
+                    Relation::account_is_a_dataset_editor(),
                 ]
                 .into_iter()
                 .fold(Vec::new(), |mut acc, relation| {

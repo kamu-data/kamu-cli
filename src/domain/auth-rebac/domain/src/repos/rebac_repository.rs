@@ -200,8 +200,23 @@ impl From<AccountPropertyName> for PropertyName {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Relation {
-    AccountDatasetReader,
-    AccountDatasetEditor,
+    AccountToDataset(AccountToDatasetRelation),
+}
+
+impl Relation {
+    pub fn account_is_a_dataset_reader() -> Self {
+        Self::AccountToDataset(AccountToDatasetRelation::Reader)
+    }
+
+    pub fn account_is_a_dataset_editor() -> Self {
+        Self::AccountToDataset(AccountToDatasetRelation::Editor)
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum AccountToDatasetRelation {
+    Reader,
+    Editor,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
