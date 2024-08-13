@@ -43,6 +43,9 @@ pub enum MetadataVisitorDecision {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: PERF: MetadataChainVisitor::visit(): use Cow<HashedMetadataBlock>.
+//             This will remove some of the cloning.
+
 pub trait MetadataChainVisitor: Send {
     type Error: std::error::Error + Send;
 
