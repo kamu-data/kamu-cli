@@ -55,7 +55,9 @@ impl From<DatasetPropertyName> for PropertyName {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum AccountPropertyName {
-    // TBA
+    // TODO: ReBAC: absorb the `is_admin` attribute from the Accounts domain
+    //       https://github.com/kamu-data/kamu-cli/issues/766
+    IsAnAdmin,
 }
 
 impl From<AccountPropertyName> for PropertyName {

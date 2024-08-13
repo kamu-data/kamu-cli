@@ -39,6 +39,8 @@ pub struct Account {
     pub account_type: AccountType,
     pub avatar_url: Option<String>,
     pub registered_at: DateTime<Utc>,
+    // TODO: ReBAC: absorb the `is_admin` attribute from the Accounts domain
+    //       https://github.com/kamu-data/kamu-cli/issues/766
     pub is_admin: bool,
     pub provider: String,
     pub provider_identity_key: String,
