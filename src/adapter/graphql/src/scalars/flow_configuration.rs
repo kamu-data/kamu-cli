@@ -287,11 +287,43 @@ pub struct BatchingConditionInput {
     pub max_batching_interval: TimeDeltaInput,
 }
 
+#[derive(OneofObject)]
+pub enum ResetPropagationMode {
+    Custom(FlowConfigurationResetCustom),
+    ToSeed(FlowConfigurationResetToSeed),
+}
+
+#[derive(InputObject)]
+pub struct FlowConfigurationResetCustom {
+    pub new_head_hash: Multihash,
+    pub old_head_hash: Option<Multihash>,
+}
+
+#[derive(InputObject)]
+pub struct FlowConfigurationResetToSeed {
+    pub old_head_hash: Option<Multihash>,
+}
+
 #[derive(InputObject)]
 pub struct ResetConditionInput {
-    pub new_head_hash: Option<Multihash>,
-    pub old_head_hash: Option<Multihash>,
+    pub mode: ResetPropagationMode,
     pub recursive: bool,
+}
+
+impl ResetConditionInput {
+    pub fn old_head_hash(&self) -> Option<Multihash> {
+        match &self.mode {
+            ResetPropagationMode::Custom(custom_args) => custom_args.old_head_hash.clone(),
+            ResetPropagationMode::ToSeed(custom_args) => custom_args.old_head_hash.clone(),
+        }
+    }
+
+    pub fn new_head_hash(&self) -> Option<Multihash> {
+        match &self.mode {
+            ResetPropagationMode::Custom(custom_args) => Some(custom_args.new_head_hash.clone()),
+            ResetPropagationMode::ToSeed(_) => None,
+        }
+    }
 }
 
 #[derive(OneofObject)]
@@ -423,13 +455,13 @@ impl FlowRunConfiguration {
                     })?;
                 if let Some(flow_run_configuration) = flow_run_configuration_maybe {
                     if let Self::Reset(reset_input) = flow_run_configuration {
-                        let old_head_hash = if reset_input.old_head_hash.is_some() {
-                            reset_input.old_head_hash.clone().map(Into::into)
+                        let old_head_hash = if reset_input.old_head_hash().is_some() {
+                            reset_input.old_head_hash().map(Into::into)
                         } else {
                             current_head_hash
                         };
                         return Ok(Some(FlowConfigurationSnapshot::Reset(ResetRule {
-                            new_head_hash: reset_input.new_head_hash.clone().map(Into::into),
+                            new_head_hash: reset_input.new_head_hash().map(Into::into),
                             old_head_hash,
                             recursive: reset_input.recursive,
                         })));

@@ -3503,7 +3503,7 @@ impl FlowRunsHarness {
                                                 }
                                                 __typename
                                             }
-                                             ... on FlowConfigurationReset {
+                                            ... on FlowConfigurationReset {
                                                 newHeadHash
                                                 oldHeadHash
                                                 recursive
@@ -3665,8 +3665,12 @@ impl FlowRunsHarness {
                                     datasetFlowType: "<dataset_flow_type>",
                                     flowRunConfiguration: {
                                         reset: {
-                                            newHeadHash: "<new_head_hash>",
-                                            oldHeadHash: "<old_head_hash>",
+                                            mode: {
+                                                custom: {
+                                                    newHeadHash: "<new_head_hash>",
+                                                    oldHeadHash: "<old_head_hash>"
+                                                }
+                                            },
                                             recursive: <recursive>
                                         }
                                     }

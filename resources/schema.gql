@@ -962,6 +962,15 @@ type FlowConfigurationReset {
 	recursive: Boolean!
 }
 
+input FlowConfigurationResetCustom {
+	newHeadHash: Multihash!
+	oldHeadHash: Multihash
+}
+
+input FlowConfigurationResetToSeed {
+	oldHeadHash: Multihash
+}
+
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
 
 type FlowConfigurationScheduleRule {
@@ -1559,9 +1568,13 @@ type RequestHeader {
 }
 
 input ResetConditionInput {
-	newHeadHash: Multihash
-	oldHeadHash: Multihash
+	mode: ResetPropagationMode!
 	recursive: Boolean!
+}
+
+input ResetPropagationMode @oneOf {
+	custom: FlowConfigurationResetCustom
+	toSeed: FlowConfigurationResetToSeed
 }
 
 type RestProtocolDesc {
