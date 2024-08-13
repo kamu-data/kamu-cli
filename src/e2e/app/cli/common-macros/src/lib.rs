@@ -70,9 +70,7 @@ fn kamu_cli_e2e_test_impl(harness_method: &Ident, input: TokenStream) -> TokenSt
             }
         },
         "mysql" => quote! {
-            // flaky: when running in parallel, errors occur with table not found (or sporadic deadlocks),
-            //        restarting again solves the problem.
-            #[test_group::group(e2e, database, mysql, flaky, #extra_test_groups)]
+            #[test_group::group(e2e, database, mysql, #extra_test_groups)]
             #[test_log::test(sqlx::test(migrations = "../../../../../migrations/mysql"))]
             async fn #test_function_name (mysql_pool: sqlx::MySqlPool) {
                 KamuCliApiServerHarness::mysql(&mysql_pool, #options )
