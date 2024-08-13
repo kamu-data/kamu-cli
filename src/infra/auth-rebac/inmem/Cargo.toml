@@ -1,6 +1,6 @@
 [package]
-name = "kamu-task-system-inmem"
-description = "In-memory implementation of the compute node's task system for testing purposes"
+name = "kamu-auth-rebac-inmem"
+description = "In-memory implementation of ReBAC domain"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -22,17 +22,14 @@ doctest = false
 
 
 [dependencies]
-opendatafabric = { workspace = true }
-kamu-task-system = { workspace = true }
+kamu-auth-rebac = { workspace = true }
 
-async-trait = { version = "0.1", default-features = false }
-chrono = { version = "0.4", default-features = false }
+async-trait = "0.1"
 dill = "0.8"
-futures = "0.3"
+tokio = { version = "1", default-features = false, features = [] }
 
 
 [dev-dependencies]
-kamu-task-system-repo-tests = { workspace = true }
+kamu-auth-rebac-repo-tests = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

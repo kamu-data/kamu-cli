@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dataset_env_var_repository_inmem;
-mod dateset_entry_repository_inmem;
+mod rebac_repository;
 
-pub use dataset_env_var_repository_inmem::*;
-pub use dateset_entry_repository_inmem::*;
+pub use rebac_repository::*;

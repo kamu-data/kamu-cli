@@ -325,18 +325,18 @@ impl Display for DataDoesNotMatchMetadata {
         match &self.error {
             DataVerificationError::SizeMismatch { expected, actual } => write!(
                 f,
-                "Data size for block {} is expected to be {} but actual {}",
-                self.block_hash, expected, actual
+                "Data size for block {} is expected to be {expected} but actual {actual}",
+                self.block_hash,
             ),
             DataVerificationError::PhysicalHashMismatch { expected, actual } => write!(
                 f,
-                "Data physical hash for block {} is expected to be {} but actual {}",
-                self.block_hash, expected, actual
+                "Data physical hash for block {} is expected to be {expected} but actual {actual}",
+                self.block_hash,
             ),
             DataVerificationError::LogicalHashMismatch { expected, actual } => write!(
                 f,
-                "Data logical hash for block {} is expected to be {} but actual {}",
-                self.block_hash, expected, actual
+                "Data logical hash for block {} is expected to be {expected} but actual {actual}",
+                self.block_hash,
             ),
         }
     }
@@ -386,13 +386,14 @@ impl Display for CheckpointDoesNotMatchMetadata {
         match &self.error {
             CheckpointVerificationError::SizeMismatch { expected, actual } => write!(
                 f,
-                "Checkpoint size for block {} is expected to be {} but actual {}",
-                self.block_hash, expected, actual
+                "Checkpoint size for block {} is expected to be {expected} but actual {actual}",
+                self.block_hash,
             ),
             CheckpointVerificationError::PhysicalHashMismatch { expected, actual } => write!(
                 f,
-                "Checkpoint physical hash for block {} is expected to be {} but actual {}",
-                self.block_hash, expected, actual
+                "Checkpoint physical hash for block {} is expected to be {expected} but actual \
+                 {actual}",
+                self.block_hash,
             ),
         }
     }

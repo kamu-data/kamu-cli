@@ -164,9 +164,9 @@ make lint
 This will do a number of highly useful checks:
 * Rust formatting check
 * License headers check
-* Dependecies check: detecting issues with existing dependencies, detecting unused dependencies
-* Rust coding practices checks (Clippy)
-* SQLX offline data check (`sqlx` data for offline compliation must be up-to-date with the database schema)
+* Dependencies check: detecting issues with existing dependencies, detecting unused dependencies
+* Rust coding practices checks (`clippy`)
+* SQLX offline data check (`sqlx` data for offline compilation must be up-to-date with the database schema)
 
 
 ### Run Tests

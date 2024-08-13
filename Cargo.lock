@@ -5205,6 +5205,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-auth-rebac"
+version = "0.193.1"
+dependencies = [
+ "async-trait",
+ "internal-error",
+ "opendatafabric",
+ "thiserror",
+]
+
+[[package]]
+name = "kamu-auth-rebac-inmem"
+version = "0.193.1"
+dependencies = [
+ "async-trait",
+ "dill",
+ "kamu-auth-rebac",
+ "kamu-auth-rebac-repo-tests",
+ "test-log",
+ "tokio",
+]
+
+[[package]]
+name = "kamu-auth-rebac-repo-tests"
+version = "0.193.1"
+dependencies = [
+ "dill",
+ "kamu-auth-rebac",
+ "tokio",
+]
+
+[[package]]
+name = "kamu-auth-rebac-services"
+version = "0.193.1"
+dependencies = [
+ "async-trait",
+ "dill",
+ "futures",
+ "kamu-auth-rebac",
+ "opendatafabric",
+]
+
+[[package]]
 name = "kamu-cli"
 version = "0.193.1"
 dependencies = [

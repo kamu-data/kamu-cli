@@ -13,7 +13,7 @@ use crate::formats::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Unique identifier of the dataset
+/// Unique identifier of the account
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct AccountID {
     did: DidOdf,

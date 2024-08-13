@@ -11,6 +11,7 @@ use database_common::{DatabaseTransactionRunner, PostgresTransactionManager};
 use dill::{Catalog, CatalogBuilder};
 use internal_error::InternalError;
 use kamu_datasets_postgres::PostgresDatasetEnvVarRepository;
+use kamu_datasets_repo_tests::dataset_env_var_repo;
 use sqlx::PgPool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -22,7 +23,7 @@ async fn test_missing_dataset_env_var_not_found(pg_pool: PgPool) {
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
-            kamu_datasets_repo_tests::test_missing_dataset_env_var_not_found(&catalog).await;
+            dataset_env_var_repo::test_missing_dataset_env_var_not_found(&catalog).await;
             Ok::<_, InternalError>(())
         })
         .await
@@ -38,7 +39,7 @@ async fn test_insert_and_get_dataset_env_var(pg_pool: PgPool) {
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
-            kamu_datasets_repo_tests::test_insert_and_get_dataset_env_var(&catalog).await;
+            dataset_env_var_repo::test_insert_and_get_dataset_env_var(&catalog).await;
             Ok::<_, InternalError>(())
         })
         .await
@@ -54,7 +55,7 @@ async fn test_insert_and_get_multiple_dataset_env_vars(pg_pool: PgPool) {
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
-            kamu_datasets_repo_tests::test_insert_and_get_multiple_dataset_env_vars(&catalog).await;
+            dataset_env_var_repo::test_insert_and_get_multiple_dataset_env_vars(&catalog).await;
             Ok::<_, InternalError>(())
         })
         .await
@@ -70,7 +71,7 @@ async fn test_delete_dataset_env_vars(pg_pool: PgPool) {
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
-            kamu_datasets_repo_tests::test_delete_dataset_env_vars(&catalog).await;
+            dataset_env_var_repo::test_delete_dataset_env_vars(&catalog).await;
             Ok::<_, InternalError>(())
         })
         .await
@@ -86,7 +87,7 @@ async fn test_modify_dataset_env_vars(pg_pool: PgPool) {
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
-            kamu_datasets_repo_tests::test_modify_dataset_env_vars(&catalog).await;
+            dataset_env_var_repo::test_modify_dataset_env_vars(&catalog).await;
             Ok::<_, InternalError>(())
         })
         .await

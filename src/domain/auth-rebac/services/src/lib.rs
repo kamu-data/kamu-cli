@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dataset_env_var_repository_inmem;
-mod dateset_entry_repository_inmem;
+// Re-exports
+pub use kamu_auth_rebac as domain;
 
-pub use dataset_env_var_repository_inmem::*;
-pub use dateset_entry_repository_inmem::*;
+mod rebac_service_impl;
+
+pub use rebac_service_impl::*;
