@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Private Datasets, preparation work:
   - Added in-mem implementation of ReBAC repository
   - Added in-mem implementation of `DatasetEntryRepository`
+### Fixed
+- E2E: added additional force off colors to exclude sometimes occurring ANSI color sequences
 
 ## [0.193.1] - 2024-08-09
 ### Fixed

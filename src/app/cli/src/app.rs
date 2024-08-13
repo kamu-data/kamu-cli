@@ -686,6 +686,7 @@ fn configure_logging(
             .with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
             .with_writer(std::io::stderr)
             .pretty()
+            .with_ansi(!no_color_output)
             .init();
 
         return Guards::default();
