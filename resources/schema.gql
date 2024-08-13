@@ -959,7 +959,6 @@ type FlowConfigurationCompactionRule {
 type FlowConfigurationReset {
 	newHeadHash: Multihash
 	oldHeadHash: Multihash
-	recursiveCompaction: Boolean!
 	recursive: Boolean!
 }
 
@@ -1562,7 +1561,6 @@ type RequestHeader {
 input ResetConditionInput {
 	newHeadHash: Multihash
 	oldHeadHash: Multihash
-	recursiveCompaction: Boolean!
 	recursive: Boolean!
 }
 

@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Fixed
-- Add `recursiveCompaction: bool` to `Reset` flow configurations in GQL Api
+- Add `recursive` field to `Reset` flow configurations in GQL Api which triggers `HardCompaction` in `KeepMetadataOnly` mode flow for each owned downstream dependency
 
 ## [0.194.0] - 2024-08-13
 ### Changed

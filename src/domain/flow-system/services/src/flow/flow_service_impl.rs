@@ -773,7 +773,6 @@ impl FlowServiceImpl {
                             dataset_id: flow_key.dataset_id.clone(),
                             new_head_hash: reset_rule.new_head_hash.clone(),
                             old_head_hash: reset_rule.old_head_hash.clone(),
-                            recursive_compaction: reset_rule.recursive_compaction,
                             recursive: reset_rule.recursive,
                         }));
                     }
@@ -839,30 +838,6 @@ impl FlowServiceImpl {
                     .dataset_ownership_service
                     .get_dataset_owners(&fk_dataset.dataset_id)
                     .await?;
-                // Currently we trigger Hard compaction recursively only in keep metadata only
-                // mode
-                let (flow_type, config_snapshot) = if let Some(config_snapshot) =
-                    maybe_config_snapshot
-                    && let FlowConfigurationSnapshot::Reset(reset_rule) = config_snapshot
-                    && reset_rule.recursive
-                {
-                    (
-                        DatasetFlowType::Reset,
-                        FlowConfigurationSnapshot::Reset(ResetRule {
-                            new_head_hash: None,
-                            old_head_hash: None,
-                            recursive_compaction: false,
-                            recursive: true,
-                        }),
-                    )
-                } else {
-                    (
-                        DatasetFlowType::HardCompaction,
-                        FlowConfigurationSnapshot::Compaction(CompactionRule::MetadataOnly(
-                            CompactionRuleMetadataOnly { recursive: true },
-                        )),
-                    )
-                };
 
                 for dependent_dataset_id in dependent_dataset_ids {
                     for owner_account_id in &dataset_owner_account_ids {
@@ -874,11 +849,17 @@ impl FlowServiceImpl {
                             plans.push(DownstreamDependencyFlowPlan {
                                 flow_key: FlowKeyDataset::new(
                                     dependent_dataset_id.clone(),
-                                    flow_type,
+                                    DatasetFlowType::HardCompaction,
                                 )
                                 .into(),
                                 flow_trigger_context: FlowTriggerContext::Unconditional,
-                                maybe_config_snapshot: Some(config_snapshot.clone()),
+                                // Currently we trigger Hard compaction recursively only in keep
+                                // metadata only mode
+                                maybe_config_snapshot: Some(FlowConfigurationSnapshot::Compaction(
+                                    CompactionRule::MetadataOnly(CompactionRuleMetadataOnly {
+                                        recursive: true,
+                                    }),
+                                )),
                             });
                             break;
                         }
@@ -917,7 +898,7 @@ impl FlowServiceImpl {
             DatasetFlowType::Reset => {
                 if let Some(config_snapshot) = &maybe_config_snapshot
                     && let FlowConfigurationSnapshot::Reset(reset_rule) = config_snapshot
-                    && reset_rule.recursive_compaction
+                    && reset_rule.recursive
                 {
                     DownstreamDependencyTriggerType::TriggerOwnUnconditionally
                 } else {

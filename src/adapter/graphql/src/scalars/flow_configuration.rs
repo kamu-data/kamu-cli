@@ -106,7 +106,6 @@ impl From<BatchingRule> for FlowConfigurationBatching {
 pub struct FlowConfigurationReset {
     pub new_head_hash: Option<Multihash>,
     pub old_head_hash: Option<Multihash>,
-    pub recursive_compaction: bool,
     pub recursive: bool,
 }
 
@@ -115,7 +114,6 @@ impl From<ResetRule> for FlowConfigurationReset {
         Self {
             new_head_hash: value.new_head_hash.map(Into::into),
             old_head_hash: value.old_head_hash.map(Into::into),
-            recursive_compaction: value.recursive_compaction,
             recursive: value.recursive,
         }
     }
@@ -293,7 +291,6 @@ pub struct BatchingConditionInput {
 pub struct ResetConditionInput {
     pub new_head_hash: Option<Multihash>,
     pub old_head_hash: Option<Multihash>,
-    pub recursive_compaction: bool,
     pub recursive: bool,
 }
 
@@ -434,7 +431,6 @@ impl FlowRunConfiguration {
                         return Ok(Some(FlowConfigurationSnapshot::Reset(ResetRule {
                             new_head_hash: reset_input.new_head_hash.clone().map(Into::into),
                             old_head_hash,
-                            recursive_compaction: reset_input.recursive_compaction,
                             recursive: reset_input.recursive,
                         })));
                     }
@@ -446,7 +442,6 @@ impl FlowRunConfiguration {
                 return Ok(Some(FlowConfigurationSnapshot::Reset(ResetRule {
                     new_head_hash: None,
                     old_head_hash: current_head_hash,
-                    recursive_compaction: false,
                     recursive: false,
                 })));
             }

@@ -83,7 +83,6 @@ pub struct ResetDataset {
     pub dataset_id: DatasetID,
     pub new_head_hash: Option<Multihash>,
     pub old_head_hash: Option<Multihash>,
-    pub recursive_compaction: bool,
     pub recursive: bool,
 }
 

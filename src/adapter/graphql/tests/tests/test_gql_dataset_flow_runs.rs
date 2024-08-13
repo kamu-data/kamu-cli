@@ -453,7 +453,6 @@ async fn test_trigger_reset_root_dataset_flow() {
         &root_dataset_blocks[1].0,
         &root_dataset_blocks[0].0,
         false,
-        false,
         "RESET",
     );
 
@@ -572,7 +571,6 @@ async fn test_trigger_reset_root_dataset_flow() {
                                         "configSnapshot": {
                                             "newHeadHash": &root_dataset_blocks[1].0,
                                             "oldHeadHash": &root_dataset_blocks[0].0,
-                                            "recursiveCompaction": false,
                                             "recursive": false
                                         }
                                     }
@@ -613,7 +611,6 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
         &create_root_result.dataset_handle.id,
         &new_invalid_head,
         &old_invalid_head,
-        false,
         false,
         "RESET",
     );
@@ -657,7 +654,6 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
         &create_root_result.dataset_handle.id,
         &root_dataset_blocks[0].0,
         &root_dataset_blocks[1].0,
-        false,
         false,
         "RESET",
     );
@@ -3510,7 +3506,6 @@ impl FlowRunsHarness {
                                              ... on FlowConfigurationReset {
                                                 newHeadHash
                                                 oldHeadHash
-                                                recursiveCompaction
                                                 recursive
                                             }
                                             ... on FlowConfigurationCompactionRule {
@@ -3656,7 +3651,6 @@ impl FlowRunsHarness {
         id: &DatasetID,
         new_head_hash: &Multihash,
         old_head_hash: &Multihash,
-        recursive_compaction: bool,
         recursive: bool,
         dataset_flow_type: &str,
     ) -> String {
@@ -3673,7 +3667,6 @@ impl FlowRunsHarness {
                                         reset: {
                                             newHeadHash: "<new_head_hash>",
                                             oldHeadHash: "<old_head_hash>",
-                                            recursiveCompaction: <recursive_compaction>,
                                             recursive: <recursive>
                                         }
                                     }
@@ -3720,14 +3713,6 @@ impl FlowRunsHarness {
         .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<new_head_hash>", &new_head_hash.to_string())
         .replace("<old_head_hash>", &old_head_hash.to_string())
-        .replace(
-            "<recursive_compaction>",
-            if recursive_compaction {
-                "true"
-            } else {
-                "false"
-            },
-        )
         .replace("<recursive>", if recursive { "true" } else { "false" })
     }
 
