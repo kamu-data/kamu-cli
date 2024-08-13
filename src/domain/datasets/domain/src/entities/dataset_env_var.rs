@@ -229,7 +229,7 @@ impl std::error::Error for AesGcmError {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DatasetEnvVarsConfig {
     pub enabled: Option<bool>,
@@ -265,15 +265,6 @@ impl DatasetEnvVarsConfig {
             return true;
         }
         false
-    }
-}
-
-impl Default for DatasetEnvVarsConfig {
-    fn default() -> Self {
-        Self {
-            enabled: Some(false),
-            encryption_key: None,
-        }
     }
 }
 
