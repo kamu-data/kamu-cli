@@ -167,7 +167,7 @@ main() {
     # Check for conflicting commands
     local _bin_name=$(basename ${_install_path})
     if check_cmd which; then
-        if which $_bin_name >/dev/null; then
+        if which $_bin_name &>/dev/null; then
             local _conflict_path=$(which ${_bin_name})
             if [ "$_conflict_path" != "$_install_path" ]; then
                 warn "Potentially conflicting binary found in PATH: ${_conflict_path}"
