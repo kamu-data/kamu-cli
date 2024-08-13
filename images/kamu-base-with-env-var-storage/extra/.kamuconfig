@@ -2,5 +2,5 @@ kind: CLIConfig
 version: 1
 content:
   datasetEnvVars:
-    mode: storage
+    enabled: true
     encryptionKey: "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC"

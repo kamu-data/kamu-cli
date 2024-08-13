@@ -227,12 +227,12 @@ impl std::error::Error for AesGcmError {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DatasetEnvVarsConfig {
-    pub mode: Option<DatasetEnvVarsType>,
+    pub enabled: Option<bool>,
     /// Represents the encryption key for the dataset env vars. This field is
-    /// required if `DatasetEnvVarsType` is `Storage`.
+    /// required if `enabled` is `true` or `None`.
     ///
     /// The encryption key must be a 32-character alphanumeric string, which
     /// includes both uppercase and lowercase Latin letters (A-Z, a-z) and
@@ -240,35 +240,29 @@ pub struct DatasetEnvVarsConfig {
     ///
     /// # Example
     /// let config = DatasetEnvVarsConfig {
-    ///     mode: Some(DatasetEnvVarsType::Storage),
+    ///     enabled: Some(true),
     ///     encryption_key:
     /// Some(String::from("aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")) };
     /// ```
     pub encryption_key: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum DatasetEnvVarsType {
-    Static,
-    Storage,
-}
-
 impl DatasetEnvVarsConfig {
     pub fn sample() -> Self {
         Self {
-            mode: Some(DatasetEnvVarsType::Storage),
+            enabled: Some(true),
             encryption_key: Some(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY.to_string()),
         }
     }
-}
 
-impl Default for DatasetEnvVarsConfig {
-    fn default() -> Self {
-        Self {
-            mode: Some(DatasetEnvVarsType::Static),
-            encryption_key: None,
+    pub fn is_enabled(&self) -> bool {
+        if let Some(enabled) = self.enabled
+            && enabled
+            && self.encryption_key.is_some()
+        {
+            return true;
         }
+        false
     }
 }
 
