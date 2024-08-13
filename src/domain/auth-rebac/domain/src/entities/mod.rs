@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod entities;
-mod repos;
-mod services;
+mod entity;
+mod property;
+mod relation;
 
-pub use entities::*;
-pub use repos::*;
-pub use services::*;
+pub use entity::*;
+pub use property::*;
+pub use relation::*;

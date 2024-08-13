@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
-
 use internal_error::InternalError;
 use thiserror::Error;
+
+use crate::{Entity, EntityType, EntityWithRelation, PropertyName, PropertyValue, Relation};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,168 +55,19 @@ pub trait RebacRepository: Send + Sync {
     async fn get_subject_entity_relations(
         &self,
         subject_entity: &Entity,
-    ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsError>;
+    ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsError>;
 
     async fn get_subject_entity_relations_by_object_type(
         &self,
         subject_entity: &Entity,
         object_entity_type: EntityType,
-    ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsByObjectTypeError>;
+    ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsByObjectTypeError>;
 
     async fn get_relations_between_entities(
         &self,
         subject_entity: &Entity,
         object_entity: &Entity,
     ) -> Result<Vec<Relation>, GetRelationsBetweenEntitiesError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// DTOs
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum EntityType {
-    Dataset,
-    Account,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Entity<'a> {
-    pub entity_type: EntityType,
-    pub entity_id: Cow<'a, str>,
-}
-
-impl<'a> Entity<'a> {
-    pub fn new(entity_type: EntityType, entity_id: impl Into<Cow<'a, str>>) -> Self {
-        Self {
-            entity_type,
-            entity_id: entity_id.into(),
-        }
-    }
-
-    pub fn new_account(entity_id: impl Into<Cow<'a, str>>) -> Self {
-        Self::new(EntityType::Account, entity_id)
-    }
-
-    pub fn new_dataset(entity_id: impl Into<Cow<'a, str>>) -> Self {
-        Self::new(EntityType::Dataset, entity_id)
-    }
-
-    pub fn into_owned(self) -> Entity<'static> {
-        Entity {
-            entity_type: self.entity_type,
-            entity_id: Cow::Owned(self.entity_id.into_owned()),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct EntityWithRelation<'a> {
-    pub entity: Entity<'a>,
-    pub relation: Relation,
-}
-
-impl<'a> EntityWithRelation<'a> {
-    pub fn new(entity: Entity<'a>, relation: Relation) -> Self {
-        Self { entity, relation }
-    }
-
-    pub fn new_account(entity_id: impl Into<Cow<'a, str>>, relation: Relation) -> Self {
-        let account_entity = Entity::new_account(entity_id);
-
-        Self::new(account_entity, relation)
-    }
-
-    pub fn new_dataset(entity_id: impl Into<Cow<'a, str>>, relation: Relation) -> Self {
-        let dataset_entity = Entity::new_dataset(entity_id);
-
-        Self::new(dataset_entity, relation)
-    }
-}
-
-pub type ObjectEntity<'a> = Entity<'a>;
-pub type ObjectEntityWithRelation<'a> = EntityWithRelation<'a>;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub type PropertyValue<'a> = Cow<'a, str>;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum PropertyName {
-    Dataset(DatasetPropertyName),
-    Account(AccountPropertyName),
-}
-
-impl PropertyName {
-    pub fn dataset_allows_anonymous_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
-        let value = if allows { "true" } else { "false" };
-
-        (
-            Self::Dataset(DatasetPropertyName::AllowsAnonymousRead),
-            value.into(),
-        )
-    }
-
-    pub fn dataset_allows_public_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
-        let value = if allows { "true" } else { "false" };
-
-        (
-            Self::Dataset(DatasetPropertyName::AllowsPublicRead),
-            value.into(),
-        )
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum DatasetPropertyName {
-    AllowsAnonymousRead,
-    AllowsPublicRead,
-}
-
-impl From<DatasetPropertyName> for PropertyName {
-    fn from(value: DatasetPropertyName) -> PropertyName {
-        PropertyName::Dataset(value)
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum AccountPropertyName {
-    // TBA
-}
-
-impl From<AccountPropertyName> for PropertyName {
-    fn from(value: AccountPropertyName) -> PropertyName {
-        PropertyName::Account(value)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum Relation {
-    AccountToDataset(AccountToDatasetRelation),
-}
-
-impl Relation {
-    pub fn account_is_a_dataset_reader() -> Self {
-        Self::AccountToDataset(AccountToDatasetRelation::Reader)
-    }
-
-    pub fn account_is_a_dataset_editor() -> Self {
-        Self::AccountToDataset(AccountToDatasetRelation::Editor)
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum AccountToDatasetRelation {
-    Reader,
-    Editor,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

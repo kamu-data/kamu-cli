@@ -19,9 +19,8 @@ use kamu_auth_rebac::{
     DeleteEntityPropertyError,
     Entity,
     EntityType,
+    EntityWithRelation,
     InsertEntitiesRelationError,
-    ObjectEntity,
-    ObjectEntityWithRelation,
     PropertyName,
     RebacRepository,
     Relation,
@@ -304,8 +303,8 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
     // 3. Deletions
 
     {
-        let account = ObjectEntity::new_account("account");
-        let dataset1 = ObjectEntity::new_dataset("dataset1");
+        let account = Entity::new_account("account");
+        let dataset1 = Entity::new_dataset("dataset1");
 
         let delete_res = rebac_repo
             .delete_entities_relation(&account, Relation::account_is_a_dataset_reader(), &dataset1)
@@ -328,8 +327,8 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
         assert_get_relations(&rebac_repo, &state).await;
     }
     {
-        let account = ObjectEntity::new_account("account");
-        let dataset2 = ObjectEntity::new_dataset("dataset2");
+        let account = Entity::new_account("account");
+        let dataset2 = Entity::new_dataset("dataset2");
 
         let delete_res = rebac_repo
             .delete_entities_relation(&account, Relation::account_is_a_dataset_reader(), &dataset2)
@@ -352,8 +351,8 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
         assert_get_relations(&rebac_repo, &state).await;
     }
     {
-        let account = ObjectEntity::new_account("account");
-        let dataset3 = ObjectEntity::new_dataset("dataset3");
+        let account = Entity::new_account("account");
+        let dataset3 = Entity::new_dataset("dataset3");
 
         let delete_res = rebac_repo
             .delete_entities_relation(&account, Relation::account_is_a_dataset_editor(), &dataset3)
@@ -373,8 +372,8 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
         assert_get_relations(&rebac_repo, &state).await;
     }
     {
-        let account = ObjectEntity::new_account("account");
-        let dataset1 = ObjectEntity::new_dataset("dataset1");
+        let account = Entity::new_account("account");
+        let dataset1 = Entity::new_dataset("dataset1");
 
         let delete_res = rebac_repo
             .delete_entities_relation(&account, Relation::account_is_a_dataset_editor(), &dataset1)
@@ -455,7 +454,7 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
         let relation_map = state.get_object_entity_relation_map();
 
         for dataset_id in &state.dataset_ids_for_check {
-            let dataset = ObjectEntity::new_dataset(*dataset_id);
+            let dataset = Entity::new_dataset(*dataset_id);
 
             let get_res = rebac_repo
                 .get_relations_between_entities(&account, &dataset)
@@ -487,13 +486,13 @@ struct CrossoverTestState {
 }
 
 impl CrossoverTestState {
-    pub fn get_object_entities_with_relation(&self) -> Vec<ObjectEntityWithRelation> {
+    pub fn get_object_entities_with_relation(&self) -> Vec<EntityWithRelation> {
         self.relation_map
             .iter()
             .fold(Vec::new(), |mut acc, (relation, dataset_ids)| {
-                let object_entity_iter = dataset_ids.iter().map(|dataset_id| {
-                    ObjectEntityWithRelation::new_dataset(*dataset_id, *relation)
-                });
+                let object_entity_iter = dataset_ids
+                    .iter()
+                    .map(|dataset_id| EntityWithRelation::new_dataset(*dataset_id, *relation));
 
                 acc.extend(object_entity_iter);
 

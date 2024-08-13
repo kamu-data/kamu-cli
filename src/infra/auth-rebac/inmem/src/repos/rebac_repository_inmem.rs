@@ -17,10 +17,10 @@ use kamu_auth_rebac::{
     DeleteEntityPropertyError,
     Entity,
     EntityType,
+    EntityWithRelation,
     GetEntityPropertiesError,
     GetRelationsBetweenEntitiesError,
     InsertEntitiesRelationError,
-    ObjectEntityWithRelation,
     PropertyName,
     PropertyValue,
     RebacRepository,
@@ -190,11 +190,11 @@ impl RebacRepository for RebacRepositoryInMem {
     async fn get_subject_entity_relations(
         &self,
         subject_entity: &Entity,
-    ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsError> {
+    ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsError> {
         let res = self
             .get_rows(|row| {
                 if row.subject_entity == *subject_entity {
-                    Some(ObjectEntityWithRelation::new(
+                    Some(EntityWithRelation::new(
                         row.object_entity.clone(),
                         row.relationship,
                     ))
@@ -211,13 +211,13 @@ impl RebacRepository for RebacRepositoryInMem {
         &self,
         subject_entity: &Entity,
         object_entity_type: EntityType,
-    ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsByObjectTypeError> {
+    ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsByObjectTypeError> {
         let res = self
             .get_rows(|row| {
                 if row.subject_entity == *subject_entity
                     && row.object_entity.entity_type == object_entity_type
                 {
-                    Some(ObjectEntityWithRelation::new(
+                    Some(EntityWithRelation::new(
                         row.object_entity.clone(),
                         row.relationship,
                     ))

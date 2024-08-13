@@ -17,10 +17,10 @@ use kamu_auth_rebac::{
     DeleteEntitiesRelationError,
     DeleteEntityPropertyError,
     Entity,
+    EntityWithRelation,
     GetEntityPropertiesError,
     InsertEntitiesRelationError,
     InsertRelationError,
-    ObjectEntityWithRelation,
     PropertyName,
     PropertyValue,
     RebacRepository,
@@ -196,7 +196,7 @@ impl RebacService for RebacServiceImpl {
     async fn get_account_dataset_relations(
         &self,
         account_id: &AccountID,
-    ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsError> {
+    ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsError> {
         let account_id = account_id.as_did_str().to_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
 

@@ -17,8 +17,8 @@ use crate::{
     DatasetPropertyName,
     DeleteEntitiesRelationError,
     EntityNotFoundError,
+    EntityWithRelation,
     GetEntityPropertiesError,
-    ObjectEntityWithRelation,
     PropertyName,
     PropertyValue,
     SetEntityPropertyError,
@@ -85,7 +85,7 @@ pub trait RebacService: Send + Sync {
     async fn get_account_dataset_relations(
         &self,
         account_id: &AccountID,
-    ) -> Result<Vec<ObjectEntityWithRelation>, SubjectEntityRelationsError>;
+    ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
