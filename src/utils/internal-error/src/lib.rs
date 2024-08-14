@@ -76,8 +76,14 @@ where
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub trait ResultIntoInternal<OK> {
     fn int_err(self) -> Result<OK, InternalError>;
+
+    fn map_int_err<E, F>(self, error_mapper: F) -> Result<OK, E>
+    where
+        F: FnOnce(InternalError) -> E;
 }
 
 impl<OK, E> ResultIntoInternal<OK> for Result<OK, E>
@@ -90,4 +96,28 @@ where
             Err(e) => Err(e.int_err()),
         }
     }
+    /// Shortcut for [`int_err()`](ResultIntoInternal::int_err())
+    /// followed by a call to [`Result::map_err()`]:
+    /// ```
+    /// auth_svc
+    ///     .login(...)
+    ///     .map_int_err(CLIError::critical)
+    /// ```
+    ///
+    /// This function is equivalent to calling:
+    /// ```
+    /// auth_svc
+    ///     .login(...)
+    ///     .int_err()
+    ///     .map_err(CLIError::critical)
+    /// ```
+    #[inline]
+    fn map_int_err<R, F>(self, error_mapper: F) -> Result<OK, R>
+    where
+        F: FnOnce(InternalError) -> R,
+    {
+        self.int_err().map_err(error_mapper)
+    }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
