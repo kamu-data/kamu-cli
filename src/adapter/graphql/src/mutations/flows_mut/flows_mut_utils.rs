@@ -134,7 +134,7 @@ pub(crate) async fn ensure_flow_preconditions(
             if let Some(flow_configuration) = flow_run_configuration
                 && let FlowRunConfiguration::Reset(reset_configuration) = flow_configuration
             {
-                if let Some(new_head_hash) = &reset_configuration.new_head_hash {
+                if let Some(new_head_hash) = &reset_configuration.new_head_hash() {
                     let dataset_repo =
                         from_catalog::<dyn kamu_core::DatasetRepository>(ctx).unwrap();
 

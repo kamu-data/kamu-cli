@@ -957,8 +957,17 @@ type FlowConfigurationCompactionRule {
 }
 
 type FlowConfigurationReset {
-	newHeadHash: Multihash
-	oldHeadHash: Multihash!
+	mode: SnapshotPropagationMode!
+	oldHeadHash: Multihash
+	recursive: Boolean!
+}
+
+input FlowConfigurationResetCustom {
+	newHeadHash: Multihash!
+}
+
+input FlowConfigurationResetToSeedDummy {
+	dummy: String!
 }
 
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
@@ -1433,6 +1442,11 @@ type PrepStepPipe {
 	command: [String!]!
 }
 
+input PropagationMode @oneOf {
+	custom: FlowConfigurationResetCustom
+	toSeed: FlowConfigurationResetToSeedDummy
+}
+
 type Query {
 	"""
 	Returns the version of the GQL API
@@ -1558,8 +1572,9 @@ type RequestHeader {
 }
 
 input ResetConditionInput {
-	newHeadHash: Multihash
+	mode: PropagationMode!
 	oldHeadHash: Multihash
+	recursive: Boolean!
 }
 
 type RestProtocolDesc {
@@ -1710,6 +1725,16 @@ type SetWatermarkUpdated implements SetWatermarkResult {
 	newHead: Multihash!
 	message: String!
 }
+
+type SnapshotConfigurationResetCustom {
+	newHeadHash: Multihash!
+}
+
+type SnapshotConfigurationResetToSeedDummy {
+	dummy: String!
+}
+
+union SnapshotPropagationMode = SnapshotConfigurationResetCustom | SnapshotConfigurationResetToSeedDummy
 
 union SourceCaching = SourceCachingForever
 

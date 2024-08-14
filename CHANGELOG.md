@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Fixed
+- Add `recursive` field to `Reset` flow configurations in GQL Api which triggers `HardCompaction` in `KeepMetadataOnly` mode flow for each owned downstream dependency
+
 ## [0.194.0] - 2024-08-13
 ### Changed
 - Change `mode` argument for `DatasetEnvVarsConfig` to `enabled: Option<bool>`

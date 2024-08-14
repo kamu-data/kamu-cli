@@ -592,12 +592,20 @@ pub fn register_config_in_catalog(
             catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceNull>();
         }
         Some(encryption_key) => {
-            assert!(
-                DatasetEnvVar::try_asm_256_gcm_from_str(encryption_key).is_ok(),
-                "Invalid dataset env var encryption key",
-            );
-            catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceImpl>();
-            catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>();
+            if let Some(enabled) = &dataset_env_vars_config.enabled
+                && !enabled
+            {
+                warn!("Dataset env vars feature will be disabled");
+                catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceSysEnv>();
+                catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceNull>();
+            } else {
+                assert!(
+                    DatasetEnvVar::try_asm_256_gcm_from_str(encryption_key).is_ok(),
+                    "Invalid dataset env var encryption key",
+                );
+                catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceImpl>();
+                catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>();
+            }
         }
     }
 }

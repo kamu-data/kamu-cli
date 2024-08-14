@@ -155,7 +155,7 @@ impl TaskExecutorImpl {
             .reset_dataset(
                 &dataset_handle,
                 reset_dataset_args.new_head_hash.as_ref(),
-                Some(&reset_dataset_args.old_head_hash),
+                reset_dataset_args.old_head_hash.as_ref(),
             )
             .await;
         match reset_result_maybe {

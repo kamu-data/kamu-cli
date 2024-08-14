@@ -13,5 +13,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResetRule {
     pub new_head_hash: Option<Multihash>,
-    pub old_head_hash: Multihash,
+    pub old_head_hash: Option<Multihash>,
+    pub recursive: bool,
 }

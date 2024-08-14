@@ -624,7 +624,8 @@ async fn test_manual_trigger_reset() {
             DatasetFlowType::Reset,
             ResetRule {
                 new_head_hash: Some(dataset_blocks[1].0.clone()),
-                old_head_hash: dataset_blocks[0].0.clone(),
+                old_head_hash: Some(dataset_blocks[0].0.clone()),
+                recursive: false,
             },
         )
         .await;
@@ -664,7 +665,8 @@ async fn test_manual_trigger_reset() {
                       dataset_id: create_dataset_result.dataset_handle.id.clone(),
                       // By deafult should reset to seed block
                       new_head_hash: Some(dataset_blocks[1].0.clone()),
-                      old_head_hash: dataset_blocks[0].0.clone()
+                      old_head_hash: Some(dataset_blocks[0].0.clone()),
+                      recursive: false,
                     }),
                 });
                 let task0_handle = task0_driver.run();
@@ -708,6 +710,241 @@ async fn test_manual_trigger_reset() {
                 Flow ID = 0 Finished Success
 
             "#
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
+    let harness = FlowHarness::new().await;
+
+    let create_foo_result = harness
+        .create_dataset(DatasetAlias {
+            dataset_name: DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let dataset_blocks: Vec<_> = create_foo_result
+        .dataset
+        .as_metadata_chain()
+        .iter_blocks_interval(&create_foo_result.head, None, false)
+        .try_collect()
+        .await
+        .unwrap();
+    let foo_bar_id = harness
+        .create_derived_dataset(
+            DatasetAlias {
+                dataset_name: DatasetName::new_unchecked("foo.bar"),
+                account_name: None,
+            },
+            vec![create_foo_result.dataset_handle.id.clone()],
+        )
+        .await;
+    let foo_baz_id = harness
+        .create_derived_dataset(
+            DatasetAlias {
+                dataset_name: DatasetName::new_unchecked("foo.baz"),
+                account_name: None,
+            },
+            vec![create_foo_result.dataset_handle.id.clone()],
+        )
+        .await;
+
+    harness
+        .set_dataset_flow_reset_rule(
+            harness.now_datetime(),
+            create_foo_result.dataset_handle.id.clone(),
+            DatasetFlowType::Reset,
+            ResetRule {
+                new_head_hash: Some(dataset_blocks[1].0.clone()),
+                old_head_hash: Some(dataset_blocks[0].0.clone()),
+                recursive: true,
+            },
+        )
+        .await;
+
+    harness.eager_initialization().await;
+
+    let foo_flow_key: FlowKey = FlowKeyDataset::new(
+        create_foo_result.dataset_handle.id.clone(),
+        DatasetFlowType::Reset,
+    )
+    .into();
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(
+        create_foo_result.dataset_handle.id.clone(),
+        "foo".to_string(),
+    );
+    test_flow_listener.define_dataset_display_name(foo_bar_id.clone(), "foo_bar".to_string());
+    test_flow_listener.define_dataset_display_name(foo_baz_id.clone(), "foo_baz".to_string());
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+      // Run API service
+      res = harness.flow_service.run(start_time) => res.int_err(),
+
+      // Run simulation script and task drivers
+      _ = async {
+          let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+              flow_key: foo_flow_key,
+              run_since_start: Duration::try_milliseconds(10).unwrap(),
+              initiator_id: None,
+          });
+          let trigger0_handle = trigger0_driver.run();
+
+          // Task 0: "foo" start running at 20ms, finish at 90ms
+          let task0_driver = harness.task_driver(TaskDriverArgs {
+              task_id: TaskID::new(0),
+              dataset_id: Some(create_foo_result.dataset_handle.id.clone()),
+              run_since_start: Duration::try_milliseconds(20).unwrap(),
+              finish_in_with: Some((Duration::try_milliseconds(70).unwrap(), TaskOutcome::Success(TaskResult::ResetDatasetResult(TaskResetDatasetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") })))),
+              expected_logical_plan: LogicalPlan::Reset(ResetDataset {
+                dataset_id: create_foo_result.dataset_handle.id.clone(),
+                new_head_hash: Some(dataset_blocks[1].0.clone()),
+                old_head_hash: Some(dataset_blocks[0].0.clone()),
+                recursive: true,
+              }),
+          });
+          let task0_handle = task0_driver.run();
+
+          // Task 1: "foo_bar" start running at 110ms, finish at 180sms
+          let task1_driver = harness.task_driver(TaskDriverArgs {
+              task_id: TaskID::new(1),
+              dataset_id: Some(foo_baz_id.clone()),
+              run_since_start: Duration::try_milliseconds(110).unwrap(),
+              finish_in_with: Some(
+                (
+                  Duration::try_milliseconds(70).unwrap(),
+                  TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                    compaction_result: CompactionResult::Success {
+                      old_head: Multihash::from_digest_sha3_256(b"old-slice-2"),
+                      new_head: Multihash::from_digest_sha3_256(b"new-slice-2"),
+                      old_num_blocks: 5,
+                      new_num_blocks: 4,
+                    }
+                  }
+                ))
+              )),
+              expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                dataset_id: foo_baz_id.clone(),
+                max_slice_size: None,
+                max_slice_records: None,
+                keep_metadata_only: true,
+              }),
+          });
+          let task1_handle = task1_driver.run();
+
+          // Task 2: "foo_bar_baz" start running at 200ms, finish at 240ms
+          let task2_driver = harness.task_driver(TaskDriverArgs {
+              task_id: TaskID::new(2),
+              dataset_id: Some(foo_bar_id.clone()),
+              run_since_start: Duration::try_milliseconds(200).unwrap(),
+              finish_in_with: Some(
+                (
+                  Duration::try_milliseconds(40).unwrap(),
+                  TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                    compaction_result: CompactionResult::Success {
+                      old_head: Multihash::from_digest_sha3_256(b"old-slice-3"),
+                      new_head: Multihash::from_digest_sha3_256(b"new-slice-3"),
+                      old_num_blocks: 8,
+                      new_num_blocks: 3,
+                    }
+                  }
+                ))
+              )),
+              expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                dataset_id: foo_bar_id.clone(),
+                max_slice_size: None,
+                max_slice_records: None,
+                keep_metadata_only: true,
+              }),
+          });
+          let task2_handle = task2_driver.run();
+
+          // Main simulation script
+          let main_handle = async {
+              harness.advance_time(Duration::try_milliseconds(300).unwrap()).await;
+          };
+
+          // tokio::join!(trigger0_handle, task0_handle, main_handle)
+          tokio::join!(trigger0_handle, task0_handle, task1_handle, task2_handle, main_handle)
+      } => Ok(())
+  }
+  .unwrap();
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+          #0: +0ms:
+
+          #1: +10ms:
+            "foo" Reset:
+              Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
+
+          #2: +20ms:
+            "foo" Reset:
+              Flow ID = 0 Running(task=0)
+
+          #3: +90ms:
+            "foo" Reset:
+              Flow ID = 0 Finished Success
+            "foo_bar" HardCompaction:
+              Flow ID = 2 Waiting Input(foo)
+            "foo_baz" HardCompaction:
+              Flow ID = 1 Waiting Input(foo)
+
+          #4: +90ms:
+            "foo" Reset:
+              Flow ID = 0 Finished Success
+            "foo_bar" HardCompaction:
+              Flow ID = 2 Waiting Input(foo) Executor(task=2, since=90ms)
+            "foo_baz" HardCompaction:
+              Flow ID = 1 Waiting Input(foo) Executor(task=1, since=90ms)
+
+          #5: +110ms:
+            "foo" Reset:
+              Flow ID = 0 Finished Success
+            "foo_bar" HardCompaction:
+              Flow ID = 2 Waiting Input(foo) Executor(task=2, since=90ms)
+            "foo_baz" HardCompaction:
+              Flow ID = 1 Running(task=1)
+
+          #6: +180ms:
+            "foo" Reset:
+              Flow ID = 0 Finished Success
+            "foo_bar" HardCompaction:
+              Flow ID = 2 Waiting Input(foo) Executor(task=2, since=90ms)
+            "foo_baz" HardCompaction:
+              Flow ID = 1 Finished Success
+
+          #7: +200ms:
+            "foo" Reset:
+              Flow ID = 0 Finished Success
+            "foo_bar" HardCompaction:
+              Flow ID = 2 Running(task=2)
+            "foo_baz" HardCompaction:
+              Flow ID = 1 Finished Success
+
+          #8: +240ms:
+            "foo" Reset:
+              Flow ID = 0 Finished Success
+            "foo_bar" HardCompaction:
+              Flow ID = 2 Finished Success
+            "foo_baz" HardCompaction:
+              Flow ID = 1 Finished Success
+
+          "#
         )
     );
 }

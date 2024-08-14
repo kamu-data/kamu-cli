@@ -773,6 +773,7 @@ impl FlowServiceImpl {
                             dataset_id: flow_key.dataset_id.clone(),
                             new_head_hash: reset_rule.new_head_hash.clone(),
                             old_head_hash: reset_rule.old_head_hash.clone(),
+                            recursive: reset_rule.recursive,
                         }));
                     }
                     InternalError::bail("Reset flow cannot be called without configuration")
@@ -812,7 +813,7 @@ impl FlowServiceImpl {
         }
 
         match self.classify_dependent_trigger_type(fk_dataset.flow_type, maybe_config_snapshot) {
-            DownstreamDependencyTriggerType::TriggerAllEnabled => {
+            DownstreamDependencyTriggerType::TriggerAllEnabledExecuteTransform => {
                 let guard = self.state.lock().unwrap();
                 for dataset_id in dependent_dataset_ids {
                     if let Some(batching_rule) = guard.active_configs.try_get_dataset_batching_rule(
@@ -832,16 +833,11 @@ impl FlowServiceImpl {
                 }
             }
 
-            DownstreamDependencyTriggerType::TriggerOwnUnconditionally => {
+            DownstreamDependencyTriggerType::TriggerOwnHardCompaction => {
                 let dataset_owner_account_ids = self
                     .dataset_ownership_service
                     .get_dataset_owners(&fk_dataset.dataset_id)
                     .await?;
-                // Currently we trigger Hard compaction recursively only in keep metadata only
-                // mode
-                let config_snapshot = FlowConfigurationSnapshot::Compaction(
-                    CompactionRule::MetadataOnly(CompactionRuleMetadataOnly { recursive: true }),
-                );
 
                 for dependent_dataset_id in dependent_dataset_ids {
                     for owner_account_id in &dataset_owner_account_ids {
@@ -857,7 +853,13 @@ impl FlowServiceImpl {
                                 )
                                 .into(),
                                 flow_trigger_context: FlowTriggerContext::Unconditional,
-                                maybe_config_snapshot: Some(config_snapshot.clone()),
+                                // Currently we trigger Hard compaction recursively only in keep
+                                // metadata only mode
+                                maybe_config_snapshot: Some(FlowConfigurationSnapshot::Compaction(
+                                    CompactionRule::MetadataOnly(CompactionRuleMetadataOnly {
+                                        recursive: true,
+                                    }),
+                                )),
                             });
                             break;
                         }
@@ -878,22 +880,31 @@ impl FlowServiceImpl {
     ) -> DownstreamDependencyTriggerType {
         match dataset_flow_type {
             DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
-                DownstreamDependencyTriggerType::TriggerAllEnabled
+                DownstreamDependencyTriggerType::TriggerAllEnabledExecuteTransform
             }
             DatasetFlowType::HardCompaction => {
                 if let Some(config_snapshot) = &maybe_config_snapshot
                     && let FlowConfigurationSnapshot::Compaction(compaction_rule) = config_snapshot
                 {
                     if compaction_rule.recursive() {
-                        DownstreamDependencyTriggerType::TriggerOwnUnconditionally
+                        DownstreamDependencyTriggerType::TriggerOwnHardCompaction
                     } else {
                         DownstreamDependencyTriggerType::Empty
                     }
                 } else {
-                    DownstreamDependencyTriggerType::TriggerAllEnabled
+                    DownstreamDependencyTriggerType::TriggerAllEnabledExecuteTransform
                 }
             }
-            DatasetFlowType::Reset => DownstreamDependencyTriggerType::Empty,
+            DatasetFlowType::Reset => {
+                if let Some(config_snapshot) = &maybe_config_snapshot
+                    && let FlowConfigurationSnapshot::Reset(reset_rule) = config_snapshot
+                    && reset_rule.recursive
+                {
+                    DownstreamDependencyTriggerType::TriggerOwnHardCompaction
+                } else {
+                    DownstreamDependencyTriggerType::Empty
+                }
+            }
         }
     }
 }
@@ -1485,8 +1496,8 @@ pub struct DownstreamDependencyFlowPlan {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum DownstreamDependencyTriggerType {
-    TriggerAllEnabled,
-    TriggerOwnUnconditionally,
+    TriggerAllEnabledExecuteTransform,
+    TriggerOwnHardCompaction,
     Empty,
 }
 

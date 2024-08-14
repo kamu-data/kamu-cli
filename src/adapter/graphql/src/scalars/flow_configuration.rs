@@ -104,15 +104,42 @@ impl From<BatchingRule> for FlowConfigurationBatching {
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfigurationReset {
-    pub new_head_hash: Option<Multihash>,
-    pub old_head_hash: Multihash,
+    pub mode: SnapshotPropagationMode,
+    pub old_head_hash: Option<Multihash>,
+    pub recursive: bool,
+}
+
+#[derive(Union, Clone, PartialEq, Eq)]
+pub enum SnapshotPropagationMode {
+    Custom(SnapshotConfigurationResetCustom),
+    ToSeed(SnapshotConfigurationResetToSeedDummy),
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct SnapshotConfigurationResetCustom {
+    pub new_head_hash: Multihash,
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct SnapshotConfigurationResetToSeedDummy {
+    pub dummy: String,
 }
 
 impl From<ResetRule> for FlowConfigurationReset {
     fn from(value: ResetRule) -> Self {
+        let propagation_mode = if let Some(new_head_hash) = &value.new_head_hash {
+            SnapshotPropagationMode::Custom(SnapshotConfigurationResetCustom {
+                new_head_hash: new_head_hash.clone().into(),
+            })
+        } else {
+            SnapshotPropagationMode::ToSeed(SnapshotConfigurationResetToSeedDummy {
+                dummy: String::new(),
+            })
+        };
         Self {
-            new_head_hash: value.new_head_hash.map(Into::into),
-            old_head_hash: value.old_head_hash.clone().into(),
+            mode: propagation_mode,
+            old_head_hash: value.old_head_hash.map(Into::into),
+            recursive: value.recursive,
         }
     }
 }
@@ -285,10 +312,36 @@ pub struct BatchingConditionInput {
     pub max_batching_interval: TimeDeltaInput,
 }
 
+#[derive(OneofObject)]
+pub enum PropagationMode {
+    Custom(FlowConfigurationResetCustom),
+    ToSeed(FlowConfigurationResetToSeedDummy),
+}
+
+#[derive(InputObject)]
+pub struct FlowConfigurationResetCustom {
+    pub new_head_hash: Multihash,
+}
+
+#[derive(InputObject)]
+pub struct FlowConfigurationResetToSeedDummy {
+    dummy: String,
+}
+
 #[derive(InputObject)]
 pub struct ResetConditionInput {
-    pub new_head_hash: Option<Multihash>,
+    pub mode: PropagationMode,
     pub old_head_hash: Option<Multihash>,
+    pub recursive: bool,
+}
+
+impl ResetConditionInput {
+    pub fn new_head_hash(&self) -> Option<Multihash> {
+        match &self.mode {
+            PropagationMode::Custom(custom_args) => Some(custom_args.new_head_hash.clone()),
+            PropagationMode::ToSeed(_) => None,
+        }
+    }
 }
 
 #[derive(OneofObject)]
@@ -417,18 +470,18 @@ impl FlowRunConfiguration {
                     .await
                     .map_err(|_| FlowInvalidRunConfigurations {
                         error: "Cannot fetch default value".to_string(),
-                    })?
-                    .unwrap();
+                    })?;
                 if let Some(flow_run_configuration) = flow_run_configuration_maybe {
                     if let Self::Reset(reset_input) = flow_run_configuration {
-                        let old_head_hash = if let Some(old_head) = &reset_input.old_head_hash {
-                            old_head.clone().into()
+                        let old_head_hash = if reset_input.old_head_hash.is_some() {
+                            reset_input.old_head_hash.clone().map(Into::into)
                         } else {
                             current_head_hash
                         };
                         return Ok(Some(FlowConfigurationSnapshot::Reset(ResetRule {
-                            new_head_hash: reset_input.new_head_hash.clone().map(Into::into),
+                            new_head_hash: reset_input.new_head_hash().map(Into::into),
                             old_head_hash,
+                            recursive: reset_input.recursive,
                         })));
                     }
                     return Err(FlowInvalidRunConfigurations {
@@ -439,6 +492,7 @@ impl FlowRunConfiguration {
                 return Ok(Some(FlowConfigurationSnapshot::Reset(ResetRule {
                     new_head_hash: None,
                     old_head_hash: current_head_hash,
+                    recursive: false,
                 })));
             }
         }
