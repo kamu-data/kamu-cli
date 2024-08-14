@@ -105,24 +105,24 @@ impl From<BatchingRule> for FlowConfigurationBatching {
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfigurationReset {
     pub mode: SnapshotPropagationMode,
+    pub old_head_hash: Option<Multihash>,
     pub recursive: bool,
 }
 
 #[derive(Union, Clone, PartialEq, Eq)]
 pub enum SnapshotPropagationMode {
     Custom(SnapshotConfigurationResetCustom),
-    ToSeed(SnapshotConfigurationResetToSeed),
+    ToSeed(SnapshotConfigurationResetToSeedDummy),
 }
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct SnapshotConfigurationResetCustom {
     pub new_head_hash: Multihash,
-    pub old_head_hash: Option<Multihash>,
 }
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct SnapshotConfigurationResetToSeed {
-    pub old_head_hash: Option<Multihash>,
+pub struct SnapshotConfigurationResetToSeedDummy {
+    pub dummy: String,
 }
 
 impl From<ResetRule> for FlowConfigurationReset {
@@ -130,15 +130,15 @@ impl From<ResetRule> for FlowConfigurationReset {
         let propagation_mode = if let Some(new_head_hash) = &value.new_head_hash {
             SnapshotPropagationMode::Custom(SnapshotConfigurationResetCustom {
                 new_head_hash: new_head_hash.clone().into(),
-                old_head_hash: value.old_head_hash.map(Into::into),
             })
         } else {
-            SnapshotPropagationMode::ToSeed(SnapshotConfigurationResetToSeed {
-                old_head_hash: value.old_head_hash.map(Into::into),
+            SnapshotPropagationMode::ToSeed(SnapshotConfigurationResetToSeedDummy {
+                dummy: String::new(),
             })
         };
         Self {
             mode: propagation_mode,
+            old_head_hash: value.old_head_hash.map(Into::into),
             recursive: value.recursive,
         }
     }
@@ -315,34 +315,27 @@ pub struct BatchingConditionInput {
 #[derive(OneofObject)]
 pub enum PropagationMode {
     Custom(FlowConfigurationResetCustom),
-    ToSeed(FlowConfigurationResetToSeed),
+    ToSeed(FlowConfigurationResetToSeedDummy),
 }
 
 #[derive(InputObject)]
 pub struct FlowConfigurationResetCustom {
     pub new_head_hash: Multihash,
-    pub old_head_hash: Option<Multihash>,
 }
 
 #[derive(InputObject)]
-pub struct FlowConfigurationResetToSeed {
-    pub old_head_hash: Option<Multihash>,
+pub struct FlowConfigurationResetToSeedDummy {
+    dummy: String,
 }
 
 #[derive(InputObject)]
 pub struct ResetConditionInput {
     pub mode: PropagationMode,
+    pub old_head_hash: Option<Multihash>,
     pub recursive: bool,
 }
 
 impl ResetConditionInput {
-    pub fn old_head_hash(&self) -> Option<Multihash> {
-        match &self.mode {
-            PropagationMode::Custom(custom_args) => custom_args.old_head_hash.clone(),
-            PropagationMode::ToSeed(custom_args) => custom_args.old_head_hash.clone(),
-        }
-    }
-
     pub fn new_head_hash(&self) -> Option<Multihash> {
         match &self.mode {
             PropagationMode::Custom(custom_args) => Some(custom_args.new_head_hash.clone()),
@@ -480,8 +473,8 @@ impl FlowRunConfiguration {
                     })?;
                 if let Some(flow_run_configuration) = flow_run_configuration_maybe {
                     if let Self::Reset(reset_input) = flow_run_configuration {
-                        let old_head_hash = if reset_input.old_head_hash().is_some() {
-                            reset_input.old_head_hash().map(Into::into)
+                        let old_head_hash = if reset_input.old_head_hash.is_some() {
+                            reset_input.old_head_hash.clone().map(Into::into)
                         } else {
                             current_head_hash
                         };

@@ -569,7 +569,9 @@ async fn test_trigger_reset_root_dataset_flow() {
                                         },
                                         "startCondition": null,
                                         "configSnapshot": {
-                                            "newHeadHash": &root_dataset_blocks[1].0,
+                                            "mode": {
+                                                "newHeadHash": &root_dataset_blocks[1].0,
+                                            },
                                             "oldHeadHash": &root_dataset_blocks[0].0,
                                             "recursive": false
                                         }
@@ -3504,7 +3506,14 @@ impl FlowRunsHarness {
                                                 __typename
                                             }
                                             ... on FlowConfigurationReset {
-                                                newHeadHash
+                                                mode {
+                                                    ... on SnapshotConfigurationResetCustom {
+                                                        newHeadHash
+                                                    }
+                                                    ... on SnapshotConfigurationResetToSeedDummy {
+                                                        dummy
+                                                    }
+                                                }
                                                 oldHeadHash
                                                 recursive
                                             }
@@ -3667,10 +3676,10 @@ impl FlowRunsHarness {
                                         reset: {
                                             mode: {
                                                 custom: {
-                                                    newHeadHash: "<new_head_hash>",
-                                                    oldHeadHash: "<old_head_hash>"
+                                                    newHeadHash: "<new_head_hash>"
                                                 }
                                             },
+                                            oldHeadHash: "<old_head_hash>",
                                             recursive: <recursive>
                                         }
                                     }

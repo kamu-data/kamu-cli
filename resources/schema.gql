@@ -958,16 +958,16 @@ type FlowConfigurationCompactionRule {
 
 type FlowConfigurationReset {
 	mode: SnapshotPropagationMode!
+	oldHeadHash: Multihash
 	recursive: Boolean!
 }
 
 input FlowConfigurationResetCustom {
 	newHeadHash: Multihash!
-	oldHeadHash: Multihash
 }
 
-input FlowConfigurationResetToSeed {
-	oldHeadHash: Multihash
+input FlowConfigurationResetToSeedDummy {
+	dummy: String!
 }
 
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
@@ -1444,7 +1444,7 @@ type PrepStepPipe {
 
 input PropagationMode @oneOf {
 	custom: FlowConfigurationResetCustom
-	toSeed: FlowConfigurationResetToSeed
+	toSeed: FlowConfigurationResetToSeedDummy
 }
 
 type Query {
@@ -1573,6 +1573,7 @@ type RequestHeader {
 
 input ResetConditionInput {
 	mode: PropagationMode!
+	oldHeadHash: Multihash
 	recursive: Boolean!
 }
 
@@ -1727,14 +1728,13 @@ type SetWatermarkUpdated implements SetWatermarkResult {
 
 type SnapshotConfigurationResetCustom {
 	newHeadHash: Multihash!
-	oldHeadHash: Multihash
 }
 
-type SnapshotConfigurationResetToSeed {
-	oldHeadHash: Multihash
+type SnapshotConfigurationResetToSeedDummy {
+	dummy: String!
 }
 
-union SnapshotPropagationMode = SnapshotConfigurationResetCustom | SnapshotConfigurationResetToSeed
+union SnapshotPropagationMode = SnapshotConfigurationResetCustom | SnapshotConfigurationResetToSeedDummy
 
 union SourceCaching = SourceCachingForever
 
