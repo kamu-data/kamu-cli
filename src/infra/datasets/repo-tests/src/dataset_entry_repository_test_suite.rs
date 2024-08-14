@@ -211,25 +211,80 @@ pub async fn test_try_save_duplicate_dataset_entry(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_try_set_same_dataset_name(catalog: &Catalog) {
+pub async fn test_try_save_dataset_entry_with_name_collision(catalog: &Catalog) {
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
-    let dataset_entry = new_dataset_entry();
+    let (_, owner_id) = AccountID::new_generated_ed25519();
+    let dataset_entry_1 = new_dataset_entry_with(owner_id.clone(), "dataset");
     {
-        let save_res = dataset_entry_repo.save_dataset_entry(&dataset_entry).await;
+        let save_res = dataset_entry_repo
+            .save_dataset_entry(&dataset_entry_1)
+            .await;
 
         assert_matches!(save_res, Ok(_));
     }
-    let same_name = dataset_entry.name;
+
+    let same_dataset_name = dataset_entry_1.name.as_str();
+    let dataset_entry_2 = new_dataset_entry_with(owner_id, same_dataset_name);
+    {
+        let save_res = dataset_entry_repo
+            .save_dataset_entry(&dataset_entry_2)
+            .await;
+
+        assert_matches!(
+            save_res,
+            Err(SaveDatasetEntryError::NameCollision(e))
+                if e.dataset_name == dataset_entry_2.name
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_try_set_same_dataset_name_for_another_owned_dataset_entry(catalog: &Catalog) {
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+
+    let (_, owner_id) = AccountID::new_generated_ed25519();
+    let dataset_entry_1 = new_dataset_entry_with(owner_id.clone(), "dataset1");
+    {
+        let save_res = dataset_entry_repo
+            .save_dataset_entry(&dataset_entry_1)
+            .await;
+
+        assert_matches!(save_res, Ok(_));
+    }
+
+    let same_dataset_name_as_before = &dataset_entry_1.name;
     {
         let update_res = dataset_entry_repo
-            .update_dataset_entry_name(&dataset_entry.id, &same_name)
+            .update_dataset_entry_name(&dataset_entry_1.id, same_dataset_name_as_before)
+            .await;
+
+        assert_matches!(update_res, Ok(_));
+    }
+
+    let dataset_entry_2 = new_dataset_entry_with(owner_id, "dataset2");
+    {
+        let save_res = dataset_entry_repo
+            .save_dataset_entry(&dataset_entry_2)
+            .await;
+
+        assert_matches!(save_res, Ok(_));
+    }
+
+    let same_dataset_name_as_another_owned_dataset = &dataset_entry_1.name;
+    {
+        let update_res = dataset_entry_repo
+            .update_dataset_entry_name(
+                &dataset_entry_2.id,
+                &same_dataset_name_as_another_owned_dataset,
+            )
             .await;
 
         assert_matches!(
             update_res,
             Err(UpdateDatasetEntryNameError::NameCollision(e))
-                if e.dataset_name == same_name
+                if e.dataset_name == *same_dataset_name_as_another_owned_dataset
         );
     }
 }
