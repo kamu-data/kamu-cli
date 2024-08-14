@@ -50,10 +50,22 @@ async fn test_try_save_duplicate_dataset_entry() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_try_set_same_dataset_name() {
+async fn test_try_save_dataset_entry_with_name_collision() {
     let harness = InMemoryDatasetEntryRepositoryHarness::new();
 
-    dataset_entry_repo::test_try_set_same_dataset_name(&harness.catalog).await;
+    dataset_entry_repo::test_try_save_dataset_entry_with_name_collision(&harness.catalog).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_try_set_same_dataset_name_for_another_owned_dataset_entry() {
+    let harness = InmemDatasetEntryRepositoryHarness::new();
+
+    dataset_entry_repo::test_try_set_same_dataset_name_for_another_owned_dataset_entry(
+        &harness.catalog,
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

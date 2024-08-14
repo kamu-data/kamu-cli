@@ -126,10 +126,14 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
     ) -> Result<(), SaveDatasetEntryError> {
         let mut writable_state = self.state.write().await;
 
-        let is_duplicate = writable_state.rows.contains_key(&dataset_entry.id);
+        for row in writable_state.rows.values() {
+            if row.id == dataset_entry.id {
+                return Err(SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into());
+            }
 
-        if is_duplicate {
-            return Err(SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into());
+            if row.owner_id == dataset_entry.owner_id && row.name == dataset_entry.name {
+                return Err(DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into());
+            }
         }
 
         writable_state
@@ -146,17 +150,27 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
     ) -> Result<(), UpdateDatasetEntryNameError> {
         let mut writable_state = self.state.write().await;
 
-        let maybe_dataset_entry = writable_state.rows.get_mut(dataset_id);
+        let maybe_dataset_entry = writable_state.rows.get(dataset_id);
 
-        let Some(dataset_entry) = maybe_dataset_entry else {
+        let Some(found_dataset_entry) = maybe_dataset_entry else {
             return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
         };
 
-        if dataset_entry.name == *new_name {
+        let has_name_collision_detected = writable_state.rows.values().any(|dataset_entry| {
+            dataset_entry.id != *dataset_id
+                && dataset_entry.owner_id == found_dataset_entry.owner_id
+                && dataset_entry.name == *new_name
+        });
+
+        if has_name_collision_detected {
             return Err(DatasetEntryNameCollisionError::new(new_name.clone()).into());
         }
 
-        dataset_entry.name = new_name.clone();
+        // To avoid frustrating the borrow checker, we have to do a second look-up.
+        // Safety: We're already guaranteed that the entry will be present.
+        let found_dataset_entry = writable_state.rows.get_mut(dataset_id).unwrap();
+
+        found_dataset_entry.name = new_name.clone();
 
         Ok(())
     }
