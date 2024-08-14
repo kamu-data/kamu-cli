@@ -5258,6 +5258,8 @@ dependencies = [
  "async-trait",
  "internal-error",
  "opendatafabric",
+ "sqlx",
+ "strum 0.26.3",
  "thiserror",
 ]
 
@@ -5291,6 +5293,23 @@ dependencies = [
  "futures",
  "kamu-auth-rebac",
  "opendatafabric",
+]
+
+[[package]]
+name = "kamu-auth-rebac-sqlite"
+version = "0.194.0"
+dependencies = [
+ "async-trait",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "internal-error",
+ "kamu-auth-rebac",
+ "kamu-auth-rebac-repo-tests",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "tokio",
 ]
 
 [[package]]

@@ -9,83 +9,85 @@
 
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_sqlite::SqliteRebacRepository;
+use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_auth_rebac_repo_tests::test_try_get_properties_from_nonexistent_entity,
-    harness = InmemRebacRepositoryHarness
+    harness = SqliteRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_auth_rebac_repo_tests::test_set_property,
-    harness = InmemRebacRepositoryHarness
+    harness = SqliteRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_auth_rebac_repo_tests::test_try_delete_property_from_nonexistent_entity,
-    harness = InmemRebacRepositoryHarness
+    harness = SqliteRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_auth_rebac_repo_tests::test_try_delete_nonexistent_property_from_entity,
-    harness = InmemRebacRepositoryHarness
+    harness = SqliteRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_auth_rebac_repo_tests::test_delete_property_from_entity,
-    harness = InmemRebacRepositoryHarness
+    harness = SqliteRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_auth_rebac_repo_tests::test_try_insert_duplicate_entities_relation,
-    harness = InmemRebacRepositoryHarness
+    harness = SqliteRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_auth_rebac_repo_tests::test_delete_entities_relation,
-    harness = InmemRebacRepositoryHarness
+    harness = SqliteRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_auth_rebac_repo_tests::test_get_relations_crossover_test,
-    harness = InmemRebacRepositoryHarness
+    harness = SqliteRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct InmemRebacRepositoryHarness {
+struct SqliteRebacRepositoryHarness {
     catalog: Catalog,
 }
 
-impl InmemRebacRepositoryHarness {
-    pub fn new() -> Self {
+impl SqliteRebacRepositoryHarness {
+    pub fn new(sqlite_pool: SqlitePool) -> Self {
         let mut catalog_builder = CatalogBuilder::new();
 
-        catalog_builder.add::<InMemoryRebacRepository>();
+        catalog_builder.add_value(sqlite_pool);
+        catalog_builder.add::<SqliteRebacRepository>();
 
         Self {
             catalog: catalog_builder.build(),

@@ -8,6 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
+use std::str::FromStr;
+
+use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,7 +44,50 @@ impl PropertyName {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+impl std::fmt::Display for PropertyName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PropertyName::Dataset(dataset_property) => write!(f, "dataset/{dataset_property}"),
+            PropertyName::Account(account_property) => write!(f, "account/{account_property}"),
+        }
+    }
+}
+
+impl FromStr for PropertyName {
+    type Err = InternalError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let split: Vec<&str> = value.split('/').collect();
+        let [property_group, property_name] = split[..] else {
+            return InternalError::bail(format!("Invalid format for value: '{value}'"));
+        };
+
+        let res = match property_group {
+            "dataset" => {
+                let dataset_property = property_name.parse::<DatasetPropertyName>().int_err()?;
+
+                Self::Dataset(dataset_property)
+            }
+            "account" => {
+                let account_property = property_name.parse::<AccountPropertyName>().int_err()?;
+
+                Self::Account(account_property)
+            }
+            unexpected_property_group => {
+                return InternalError::bail(format!(
+                    "Unexpected property group: '{unexpected_property_group}'"
+                ))
+            }
+        };
+
+        Ok(res)
+    }
+}
+
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, strum::EnumString, strum::Display,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum DatasetPropertyName {
     AllowsAnonymousRead,
     AllowsPublicRead,
@@ -53,7 +99,10 @@ impl From<DatasetPropertyName> for PropertyName {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, strum::EnumString, strum::Display,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum AccountPropertyName {
     // TODO: ReBAC: absorb the `is_admin` attribute from the Accounts domain
     //       https://github.com/kamu-data/kamu-cli/issues/766
@@ -63,6 +112,27 @@ pub enum AccountPropertyName {
 impl From<AccountPropertyName> for PropertyName {
     fn from(value: AccountPropertyName) -> PropertyName {
         PropertyName::Account(value)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "sqlx")]
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct PropertyRowModel {
+    pub property_name: String,
+    pub property_value: String,
+}
+
+#[cfg(feature = "sqlx")]
+impl TryFrom<PropertyRowModel> for (PropertyName, PropertyValue<'static>) {
+    type Error = InternalError;
+
+    fn try_from(row_model: PropertyRowModel) -> Result<Self, Self::Error> {
+        let property_name = row_model.property_name.parse().int_err()?;
+        let property_value = row_model.property_value.into();
+
+        Ok((property_name, property_value))
     }
 }
 

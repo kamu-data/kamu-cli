@@ -21,12 +21,22 @@ workspace = true
 doctest = false
 
 
+[features]
+sqlx = ["dep:sqlx"]
+
+
 [dependencies]
 internal-error = { workspace = true }
 opendatafabric = { workspace = true }
 
 async-trait = "0.1"
+strum = { version = "0.26", features = ["derive"] }
 thiserror = { version = "1", default-features = false }
+
+# Optional
+sqlx = { optional = true, version = "0.7", default-features = false, features = [
+    "macros",
+] }
 
 
 [dev-dependencies]

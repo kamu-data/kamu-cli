@@ -14,6 +14,11 @@ use crate::Relation;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(
+    feature = "sqlx",
+    derive(sqlx::Type),
+    sqlx(type_name = "entity_type", rename_all = "lowercase")
+)]
 pub enum EntityType {
     Dataset,
     Account,

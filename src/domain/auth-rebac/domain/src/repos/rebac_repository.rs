@@ -21,7 +21,7 @@ pub trait RebacRepository: Send + Sync {
     async fn set_entity_property(
         &self,
         entity: &Entity,
-        property: PropertyName,
+        property_name: PropertyName,
         property_value: &PropertyValue,
     ) -> Result<(), SetEntityPropertyError>;
 
