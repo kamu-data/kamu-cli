@@ -9,6 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
+use chrono::Utc;
 use dill::Catalog;
 use kamu_datasets::{
     DatasetEntry,
@@ -294,8 +295,9 @@ pub async fn test_delete_dataset_entry(catalog: &Catalog) {
 fn new_dataset_entry_with(owner_id: AccountID, dataset_name: &str) -> DatasetEntry {
     let (_, dataset_id) = DatasetID::new_generated_ed25519();
     let dataset_alias = DatasetName::new_unchecked(dataset_name);
+    let created_at = Utc::now();
 
-    DatasetEntry::new(dataset_id, owner_id, dataset_alias)
+    DatasetEntry::new(dataset_id, owner_id, dataset_alias, created_at)
 }
 
 fn new_dataset_entry() -> DatasetEntry {
