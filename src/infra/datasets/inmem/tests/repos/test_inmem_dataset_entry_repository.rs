@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::{Catalog, CatalogBuilder};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
 use kamu_datasets_repo_tests::dataset_entry_repo;
 
@@ -96,6 +97,7 @@ impl InMemoryDatasetEntryRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
 
+        catalog_builder.add::<InMemoryAccountRepository>();
         catalog_builder.add::<InMemoryDatasetEntryRepository>();
 
         Self {

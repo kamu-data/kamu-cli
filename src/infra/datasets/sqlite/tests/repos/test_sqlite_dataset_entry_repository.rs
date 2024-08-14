@@ -10,6 +10,7 @@
 use database_common::{DatabaseTransactionRunner, SqliteTransactionManager};
 use dill::{Catalog, CatalogBuilder};
 use internal_error::InternalError;
+use kamu_accounts_sqlite::SqliteAccountRepository;
 use kamu_datasets_repo_tests::dataset_entry_repo;
 use kamu_datasets_sqlite::SqliteDatasetEntryRepository;
 use sqlx::SqlitePool;
@@ -157,6 +158,7 @@ impl SqliteDatasetEntryRepositoryHarness {
 
         catalog_builder.add_value(sqlite_pool);
         catalog_builder.add::<SqliteTransactionManager>();
+        catalog_builder.add::<SqliteAccountRepository>();
         catalog_builder.add::<SqliteDatasetEntryRepository>();
 
         Self {

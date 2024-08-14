@@ -38,6 +38,7 @@ uuid = "1"
 
 
 [dev-dependencies]
+kamu-accounts-inmem = { workspace = true }
 kamu-datasets-repo-tests = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }
