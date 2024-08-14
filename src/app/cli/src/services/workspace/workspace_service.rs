@@ -83,7 +83,7 @@ impl WorkspaceService {
         }
     }
 
-    //// Layout of the workspace (if we are in one)
+    /// Layout of the workspace (if we are in one)
     pub fn layout(&self) -> Option<&WorkspaceLayout> {
         if self.is_in_workspace() {
             Some(self.workspace_layout.as_ref())
