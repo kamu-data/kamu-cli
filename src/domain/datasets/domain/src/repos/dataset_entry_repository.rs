@@ -33,8 +33,10 @@ pub trait DatasetEntryRepository: Send + Sync {
         owner_id: &AccountID,
     ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByOwnerIdError>;
 
-    async fn save_dataset_entry(&self, dataset: &DatasetEntry)
-        -> Result<(), SaveDatasetEntryError>;
+    async fn save_dataset_entry(
+        &self,
+        dataset_entry: &DatasetEntry,
+    ) -> Result<(), SaveDatasetEntryError>;
 
     async fn update_dataset_entry_name(
         &self,

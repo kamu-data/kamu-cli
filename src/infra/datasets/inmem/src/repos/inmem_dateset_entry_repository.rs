@@ -122,19 +122,19 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
 
     async fn save_dataset_entry(
         &self,
-        dataset: &DatasetEntry,
+        dataset_entry: &DatasetEntry,
     ) -> Result<(), SaveDatasetEntryError> {
         let mut writable_state = self.state.write().await;
 
-        let is_duplicate = writable_state.rows.contains_key(&dataset.id);
+        let is_duplicate = writable_state.rows.contains_key(&dataset_entry.id);
 
         if is_duplicate {
-            return Err(SaveDatasetEntryErrorDuplicate::new(dataset.id.clone()).into());
+            return Err(SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into());
         }
 
         writable_state
             .rows
-            .insert(dataset.id.clone(), dataset.clone());
+            .insert(dataset_entry.id.clone(), dataset_entry.clone());
 
         Ok(())
     }
