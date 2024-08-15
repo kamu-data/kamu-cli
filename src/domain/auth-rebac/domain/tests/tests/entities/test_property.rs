@@ -65,8 +65,6 @@ fn test_try_parse_unexpected_property_name() {
 
     let input = format!("{group}{SEP}{unexpected_property}");
 
-    dbg!(PropertyName::from_str(&input).err().unwrap().reason());
-
     assert_matches!(
         PropertyName::from_str(&input),
         Err(e)
