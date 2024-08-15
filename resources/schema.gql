@@ -202,11 +202,6 @@ type AuthMut {
 	revokeAccessToken(tokenId: AccessTokenID!): RevokeResult!
 }
 
-input BatchingConditionInput {
-	minRecordsToAwait: Int!
-	maxBatchingInterval: TimeDeltaInput!
-}
-
 type BlockRef {
 	name: String!
 	blockHash: Multihash!
@@ -553,7 +548,7 @@ type DatasetFlowConfigs {
 
 type DatasetFlowConfigsMut {
 	setConfigIngest(datasetFlowType: DatasetFlowType!, paused: Boolean!, ingest: IngestConditionInput!): SetFlowConfigResult!
-	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, batching: BatchingConditionInput!): SetFlowBatchingConfigResult!
+	setConfigTransform(datasetFlowType: DatasetFlowType!, paused: Boolean!, transformInput: TransformConditionInput!): SetFlowTransformConfigResult!
 	setConfigCompaction(datasetFlowType: DatasetFlowType!, compactionArgs: CompactionConditionInput!): SetFlowCompactionConfigResult!
 	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
 	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
@@ -940,14 +935,9 @@ type FlowAbortedResult {
 type FlowConfiguration {
 	paused: Boolean!
 	ingest: FlowConfigurationIngest
-	batching: FlowConfigurationBatching
+	transform: FlowConfigurationTransform
 	compaction: FlowConfigurationCompaction
 	reset: FlowConfigurationReset
-}
-
-type FlowConfigurationBatching {
-	minRecordsToAwait: Int!
-	maxBatchingInterval: TimeDelta!
 }
 
 union FlowConfigurationCompaction = CompactionFull | CompactionMetadataOnly
@@ -977,11 +967,12 @@ input FlowConfigurationResetToSeedDummy {
 
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
 
-type FlowConfigurationScheduleRule {
-	scheduleRule: FlowConfigurationSchedule!
-}
+union FlowConfigurationSnapshot = FlowConfigurationTransform | FlowConfigurationCompactionRule | FlowConfigurationIngest | FlowConfigurationReset
 
-union FlowConfigurationSnapshot = FlowConfigurationBatching | FlowConfigurationScheduleRule | FlowConfigurationCompactionRule | FlowConfigurationReset | FlowConfigurationIngest
+type FlowConfigurationTransform {
+	minRecordsToAwait: Int!
+	maxBatchingInterval: TimeDelta!
+}
 
 type FlowConnection {
 	"""
@@ -1121,14 +1112,9 @@ union FlowFailedReason = FlowFailedMessage | FlowDatasetCompactedFailedError
 
 scalar FlowID
 
-type FlowIncompatibleDatasetKind implements SetFlowConfigResult & SetFlowBatchingConfigResult & SetFlowCompactionConfigResult & TriggerFlowResult {
+type FlowIncompatibleDatasetKind implements SetFlowConfigResult & SetFlowTransformConfigResult & SetFlowCompactionConfigResult & TriggerFlowResult {
 	expectedDatasetKind: DatasetKind!
 	actualDatasetKind: DatasetKind!
-	message: String!
-}
-
-type FlowInvalidBatchingConfig implements SetFlowBatchingConfigResult {
-	reason: String!
 	message: String!
 }
 
@@ -1142,6 +1128,11 @@ type FlowInvalidRunConfigurations implements TriggerFlowResult {
 	message: String!
 }
 
+type FlowInvalidTransformConfig implements SetFlowTransformConfigResult {
+	reason: String!
+	message: String!
+}
+
 type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
 	flowId: FlowID!
 	message: String!
@@ -1149,14 +1140,13 @@ type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
 
 union FlowOutcome = FlowSuccessResult | FlowFailedError | FlowAbortedResult
 
-type FlowPreconditionsNotMet implements SetFlowConfigResult & SetFlowBatchingConfigResult & TriggerFlowResult {
+type FlowPreconditionsNotMet implements SetFlowConfigResult & SetFlowTransformConfigResult & TriggerFlowResult {
 	preconditions: String!
 	message: String!
 }
 
 input FlowRunConfiguration @oneOf {
-	schedule: ScheduleInput
-	batching: BatchingConditionInput
+	transform: TransformConditionInput
 	compaction: CompactionConditionInput
 	ingest: IngestConditionInput
 	reset: ResetConditionInput
@@ -1165,7 +1155,7 @@ input FlowRunConfiguration @oneOf {
 union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionBatching | FlowStartConditionExecutor
 
 type FlowStartConditionBatching {
-	activeBatchingRule: FlowConfigurationBatching!
+	activeTransformRule: FlowConfigurationTransform!
 	batchingDeadline: DateTime!
 	accumulatedRecordsCount: Int!
 	watermarkModified: Boolean!
@@ -1231,7 +1221,7 @@ type FlowTriggerPush {
 	dummy: Boolean!
 }
 
-type FlowTypeIsNotSupported implements SetFlowConfigResult & SetFlowBatchingConfigResult & SetFlowCompactionConfigResult {
+type FlowTypeIsNotSupported implements SetFlowConfigResult & SetFlowTransformConfigResult & SetFlowCompactionConfigResult {
 	message: String!
 }
 
@@ -1682,10 +1672,6 @@ type SetDataSchema {
 	schema: DataSchema!
 }
 
-interface SetFlowBatchingConfigResult {
-	message: String!
-}
-
 interface SetFlowCompactionConfigResult {
 	message: String!
 }
@@ -1694,8 +1680,12 @@ interface SetFlowConfigResult {
 	message: String!
 }
 
-type SetFlowConfigSuccess implements SetFlowConfigResult & SetFlowBatchingConfigResult & SetFlowCompactionConfigResult {
+type SetFlowConfigSuccess implements SetFlowConfigResult & SetFlowTransformConfigResult & SetFlowCompactionConfigResult {
 	config: FlowConfiguration!
+	message: String!
+}
+
+interface SetFlowTransformConfigResult {
 	message: String!
 }
 
@@ -1928,6 +1918,11 @@ enum TimeUnit {
 }
 
 union Transform = TransformSql
+
+input TransformConditionInput {
+	minRecordsToAwait: Int!
+	maxBatchingInterval: TimeDeltaInput!
+}
 
 type TransformInput {
 	datasetRef: DatasetRef!
