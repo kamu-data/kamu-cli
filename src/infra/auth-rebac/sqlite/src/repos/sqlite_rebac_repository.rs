@@ -118,10 +118,7 @@ impl RebacRepository for SqliteRebacRepository {
         .map_int_err(DeleteEntityPropertyError::Internal)?;
 
         if delete_result.rows_affected() == 0 {
-            return Err(DeleteEntityPropertyError::property_not_found(
-                entity,
-                property_name,
-            ));
+            return Err(DeleteEntityPropertyError::not_found(entity, property_name));
         }
 
         Ok(())

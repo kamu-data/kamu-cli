@@ -106,16 +106,13 @@ impl RebacRepository for InMemoryRebacRepository {
             .get_mut(&entity.clone().into_owned());
 
         let Some(entity_properties) = maybe_entity_properties else {
-            return Err(DeleteEntityPropertyError::entity_not_found(entity));
+            return Err(DeleteEntityPropertyError::not_found(entity, property_name));
         };
 
         let property_not_found = entity_properties.remove(&property_name).is_none();
 
         if property_not_found {
-            return Err(DeleteEntityPropertyError::property_not_found(
-                entity,
-                property_name,
-            ));
+            return Err(DeleteEntityPropertyError::not_found(entity, property_name));
         }
 
         Ok(())

@@ -85,24 +85,15 @@ pub enum SetEntityPropertyError {
 #[derive(Error, Debug)]
 pub enum DeleteEntityPropertyError {
     #[error(transparent)]
-    EntityNotFound(EntityNotFoundError),
-
-    #[error(transparent)]
-    PropertyNotFound(EntityPropertyNotFoundError),
+    NotFound(EntityPropertyNotFoundError),
 
     #[error(transparent)]
     Internal(InternalError),
 }
 
 impl DeleteEntityPropertyError {
-    pub fn entity_not_found(entity: &Entity) -> Self {
-        Self::EntityNotFound(EntityNotFoundError {
-            entity: entity.clone().into_owned(),
-        })
-    }
-
-    pub fn property_not_found(entity: &Entity, property_name: PropertyName) -> Self {
-        Self::PropertyNotFound(EntityPropertyNotFoundError {
+    pub fn not_found(entity: &Entity, property_name: PropertyName) -> Self {
+        Self::NotFound(EntityPropertyNotFoundError {
             entity: entity.clone().into_owned(),
             property_name,
         })
