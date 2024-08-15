@@ -43,6 +43,10 @@ impl InternalError {
     pub fn bail<T>(reason: impl Into<String>) -> Result<T, Self> {
         Err(Self::new(InternalErrorBail::new(reason)))
     }
+
+    pub fn reason(&self) -> String {
+        format!("{self}: {}", self.source)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
