@@ -94,7 +94,7 @@ pub struct EntityWithRelationRowModel {
 
 #[cfg(feature = "sqlx")]
 impl TryFrom<EntityWithRelationRowModel> for EntityWithRelation<'static> {
-    type Error = InternalError;
+    type Error = internal_error::InternalError;
 
     fn try_from(row_model: EntityWithRelationRowModel) -> Result<Self, Self::Error> {
         let relationship = row_model.relationship.parse()?;

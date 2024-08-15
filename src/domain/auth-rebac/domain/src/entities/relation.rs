@@ -13,7 +13,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const GROUP_SEPARATOR: &str = "/";
+pub const RELATION_GROUP_SEPARATOR: &str = "/";
 const RELATION_GROUP_ACCOUNT_TO_DATASET: &str = "account->dataset";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -31,6 +31,12 @@ impl Relation {
     pub fn account_is_a_dataset_editor() -> Self {
         Self::AccountToDataset(AccountToDatasetRelation::Editor)
     }
+
+    pub fn relation_group(&self) -> &'static str {
+        match self {
+            Relation::AccountToDataset(_) => RELATION_GROUP_ACCOUNT_TO_DATASET,
+        }
+    }
 }
 
 impl std::fmt::Display for Relation {
@@ -39,7 +45,7 @@ impl std::fmt::Display for Relation {
             Self::AccountToDataset(relation) => {
                 write!(
                     f,
-                    "{RELATION_GROUP_ACCOUNT_TO_DATASET}{GROUP_SEPARATOR}{relation}"
+                    "{RELATION_GROUP_ACCOUNT_TO_DATASET}{RELATION_GROUP_SEPARATOR}{relation}"
                 )
             }
         }
@@ -50,23 +56,23 @@ impl FromStr for Relation {
     type Err = InternalError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let split: Vec<&str> = value.split(GROUP_SEPARATOR).collect();
+        let split: Vec<&str> = value.split(RELATION_GROUP_SEPARATOR).collect();
         let [relation_group, relation_name] = split[..] else {
             return InternalError::bail(format!("Invalid format for value: '{value}'"));
         };
 
         let res = match relation_group {
-            RELATION_GROUP_ACCOUNT_TO_DATASET => {
+            group @ RELATION_GROUP_ACCOUNT_TO_DATASET => {
                 let relation = relation_name
                     .parse::<AccountToDatasetRelation>()
-                    .int_err()?;
+                    .context_int_err(format!("group '{group}', relation_name '{relation_name}'"))?;
 
                 Self::AccountToDataset(relation)
             }
             unexpected_property_group => {
                 return InternalError::bail(format!(
                     "Unexpected relation group: '{unexpected_property_group}'"
-                ))
+                ));
             }
         };
 
@@ -79,6 +85,7 @@ impl FromStr for Relation {
 #[derive(
     Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, strum::EnumString, strum::Display,
 )]
+#[strum(serialize_all = "snake_case")]
 pub enum AccountToDatasetRelation {
     Reader,
     Editor,

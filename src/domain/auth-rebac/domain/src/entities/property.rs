@@ -14,7 +14,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const GROUP_SEPARATOR: &str = "/";
+pub const PROPERTY_GROUP_SEPARATOR: &str = "/";
 const PROPERTY_GROUP_DATASET: &str = "dataset";
 const PROPERTY_GROUP_ACCOUNT: &str = "account";
 
@@ -48,6 +48,13 @@ impl PropertyName {
             value.into(),
         )
     }
+
+    pub fn property_group(&self) -> &'static str {
+        match self {
+            PropertyName::Dataset(_) => PROPERTY_GROUP_DATASET,
+            PropertyName::Account(_) => PROPERTY_GROUP_ACCOUNT,
+        }
+    }
 }
 
 impl std::fmt::Display for PropertyName {
@@ -56,13 +63,13 @@ impl std::fmt::Display for PropertyName {
             Self::Dataset(dataset_property) => {
                 write!(
                     f,
-                    "{PROPERTY_GROUP_DATASET}{GROUP_SEPARATOR}{dataset_property}"
+                    "{PROPERTY_GROUP_DATASET}{PROPERTY_GROUP_SEPARATOR}{dataset_property}"
                 )
             }
             Self::Account(account_property) => {
                 write!(
                     f,
-                    "{PROPERTY_GROUP_ACCOUNT}{GROUP_SEPARATOR}{account_property}"
+                    "{PROPERTY_GROUP_ACCOUNT}{PROPERTY_GROUP_SEPARATOR}{account_property}"
                 )
             }
         }
@@ -73,19 +80,23 @@ impl FromStr for PropertyName {
     type Err = InternalError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let split: Vec<&str> = value.split(GROUP_SEPARATOR).collect();
+        let split: Vec<&str> = value.split(PROPERTY_GROUP_SEPARATOR).collect();
         let [property_group, property_name] = split[..] else {
             return InternalError::bail(format!("Invalid format for value: '{value}'"));
         };
 
         let res = match property_group {
-            PROPERTY_GROUP_DATASET => {
-                let dataset_property = property_name.parse::<DatasetPropertyName>().int_err()?;
+            group @ PROPERTY_GROUP_DATASET => {
+                let dataset_property = property_name
+                    .parse::<DatasetPropertyName>()
+                    .context_int_err(format!("group '{group}', property_name '{property_name}'"))?;
 
                 Self::Dataset(dataset_property)
             }
-            PROPERTY_GROUP_ACCOUNT => {
-                let account_property = property_name.parse::<AccountPropertyName>().int_err()?;
+            group @ PROPERTY_GROUP_ACCOUNT => {
+                let account_property = property_name
+                    .parse::<AccountPropertyName>()
+                    .context_int_err(format!("group '{group}', property_name '{property_name}'"))?;
 
                 Self::Account(account_property)
             }
