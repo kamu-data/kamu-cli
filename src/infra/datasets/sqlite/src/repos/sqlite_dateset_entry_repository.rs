@@ -139,7 +139,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         let stack_owner_id = owner_id.as_did_str().to_stack_string();
         let owner_id_as_str = stack_owner_id.as_str();
 
-        let maybe_dataset_entry_rows = sqlx::query_as!(
+        let dataset_entry_rows = sqlx::query_as!(
             DatasetEntryRowModel,
             r#"
             SELECT dataset_id   as "id: _",
@@ -155,10 +155,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         .await
         .map_int_err(GetDatasetEntriesByOwnerIdError::Internal)?;
 
-        Ok(maybe_dataset_entry_rows
-            .into_iter()
-            .map(Into::into)
-            .collect())
+        Ok(dataset_entry_rows.into_iter().map(Into::into).collect())
     }
 
     async fn save_dataset_entry(

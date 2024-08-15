@@ -9,6 +9,8 @@
 
 use std::borrow::Cow;
 
+use internal_error::InternalError;
+
 use crate::Relation;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,6 +81,28 @@ impl<'a> EntityWithRelation<'a> {
         let dataset_entity = Entity::new_dataset(entity_id);
 
         Self::new(dataset_entity, relation)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "sqlx")]
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct EntityWithRelationRowModel {
+    pub entity_type: EntityType,
+    pub entity_id: String,
+    pub relationship: String,
+}
+
+#[cfg(feature = "sqlx")]
+impl TryFrom<EntityWithRelationRowModel> for EntityWithRelation<'static> {
+    type Error = InternalError;
+
+    fn try_from(row_model: EntityWithRelationRowModel) -> Result<Self, Self::Error> {
+        let relationship = row_model.relationship.parse()?;
+        let entity = Entity::new(row_model.entity_type, row_model.entity_id);
+
+        Ok(EntityWithRelation::new(entity, relationship))
     }
 }
 

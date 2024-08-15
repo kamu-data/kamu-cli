@@ -14,6 +14,12 @@ use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const GROUP_SEPARATOR: &str = "/";
+const PROPERTY_GROUP_DATASET: &str = "dataset";
+const PROPERTY_GROUP_ACCOUNT: &str = "account";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub type PropertyValue<'a> = Cow<'a, str>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,8 +53,18 @@ impl PropertyName {
 impl std::fmt::Display for PropertyName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PropertyName::Dataset(dataset_property) => write!(f, "dataset/{dataset_property}"),
-            PropertyName::Account(account_property) => write!(f, "account/{account_property}"),
+            Self::Dataset(dataset_property) => {
+                write!(
+                    f,
+                    "{PROPERTY_GROUP_DATASET}{GROUP_SEPARATOR}{dataset_property}"
+                )
+            }
+            Self::Account(account_property) => {
+                write!(
+                    f,
+                    "{PROPERTY_GROUP_ACCOUNT}{GROUP_SEPARATOR}{account_property}"
+                )
+            }
         }
     }
 }
@@ -57,18 +73,18 @@ impl FromStr for PropertyName {
     type Err = InternalError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let split: Vec<&str> = value.split('/').collect();
+        let split: Vec<&str> = value.split(GROUP_SEPARATOR).collect();
         let [property_group, property_name] = split[..] else {
             return InternalError::bail(format!("Invalid format for value: '{value}'"));
         };
 
         let res = match property_group {
-            "dataset" => {
+            PROPERTY_GROUP_DATASET => {
                 let dataset_property = property_name.parse::<DatasetPropertyName>().int_err()?;
 
                 Self::Dataset(dataset_property)
             }
-            "account" => {
+            PROPERTY_GROUP_ACCOUNT => {
                 let account_property = property_name.parse::<AccountPropertyName>().int_err()?;
 
                 Self::Account(account_property)
@@ -84,6 +100,8 @@ impl FromStr for PropertyName {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(
     Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, strum::EnumString, strum::Display,
 )]
@@ -98,6 +116,8 @@ impl From<DatasetPropertyName> for PropertyName {
         PropertyName::Dataset(value)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(
     Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, strum::EnumString, strum::Display,
@@ -129,7 +149,7 @@ impl TryFrom<PropertyRowModel> for (PropertyName, PropertyValue<'static>) {
     type Error = InternalError;
 
     fn try_from(row_model: PropertyRowModel) -> Result<Self, Self::Error> {
-        let property_name = row_model.property_name.parse().int_err()?;
+        let property_name = row_model.property_name.parse()?;
         let property_value = row_model.property_value.into();
 
         Ok((property_name, property_value))

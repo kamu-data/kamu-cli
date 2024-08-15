@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::SqliteTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_auth_rebac_sqlite::SqliteRebacRepository;
@@ -87,6 +88,7 @@ impl SqliteRebacRepositoryHarness {
         let mut catalog_builder = CatalogBuilder::new();
 
         catalog_builder.add_value(sqlite_pool);
+        catalog_builder.add::<SqliteTransactionManager>();
         catalog_builder.add::<SqliteRebacRepository>();
 
         Self {
