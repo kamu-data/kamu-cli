@@ -172,7 +172,7 @@ pub trait PullMultiListener: Send + Sync {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PullResult {
-    UpToDate(UpToDateResult),
+    UpToDate(PullResultUpToDate),
     Updated {
         old_head: Option<Multihash>,
         new_head: Multihash,
@@ -180,17 +180,30 @@ pub enum PullResult {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum UpToDateResult {
-    IngestUpToDate { uncacheable: bool },
-    UpToDate,
+pub enum PullResultUpToDate {
+    PollingIngest(PollingInsgestResultUpToDate),
+    PushIngest(PushInsgestResultUpToDate),
+    Transform,
+    Sync,
+    SetWatermark,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct PollingInsgestResultUpToDate {
+    pub uncacheable: bool,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct PushInsgestResultUpToDate {
+    pub uncacheable: bool,
 }
 
 impl From<PollingIngestResult> for PullResult {
     fn from(other: PollingIngestResult) -> Self {
         match other {
-            PollingIngestResult::UpToDate { uncacheable, .. } => {
-                PullResult::UpToDate(UpToDateResult::IngestUpToDate { uncacheable })
-            }
+            PollingIngestResult::UpToDate { uncacheable, .. } => PullResult::UpToDate(
+                PullResultUpToDate::PollingIngest(PollingInsgestResultUpToDate { uncacheable }),
+            ),
             PollingIngestResult::Updated {
                 old_head, new_head, ..
             } => PullResult::Updated {
@@ -204,7 +217,7 @@ impl From<PollingIngestResult> for PullResult {
 impl From<TransformResult> for PullResult {
     fn from(other: TransformResult) -> Self {
         match other {
-            TransformResult::UpToDate => PullResult::UpToDate(UpToDateResult::UpToDate),
+            TransformResult::UpToDate => PullResult::UpToDate(PullResultUpToDate::Transform),
             TransformResult::Updated { old_head, new_head } => PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
@@ -216,7 +229,7 @@ impl From<TransformResult> for PullResult {
 impl From<SyncResult> for PullResult {
     fn from(other: SyncResult) -> Self {
         match other {
-            SyncResult::UpToDate => PullResult::UpToDate(UpToDateResult::UpToDate),
+            SyncResult::UpToDate => PullResult::UpToDate(PullResultUpToDate::Sync),
             SyncResult::Updated {
                 old_head, new_head, ..
             } => PullResult::Updated { old_head, new_head },

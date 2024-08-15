@@ -548,7 +548,7 @@ type DatasetFlowConfigs {
 
 type DatasetFlowConfigsMut {
 	setConfigIngest(datasetFlowType: DatasetFlowType!, paused: Boolean!, ingest: IngestConditionInput!): SetFlowConfigResult!
-	setConfigTransform(datasetFlowType: DatasetFlowType!, paused: Boolean!, transformInput: TransformConditionInput!): SetFlowTransformConfigResult!
+	setConfigTransform(datasetFlowType: DatasetFlowType!, paused: Boolean!, transform: TransformConditionInput!): SetFlowTransformConfigResult!
 	setConfigCompaction(datasetFlowType: DatasetFlowType!, compactionArgs: CompactionConditionInput!): SetFlowCompactionConfigResult!
 	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
 	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
@@ -1883,11 +1883,6 @@ type TasksMut {
 	Requests cancellation of the specified task
 	"""
 	cancelTask(taskId: TaskID!): Task!
-	"""
-	Schedules a task to update the specified dataset by performing polling
-	ingest or a derivative transformation
-	"""
-	createUpdateDatasetTask(datasetId: DatasetID!, fetchUncacheable: Boolean): Task!
 	"""
 	Schedules a task to update the specified dataset by performing polling
 	ingest or a derivative transformation

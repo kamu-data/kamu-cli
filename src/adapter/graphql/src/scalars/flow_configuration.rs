@@ -414,15 +414,17 @@ impl FlowRunConfiguration {
     ) -> Result<Option<FlowConfigurationSnapshot>, FlowInvalidRunConfigurations> {
         match dataset_flow_type {
             DatasetFlowType::Ingest => {
-                if let Some(Self::Ingest(ingest_input)) = flow_run_configuration_maybe {
-                    return Ok(Some(FlowConfigurationSnapshot::Ingest(IngestRule {
-                        fetch_uncacheable: ingest_input.fetch_uncacheable,
-                        schedule_condition: match &ingest_input.schedule {
-                            ScheduleInput::TimeDelta(td) => {
-                                Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
-                            }
-                            ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
-                                Schedule::try_from_5component_cron_expression(
+                if let Some(flow_run_configuration) = flow_run_configuration_maybe {
+                    if let Self::Ingest(ingest_input) = flow_run_configuration {
+                        return Ok(Some(FlowConfigurationSnapshot::Ingest(IngestRule {
+                            fetch_uncacheable: ingest_input.fetch_uncacheable,
+                            schedule_condition: match &ingest_input.schedule {
+                                ScheduleInput::TimeDelta(td) => {
+                                    Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
+                                }
+                                ScheduleInput::Cron5ComponentExpression(
+                                    cron_5component_expression,
+                                ) => Schedule::try_from_5component_cron_expression(
                                     cron_5component_expression,
                                 )
                                 .map_err(|_| {
@@ -430,14 +432,15 @@ impl FlowRunConfiguration {
                                         error: "Invalid schedule flow run configuration"
                                             .to_string(),
                                     }
-                                })?
-                            }
-                        },
-                    })));
+                                })?,
+                            },
+                        })));
+                    }
+                    return Err(FlowInvalidRunConfigurations {
+                        error: "Incompatible flow run configuration and dataset flow type"
+                            .to_string(),
+                    });
                 }
-                return Err(FlowInvalidRunConfigurations {
-                    error: "Incompatible flow run configuration and dataset flow type".to_string(),
-                });
             }
             DatasetFlowType::ExecuteTransform => {
                 if let Some(flow_run_configuration) = flow_run_configuration_maybe {

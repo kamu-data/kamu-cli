@@ -126,10 +126,7 @@ impl TaskExecutorImpl {
 
         match maybe_pull_result {
             Ok(pull_result) => Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
-                TaskUpdateDatasetResult::from_pull_result(
-                    &pull_result,
-                    update_dataset_args.fetch_uncacheable,
-                ),
+                TaskUpdateDatasetResult { pull_result },
             ))),
             Err(err) => match err {
                 PullError::TransformError(TransformError::InvalidInterval(_)) => {

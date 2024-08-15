@@ -102,7 +102,7 @@ impl DatasetFlowConfigsMut {
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
         paused: bool,
-        transform_input: TransformConditionInput,
+        transform: TransformConditionInput,
     ) -> Result<SetFlowTransformConfigResult> {
         if !ensure_set_config_flow_supported(
             dataset_flow_type,
@@ -113,8 +113,8 @@ impl DatasetFlowConfigsMut {
             ));
         }
         let transform_rule = match TransformRule::new_checked(
-            transform_input.min_records_to_await,
-            transform_input.max_batching_interval.into(),
+            transform.min_records_to_await,
+            transform.max_batching_interval.into(),
         ) {
             Ok(rule) => rule,
             Err(e) => {
