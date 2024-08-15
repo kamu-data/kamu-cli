@@ -24,6 +24,7 @@ pub type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 pub struct InternalError {
     #[source]
     source: BoxedError,
+    context: Option<String>,
     #[backtrace]
     backtrace: Option<Backtrace>,
 }
@@ -37,22 +38,38 @@ impl InternalError {
             Some(Backtrace::capture())
         };
 
-        Self { source, backtrace }
+        Self {
+            source,
+            backtrace,
+            context: None,
+        }
     }
 
     pub fn bail<T>(reason: impl Into<String>) -> Result<T, Self> {
         Err(Self::new(InternalErrorBail::new(reason)))
     }
 
+    pub fn with_context(mut self, context: impl Into<String>) -> Self {
+        self.context = Some(context.into());
+
+        self
+    }
+
     pub fn reason(&self) -> String {
-        format!("{self}: {}", self.source)
+        let mut reason = format!("{self}: {}", self.source);
+
+        if let Some(context) = &self.context {
+            reason += &format!(" (context: {context})");
+        };
+
+        reason
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("Error: {reason}")]
+#[error("{reason}")]
 struct InternalErrorBail {
     reason: String,
 }
@@ -88,18 +105,27 @@ pub trait ResultIntoInternal<OK> {
     fn map_int_err<E, F>(self, error_mapper: F) -> Result<OK, E>
     where
         F: FnOnce(InternalError) -> E;
+
+    fn context_int_err(self, context: impl Into<String>) -> Result<OK, InternalError>;
 }
 
 impl<OK, E> ResultIntoInternal<OK> for Result<OK, E>
 where
     E: Into<BoxedError>,
 {
+    /// Method whose purpose is to convert a dynamic error
+    /// into an [`InternalError`].
+    ///
+    /// If you need to add additional context to the error,
+    /// [`context_int_err()`](ResultIntoInternal::context_int_err())
+    /// method will help.
     fn int_err(self) -> Result<OK, InternalError> {
         match self {
             Ok(ok) => Ok(ok),
             Err(e) => Err(e.int_err()),
         }
     }
+
     /// Shortcut for [`int_err()`](ResultIntoInternal::int_err())
     /// followed by a call to [`Result::map_err()`]:
     /// ```
@@ -121,6 +147,22 @@ where
         F: FnOnce(InternalError) -> R,
     {
         self.int_err().map_err(error_mapper)
+    }
+
+    /// Version of method [`int_err()`](ResultIntoInternal::int_err())
+    /// with additional context.
+    ///
+    /// # Examples
+    /// ```
+    /// // Adding context to a parsing error:
+    /// let account_property = property_name
+    ///     .parse::<AccountPropertyName>()
+    ///     .context_int_err(format!("group '{group}', property_name '{property_name}'"))?;
+    /// //   ^^^^^^^^^^^^^^^
+    /// ```
+    #[inline]
+    fn context_int_err(self, context: impl Into<String>) -> Result<OK, InternalError> {
+        self.int_err().map_err(|e| e.with_context(context))
     }
 }
 

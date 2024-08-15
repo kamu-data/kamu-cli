@@ -102,13 +102,45 @@ fn test_creates_backtrace_when_unavailable() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-fn test_creates_the_correct_reason() {
+fn test_creates_the_bail_error() {
     let error: Result<!, _> = InternalError::bail("Oh, no, something went wrong");
 
     assert_matches!(
         error,
         Err(e)
-            if e.reason() == "Internal error: Error: Oh, no, something went wrong" );
+            if e.reason() == "Internal error: Oh, no, something went wrong"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+#[error("Input value is not an integer")]
+struct IntegerParsingError;
+
+#[test]
+fn test_creates_the_correct_reason_without_context() {
+    let error = IntegerParsingError {}.int_err();
+
+    assert_eq!(
+        error.reason(),
+        "Internal error: Input value is not an integer"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_creates_the_correct_reason_wit_context() {
+    let definitely_not_a_number = "λ";
+    let error: Result<!, _> =
+        Err(IntegerParsingError {}).context_int_err(format!("value '{definitely_not_a_number}'"));
+
+    assert_matches!(
+        error,
+        Err(e)
+            if e.reason() == "Internal error: Input value is not an integer (context: value 'λ')"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
