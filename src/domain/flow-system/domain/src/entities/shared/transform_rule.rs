@@ -15,31 +15,31 @@ use thiserror::Error;
 
 #[serde_with::serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BatchingRule {
+pub struct TransformRule {
     min_records_to_await: u64,
     #[serde_as(as = "serde_with::DurationSeconds<i64>")]
     max_batching_interval: Duration,
 }
 
-impl BatchingRule {
+impl TransformRule {
     const MAX_BATCHING_INTERVAL_HOURS: i64 = 24;
 
     pub fn new_checked(
         min_records_to_await: u64,
         max_batching_interval: Duration,
-    ) -> Result<Self, BatchingRuleValidationError> {
+    ) -> Result<Self, TransformRuleValidationError> {
         if min_records_to_await == 0 {
-            return Err(BatchingRuleValidationError::MinRecordsToAwaitNotPositive);
+            return Err(TransformRuleValidationError::MinRecordsToAwaitNotPositive);
         }
 
         let lower_interval_bound = Duration::try_seconds(0).unwrap();
         if lower_interval_bound >= max_batching_interval {
-            return Err(BatchingRuleValidationError::MinIntervalNotPositive);
+            return Err(TransformRuleValidationError::MinIntervalNotPositive);
         }
 
         let upper_interval_bound = Duration::try_hours(Self::MAX_BATCHING_INTERVAL_HOURS).unwrap();
         if max_batching_interval > upper_interval_bound {
-            return Err(BatchingRuleValidationError::MaxIntervalAboveLimit);
+            return Err(TransformRuleValidationError::MaxIntervalAboveLimit);
         }
 
         Ok(Self {
@@ -62,7 +62,7 @@ impl BatchingRule {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum BatchingRuleValidationError {
+pub enum TransformRuleValidationError {
     #[error("Minimum records to await must be a positive number")]
     MinRecordsToAwaitNotPositive,
 
@@ -71,7 +71,7 @@ pub enum BatchingRuleValidationError {
 
     #[error(
         "Maximum interval to await should not exceed {} hours",
-        BatchingRule::MAX_BATCHING_INTERVAL_HOURS
+        TransformRule::MAX_BATCHING_INTERVAL_HOURS
     )]
     MaxIntervalAboveLimit,
 }
@@ -84,20 +84,20 @@ mod tests {
 
     use chrono::TimeDelta;
 
-    use crate::{BatchingRule, BatchingRuleValidationError};
+    use crate::{TransformRule, TransformRuleValidationError};
 
     #[test]
-    fn test_good_batching_rule() {
+    fn test_good_transform_rule() {
         assert_matches!(
-            BatchingRule::new_checked(1, TimeDelta::try_minutes(15).unwrap()),
+            TransformRule::new_checked(1, TimeDelta::try_minutes(15).unwrap()),
             Ok(_)
         );
         assert_matches!(
-            BatchingRule::new_checked(1_000_000, TimeDelta::try_hours(3).unwrap()),
+            TransformRule::new_checked(1_000_000, TimeDelta::try_hours(3).unwrap()),
             Ok(_)
         );
         assert_matches!(
-            BatchingRule::new_checked(1, TimeDelta::try_hours(24).unwrap()),
+            TransformRule::new_checked(1, TimeDelta::try_hours(24).unwrap()),
             Ok(_)
         );
     }
@@ -105,31 +105,31 @@ mod tests {
     #[test]
     fn test_non_positive_min_records() {
         assert_matches!(
-            BatchingRule::new_checked(0, TimeDelta::try_minutes(15).unwrap()),
-            Err(BatchingRuleValidationError::MinRecordsToAwaitNotPositive)
+            TransformRule::new_checked(0, TimeDelta::try_minutes(15).unwrap()),
+            Err(TransformRuleValidationError::MinRecordsToAwaitNotPositive)
         );
     }
 
     #[test]
     fn test_non_positive_max_interval() {
         assert_matches!(
-            BatchingRule::new_checked(1, TimeDelta::try_minutes(0).unwrap()),
-            Err(BatchingRuleValidationError::MinIntervalNotPositive)
+            TransformRule::new_checked(1, TimeDelta::try_minutes(0).unwrap()),
+            Err(TransformRuleValidationError::MinIntervalNotPositive)
         );
         assert_matches!(
-            BatchingRule::new_checked(1, TimeDelta::try_minutes(-1).unwrap()),
-            Err(BatchingRuleValidationError::MinIntervalNotPositive)
+            TransformRule::new_checked(1, TimeDelta::try_minutes(-1).unwrap()),
+            Err(TransformRuleValidationError::MinIntervalNotPositive)
         );
     }
 
     #[test]
     fn test_too_large_max_interval() {
         assert_matches!(
-            BatchingRule::new_checked(
+            TransformRule::new_checked(
                 1,
                 TimeDelta::try_hours(24).unwrap() + TimeDelta::nanoseconds(1)
             ),
-            Err(BatchingRuleValidationError::MaxIntervalAboveLimit)
+            Err(TransformRuleValidationError::MaxIntervalAboveLimit)
         );
     }
 }

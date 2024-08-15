@@ -17,7 +17,7 @@ use opendatafabric::DatasetID;
 #[derive(Default)]
 pub(crate) struct ActiveConfigsState {
     system_schedules: HashMap<SystemFlowType, Schedule>,
-    dataset_batching_rules: HashMap<FlowKeyDataset, BatchingRule>,
+    dataset_transform_rules: HashMap<FlowKeyDataset, TransformRule>,
     dataset_reset_rules: HashMap<FlowKeyDataset, ResetRule>,
     dataset_compaction_rules: HashMap<FlowKeyDataset, CompactionRule>,
     dataset_ingest_rules: HashMap<FlowKeyDataset, IngestRule>,
@@ -40,8 +40,8 @@ impl ActiveConfigsState {
             FlowConfigurationRule::ResetRule(reset) => {
                 self.dataset_reset_rules.insert(key, reset);
             }
-            FlowConfigurationRule::BatchingRule(batching) => {
-                self.dataset_batching_rules.insert(key, batching);
+            FlowConfigurationRule::TransformRule(transform) => {
+                self.dataset_transform_rules.insert(key, transform);
             }
             FlowConfigurationRule::CompactionRule(compaction) => {
                 self.dataset_compaction_rules.insert(key, compaction);
@@ -72,8 +72,9 @@ impl ActiveConfigsState {
 
     fn drop_dataset_flow_config(&mut self, flow_key: BorrowedFlowKeyDataset) {
         self.dataset_ingest_rules.remove(flow_key.as_trait());
-        self.dataset_batching_rules.remove(flow_key.as_trait());
+        self.dataset_transform_rules.remove(flow_key.as_trait());
         self.dataset_compaction_rules.remove(flow_key.as_trait());
+        self.dataset_reset_rules.remove(flow_key.as_trait());
     }
 
     pub fn try_get_flow_schedule(&self, flow_key: &FlowKey) -> Option<Schedule> {
@@ -89,12 +90,12 @@ impl ActiveConfigsState {
         }
     }
 
-    pub fn try_get_dataset_batching_rule(
+    pub fn try_get_dataset_transform_rule(
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Option<BatchingRule> {
-        self.dataset_batching_rules
+    ) -> Option<TransformRule> {
+        self.dataset_transform_rules
             .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
             .copied()
     }
@@ -139,11 +140,11 @@ impl ActiveConfigsState {
                 .map(FlowConfigurationSnapshot::Schedule),
             FlowKey::Dataset(dataset_flow_key) => match dataset_flow_key.flow_type {
                 DatasetFlowType::ExecuteTransform => self
-                    .try_get_dataset_batching_rule(
+                    .try_get_dataset_transform_rule(
                         &dataset_flow_key.dataset_id,
                         dataset_flow_key.flow_type,
                     )
-                    .map(FlowConfigurationSnapshot::Batching),
+                    .map(FlowConfigurationSnapshot::Transform),
                 DatasetFlowType::Ingest => self
                     .try_get_dataset_ingest_rule(
                         &dataset_flow_key.dataset_id,

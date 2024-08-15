@@ -853,7 +853,7 @@ impl FlowConfigHarness {
                                           __typename
                                           ... on FlowStartConditionBatching {
                                               accumulatedRecordsCount
-                                              activeBatchingRule {
+                                              activeTransformRule {
                                                   __typename
                                                   minRecordsToAwait
                                                   maxBatchingInterval {
@@ -1060,7 +1060,7 @@ impl FlowConfigHarness {
                                                     }
                                                 }
                                             }
-                                            batching {
+                                            transform {
                                                 __typename
                                             }
                                             compaction {

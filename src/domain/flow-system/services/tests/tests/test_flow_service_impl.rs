@@ -2933,11 +2933,11 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
         .await;
 
     harness
-        .set_dataset_flow_batching_rule(
+        .set_dataset_flow_transform_rule(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            BatchingRule::new_checked(1, Duration::try_seconds(1).unwrap()).unwrap(),
+            TransformRule::new_checked(1, Duration::try_seconds(1).unwrap()).unwrap(),
         )
         .await;
 
@@ -3338,11 +3338,11 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         .await;
 
     harness
-        .set_dataset_flow_batching_rule(
+        .set_dataset_flow_transform_rule(
             harness.now_datetime(),
             baz_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            BatchingRule::new_checked(1, Duration::try_hours(24).unwrap()).unwrap(),
+            TransformRule::new_checked(1, Duration::try_hours(24).unwrap()).unwrap(),
         )
         .await;
 
@@ -3804,11 +3804,11 @@ async fn test_batching_condition_records_reached() {
         .await;
 
     harness
-        .set_dataset_flow_batching_rule(
+        .set_dataset_flow_transform_rule(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            BatchingRule::new_checked(10, Duration::try_milliseconds(120).unwrap()).unwrap(),
+            TransformRule::new_checked(10, Duration::try_milliseconds(120).unwrap()).unwrap(),
         )
         .await;
 
@@ -4126,11 +4126,11 @@ async fn test_batching_condition_timeout() {
         .await;
 
     harness
-        .set_dataset_flow_batching_rule(
+        .set_dataset_flow_transform_rule(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            BatchingRule::new_checked(10, Duration::try_milliseconds(150).unwrap()).unwrap(),
+            TransformRule::new_checked(10, Duration::try_milliseconds(150).unwrap()).unwrap(),
         )
         .await;
 
@@ -4400,11 +4400,11 @@ async fn test_batching_condition_watermark() {
         .await;
 
     harness
-        .set_dataset_flow_batching_rule(
+        .set_dataset_flow_transform_rule(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            BatchingRule::new_checked(10, Duration::try_milliseconds(200).unwrap()).unwrap(),
+            TransformRule::new_checked(10, Duration::try_milliseconds(200).unwrap()).unwrap(),
         )
         .await;
 
@@ -4741,11 +4741,11 @@ async fn test_batching_condition_with_2_inputs() {
         .await;
 
     harness
-        .set_dataset_flow_batching_rule(
+        .set_dataset_flow_transform_rule(
             harness.now_datetime(),
             baz_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            BatchingRule::new_checked(15, Duration::try_milliseconds(200).unwrap()).unwrap(),
+            TransformRule::new_checked(15, Duration::try_milliseconds(200).unwrap()).unwrap(),
         )
         .await;
 

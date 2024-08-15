@@ -293,19 +293,19 @@ impl FlowHarness {
             .unwrap();
     }
 
-    pub async fn set_dataset_flow_batching_rule(
+    pub async fn set_dataset_flow_transform_rule(
         &self,
         request_time: DateTime<Utc>,
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
-        batching_rule: BatchingRule,
+        transform_rule: TransformRule,
     ) {
         self.flow_configuration_service
             .set_configuration(
                 request_time,
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
-                FlowConfigurationRule::BatchingRule(batching_rule),
+                FlowConfigurationRule::TransformRule(transform_rule),
             )
             .await
             .unwrap();

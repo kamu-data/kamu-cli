@@ -13,7 +13,7 @@ use crate::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowConfigurationSnapshot {
-    Batching(BatchingRule),
+    Transform(TransformRule),
     Compaction(CompactionRule),
     Schedule(Schedule),
     Ingest(IngestRule),

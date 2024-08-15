@@ -3487,7 +3487,7 @@ impl FlowRunsHarness {
                                             __typename
                                             ... on FlowStartConditionBatching {
                                                 accumulatedRecordsCount
-                                                activeBatchingRule {
+                                                activeTransformRule {
                                                     __typename
                                                     minRecordsToAwait
                                                     maxBatchingInterval {
@@ -3507,7 +3507,7 @@ impl FlowRunsHarness {
                                             }
                                         }
                                         configSnapshot {
-                                            ... on FlowConfigurationBatching {
+                                            ... on FlowConfigurationTransform {
                                                 maxBatchingInterval {
                                                     every
                                                     unit

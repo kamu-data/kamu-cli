@@ -62,7 +62,7 @@ async fn test_crud_time_delta_root_dataset() {
                                         }
                                     }
                                 }
-                                batching {
+                                transform {
                                     __typename
                                 }
                                 compaction {
@@ -140,7 +140,7 @@ async fn test_crud_time_delta_root_dataset() {
                                             "unit": "DAYS"
                                         },
                                     },
-                                    "batching": null,
+                                    "transform": null,
                                     "compaction": null
                                 }
                             }
@@ -189,7 +189,7 @@ async fn test_crud_time_delta_root_dataset() {
                                             "unit": "HOURS"
                                         },
                                     },
-                                    "batching": null,
+                                    "transform": null,
                                     "compaction": null
                                 }
                             }
@@ -307,7 +307,7 @@ async fn test_crud_cron_root_dataset() {
                                         }
                                     }
                                 }
-                                batching {
+                                transform {
                                     __typename
                                 }
                                 compaction {
@@ -383,7 +383,7 @@ async fn test_crud_cron_root_dataset() {
                                             "cron5ComponentExpression": "*/2 * * * *",
                                         },
                                     },
-                                    "batching": null,
+                                    "transform": null,
                                     "compaction": null
                                 }
                             }
@@ -430,7 +430,7 @@ async fn test_crud_cron_root_dataset() {
                                             "cron5ComponentExpression": "0 */1 * * *",
                                         },
                                     },
-                                    "batching": null,
+                                    "transform": null,
                                     "compaction": null
                                 }
                             }
@@ -489,7 +489,7 @@ async fn test_crud_cron_root_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_crud_batching_derived_dataset() {
+async fn test_crud_transform_derived_dataset() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -511,7 +511,7 @@ async fn test_crud_batching_derived_dataset() {
                                 ingest {
                                     __typename
                                 }
-                                batching {
+                                transform {
                                     __typename
                                     minRecordsToAwait
                                     maxBatchingInterval {
@@ -556,7 +556,7 @@ async fn test_crud_batching_derived_dataset() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_config_batching_mutation(
+    let mutation_code = FlowConfigHarness::set_config_transform_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
         false,
@@ -579,15 +579,15 @@ async fn test_crud_batching_derived_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigBatching": {
+                            "setConfigTransform": {
                                 "__typename": "SetFlowConfigSuccess",
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
                                     "paused": false,
                                     "ingest": null,
-                                    "batching": {
-                                        "__typename": "FlowConfigurationBatching",
+                                    "transform": {
+                                        "__typename": "FlowConfigurationTransform",
                                         "minRecordsToAwait": 1,
                                         "maxBatchingInterval": {
                                             "every": 30,
@@ -629,7 +629,7 @@ async fn test_crud_compaction_root_dataset() {
                                 ingest {
                                     __typename
                                 }
-                                batching {
+                                transform {
                                     __typename
                                 }
                                 compaction {
@@ -706,7 +706,7 @@ async fn test_crud_compaction_root_dataset() {
                                     "__typename": "FlowConfiguration",
                                     "paused": false,
                                     "ingest": null,
-                                    "batching": null,
+                                    "transform": null,
                                     "compaction": {
                                         "__typename": "CompactionFull",
                                         "maxSliceSize": 1_000_000,
@@ -726,7 +726,7 @@ async fn test_crud_compaction_root_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_batching_config_validation() {
+async fn test_transform_config_validation() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -757,7 +757,7 @@ async fn test_batching_config_validation() {
             "Maximum interval to await should not exceed 24 hours",
         ),
     ] {
-        let mutation_code = FlowConfigHarness::set_config_batching_mutation(
+        let mutation_code = FlowConfigHarness::set_config_transform_mutation(
             &create_derived_result.dataset_handle.id,
             "EXECUTE_TRANSFORM",
             true,
@@ -779,8 +779,8 @@ async fn test_batching_config_validation() {
                         "byId": {
                             "flows": {
                                 "configs": {
-                                    "setConfigBatching": {
-                                        "__typename": "FlowInvalidBatchingConfig",
+                                    "setConfigTransform": {
+                                        "__typename": "FlowInvalidTransformConfig",
                                         "message": test_case.3,
                                     }
                                 }
@@ -948,7 +948,7 @@ async fn test_pause_resume_dataset_flows() {
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    let mutation_set_transform = FlowConfigHarness::set_config_batching_mutation(
+    let mutation_set_transform = FlowConfigHarness::set_config_transform_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
         false,
@@ -1156,7 +1156,7 @@ async fn test_conditions_not_met_for_flows() {
 
     ////
 
-    let mutation_code = FlowConfigHarness::set_config_batching_mutation(
+    let mutation_code = FlowConfigHarness::set_config_transform_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
         false,
@@ -1181,7 +1181,7 @@ async fn test_conditions_not_met_for_flows() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigBatching": {
+                            "setConfigTransform": {
                                 "__typename": "FlowPreconditionsNotMet",
                                 "message": "Flow didn't met preconditions: 'No SetTransform event defined'",
                             }
@@ -1245,7 +1245,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     ////
 
-    let mutation_code = FlowConfigHarness::set_config_batching_mutation(
+    let mutation_code = FlowConfigHarness::set_config_transform_mutation(
         &create_root_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
         false,
@@ -1270,7 +1270,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigBatching": {
+                            "setConfigTransform": {
                                 "__typename": "FlowIncompatibleDatasetKind",
                                 "message": "Expected a Derivative dataset, but a Root dataset was provided",
                             }
@@ -1404,7 +1404,7 @@ async fn test_set_config_for_hard_compaction_fails() {
 
     ////
 
-    let mutation_code = FlowConfigHarness::set_config_batching_mutation(
+    let mutation_code = FlowConfigHarness::set_config_transform_mutation(
         &create_root_result.dataset_handle.id,
         "HARD_COMPACTION",
         false,
@@ -1429,7 +1429,7 @@ async fn test_set_config_for_hard_compaction_fails() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigBatching": {
+                            "setConfigTransform": {
                                 "__typename": "FlowTypeIsNotSupported",
                                 "message": "Flow type is not supported",
                             }
@@ -1507,7 +1507,7 @@ async fn test_anonymous_setters_fail() {
             "* */2 * * *",
             false,
         ),
-        FlowConfigHarness::set_config_batching_mutation(
+        FlowConfigHarness::set_config_transform_mutation(
             &create_derived_result.dataset_handle.id,
             "EXECUTE_TRANSFORM",
             false,
@@ -1685,7 +1685,7 @@ impl FlowConfigHarness {
                                                     }
                                                 }
                                             }
-                                            batching {
+                                            transform {
                                                 __typename
                                             }
                                             compaction {
@@ -1751,7 +1751,7 @@ impl FlowConfigHarness {
                                                     }
                                                 }
                                             }
-                                            batching {
+                                            transform {
                                                 __typename
                                             }
                                             compaction {
@@ -1777,7 +1777,7 @@ impl FlowConfigHarness {
         .replace("<cron_expression>", cron_expression)
     }
 
-    fn set_config_batching_mutation(
+    fn set_config_transform_mutation(
         id: &DatasetID,
         dataset_flow_type: &str,
         paused: bool,
@@ -1791,10 +1791,10 @@ impl FlowConfigHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             configs {
-                                setConfigBatching (
+                                setConfigTransform (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    batching: {
+                                    transform: {
                                         minRecordsToAwait: <minRecordsToAwait>,
                                         maxBatchingInterval: { every: <every>, unit: "<unit>" }
                                     }
@@ -1811,7 +1811,7 @@ impl FlowConfigHarness {
                                                 ingest {
                                                     __typename
                                                 }
-                                                batching {
+                                                transform {
                                                     __typename
                                                     minRecordsToAwait
                                                     maxBatchingInterval {
@@ -1877,7 +1877,7 @@ impl FlowConfigHarness {
                                                 ingest {
                                                     __typename
                                                 }
-                                                batching {
+                                                transform {
                                                     __typename
                                                 }
                                                 compaction {

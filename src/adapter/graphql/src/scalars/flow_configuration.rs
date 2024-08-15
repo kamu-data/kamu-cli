@@ -9,7 +9,6 @@
 
 use kamu_core::MetadataChainExt;
 use kamu_flow_system::{
-    BatchingRule,
     CompactionRule,
     CompactionRuleFull,
     CompactionRuleMetadataOnly,
@@ -21,6 +20,7 @@ use kamu_flow_system::{
     ScheduleCron,
     ScheduleCronError,
     ScheduleTimeDelta,
+    TransformRule,
 };
 use opendatafabric::DatasetHandle;
 
@@ -33,7 +33,7 @@ use crate::prelude::*;
 pub struct FlowConfiguration {
     pub paused: bool,
     pub ingest: Option<FlowConfigurationIngest>,
-    pub batching: Option<FlowConfigurationBatching>,
+    pub transform: Option<FlowConfigurationTransform>,
     pub compaction: Option<FlowConfigurationCompaction>,
     pub reset: Option<FlowConfigurationReset>,
 }
@@ -42,7 +42,7 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
     fn from(value: kamu_flow_system::FlowConfigurationState) -> Self {
         Self {
             paused: !value.is_active(),
-            batching: if let FlowConfigurationRule::BatchingRule(condition) = &value.rule {
+            transform: if let FlowConfigurationRule::TransformRule(condition) = &value.rule {
                 Some((*condition).into())
             } else {
                 None
@@ -101,13 +101,13 @@ pub enum FlowConfigurationSchedule {
 }
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowConfigurationBatching {
+pub struct FlowConfigurationTransform {
     pub min_records_to_await: u64,
     pub max_batching_interval: TimeDelta,
 }
 
-impl From<BatchingRule> for FlowConfigurationBatching {
-    fn from(value: BatchingRule) -> Self {
+impl From<TransformRule> for FlowConfigurationTransform {
+    fn from(value: TransformRule) -> Self {
         Self {
             min_records_to_await: value.min_records_to_await(),
             max_batching_interval: (*value.max_batching_interval()).into(),
@@ -279,7 +279,7 @@ impl From<chrono::Duration> for TimeDelta {
 #[derive(OneofObject)]
 pub enum FlowRunConfiguration {
     Schedule(ScheduleInput),
-    Batching(BatchingConditionInput),
+    Transform(TransformConditionInput),
     Compaction(CompactionConditionInput),
     Ingest(IngestConditionInput),
     Reset(ResetConditionInput),
@@ -323,7 +323,7 @@ impl From<&TimeDeltaInput> for chrono::Duration {
 }
 
 #[derive(InputObject)]
-pub struct BatchingConditionInput {
+pub struct TransformConditionInput {
     pub min_records_to_await: u64,
     pub max_batching_interval: TimeDeltaInput,
 }
@@ -444,15 +444,15 @@ impl FlowRunConfiguration {
             }
             DatasetFlowType::ExecuteTransform => {
                 if let Some(flow_run_configuration) = flow_run_configuration_maybe {
-                    if let Self::Batching(batching_input) = flow_run_configuration {
-                        return Ok(Some(FlowConfigurationSnapshot::Batching(
-                            BatchingRule::new_checked(
-                                batching_input.min_records_to_await,
-                                batching_input.max_batching_interval.clone().into(),
+                    if let Self::Transform(transform_input) = flow_run_configuration {
+                        return Ok(Some(FlowConfigurationSnapshot::Transform(
+                            TransformRule::new_checked(
+                                transform_input.min_records_to_await,
+                                transform_input.max_batching_interval.clone().into(),
                             )
                             .map_err(|_| {
                                 FlowInvalidRunConfigurations {
-                                    error: "Invalid batching flow run configuration".to_string(),
+                                    error: "Invalid transform flow run configuration".to_string(),
                                 }
                             })?,
                         )));

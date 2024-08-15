@@ -15,7 +15,7 @@ use crate::prelude::*;
 
 #[derive(Union)]
 pub enum FlowConfigurationSnapshot {
-    Batching(FlowConfigurationBatching),
+    Transform(FlowConfigurationTransform),
     Schedule(FlowConfigurationScheduleRule),
     Compaction(FlowConfigurationCompactionRule),
     Ingest(FlowConfigurationIngest),
@@ -38,8 +38,8 @@ impl From<fs::FlowConfigurationSnapshot> for FlowConfigurationSnapshot {
     fn from(value: fs::FlowConfigurationSnapshot) -> Self {
         match value {
             fs::FlowConfigurationSnapshot::Ingest(ingest_rule) => Self::Ingest(ingest_rule.into()),
-            fs::FlowConfigurationSnapshot::Batching(batching_rule) => {
-                Self::Batching(batching_rule.into())
+            fs::FlowConfigurationSnapshot::Transform(transform_rule) => {
+                Self::Transform(transform_rule.into())
             }
             fs::FlowConfigurationSnapshot::Reset(reset_rule) => Self::Reset(reset_rule.into()),
             fs::FlowConfigurationSnapshot::Schedule(schedule) => {
