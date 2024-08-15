@@ -20,7 +20,8 @@ use kamu_accounts::*;
 use kamu_accounts_services::PredefinedAccountsRegistrator;
 use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
-use kamu_datasets::{DatasetEnvVar, DatasetEnvVarsType};
+use kamu_datasets::DatasetEnvVar;
+use tracing::warn;
 
 use crate::accounts::AccountService;
 use crate::error::*;
@@ -361,8 +362,6 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 
-    b.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>();
-
     // No GitHub login possible for single-tenant workspace
     if multi_tenant_workspace {
         if is_e2e_testing {
@@ -580,25 +579,35 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(config.dataset_env_vars.clone().unwrap());
 
     let dataset_env_vars_config = config.dataset_env_vars.as_ref().unwrap();
-    match dataset_env_vars_config.mode.as_ref().unwrap() {
-        DatasetEnvVarsType::Static => {
-            catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceStaticImpl>()
-        }
-        DatasetEnvVarsType::Storage => {
-            assert!(
-                dataset_env_vars_config.encryption_key.is_some(),
-                "Dataset env var encryption key is required"
-            );
-            if DatasetEnvVar::try_asm_256_gcm_from_str(
-                dataset_env_vars_config.encryption_key.as_ref().unwrap(),
-            )
-            .is_err()
-            {
-                panic!("Invalid dataset env var encryption key");
+    match dataset_env_vars_config.encryption_key.as_ref() {
+        None => {
+            match dataset_env_vars_config.enabled.as_ref() {
+                None => {
+                    warn!("Dataset env vars configuration is missing. Feature will be disabled");
+                }
+                Some(true) => panic!("Dataset env vars encryption key is required"),
+                _ => {}
             }
-            catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceImpl>()
+            catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceSysEnv>();
+            catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceNull>();
         }
-    };
+        Some(encryption_key) => {
+            if let Some(enabled) = &dataset_env_vars_config.enabled
+                && !enabled
+            {
+                warn!("Dataset env vars feature will be disabled");
+                catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceSysEnv>();
+                catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceNull>();
+            } else {
+                assert!(
+                    DatasetEnvVar::try_asm_256_gcm_from_str(encryption_key).is_ok(),
+                    "Invalid dataset env var encryption key",
+                );
+                catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceImpl>();
+                catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>();
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

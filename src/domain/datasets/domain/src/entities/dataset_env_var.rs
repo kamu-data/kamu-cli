@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use aes_gcm::aead::consts::U12;
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::aead::{Aead, AeadCore, KeyInit, OsRng};
@@ -85,11 +83,11 @@ impl DatasetEnvVar {
 
     pub fn try_asm_256_gcm_from_str(
         encryption_key: &str,
-    ) -> Result<AesGcm<Aes256, U12>, ParseEncyptionKey> {
+    ) -> Result<AesGcm<Aes256, U12>, ParseEncryptionKey> {
         let key_bytes = encryption_key.as_bytes();
         match std::panic::catch_unwind(|| Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key_bytes))) {
             Ok(aes_gcm) => Ok(aes_gcm),
-            Err(_) => Err(ParseEncyptionKey::InvalidEncryptionKeyLength),
+            Err(_) => Err(ParseEncryptionKey::InvalidEncryptionKeyLength),
         }
     }
 
@@ -197,18 +195,18 @@ pub enum DatasetEnvVarEncryptionError {
 }
 
 #[derive(Error, Debug)]
-pub enum ParseEncyptionKey {
+pub enum ParseEncryptionKey {
     #[error("Invalid encryption key length")]
     InvalidEncryptionKeyLength,
     #[error(transparent)]
     InternalError(#[from] InternalError),
 }
 
-impl From<ParseEncyptionKey> for DatasetEnvVarEncryptionError {
-    fn from(value: ParseEncyptionKey) -> Self {
+impl From<ParseEncryptionKey> for DatasetEnvVarEncryptionError {
+    fn from(value: ParseEncryptionKey) -> Self {
         match value {
-            ParseEncyptionKey::InvalidEncryptionKeyLength => Self::InvalidEncryptionKey,
-            ParseEncyptionKey::InternalError(err) => Self::InternalError(err),
+            ParseEncryptionKey::InvalidEncryptionKeyLength => Self::InvalidEncryptionKey,
+            ParseEncryptionKey::InternalError(err) => Self::InternalError(err),
         }
     }
 }
@@ -229,12 +227,12 @@ impl std::error::Error for AesGcmError {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DatasetEnvVarsConfig {
-    pub mode: Option<DatasetEnvVarsType>,
+    pub enabled: Option<bool>,
     /// Represents the encryption key for the dataset env vars. This field is
-    /// required if `DatasetEnvVarsType` is `Storage`.
+    /// required if `enabled` is `true` or `None`.
     ///
     /// The encryption key must be a 32-character alphanumeric string, which
     /// includes both uppercase and lowercase Latin letters (A-Z, a-z) and
@@ -242,35 +240,29 @@ pub struct DatasetEnvVarsConfig {
     ///
     /// # Example
     /// let config = DatasetEnvVarsConfig {
-    ///     mode: Some(DatasetEnvVarsType::Storage),
+    ///     enabled: Some(true),
     ///     encryption_key:
     /// Some(String::from("aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")) };
     /// ```
     pub encryption_key: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum DatasetEnvVarsType {
-    Static,
-    Storage,
-}
-
 impl DatasetEnvVarsConfig {
     pub fn sample() -> Self {
         Self {
-            mode: Some(DatasetEnvVarsType::Storage),
+            enabled: Some(true),
             encryption_key: Some(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY.to_string()),
         }
     }
-}
 
-impl Default for DatasetEnvVarsConfig {
-    fn default() -> Self {
-        Self {
-            mode: Some(DatasetEnvVarsType::Static),
-            encryption_key: None,
+    pub fn is_enabled(&self) -> bool {
+        if let Some(enabled) = self.enabled
+            && enabled
+            && self.encryption_key.is_some()
+        {
+            return true;
         }
+        false
     }
 }
 

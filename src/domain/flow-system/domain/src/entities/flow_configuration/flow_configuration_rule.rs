@@ -9,7 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{BatchingRule, CompactionRule, IngestRule, Schedule};
+use crate::{BatchingRule, CompactionRule, IngestRule, ResetRule, Schedule};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,6 +19,7 @@ pub enum FlowConfigurationRule {
     BatchingRule(BatchingRule),
     CompactionRule(CompactionRule),
     IngestRule(IngestRule),
+    ResetRule(ResetRule),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

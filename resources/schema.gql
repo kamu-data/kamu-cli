@@ -580,6 +580,7 @@ enum DatasetFlowType {
 	INGEST
 	EXECUTE_TRANSFORM
 	HARD_COMPACTION
+	RESET
 }
 
 type DatasetFlows {
@@ -941,6 +942,7 @@ type FlowConfiguration {
 	ingest: FlowConfigurationIngest
 	batching: FlowConfigurationBatching
 	compaction: FlowConfigurationCompaction
+	reset: FlowConfigurationReset
 }
 
 type FlowConfigurationBatching {
@@ -959,13 +961,27 @@ type FlowConfigurationIngest {
 	fetchUncacheable: Boolean!
 }
 
+type FlowConfigurationReset {
+	mode: SnapshotPropagationMode!
+	oldHeadHash: Multihash
+	recursive: Boolean!
+}
+
+input FlowConfigurationResetCustom {
+	newHeadHash: Multihash!
+}
+
+input FlowConfigurationResetToSeedDummy {
+	dummy: String!
+}
+
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
 
 type FlowConfigurationScheduleRule {
 	scheduleRule: FlowConfigurationSchedule!
 }
 
-union FlowConfigurationSnapshot = FlowConfigurationBatching | FlowConfigurationScheduleRule | FlowConfigurationCompactionRule | FlowConfigurationIngest
+union FlowConfigurationSnapshot = FlowConfigurationBatching | FlowConfigurationScheduleRule | FlowConfigurationCompactionRule | FlowConfigurationReset | FlowConfigurationIngest
 
 type FlowConnection {
 	"""
@@ -988,7 +1004,7 @@ type FlowDatasetCompactedFailedError {
 	message: String!
 }
 
-union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionSystemGC
+union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionDatasetReset | FlowDescriptionSystemGC
 
 type FlowDescriptionDatasetExecuteTransform {
 	datasetId: DatasetID!
@@ -1014,6 +1030,11 @@ type FlowDescriptionDatasetPushIngest {
 	ingestResult: FlowDescriptionUpdateResult
 }
 
+type FlowDescriptionDatasetReset {
+	datasetId: DatasetID!
+	resetResult: FlowDescriptionResetResult
+}
+
 type FlowDescriptionHardCompactionNothingToDo {
 	dummy: String!
 	message: String!
@@ -1022,6 +1043,10 @@ type FlowDescriptionHardCompactionNothingToDo {
 type FlowDescriptionHardCompactionSuccess {
 	originalBlocksCount: Int!
 	resultingBlocksCount: Int!
+	newHead: Multihash!
+}
+
+type FlowDescriptionResetResult {
 	newHead: Multihash!
 }
 
@@ -1134,6 +1159,7 @@ input FlowRunConfiguration @oneOf {
 	batching: BatchingConditionInput
 	compaction: CompactionConditionInput
 	ingest: IngestConditionInput
+	reset: ResetConditionInput
 }
 
 union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionBatching | FlowStartConditionExecutor
@@ -1439,6 +1465,11 @@ type PrepStepPipe {
 	command: [String!]!
 }
 
+input PropagationMode @oneOf {
+	custom: FlowConfigurationResetCustom
+	toSeed: FlowConfigurationResetToSeedDummy
+}
+
 type Query {
 	"""
 	Returns the version of the GQL API
@@ -1561,6 +1592,12 @@ type RenameResultSuccess implements RenameResult {
 type RequestHeader {
 	name: String!
 	value: String!
+}
+
+input ResetConditionInput {
+	mode: PropagationMode!
+	oldHeadHash: Multihash
+	recursive: Boolean!
 }
 
 type RestProtocolDesc {
@@ -1711,6 +1748,16 @@ type SetWatermarkUpdated implements SetWatermarkResult {
 	newHead: Multihash!
 	message: String!
 }
+
+type SnapshotConfigurationResetCustom {
+	newHeadHash: Multihash!
+}
+
+type SnapshotConfigurationResetToSeedDummy {
+	dummy: String!
+}
+
+union SnapshotPropagationMode = SnapshotConfigurationResetCustom | SnapshotConfigurationResetToSeedDummy
 
 union SourceCaching = SourceCachingForever
 

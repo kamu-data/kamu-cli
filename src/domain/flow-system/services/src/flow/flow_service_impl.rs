@@ -191,11 +191,12 @@ impl FlowServiceImpl {
                         self.enqueue_auto_polling_flow_unconditionally(start_time, &flow_key)
                             .await?;
                     }
-                    // Such as compaction is very dangerous operation we
+                    // Such as compaction and reset is very dangerous operation we
                     // skip running it during activation flow configurations.
                     // And schedule will be used only for system flows
                     FlowConfigurationRule::CompactionRule(_)
-                    | FlowConfigurationRule::Schedule(_) => (),
+                    | FlowConfigurationRule::Schedule(_)
+                    | FlowConfigurationRule::ResetRule(_) => (),
                     FlowConfigurationRule::IngestRule(ingest_rule) => {
                         self.enqueue_scheduled_auto_polling_flow(
                             start_time,
@@ -502,7 +503,7 @@ impl FlowServiceImpl {
         for trigger in &flow.triggers {
             if let FlowTrigger::InputDatasetFlow(trigger) = trigger {
                 match &trigger.flow_result {
-                    FlowResult::Empty => {}
+                    FlowResult::Empty | FlowResult::DatasetReset(_) => {}
                     FlowResult::DatasetCompact(_) => {
                         is_compacted = true;
                     }
@@ -685,7 +686,7 @@ impl FlowServiceImpl {
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
         let logical_plan =
-            self.make_task_logical_plan(&flow.flow_key, flow.config_snapshot.as_ref());
+            self.make_task_logical_plan(&flow.flow_key, flow.config_snapshot.as_ref())?;
 
         let task = self
             .task_scheduler
@@ -746,7 +747,7 @@ impl FlowServiceImpl {
         &self,
         flow_key: &FlowKey,
         maybe_config_snapshot: Option<&FlowConfigurationSnapshot>,
-    ) -> LogicalPlan {
+    ) -> Result<LogicalPlan, InternalError> {
         match flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
                 DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
@@ -756,10 +757,10 @@ impl FlowServiceImpl {
                     {
                         fetch_uncacheable = ingest_rule.fetch_uncacheable;
                     }
-                    LogicalPlan::UpdateDataset(UpdateDataset {
+                    Ok(LogicalPlan::UpdateDataset(UpdateDataset {
                         dataset_id: flow_key.dataset_id.clone(),
                         fetch_uncacheable,
-                    })
+                    }))
                 }
                 DatasetFlowType::HardCompaction => {
                     let mut max_slice_size: Option<u64> = None;
@@ -776,22 +777,35 @@ impl FlowServiceImpl {
                             matches!(compaction_rule, CompactionRule::MetadataOnly(_));
                     };
 
-                    LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                    Ok(LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                         dataset_id: flow_key.dataset_id.clone(),
                         max_slice_size,
                         max_slice_records,
                         keep_metadata_only,
-                    })
+                    }))
+                }
+                DatasetFlowType::Reset => {
+                    if let Some(config_rule) = maybe_config_snapshot
+                        && let FlowConfigurationSnapshot::Reset(reset_rule) = config_rule
+                    {
+                        return Ok(LogicalPlan::Reset(ResetDataset {
+                            dataset_id: flow_key.dataset_id.clone(),
+                            new_head_hash: reset_rule.new_head_hash.clone(),
+                            old_head_hash: reset_rule.old_head_hash.clone(),
+                            recursive: reset_rule.recursive,
+                        }));
+                    }
+                    InternalError::bail("Reset flow cannot be called without configuration")
                 }
             },
             FlowKey::System(flow_key) => {
                 match flow_key.flow_type {
                     // TODO: replace on correct logical plan
-                    SystemFlowType::GC => LogicalPlan::Probe(Probe {
+                    SystemFlowType::GC => Ok(LogicalPlan::Probe(Probe {
                         dataset_id: None,
                         busy_time: Some(std::time::Duration::from_secs(20)),
                         end_with_outcome: Some(TaskOutcome::Success(TaskResult::Empty)),
-                    }),
+                    })),
                 }
             }
         }
@@ -818,7 +832,7 @@ impl FlowServiceImpl {
         }
 
         match self.classify_dependent_trigger_type(fk_dataset.flow_type, maybe_config_snapshot) {
-            DownstreamDependencyTriggerType::TriggerAllEnabled => {
+            DownstreamDependencyTriggerType::TriggerAllEnabledExecuteTransform => {
                 let guard = self.state.lock().unwrap();
                 for dataset_id in dependent_dataset_ids {
                     if let Some(batching_rule) = guard.active_configs.try_get_dataset_batching_rule(
@@ -838,16 +852,11 @@ impl FlowServiceImpl {
                 }
             }
 
-            DownstreamDependencyTriggerType::TriggerOwnUnconditionally => {
+            DownstreamDependencyTriggerType::TriggerOwnHardCompaction => {
                 let dataset_owner_account_ids = self
                     .dataset_ownership_service
                     .get_dataset_owners(&fk_dataset.dataset_id)
                     .await?;
-                // Currently we trigger Hard compaction recursively only in keep metadata only
-                // mode
-                let config_snapshot = FlowConfigurationSnapshot::Compaction(
-                    CompactionRule::MetadataOnly(CompactionRuleMetadataOnly { recursive: true }),
-                );
 
                 for dependent_dataset_id in dependent_dataset_ids {
                     for owner_account_id in &dataset_owner_account_ids {
@@ -863,7 +872,13 @@ impl FlowServiceImpl {
                                 )
                                 .into(),
                                 flow_trigger_context: FlowTriggerContext::Unconditional,
-                                maybe_config_snapshot: Some(config_snapshot.clone()),
+                                // Currently we trigger Hard compaction recursively only in keep
+                                // metadata only mode
+                                maybe_config_snapshot: Some(FlowConfigurationSnapshot::Compaction(
+                                    CompactionRule::MetadataOnly(CompactionRuleMetadataOnly {
+                                        recursive: true,
+                                    }),
+                                )),
                             });
                             break;
                         }
@@ -884,19 +899,29 @@ impl FlowServiceImpl {
     ) -> DownstreamDependencyTriggerType {
         match dataset_flow_type {
             DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
-                DownstreamDependencyTriggerType::TriggerAllEnabled
+                DownstreamDependencyTriggerType::TriggerAllEnabledExecuteTransform
             }
             DatasetFlowType::HardCompaction => {
                 if let Some(config_snapshot) = &maybe_config_snapshot
                     && let FlowConfigurationSnapshot::Compaction(compaction_rule) = config_snapshot
                 {
                     if compaction_rule.recursive() {
-                        DownstreamDependencyTriggerType::TriggerOwnUnconditionally
+                        DownstreamDependencyTriggerType::TriggerOwnHardCompaction
                     } else {
                         DownstreamDependencyTriggerType::Empty
                     }
                 } else {
-                    DownstreamDependencyTriggerType::TriggerAllEnabled
+                    DownstreamDependencyTriggerType::TriggerAllEnabledExecuteTransform
+                }
+            }
+            DatasetFlowType::Reset => {
+                if let Some(config_snapshot) = &maybe_config_snapshot
+                    && let FlowConfigurationSnapshot::Reset(reset_rule) = config_snapshot
+                    && reset_rule.recursive
+                {
+                    DownstreamDependencyTriggerType::TriggerOwnHardCompaction
+                } else {
+                    DownstreamDependencyTriggerType::Empty
                 }
             }
         }
@@ -1490,8 +1515,8 @@ pub struct DownstreamDependencyFlowPlan {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum DownstreamDependencyTriggerType {
-    TriggerAllEnabled,
-    TriggerOwnUnconditionally,
+    TriggerAllEnabledExecuteTransform,
+    TriggerOwnHardCompaction,
     Empty,
 }
 

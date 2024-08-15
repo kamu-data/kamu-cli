@@ -35,4 +35,4 @@ futures = "0.3"
 kamu-task-system-repo-tests = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features=["rt", "macros"] }
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

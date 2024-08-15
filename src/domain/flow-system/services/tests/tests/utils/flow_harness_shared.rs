@@ -181,9 +181,8 @@ impl FlowHarness {
         }
     }
 
-    pub async fn create_root_dataset(&self, dataset_alias: DatasetAlias) -> DatasetID {
-        let result = self
-            .dataset_repo
+    pub async fn create_dataset(&self, dataset_alias: DatasetAlias) -> CreateDatasetResult {
+        self.dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
                     .name(dataset_alias)
@@ -192,7 +191,11 @@ impl FlowHarness {
                     .build(),
             )
             .await
-            .unwrap();
+            .unwrap()
+    }
+
+    pub async fn create_root_dataset(&self, dataset_alias: DatasetAlias) -> DatasetID {
+        let result = self.create_dataset(dataset_alias).await;
 
         result.dataset_handle.id
     }
@@ -202,7 +205,7 @@ impl FlowHarness {
         dataset_alias: DatasetAlias,
         input_ids: Vec<DatasetID>,
     ) -> DatasetID {
-        let create_result = self
+        let result = self
             .dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -217,7 +220,8 @@ impl FlowHarness {
             )
             .await
             .unwrap();
-        create_result.dataset_handle.id
+
+        result.dataset_handle.id
     }
 
     pub async fn eager_initialization(&self) {
@@ -266,6 +270,24 @@ impl FlowHarness {
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
                 FlowConfigurationRule::IngestRule(ingest_rule),
+            )
+            .await
+            .unwrap();
+    }
+
+    pub async fn set_dataset_flow_reset_rule(
+        &self,
+        request_time: DateTime<Utc>,
+        dataset_id: DatasetID,
+        dataset_flow_type: DatasetFlowType,
+        reset_rule: ResetRule,
+    ) {
+        self.flow_configuration_service
+            .set_configuration(
+                request_time,
+                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
+                false,
+                FlowConfigurationRule::ResetRule(reset_rule),
             )
             .await
             .unwrap();

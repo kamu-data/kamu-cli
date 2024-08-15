@@ -18,6 +18,7 @@ use opendatafabric::DatasetID;
 pub(crate) struct ActiveConfigsState {
     system_schedules: HashMap<SystemFlowType, Schedule>,
     dataset_batching_rules: HashMap<FlowKeyDataset, BatchingRule>,
+    dataset_reset_rules: HashMap<FlowKeyDataset, ResetRule>,
     dataset_compaction_rules: HashMap<FlowKeyDataset, CompactionRule>,
     dataset_ingest_rules: HashMap<FlowKeyDataset, IngestRule>,
 }
@@ -35,6 +36,9 @@ impl ActiveConfigsState {
             }
             FlowConfigurationRule::IngestRule(ingest_rule) => {
                 self.dataset_ingest_rules.insert(key, ingest_rule);
+            }
+            FlowConfigurationRule::ResetRule(reset) => {
+                self.dataset_reset_rules.insert(key, reset);
             }
             FlowConfigurationRule::BatchingRule(batching) => {
                 self.dataset_batching_rules.insert(key, batching);
@@ -115,6 +119,16 @@ impl ActiveConfigsState {
             .copied()
     }
 
+    pub fn try_get_dataset_reset_rule(
+        &self,
+        dataset_id: &DatasetID,
+        flow_type: DatasetFlowType,
+    ) -> Option<ResetRule> {
+        self.dataset_reset_rules
+            .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
+            .cloned()
+    }
+
     pub fn try_get_config_snapshot_by_key(
         &self,
         flow_key: &FlowKey,
@@ -136,6 +150,12 @@ impl ActiveConfigsState {
                         dataset_flow_key.flow_type,
                     )
                     .map(FlowConfigurationSnapshot::Ingest),
+                DatasetFlowType::Reset => self
+                    .try_get_dataset_reset_rule(
+                        &dataset_flow_key.dataset_id,
+                        dataset_flow_key.flow_type,
+                    )
+                    .map(FlowConfigurationSnapshot::Reset),
                 DatasetFlowType::HardCompaction => self
                     .try_get_dataset_compaction_rule(
                         &dataset_flow_key.dataset_id,

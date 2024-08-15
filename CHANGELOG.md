@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.194.1] - 2024-08-14
+### Fixed
+- Add `recursive` field to `Reset` flow configurations in GQL Api which triggers `HardCompaction` in `KeepMetadataOnly` mode flow for each owned downstream dependency
+
+## [0.194.0] - 2024-08-13
+### Changed
+- Change `mode` argument for `DatasetEnvVarsConfig` to `enabled: Option<bool>`
+### Added
+- New `Reset` flow in GQL Api which can be triggered manually for `Root` and `Derivative` datasets
+- Private Datasets, preparation work:
+  - Added in-mem implementation of ReBAC repository
+  - Added in-mem implementation of `DatasetEntryRepository`
+
+## [0.193.1] - 2024-08-09
+### Fixed
+- Panic for `EXECUTE_TRANSFORM` flow without dataset env vars enabled feature
+
+## [0.193.0] - 2024-08-07
+### Added
+- `kamu add` command accepts optional `--name` argument to add a snapshot under a different name
+
 ## [0.192.0] - 2024-08-07
 ### Added
 - `kamu --no-color` to disable color output in the terminal.

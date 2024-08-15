@@ -113,6 +113,14 @@ impl Flow {
                         ),
                 })
             }
+            fs::DatasetFlowType::Reset => {
+                FlowDescriptionDataset::Reset(FlowDescriptionDatasetReset {
+                    dataset_id: dataset_key.dataset_id.clone().into(),
+                    reset_result: FlowDescriptionResetResult::from_maybe_flow_outcome(
+                        self.flow_state.outcome.as_ref(),
+                    ),
+                })
+            }
         })
     }
 
@@ -241,6 +249,7 @@ enum FlowDescriptionDataset {
     PushIngest(FlowDescriptionDatasetPushIngest),
     ExecuteTransform(FlowDescriptionDatasetExecuteTransform),
     HardCompaction(FlowDescriptionDatasetHardCompaction),
+    Reset(FlowDescriptionDatasetReset),
 }
 
 #[derive(SimpleObject)]
@@ -267,6 +276,12 @@ struct FlowDescriptionDatasetExecuteTransform {
 struct FlowDescriptionDatasetHardCompaction {
     dataset_id: DatasetID,
     compaction_result: Option<FlowDescriptionDatasetHardCompactionResult>,
+}
+
+#[derive(SimpleObject)]
+struct FlowDescriptionDatasetReset {
+    dataset_id: DatasetID,
+    reset_result: Option<FlowDescriptionResetResult>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -299,7 +314,9 @@ impl FlowDescriptionUpdateResult {
         if let Some(outcome) = maybe_outcome {
             match outcome {
                 fs::FlowOutcome::Success(result) => match result {
-                    fs::FlowResult::Empty | fs::FlowResult::DatasetCompact(_) => Ok(None),
+                    fs::FlowResult::Empty
+                    | fs::FlowResult::DatasetCompact(_)
+                    | fs::FlowResult::DatasetReset(_) => Ok(None),
                     fs::FlowResult::DatasetUpdate(update) => match update {
                         FlowResultDatasetUpdate::Changed(update_result) => {
                             let increment = dataset_changes_service
@@ -365,7 +382,7 @@ impl FlowDescriptionDatasetHardCompactionResult {
         if let Some(outcome) = maybe_outcome {
             match outcome {
                 fs::FlowOutcome::Success(result) => match result {
-                    fs::FlowResult::DatasetUpdate(_) => None,
+                    fs::FlowResult::DatasetUpdate(_) | fs::FlowResult::DatasetReset(_) => None,
                     fs::FlowResult::Empty => Some(Self::NothingToDo(
                         FlowDescriptionHardCompactionNothingToDo {
                             _dummy: "Nothing to do".to_string(),
@@ -378,6 +395,33 @@ impl FlowDescriptionDatasetHardCompactionResult {
                             new_head: compact.new_head.clone().into(),
                         }))
                     }
+                },
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+struct FlowDescriptionResetResult {
+    new_head: Multihash,
+}
+
+impl FlowDescriptionResetResult {
+    fn from_maybe_flow_outcome(maybe_outcome: Option<&fs::FlowOutcome>) -> Option<Self> {
+        if let Some(outcome) = maybe_outcome {
+            match outcome {
+                fs::FlowOutcome::Success(result) => match result {
+                    fs::FlowResult::Empty
+                    | fs::FlowResult::DatasetCompact(_)
+                    | fs::FlowResult::DatasetUpdate(_) => None,
+                    fs::FlowResult::DatasetReset(reset_result) => Some(Self {
+                        new_head: reset_result.new_head.clone().into(),
+                    }),
                 },
                 _ => None,
             }

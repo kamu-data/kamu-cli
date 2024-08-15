@@ -408,6 +408,11 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
         self.chain.get_block(hash).await
     }
 
+    async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
+        (self.on_read)(1);
+        self.chain.contains_block(hash).await
+    }
+
     fn iter_blocks_interval<'b>(
         &'b self,
         head: &'b Multihash,

@@ -11,8 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::IngestRule;
-use crate::{BatchingRule, CompactionRule, Schedule};
+use crate::{BatchingRule, CompactionRule, IngestRule, ResetRule, Schedule};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "dataset_flow_type", rename_all = "snake_case")]
@@ -20,11 +19,17 @@ pub enum DatasetFlowType {
     Ingest,
     ExecuteTransform,
     HardCompaction,
+    Reset,
 }
 
 impl DatasetFlowType {
     pub fn all() -> &'static [DatasetFlowType] {
-        &[Self::Ingest, Self::ExecuteTransform, Self::HardCompaction]
+        &[
+            Self::Ingest,
+            Self::ExecuteTransform,
+            Self::HardCompaction,
+            Self::Reset,
+        ]
     }
 
     pub fn dataset_kind_restriction(&self) -> Option<opendatafabric::DatasetKind> {
@@ -33,6 +38,7 @@ impl DatasetFlowType {
                 Some(opendatafabric::DatasetKind::Root)
             }
             DatasetFlowType::ExecuteTransform => Some(opendatafabric::DatasetKind::Derivative),
+            DatasetFlowType::Reset => None,
         }
     }
 
@@ -48,6 +54,7 @@ impl DatasetFlowType {
             DatasetFlowType::HardCompaction => {
                 flow_configuration_type == std::any::type_name::<CompactionRule>()
             }
+            DatasetFlowType::Reset => flow_configuration_type == std::any::type_name::<ResetRule>(),
         }
     }
 }
@@ -81,7 +88,8 @@ impl AnyFlowType {
             AnyFlowType::Dataset(
                 DatasetFlowType::Ingest
                 | DatasetFlowType::ExecuteTransform
-                | DatasetFlowType::HardCompaction,
+                | DatasetFlowType::HardCompaction
+                | DatasetFlowType::Reset,
             ) => FlowSuccessFollowupMethod::TriggerDependent,
             _ => FlowSuccessFollowupMethod::Ignore,
         }

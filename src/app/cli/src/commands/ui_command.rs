@@ -19,7 +19,7 @@ use dill::Catalog;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::PredefinedAccountsConfig;
 use kamu_adapter_http::FileUploadLimitConfig;
-use kamu_datasets::{DatasetEnvVarsConfig, DatasetEnvVarsType};
+use kamu_datasets::DatasetEnvVarsConfig;
 use opendatafabric::AccountName;
 
 use super::{CLIError, Command};
@@ -78,7 +78,7 @@ impl Command for UICommand {
             self.current_account_name.clone(),
             self.predefined_accounts_config.clone(),
             self.file_upload_limit_config.clone(),
-            self.dataset_env_vars_config.mode == Some(DatasetEnvVarsType::Storage),
+            self.dataset_env_vars_config.is_enabled(),
             self.address,
             self.port,
         )

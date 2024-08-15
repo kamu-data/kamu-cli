@@ -21,6 +21,7 @@ pub struct AddCommand {
     resource_loader: Arc<dyn ResourceLoader>,
     dataset_repo: Arc<dyn DatasetRepository>,
     snapshot_refs: Vec<String>,
+    name: Option<DatasetAlias>,
     recursive: bool,
     replace: bool,
     stdin: bool,
@@ -32,6 +33,7 @@ impl AddCommand {
         resource_loader: Arc<dyn ResourceLoader>,
         dataset_repo: Arc<dyn DatasetRepository>,
         snapshot_refs_iter: I,
+        name: Option<DatasetAlias>,
         recursive: bool,
         replace: bool,
         stdin: bool,
@@ -44,6 +46,7 @@ impl AddCommand {
             resource_loader,
             dataset_repo,
             snapshot_refs: snapshot_refs_iter.map(ToOwned::to_owned).collect(),
+            name,
             recursive,
             replace,
             stdin,
@@ -141,6 +144,11 @@ impl Command for AddCommand {
                 "No manifest references or paths were provided",
             ));
         }
+        if self.name.is_some() && (self.recursive || self.snapshot_refs.len() != 1) {
+            return Err(CLIError::usage_error(
+                "Name override can be used only when adding a single manifest",
+            ));
+        }
 
         let load_results = if self.recursive {
             self.load_recursive().await
@@ -152,7 +160,7 @@ impl Command for AddCommand {
 
         let (snapshots, mut errors): (Vec<_>, Vec<_>) =
             load_results.into_iter().partition(|(_, r)| r.is_ok());
-        let snapshots: Vec<_> = snapshots.into_iter().map(|(_, r)| r.unwrap()).collect();
+        let mut snapshots: Vec<_> = snapshots.into_iter().map(|(_, r)| r.unwrap()).collect();
 
         if !errors.is_empty() {
             errors.sort_by(|(a, _), (b, _)| a.cmp(b));
@@ -163,6 +171,13 @@ impl Command for AddCommand {
                     .map(|(p, r)| (r.unwrap_err(), format!("Failed to load from {p}"))),
             )
             .into());
+        }
+
+        // Rename snapshot if a new name was provided
+        if let Some(name) = &self.name
+            && snapshots.len() == 1
+        {
+            snapshots[0].name = name.clone();
         }
 
         // Delete existing datasets if we are replacing

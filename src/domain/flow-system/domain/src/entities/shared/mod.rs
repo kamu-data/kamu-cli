@@ -13,6 +13,7 @@ mod flow_key;
 mod flow_run_snapshot;
 mod flow_type;
 mod ingest_rule;
+mod reset_rule;
 mod schedule;
 
 pub use batching_rule::*;
@@ -21,4 +22,5 @@ pub use flow_key::*;
 pub use flow_run_snapshot::*;
 pub use flow_type::*;
 pub use ingest_rule::*;
+pub use reset_rule::*;
 pub use schedule::*;

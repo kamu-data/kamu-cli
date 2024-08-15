@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_core::{CompactionResult, PullResult, UpToDateResult};
-use opendatafabric::DatasetID;
+use opendatafabric::{DatasetID, Multihash};
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,12 +49,18 @@ impl TaskOutcome {
 pub enum TaskResult {
     Empty,
     UpdateDatasetResult(TaskUpdateDatasetResult),
+    ResetDatasetResult(TaskResetDatasetResult),
     CompactionDatasetResult(TaskCompactionDatasetResult),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskUpdateDatasetResult {
     pub pull_result: PullResult,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskResetDatasetResult {
+    pub new_head: Multihash,
 }
 
 impl TaskUpdateDatasetResult {
@@ -96,6 +102,7 @@ impl From<CompactionResult> for TaskCompactionDatasetResult {
 pub enum TaskError {
     Empty,
     UpdateDatasetError(UpdateDatasetTaskError),
+    ResetDatasetError(ResetDatasetTaskError),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -106,6 +113,11 @@ pub enum UpdateDatasetTaskError {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RootDatasetCompactedError {
     pub dataset_id: DatasetID,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ResetDatasetTaskError {
+    ResetHeadNotFound,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
