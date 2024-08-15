@@ -26,11 +26,3 @@ CREATE TABLE auth_rebac_relations
 CREATE UNIQUE INDEX idx_uniq_row
     ON auth_rebac_relations (subject_entity_type, subject_entity_id, relationship, object_entity_type,
                              object_entity_id);
-CREATE INDEX idx_subject_entity
-    ON auth_rebac_relations (subject_entity_type, subject_entity_id);
-
-CREATE INDEX idx_subject_entity_relationship
-    ON auth_rebac_relations (subject_entity_type, subject_entity_id, relationship);
-
-CREATE INDEX idx_subject_entity_object_entity
-    ON auth_rebac_relations (subject_entity_type, subject_entity_id, object_entity_type, object_entity_id);
