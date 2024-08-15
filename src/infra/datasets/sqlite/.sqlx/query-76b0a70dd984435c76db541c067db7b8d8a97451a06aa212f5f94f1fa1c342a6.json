@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE dataset_entries\n            SET dataset_name = $2\n            WHERE dataset_id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "76b0a70dd984435c76db541c067db7b8d8a97451a06aa212f5f94f1fa1c342a6"
+}
