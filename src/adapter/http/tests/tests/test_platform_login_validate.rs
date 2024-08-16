@@ -12,9 +12,9 @@ use std::sync::Arc;
 
 use chrono::{Duration, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
-use kamu::domain::{InternalError, ResultIntoInternal, SystemTimeSource, SystemTimeSourceStub};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::*;
-use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
+use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
@@ -24,6 +24,7 @@ use kamu_accounts_services::{
 use kamu_adapter_http::{LoginRequestBody, LoginResponseBody};
 use opendatafabric::AccountName;
 use serde_json::json;
+use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 use crate::harness::{await_client_server_flow, TestAPIServer};
 
@@ -63,14 +64,14 @@ impl Harness {
 
             b.add::<AuthenticationServiceImpl>()
                 .add_value(predefined_accounts_config)
-                .add::<AccountRepositoryInMemory>()
+                .add::<InMemoryAccountRepository>()
                 .add_value(SystemTimeSourceStub::new())
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<LoginPasswordAuthProvider>()
                 .add_value(JwtAuthenticationConfig::default())
                 .add::<DatabaseTransactionRunner>()
                 .add::<AccessTokenServiceImpl>()
-                .add::<AccessTokenRepositoryInMemory>()
+                .add::<InMemoryAccessTokenRepository>()
                 .add::<PredefinedAccountsRegistrator>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);

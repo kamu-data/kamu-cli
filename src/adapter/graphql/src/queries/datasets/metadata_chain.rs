@@ -42,19 +42,15 @@ impl MetadataChain {
     }
 
     #[graphql(skip)]
-    async fn get_dataset(&self, ctx: &Context<'_>) -> Result<std::sync::Arc<dyn domain::Dataset>> {
+    fn get_dataset(&self, ctx: &Context<'_>) -> std::sync::Arc<dyn domain::Dataset> {
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = dataset_repo
-            .get_dataset(&self.dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
-        Ok(dataset)
+        dataset_repo.get_dataset_by_handle(&self.dataset_handle)
     }
 
     /// Returns all named metadata block references
     #[tracing::instrument(level = "info", skip_all)]
     async fn refs(&self, ctx: &Context<'_>) -> Result<Vec<BlockRef>> {
-        let dataset = self.get_dataset(ctx).await?;
+        let dataset = self.get_dataset(ctx);
         Ok(vec![BlockRef {
             name: "head".to_owned(),
             block_hash: dataset
@@ -73,7 +69,7 @@ impl MetadataChain {
         ctx: &Context<'_>,
         hash: Multihash,
     ) -> Result<Option<MetadataBlockExtended>> {
-        let dataset = self.get_dataset(ctx).await?;
+        let dataset = self.get_dataset(ctx);
         let block = dataset.as_metadata_chain().try_get_block(&hash).await?;
         let account = Account::from_dataset_alias(ctx, &self.dataset_handle.alias)
             .await?
@@ -92,7 +88,7 @@ impl MetadataChain {
     ) -> Result<Option<String>> {
         use odf::serde::MetadataBlockSerializer;
 
-        let dataset = self.get_dataset(ctx).await?;
+        let dataset = self.get_dataset(ctx);
         match dataset.as_metadata_chain().try_get_block(&hash).await? {
             None => Ok(None),
             Some(block) => match format {
@@ -119,7 +115,7 @@ impl MetadataChain {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_BLOCKS_PER_PAGE);
 
-        let dataset = self.get_dataset(ctx).await?;
+        let dataset = self.get_dataset(ctx);
         let chain = dataset.as_metadata_chain();
 
         let head = chain.resolve_ref(&domain::BlockRef::Head).await.int_err()?;

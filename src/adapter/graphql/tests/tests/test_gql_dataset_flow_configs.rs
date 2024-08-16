@@ -7,26 +7,30 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
-use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::{MetadataFactory, MockPollingIngestService, MockTransformService};
-use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    DatasetRepositoryLocalFs,
+    DatasetRepositoryWriter,
+    DependencyGraphServiceInMemory,
+};
 use kamu_core::{
     auth,
+    CreateDatasetFromSnapshotUseCase,
     CreateDatasetResult,
     DatasetRepository,
     PollingIngestService,
-    SystemTimeSourceDefault,
     TransformService,
 };
-use kamu_flow_system_inmem::FlowConfigurationEventStoreInMem;
+use kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore;
 use kamu_flow_system_services::FlowConfigurationServiceImpl;
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
+use time_source::SystemTimeSourceDefault;
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
@@ -1517,7 +1521,6 @@ struct FlowConfigHarness {
     _catalog_base: dill::Catalog,
     catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
-    dataset_repo: Arc<dyn DatasetRepository>,
 }
 
 impl FlowConfigHarness {
@@ -1532,13 +1535,15 @@ impl FlowConfigHarness {
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new();
 
-            b.add::<EventBus>()
+            b.add::<DummyOutboxImpl>()
                 .add_builder(
                     DatasetRepositoryLocalFs::builder()
                         .with_root(datasets_dir)
                         .with_multi_tenant(false),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
                 .add_value(polling_service_mock)
                 .bind::<dyn PollingIngestService, MockPollingIngestService>()
@@ -1547,7 +1552,7 @@ impl FlowConfigHarness {
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<DependencyGraphServiceInMemory>()
                 .add::<FlowConfigurationServiceImpl>()
-                .add::<FlowConfigurationEventStoreInMem>()
+                .add::<InMemoryFlowConfigurationEventStore>()
                 .add::<DatabaseTransactionRunner>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
@@ -1558,22 +1563,22 @@ impl FlowConfigHarness {
         // Init dataset with no sources
         let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
 
-        let dataset_repo = catalog_authorized
-            .get_one::<dyn DatasetRepository>()
-            .unwrap();
-
         Self {
             _tempdir: tempdir,
             _catalog_base: catalog_base,
             catalog_anonymous,
             catalog_authorized,
-            dataset_repo,
         }
     }
 
     async fn create_root_dataset(&self) -> CreateDatasetResult {
-        self.dataset_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .kind(DatasetKind::Root)
                     .name("foo")
@@ -1585,8 +1590,13 @@ impl FlowConfigHarness {
     }
 
     async fn create_derived_dataset(&self) -> CreateDatasetResult {
-        self.dataset_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .name("bar")
                     .kind(DatasetKind::Derivative)

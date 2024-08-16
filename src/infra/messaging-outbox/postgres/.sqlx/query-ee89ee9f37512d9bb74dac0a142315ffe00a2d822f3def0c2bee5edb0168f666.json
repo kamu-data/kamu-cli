@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO outbox_messages (producer_name, content_json, occurred_on)\n                    VALUES ($1, $2, $3)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Jsonb",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ee89ee9f37512d9bb74dac0a142315ffe00a2d822f3def0c2bee5edb0168f666"
+}

@@ -29,6 +29,7 @@ use domain::{
     DEFAULT_MAX_SLICE_SIZE,
 };
 use futures::stream::TryStreamExt;
+use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use opendatafabric::{
     Checkpoint,
@@ -44,6 +45,7 @@ use opendatafabric::{
     SourceState,
 };
 use random_names::get_random_name;
+use time_source::SystemTimeSource;
 use url::Url;
 
 use crate::utils::datasets_filtering::filter_datasets_by_local_pattern;
@@ -470,10 +472,7 @@ impl CompactionService for CompactionServiceImpl {
             .check_action_allowed(dataset_handle, domain::auth::DatasetAction::Write)
             .await?;
 
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
 
         let dataset_kind = dataset
             .get_summary(GetSummaryOpts::default())

@@ -9,12 +9,11 @@
 
 use std::assert_matches::assert_matches;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use chrono::{Duration, Utc};
 use database_common_macros::transactional_method;
 use dill::*;
-use event_bus::{AsyncEventHandler, EventBus};
 use futures::TryStreamExt;
 use kamu::testing::MetadataFactory;
 use kamu::*;
@@ -23,7 +22,11 @@ use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use opendatafabric::*;
+use time_source::SystemTimeSourceDefault;
+
+use super::FlowConfigTestListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -424,7 +427,7 @@ struct FlowConfigurationHarness {
     dataset_repo: Arc<dyn DatasetRepository>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_configuration_event_store: Arc<dyn FlowConfigurationEventStore>,
-    config_events_listener: Arc<FlowConfigEventsListener>,
+    config_listener: Arc<FlowConfigTestListener>,
 }
 
 impl FlowConfigurationHarness {
@@ -436,22 +439,38 @@ impl FlowConfigurationHarness {
         let catalog = {
             let mut b = CatalogBuilder::new();
 
-            b.add::<EventBus>()
-                .add::<FlowConfigurationServiceImpl>()
-                .add::<FlowConfigurationEventStoreInMem>()
-                .add::<SystemTimeSourceDefault>()
-                .add_builder(
-                    DatasetRepositoryLocalFs::builder()
-                        .with_root(datasets_dir)
-                        .with_multi_tenant(false),
-                )
-                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .add_value(CurrentAccountSubject::new_test())
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-                .add::<DependencyGraphServiceInMemory>()
-                .add::<FlowConfigEventsListener>();
+            b.add_builder(
+                messaging_outbox::OutboxImmediateImpl::builder()
+                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+            )
+            .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .add::<FlowConfigTestListener>()
+            .add::<FlowConfigurationServiceImpl>()
+            .add::<InMemoryFlowConfigurationEventStore>()
+            .add::<SystemTimeSourceDefault>()
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(datasets_dir)
+                    .with_multi_tenant(false),
+            )
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add_value(CurrentAccountSubject::new_test())
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+            .add::<DeleteDatasetUseCaseImpl>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
+            register_message_dispatcher::<DatasetLifecycleMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+            );
+            register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+            );
 
             b.build()
         };
@@ -461,7 +480,7 @@ impl FlowConfigurationHarness {
             .get_one::<dyn FlowConfigurationEventStore>()
             .unwrap();
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-        let flow_config_events_listener = catalog.get_one::<FlowConfigEventsListener>().unwrap();
+        let flow_config_events_listener = catalog.get_one::<FlowConfigTestListener>().unwrap();
 
         Self {
             _tmp_dir: tmp_dir,
@@ -469,7 +488,7 @@ impl FlowConfigurationHarness {
             flow_configuration_service,
             flow_configuration_event_store,
             dataset_repo,
-            config_events_listener: flow_config_events_listener,
+            config_listener: flow_config_events_listener,
         }
     }
 
@@ -616,10 +635,15 @@ impl FlowConfigurationHarness {
                 .unwrap();
         flow_configuration.into()
     }
+
     async fn create_root_dataset(&self, dataset_name: &str) -> DatasetID {
-        let result = self
-            .dataset_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot = self
+            .catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        let result = create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(dataset_name)
                     .kind(DatasetKind::Root)
@@ -647,46 +671,15 @@ impl FlowConfigurationHarness {
             .unwrap();
 
         // Do the actual deletion
-        self.dataset_repo
-            .delete_dataset(&(dataset_id.as_local_ref()))
+        let delete_dataset = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
+        delete_dataset
+            .execute_via_ref(&(dataset_id.as_local_ref()))
             .await
             .unwrap();
     }
 
     fn configuration_events_count(&self) -> usize {
-        self.config_events_listener.configuration_events_count()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct FlowConfigEventsListener {
-    configuration_modified_events: Mutex<Vec<FlowConfigurationEventModified>>,
-}
-
-#[component]
-#[scope(Singleton)]
-#[interface(dyn AsyncEventHandler<FlowConfigurationEventModified>)]
-impl FlowConfigEventsListener {
-    fn new() -> Self {
-        Self {
-            configuration_modified_events: Mutex::new(Vec::new()),
-        }
-    }
-
-    fn configuration_events_count(&self) -> usize {
-        let events = self.configuration_modified_events.lock().unwrap();
-        events.len()
-    }
-}
-
-#[async_trait::async_trait]
-impl AsyncEventHandler<FlowConfigurationEventModified> for FlowConfigEventsListener {
-    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
-    async fn handle(&self, event: &FlowConfigurationEventModified) -> Result<(), InternalError> {
-        let mut events = self.configuration_modified_events.lock().unwrap();
-        events.push(event.clone());
-        Ok(())
+        self.config_listener.configuration_events_count()
     }
 }
 

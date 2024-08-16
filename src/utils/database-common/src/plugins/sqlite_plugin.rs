@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
-use sqlx::sqlite::SqliteConnectOptions;
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::SqlitePool;
 
 use crate::*;
@@ -42,7 +42,9 @@ impl SqlitePlugin {
     #[tracing::instrument(level = "info", skip_all)]
     fn open_sqlite_pool(db_connection_settings: &DatabaseConnectionSettings) -> SqlitePool {
         let sqlite_options = SqliteConnectOptions::new().filename(&db_connection_settings.host);
-        SqlitePool::connect_lazy_with(sqlite_options)
+        SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_lazy_with(sqlite_options)
     }
 }
 

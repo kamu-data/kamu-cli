@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use container_runtime::*;
 use datafusion::config::{ParquetOptions, TableParquetOptions};
+use internal_error::ResultIntoInternal;
 use kamu_core::engine::*;
 use kamu_core::*;
 use odf::engine::{EngineGrpcClient, ExecuteRawQueryError, ExecuteTransformError};
@@ -52,25 +53,20 @@ impl ODFEngine {
     // TODO: Currently we are always proxying remote inputs, but in future we should
     // have a capabilities mechanism for engines to declare that they can work
     // with some remote storages directly without us needing to proxy data.
-    async fn get_io_strategy(
-        &self,
-        request: &TransformRequestExt,
-    ) -> Result<Arc<dyn EngineIoStrategy>, InternalError> {
+    fn get_io_strategy(&self, request: &TransformRequestExt) -> Arc<dyn EngineIoStrategy> {
         let dataset = self
             .dataset_repo
-            .get_dataset(&request.dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
+            .get_dataset_by_handle(&request.dataset_handle);
 
         match dataset.as_data_repo().protocol() {
-            ObjectRepositoryProtocol::LocalFs { .. } => Ok(Arc::new(
-                EngineIoStrategyLocalVolume::new(self.dataset_repo.clone()),
-            )),
+            ObjectRepositoryProtocol::LocalFs { .. } => {
+                Arc::new(EngineIoStrategyLocalVolume::new(self.dataset_repo.clone()))
+            }
             ObjectRepositoryProtocol::Memory
             | ObjectRepositoryProtocol::Http
-            | ObjectRepositoryProtocol::S3 => Ok(Arc::new(EngineIoStrategyRemoteProxy::new(
-                self.dataset_repo.clone(),
-            ))),
+            | ObjectRepositoryProtocol::S3 => {
+                Arc::new(EngineIoStrategyRemoteProxy::new(self.dataset_repo.clone()))
+            }
         }
     }
 
@@ -340,9 +336,7 @@ impl Engine for ODFEngine {
     ) -> Result<TransformResponseExt, EngineError> {
         let dataset = self
             .dataset_repo
-            .get_dataset(&request.dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
+            .get_dataset_by_handle(&request.dataset_handle);
 
         let operation_id = request.operation_id.clone();
         let operation_dir = self
@@ -352,7 +346,7 @@ impl Engine for ODFEngine {
         std::fs::create_dir(&operation_dir).int_err()?;
         std::fs::create_dir(&logs_dir).int_err()?;
 
-        let io_strategy = self.get_io_strategy(&request).await.int_err()?;
+        let io_strategy = self.get_io_strategy(&request);
 
         let materialized_request = io_strategy
             .materialize_request(dataset.as_ref(), request, &operation_dir)

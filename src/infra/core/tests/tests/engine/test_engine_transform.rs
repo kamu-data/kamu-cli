@@ -16,7 +16,6 @@ use container_runtime::*;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::common::DFSchema;
 use dill::Component;
-use event_bus::EventBus;
 use futures::StreamExt;
 use indoc::indoc;
 use kamu::domain::*;
@@ -25,6 +24,7 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use opendatafabric::*;
+use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 struct DatasetHelper {
     dataset: Arc<dyn Dataset>,
@@ -225,9 +225,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .add_value(RunInfoDir::new(run_info_dir))
         .add_value(CacheDir::new(cache_dir))
         .add::<ContainerRuntime>()
-        .add::<EventBus>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
-        .add::<kamu::DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
             DatasetRepositoryLocalFs::builder()
@@ -253,7 +251,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
         .build();
 
-    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
     let ingest_svc = catalog.get_one::<dyn PollingIngestService>().unwrap();
     let transform_svc = catalog.get_one::<dyn TransformService>().unwrap();
 
@@ -335,6 +333,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()
+        .create_dataset_result
         .dataset;
 
     let deriv_helper = DatasetHelper::new(dataset.clone(), tempdir.path());

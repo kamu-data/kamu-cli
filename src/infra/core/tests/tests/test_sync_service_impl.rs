@@ -12,13 +12,13 @@ use std::path::Path;
 use std::str::FromStr;
 
 use dill::Component;
-use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
+use time_source::SystemTimeSourceDefault;
 use url::Url;
 
 use crate::utils::IpfsDaemon;
@@ -63,10 +63,10 @@ fn construct_authorizer(
     d2_alias: &DatasetAlias,
 ) -> impl auth::DatasetActionAuthorizer {
     MockDatasetActionAuthorizer::new()
-        .expect_check_read_dataset(d1_alias.clone(), authorization_expectations.d1_reads)
-        .expect_check_read_dataset(d2_alias.clone(), authorization_expectations.d2_reads)
-        .expect_check_write_dataset(d1_alias.clone(), authorization_expectations.d1_writes)
-        .expect_check_write_dataset(d2_alias.clone(), authorization_expectations.d2_writes)
+        .expect_check_read_dataset(d1_alias, authorization_expectations.d1_reads, true)
+        .expect_check_read_dataset(d2_alias, authorization_expectations.d2_reads, true)
+        .expect_check_write_dataset(d1_alias, authorization_expectations.d1_writes, true)
+        .expect_check_write_dataset(d2_alias, authorization_expectations.d2_writes, true)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,8 +93,6 @@ async fn do_test_sync(
 
     let catalog = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add::<EventBus>()
-        .add::<DependencyGraphServiceInMemory>()
         .add_value(ipfs_gateway)
         .add_value(ipfs_client)
         .add_value(CurrentAccountSubject::new_test())
@@ -106,6 +104,7 @@ async fn do_test_sync(
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
         .add_value(RemoteReposDir::new(tmp_workspace_dir.join("repos")))
         .add::<RemoteRepositoryRegistryImpl>()
         .add::<auth::DummyOdfServerAccessTokenResolver>()
@@ -153,6 +152,7 @@ async fn do_test_sync(
         .create_dataset_from_snapshot(snapshot)
         .await
         .unwrap()
+        .create_dataset_result
         .head;
 
     // Initial sync ///////////////////////////////////////////////////////////

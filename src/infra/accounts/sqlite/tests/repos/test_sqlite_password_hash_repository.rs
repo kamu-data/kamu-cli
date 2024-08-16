@@ -18,7 +18,7 @@ use sqlx::SqlitePool;
 #[test_group::group(database, sqlite)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
 async fn test_no_password_stored(sqlite_pool: SqlitePool) {
-    let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
+    let harness = SqlitePasswordHashRepositoryHarness::new(sqlite_pool);
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
@@ -34,7 +34,7 @@ async fn test_no_password_stored(sqlite_pool: SqlitePool) {
 #[test_group::group(database, sqlite)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
 async fn test_store_couple_account_passwords(sqlite_pool: SqlitePool) {
-    let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
+    let harness = SqlitePasswordHashRepositoryHarness::new(sqlite_pool);
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
@@ -47,11 +47,11 @@ async fn test_store_couple_account_passwords(sqlite_pool: SqlitePool) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct SqliteAccountRepositoryHarness {
+struct SqlitePasswordHashRepositoryHarness {
     catalog: Catalog,
 }
 
-impl SqliteAccountRepositoryHarness {
+impl SqlitePasswordHashRepositoryHarness {
     pub fn new(sqlite_pool: SqlitePool) -> Self {
         // Initialize catalog with predefined Postgres pool
         let mut catalog_builder = CatalogBuilder::new();

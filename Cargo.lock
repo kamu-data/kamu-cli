@@ -2051,9 +2051,9 @@ dependencies = [
 
 [[package]]
 name = "camino"
-version = "1.1.7"
+version = "1.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0ec6b951b160caa93cc0c7b209e5a3bff7aae9062213451ac99493cd844c239"
+checksum = "3054fea8a20d8ff3968d5b22cc27501d2b08dc4decdb31b184323f00c5ef23bb"
 dependencies = [
  "serde",
 ]
@@ -2201,9 +2201,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.15"
+version = "4.5.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11d8838454fda655dafd3accb2b6e2bea645b9e4078abe84a22ceb947235c5cc"
+checksum = "ed6719fffa43d0d87e5fd8caeab59be1554fb028cd30edc88fc4369b17971019"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -2352,11 +2352,11 @@ checksum = "f7144d30dcf0fafbce74250a3963025d8d52177934239851c917d29f1df280c2"
 
 [[package]]
 name = "container-runtime"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "cfg-if",
- "dill",
+ "dill 0.9.1",
  "libc",
  "once_cell",
  "random-names",
@@ -2791,14 +2791,14 @@ checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 
 [[package]]
 name = "database-common"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "aws-config",
  "aws-credential-types",
  "aws-sdk-secretsmanager",
  "chrono",
- "dill",
+ "dill 0.9.1",
  "hex",
  "hmac",
  "internal-error",
@@ -2815,7 +2815,7 @@ dependencies = [
 
 [[package]]
 name = "database-common-macros"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "quote",
  "syn 2.0.74",
@@ -3321,8 +3321,19 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3a18eaae0c1d3dc669fa6388383dfce0420742a916950cbef6d090d13cb52a0"
 dependencies = [
- "dill-impl",
- "multimap",
+ "dill-impl 0.8.1",
+ "multimap 0.9.1",
+ "thiserror",
+]
+
+[[package]]
+name = "dill"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc86c45437bf03daddf914ea76571cc341dde47ae8cfae336cc8d24803f80210"
+dependencies = [
+ "dill-impl 0.9.1",
+ "multimap 0.10.0",
  "thiserror",
 ]
 
@@ -3331,6 +3342,17 @@ name = "dill-impl"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f2abd05d581140fcd1e4256e5c4006273515b00696ba11a883f11c7b3dc52fa"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.74",
+]
+
+[[package]]
+name = "dill-impl"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d0e68e1e07d64dbf3bb2991657979ec4e3fe13b7b3c18067b802052af1330a3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3570,7 +3592,7 @@ dependencies = [
 
 [[package]]
 name = "enum-variants"
-version = "0.194.1"
+version = "0.195.0"
 
 [[package]]
 name = "env_filter"
@@ -3631,21 +3653,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "event-bus"
-version = "0.194.1"
-dependencies = [
- "async-trait",
- "dill",
- "futures",
- "internal-error",
- "test-log",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "event-listener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3653,13 +3660,14 @@ checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
 
 [[package]]
 name = "event-sourcing"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-stream",
  "async-trait",
  "event-sourcing-macros",
  "futures",
  "internal-error",
+ "serde",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -3668,7 +3676,7 @@ dependencies = [
 
 [[package]]
 name = "event-sourcing-macros"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "quote",
  "syn 2.0.74",
@@ -4335,10 +4343,11 @@ dependencies = [
 
 [[package]]
 name = "http-common"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "axum",
  "http 0.2.12",
+ "internal-error",
  "kamu-core",
  "thiserror",
  "tracing",
@@ -4655,7 +4664,7 @@ checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
 name = "internal-error"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "thiserror",
 ]
@@ -4812,7 +4821,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "alloy",
  "async-recursion",
@@ -4837,8 +4846,7 @@ dependencies = [
  "datafusion-ethers",
  "datafusion-functions-json",
  "digest 0.10.7",
- "dill",
- "event-bus",
+ "dill 0.9.1",
  "filetime",
  "flatbuffers",
  "flate2",
@@ -4860,6 +4868,7 @@ dependencies = [
  "kamu-ingest-datafusion",
  "libc",
  "like",
+ "messaging-outbox",
  "mockall",
  "nanoid",
  "object_store",
@@ -4883,6 +4892,7 @@ dependencies = [
  "test-group",
  "test-log",
  "thiserror",
+ "time-source",
  "tokio",
  "tokio-stream",
  "tokio-util",
@@ -4898,7 +4908,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "base32",
@@ -4924,12 +4934,12 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-inmem"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill",
+ "dill 0.9.1",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
@@ -4943,12 +4953,12 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-mysql"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill",
+ "dill 0.9.1",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
@@ -4963,12 +4973,12 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-postgres"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill",
+ "dill 0.9.1",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
@@ -4983,12 +4993,12 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-repo-tests"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "argon2",
  "chrono",
  "database-common",
- "dill",
+ "dill 0.9.1",
  "kamu-accounts",
  "kamu-adapter-oauth",
  "opendatafabric",
@@ -4999,18 +5009,17 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-services"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "argon2",
  "async-trait",
  "chrono",
  "database-common",
- "dill",
+ "dill 0.9.1",
  "internal-error",
  "jsonwebtoken",
  "kamu-accounts",
  "kamu-accounts-inmem",
- "kamu-core",
  "opendatafabric",
  "password-hash 0.5.0",
  "random-names",
@@ -5018,6 +5027,7 @@ dependencies = [
  "serde_json",
  "test-log",
  "thiserror",
+ "time-source",
  "tokio",
  "tracing",
  "uuid",
@@ -5025,12 +5035,12 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-sqlite"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill",
+ "dill 0.9.1",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
@@ -5045,19 +5055,21 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-auth-oso"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
- "dill",
- "event-bus",
+ "dill 0.9.1",
+ "internal-error",
  "kamu",
  "kamu-accounts",
  "kamu-core",
+ "messaging-outbox",
  "opendatafabric",
  "oso",
  "oso-derive",
  "tempfile",
  "test-log",
+ "time-source",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -5065,7 +5077,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-flight-sql"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "arrow-flight",
  "async-trait",
@@ -5088,7 +5100,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-graphql"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-graphql",
  "async-trait",
@@ -5097,8 +5109,7 @@ dependencies = [
  "cron",
  "database-common",
  "datafusion",
- "dill",
- "event-bus",
+ "dill 0.9.1",
  "event-sourcing",
  "futures",
  "indoc 2.0.5",
@@ -5118,6 +5129,7 @@ dependencies = [
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
+ "messaging-outbox",
  "mockall",
  "opendatafabric",
  "secrecy",
@@ -5127,6 +5139,7 @@ dependencies = [
  "test-group",
  "test-log",
  "thiserror",
+ "time-source",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -5137,7 +5150,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-http"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "aws-sdk-s3",
@@ -5150,8 +5163,7 @@ dependencies = [
  "database-common",
  "database-common-macros",
  "datafusion",
- "dill",
- "event-bus",
+ "dill 0.9.1",
  "flate2",
  "fs_extra",
  "futures",
@@ -5159,13 +5171,16 @@ dependencies = [
  "http-common",
  "hyper 0.14.30",
  "indoc 2.0.5",
+ "internal-error",
  "kamu",
  "kamu-accounts",
  "kamu-accounts-inmem",
  "kamu-accounts-services",
+ "kamu-core",
  "kamu-data-utils",
  "kamu-datasets-services",
  "kamu-ingest-datafusion",
+ "messaging-outbox",
  "mockall",
  "opendatafabric",
  "paste",
@@ -5179,6 +5194,7 @@ dependencies = [
  "test-group",
  "test-log",
  "thiserror",
+ "time-source",
  "tokio",
  "tokio-stream",
  "tokio-tungstenite 0.20.1",
@@ -5193,19 +5209,18 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-oauth"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "chrono",
- "dill",
+ "dill 0.9.1",
  "http 0.2.12",
+ "internal-error",
  "kamu-accounts",
- "kamu-core",
  "opendatafabric",
  "reqwest 0.11.27",
  "serde",
  "serde_json",
- "tempfile",
  "thiserror",
  "tokio",
  "tracing",
@@ -5213,7 +5228,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-odata"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "axum",
  "chrono",
@@ -5221,16 +5236,17 @@ dependencies = [
  "database-common-macros",
  "datafusion",
  "datafusion-odata",
- "dill",
- "event-bus",
+ "dill 0.9.1",
  "futures",
  "http 0.2.12",
  "http-common",
  "hyper 0.14.30",
  "indoc 2.0.5",
+ "internal-error",
  "kamu",
  "kamu-accounts",
  "kamu-core",
+ "messaging-outbox",
  "opendatafabric",
  "quick-xml",
  "reqwest 0.11.27",
@@ -5238,6 +5254,7 @@ dependencies = [
  "tempfile",
  "test-group",
  "test-log",
+ "time-source",
  "tokio",
  "tower-http",
  "tracing",
@@ -5246,7 +5263,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "internal-error",
@@ -5256,10 +5273,10 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-inmem"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
- "dill",
+ "dill 0.8.1",
  "kamu-auth-rebac",
  "kamu-auth-rebac-repo-tests",
  "test-log",
@@ -5268,19 +5285,19 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-repo-tests"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
- "dill",
+ "dill 0.8.1",
  "kamu-auth-rebac",
  "tokio",
 ]
 
 [[package]]
 name = "kamu-auth-rebac-services"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
- "dill",
+ "dill 0.8.1",
  "futures",
  "kamu-auth-rebac",
  "opendatafabric",
@@ -5288,7 +5305,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "arrow-flight",
  "async-graphql",
@@ -5307,10 +5324,9 @@ dependencies = [
  "database-common",
  "database-common-macros",
  "datafusion",
- "dill",
+ "dill 0.9.1",
  "dirs",
  "duration-string",
- "event-bus",
  "fs_extra",
  "futures",
  "glob",
@@ -5345,11 +5361,17 @@ dependencies = [
  "kamu-datasets-services",
  "kamu-datasets-sqlite",
  "kamu-flow-system-inmem",
+ "kamu-flow-system-postgres",
  "kamu-flow-system-services",
+ "kamu-flow-system-sqlite",
+ "kamu-messaging-outbox-inmem",
+ "kamu-messaging-outbox-postgres",
+ "kamu-messaging-outbox-sqlite",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
  "libc",
  "merge",
+ "messaging-outbox",
  "mime",
  "mime_guess",
  "minus",
@@ -5372,6 +5394,7 @@ dependencies = [
  "tempfile",
  "test-log",
  "thiserror",
+ "time-source",
  "tokio",
  "tokio-stream",
  "tokio-util",
@@ -5393,7 +5416,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-common"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "chrono",
  "indoc 2.0.5",
@@ -5413,7 +5436,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-common-macros"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "quote",
  "syn 2.0.74",
@@ -5421,7 +5444,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-inmem"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
@@ -5434,7 +5457,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-mysql"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
@@ -5448,7 +5471,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-postgres"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
@@ -5462,7 +5485,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-repo-tests"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "chrono",
  "indoc 2.0.5",
@@ -5478,7 +5501,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-sqlite"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
@@ -5492,7 +5515,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-puppet"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "assert_cmd",
  "async-trait",
@@ -5508,7 +5531,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-core"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5516,12 +5539,13 @@ dependencies = [
  "chrono",
  "container-runtime",
  "datafusion",
- "dill",
+ "dill 0.9.1",
  "futures",
  "http 0.2.12",
  "internal-error",
  "kamu-accounts",
  "kamu-datasets",
+ "messaging-outbox",
  "object_store",
  "opendatafabric",
  "pathdiff",
@@ -5537,7 +5561,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-data-utils"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "arrow",
  "arrow-digest",
@@ -5562,7 +5586,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datafusion-cli"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "arrow",
  "async-trait",
@@ -5584,7 +5608,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -5603,12 +5627,12 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets-inmem"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill",
+ "dill 0.9.1",
  "internal-error",
  "kamu-datasets",
  "kamu-datasets-repo-tests",
@@ -5623,12 +5647,12 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets-postgres"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill",
+ "dill 0.9.1",
  "internal-error",
  "kamu-datasets",
  "kamu-datasets-repo-tests",
@@ -5644,11 +5668,11 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets-repo-tests"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "chrono",
  "database-common",
- "dill",
+ "dill 0.9.1",
  "kamu-datasets",
  "opendatafabric",
  "secrecy",
@@ -5657,20 +5681,20 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets-services"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill",
+ "dill 0.9.1",
  "internal-error",
- "kamu-core",
  "kamu-datasets",
  "opendatafabric",
  "secrecy",
  "serde",
  "serde_json",
  "thiserror",
+ "time-source",
  "tokio",
  "tracing",
  "uuid",
@@ -5678,12 +5702,12 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets-sqlite"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill",
+ "dill 0.9.1",
  "internal-error",
  "kamu-datasets",
  "kamu-datasets-repo-tests",
@@ -5699,7 +5723,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5712,6 +5736,7 @@ dependencies = [
  "kamu-core",
  "kamu-task-system",
  "lazy_static",
+ "messaging-outbox",
  "opendatafabric",
  "serde",
  "serde_with",
@@ -5724,13 +5749,13 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-inmem"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
  "cron",
- "dill",
+ "dill 0.9.1",
  "futures",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
@@ -5751,13 +5776,13 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-postgres"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
  "database-common",
- "dill",
+ "dill 0.9.1",
  "futures",
  "internal-error",
  "kamu-flow-system",
@@ -5774,10 +5799,10 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-repo-tests"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "chrono",
- "dill",
+ "dill 0.9.1",
  "futures",
  "kamu-flow-system",
  "opendatafabric",
@@ -5785,7 +5810,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-services"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5793,10 +5818,10 @@ dependencies = [
  "cron",
  "database-common",
  "database-common-macros",
- "dill",
- "event-bus",
+ "dill 0.9.1",
  "futures",
  "indoc 2.0.5",
+ "internal-error",
  "kamu",
  "kamu-accounts",
  "kamu-accounts-inmem",
@@ -5807,14 +5832,17 @@ dependencies = [
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
+ "messaging-outbox",
  "mockall",
  "opendatafabric",
  "pretty_assertions",
  "serde",
+ "serde_json",
  "serde_with",
  "tempfile",
  "test-log",
  "thiserror",
+ "time-source",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -5824,13 +5852,13 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-sqlite"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
  "database-common",
- "dill",
+ "dill 0.9.1",
  "futures",
  "internal-error",
  "kamu-flow-system",
@@ -5847,7 +5875,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-ingest-datafusion"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5883,8 +5911,82 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-messaging-outbox-inmem"
+version = "0.195.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dill 0.9.1",
+ "internal-error",
+ "kamu-messaging-outbox-repo-tests",
+ "messaging-outbox",
+ "test-log",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
+name = "kamu-messaging-outbox-postgres"
+version = "0.195.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill 0.9.1",
+ "futures",
+ "internal-error",
+ "kamu-messaging-outbox-repo-tests",
+ "messaging-outbox",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-messaging-outbox-repo-tests"
+version = "0.195.0"
+dependencies = [
+ "chrono",
+ "database-common",
+ "dill 0.9.1",
+ "futures",
+ "messaging-outbox",
+ "rand",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "kamu-messaging-outbox-sqlite"
+version = "0.195.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill 0.9.1",
+ "futures",
+ "internal-error",
+ "kamu-messaging-outbox-repo-tests",
+ "messaging-outbox",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "kamu-repo-tools"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "chrono",
  "clap",
@@ -5899,13 +6001,14 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "chrono",
  "enum-variants",
  "event-sourcing",
  "kamu-core",
+ "messaging-outbox",
  "opendatafabric",
  "serde",
  "thiserror",
@@ -5914,11 +6017,11 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-inmem"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-trait",
  "chrono",
- "dill",
+ "dill 0.9.1",
  "futures",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
@@ -5929,13 +6032,13 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-postgres"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
  "database-common",
- "dill",
+ "dill 0.9.1",
  "futures",
  "internal-error",
  "kamu-task-system",
@@ -5951,10 +6054,10 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-repo-tests"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "chrono",
- "dill",
+ "dill 0.9.1",
  "futures",
  "kamu-task-system",
  "opendatafabric",
@@ -5962,34 +6065,37 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-services"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
  "database-common",
- "dill",
- "event-bus",
+ "dill 0.9.1",
  "futures",
+ "internal-error",
  "kamu-core",
  "kamu-datasets",
  "kamu-task-system",
  "kamu-task-system-inmem",
+ "messaging-outbox",
  "opendatafabric",
+ "serde_json",
  "test-log",
+ "time-source",
  "tokio",
  "tracing",
 ]
 
 [[package]]
 name = "kamu-task-system-sqlite"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
  "database-common",
- "dill",
+ "dill 0.9.1",
  "futures",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
@@ -6124,9 +6230,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.155"
+version = "0.2.156"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97b3888a4aecf77e811145cadf6eef5901f4782c53886191b2f693f24761847c"
+checksum = "a5f43f184355eefb8d17fc948dbecf6c13be3c141f20d834ae842193a448c72a"
 
 [[package]]
 name = "libflate"
@@ -6370,6 +6476,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "messaging-outbox"
+version = "0.195.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill 0.9.1",
+ "futures",
+ "internal-error",
+ "kamu-messaging-outbox-inmem",
+ "mockall",
+ "paste",
+ "serde",
+ "serde_json",
+ "test-log",
+ "thiserror",
+ "time-source",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6486,7 +6615,7 @@ dependencies = [
 
 [[package]]
 name = "multiformats"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "bs58",
  "digest 0.10.7",
@@ -6504,6 +6633,15 @@ name = "multimap"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1a5d38b9b352dbd913288736af36af41c48d61b1a8cd34bcecd727561b7d511"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "multimap"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "defc4c55412d89136f966bbb339008b474350e5e6e78d2714439c386b3137a03"
 dependencies = [
  "serde",
 ]
@@ -6811,7 +6949,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "opendatafabric"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "arrow",
  "base64 0.22.1",
@@ -7669,7 +7807,7 @@ dependencies = [
 
 [[package]]
 name = "random-names"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "rand",
 ]
@@ -8383,18 +8521,18 @@ checksum = "a3f0bf26fd526d2a95683cd0f87bf103b8539e2ca1ef48ce002d67aad59aa0b4"
 
 [[package]]
 name = "serde"
-version = "1.0.207"
+version = "1.0.208"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5665e14a49a4ea1b91029ba7d3bca9f299e1f7cfa194388ccc20f14743e784f2"
+checksum = "cff085d2cb684faa248efb494c39b68e522822ac0de72ccf08109abde717cfb2"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.207"
+version = "1.0.208"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6aea2634c86b0e8ef2cfdc0c340baede54ec27b1e46febd7f80dffb2aa44a00e"
+checksum = "24008e81ff7613ed8e5ba0cfaf24e2c2f1e5b8a0495711e44fcd4882fca62bcf"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -9297,6 +9435,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "time-source"
+version = "0.195.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dill 0.9.1",
+ "futures",
+ "tokio",
+]
+
+[[package]]
 name = "tiny-keccak"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9685,7 +9834,7 @@ dependencies = [
 
 [[package]]
 name = "tracing-perfetto"
-version = "0.194.1"
+version = "0.195.0"
 dependencies = [
  "conv",
  "serde",

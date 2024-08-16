@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
+use internal_error::ResultIntoInternal;
 use kamu_core::repos::reference_repository::SetRefError;
 use kamu_core::*;
 use opendatafabric::Multihash;

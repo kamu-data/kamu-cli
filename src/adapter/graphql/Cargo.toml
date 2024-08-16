@@ -48,7 +48,7 @@ chrono = "0.4"
 datafusion = { version = "41", default-features = false, features = [
     "serde",
 ] } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
-dill = "0.8"
+dill = "0.9"
 futures = "0.3"
 secrecy = "0.8"
 serde = { version = "1", default-features = false }
@@ -64,7 +64,7 @@ uuid = { version = "1", default-features = false }
 [dev-dependencies]
 # TODO: Limit to mock or in-memory implementations only
 container-runtime = { workspace = true }
-event-bus = { workspace = true }
+messaging-outbox = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-datasets-services = { workspace = true }
@@ -72,6 +72,7 @@ kamu-datasets-inmem = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
+time-source = { workspace = true }
 
 
 indoc = "2"

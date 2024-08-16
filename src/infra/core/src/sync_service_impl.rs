@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::services::sync_service::DatasetNotFoundError;
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;
@@ -20,12 +21,14 @@ use super::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use crate::utils::ipfs_wrapper::*;
 use crate::utils::simple_transfer_protocol::{DatasetFactoryFn, SimpleTransferProtocol};
 use crate::utils::smart_transfer_protocol::TransferOptions;
+use crate::DatasetRepositoryWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SyncServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     dataset_factory: Arc<dyn DatasetFactory>,
     smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
@@ -40,6 +43,7 @@ impl SyncServiceImpl {
     pub fn new(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         dataset_factory: Arc<dyn DatasetFactory>,
         smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
@@ -48,6 +52,7 @@ impl SyncServiceImpl {
         Self {
             remote_repo_reg,
             dataset_repo,
+            dataset_repo_writer,
             dataset_action_authorizer,
             dataset_factory,
             smart_transfer_protocol,
@@ -96,7 +101,7 @@ impl SyncServiceImpl {
                     .check_action_allowed(&dataset_handle, auth::DatasetAction::Read)
                     .await?;
 
-                self.dataset_repo.get_dataset(local_ref).await?
+                self.dataset_repo.find_dataset_by_ref(local_ref).await?
             }
             SyncRef::Remote(url) => {
                 // TODO: implement authorization checks somehow
@@ -127,27 +132,32 @@ impl SyncServiceImpl {
         create_if_not_exists: bool,
     ) -> Result<(Option<Arc<dyn Dataset>>, Option<DatasetFactoryFn>), SyncError> {
         match dataset_ref {
-            SyncRef::Local(local_ref) => match self.dataset_repo.get_dataset(local_ref).await {
-                Ok(dataset) => {
-                    let dataset_handle = self.dataset_repo.resolve_dataset_ref(local_ref).await?;
-                    self.dataset_action_authorizer
-                        .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
-                        .await?;
+            SyncRef::Local(local_ref) => {
+                match self.dataset_repo.find_dataset_by_ref(local_ref).await {
+                    Ok(dataset) => {
+                        let dataset_handle =
+                            self.dataset_repo.resolve_dataset_ref(local_ref).await?;
+                        self.dataset_action_authorizer
+                            .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
+                            .await?;
 
-                    Ok((Some(dataset), None))
+                        Ok((Some(dataset), None))
+                    }
+                    Err(GetDatasetError::NotFound(_)) if create_if_not_exists => {
+                        let alias = local_ref.alias().unwrap().clone();
+                        let repo_writer = self.dataset_repo_writer.clone();
+                        Ok((
+                            None,
+                            Some(Box::new(move |seed_block| {
+                                Box::pin(async move {
+                                    repo_writer.create_dataset(&alias, seed_block).await
+                                })
+                            })),
+                        ))
+                    }
+                    Err(err) => Err(err.into()),
                 }
-                Err(GetDatasetError::NotFound(_)) if create_if_not_exists => {
-                    let alias = local_ref.alias().unwrap().clone();
-                    let repo = self.dataset_repo.clone();
-                    Ok((
-                        None,
-                        Some(Box::new(move |seed_block| {
-                            Box::pin(async move { repo.create_dataset(&alias, seed_block).await })
-                        })),
-                    ))
-                }
-                Err(err) => Err(err.into()),
-            },
+            }
             SyncRef::Remote(url) => {
                 // TODO: implement authorization checks somehow
                 let dataset = self
@@ -316,7 +326,7 @@ impl SyncServiceImpl {
             .await?;
 
         // Resolve and compare heads
-        let src_dataset = self.dataset_repo.get_dataset(src).await?;
+        let src_dataset = self.dataset_repo.find_dataset_by_ref(src).await?;
         let src_head = src_dataset
             .as_metadata_chain()
             .resolve_ref(&BlockRef::Head)

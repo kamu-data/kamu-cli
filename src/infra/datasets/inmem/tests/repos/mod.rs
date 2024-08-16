@@ -7,5 +7,5 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_dataset_entry_repository_inmem;
-mod test_dataset_env_var_repository_inmem;
+mod test_inmem_dataset_entry_repository;
+mod test_inmem_dataset_env_var_repository;

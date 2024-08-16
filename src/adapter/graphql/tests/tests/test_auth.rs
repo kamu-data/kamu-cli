@@ -17,9 +17,9 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME_STR,
     DUMMY_LOGIN_METHOD,
 };
-use kamu_accounts_inmem::AccessTokenRepositoryInMemory;
+use kamu_accounts_inmem::InMemoryAccessTokenRepository;
 use kamu_accounts_services::AccessTokenServiceImpl;
-use kamu_core::SystemTimeSourceDefault;
+use time_source::SystemTimeSourceDefault;
 
 use crate::utils::authentication_catalogs;
 
@@ -351,7 +351,7 @@ impl AuthGQLHarness {
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add::<SystemTimeSourceDefault>()
                 .add::<AccessTokenServiceImpl>()
-                .add::<AccessTokenRepositoryInMemory>()
+                .add::<InMemoryAccessTokenRepository>()
                 .add::<DatabaseTransactionRunner>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);

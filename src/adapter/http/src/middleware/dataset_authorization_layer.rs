@@ -13,8 +13,8 @@ use std::task::{Context, Poll};
 use axum::body::Body;
 use axum::response::Response;
 use futures::Future;
-use kamu::domain::GetDatasetError;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_core::GetDatasetError;
 use opendatafabric::DatasetRef;
 use tower::{Layer, Service};
 
@@ -29,7 +29,7 @@ pub struct DatasetAuthorizationLayer<DatasetActionQuery> {
 
 impl<DatasetActionQuery> DatasetAuthorizationLayer<DatasetActionQuery>
 where
-    DatasetActionQuery: Fn(&http::Request<Body>) -> kamu::domain::auth::DatasetAction,
+    DatasetActionQuery: Fn(&http::Request<Body>) -> kamu_core::auth::DatasetAction,
 {
     pub fn new(dataset_action_query: DatasetActionQuery) -> Self {
         Self {
@@ -77,7 +77,7 @@ where
     Svc: Service<http::Request<Body>, Response = Response> + Send + 'static + Clone,
     Svc::Future: Send + 'static,
     DatasetActionQuery: Send + Clone + 'static,
-    DatasetActionQuery: Fn(&http::Request<Body>) -> kamu::domain::auth::DatasetAction,
+    DatasetActionQuery: Fn(&http::Request<Body>) -> kamu_core::auth::DatasetAction,
 {
     type Response = Svc::Response;
     type Error = Svc::Error;
@@ -102,11 +102,11 @@ where
                 .expect("Catalog not found in http server extensions");
 
             let dataset_action_authorizer = catalog
-                .get_one::<dyn kamu::domain::auth::DatasetActionAuthorizer>()
+                .get_one::<dyn kamu_core::auth::DatasetActionAuthorizer>()
                 .unwrap();
 
             let dataset_repo = catalog
-                .get_one::<dyn kamu::domain::DatasetRepository>()
+                .get_one::<dyn kamu_core::DatasetRepository>()
                 .unwrap();
 
             let dataset_ref = request

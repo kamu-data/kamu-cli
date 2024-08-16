@@ -10,8 +10,11 @@
 use std::sync::Arc;
 
 use dill::*;
+use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use opendatafabric::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ResetServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
@@ -44,10 +47,7 @@ impl ResetService for ResetServiceImpl {
             .check_action_allowed(dataset_handle, auth::DatasetAction::Write)
             .await?;
 
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
+        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
 
         let new_head = if let Some(new_head) = new_head_maybe {
             new_head
@@ -89,3 +89,5 @@ impl ResetService for ResetServiceImpl {
         Ok(new_head.clone())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

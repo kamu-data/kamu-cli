@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::{HashSet, LinkedList};
 use std::sync::Arc;
 
 use kamu::domain::*;
@@ -20,6 +21,8 @@ use crate::OutputConfig;
 pub struct AddCommand {
     resource_loader: Arc<dyn ResourceLoader>,
     dataset_repo: Arc<dyn DatasetRepository>,
+    create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
+    delete_dataset: Arc<dyn DeleteDatasetUseCase>,
     snapshot_refs: Vec<String>,
     name: Option<DatasetAlias>,
     recursive: bool,
@@ -32,6 +35,8 @@ impl AddCommand {
     pub fn new<'s, I>(
         resource_loader: Arc<dyn ResourceLoader>,
         dataset_repo: Arc<dyn DatasetRepository>,
+        create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
+        delete_dataset: Arc<dyn DeleteDatasetUseCase>,
         snapshot_refs_iter: I,
         name: Option<DatasetAlias>,
         recursive: bool,
@@ -45,6 +50,8 @@ impl AddCommand {
         Self {
             resource_loader,
             dataset_repo,
+            create_dataset_from_snapshot,
+            delete_dataset,
             snapshot_refs: snapshot_refs_iter.map(ToOwned::to_owned).collect(),
             name,
             recursive,
@@ -129,6 +136,66 @@ impl AddCommand {
 
         Ok(false)
     }
+
+    pub async fn create_datasets_from_snapshots(
+        &self,
+        snapshots: Vec<DatasetSnapshot>,
+    ) -> Vec<(
+        DatasetAlias,
+        Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
+    )> {
+        let snapshots_ordered =
+            self.sort_snapshots_in_dependency_order(snapshots.into_iter().collect());
+
+        let mut ret = Vec::new();
+        for snapshot in snapshots_ordered {
+            let alias = snapshot.name.clone();
+            let res = self.create_dataset_from_snapshot.execute(snapshot).await;
+            ret.push((alias, res));
+        }
+        ret
+    }
+
+    #[allow(clippy::linkedlist)]
+    fn sort_snapshots_in_dependency_order(
+        &self,
+        mut snapshots: LinkedList<DatasetSnapshot>,
+    ) -> Vec<DatasetSnapshot> {
+        let mut ordered = Vec::with_capacity(snapshots.len());
+        let mut pending: HashSet<DatasetRef> =
+            snapshots.iter().map(|s| s.name.clone().into()).collect();
+        let mut added: HashSet<DatasetAlias> = HashSet::new();
+
+        // TODO: cycle detection
+        while !snapshots.is_empty() {
+            let snapshot = snapshots.pop_front().unwrap();
+
+            let transform = snapshot
+                .metadata
+                .iter()
+                .find_map(|e| e.as_variant::<SetTransform>());
+
+            let has_pending_deps = if let Some(transform) = transform {
+                transform
+                    .inputs
+                    .iter()
+                    .any(|input| pending.contains(&input.dataset_ref))
+            } else {
+                false
+            };
+
+            if !has_pending_deps {
+                pending.remove(&snapshot.name.clone().into());
+                added.insert(snapshot.name.clone());
+                ordered.push(snapshot);
+            } else {
+                snapshots.push_back(snapshot);
+            }
+        }
+        ordered
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
 
 #[async_trait::async_trait(?Send)]
@@ -211,17 +278,12 @@ impl Command for AddCommand {
 
                 // TODO: delete permissions should be checked in multi-tenant scenario
                 for hdl in already_exist {
-                    self.dataset_repo
-                        .delete_dataset(&hdl.as_local_ref())
-                        .await?;
+                    self.delete_dataset.execute_via_handle(&hdl).await?;
                 }
             }
         };
 
-        let mut add_results = self
-            .dataset_repo
-            .create_datasets_from_snapshots(snapshots)
-            .await;
+        let mut add_results = self.create_datasets_from_snapshots(snapshots).await;
 
         add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(id_b));
 

@@ -18,7 +18,7 @@ use sqlx::PgPool;
 #[test_group::group(database, postgres)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_no_password_stored(pg_pool: PgPool) {
-    let harness = PostgresAccountRepositoryHarness::new(pg_pool);
+    let harness = PostgresPasswordHashRepositoryHarness::new(pg_pool);
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
@@ -34,7 +34,7 @@ async fn test_no_password_stored(pg_pool: PgPool) {
 #[test_group::group(database, postgres)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_store_couple_account_passwords(pg_pool: PgPool) {
-    let harness = PostgresAccountRepositoryHarness::new(pg_pool);
+    let harness = PostgresPasswordHashRepositoryHarness::new(pg_pool);
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
@@ -47,11 +47,11 @@ async fn test_store_couple_account_passwords(pg_pool: PgPool) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct PostgresAccountRepositoryHarness {
+struct PostgresPasswordHashRepositoryHarness {
     catalog: Catalog,
 }
 
-impl PostgresAccountRepositoryHarness {
+impl PostgresPasswordHashRepositoryHarness {
     pub fn new(pg_pool: PgPool) -> Self {
         // Initialize catalog with predefined Postgres pool
         let mut catalog_builder = CatalogBuilder::new();

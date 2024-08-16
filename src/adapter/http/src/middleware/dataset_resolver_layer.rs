@@ -16,7 +16,7 @@ use axum::body::Body;
 use axum::extract::FromRequestParts;
 use axum::response::Response;
 use axum::RequestExt;
-use kamu::domain::{DatasetRepository, GetDatasetError};
+use kamu_core::{DatasetRepository, GetDatasetError};
 use opendatafabric::DatasetRef;
 use tower::{Layer, Service};
 
@@ -143,7 +143,7 @@ where
 
                 let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
-                let dataset = match dataset_repo.get_dataset(&dataset_ref).await {
+                let dataset = match dataset_repo.find_dataset_by_ref(&dataset_ref).await {
                     Ok(ds) => ds,
                     Err(GetDatasetError::NotFound(err)) => {
                         tracing::warn!("Dataset not found: {:?}", err);

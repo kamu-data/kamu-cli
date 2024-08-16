@@ -18,7 +18,7 @@ use sqlx::MySqlPool;
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_no_password_stored(mysql_pool: MySqlPool) {
-    let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
+    let harness = MySqlPasswordHashRepositoryHarness::new(mysql_pool);
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
@@ -34,7 +34,7 @@ async fn test_no_password_stored(mysql_pool: MySqlPool) {
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_store_couple_account_passwords(mysql_pool: MySqlPool) {
-    let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
+    let harness = MySqlPasswordHashRepositoryHarness::new(mysql_pool);
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
@@ -47,11 +47,11 @@ async fn test_store_couple_account_passwords(mysql_pool: MySqlPool) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct MySqlAccountRepositoryHarness {
+struct MySqlPasswordHashRepositoryHarness {
     catalog: Catalog,
 }
 
-impl MySqlAccountRepositoryHarness {
+impl MySqlPasswordHashRepositoryHarness {
     pub fn new(mysql_pool: MySqlPool) -> Self {
         // Initialize catalog with predefined MySql pool
         let mut catalog_builder = CatalogBuilder::new();

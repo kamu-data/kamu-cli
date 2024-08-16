@@ -149,11 +149,11 @@ fn is_dataset_optional_for_request(request: &http::Request<hyper::Body>) -> bool
 
 fn get_dataset_action_for_request(
     request: &http::Request<hyper::Body>,
-) -> kamu::domain::auth::DatasetAction {
+) -> kamu_core::auth::DatasetAction {
     if !request.method().is_safe() || request.uri().path() == "/push" {
-        kamu::domain::auth::DatasetAction::Write
+        kamu_core::auth::DatasetAction::Write
     } else {
-        kamu::domain::auth::DatasetAction::Read
+        kamu_core::auth::DatasetAction::Read
     }
 }
 

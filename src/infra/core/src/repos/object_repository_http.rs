@@ -11,6 +11,7 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::Multihash;
 use reqwest::Client;

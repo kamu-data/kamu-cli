@@ -67,28 +67,42 @@ impl MockDatasetActionAuthorizer {
         mock_dataset_action_authorizer
     }
 
-    pub fn expect_check_read_dataset(self, dataset_alias: DatasetAlias, times: usize) -> Self {
+    pub fn expect_check_read_dataset(
+        self,
+        dataset_alias: &DatasetAlias,
+        times: usize,
+        success: bool,
+    ) -> Self {
+        let dataset_alias = dataset_alias.clone();
         self.expect_check_action_allowed_internal(
             function(move |dh: &DatasetHandle| dh.alias == dataset_alias),
             DatasetAction::Read,
             times,
+            success,
         )
     }
 
-    pub fn expect_check_write_dataset(self, dataset_alias: DatasetAlias, times: usize) -> Self {
+    pub fn expect_check_write_dataset(
+        self,
+        dataset_alias: &DatasetAlias,
+        times: usize,
+        success: bool,
+    ) -> Self {
+        let dataset_alias = dataset_alias.clone();
         self.expect_check_action_allowed_internal(
             function(move |dh: &DatasetHandle| dh.alias == dataset_alias),
             DatasetAction::Write,
             times,
+            success,
         )
     }
 
-    pub fn expect_check_read_a_dataset(self, times: usize) -> Self {
-        self.expect_check_action_allowed_internal(always(), DatasetAction::Read, times)
+    pub fn expect_check_read_a_dataset(self, times: usize, success: bool) -> Self {
+        self.expect_check_action_allowed_internal(always(), DatasetAction::Read, times, success)
     }
 
-    pub fn expect_check_write_a_dataset(self, times: usize) -> Self {
-        self.expect_check_action_allowed_internal(always(), DatasetAction::Write, times)
+    pub fn expect_check_write_a_dataset(self, times: usize, success: bool) -> Self {
+        self.expect_check_action_allowed_internal(always(), DatasetAction::Write, times, success)
     }
 
     fn expect_check_action_allowed_internal<P>(
@@ -96,6 +110,7 @@ impl MockDatasetActionAuthorizer {
         dataset_handle_predicate: P,
         action: auth::DatasetAction,
         times: usize,
+        success: bool,
     ) -> Self
     where
         P: Predicate<DatasetHandle> + Sync + Send + 'static,
@@ -104,7 +119,13 @@ impl MockDatasetActionAuthorizer {
             self.expect_check_action_allowed()
                 .with(dataset_handle_predicate, eq(action))
                 .times(times)
-                .returning(|_, _| Ok(()));
+                .returning(move |hdl, action| {
+                    if success {
+                        Ok(())
+                    } else {
+                        Err(Self::denying_error(hdl, action))
+                    }
+                });
         } else {
             self.expect_check_action_allowed()
                 .with(dataset_handle_predicate, eq(action))
