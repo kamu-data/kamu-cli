@@ -16,7 +16,6 @@ use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_auth_rebac::RebacService;
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
 use opendatafabric::*;
 use time_source::SystemTimeSource;
@@ -488,7 +487,18 @@ impl DatasetRepositoryWriter for DatasetRepositoryS3 {
         &self,
         snapshot: DatasetSnapshot,
     ) -> Result<CreateDatasetFromSnapshotResult, CreateDatasetFromSnapshotError> {
-        create_dataset_from_snapshot_impl(self, snapshot, self.system_time_source.now()).await
+        // TODO: Introduce CreateDatasetOpts with Visibility::Public
+        let publicly_available = true;
+
+        create_dataset_from_snapshot_impl(
+            self,
+            // TODO: move to the use case?
+            Some(self.rebac_service.as_ref()),
+            snapshot,
+            self.system_time_source.now(),
+            publicly_available,
+        )
+        .await
     }
 
     async fn rename_dataset(

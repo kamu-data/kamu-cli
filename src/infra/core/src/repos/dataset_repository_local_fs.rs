@@ -27,7 +27,6 @@ use crate::*;
 pub struct DatasetRepositoryLocalFs {
     storage_strategy: Box<dyn DatasetStorageStrategy>,
     thrash_lock: tokio::sync::Mutex<()>,
-    multi_tenant: bool,
     system_time_source: Arc<dyn SystemTimeSource>,
     rebac_service: Arc<dyn RebacService>,
 }
@@ -53,26 +52,9 @@ impl DatasetRepositoryLocalFs {
                 Box::new(DatasetSingleTenantStorageStrategy::new(root))
             },
             thrash_lock: tokio::sync::Mutex::new(()),
-            multi_tenant,
             system_time_source,
             rebac_service,
         }
-    }
-
-    pub fn create(
-        root: impl Into<PathBuf>,
-        current_account_subject: Arc<CurrentAccountSubject>,
-        multi_tenant: bool,
-        system_time_source: Arc<dyn SystemTimeSource>,
-    ) -> Result<Self, std::io::Error> {
-        let root = root.into();
-        std::fs::create_dir_all(&root)?;
-        Ok(Self::new(
-            root,
-            current_account_subject,
-            multi_tenant,
-            system_time_source,
-        ))
     }
 
     fn build_dataset(layout: DatasetLayout) -> Arc<dyn Dataset> {
@@ -308,7 +290,23 @@ impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
         &self,
         snapshot: DatasetSnapshot,
     ) -> Result<CreateDatasetFromSnapshotResult, CreateDatasetFromSnapshotError> {
-        create_dataset_from_snapshot_impl(self, snapshot, self.system_time_source.now()).await
+        // TODO: Introduce CreateDatasetOpts with Visibility::Public
+        let publicly_available = true;
+
+        let maybe_rebac_service = if self.storage_strategy.is_multi_tenant() {
+            Some(self.rebac_service.as_ref())
+        } else {
+            None
+        };
+
+        create_dataset_from_snapshot_impl(
+            self,
+            maybe_rebac_service,
+            snapshot,
+            self.system_time_source.now(),
+            publicly_available,
+        )
+        .await
     }
 
     async fn rename_dataset(

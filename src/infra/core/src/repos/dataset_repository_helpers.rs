@@ -9,8 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::*;
-use kamu_auth_rebac::{Property, RebacService};
-use kamu_core::events::DatasetEventDependenciesUpdated;
+use kamu_auth_rebac::{DatasetPropertyName, RebacService};
 use kamu_core::*;
 use opendatafabric::*;
 use random_names::get_random_name;
@@ -173,11 +172,10 @@ pub(crate) async fn create_dataset_from_snapshot_impl<
     }
 
     if let Some(rebac_service) = maybe_rebac_service {
+        let property = DatasetPropertyName::allows_public_read(publicly_available);
+
         rebac_service
-            .set_dataset_property(
-                &create_result.dataset_handle.id,
-                &Property::new_dataset_allows_public_read(publicly_available),
-            )
+            .set_dataset_property(&create_result.dataset_handle.id, property.0, &property.1)
             .await
             .int_err()?;
     }
