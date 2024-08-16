@@ -54,6 +54,7 @@ deny = [
     { name = "aws-config", deny-multiple-versions = true },
     { name = "clap", deny-multiple-versions = true },
     { name = "datafusion", deny-multiple-versions = true },
+    { name = "dill", deny-multiple-versions = true },
     # { name = "hyper", deny-multiple-versions = true },
     { name = "object_store", deny-multiple-versions = true },
     { name = "parquet", deny-multiple-versions = true },

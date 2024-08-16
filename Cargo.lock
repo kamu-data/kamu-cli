@@ -2356,7 +2356,7 @@ version = "0.195.1"
 dependencies = [
  "async-trait",
  "cfg-if",
- "dill 0.9.1",
+ "dill",
  "libc",
  "once_cell",
  "random-names",
@@ -2798,7 +2798,7 @@ dependencies = [
  "aws-credential-types",
  "aws-sdk-secretsmanager",
  "chrono",
- "dill 0.9.1",
+ "dill",
  "hex",
  "hmac",
  "internal-error",
@@ -3317,35 +3317,13 @@ dependencies = [
 
 [[package]]
 name = "dill"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3a18eaae0c1d3dc669fa6388383dfce0420742a916950cbef6d090d13cb52a0"
-dependencies = [
- "dill-impl 0.8.1",
- "multimap 0.9.1",
- "thiserror",
-]
-
-[[package]]
-name = "dill"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cc86c45437bf03daddf914ea76571cc341dde47ae8cfae336cc8d24803f80210"
 dependencies = [
- "dill-impl 0.9.1",
- "multimap 0.10.0",
+ "dill-impl",
+ "multimap",
  "thiserror",
-]
-
-[[package]]
-name = "dill-impl"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f2abd05d581140fcd1e4256e5c4006273515b00696ba11a883f11c7b3dc52fa"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.74",
 ]
 
 [[package]]
@@ -4846,7 +4824,7 @@ dependencies = [
  "datafusion-ethers",
  "datafusion-functions-json",
  "digest 0.10.7",
- "dill 0.9.1",
+ "dill",
  "filetime",
  "flatbuffers",
  "flate2",
@@ -4939,7 +4917,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
@@ -4958,7 +4936,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
@@ -4978,7 +4956,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
@@ -4998,7 +4976,7 @@ dependencies = [
  "argon2",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "kamu-accounts",
  "kamu-adapter-oauth",
  "opendatafabric",
@@ -5015,7 +4993,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "internal-error",
  "jsonwebtoken",
  "kamu-accounts",
@@ -5040,7 +5018,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
@@ -5058,7 +5036,7 @@ name = "kamu-adapter-auth-oso"
 version = "0.195.1"
 dependencies = [
  "async-trait",
- "dill 0.9.1",
+ "dill",
  "internal-error",
  "kamu",
  "kamu-accounts",
@@ -5109,7 +5087,7 @@ dependencies = [
  "cron",
  "database-common",
  "datafusion",
- "dill 0.9.1",
+ "dill",
  "event-sourcing",
  "futures",
  "indoc 2.0.5",
@@ -5163,7 +5141,7 @@ dependencies = [
  "database-common",
  "database-common-macros",
  "datafusion",
- "dill 0.9.1",
+ "dill",
  "flate2",
  "fs_extra",
  "futures",
@@ -5213,7 +5191,7 @@ version = "0.195.1"
 dependencies = [
  "async-trait",
  "chrono",
- "dill 0.9.1",
+ "dill",
  "http 0.2.12",
  "internal-error",
  "kamu-accounts",
@@ -5236,7 +5214,7 @@ dependencies = [
  "database-common-macros",
  "datafusion",
  "datafusion-odata",
- "dill 0.9.1",
+ "dill",
  "futures",
  "http 0.2.12",
  "http-common",
@@ -5276,7 +5254,7 @@ name = "kamu-auth-rebac-inmem"
 version = "0.195.1"
 dependencies = [
  "async-trait",
- "dill 0.8.1",
+ "dill",
  "kamu-auth-rebac",
  "kamu-auth-rebac-repo-tests",
  "test-log",
@@ -5287,7 +5265,7 @@ dependencies = [
 name = "kamu-auth-rebac-repo-tests"
 version = "0.195.1"
 dependencies = [
- "dill 0.8.1",
+ "dill",
  "kamu-auth-rebac",
  "tokio",
 ]
@@ -5297,7 +5275,7 @@ name = "kamu-auth-rebac-services"
 version = "0.195.1"
 dependencies = [
  "async-trait",
- "dill 0.8.1",
+ "dill",
  "futures",
  "kamu-auth-rebac",
  "opendatafabric",
@@ -5324,7 +5302,7 @@ dependencies = [
  "database-common",
  "database-common-macros",
  "datafusion",
- "dill 0.9.1",
+ "dill",
  "dirs",
  "duration-string",
  "fs_extra",
@@ -5539,7 +5517,7 @@ dependencies = [
  "chrono",
  "container-runtime",
  "datafusion",
- "dill 0.9.1",
+ "dill",
  "futures",
  "http 0.2.12",
  "internal-error",
@@ -5632,7 +5610,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "internal-error",
  "kamu-datasets",
  "kamu-datasets-repo-tests",
@@ -5652,7 +5630,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "internal-error",
  "kamu-datasets",
  "kamu-datasets-repo-tests",
@@ -5672,7 +5650,7 @@ version = "0.195.1"
 dependencies = [
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "kamu-datasets",
  "opendatafabric",
  "secrecy",
@@ -5686,7 +5664,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "internal-error",
  "kamu-datasets",
  "opendatafabric",
@@ -5707,7 +5685,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "internal-error",
  "kamu-datasets",
  "kamu-datasets-repo-tests",
@@ -5755,7 +5733,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "cron",
- "dill 0.9.1",
+ "dill",
  "futures",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
@@ -5782,7 +5760,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "futures",
  "internal-error",
  "kamu-flow-system",
@@ -5802,7 +5780,7 @@ name = "kamu-flow-system-repo-tests"
 version = "0.195.1"
 dependencies = [
  "chrono",
- "dill 0.9.1",
+ "dill",
  "futures",
  "kamu-flow-system",
  "opendatafabric",
@@ -5818,7 +5796,7 @@ dependencies = [
  "cron",
  "database-common",
  "database-common-macros",
- "dill 0.9.1",
+ "dill",
  "futures",
  "indoc 2.0.5",
  "internal-error",
@@ -5858,7 +5836,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "futures",
  "internal-error",
  "kamu-flow-system",
@@ -5916,7 +5894,7 @@ version = "0.195.1"
 dependencies = [
  "async-trait",
  "chrono",
- "dill 0.9.1",
+ "dill",
  "internal-error",
  "kamu-messaging-outbox-repo-tests",
  "messaging-outbox",
@@ -5935,7 +5913,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "futures",
  "internal-error",
  "kamu-messaging-outbox-repo-tests",
@@ -5955,7 +5933,7 @@ version = "0.195.1"
 dependencies = [
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "futures",
  "messaging-outbox",
  "rand",
@@ -5971,7 +5949,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "futures",
  "internal-error",
  "kamu-messaging-outbox-repo-tests",
@@ -6021,7 +5999,7 @@ version = "0.195.1"
 dependencies = [
  "async-trait",
  "chrono",
- "dill 0.9.1",
+ "dill",
  "futures",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
@@ -6038,7 +6016,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "futures",
  "internal-error",
  "kamu-task-system",
@@ -6057,7 +6035,7 @@ name = "kamu-task-system-repo-tests"
 version = "0.195.1"
 dependencies = [
  "chrono",
- "dill 0.9.1",
+ "dill",
  "futures",
  "kamu-task-system",
  "opendatafabric",
@@ -6071,7 +6049,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "futures",
  "internal-error",
  "kamu-core",
@@ -6095,7 +6073,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "futures",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
@@ -6482,7 +6460,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "dill 0.9.1",
+ "dill",
  "futures",
  "internal-error",
  "kamu-messaging-outbox-inmem",
@@ -6626,15 +6604,6 @@ dependencies = [
  "sha3",
  "thiserror",
  "unsigned-varint",
-]
-
-[[package]]
-name = "multimap"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1a5d38b9b352dbd913288736af36af41c48d61b1a8cd34bcecd727561b7d511"
-dependencies = [
- "serde",
 ]
 
 [[package]]
@@ -9440,7 +9409,7 @@ version = "0.195.1"
 dependencies = [
  "async-trait",
  "chrono",
- "dill 0.9.1",
+ "dill",
  "futures",
  "tokio",
 ]
