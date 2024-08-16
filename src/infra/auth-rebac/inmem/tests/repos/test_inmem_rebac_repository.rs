@@ -16,7 +16,7 @@ use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 database_transactional_test!(
     storage = inmem,
     fixture = kamu_auth_rebac_repo_tests::test_try_get_properties_from_nonexistent_entity,
-    harness = InmemRebacRepositoryHarness
+    harness = InMemoryRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,7 +24,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = kamu_auth_rebac_repo_tests::test_set_property,
-    harness = InmemRebacRepositoryHarness
+    harness = InMemoryRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,7 +32,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = kamu_auth_rebac_repo_tests::test_try_delete_property_from_nonexistent_entity,
-    harness = InmemRebacRepositoryHarness
+    harness = InMemoryRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,7 +40,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = kamu_auth_rebac_repo_tests::test_try_delete_nonexistent_property_from_entity,
-    harness = InmemRebacRepositoryHarness
+    harness = InMemoryRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,7 +48,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = kamu_auth_rebac_repo_tests::test_delete_property_from_entity,
-    harness = InmemRebacRepositoryHarness
+    harness = InMemoryRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +56,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = kamu_auth_rebac_repo_tests::test_try_insert_duplicate_entities_relation,
-    harness = InmemRebacRepositoryHarness
+    harness = InMemoryRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,7 +64,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = kamu_auth_rebac_repo_tests::test_delete_entities_relation,
-    harness = InmemRebacRepositoryHarness
+    harness = InMemoryRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -72,16 +72,16 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = kamu_auth_rebac_repo_tests::test_get_relations_crossover_test,
-    harness = InmemRebacRepositoryHarness
+    harness = InMemoryRebacRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct InmemRebacRepositoryHarness {
+struct InMemoryRebacRepositoryHarness {
     catalog: Catalog,
 }
 
-impl InmemRebacRepositoryHarness {
+impl InMemoryRebacRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
 
