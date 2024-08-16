@@ -33,12 +33,14 @@ async fn test_read_initial_config_and_queue_without_waiting() {
     let harness = FlowHarness::new().await;
 
     // Create a "foo" root dataset, and configure ingestion schedule every 60ms
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
     harness
         .set_dataset_flow_ingest(
             harness.now_datetime(),
@@ -160,14 +162,15 @@ async fn test_cron_config() {
     })
     .await;
 
-    // Create a "foo" root dataset, and configure ingestion cron schedule of every
-    // 5s
-    let foo_id = harness
+    // Create a "foo" root dataset, configure ingestion cron schedule of every 5s
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
     harness
         .set_dataset_flow_ingest(
             harness.now_datetime(),
@@ -257,18 +260,21 @@ async fn test_cron_config() {
 async fn test_manual_trigger() {
     let harness = FlowHarness::new().await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let bar_id = harness
+    let foo_id = foo_create_result.dataset_handle.id;
+
+    let bar_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
+    let bar_id = bar_create_result.dataset_handle.id;
 
     // Note: only "foo" has auto-schedule, "bar" hasn't
     harness
@@ -678,18 +684,21 @@ async fn test_ingest_trigger_with_ingest_config() {
 async fn test_manual_trigger_compaction() {
     let harness = FlowHarness::new().await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let bar_id = harness
+    let foo_id = foo_create_result.dataset_handle.id;
+
+    let bar_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
+    let bar_id = bar_create_result.dataset_handle.id;
 
     harness.eager_initialization().await;
 
@@ -827,7 +836,7 @@ async fn test_manual_trigger_reset() {
     let harness = FlowHarness::new().await;
 
     let create_dataset_result = harness
-        .create_dataset(DatasetAlias {
+        .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
@@ -946,7 +955,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
     let harness = FlowHarness::new().await;
 
     let create_foo_result = harness
-        .create_dataset(DatasetAlias {
+        .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
@@ -1182,12 +1191,13 @@ async fn test_manual_trigger_compaction_with_config() {
     let max_slice_records = 1000u64;
     let harness = FlowHarness::new().await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
+    let foo_id = foo_create_result.dataset_handle.id;
 
     harness.eager_initialization().await;
     harness
@@ -1283,12 +1293,14 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
     let max_slice_records = 1000u64;
     let harness = FlowHarness::new().await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
     let foo_bar_id = harness
         .create_derived_dataset(
             DatasetAlias {
@@ -1513,12 +1525,14 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
 async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
     let harness = FlowHarness::new().await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
     let foo_bar_id = harness
         .create_derived_dataset(
             DatasetAlias {
@@ -1744,12 +1758,14 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
 async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
     let harness = FlowHarness::new().await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
     let foo_bar_id = harness
         .create_derived_dataset(
             DatasetAlias {
@@ -1883,12 +1899,14 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
     })
     .await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: Some(wasya_account_name.clone()),
         })
         .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
     let foo_bar_id = harness
         .create_derived_dataset(
             DatasetAlias {
@@ -2050,18 +2068,22 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
 async fn test_dataset_flow_configuration_paused_resumed_modified() {
     let harness = FlowHarness::new().await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let bar_id: DatasetID = harness
+    let foo_id = foo_create_result.dataset_handle.id;
+
+    let bar_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
+    let bar_id = bar_create_result.dataset_handle.id;
+
     harness
         .set_dataset_flow_ingest(
             harness.now_datetime(),
@@ -2267,18 +2289,21 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
 async fn test_respect_last_success_time_when_schedule_resumes() {
     let harness = FlowHarness::new().await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let bar_id = harness
+    let foo_id = foo_create_result.dataset_handle.id;
+
+    let bar_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
+    let bar_id = bar_create_result.dataset_handle.id;
 
     harness
         .set_dataset_flow_ingest(
@@ -2488,18 +2513,21 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
 async fn test_dataset_deleted() {
     let harness = FlowHarness::new().await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let bar_id = harness
+    let foo_id = foo_create_result.dataset_handle.id;
+
+    let bar_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
+    let bar_id = bar_create_result.dataset_handle.id;
 
     harness
         .set_dataset_flow_ingest(
@@ -2681,24 +2709,29 @@ async fn test_dataset_deleted() {
 async fn test_task_completions_trigger_next_loop_on_success() {
     let harness = FlowHarness::new().await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let bar_id = harness
+    let foo_id = foo_create_result.dataset_handle.id;
+
+    let bar_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
-    let baz_id = harness
+    let bar_id = bar_create_result.dataset_handle.id;
+
+    let baz_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("baz"),
             account_name: None,
         })
         .await;
+    let baz_id = baz_create_result.dataset_handle.id;
 
     for dataset_id in [&foo_id, &bar_id, &baz_id] {
         harness
@@ -2904,12 +2937,14 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
     })
     .await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
     let bar_id = harness
         .create_derived_dataset(
             DatasetAlias {
@@ -3159,12 +3194,13 @@ async fn test_throttling_manual_triggers() {
     .await;
 
     // Foo Flow
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
+    let foo_id = foo_create_result.dataset_handle.id;
     let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
 
     // Enforce dependency graph initialization
@@ -3291,18 +3327,22 @@ async fn test_throttling_derived_dataset_with_2_parents() {
     })
     .await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let bar_id = harness
+    let foo_id = foo_create_result.dataset_handle.id;
+
+    let bar_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
+    let bar_id = bar_create_result.dataset_handle.id;
+
     let baz_id = harness
         .create_derived_dataset(
             DatasetAlias {
@@ -3775,12 +3815,14 @@ async fn test_batching_condition_records_reached() {
     })
     .await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
     let bar_id = harness
         .create_derived_dataset(
             DatasetAlias {
@@ -4097,12 +4139,14 @@ async fn test_batching_condition_timeout() {
     })
     .await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
     let bar_id = harness
         .create_derived_dataset(
             DatasetAlias {
@@ -4371,12 +4415,14 @@ async fn test_batching_condition_watermark() {
     })
     .await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
     let bar_id = harness
         .create_derived_dataset(
             DatasetAlias {
@@ -4694,18 +4740,22 @@ async fn test_batching_condition_with_2_inputs() {
     })
     .await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let bar_id = harness
+    let foo_id = foo_create_result.dataset_handle.id;
+
+    let bar_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
+    let bar_id = bar_create_result.dataset_handle.id;
+
     let baz_id = harness
         .create_derived_dataset(
             DatasetAlias {
@@ -5181,12 +5231,14 @@ async fn test_list_all_flow_initiators() {
     })
     .await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: Some(foo_account_name.clone()),
         })
         .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
     let foo_account_id = harness
         .auth_svc
         .find_account_id_by_name(&foo_account_name)
@@ -5200,12 +5252,13 @@ async fn test_list_all_flow_initiators() {
         .unwrap()
         .unwrap();
 
-    let bar_id = harness
+    let bar_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("bar"),
             account_name: Some(bar_account_name.clone()),
         })
         .await;
+    let bar_id = bar_create_result.dataset_handle.id;
 
     harness.eager_initialization().await;
 
@@ -5330,12 +5383,13 @@ async fn test_list_all_datasets_with_flow() {
     })
     .await;
 
-    let foo_id = harness
+    let foo_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: Some(foo_account_name.clone()),
         })
         .await;
+    let foo_id = foo_create_result.dataset_handle.id;
 
     let _foo_bar_id = harness
         .create_derived_dataset(
@@ -5360,12 +5414,13 @@ async fn test_list_all_datasets_with_flow() {
         .unwrap()
         .unwrap();
 
-    let bar_id = harness
+    let bar_create_result = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("bar"),
             account_name: Some(bar_account_name.clone()),
         })
         .await;
+    let bar_id = bar_create_result.dataset_handle.id;
 
     harness.eager_initialization().await;
 

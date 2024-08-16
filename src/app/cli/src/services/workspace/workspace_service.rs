@@ -10,7 +10,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use kamu::domain::*;
+use internal_error::{InternalError, ResultIntoInternal};
 
 use crate::{WorkspaceConfig, WorkspaceLayout, WorkspaceVersion};
 

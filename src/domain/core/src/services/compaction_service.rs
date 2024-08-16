@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
+use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::*;
 use thiserror::Error;
 

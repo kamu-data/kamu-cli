@@ -7,6 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod rebac_repository_inmem;
+mod inmem_rebac_repository;
 
-pub use rebac_repository_inmem::*;
+pub use inmem_rebac_repository::*;

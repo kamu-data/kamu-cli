@@ -16,8 +16,9 @@ use chrono::{DateTime, TimeZone, Utc};
 use datafusion::arrow::array::Array;
 use datafusion::arrow::datatypes::{DataType, Field, SchemaRef, TimeUnit};
 use datafusion::common::DFSchema;
-use datafusion::config::{ColumnOptions, ParquetOptions, TableParquetOptions};
+use datafusion::config::{ParquetColumnOptions, ParquetOptions, TableParquetOptions};
 use datafusion::dataframe::DataFrameWriteOptions;
+use datafusion::functions_aggregate::min_max::{max, min};
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::*;
@@ -417,14 +418,14 @@ impl DataWriterDataFusion {
                 (
                     // op column is low cardinality and best encoded as RLE_DICTIONARY
                     self.meta.vocab.operation_type_column.clone(),
-                    ColumnOptions {
+                    ParquetColumnOptions {
                         dictionary_enabled: Some(true),
                         ..Default::default()
                     },
                 ),
                 (
                     self.meta.vocab.system_time_column.clone(),
-                    ColumnOptions {
+                    ParquetColumnOptions {
                         // system_time value will be the same for all rows in a batch
                         dictionary_enabled: Some(true),
                         ..Default::default()

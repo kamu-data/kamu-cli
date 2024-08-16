@@ -21,12 +21,14 @@ workspace = true
 doctest = false
 
 [dependencies]
+internal-error = { workspace = true }
+messaging-outbox = { workspace = true }
 opendatafabric = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 
 async-trait = "0.1"
-dill = "0.8"
+dill = "0.9"
 
 # Authorization
 oso = "0.27"
@@ -34,7 +36,7 @@ oso-derive = "0.27"
 
 [dev-dependencies]
 kamu = { workspace = true }
-event-bus = { workspace = true }
+time-source = { workspace = true }
 
 tempfile = "3"
 test-log = { version = "0.2", features = ["trace"] }

@@ -13,36 +13,49 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, DurationRound, Utc};
+use database_common::DatabaseTransactionRunner;
 use dill::*;
-use event_bus::{AsyncEventHandler, EventBus};
 use futures::TryStreamExt;
-use kamu_core::events::DatasetEventDeleted;
+use internal_error::InternalError;
 use kamu_core::{
     DatasetChangesService,
+    DatasetLifecycleMessage,
     DatasetOwnershipService,
     DependencyGraphService,
-    InternalError,
-    SystemTimeSource,
+    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use kamu_flow_system::*;
 use kamu_task_system::*;
+use messaging_outbox::{
+    MessageConsumer,
+    MessageConsumerMeta,
+    MessageConsumerT,
+    MessageConsumptionDurability,
+    Outbox,
+    OutboxExt,
+};
 use opendatafabric::{AccountID, DatasetID};
+use time_source::SystemTimeSource;
 use tokio_stream::StreamExt;
 
 use super::active_configs_state::ActiveConfigsState;
 use super::flow_time_wheel::FlowTimeWheel;
 use super::pending_flows_state::PendingFlowsState;
+use crate::{
+    MESSAGE_CONSUMER_KAMU_FLOW_SERVICE,
+    MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+    MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FlowServiceImpl {
+    catalog: Catalog,
     state: Arc<Mutex<State>>,
     run_config: Arc<FlowServiceRunConfig>,
-    event_bus: Arc<EventBus>,
     flow_event_store: Arc<dyn FlowEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
-    flow_configuration_service: Arc<dyn FlowConfigurationService>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
@@ -63,31 +76,38 @@ struct State {
 #[component(pub)]
 #[interface(dyn FlowService)]
 #[interface(dyn FlowServiceTestDriver)]
-#[interface(dyn AsyncEventHandler<TaskEventRunning>)]
-#[interface(dyn AsyncEventHandler<TaskEventFinished>)]
-#[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
-#[interface(dyn AsyncEventHandler<FlowConfigurationEventModified>)]
+#[interface(dyn MessageConsumer)]
+#[interface(dyn MessageConsumerT<TaskProgressMessage>)]
+#[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
+#[interface(dyn MessageConsumerT<FlowConfigurationUpdatedMessage>)]
+#[meta(MessageConsumerMeta {
+    consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_SERVICE,
+    feeding_producers: &[
+        MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+        MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+        MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE
+    ],
+    durability: MessageConsumptionDurability::Durable,
+})]
 #[scope(Singleton)]
 impl FlowServiceImpl {
     pub fn new(
+        catalog: Catalog,
         run_config: Arc<FlowServiceRunConfig>,
-        event_bus: Arc<EventBus>,
         flow_event_store: Arc<dyn FlowEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
         task_scheduler: Arc<dyn TaskScheduler>,
-        flow_configuration_service: Arc<dyn FlowConfigurationService>,
         dataset_changes_service: Arc<dyn DatasetChangesService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
     ) -> Self {
         Self {
+            catalog,
             state: Arc::new(Mutex::new(State::default())),
             run_config,
-            event_bus,
             flow_event_store,
             time_source,
             task_scheduler,
-            flow_configuration_service,
             dataset_changes_service,
             dependency_graph_service,
             dataset_ownership_service,
@@ -137,11 +157,11 @@ impl FlowServiceImpl {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn initialize_auto_polling_flows_from_configurations(
         &self,
+        flow_configuration_service: &dyn FlowConfigurationService,
         start_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
         // Query all enabled flow configurations
-        let enabled_configurations: Vec<_> = self
-            .flow_configuration_service
+        let enabled_configurations: Vec<_> = flow_configuration_service
             .list_enabled_configurations()
             .try_collect()
             .await?;
@@ -941,17 +961,31 @@ impl FlowService for FlowServiceImpl {
         self.state.lock().unwrap().running = true;
 
         // Initial scheduling
-        let start_time = self.round_time(planned_start_time)?;
-        self.initialize_auto_polling_flows_from_configurations(start_time)
-            .await?;
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with2(
+                |flow_configuration_service: Arc<dyn FlowConfigurationService>,
+                 outbox: Arc<dyn Outbox>| async move {
+                    let start_time = self.round_time(planned_start_time)?;
+                    self.initialize_auto_polling_flows_from_configurations(
+                        flow_configuration_service.as_ref(),
+                        start_time,
+                    )
+                    .await?;
 
-        // Publish progress event
-        self.event_bus
-            .dispatch_event(FlowServiceEvent::ConfigurationLoaded(
-                FlowServiceEventConfigurationLoaded {
-                    event_time: start_time,
+                    // Publish progress event
+                    outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
+                            FlowServiceUpdatedMessage {
+                                update_time: start_time,
+                                update_details: FlowServiceUpdateDetails::Loaded,
+                            },
+                        )
+                        .await?;
+
+                    Ok(())
                 },
-            ))
+            )
             .await?;
 
         // Main scanning loop
@@ -975,12 +1009,18 @@ impl FlowService for FlowServiceImpl {
                 self.run_current_timeslot(nearest_activation_time).await?;
 
                 // Publish progress event
-                self.event_bus
-                    .dispatch_event(FlowServiceEvent::ExecutedTimeSlot(
-                        FlowServiceEventExecutedTimeSlot {
-                            event_time: nearest_activation_time,
-                        },
-                    ))
+                DatabaseTransactionRunner::new(self.catalog.clone())
+                    .transactional_with(|outbox: Arc<dyn Outbox>| async move {
+                        outbox
+                            .post_message(
+                                MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
+                                FlowServiceUpdatedMessage {
+                                    update_time: nearest_activation_time,
+                                    update_details: FlowServiceUpdateDetails::ExecutedTimeslot,
+                                },
+                            )
+                            .await
+                    })
                     .await?;
             }
 
@@ -1287,106 +1327,119 @@ impl FlowServiceTestDriver for FlowServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-impl AsyncEventHandler<TaskEventRunning> for FlowServiceImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
-    async fn handle(&self, event: &TaskEventRunning) -> Result<(), InternalError> {
-        // Is this a task associated with flows?
-        let maybe_flow_id = {
-            let state = self.state.lock().unwrap();
-            if !state.running {
-                // Abort if running hasn't started yet
-                return Ok(());
-            }
-            state.pending_flows.try_get_flow_id_by_task(event.task_id)
-        };
-
-        if let Some(flow_id) = maybe_flow_id {
-            let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
-                .await
-                .int_err()?;
-            flow.on_task_running(event.event_time, event.task_id)
-                .int_err()?;
-            flow.save(self.flow_event_store.as_ref()).await.int_err()?;
-        }
-
-        // Publish progress event
-        self.event_bus
-            .dispatch_event(FlowServiceEvent::FlowRunning(FlowServiceEventFlowRunning {
-                event_time: event.event_time,
-            }))
-            .await?;
-
-        Ok(())
-    }
-}
+impl MessageConsumer for FlowServiceImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<TaskEventFinished> for FlowServiceImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
-    async fn handle(&self, event: &TaskEventFinished) -> Result<(), InternalError> {
-        // Is this a task associated with flows?
-        let maybe_flow_id = {
-            let state = self.state.lock().unwrap();
-            if !state.running {
-                // Abort if running hasn't started yet
-                return Ok(());
-            }
-            state.pending_flows.try_get_flow_id_by_task(event.task_id)
-        };
-
-        let finish_time = self.round_time(event.event_time)?;
-
-        if let Some(flow_id) = maybe_flow_id {
-            let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
-                .await
-                .int_err()?;
-            flow.on_task_finished(event.event_time, event.task_id, event.outcome.clone())
-                .int_err()?;
-            flow.save(self.flow_event_store.as_ref()).await.int_err()?;
-
-            {
-                let mut state = self.state.lock().unwrap();
-                state.pending_flows.untrack_flow_by_task(event.task_id);
-                state.pending_flows.drop_pending_flow(&flow.flow_key);
-            }
-
-            // In case of success:
-            //  - execute followup method
-            if let Some(flow_result) = flow.try_result_as_ref()
-                && !flow_result.is_empty()
-            {
-                match flow.flow_key.get_type().success_followup_method() {
-                    FlowSuccessFollowupMethod::Ignore => {}
-                    FlowSuccessFollowupMethod::TriggerDependent => {
-                        self.enqueue_dependent_flows(finish_time, &flow, flow_result)
-                            .await?;
+impl MessageConsumerT<TaskProgressMessage> for FlowServiceImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    async fn consume_message(
+        &self,
+        target_catalog: &Catalog,
+        message: &TaskProgressMessage,
+    ) -> Result<(), InternalError> {
+        match message {
+            TaskProgressMessage::Running(message) => {
+                // Is this a task associated with flows?
+                let maybe_flow_id = {
+                    let state = self.state.lock().unwrap();
+                    if !state.running {
+                        // Abort if running hasn't started yet
+                        return Ok(());
                     }
+                    state.pending_flows.try_get_flow_id_by_task(message.task_id)
+                };
+
+                if let Some(flow_id) = maybe_flow_id {
+                    let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
+                        .await
+                        .int_err()?;
+                    flow.on_task_running(message.event_time, message.task_id)
+                        .int_err()?;
+                    flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+
+                    let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
+                    outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
+                            FlowServiceUpdatedMessage {
+                                update_time: message.event_time,
+                                update_details: FlowServiceUpdateDetails::FlowRunning,
+                            },
+                        )
+                        .await?;
                 }
             }
+            TaskProgressMessage::Finished(message) => {
+                // Is this a task associated with flows?
+                let maybe_flow_id = {
+                    let state = self.state.lock().unwrap();
+                    if !state.running {
+                        // Abort if running hasn't started yet
+                        return Ok(());
+                    }
+                    state.pending_flows.try_get_flow_id_by_task(message.task_id)
+                };
 
-            // In case of success:
-            //  - enqueue next auto-polling flow cycle
-            if event.outcome.is_success() {
-                self.try_enqueue_scheduled_auto_polling_flow_if_enabled(
-                    finish_time,
-                    &flow.flow_key,
-                )
-                .await?;
+                let finish_time = self.round_time(message.event_time)?;
+
+                if let Some(flow_id) = maybe_flow_id {
+                    let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
+                        .await
+                        .int_err()?;
+                    flow.on_task_finished(
+                        message.event_time,
+                        message.task_id,
+                        message.outcome.clone(),
+                    )
+                    .int_err()?;
+                    flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+
+                    {
+                        let mut state = self.state.lock().unwrap();
+                        state.pending_flows.untrack_flow_by_task(message.task_id);
+                        state.pending_flows.drop_pending_flow(&flow.flow_key);
+                    }
+
+                    // In case of success:
+                    //  - execute followup method
+                    if let Some(flow_result) = flow.try_result_as_ref()
+                        && !flow_result.is_empty()
+                    {
+                        match flow.flow_key.get_type().success_followup_method() {
+                            FlowSuccessFollowupMethod::Ignore => {}
+                            FlowSuccessFollowupMethod::TriggerDependent => {
+                                self.enqueue_dependent_flows(finish_time, &flow, flow_result)
+                                    .await?;
+                            }
+                        }
+                    }
+
+                    // In case of success:
+                    //  - enqueue next auto-polling flow cycle
+                    if message.outcome.is_success() {
+                        self.try_enqueue_scheduled_auto_polling_flow_if_enabled(
+                            finish_time,
+                            &flow.flow_key,
+                        )
+                        .await?;
+                    }
+
+                    let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
+                    outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
+                            FlowServiceUpdatedMessage {
+                                update_time: message.event_time,
+                                update_details: FlowServiceUpdateDetails::FlowFinished,
+                            },
+                        )
+                        .await?;
+
+                    // TODO: retry logic in case of failed outcome
+                }
             }
-
-            // Publish progress event
-            self.event_bus
-                .dispatch_event(FlowServiceEvent::FlowFinished(
-                    FlowServiceEventFlowFinished {
-                        event_time: finish_time,
-                    },
-                ))
-                .await?;
-
-            // TODO: retry logic in case of failed outcome
         }
 
         Ok(())
@@ -1396,10 +1449,14 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
-    async fn handle(&self, event: &FlowConfigurationEventModified) -> Result<(), InternalError> {
-        if event.paused {
+impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowServiceImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: &FlowConfigurationUpdatedMessage,
+    ) -> Result<(), InternalError> {
+        if message.paused {
             let maybe_pending_flow_id = {
                 let mut state = self.state.lock().unwrap();
                 if !state.running {
@@ -1407,9 +1464,10 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceImpl {
                     return Ok(());
                 };
 
-                state.active_configs.drop_flow_config(&event.flow_key);
+                state.active_configs.drop_flow_config(&message.flow_key);
 
-                let maybe_pending_flow_id = state.pending_flows.drop_pending_flow(&event.flow_key);
+                let maybe_pending_flow_id =
+                    state.pending_flows.drop_pending_flow(&message.flow_key);
                 if let Some(flow_id) = &maybe_pending_flow_id {
                     state
                         .time_wheel
@@ -1431,11 +1489,11 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceImpl {
                 };
             }
 
-            let activation_time = self.round_time(event.event_time)?;
+            let activation_time = self.round_time(message.event_time)?;
             self.activate_flow_configuration(
                 activation_time,
-                event.flow_key.clone(),
-                event.rule.clone(),
+                message.flow_key.clone(),
+                message.rule.clone(),
             )
             .await?;
         }
@@ -1447,50 +1505,69 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
-    async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
-        let flow_ids_2_abort = {
-            let mut state = self.state.lock().unwrap();
-            if !state.running {
-                // Abort if running hasn't started yet
-                return Ok(());
-            };
+impl MessageConsumerT<DatasetLifecycleMessage> for FlowServiceImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: &DatasetLifecycleMessage,
+    ) -> Result<(), InternalError> {
+        match message {
+            DatasetLifecycleMessage::Deleted(message) => {
+                let flow_ids_2_abort = {
+                    let mut state = self.state.lock().unwrap();
+                    if !state.running {
+                        // Abort if running hasn't started yet
+                        return Ok(());
+                    };
 
-            state.active_configs.drop_dataset_configs(&event.dataset_id);
+                    state
+                        .active_configs
+                        .drop_dataset_configs(&message.dataset_id);
 
-            // For every possible dataset flow:
-            //  - drop it from pending state
-            //  - drop queued activations
-            //  - collect ID of aborted flow
-            let mut flow_ids_2_abort: Vec<_> = Vec::with_capacity(DatasetFlowType::all().len());
-            for flow_type in DatasetFlowType::all() {
-                if let Some(flow_id) = state
-                    .pending_flows
-                    .drop_dataset_pending_flow(&event.dataset_id, *flow_type)
-                {
-                    flow_ids_2_abort.push(flow_id);
-                    state.time_wheel.cancel_flow_activation(flow_id).int_err()?;
+                    // For every possible dataset flow:
+                    //  - drop it from pending state
+                    //  - drop queued activations
+                    //  - collect ID of aborted flow
+                    let mut flow_ids_2_abort: Vec<_> =
+                        Vec::with_capacity(DatasetFlowType::all().len());
+                    for flow_type in DatasetFlowType::all() {
+                        if let Some(flow_id) = state
+                            .pending_flows
+                            .drop_dataset_pending_flow(&message.dataset_id, *flow_type)
+                        {
+                            flow_ids_2_abort.push(flow_id);
+                            state.time_wheel.cancel_flow_activation(flow_id).int_err()?;
+                        }
+                    }
+                    flow_ids_2_abort
+                };
+
+                // Abort matched flows
+                for flow_id in flow_ids_2_abort {
+                    let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
+                        .await
+                        .int_err()?;
+                    flow.abort(self.time_source.now()).int_err()?;
+                    flow.save(self.flow_event_store.as_ref()).await.int_err()?;
                 }
+
+                // Not deleting task->update association, it should be safe.
+                // Most of the time the outcome of the task will be "Cancelled".
+                // Even if task squeezes to succeed in between cancellations,
+                // it's safe:
+                //   - we will record a successful update, no consequence
+                //   - no further updates will be attempted (schedule
+                //     deactivated above)
+                //   - no dependent tasks will be launched (dependency graph
+                //     erases neighbors)
             }
-            flow_ids_2_abort
-        };
 
-        // Abort matched flows
-        for flow_id in flow_ids_2_abort {
-            let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
-                .await
-                .int_err()?;
-            flow.abort(self.time_source.now()).int_err()?;
-            flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+            DatasetLifecycleMessage::Created(_)
+            | DatasetLifecycleMessage::DependenciesUpdated(_) => {
+                // No action required
+            }
         }
-
-        // Not deleting task->update association, it should be safe.
-        // Most of the time the outcome of the task will be "Cancelled".
-        // Even if task squeezes to succeed in between cancellations, it's safe:
-        //   - we will record a successful update, no consequence
-        //   - no further updates will be attempted (schedule deactivated above)
-        //   - no dependent tasks will be launched (dependency graph erases neighbors)
 
         Ok(())
     }

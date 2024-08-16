@@ -26,7 +26,8 @@ use datafusion::common::DFSchema;
 use datafusion::error::DataFusionError;
 use dill::Catalog;
 use http_common::*;
-use kamu::domain::*;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_core::*;
 use kamu_data_utils::data::format::*;
 use opendatafabric::{DatasetID, Multihash};
 
@@ -267,8 +268,8 @@ pub struct QueryDatasetState {
 }
 
 impl QueryState {
-    fn to_state(&self) -> kamu::domain::QueryState {
-        kamu::domain::QueryState {
+    fn to_state(&self) -> kamu_core::QueryState {
+        kamu_core::QueryState {
             inputs: self
                 .inputs
                 .iter()
@@ -278,8 +279,8 @@ impl QueryState {
     }
 }
 
-impl From<kamu::domain::QueryState> for QueryState {
-    fn from(value: kamu::domain::QueryState) -> Self {
+impl From<kamu_core::QueryState> for QueryState {
+    fn from(value: kamu_core::QueryState) -> Self {
         Self {
             inputs: value
                 .inputs

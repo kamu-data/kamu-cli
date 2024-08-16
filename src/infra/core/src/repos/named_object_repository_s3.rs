@@ -10,6 +10,7 @@
 use async_trait::async_trait;
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use bytes::Bytes;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 
 use crate::utils::s3_context::S3Context;

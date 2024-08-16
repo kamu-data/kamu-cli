@@ -49,7 +49,7 @@ impl Command for SystemE2ECommand {
                     return Err(CLIError::usage_error("dataset required"));
                 };
 
-                let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
+                let dataset = self.dataset_repo.find_dataset_by_ref(dataset_ref).await?;
 
                 let maybe_physical_hash = dataset
                     .as_metadata_chain()

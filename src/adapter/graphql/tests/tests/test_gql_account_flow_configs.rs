@@ -9,13 +9,10 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use std::sync::Arc;
-
 use async_graphql::value;
 use chrono::Duration;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
-use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::{
     MetadataFactory,
@@ -26,21 +23,25 @@ use kamu::testing::{
     MockTransformService,
 };
 use kamu::{
+    CreateDatasetFromSnapshotUseCaseImpl,
     DatasetOwnershipServiceInMemory,
     DatasetOwnershipServiceInMemoryStateInitializer,
     DatasetRepositoryLocalFs,
+    DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
 };
 use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_accounts_inmem::AccessTokenRepositoryInMemory;
+use kamu_accounts_inmem::InMemoryAccessTokenRepository;
 use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
 use kamu_flow_system::FlowServiceRunConfig;
-use kamu_flow_system_inmem::{FlowConfigurationEventStoreInMem, FlowEventStoreInMem};
+use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowEventStore};
 use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceImpl};
-use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
+use kamu_task_system_inmem::InMemoryTaskSystemEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use opendatafabric::{AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
+use time_source::SystemTimeSourceDefault;
 
 use crate::utils::authentication_catalogs;
 
@@ -625,7 +626,6 @@ struct FlowConfigHarness {
     _catalog_base: dill::Catalog,
     _catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
-    dataset_repo: Arc<dyn DatasetRepository>,
 }
 
 #[derive(Default)]
@@ -653,44 +653,55 @@ impl FlowConfigHarness {
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new();
 
-            b.add::<EventBus>()
-                .add_builder(
-                    DatasetRepositoryLocalFs::builder()
-                        .with_root(datasets_dir)
-                        .with_multi_tenant(true),
-                )
-                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .add_value(dataset_changes_mock)
-                .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
-                .add::<SystemTimeSourceDefault>()
-                .add_value(mock_dataset_action_authorizer)
-                .add::<AuthenticationServiceImpl>()
-                .add::<AccessTokenServiceImpl>()
-                .add::<AccessTokenRepositoryInMemory>()
-                .add_value(JwtAuthenticationConfig::default())
-                .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
-                .add::<DependencyGraphServiceInMemory>()
-                .add_value(dependency_graph_mock)
-                .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
-                .add::<FlowConfigurationServiceImpl>()
-                .add::<FlowConfigurationEventStoreInMem>()
-                .add::<FlowServiceImpl>()
-                .add::<FlowEventStoreInMem>()
-                .add_value(FlowServiceRunConfig::new(
-                    Duration::try_seconds(1).unwrap(),
-                    Duration::try_minutes(1).unwrap(),
-                ))
-                .add::<TaskSchedulerImpl>()
-                .add::<TaskSystemEventStoreInMemory>()
-                .add_value(transform_service_mock)
-                .bind::<dyn TransformService, MockTransformService>()
-                .add_value(polling_service_mock)
-                .bind::<dyn PollingIngestService, MockPollingIngestService>()
-                .add::<DatasetOwnershipServiceInMemory>()
-                .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
-                .add::<DatabaseTransactionRunner>();
+            b.add_builder(
+                messaging_outbox::OutboxImmediateImpl::builder()
+                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+            )
+            .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(datasets_dir)
+                    .with_multi_tenant(true),
+            )
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+            .add_value(dataset_changes_mock)
+            .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
+            .add::<SystemTimeSourceDefault>()
+            .add_value(mock_dataset_action_authorizer)
+            .add::<AuthenticationServiceImpl>()
+            .add::<AccessTokenServiceImpl>()
+            .add::<InMemoryAccessTokenRepository>()
+            .add_value(JwtAuthenticationConfig::default())
+            .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add_value(dependency_graph_mock)
+            .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
+            .add::<FlowConfigurationServiceImpl>()
+            .add::<InMemoryFlowConfigurationEventStore>()
+            .add::<FlowServiceImpl>()
+            .add::<InMemoryFlowEventStore>()
+            .add_value(FlowServiceRunConfig::new(
+                Duration::try_seconds(1).unwrap(),
+                Duration::try_minutes(1).unwrap(),
+            ))
+            .add::<TaskSchedulerImpl>()
+            .add::<InMemoryTaskSystemEventStore>()
+            .add_value(transform_service_mock)
+            .bind::<dyn TransformService, MockTransformService>()
+            .add_value(polling_service_mock)
+            .bind::<dyn PollingIngestService, MockPollingIngestService>()
+            .add::<DatasetOwnershipServiceInMemory>()
+            .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
+            .add::<DatabaseTransactionRunner>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
+
+            register_message_dispatcher::<DatasetLifecycleMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+            );
 
             b.build()
         };
@@ -709,22 +720,22 @@ impl FlowConfigHarness {
             .await
             .unwrap();
 
-        let dataset_repo = catalog_authorized
-            .get_one::<dyn DatasetRepository>()
-            .unwrap();
-
         Self {
             _tempdir: tempdir,
             _catalog_base: catalog_base,
             _catalog_anonymous: catalog_anonymous,
             catalog_authorized,
-            dataset_repo,
         }
     }
 
     async fn create_root_dataset(&self, dataset_alias: DatasetAlias) -> CreateDatasetResult {
-        self.dataset_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .kind(DatasetKind::Root)
                     .name(dataset_alias)

@@ -10,7 +10,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use database_common::DatabaseTransactionRunner;
 use dill::*;
@@ -21,6 +21,11 @@ use kamu_accounts_services::PredefinedAccountsRegistrator;
 use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_datasets::DatasetEnvVar;
+use kamu_flow_system_inmem::domain::FlowConfigurationUpdatedMessage;
+use kamu_flow_system_services::MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE;
+use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
+use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::warn;
 
 use crate::accounts::AccountService;
@@ -247,7 +252,6 @@ pub fn prepare_dependencies_graph_repository(
     // bound to CLI user. It also should be authorized to access any dataset.
 
     let special_catalog_for_graph = CatalogBuilder::new()
-        .add::<event_bus::EventBus>()
         .add::<SystemTimeSourceDefault>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
@@ -255,6 +259,7 @@ pub fn prepare_dependencies_graph_repository(
                 .with_multi_tenant(multi_tenant_workspace),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
         .add_value(current_account_subject)
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<DependencyGraphServiceInMemory>()
@@ -289,14 +294,13 @@ pub fn configure_base_catalog(
         b.add::<SystemTimeSourceDefault>();
     }
 
-    b.add::<event_bus::EventBus>();
-
     b.add_builder(
         DatasetRepositoryLocalFs::builder()
             .with_root(workspace_layout.datasets_dir.clone())
             .with_multi_tenant(multi_tenant_workspace),
     );
     b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
+    b.bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>();
 
     b.add::<DatasetFactoryImpl>();
 
@@ -353,6 +357,13 @@ pub fn configure_base_catalog(
     b.add::<DatasetOwnershipServiceInMemory>();
     b.add::<DatasetOwnershipServiceInMemoryStateInitializer>();
 
+    b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
+    b.add::<CommitDatasetEventUseCaseImpl>();
+    b.add::<CreateDatasetUseCaseImpl>();
+    b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
+    b.add::<DeleteDatasetUseCaseImpl>();
+    b.add::<RenameDatasetUseCaseImpl>();
+
     b.add::<kamu_flow_system_services::FlowConfigurationServiceImpl>();
     b.add::<kamu_flow_system_services::FlowServiceImpl>();
     b.add_value(kamu_flow_system_inmem::domain::FlowServiceRunConfig::new(
@@ -385,6 +396,25 @@ pub fn configure_base_catalog(
     b.add::<UploadServiceLocal>();
 
     b.add::<DatabaseTransactionRunner>();
+
+    b.add_builder(
+        messaging_outbox::OutboxImmediateImpl::builder()
+            .with_consumer_filter(messaging_outbox::ConsumerFilter::BestEffortConsumers),
+    );
+    b.add::<messaging_outbox::OutboxTransactionalImpl>();
+    b.add::<messaging_outbox::OutboxDispatchingImpl>();
+    b.bind::<dyn Outbox, OutboxDispatchingImpl>();
+    b.add::<messaging_outbox::OutboxTransactionalProcessor>();
+
+    register_message_dispatcher::<DatasetLifecycleMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+    );
+    register_message_dispatcher::<TaskProgressMessage>(&mut b, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR);
+    register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+    );
 
     b
 }
@@ -608,6 +638,12 @@ pub fn register_config_in_catalog(
             }
         }
     }
+
+    let outbox_config = config.outbox.as_ref().unwrap();
+    catalog_builder.add_value(messaging_outbox::OutboxConfig::new(
+        Duration::seconds(outbox_config.awaiting_step_secs.unwrap()),
+        outbox_config.batch_size.unwrap(),
+    ));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -686,6 +722,7 @@ fn configure_logging(
             .with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
             .with_writer(std::io::stderr)
             .pretty()
+            .with_ansi(!no_color_output)
             .init();
 
         return Guards::default();

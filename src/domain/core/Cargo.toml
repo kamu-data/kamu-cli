@@ -25,6 +25,7 @@ doctest = false
 kamu-accounts = { workspace = true }
 kamu-datasets = { workspace = true }
 container-runtime = { workspace = true }
+messaging-outbox = { workspace = true }
 internal-error = { workspace = true }
 opendatafabric = { workspace = true }
 
@@ -32,7 +33,7 @@ async-stream = { version = "0.3", default-features = false }
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dill = { version = "0.8", default-features = false }
+dill = "0.9"
 futures = { version = "0.3", default-features = false }
 http = { version = "0.2" }
 pathdiff = { version = "0.2", default-features = false }
@@ -44,7 +45,7 @@ tracing = { version = "0.1", default-features = false }
 url = { version = "2", default-features = false, features = ["serde"] }
 
 # TODO: Avoid this dependency or depend on sub-crates
-datafusion = { version = "39", default-features = false, features = [
+datafusion = { version = "41", default-features = false, features = [
     "parquet",
 ] }
 object_store = { version = "0.10", default-features = false }

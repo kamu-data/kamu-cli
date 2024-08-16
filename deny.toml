@@ -22,6 +22,10 @@ features = [
     ] },
     { name = "kamu", allow = [
         "default",
+        "ingest-evm",
+        "ingest-ftp",
+        "ingest-mqtt",
+        "query-extensions-json",
     ] },
     { name = "kamu-accounts", allow = [
         "default",

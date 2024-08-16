@@ -12,15 +12,10 @@ use std::ops::Add;
 use std::path::{Path, PathBuf};
 
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
-use kamu::domain::{
-    CacheDir,
-    InternalError,
-    ResultIntoInternal,
-    ServerUrlConfig,
-    SystemTimeSourceDefault,
-};
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu::domain::{CacheDir, ServerUrlConfig};
 use kamu_accounts::{JwtAuthenticationConfig, PredefinedAccountsConfig, DEFAULT_ACCOUNT_ID};
-use kamu_accounts_inmem::{AccessTokenRepositoryInMemory, AccountRepositoryInMemory};
+use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
@@ -33,6 +28,7 @@ use kamu_adapter_http::{
     UploadContext,
     UploadServiceLocal,
 };
+use time_source::SystemTimeSourceDefault;
 
 use crate::harness::{await_client_server_flow, TestAPIServer};
 
@@ -63,9 +59,9 @@ impl Harness {
             b.add_value(CacheDir::new(cache_dir.clone()))
                 .add_value(PredefinedAccountsConfig::single_tenant())
                 .add::<AuthenticationServiceImpl>()
-                .add::<AccountRepositoryInMemory>()
+                .add::<InMemoryAccountRepository>()
                 .add::<AccessTokenServiceImpl>()
-                .add::<AccessTokenRepositoryInMemory>()
+                .add::<InMemoryAccessTokenRepository>()
                 .add::<SystemTimeSourceDefault>()
                 .add::<LoginPasswordAuthProvider>()
                 .add_value(JwtAuthenticationConfig::default())

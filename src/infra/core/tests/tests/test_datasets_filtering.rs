@@ -11,7 +11,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::Component;
-use event_bus::EventBus;
 use futures::TryStreamExt;
 use kamu::testing::MetadataFactory;
 use kamu::utils::datasets_filtering::{
@@ -19,9 +18,9 @@ use kamu::utils::datasets_filtering::{
     matches_local_ref_pattern,
     matches_remote_ref_pattern,
 };
-use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu::{DatasetRepositoryLocalFs, DatasetRepositoryWriter};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
-use kamu_core::{auth, DatasetRepository, SystemTimeSourceDefault};
+use kamu_core::DatasetRepository;
 use opendatafabric::{
     AccountName,
     DatasetAlias,
@@ -35,6 +34,7 @@ use opendatafabric::{
     RepoName,
 };
 use tempfile::TempDir;
+use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -264,6 +264,7 @@ struct DatasetFilteringHarness {
     _workdir: TempDir,
     _catalog: dill::Catalog,
     dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
 }
 
 impl DatasetFilteringHarness {
@@ -274,24 +275,24 @@ impl DatasetFilteringHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
-            .add::<EventBus>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
                     .with_multi_tenant(is_multi_tenant),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceInMemory>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
 
         Self {
             _workdir: workdir,
             _catalog: catalog,
             dataset_repo,
+            dataset_repo_writer,
         }
     }
 
@@ -300,7 +301,7 @@ impl DatasetFilteringHarness {
         account_name: Option<AccountName>,
         dataset_name: &str,
     ) -> DatasetHandle {
-        self.dataset_repo
+        self.dataset_repo_writer
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
                     .name(DatasetAlias::new(
@@ -313,6 +314,7 @@ impl DatasetFilteringHarness {
             )
             .await
             .unwrap()
+            .create_dataset_result
             .dataset_handle
     }
 

@@ -48,13 +48,9 @@ impl Dataset {
     }
 
     #[graphql(skip)]
-    async fn get_dataset(&self, ctx: &Context<'_>) -> Result<std::sync::Arc<dyn domain::Dataset>> {
+    fn get_dataset(&self, ctx: &Context<'_>) -> std::sync::Arc<dyn domain::Dataset> {
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = dataset_repo
-            .get_dataset(&self.dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
-        Ok(dataset)
+        dataset_repo.get_dataset_by_handle(&self.dataset_handle)
     }
 
     /// Unique identifier of the dataset
@@ -81,7 +77,7 @@ impl Dataset {
 
     /// Returns the kind of dataset (Root or Derivative)
     async fn kind(&self, ctx: &Context<'_>) -> Result<DatasetKind> {
-        let dataset = self.get_dataset(ctx).await?;
+        let dataset = self.get_dataset(ctx);
         let summary = dataset
             .get_summary(domain::GetSummaryOpts::default())
             .await
@@ -115,7 +111,7 @@ impl Dataset {
     // TODO: PERF: Avoid traversing the entire chain
     /// Creation time of the first metadata block in the chain
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let dataset = self.get_dataset(ctx).await?;
+        let dataset = self.get_dataset(ctx);
 
         Ok(dataset
             .as_metadata_chain()
@@ -129,7 +125,7 @@ impl Dataset {
 
     /// Creation time of the most recent metadata block in the chain
     async fn last_updated_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let dataset = self.get_dataset(ctx).await?;
+        let dataset = self.get_dataset(ctx);
 
         Ok(dataset
             .as_metadata_chain()

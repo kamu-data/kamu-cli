@@ -1,0 +1,33 @@
+[package]
+name = "kamu-messaging-outbox-repo-tests"
+description = "Shared repository tests for Kamu messaging outbox"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+database-common = { workspace = true }
+messaging-outbox = { workspace = true }
+
+chrono = { version = "0.4", default-features = false }
+dill = "0.9"
+futures = "0.3"
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

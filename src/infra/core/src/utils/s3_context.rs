@@ -17,7 +17,7 @@ use aws_sdk_s3::operation::head_object::{HeadObjectError, HeadObjectOutput};
 use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
 use aws_sdk_s3::types::{CommonPrefix, Delete, ObjectIdentifier};
 use aws_sdk_s3::Client;
-use kamu_core::*;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use tokio::io::AsyncRead;
 use tokio_util::io::ReaderStream;
 use url::Url;

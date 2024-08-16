@@ -18,8 +18,10 @@ pub const JUPYTER: &str = "ghcr.io/kamu-data/jupyter:0.6.2";
 // Test Images
 pub const HTTPD: &str = "docker.io/httpd:2.4";
 pub const MINIO: &str = "docker.io/minio/minio:RELEASE.2021-08-31T05-46-54Z";
-pub const RUMQTTD: &str = "docker.io/bytebeamio/rumqttd:0.19.0";
 pub const BUSYBOX: &str = "docker.io/busybox:latest";
 
-#[cfg(feature = "ftp")]
+#[cfg(feature = "ingest-mqtt")]
+pub const RUMQTTD: &str = "docker.io/bytebeamio/rumqttd:0.19.0";
+
+#[cfg(feature = "ingest-ftp")]
 pub const FTP: &'static str = "docker.io/bogem/ftp";

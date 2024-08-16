@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.0] - 2024-08-16
+### Added
+- Reliable transaction-based internal cross-domain message passing component (`MessageOutbox`), replacing `EventBus`
+   - Metadata-driven producer/consumer annotations
+   - Immediate and transaction-backed message delivery
+   - Background transactional message processor, respecting client idempotence 
+- Persistent storage for flow configuration events
+### Changed
+- Upgraded to `datafusion v41` (#713)
+- Introduced use case layer, encapsulating authorization checks and action validations, for first 6 basic dataset scenarios
+   (creating, creating from snapshot, deleting, renaming, committing an event, syncing a batch of events),
+- Separated `DatasetRepository` on read-only and read-write parts
+- Isolated `time-source` library
+### Fixed
+- E2E: added additional force off colors to exclude sometimes occurring ANSI color sequences
+- E2E: modify a workaround for MySQL tests
+
 ## [0.194.1] - 2024-08-14
 ### Fixed
 - Add `recursive` field to `Reset` flow configurations in GQL Api which triggers `HardCompaction` in `KeepMetadataOnly` mode flow for each owned downstream dependency

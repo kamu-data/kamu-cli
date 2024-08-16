@@ -16,6 +16,7 @@ use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::head_object::HeadObjectError;
 use aws_sdk_s3::presigning::PresigningConfig;
 use bytes::Bytes;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::{Multicodec, Multihash};
 use url::Url;

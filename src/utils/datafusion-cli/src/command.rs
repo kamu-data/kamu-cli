@@ -29,8 +29,8 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::common::exec_err;
 use datafusion::common::instant::Instant;
 use datafusion::error::{DataFusionError, Result};
-use datafusion::prelude::SessionContext;
 
+use crate::cli_context::CliSessionContext;
 use crate::exec::{exec_and_print, exec_from_lines};
 use crate::functions::{display_all_functions, Function};
 use crate::print_format::PrintFormat;
@@ -57,7 +57,7 @@ pub enum OutputFormat {
 impl Command {
     pub async fn execute(
         &self,
-        ctx: &mut SessionContext,
+        ctx: &dyn CliSessionContext,
         print_options: &mut PrintOptions,
     ) -> Result<()> {
         match self {

@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 
 use dill::*;
-use kamu_core::ErrorIntoInternal;
+use internal_error::ErrorIntoInternal;
 use kamu_datasets::{
     DatasetEnvVar,
     DatasetEnvVarValue,

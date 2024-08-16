@@ -7,13 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{self as domain, MetadataChainExt, SearchSetAttachmentsVisitor};
+use kamu_core::{
+    self as domain,
+    CommitDatasetEventUseCase,
+    MetadataChainExt,
+    SearchSetAttachmentsVisitor,
+};
 use opendatafabric as odf;
 
 use super::{CommitResultAppendError, CommitResultSuccess, NoChanges};
 use crate::mutations::MetadataChainMut;
 use crate::prelude::*;
-use crate::utils::check_dataset_write_access;
+use crate::utils::make_dataset_access_error;
 use crate::LoggedInGuard;
 
 pub struct DatasetMetadataMut {
@@ -28,13 +33,10 @@ impl DatasetMetadataMut {
     }
 
     #[graphql(skip)]
-    async fn get_dataset(&self, ctx: &Context<'_>) -> Result<std::sync::Arc<dyn domain::Dataset>> {
+    fn get_dataset(&self, ctx: &Context<'_>) -> std::sync::Arc<dyn domain::Dataset> {
+        // TODO: cut off this dependency - extract a higher level use case
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = dataset_repo
-            .get_dataset(&self.dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
-        Ok(dataset)
+        dataset_repo.get_dataset_by_handle(&self.dataset_handle)
     }
 
     /// Access to the mutable metadata chain of the dataset
@@ -49,9 +51,7 @@ impl DatasetMetadataMut {
         ctx: &Context<'_>,
         content: Option<String>,
     ) -> Result<UpdateReadmeResult> {
-        check_dataset_write_access(ctx, &self.dataset_handle).await?;
-
-        let dataset = self.get_dataset(ctx).await?;
+        let dataset = self.get_dataset(ctx);
 
         let old_attachments = dataset
             .as_metadata_chain()
@@ -112,8 +112,14 @@ impl DatasetMetadataMut {
             attachments: new_attachments.into(),
         };
 
-        let result = match dataset
-            .commit_event(event.into(), domain::CommitOpts::default())
+        let commit_event = from_catalog::<dyn CommitDatasetEventUseCase>(ctx).unwrap();
+
+        let result = match commit_event
+            .execute(
+                &self.dataset_handle,
+                event.into(),
+                domain::CommitOpts::default(),
+            )
             .await
         {
             Ok(result) => UpdateReadmeResult::Success(CommitResultSuccess {
@@ -129,6 +135,9 @@ impl DatasetMetadataMut {
                 UpdateReadmeResult::AppendError(CommitResultAppendError {
                     message: e.to_string(),
                 })
+            }
+            Err(domain::CommitError::Access(_)) => {
+                return Err(make_dataset_access_error(&self.dataset_handle))
             }
             Err(e @ domain::CommitError::Internal(_)) => return Err(e.int_err().into()),
         };

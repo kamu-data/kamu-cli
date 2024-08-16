@@ -21,7 +21,8 @@ use axum::response::Json;
 use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
-use kamu::domain::*;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_core::*;
 use opendatafabric::DatasetRef;
 
 use super::query_handler::{DataFormat, SchemaFormat};

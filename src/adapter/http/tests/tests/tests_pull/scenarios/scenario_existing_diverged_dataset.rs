@@ -40,9 +40,11 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingDivergedDatasetScenario
     ) -> Self {
         let server_account_name = server_harness.operating_account_name();
 
-        let server_repo = server_harness.cli_dataset_repository();
-        let server_create_result = server_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot =
+            server_harness.cli_create_dataset_from_snapshot_use_case();
+
+        let server_create_result = create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(DatasetAlias::new(
                         server_account_name.clone(),
@@ -66,7 +68,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingDivergedDatasetScenario
         for _ in 0..3 {
             commit_result = Some(
                 commit_add_data_event(
-                    server_repo.as_ref(),
+                    server_harness.cli_dataset_repository().as_ref(),
                     &server_dataset_ref,
                     &server_dataset_layout,
                     commit_result.map(|r| r.new_head),

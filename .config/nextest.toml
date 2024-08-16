@@ -2,10 +2,24 @@
 fail-fast = false
 
 [test-groups]
+mysql = { max-threads = 1 } # Explanation below
 setup = { max-threads = 1 }  # Serialize the setup steps
 containerized = { max-threads = 8 }  # Don't use too much memory
 engine = { max-threads = 2 }  # Engine tests are very memory-hungry
 database = { max-threads = 8 }  # Don't use too much memory
+
+# TODO: Delete this workaround when this PR is merged:
+#       - Fix: nextest cleanup race condition by bonega
+#         https://github.com/launchbadge/sqlx/pull/3334
+#
+# NOTE: There is an incompatibility between nextest and sqlx:
+#       - nextest implies multiprocessing,
+#       - while sqlx has a lock on cleanup within the current process
+#         (https://github.com/launchbadge/sqlx/pull/2640#issuecomment-1659455042).
+[[profile.default.overrides]]
+filter = "test(::mysql::)"
+test-group = "mysql"
+retries = { count = 3, backoff = "exponential", delay = "3s" }
 
 [[profile.default.overrides]]
 filter = "test(::setup::)"

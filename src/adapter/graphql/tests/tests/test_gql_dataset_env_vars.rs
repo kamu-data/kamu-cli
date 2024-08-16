@@ -7,20 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
-use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
-use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
-use kamu_core::{auth, CreateDatasetResult, DatasetRepository, SystemTimeSourceDefault};
+use kamu::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    DatasetRepositoryLocalFs,
+    DatasetRepositoryWriter,
+    DependencyGraphServiceInMemory,
+};
+use kamu_core::{auth, CreateDatasetFromSnapshotUseCase, CreateDatasetResult, DatasetRepository};
 use kamu_datasets::DatasetEnvVarsConfig;
-use kamu_datasets_inmem::DatasetEnvVarRepositoryInMemory;
+use kamu_datasets_inmem::InMemoryDatasetEnvVarRepository;
 use kamu_datasets_services::DatasetEnvVarServiceImpl;
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::DatasetKind;
+use time_source::SystemTimeSourceDefault;
 
 use crate::utils::authentication_catalogs;
 
@@ -328,7 +332,6 @@ struct DatasetEnvVarsHarness {
     _tempdir: tempfile::TempDir,
     _catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
-    dataset_repo: Arc<dyn DatasetRepository>,
 }
 
 impl DatasetEnvVarsHarness {
@@ -340,7 +343,7 @@ impl DatasetEnvVarsHarness {
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new();
 
-            b.add::<EventBus>()
+            b.add::<DummyOutboxImpl>()
                 .add_value(DatasetEnvVarsConfig::sample())
                 .add_builder(
                     DatasetRepositoryLocalFs::builder()
@@ -348,12 +351,14 @@ impl DatasetEnvVarsHarness {
                         .with_multi_tenant(false),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<DependencyGraphServiceInMemory>()
                 .add::<DatabaseTransactionRunner>()
                 .add::<DatasetEnvVarServiceImpl>()
-                .add::<DatasetEnvVarRepositoryInMemory>();
+                .add::<InMemoryDatasetEnvVarRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -361,21 +366,22 @@ impl DatasetEnvVarsHarness {
         };
 
         let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
-        let dataset_repo = catalog_authorized
-            .get_one::<dyn DatasetRepository>()
-            .unwrap();
 
         Self {
             _tempdir: tempdir,
             _catalog_anonymous: catalog_anonymous,
             catalog_authorized,
-            dataset_repo,
         }
     }
 
     async fn create_dataset(&self) -> CreateDatasetResult {
-        self.dataset_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .kind(DatasetKind::Root)
                     .name("foo")

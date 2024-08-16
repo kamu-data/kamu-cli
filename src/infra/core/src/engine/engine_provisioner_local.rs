@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use container_runtime::*;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::engine::*;
 use kamu_core::*;
 

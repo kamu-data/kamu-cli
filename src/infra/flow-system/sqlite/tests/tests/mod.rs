@@ -7,4 +7,4 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_flow_configuration_event_store_sqlite;
+mod test_sqlite_flow_configuration_event_store;

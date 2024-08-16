@@ -12,6 +12,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;

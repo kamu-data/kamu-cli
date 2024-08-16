@@ -499,13 +499,8 @@ impl FlowRunConfiguration {
             }
             DatasetFlowType::Reset => {
                 let dataset_repo = from_catalog::<dyn kamu_core::DatasetRepository>(ctx).unwrap();
+                let dataset = dataset_repo.get_dataset_by_handle(dataset_handle);
 
-                let dataset = dataset_repo
-                    .get_dataset(&dataset_handle.as_local_ref())
-                    .await
-                    .map_err(|_| FlowInvalidRunConfigurations {
-                        error: "Cannot fetch default value".to_string(),
-                    })?;
                 // Assume unwrap safe such as we have checked this existance during
                 // validation step
                 let current_head_hash = dataset

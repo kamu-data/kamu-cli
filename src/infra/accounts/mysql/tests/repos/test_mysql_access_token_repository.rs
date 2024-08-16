@@ -10,7 +10,7 @@
 use database_common::{DatabaseTransactionRunner, MySqlTransactionManager};
 use dill::{Catalog, CatalogBuilder};
 use internal_error::InternalError;
-use kamu_accounts_mysql::{MySqlAccountRepository, MysqlAccessTokenRepository};
+use kamu_accounts_mysql::{MySqlAccessTokenRepository, MySqlAccountRepository};
 use sqlx::MySqlPool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -18,7 +18,7 @@ use sqlx::MySqlPool;
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_missing_access_token_not_found(mysql_pool: MySqlPool) {
-    let harness = MysqlAccessTokenRepositoryHarness::new(mysql_pool);
+    let harness = MySqlAccessTokenRepositoryHarness::new(mysql_pool);
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
@@ -34,7 +34,7 @@ async fn test_missing_access_token_not_found(mysql_pool: MySqlPool) {
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_insert_and_locate_access_token(mysql_pool: MySqlPool) {
-    let harness = MysqlAccessTokenRepositoryHarness::new(mysql_pool);
+    let harness = MySqlAccessTokenRepositoryHarness::new(mysql_pool);
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
@@ -50,7 +50,7 @@ async fn test_insert_and_locate_access_token(mysql_pool: MySqlPool) {
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_insert_and_locate_multiple_access_tokens(mysql_pool: MySqlPool) {
-    let harness = MysqlAccessTokenRepositoryHarness::new(mysql_pool);
+    let harness = MySqlAccessTokenRepositoryHarness::new(mysql_pool);
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
@@ -66,7 +66,7 @@ async fn test_insert_and_locate_multiple_access_tokens(mysql_pool: MySqlPool) {
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_mark_existing_access_token_revorked(mysql_pool: MySqlPool) {
-    let harness = MysqlAccessTokenRepositoryHarness::new(mysql_pool);
+    let harness = MySqlAccessTokenRepositoryHarness::new(mysql_pool);
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
@@ -82,7 +82,7 @@ async fn test_mark_existing_access_token_revorked(mysql_pool: MySqlPool) {
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_mark_non_existing_access_token_revorked(mysql_pool: MySqlPool) {
-    let harness = MysqlAccessTokenRepositoryHarness::new(mysql_pool);
+    let harness = MySqlAccessTokenRepositoryHarness::new(mysql_pool);
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
@@ -98,7 +98,7 @@ async fn test_mark_non_existing_access_token_revorked(mysql_pool: MySqlPool) {
 #[test_group::group(database, mysql)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
 async fn test_find_account_by_active_token_id(mysql_pool: MySqlPool) {
-    let harness = MysqlAccessTokenRepositoryHarness::new(mysql_pool);
+    let harness = MySqlAccessTokenRepositoryHarness::new(mysql_pool);
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
@@ -111,17 +111,17 @@ async fn test_find_account_by_active_token_id(mysql_pool: MySqlPool) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct MysqlAccessTokenRepositoryHarness {
+struct MySqlAccessTokenRepositoryHarness {
     catalog: Catalog,
 }
 
-impl MysqlAccessTokenRepositoryHarness {
+impl MySqlAccessTokenRepositoryHarness {
     pub fn new(mysql_pool: MySqlPool) -> Self {
         // Initialize catalog with predefined Postgres pool
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add_value(mysql_pool);
         catalog_builder.add::<MySqlTransactionManager>();
-        catalog_builder.add::<MysqlAccessTokenRepository>();
+        catalog_builder.add::<MySqlAccessTokenRepository>();
         catalog_builder.add::<MySqlAccountRepository>();
 
         Self {

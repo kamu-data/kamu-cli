@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
 use dill::Component;
-use event_bus::EventBus;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -21,10 +20,13 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use opendatafabric::*;
+use time_source::SystemTimeSourceDefault;
 
-async fn test_engine_io_common(
+async fn test_engine_io_common<
+    TDatasetRepo: DatasetRepository + DatasetRepositoryWriter + 'static,
+>(
     object_stores: Vec<Arc<dyn ObjectStoreBuilder>>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<TDatasetRepo>,
     run_info_dir: &Path,
     cache_dir: &Path,
     transform: Transform,
@@ -154,6 +156,7 @@ async fn test_engine_io_common(
         .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()
+        .create_dataset_result
         .dataset;
 
     let block_hash = match transform_svc
@@ -260,9 +263,7 @@ async fn test_engine_io_local_file_mount() {
 
     let catalog = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add::<EventBus>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
-        .add::<kamu::DependencyGraphServiceInMemory>()
         .add::<DatasetKeyValueServiceSysEnv>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
@@ -273,7 +274,7 @@ async fn test_engine_io_local_file_mount() {
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
 
-    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
 
     test_engine_io_common(
         vec![Arc::new(ObjectStoreBuilderLocalFs::new())],
@@ -304,9 +305,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
 
     let catalog = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add::<EventBus>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
-        .add::<kamu::DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
             DatasetRepositoryS3::builder()
@@ -316,7 +315,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
         .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
         .build();
 
-    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let dataset_repo = catalog.get_one::<DatasetRepositoryS3>().unwrap();
 
     test_engine_io_common(
         vec![

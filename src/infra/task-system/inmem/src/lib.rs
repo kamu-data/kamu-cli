@@ -14,6 +14,6 @@
 // Re-exports
 pub use kamu_task_system as domain;
 
-mod task_system_event_store_inmem;
+mod inmem_task_system_event_store;
 
-pub use task_system_event_store_inmem::*;
+pub use inmem_task_system_event_store::*;

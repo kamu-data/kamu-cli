@@ -45,9 +45,11 @@ impl<TServerHarness: ServerSideHarness>
     ) -> Self {
         let server_account_name = server_harness.operating_account_name();
 
-        let server_repo = server_harness.cli_dataset_repository();
-        let server_create_result = server_repo
-            .create_dataset_from_snapshot(
+        let create_dataset_from_snapshot =
+            server_harness.cli_create_dataset_from_snapshot_use_case();
+
+        let server_create_result = create_dataset_from_snapshot
+            .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(DatasetAlias::new(
                         server_account_name.clone(),
@@ -79,13 +81,18 @@ impl<TServerHarness: ServerSideHarness>
 
         // Extend server-side dataset with new nodes
 
-        let server_dataset_ref = make_dataset_ref(&server_account_name, "foo");
+        let server_repo = server_harness.cli_dataset_repository();
 
-        server_repo
-            .get_dataset(&server_dataset_ref)
+        let server_dataset_ref = make_dataset_ref(&server_account_name, "foo");
+        let server_dataset_handle = server_repo
+            .resolve_dataset_ref(&server_dataset_ref)
             .await
-            .unwrap()
-            .commit_event(
+            .unwrap();
+
+        let commit_dataset_event = server_harness.cli_commit_dataset_event_use_case();
+        commit_dataset_event
+            .execute(
+                &server_dataset_handle,
                 MetadataEvent::SetInfo(
                     MetadataFactory::set_info()
                         .description("updated description")

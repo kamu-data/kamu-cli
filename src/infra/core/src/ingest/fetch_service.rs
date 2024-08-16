@@ -16,6 +16,7 @@ use std::sync::Arc;
 use chrono::{DateTime, SubsecRound, TimeZone, Utc};
 use container_runtime::*;
 use futures::TryStreamExt;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::engine::ProcessError;
 use kamu_core::*;
 use kamu_datasets::{DatasetEnvVar, DatasetKeyValueService};
@@ -183,7 +184,13 @@ impl FetchService {
                         .await
                     }
                     "ftp" | "ftps" => {
-                        Self::fetch_ftp(url, target_path, system_time, &listener).await
+                        cfg_if::cfg_if! {
+                            if #[cfg(feature = "ingest-ftp")] {
+                                Self::fetch_ftp(url, target_path, system_time, &listener).await
+                            } else {
+                                unimplemented!("Kamu was compiled without FTP support")
+                            }
+                        }
                     }
                     // TODO: Replace with proper error type
                     scheme => unimplemented!("Unsupported scheme: {}", scheme),
@@ -207,24 +214,36 @@ impl FetchService {
                 &listener,
             ),
             FetchStep::Mqtt(fetch) => {
-                self.fetch_mqtt(
-                    dataset_handle,
-                    fetch,
-                    target_path,
-                    dataset_env_vars,
-                    &listener,
-                )
-                .await
+                cfg_if::cfg_if! {
+                    if #[cfg(feature = "ingest-mqtt")] {
+                    self.fetch_mqtt(
+                        dataset_handle,
+                        fetch,
+                        target_path,
+                        dataset_env_vars,
+                        &listener,
+                    )
+                    .await
+                } else {
+                    unimplemented!("Kamu was compiled without MQTT support")
+                }}
             }
             FetchStep::EthereumLogs(fetch) => {
-                self.fetch_ethereum_logs(
-                    fetch,
-                    prev_source_state,
-                    target_path,
-                    dataset_env_vars,
-                    &listener,
-                )
-                .await
+                cfg_if::cfg_if! {
+                        if #[cfg(feature = "ingest-evm")] {
+                        self.fetch_ethereum_logs(
+                            fetch,
+                            prev_source_state,
+                            target_path,
+                            dataset_env_vars,
+                            &listener,
+                        )
+                        .await
+                    }
+                    else {
+                        unimplemented!("Kamu was compiled without Ethereum support")
+                    }
+                }
             }
         }
     }
@@ -752,39 +771,27 @@ impl FetchService {
         }))
     }
 
-    #[allow(unused_variables)]
-    #[allow(clippy::unused_async)]
+    #[cfg(feature = "ingest-ftp")]
     async fn fetch_ftp(
         url: Url,
         target_path: &Path,
         system_time: &DateTime<Utc>,
         listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, PollingIngestError> {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "ftp")] {
-                let target_path = target_path.to_owned();
-                let system_time = system_time.clone();
-                let listener = listener.clone();
-                tokio::task::spawn_blocking(move || {
-                        Self::fetch_ftp_impl(
-                            url,
-                            &target_path,
-                            system_time,
-                            listener.as_ref(),
-                        )
-                    })
-                    .await
-                    .int_err()?
-            } else {
-                unimplemented!("Kamu was compiled without FTP support")
-            }
-        }
+        let target_path = target_path.to_owned();
+        let system_time = system_time.clone();
+        let listener = listener.clone();
+        tokio::task::spawn_blocking(move || {
+            Self::fetch_ftp_impl(url, &target_path, system_time, listener.as_ref())
+        })
+        .await
+        .int_err()?
     }
 
     // TODO: convert to non-blocking
     // TODO: not implementing caching as some FTP servers throw errors at us
     // when we request filetime :(
-    #[cfg(feature = "ftp")]
+    #[cfg(feature = "ingest-ftp")]
     fn fetch_ftp_impl(
         url: Url,
         target_path: &Path,
@@ -854,6 +861,7 @@ impl FetchService {
         }))
     }
 
+    #[cfg(feature = "ingest-mqtt")]
     async fn fetch_mqtt(
         &self,
         dataset_handle: &DatasetHandle,
@@ -970,6 +978,7 @@ impl FetchService {
     // to scan through block ranges.
     //
     // TODO: Account for re-orgs
+    #[cfg(feature = "ingest-evm")]
     async fn fetch_ethereum_logs(
         &self,
         fetch: &FetchStepEthereumLogs,

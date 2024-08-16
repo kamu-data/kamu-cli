@@ -62,9 +62,9 @@ impl DatasetMut {
             }));
         }
 
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        match dataset_repo
-            .rename_dataset(&self.dataset_handle.as_local_ref(), &new_name)
+        let rename_dataset = from_catalog::<dyn domain::RenameDatasetUseCase>(ctx).unwrap();
+        match rename_dataset
+            .execute(&self.dataset_handle.as_local_ref(), &new_name)
             .await
         {
             Ok(_) => Ok(RenameResult::Success(RenameResultSuccess {
@@ -89,9 +89,9 @@ impl DatasetMut {
     /// Delete the dataset
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteResult> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        match dataset_repo
-            .delete_dataset(&self.dataset_handle.as_local_ref())
+        let delete_dataset = from_catalog::<dyn domain::DeleteDatasetUseCase>(ctx).unwrap();
+        match delete_dataset
+            .execute_via_handle(&self.dataset_handle)
             .await
         {
             Ok(_) => Ok(DeleteResult::Success(DeleteResultSuccess {

@@ -71,7 +71,7 @@ pub(crate) async fn ensure_expected_dataset_kind(
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
     match dataset_flow_type.dataset_kind_restriction() {
         Some(expected_kind) => {
-            let dataset = utils::get_dataset(ctx, dataset_handle).await?;
+            let dataset = utils::get_dataset(ctx, dataset_handle);
 
             let dataset_kind = dataset
                 .get_summary(GetSummaryOpts::default())
@@ -138,10 +138,7 @@ pub(crate) async fn ensure_flow_preconditions(
                     let dataset_repo =
                         from_catalog::<dyn kamu_core::DatasetRepository>(ctx).unwrap();
 
-                    let dataset = dataset_repo
-                        .get_dataset(&dataset_handle.as_local_ref())
-                        .await
-                        .int_err()?;
+                    let dataset = dataset_repo.get_dataset_by_handle(dataset_handle);
                     let current_head_hash_maybe = dataset
                         .as_metadata_chain()
                         .try_get_ref(&kamu_core::BlockRef::Head)

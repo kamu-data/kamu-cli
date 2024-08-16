@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use datafusion::prelude::*;
+use internal_error::ResultIntoInternal;
 use kamu_core::engine::*;
 use kamu_core::{ObjectStoreRegistry, *};
 use opendatafabric::*;
@@ -66,8 +67,17 @@ pub fn new_session_context(object_store_registry: Arc<dyn ObjectStoreRegistry>) 
 
     // TODO: As part of the ODF spec we should let people opt-in into various
     // SQL extensions on per-transform basis
-    datafusion_ethers::udf::register_all(&mut ctx).unwrap();
-    datafusion_functions_json::register_all(&mut ctx).unwrap();
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "ingest-evm")] {
+            datafusion_ethers::udf::register_all(&mut ctx).unwrap();
+        }
+    }
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "query-extensions-json")] {
+            datafusion_functions_json::register_all(&mut ctx).unwrap();
+        }
+    }
 
     ctx
 }

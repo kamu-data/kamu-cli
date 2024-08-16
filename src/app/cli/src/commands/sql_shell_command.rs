@@ -138,14 +138,14 @@ impl SqlShellCommand {
             maxrows: MaxRows::Limited(DEFAULT_MAX_ROWS_FOR_OUTPUT),
         };
 
-        let mut ctx = self.query_svc.create_session().await.unwrap();
+        let ctx = self.query_svc.create_session().await.unwrap();
 
         eprintln!(
             "{}",
             console::style("Kamu + DataFusion SQL shell. Type \\? for help.").dim()
         );
 
-        exec::exec_from_repl(&mut ctx, &mut print_options)
+        Box::pin(exec::exec_from_repl(&ctx, &mut print_options))
             .await
             .map_err(CLIError::failure)?;
 

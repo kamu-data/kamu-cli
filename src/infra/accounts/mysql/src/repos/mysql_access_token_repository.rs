@@ -19,13 +19,13 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MysqlAccessTokenRepository {
+pub struct MySqlAccessTokenRepository {
     transaction: TransactionRefT<sqlx::MySql>,
 }
 
 #[component(pub)]
 #[interface(dyn AccessTokenRepository)]
-impl MysqlAccessTokenRepository {
+impl MySqlAccessTokenRepository {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
@@ -61,7 +61,7 @@ impl MysqlAccessTokenRepository {
 }
 
 #[async_trait::async_trait]
-impl AccessTokenRepository for MysqlAccessTokenRepository {
+impl AccessTokenRepository for MySqlAccessTokenRepository {
     async fn save_access_token(
         &self,
         access_token: &AccessToken,
