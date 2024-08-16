@@ -479,13 +479,17 @@ async fn test_ingest_trigger_with_ingest_config() {
             dataset_name: DatasetName::new_unchecked("foo"),
             account_name: None,
         })
-        .await;
+        .await
+        .dataset_handle
+        .id;
     let bar_id = harness
         .create_root_dataset(DatasetAlias {
             dataset_name: DatasetName::new_unchecked("bar"),
             account_name: None,
         })
-        .await;
+        .await
+        .dataset_handle
+        .id;
 
     harness
         .set_dataset_flow_ingest(
