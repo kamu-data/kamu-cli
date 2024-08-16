@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Changed
 - Upgraded to `datafusion v41` (#713)
+### Fixed
+- E2E: added additional force off colors to exclude sometimes occurring ANSI color sequences
+- E2E: modify a workaround for MySQL tests
 
 ## [0.194.1] - 2024-08-14
 ### Fixed

@@ -110,7 +110,7 @@ impl KamuCliPuppet {
     {
         let mut command = assert_cmd::Command::cargo_bin("kamu-cli").unwrap();
 
-        command.env("RUST_LOG", "trace");
+        command.env("RUST_LOG", "info,sqlx=debug");
 
         command.arg("-v");
         command.arg("--no-color");
