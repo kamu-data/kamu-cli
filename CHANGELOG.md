@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.195.1] - 2024-08-16
+### Fixed
+- Add `reset` ENUM variant to `dataset_flow_type` in postgres migration
+
 ## [0.195.0] - 2024-08-16
 ### Added
 - Reliable transaction-based internal cross-domain message passing component (`MessageOutbox`), replacing `EventBus`
