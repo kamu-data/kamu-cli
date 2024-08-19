@@ -15,6 +15,10 @@ use crate::{CreateDatasetError, CreateDatasetResult};
 
 #[async_trait::async_trait]
 pub trait CreateDatasetUseCase: Send + Sync {
+    // TODO: Add "options" that specify the visibility dataset
+    //
+    //       Based on: Private Datasets: Update use case: Pushing a dataset
+    //                 https://github.com/kamu-data/kamu-cli/issues/728
     async fn execute(
         &self,
         dataset_alias: &DatasetAlias,
