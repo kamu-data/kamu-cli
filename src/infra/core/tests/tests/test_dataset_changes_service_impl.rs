@@ -14,7 +14,7 @@ use dill::Component;
 use kamu::testing::MetadataFactory;
 use kamu::{DatasetChangesServiceImpl, DatasetRepositoryLocalFs, DatasetRepositoryWriter};
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{
     CommitOpts,
@@ -813,7 +813,7 @@ impl DatasetChangesHarness {
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<DatasetChangesServiceImpl>()
-            .add::<RebacRepositoryInMem>()
+            .add::<InMemoryRebacRepository>()
             .add::<RebacServiceImpl>()
             .build();
 

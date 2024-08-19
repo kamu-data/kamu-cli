@@ -19,7 +19,7 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use opendatafabric::*;
 use tempfile::TempDir;
@@ -75,7 +75,7 @@ impl TransformTestHarness {
             .bind::<dyn EngineProvisioner, TEngineProvisioner>()
             .add::<TransformServiceImpl>()
             .add::<VerificationServiceImpl>()
-            .add::<RebacRepositoryInMem>()
+            .add::<InMemoryRebacRepository>()
             .add::<RebacServiceImpl>()
             .build();
 

@@ -22,7 +22,7 @@ use kamu::testing::{DatasetDataHelper, LocalS3Server, MetadataFactory};
 use kamu::utils::s3_context::S3Context;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::auth;
 use opendatafabric::*;
@@ -1105,7 +1105,7 @@ impl CompactTestHarness {
             .bind::<dyn EngineProvisioner, mock_engine_provisioner::MockEngineProvisioner>()
             .add::<TransformServiceImpl>()
             .add::<VerificationServiceImpl>()
-            .add::<RebacRepositoryInMem>()
+            .add::<InMemoryRebacRepository>()
             .add::<RebacServiceImpl>()
             .build();
 
@@ -1160,7 +1160,7 @@ impl CompactTestHarness {
             .add::<DataFormatRegistryImpl>()
             .add::<CompactionServiceImpl>()
             .add_value(CurrentAccountSubject::new_test())
-            .add::<RebacRepositoryInMem>()
+            .add::<InMemoryRebacRepository>()
             .add::<RebacServiceImpl>()
             .build();
 

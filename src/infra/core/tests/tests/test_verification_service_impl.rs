@@ -18,7 +18,7 @@ use kamu::domain::*;
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer, ParquetWriterHelper};
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
@@ -52,7 +52,7 @@ async fn test_verify_data_consistency() {
         .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
         .bind::<dyn TransformService, TestTransformService>()
         .add::<VerificationServiceImpl>()
-        .add::<RebacRepositoryInMem>()
+        .add::<InMemoryRebacRepository>()
         .add::<RebacServiceImpl>()
         .build();
 

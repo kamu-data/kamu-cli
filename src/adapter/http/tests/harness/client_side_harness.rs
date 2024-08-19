@@ -17,7 +17,7 @@ use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_http::SmartTransferProtocolClientWs;
-use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use messaging_outbox::DummyOutboxImpl;
@@ -138,7 +138,7 @@ impl ClientSideHarness {
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
         b.add_value(IpfsGateway::default());
 
-        b.add::<RebacRepositoryInMem>();
+        b.add::<InMemoryRebacRepository>();
         b.add::<RebacServiceImpl>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);

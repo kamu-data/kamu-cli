@@ -17,7 +17,7 @@ use kamu::testing::*;
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
@@ -115,7 +115,7 @@ async fn do_test_sync(
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
         .add::<DummySmartTransferProtocolClient>()
-        .add::<RebacRepositoryInMem>()
+        .add::<InMemoryRebacRepository>()
         .add::<RebacServiceImpl>()
         .build();
 

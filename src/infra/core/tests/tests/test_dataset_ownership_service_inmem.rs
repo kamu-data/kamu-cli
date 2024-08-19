@@ -34,7 +34,7 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
-use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{DatasetOwnershipService, DatasetRepository};
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
@@ -135,7 +135,7 @@ impl DatasetOwnershipHarness {
                 .add::<DatabaseTransactionRunner>()
                 .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>()
-                .add::<RebacRepositoryInMem>()
+                .add::<InMemoryRebacRepository>()
                 .add::<RebacServiceImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);

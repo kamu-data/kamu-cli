@@ -25,7 +25,7 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
-use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use messaging_outbox::DummyOutboxImpl;
@@ -82,7 +82,7 @@ async fn create_catalog_with_local_workspace(
             .add::<LoginPasswordAuthProvider>()
             .add::<PredefinedAccountsRegistrator>()
             .add::<DatabaseTransactionRunner>()
-            .add::<RebacRepositoryInMem>()
+            .add::<InMemoryRebacRepository>()
             .add::<RebacServiceImpl>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);

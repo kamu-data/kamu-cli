@@ -13,7 +13,7 @@ use dill::*;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
-use kamu_auth_rebac_inmem::RebacRepositoryInMem;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use messaging_outbox::DummyOutboxImpl;
@@ -50,7 +50,7 @@ async fn test_current_push_sources() {
             .add::<DataFormatRegistryImpl>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
-            .add::<RebacRepositoryInMem>()
+            .add::<InMemoryRebacRepository>()
             .add::<RebacServiceImpl>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
