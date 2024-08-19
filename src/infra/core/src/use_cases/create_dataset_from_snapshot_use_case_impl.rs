@@ -69,10 +69,11 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             .create_dataset_from_snapshot(snapshot)
             .await?;
 
+        let is_multi_tenant_workspace = self.dataset_repo_writer.is_multi_tenant();
         // TODO: Test fail scenario -- do we need clean-up in that case?
         let created_dataset_id = &create_dataset_result.dataset_handle.id;
 
-        if options.is_multi_tenant_workspace {
+        if is_multi_tenant_workspace {
             let allows = options.dataset_visibility.allows_public_read();
             let (name, value) = DatasetPropertyName::allows_public_read(allows);
 

@@ -26,14 +26,12 @@ pub trait CreateDatasetFromSnapshotUseCase: Send + Sync {
 
 #[derive(Debug)]
 pub struct CreateDatasetFromSnapshotUseCaseOptions {
-    pub is_multi_tenant_workspace: bool,
     pub dataset_visibility: DatasetVisibility,
 }
 
 impl Default for CreateDatasetFromSnapshotUseCaseOptions {
     fn default() -> Self {
         Self {
-            is_multi_tenant_workspace: true,
             dataset_visibility: DatasetVisibility::PubliclyAvailable,
         }
     }

@@ -302,7 +302,6 @@ impl Command for AddCommand {
         };
 
         let create_options = CreateDatasetFromSnapshotUseCaseOptions {
-            is_multi_tenant_workspace: self.multi_tenant,
             dataset_visibility: if self.publicly_available {
                 DatasetVisibility::PubliclyAvailable
             } else {
