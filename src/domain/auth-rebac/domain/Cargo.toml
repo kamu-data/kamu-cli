@@ -34,7 +34,7 @@ strum = { version = "0.26", features = ["derive"] }
 thiserror = { version = "1", default-features = false }
 
 # Optional
-sqlx = { optional = true, version = "0.7", default-features = false, features = [
+sqlx = { optional = true, version = "0.8", default-features = false, features = [
     "macros",
 ] }
 

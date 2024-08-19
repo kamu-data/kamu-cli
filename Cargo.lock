@@ -5268,9 +5268,11 @@ name = "kamu-auth-rebac-inmem"
 version = "0.195.1"
 dependencies = [
  "async-trait",
+ "database-common-macros",
  "dill",
  "kamu-auth-rebac",
  "kamu-auth-rebac-repo-tests",
+ "test-group",
  "test-log",
  "tokio",
 ]
@@ -5297,7 +5299,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-sqlite"
-version = "0.194.1"
+version = "0.195.1"
 dependencies = [
  "async-trait",
  "database-common",
@@ -5641,12 +5643,15 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
+ "database-common-macros",
  "dill",
  "internal-error",
+ "kamu-accounts-inmem",
  "kamu-datasets",
  "kamu-datasets-repo-tests",
  "opendatafabric",
  "secrecy",
+ "test-group",
  "test-log",
  "thiserror",
  "tokio",
@@ -5682,6 +5687,7 @@ dependencies = [
  "chrono",
  "database-common",
  "dill",
+ "kamu-accounts",
  "kamu-datasets",
  "opendatafabric",
  "secrecy",
@@ -5716,8 +5722,10 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
+ "database-common-macros",
  "dill",
  "internal-error",
+ "kamu-accounts-sqlite",
  "kamu-datasets",
  "kamu-datasets-repo-tests",
  "opendatafabric",
