@@ -13,7 +13,12 @@ use kamu::domain::*;
 use kamu::testing::DatasetDataHelper;
 use kamu::*;
 use kamu_accounts::DUMMY_ACCESS_TOKEN;
-use kamu_adapter_http::{make_upload_token, FileUploadLimitConfig, UploadServiceLocal};
+use kamu_adapter_http::{
+    FileUploadLimitConfig,
+    UploadServiceLocal,
+    UploadToken,
+    UploadTokenBase64Json,
+};
 use opendatafabric::{MergeStrategy, *};
 use serde_json::json;
 use url::Url;
@@ -293,12 +298,12 @@ async fn test_data_push_ingest_upload_token_no_initial_source() {
         .upload_file(&upload_id, "population.json", FILE_CONTENT)
         .await;
 
-    let upload_token = make_upload_token(
+    let upload_token = UploadTokenBase64Json(UploadToken {
         upload_id,
-        String::from("population.json"),
-        String::from("application/json"),
-        FILE_CONTENT.len(),
-    );
+        file_name: String::from("population.json"),
+        content_type: Some(MediaType(String::from("application/json"))),
+        content_length: FILE_CONTENT.len(),
+    });
 
     let dataset_url = harness.dataset_http_url(&create_result.dataset_handle.alias);
 
@@ -380,12 +385,12 @@ async fn test_data_push_ingest_upload_token_with_initial_source() {
         .upload_file(&upload_id, "population.json", FILE_CONTENT)
         .await;
 
-    let upload_token = make_upload_token(
+    let upload_token = UploadTokenBase64Json(UploadToken {
         upload_id,
-        String::from("population.json"),
-        String::from("application/json"),
-        FILE_CONTENT.len(),
-    );
+        file_name: String::from("population.json"),
+        content_type: Some(MediaType(String::from("application/json"))),
+        content_length: FILE_CONTENT.len(),
+    });
 
     let dataset_url = harness.dataset_http_url(&create_result.dataset_handle.alias);
 
@@ -441,6 +446,85 @@ async fn test_data_push_ingest_upload_token_with_initial_source() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
+async fn test_data_push_ingest_upload_content_type_not_specified() {
+    let harness = DataIngestHarness::new();
+
+    let create_result = harness.create_population_dataset(false).await;
+
+    const FILE_CONTENT: &str = indoc::indoc!(
+        r#"
+        {"city": "A", "population": 100}
+        {"city": "B", "population": 200}
+        "#
+    );
+
+    let upload_id = Uuid::new_v4().simple().to_string();
+
+    harness
+        .upload_file(&upload_id, "population.ndjson", FILE_CONTENT)
+        .await;
+
+    let upload_token = UploadTokenBase64Json(UploadToken {
+        upload_id,
+        file_name: String::from("population.ndjson"),
+        content_type: None,
+        content_length: FILE_CONTENT.len(),
+    });
+
+    let dataset_url = harness.dataset_http_url(&create_result.dataset_handle.alias);
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+        let dataset_helper = DatasetDataHelper::new(create_result.dataset.clone());
+        let ingest_url = format!("{dataset_url}/ingest?uploadToken={upload_token}");
+        tracing::info!(%ingest_url, "Client request");
+
+        cl.execute(
+            cl.post(&ingest_url)
+                .bearer_auth(DUMMY_ACCESS_TOKEN)
+                .build()
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap();
+
+        dataset_helper
+            .assert_last_data_eq(
+                indoc!(
+                    r#"
+                    message arrow_schema {
+                      OPTIONAL INT64 offset;
+                      REQUIRED INT32 op;
+                      REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                      OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                      OPTIONAL BYTE_ARRAY city (STRING);
+                      OPTIONAL INT64 population;
+                    }
+                   "#
+                ),
+                indoc!(
+                    r#"
+                    +--------+----+----------------------+----------------------+------+------------+
+                    | offset | op | system_time          | event_time           | city | population |
+                    +--------+----+----------------------+----------------------+------+------------+
+                    | 0      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | A    | 100        |
+                    | 1      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | B    | 200        |
+                    +--------+----+----------------------+----------------------+------+------------+
+                    "#
+                ),
+            )
+            .await;
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
 async fn test_data_push_ingest_upload_token_actual_file_different_size() {
     let harness = DataIngestHarness::new();
 
@@ -467,12 +551,12 @@ async fn test_data_push_ingest_upload_token_actual_file_different_size() {
         .upload_file(&upload_id, "population.json", FILE_CONTENT)
         .await;
 
-    let upload_token = make_upload_token(
+    let upload_token = UploadTokenBase64Json(UploadToken {
         upload_id,
-        String::from("population.json"),
-        String::from("application/json"),
-        FILE_CONTENT.len() - 17, // Intentionally wrong file size
-    );
+        file_name: String::from("population.json"),
+        content_type: Some(MediaType(String::from("application/json"))),
+        content_length: FILE_CONTENT.len() - 17, // Intentionally wrong file size
+    });
 
     let dataset_url = harness.dataset_http_url(&create_result.dataset_handle.alias);
 

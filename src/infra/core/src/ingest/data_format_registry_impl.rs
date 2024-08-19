@@ -25,30 +25,37 @@ impl DataFormatRegistryImpl {
     pub const FMT_CSV: DataFormatDesc = DataFormatDesc {
         short_name: "CSV",
         media_type: MediaType::CSV,
+        file_extensions: &["csv"],
     };
     pub const FMT_JSON: DataFormatDesc = DataFormatDesc {
         short_name: "JSON",
         media_type: MediaType::JSON,
+        file_extensions: &["json"],
     };
     pub const FMT_NDJSON: DataFormatDesc = DataFormatDesc {
         short_name: "NDJSON",
         media_type: MediaType::NDJSON,
+        file_extensions: &["ndjson"],
     };
     pub const FMT_GEOJSON: DataFormatDesc = DataFormatDesc {
         short_name: "GeoJSON",
         media_type: MediaType::GEOJSON,
+        file_extensions: &["geojson"],
     };
     pub const FMT_NDGEOJSON: DataFormatDesc = DataFormatDesc {
         short_name: "NDGeoJSON",
         media_type: MediaType::NDGEOJSON,
+        file_extensions: &["ndgeojson"],
     };
     pub const FMT_PARQUET: DataFormatDesc = DataFormatDesc {
         short_name: "Parquet",
         media_type: MediaType::PARQUET,
+        file_extensions: &["parquet"],
     };
     pub const FMT_ESRI_SHAPEFILE: DataFormatDesc = DataFormatDesc {
         short_name: "Shapefile",
         media_type: MediaType::ESRI_SHAPEFILE,
+        file_extensions: &["shp", "shx"],
     };
 
     pub fn new() -> Self {
@@ -68,6 +75,18 @@ impl DataFormatRegistry for DataFormatRegistryImpl {
             Self::FMT_PARQUET,
             Self::FMT_ESRI_SHAPEFILE,
         ]
+    }
+
+    fn format_by_file_extension(&self, ext: &str) -> Option<DataFormatDesc> {
+        let ext = ext.to_lowercase();
+        for fmt in self.list_formats() {
+            for fext in fmt.file_extensions {
+                if *fext == ext {
+                    return Some(fmt);
+                }
+            }
+        }
+        None
     }
 
     fn format_of(&self, conf: &ReadStep) -> DataFormatDesc {
@@ -145,11 +164,13 @@ impl DataFormatRegistry for DataFormatRegistryImpl {
             MediaType::GEOJSON => Ok(ReadStepGeoJson { schema }.into()),
             MediaType::NDGEOJSON => Ok(ReadStepNdGeoJson { schema }.into()),
             MediaType::PARQUET => Ok(ReadStepParquet { schema }.into()),
-            MediaType::ESRI_SHAPEFILE => Ok(ReadStepEsriShapefile {
-                schema,
-                ..Default::default()
+            MediaType::ESRI_SHAPEFILE | MediaTypeRef("x-gis/x-shapefile") => {
+                Ok(ReadStepEsriShapefile {
+                    schema,
+                    ..Default::default()
+                }
+                .into())
             }
-            .into()),
             _ => Err(UnsupportedMediaTypeError::new(media_type.clone())),
         }
     }

@@ -24,13 +24,7 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
-use kamu_adapter_http::{
-    decode_upload_token_payload,
-    FileUploadLimitConfig,
-    UploadContext,
-    UploadService,
-    UploadServiceS3,
-};
+use kamu_adapter_http::{FileUploadLimitConfig, UploadContext, UploadService, UploadServiceS3};
 use time_source::SystemTimeSourceDefault;
 use tokio::io::AsyncReadExt;
 
@@ -216,13 +210,12 @@ async fn test_attempt_upload_file_authorized() {
 
         assert_eq!(200, s3_upload_response.status());
 
-        let upload_token_payload =
-            decode_upload_token_payload(&upload_context.upload_token).unwrap();
+        let upload_token = upload_context.upload_token.0;
 
         let expected_key = format!(
             "{}/{}/{}",
             DEFAULT_ACCOUNT_ID.as_multibase(),
-            upload_token_payload.upload_id,
+            upload_token.upload_id,
             "test.txt"
         );
         let file_exists = upload_bucket_context
