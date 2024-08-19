@@ -170,6 +170,7 @@ impl TaskExecutorImpl {
         let pull_options = PullOptions {
             ingest_options: PollingIngestOptions {
                 dataset_env_vars: dataset_env_vars_hash_map,
+                fetch_uncacheable: update_dataset_args.fetch_uncacheable,
                 ..Default::default()
             },
             ..Default::default()
@@ -186,7 +187,7 @@ impl TaskExecutorImpl {
 
         match maybe_pull_result {
             Ok(pull_result) => Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
-                pull_result.into(),
+                TaskUpdateDatasetResult { pull_result },
             ))),
             Err(err) => match err {
                 PullError::TransformError(TransformError::InvalidInterval(_)) => {

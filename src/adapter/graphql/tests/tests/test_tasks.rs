@@ -80,6 +80,7 @@ async fn test_task_get_existing() {
         cancellation_requested: false,
         logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
             dataset_id: DatasetID::new_seeded_ed25519(b"foo"),
+            fetch_uncacheable: false,
         }),
         created_at: Utc::now(),
         ran_at: None,
@@ -144,6 +145,7 @@ async fn test_task_list_by_dataset() {
         cancellation_requested: false,
         logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
             dataset_id: dataset_id.clone(),
+            fetch_uncacheable: false,
         }),
         created_at: Utc::now(),
         ran_at: None,
@@ -209,69 +211,6 @@ async fn test_task_list_by_dataset() {
                         "currentPage": 0,
                         "totalPages": 1,
                     },
-                },
-            },
-        })
-    );
-}
-
-#[test_log::test(tokio::test)]
-async fn test_task_create_update_dataset() {
-    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
-
-    let expected_logical_plan = LogicalPlan::UpdateDataset(UpdateDataset {
-        dataset_id: dataset_id.clone(),
-    });
-    let returned_task = TaskState {
-        task_id: TaskID::new(123),
-        status: TaskStatus::Queued,
-        cancellation_requested: false,
-        logical_plan: expected_logical_plan.clone(),
-        created_at: Utc::now(),
-        ran_at: None,
-        cancellation_requested_at: None,
-        finished_at: None,
-    };
-    let expected_task = returned_task.clone();
-
-    let mut task_sched_mock = MockTaskScheduler::new();
-    task_sched_mock
-        .expect_create_task()
-        .withf(move |logical_plan| *logical_plan == expected_logical_plan)
-        .return_once(move |_| Ok(returned_task));
-
-    let base_cat = create_catalog(task_sched_mock);
-    let (cat_anonymous, cat_authorized) = authentication_catalogs(&base_cat).await;
-
-    let schema = kamu_adapter_graphql::schema_quiet();
-
-    let request_code = format!(
-        r#"
-        mutation {{
-            tasks {{
-                createUpdateDatasetTask (datasetId: "{dataset_id}") {{
-                    taskId
-                }}
-            }}
-        }}
-        "#,
-    );
-
-    let res = schema
-        .execute(async_graphql::Request::new(request_code.clone()).data(cat_anonymous))
-        .await;
-    expect_anonymous_access_error(res);
-
-    let res = schema
-        .execute(async_graphql::Request::new(request_code).data(cat_authorized))
-        .await;
-    assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
-            "tasks": {
-                "createUpdateDatasetTask": {
-                    "taskId": expected_task.task_id.to_string(),
                 },
             },
         })

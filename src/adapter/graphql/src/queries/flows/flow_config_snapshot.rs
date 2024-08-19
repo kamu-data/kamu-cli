@@ -15,15 +15,10 @@ use crate::prelude::*;
 
 #[derive(Union)]
 pub enum FlowConfigurationSnapshot {
-    Batching(FlowConfigurationBatching),
-    Schedule(FlowConfigurationScheduleRule),
+    Transform(FlowConfigurationTransform),
     Compaction(FlowConfigurationCompactionRule),
+    Ingest(FlowConfigurationIngest),
     Reset(FlowConfigurationReset),
-}
-
-#[derive(SimpleObject)]
-pub struct FlowConfigurationScheduleRule {
-    schedule_rule: FlowConfigurationSchedule,
 }
 
 #[derive(SimpleObject)]
@@ -36,22 +31,14 @@ pub struct FlowConfigurationCompactionRule {
 impl From<fs::FlowConfigurationSnapshot> for FlowConfigurationSnapshot {
     fn from(value: fs::FlowConfigurationSnapshot) -> Self {
         match value {
-            fs::FlowConfigurationSnapshot::Batching(batching_rule) => {
-                Self::Batching(batching_rule.into())
+            fs::FlowConfigurationSnapshot::Ingest(ingest_rule) => Self::Ingest(ingest_rule.into()),
+            fs::FlowConfigurationSnapshot::Transform(transform_rule) => {
+                Self::Transform(transform_rule.into())
+            }
+            fs::FlowConfigurationSnapshot::Schedule(_) => {
+                unreachable!()
             }
             fs::FlowConfigurationSnapshot::Reset(reset_rule) => Self::Reset(reset_rule.into()),
-            fs::FlowConfigurationSnapshot::Schedule(schedule) => {
-                Self::Schedule(FlowConfigurationScheduleRule {
-                    schedule_rule: match schedule {
-                        fs::Schedule::TimeDelta(time_delta) => {
-                            FlowConfigurationSchedule::TimeDelta(time_delta.every.into())
-                        }
-                        fs::Schedule::Cron(cron) => {
-                            FlowConfigurationSchedule::Cron(cron.clone().into())
-                        }
-                    },
-                })
-            }
             fs::FlowConfigurationSnapshot::Compaction(compaction_rule) => {
                 Self::Compaction(FlowConfigurationCompactionRule {
                     compaction_rule: match compaction_rule {

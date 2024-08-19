@@ -7,17 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::*;
+use serde::{Deserialize, Serialize};
+
+use super::Schedule;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FlowConfigurationSnapshot {
-    Transform(TransformRule),
-    Compaction(CompactionRule),
-    Schedule(Schedule),
-    Ingest(IngestRule),
-    Reset(ResetRule),
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IngestRule {
+    pub fetch_uncacheable: bool,
+    // ToDo: Schedule should be on higher level and not mixed up
+    // with general configuration rules
+    pub schedule_condition: Schedule,
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

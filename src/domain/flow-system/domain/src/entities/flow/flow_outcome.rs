@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{CompactionResult, PullResult};
+use kamu_core::{CompactionResult, PullResult, PullResultUpToDate};
 use kamu_task_system::{self as ts, ResetDatasetTaskError, UpdateDatasetTaskError};
 use opendatafabric::{DatasetID, Multihash};
 use ts::TaskError;
@@ -85,9 +85,20 @@ impl From<&TaskError> for FlowError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowResultDatasetUpdate {
+pub enum FlowResultDatasetUpdate {
+    Changed(FlowResultDatasetUpdateChanged),
+    UpToDate(FlowResultDatasetUpdateUpToDate),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FlowResultDatasetUpdateChanged {
     pub old_head: Option<Multihash>,
     pub new_head: Multihash,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FlowResultDatasetUpdateUpToDate {
+    pub uncacheable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -108,9 +119,25 @@ impl From<ts::TaskResult> for FlowResult {
             ts::TaskResult::Empty => Self::Empty,
             ts::TaskResult::UpdateDatasetResult(task_update_result) => {
                 match task_update_result.pull_result {
-                    PullResult::UpToDate => Self::Empty,
+                    PullResult::UpToDate(up_to_date_result) => match up_to_date_result {
+                        PullResultUpToDate::Sync
+                        | PullResultUpToDate::Transform
+                        | PullResultUpToDate::SetWatermark => Self::Empty,
+                        PullResultUpToDate::PollingIngest(result) => Self::DatasetUpdate(
+                            FlowResultDatasetUpdate::UpToDate(FlowResultDatasetUpdateUpToDate {
+                                uncacheable: result.uncacheable,
+                            }),
+                        ),
+                        PullResultUpToDate::PushIngest(result) => Self::DatasetUpdate(
+                            FlowResultDatasetUpdate::UpToDate(FlowResultDatasetUpdateUpToDate {
+                                uncacheable: result.uncacheable,
+                            }),
+                        ),
+                    },
                     PullResult::Updated { old_head, new_head } => {
-                        Self::DatasetUpdate(FlowResultDatasetUpdate { old_head, new_head })
+                        Self::DatasetUpdate(FlowResultDatasetUpdate::Changed(
+                            FlowResultDatasetUpdateChanged { old_head, new_head },
+                        ))
                     }
                 }
             }

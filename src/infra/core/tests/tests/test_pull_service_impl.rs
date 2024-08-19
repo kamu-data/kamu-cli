@@ -760,7 +760,7 @@ async fn test_set_watermark() {
                 Utc.with_ymd_and_hms(2000, 1, 3, 0, 0, 0).unwrap()
             )
             .await,
-        Ok(PullResult::UpToDate)
+        Ok(PullResult::UpToDate(_))
     );
     assert_eq!(harness.num_blocks(&dataset_alias).await, 3);
 
@@ -772,7 +772,7 @@ async fn test_set_watermark() {
                 Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
             )
             .await,
-        Ok(PullResult::UpToDate)
+        Ok(PullResult::UpToDate(_))
     );
     assert_eq!(harness.num_blocks(&dataset_alias).await, 3);
 }

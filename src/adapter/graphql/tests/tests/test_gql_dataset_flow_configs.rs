@@ -56,14 +56,17 @@ async fn test_crud_time_delta_root_dataset() {
                             byType (datasetFlowType: "INGEST") {
                                 __typename
                                 paused
-                                schedule {
-                                    __typename
-                                    ... on TimeDelta {
-                                        every
-                                        unit
+                                ingest {
+                                    fetchUncacheable
+                                    schedule {
+                                        __typename
+                                        ... on TimeDelta {
+                                            every
+                                            unit
+                                        }
                                     }
                                 }
-                                batching {
+                                transform {
                                     __typename
                                 }
                                 compaction {
@@ -103,12 +106,13 @@ async fn test_crud_time_delta_root_dataset() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_config_time_delta_mutation(
+    let mutation_code = FlowConfigHarness::set_ingest_config_time_delta_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
         false,
         1,
         "DAYS",
+        false,
     );
 
     let res = schema
@@ -126,18 +130,21 @@ async fn test_crud_time_delta_root_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigSchedule": {
+                            "setConfigIngest": {
                                 "__typename": "SetFlowConfigSuccess",
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
                                     "paused": false,
-                                    "schedule": {
-                                        "__typename": "TimeDelta",
-                                        "every": 1,
-                                        "unit": "DAYS"
+                                    "ingest": {
+                                        "fetchUncacheable": false,
+                                        "schedule": {
+                                            "__typename": "TimeDelta",
+                                            "every": 1,
+                                            "unit": "DAYS"
+                                        },
                                     },
-                                    "batching": null,
+                                    "transform": null,
                                     "compaction": null
                                 }
                             }
@@ -148,12 +155,13 @@ async fn test_crud_time_delta_root_dataset() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_config_time_delta_mutation(
+    let mutation_code = FlowConfigHarness::set_ingest_config_time_delta_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
         true,
         2,
         "HOURS",
+        false,
     );
 
     let res = schema
@@ -171,18 +179,21 @@ async fn test_crud_time_delta_root_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigSchedule": {
+                            "setConfigIngest": {
                                 "__typename": "SetFlowConfigSuccess",
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
                                     "paused": true,
-                                    "schedule": {
-                                        "__typename": "TimeDelta",
-                                        "every": 2,
-                                        "unit": "HOURS"
+                                    "ingest": {
+                                        "fetchUncacheable": false,
+                                        "schedule": {
+                                            "__typename": "TimeDelta",
+                                            "every": 2,
+                                            "unit": "HOURS"
+                                        },
                                     },
-                                    "batching": null,
+                                    "transform": null,
                                     "compaction": null
                                 }
                             }
@@ -215,12 +226,13 @@ async fn test_time_delta_validation() {
         (169, "DAYS"),
         (169, "WEEKS"),
     ] {
-        let mutation_code = FlowConfigHarness::set_config_time_delta_mutation(
+        let mutation_code = FlowConfigHarness::set_ingest_config_time_delta_mutation(
             &create_result.dataset_handle.id,
             "INGEST",
             true,
             test_case.0,
             test_case.1,
+            false,
         );
 
         let response = schema
@@ -244,12 +256,13 @@ async fn test_time_delta_validation() {
         (48, "HOURS", 2, "DAYS"),
         (7, "DAYS", 1, "WEEKS"),
     ] {
-        let mutation_code = FlowConfigHarness::set_config_time_delta_mutation(
+        let mutation_code = FlowConfigHarness::set_ingest_config_time_delta_mutation(
             &create_result.dataset_handle.id,
             "INGEST",
             true,
             test_case.0,
             test_case.1,
+            false,
         );
 
         let response = schema
@@ -289,13 +302,16 @@ async fn test_crud_cron_root_dataset() {
                             byType (datasetFlowType: "INGEST") {
                                 __typename
                                 paused
-                                schedule {
-                                    __typename
-                                    ... on Cron5ComponentExpression {
-                                        cron5ComponentExpression
+                                ingest {
+                                    fetchUncacheable
+                                    schedule {
+                                        __typename
+                                        ... on Cron5ComponentExpression {
+                                            cron5ComponentExpression
+                                        }
                                     }
                                 }
-                                batching {
+                                transform {
                                     __typename
                                 }
                                 compaction {
@@ -335,11 +351,12 @@ async fn test_crud_cron_root_dataset() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
+    let mutation_code = FlowConfigHarness::set_ingest_config_cron_expression_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
         false,
         "*/2 * * * *",
+        false,
     );
 
     let res = schema
@@ -357,17 +374,20 @@ async fn test_crud_cron_root_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigSchedule": {
+                            "setConfigIngest": {
                                 "__typename": "SetFlowConfigSuccess",
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
                                     "paused": false,
-                                    "schedule": {
-                                        "__typename": "Cron5ComponentExpression",
-                                        "cron5ComponentExpression": "*/2 * * * *",
+                                    "ingest": {
+                                        "fetchUncacheable": false,
+                                        "schedule": {
+                                            "__typename": "Cron5ComponentExpression",
+                                            "cron5ComponentExpression": "*/2 * * * *",
+                                        },
                                     },
-                                    "batching": null,
+                                    "transform": null,
                                     "compaction": null
                                 }
                             }
@@ -378,11 +398,12 @@ async fn test_crud_cron_root_dataset() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
+    let mutation_code = FlowConfigHarness::set_ingest_config_cron_expression_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
         true,
         "0 */1 * * *",
+        false,
     );
 
     let res = schema
@@ -400,17 +421,20 @@ async fn test_crud_cron_root_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigSchedule": {
+                            "setConfigIngest": {
                                 "__typename": "SetFlowConfigSuccess",
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
                                     "paused": true,
-                                    "schedule": {
-                                        "__typename": "Cron5ComponentExpression",
-                                        "cron5ComponentExpression": "0 */1 * * *",
+                                    "ingest": {
+                                        "fetchUncacheable": false,
+                                        "schedule": {
+                                            "__typename": "Cron5ComponentExpression",
+                                            "cron5ComponentExpression": "0 */1 * * *",
+                                        },
                                     },
-                                    "batching": null,
+                                    "transform": null,
                                     "compaction": null
                                 }
                             }
@@ -423,11 +447,12 @@ async fn test_crud_cron_root_dataset() {
 
     // Try to pass invalid cron expression
     let invalid_cron_expression = "0 0 */1 *";
-    let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
+    let mutation_code = FlowConfigHarness::set_ingest_config_cron_expression_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
         true,
         invalid_cron_expression,
+        false,
     );
 
     let res = schema
@@ -444,11 +469,12 @@ async fn test_crud_cron_root_dataset() {
 
     // Try to pass valid cron expression with year (not supported)
     let past_cron_expression = "0 0 1 JAN ? 2024";
-    let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
+    let mutation_code = FlowConfigHarness::set_ingest_config_cron_expression_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
         true,
         past_cron_expression,
+        false,
     );
 
     let res = schema
@@ -467,7 +493,7 @@ async fn test_crud_cron_root_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_crud_batching_derived_dataset() {
+async fn test_crud_transform_derived_dataset() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -486,10 +512,10 @@ async fn test_crud_batching_derived_dataset() {
                             byType (datasetFlowType: "EXECUTE_TRANSFORM") {
                                 __typename
                                 paused
-                                schedule {
+                                ingest {
                                     __typename
                                 }
-                                batching {
+                                transform {
                                     __typename
                                     minRecordsToAwait
                                     maxBatchingInterval {
@@ -534,7 +560,7 @@ async fn test_crud_batching_derived_dataset() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_config_batching_mutation(
+    let mutation_code = FlowConfigHarness::set_config_transform_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
         false,
@@ -557,15 +583,15 @@ async fn test_crud_batching_derived_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigBatching": {
+                            "setConfigTransform": {
                                 "__typename": "SetFlowConfigSuccess",
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
                                     "paused": false,
-                                    "schedule": null,
-                                    "batching": {
-                                        "__typename": "FlowConfigurationBatching",
+                                    "ingest": null,
+                                    "transform": {
+                                        "__typename": "FlowConfigurationTransform",
                                         "minRecordsToAwait": 1,
                                         "maxBatchingInterval": {
                                             "every": 30,
@@ -604,10 +630,10 @@ async fn test_crud_compaction_root_dataset() {
                             byType (datasetFlowType: "HARD_COMPACTION") {
                                 __typename
                                 paused
-                                schedule {
+                                ingest {
                                     __typename
                                 }
-                                batching {
+                                transform {
                                     __typename
                                 }
                                 compaction {
@@ -683,8 +709,8 @@ async fn test_crud_compaction_root_dataset() {
                                 "config": {
                                     "__typename": "FlowConfiguration",
                                     "paused": false,
-                                    "schedule": null,
-                                    "batching": null,
+                                    "ingest": null,
+                                    "transform": null,
                                     "compaction": {
                                         "__typename": "CompactionFull",
                                         "maxSliceSize": 1_000_000,
@@ -704,7 +730,7 @@ async fn test_crud_compaction_root_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_batching_config_validation() {
+async fn test_transform_config_validation() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
         transform_service_mock: Some(MockTransformService::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -735,7 +761,7 @@ async fn test_batching_config_validation() {
             "Maximum interval to await should not exceed 24 hours",
         ),
     ] {
-        let mutation_code = FlowConfigHarness::set_config_batching_mutation(
+        let mutation_code = FlowConfigHarness::set_config_transform_mutation(
             &create_derived_result.dataset_handle.id,
             "EXECUTE_TRANSFORM",
             true,
@@ -757,8 +783,8 @@ async fn test_batching_config_validation() {
                         "byId": {
                             "flows": {
                                 "configs": {
-                                    "setConfigBatching": {
-                                        "__typename": "FlowInvalidBatchingConfig",
+                                    "setConfigTransform": {
+                                        "__typename": "FlowInvalidTransformConfig",
                                         "message": test_case.3,
                                     }
                                 }
@@ -909,12 +935,13 @@ async fn test_pause_resume_dataset_flows() {
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let mutation_set_ingest = FlowConfigHarness::set_config_time_delta_mutation(
+    let mutation_set_ingest = FlowConfigHarness::set_ingest_config_time_delta_mutation(
         &create_root_result.dataset_handle.id,
         "INGEST",
         false,
         1,
         "DAYS",
+        false,
     );
 
     let res = schema
@@ -925,7 +952,7 @@ async fn test_pause_resume_dataset_flows() {
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    let mutation_set_transform = FlowConfigHarness::set_config_batching_mutation(
+    let mutation_set_transform = FlowConfigHarness::set_config_transform_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
         false,
@@ -1133,7 +1160,7 @@ async fn test_conditions_not_met_for_flows() {
 
     ////
 
-    let mutation_code = FlowConfigHarness::set_config_batching_mutation(
+    let mutation_code = FlowConfigHarness::set_config_transform_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
         false,
@@ -1158,7 +1185,7 @@ async fn test_conditions_not_met_for_flows() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigBatching": {
+                            "setConfigTransform": {
                                 "__typename": "FlowPreconditionsNotMet",
                                 "message": "Flow didn't met preconditions: 'No SetTransform event defined'",
                             }
@@ -1171,11 +1198,12 @@ async fn test_conditions_not_met_for_flows() {
 
     ////
 
-    let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
+    let mutation_code = FlowConfigHarness::set_ingest_config_cron_expression_mutation(
         &create_root_result.dataset_handle.id,
         "INGEST",
         false,
         "0 */2 * * *",
+        false,
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -1195,7 +1223,7 @@ async fn test_conditions_not_met_for_flows() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigSchedule": {
+                            "setConfigIngest": {
                                 "__typename": "FlowPreconditionsNotMet",
                                 "message": "Flow didn't met preconditions: 'No SetPollingSource event defined'",
                             }
@@ -1221,7 +1249,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     ////
 
-    let mutation_code = FlowConfigHarness::set_config_batching_mutation(
+    let mutation_code = FlowConfigHarness::set_config_transform_mutation(
         &create_root_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
         false,
@@ -1246,7 +1274,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigBatching": {
+                            "setConfigTransform": {
                                 "__typename": "FlowIncompatibleDatasetKind",
                                 "message": "Expected a Derivative dataset, but a Root dataset was provided",
                             }
@@ -1259,11 +1287,12 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     ////
 
-    let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
+    let mutation_code = FlowConfigHarness::set_ingest_config_cron_expression_mutation(
         &create_derived_result.dataset_handle.id,
         "INGEST",
         false,
         "0 */2 * * *",
+        false,
     );
 
     let res = schema
@@ -1281,7 +1310,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigSchedule": {
+                            "setConfigIngest": {
                                 "__typename": "FlowIncompatibleDatasetKind",
                                 "message": "Expected a Root dataset, but a Derivative dataset was provided",
                             }
@@ -1294,12 +1323,13 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     ////
 
-    let mutation_code = FlowConfigHarness::set_config_time_delta_mutation(
+    let mutation_code = FlowConfigHarness::set_ingest_config_time_delta_mutation(
         &create_derived_result.dataset_handle.id,
         "INGEST",
         false,
         2,
         "HOURS",
+        false,
     );
 
     let res = schema
@@ -1317,7 +1347,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigSchedule": {
+                            "setConfigIngest": {
                                 "__typename": "FlowIncompatibleDatasetKind",
                                 "message": "Expected a Root dataset, but a Derivative dataset was provided",
                             }
@@ -1378,7 +1408,7 @@ async fn test_set_config_for_hard_compaction_fails() {
 
     ////
 
-    let mutation_code = FlowConfigHarness::set_config_batching_mutation(
+    let mutation_code = FlowConfigHarness::set_config_transform_mutation(
         &create_root_result.dataset_handle.id,
         "HARD_COMPACTION",
         false,
@@ -1403,7 +1433,7 @@ async fn test_set_config_for_hard_compaction_fails() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigBatching": {
+                            "setConfigTransform": {
                                 "__typename": "FlowTypeIsNotSupported",
                                 "message": "Flow type is not supported",
                             }
@@ -1416,11 +1446,12 @@ async fn test_set_config_for_hard_compaction_fails() {
 
     ////
 
-    let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
+    let mutation_code = FlowConfigHarness::set_ingest_config_cron_expression_mutation(
         &create_root_result.dataset_handle.id,
         "HARD_COMPACTION",
         false,
         "0 */2 * * *",
+        false,
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -1440,7 +1471,7 @@ async fn test_set_config_for_hard_compaction_fails() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigSchedule": {
+                            "setConfigIngest": {
                                 "__typename": "FlowTypeIsNotSupported",
                                 "message": "Flow type is not supported",
                             }
@@ -1465,20 +1496,22 @@ async fn test_anonymous_setters_fail() {
     let create_derived_result = harness.create_derived_dataset().await;
 
     let mutation_codes = [
-        FlowConfigHarness::set_config_time_delta_mutation(
+        FlowConfigHarness::set_ingest_config_time_delta_mutation(
             &create_root_result.dataset_handle.id,
             "INGEST",
             false,
             30,
             "MINUTES",
+            false,
         ),
-        FlowConfigHarness::set_config_cron_expression_mutation(
+        FlowConfigHarness::set_ingest_config_cron_expression_mutation(
             &create_root_result.dataset_handle.id,
             "INGEST",
             false,
             "* */2 * * *",
+            false,
         ),
-        FlowConfigHarness::set_config_batching_mutation(
+        FlowConfigHarness::set_config_transform_mutation(
             &create_derived_result.dataset_handle.id,
             "EXECUTE_TRANSFORM",
             false,
@@ -1613,7 +1646,7 @@ impl FlowConfigHarness {
 
     fn extract_time_delta_from_response(response_json: &serde_json::Value) -> (u64, &str) {
         let schedule_json = &response_json["datasets"]["byId"]["flows"]["configs"]
-            ["setConfigSchedule"]["config"]["schedule"];
+            ["setConfigIngest"]["config"]["ingest"]["schedule"];
 
         (
             schedule_json["every"].as_u64().unwrap(),
@@ -1621,12 +1654,13 @@ impl FlowConfigHarness {
         )
     }
 
-    fn set_config_time_delta_mutation(
+    fn set_ingest_config_time_delta_mutation(
         id: &DatasetID,
         dataset_flow_type: &str,
         paused: bool,
         every: u64,
         unit: &str,
+        feach_uncacheable: bool,
     ) -> String {
         indoc!(
             r#"
@@ -1635,11 +1669,14 @@ impl FlowConfigHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             configs {
-                                setConfigSchedule (
+                                setConfigIngest (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    schedule: {
-                                        timeDelta: { every: <every>, unit: "<unit>" }
+                                    ingest: {
+                                        fetchUncacheable: <feach_uncacheable>,
+                                        schedule: {
+                                            timeDelta: { every: <every>, unit: "<unit>" }
+                                        }
                                     }
                                 ) {
                                     __typename,
@@ -1648,14 +1685,17 @@ impl FlowConfigHarness {
                                         config {
                                             __typename
                                             paused
-                                            schedule {
-                                                __typename
-                                                ... on TimeDelta {
-                                                    every
-                                                    unit
+                                            ingest {
+                                                fetchUncacheable,
+                                                schedule {
+                                                    __typename
+                                                    ... on TimeDelta {
+                                                        every
+                                                        unit
+                                                    }
                                                 }
                                             }
-                                            batching {
+                                            transform {
                                                 __typename
                                             }
                                             compaction {
@@ -1674,15 +1714,20 @@ impl FlowConfigHarness {
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<paused>", if paused { "true" } else { "false" })
+        .replace(
+            "<feach_uncacheable>",
+            if feach_uncacheable { "true" } else { "false" },
+        )
         .replace("<every>", every.to_string().as_str())
         .replace("<unit>", unit)
     }
 
-    fn set_config_cron_expression_mutation(
+    fn set_ingest_config_cron_expression_mutation(
         id: &DatasetID,
         dataset_flow_type: &str,
         paused: bool,
         cron_expression: &str,
+        feach_uncacheable: bool,
     ) -> String {
         indoc!(
             r#"
@@ -1691,11 +1736,14 @@ impl FlowConfigHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             configs {
-                                setConfigSchedule (
+                                setConfigIngest (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    schedule: {
-                                        cron5ComponentExpression: "<cron_expression>"
+                                    ingest: {
+                                        fetchUncacheable: <feach_uncacheable>,
+                                        schedule: {
+                                            cron5ComponentExpression: "<cron_expression>"
+                                        }
                                     }
                                 ) {
                                     __typename,
@@ -1704,13 +1752,16 @@ impl FlowConfigHarness {
                                         config {
                                             __typename,
                                             paused
-                                            schedule {
-                                                __typename
-                                                ... on Cron5ComponentExpression {
-                                                    cron5ComponentExpression
+                                            ingest {
+                                                fetchUncacheable,
+                                                schedule {
+                                                    __typename
+                                                    ... on Cron5ComponentExpression {
+                                                        cron5ComponentExpression
+                                                    }
                                                 }
                                             }
-                                            batching {
+                                            transform {
                                                 __typename
                                             }
                                             compaction {
@@ -1729,10 +1780,14 @@ impl FlowConfigHarness {
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<paused>", if paused { "true" } else { "false" })
+        .replace(
+            "<feach_uncacheable>",
+            if feach_uncacheable { "true" } else { "false" },
+        )
         .replace("<cron_expression>", cron_expression)
     }
 
-    fn set_config_batching_mutation(
+    fn set_config_transform_mutation(
         id: &DatasetID,
         dataset_flow_type: &str,
         paused: bool,
@@ -1746,10 +1801,10 @@ impl FlowConfigHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             configs {
-                                setConfigBatching (
+                                setConfigTransform (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    batching: {
+                                    transform: {
                                         minRecordsToAwait: <minRecordsToAwait>,
                                         maxBatchingInterval: { every: <every>, unit: "<unit>" }
                                     }
@@ -1763,10 +1818,10 @@ impl FlowConfigHarness {
                                             config {
                                                 __typename
                                                 paused
-                                                schedule {
+                                                ingest {
                                                     __typename
                                                 }
-                                                batching {
+                                                transform {
                                                     __typename
                                                     minRecordsToAwait
                                                     maxBatchingInterval {
@@ -1829,10 +1884,10 @@ impl FlowConfigHarness {
                                             config {
                                                 __typename
                                                 paused
-                                                schedule {
+                                                ingest {
                                                     __typename
                                                 }
-                                                batching {
+                                                transform {
                                                     __typename
                                                 }
                                                 compaction {

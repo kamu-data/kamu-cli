@@ -9,16 +9,17 @@
 
 use chrono::Utc;
 use kamu_flow_system::{
-    BatchingRule,
     CompactionRule,
     CompactionRuleFull,
     CompactionRuleMetadataOnly,
     FlowConfigurationRule,
     FlowConfigurationService,
     FlowKeyDataset,
+    IngestRule,
     Schedule,
-    ScheduleTimeDelta,
+    ScheduleCronError,
     SetFlowConfigurationError,
+    TransformRule,
 };
 use opendatafabric as odf;
 
@@ -47,12 +48,12 @@ impl DatasetFlowConfigsMut {
     }
 
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn set_config_schedule(
+    async fn set_config_ingest(
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
         paused: bool,
-        schedule: ScheduleInput,
+        ingest: IngestConditionInput,
     ) -> Result<SetFlowConfigResult> {
         if !ensure_set_config_flow_supported(dataset_flow_type, std::any::type_name::<Schedule>()) {
             return Ok(SetFlowConfigResult::TypeIsNotSupported(
@@ -73,15 +74,9 @@ impl DatasetFlowConfigsMut {
         }
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
-        let configuration_rule = match schedule {
-            ScheduleInput::TimeDelta(td) => {
-                Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
-            }
-            ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
-                Schedule::try_from_5component_cron_expression(&cron_5component_expression)
-                    .map_err(|e| GqlError::Gql(e.into()))?
-            }
-        };
+        let configuration_rule: IngestRule = ingest
+            .try_into()
+            .map_err(|e: ScheduleCronError| GqlError::Gql(e.into()))?;
 
         let res = flow_config_service
             .set_configuration(
@@ -89,7 +84,7 @@ impl DatasetFlowConfigsMut {
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 paused,
-                FlowConfigurationRule::Schedule(configuration_rule),
+                FlowConfigurationRule::IngestRule(configuration_rule),
             )
             .await
             .map_err(|e| match e {
@@ -102,29 +97,29 @@ impl DatasetFlowConfigsMut {
     }
 
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn set_config_batching(
+    async fn set_config_transform(
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
         paused: bool,
-        batching: BatchingConditionInput,
-    ) -> Result<SetFlowBatchingConfigResult> {
+        transform: TransformConditionInput,
+    ) -> Result<SetFlowTransformConfigResult> {
         if !ensure_set_config_flow_supported(
             dataset_flow_type,
-            std::any::type_name::<BatchingRule>(),
+            std::any::type_name::<TransformRule>(),
         ) {
-            return Ok(SetFlowBatchingConfigResult::TypeIsNotSupported(
+            return Ok(SetFlowTransformConfigResult::TypeIsNotSupported(
                 FlowTypeIsNotSupported,
             ));
         }
-        let batching_rule = match BatchingRule::new_checked(
-            batching.min_records_to_await,
-            batching.max_batching_interval.into(),
+        let transform_rule = match TransformRule::new_checked(
+            transform.min_records_to_await,
+            transform.max_batching_interval.into(),
         ) {
             Ok(rule) => rule,
             Err(e) => {
-                return Ok(SetFlowBatchingConfigResult::InvalidBatchingConfig(
-                    FlowInvalidBatchingConfig {
+                return Ok(SetFlowTransformConfigResult::InvalidTransformConfig(
+                    FlowInvalidTransformConfig {
                         reason: e.to_string(),
                     },
                 ))
@@ -134,14 +129,14 @@ impl DatasetFlowConfigsMut {
         if let Some(e) =
             ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
         {
-            return Ok(SetFlowBatchingConfigResult::IncompatibleDatasetKind(e));
+            return Ok(SetFlowTransformConfigResult::IncompatibleDatasetKind(e));
         }
 
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
         if let Some(e) =
             ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type, None).await?
         {
-            return Ok(SetFlowBatchingConfigResult::PreconditionsNotMet(e));
+            return Ok(SetFlowTransformConfigResult::PreconditionsNotMet(e));
         }
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
@@ -152,16 +147,16 @@ impl DatasetFlowConfigsMut {
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 paused,
-                FlowConfigurationRule::BatchingRule(batching_rule),
+                FlowConfigurationRule::TransformRule(transform_rule),
             )
             .await
             .map_err(|e| match e {
                 SetFlowConfigurationError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        Ok(SetFlowBatchingConfigResult::Success(SetFlowConfigSuccess {
-            config: res.into(),
-        }))
+        Ok(SetFlowTransformConfigResult::Success(
+            SetFlowConfigSuccess { config: res.into() },
+        ))
     }
 
     #[graphql(guard = "LoggedInGuard::new()")]
@@ -310,12 +305,12 @@ impl FlowTypeIsNotSupported {
 
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
-pub(crate) struct FlowInvalidBatchingConfig {
+pub(crate) struct FlowInvalidTransformConfig {
     reason: String,
 }
 
 #[ComplexObject]
-impl FlowInvalidBatchingConfig {
+impl FlowInvalidTransformConfig {
     pub async fn message(&self) -> String {
         self.reason.clone()
     }
@@ -345,10 +340,10 @@ enum SetFlowCompactionConfigResult {
 
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
-enum SetFlowBatchingConfigResult {
+enum SetFlowTransformConfigResult {
     Success(SetFlowConfigSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
-    InvalidBatchingConfig(FlowInvalidBatchingConfig),
+    InvalidTransformConfig(FlowInvalidTransformConfig),
     PreconditionsNotMet(FlowPreconditionsNotMet),
     TypeIsNotSupported(FlowTypeIsNotSupported),
 }

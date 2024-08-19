@@ -207,18 +207,24 @@ impl FlowServiceImpl {
                     .add_dataset_flow_config(dataset_flow_key, rule.clone());
 
                 match &rule {
-                    FlowConfigurationRule::Schedule(schedule) => {
-                        self.enqueue_scheduled_auto_polling_flow(start_time, &flow_key, schedule)
-                            .await?;
-                    }
-                    FlowConfigurationRule::BatchingRule(_) => {
+                    FlowConfigurationRule::TransformRule(_) => {
                         self.enqueue_auto_polling_flow_unconditionally(start_time, &flow_key)
                             .await?;
                     }
-                    // Such as compaction and reset are very dangerous operations we
-                    // skip running them during activation flow configurations
+                    // Such as compaction and reset is very dangerous operation we
+                    // skip running it during activation flow configurations.
+                    // And schedule will be used only for system flows
                     FlowConfigurationRule::CompactionRule(_)
+                    | FlowConfigurationRule::Schedule(_)
                     | FlowConfigurationRule::ResetRule(_) => (),
+                    FlowConfigurationRule::IngestRule(ingest_rule) => {
+                        self.enqueue_scheduled_auto_polling_flow(
+                            start_time,
+                            &flow_key,
+                            &ingest_rule.schedule_condition,
+                        )
+                        .await?;
+                    }
                 }
             }
             FlowKey::System(system_flow_key) => {
@@ -373,13 +379,13 @@ impl FlowServiceImpl {
                     .int_err()?;
 
                 match context {
-                    FlowTriggerContext::Batching(batching_rule) => {
+                    FlowTriggerContext::Batching(transform_rule) => {
                         // Is this rule still waited?
                         if matches!(flow.start_condition, Some(FlowStartCondition::Batching(_))) {
-                            self.evaluate_flow_batching_rule(
+                            self.evaluate_flow_transform_rule(
                                 trigger_time,
                                 &mut flow,
-                                &batching_rule,
+                                &transform_rule,
                                 throttling_boundary_time,
                             )
                             .await?;
@@ -430,12 +436,12 @@ impl FlowServiceImpl {
                     .await?;
 
                 match context {
-                    FlowTriggerContext::Batching(batching_rule) => {
+                    FlowTriggerContext::Batching(transform_rule) => {
                         // Don't activate if batching condition not satisfied
-                        self.evaluate_flow_batching_rule(
+                        self.evaluate_flow_transform_rule(
                             trigger_time,
                             &mut flow,
-                            &batching_rule,
+                            &transform_rule,
                             throttling_boundary_time,
                         )
                         .await?;
@@ -493,11 +499,11 @@ impl FlowServiceImpl {
         }
     }
 
-    async fn evaluate_flow_batching_rule(
+    async fn evaluate_flow_transform_rule(
         &self,
         evaluation_time: DateTime<Utc>,
         flow: &mut Flow,
-        batching_rule: &BatchingRule,
+        transform_rule: &TransformRule,
         throttling_boundary_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
         assert!(matches!(
@@ -525,14 +531,19 @@ impl FlowServiceImpl {
                         // Compute increment since the first trigger by this dataset.
                         // Note: there might have been multiple updates since that time.
                         // We are only recording the first trigger of particular dataset.
-                        let increment = self
-                            .dataset_changes_service
-                            .get_increment_since(&trigger.dataset_id, update.old_head.as_ref())
-                            .await
-                            .int_err()?;
+                        if let FlowResultDatasetUpdate::Changed(update_result) = update {
+                            let increment = self
+                                .dataset_changes_service
+                                .get_increment_since(
+                                    &trigger.dataset_id,
+                                    update_result.old_head.as_ref(),
+                                )
+                                .await
+                                .int_err()?;
 
-                        accumulated_records_count += increment.num_records;
-                        watermark_modified |= increment.updated_watermark.is_some();
+                            accumulated_records_count += increment.num_records;
+                            watermark_modified |= increment.updated_watermark.is_some();
+                        }
                     }
                 }
             }
@@ -540,7 +551,7 @@ impl FlowServiceImpl {
 
         // The timeout for batching will happen at:
         let batching_deadline =
-            flow.primary_trigger().trigger_time() + *batching_rule.max_batching_interval();
+            flow.primary_trigger().trigger_time() + *transform_rule.max_batching_interval();
 
         // Accumulated something if at least some input changed or watermark was touched
         let accumulated_something = accumulated_records_count > 0 || watermark_modified;
@@ -551,7 +562,7 @@ impl FlowServiceImpl {
         //      - there is at least some change of the inputs
         //      - watermark got touched
         let satisfied = accumulated_something
-            && (accumulated_records_count >= batching_rule.min_records_to_await()
+            && (accumulated_records_count >= transform_rule.min_records_to_await()
                 || evaluation_time >= batching_deadline);
 
         // Set batching condition data, but only during the first rule evaluation.
@@ -562,7 +573,7 @@ impl FlowServiceImpl {
             flow.set_relevant_start_condition(
                 self.time_source.now(),
                 FlowStartCondition::Batching(FlowStartConditionBatching {
-                    active_batching_rule: *batching_rule,
+                    active_transform_rule: *transform_rule,
                     batching_deadline,
                 }),
             )
@@ -755,13 +766,20 @@ impl FlowServiceImpl {
     pub fn make_task_logical_plan(
         &self,
         flow_key: &FlowKey,
-        config_snapshot: Option<&FlowConfigurationSnapshot>,
+        maybe_config_snapshot: Option<&FlowConfigurationSnapshot>,
     ) -> Result<LogicalPlan, InternalError> {
         match flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
                 DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
+                    let mut fetch_uncacheable = false;
+                    if let Some(config_snapshot) = maybe_config_snapshot
+                        && let FlowConfigurationSnapshot::Ingest(ingest_rule) = config_snapshot
+                    {
+                        fetch_uncacheable = ingest_rule.fetch_uncacheable;
+                    }
                     Ok(LogicalPlan::UpdateDataset(UpdateDataset {
                         dataset_id: flow_key.dataset_id.clone(),
+                        fetch_uncacheable,
                     }))
                 }
                 DatasetFlowType::HardCompaction => {
@@ -769,8 +787,9 @@ impl FlowServiceImpl {
                     let mut max_slice_records: Option<u64> = None;
                     let mut keep_metadata_only = false;
 
-                    if let Some(config_rule) = config_snapshot
-                        && let FlowConfigurationSnapshot::Compaction(compaction_rule) = config_rule
+                    if let Some(config_snapshot) = maybe_config_snapshot
+                        && let FlowConfigurationSnapshot::Compaction(compaction_rule) =
+                            config_snapshot
                     {
                         max_slice_size = compaction_rule.max_slice_size();
                         max_slice_records = compaction_rule.max_slice_records();
@@ -786,7 +805,7 @@ impl FlowServiceImpl {
                     }))
                 }
                 DatasetFlowType::Reset => {
-                    if let Some(config_rule) = config_snapshot
+                    if let Some(config_rule) = maybe_config_snapshot
                         && let FlowConfigurationSnapshot::Reset(reset_rule) = config_rule
                     {
                         return Ok(LogicalPlan::Reset(ResetDataset {
@@ -836,17 +855,19 @@ impl FlowServiceImpl {
             DownstreamDependencyTriggerType::TriggerAllEnabledExecuteTransform => {
                 let guard = self.state.lock().unwrap();
                 for dataset_id in dependent_dataset_ids {
-                    if let Some(batching_rule) = guard.active_configs.try_get_dataset_batching_rule(
-                        &dataset_id,
-                        DatasetFlowType::ExecuteTransform,
-                    ) {
+                    if let Some(transform_rule) =
+                        guard.active_configs.try_get_dataset_transform_rule(
+                            &dataset_id,
+                            DatasetFlowType::ExecuteTransform,
+                        )
+                    {
                         plans.push(DownstreamDependencyFlowPlan {
                             flow_key: FlowKeyDataset::new(
                                 dataset_id,
                                 DatasetFlowType::ExecuteTransform,
                             )
                             .into(),
-                            flow_trigger_context: FlowTriggerContext::Batching(batching_rule),
+                            flow_trigger_context: FlowTriggerContext::Batching(transform_rule),
                             maybe_config_snapshot: None,
                         });
                     };
@@ -1558,7 +1579,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowServiceImpl {
 pub enum FlowTriggerContext {
     Unconditional,
     Scheduled(Schedule),
-    Batching(BatchingRule),
+    Batching(TransformRule),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

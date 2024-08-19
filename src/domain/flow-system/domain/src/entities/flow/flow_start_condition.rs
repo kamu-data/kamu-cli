@@ -10,7 +10,7 @@
 use chrono::{DateTime, Duration, Utc};
 use kamu_task_system::TaskID;
 
-use crate::BatchingRule;
+use crate::TransformRule;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,7 +42,7 @@ pub struct FlowStartConditionThrottling {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FlowStartConditionBatching {
-    pub active_batching_rule: BatchingRule,
+    pub active_transform_rule: TransformRule,
     pub batching_deadline: DateTime<Utc>,
 }
 

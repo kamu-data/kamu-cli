@@ -11,8 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::ResetRule;
-use crate::{BatchingRule, CompactionRule, Schedule};
+use crate::{CompactionRule, IngestRule, ResetRule, Schedule, TransformRule};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "dataset_flow_type", rename_all = "snake_case")]
@@ -45,9 +44,12 @@ impl DatasetFlowType {
 
     pub fn config_restriction(&self, flow_configuration_type: &'static str) -> bool {
         match self {
-            DatasetFlowType::Ingest => flow_configuration_type == std::any::type_name::<Schedule>(),
+            DatasetFlowType::Ingest => {
+                flow_configuration_type == std::any::type_name::<Schedule>()
+                    || flow_configuration_type == std::any::type_name::<IngestRule>()
+            }
             DatasetFlowType::ExecuteTransform => {
-                flow_configuration_type == std::any::type_name::<BatchingRule>()
+                flow_configuration_type == std::any::type_name::<TransformRule>()
             }
             DatasetFlowType::HardCompaction => {
                 flow_configuration_type == std::any::type_name::<CompactionRule>()

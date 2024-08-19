@@ -63,12 +63,6 @@ pub struct TaskResetDatasetResult {
     pub new_head: Multihash,
 }
 
-impl From<PullResult> for TaskUpdateDatasetResult {
-    fn from(value: PullResult) -> Self {
-        Self { pull_result: value }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskCompactionDatasetResult {
     pub compaction_result: CompactionResult,

@@ -9,16 +9,18 @@
 
 use kamu_core::MetadataChainExt;
 use kamu_flow_system::{
-    BatchingRule,
     CompactionRule,
     CompactionRuleFull,
     CompactionRuleMetadataOnly,
     FlowConfigurationRule,
     FlowConfigurationSnapshot,
+    IngestRule,
     ResetRule,
     Schedule,
     ScheduleCron,
+    ScheduleCronError,
     ScheduleTimeDelta,
+    TransformRule,
 };
 use opendatafabric::DatasetHandle;
 
@@ -30,8 +32,8 @@ use crate::prelude::*;
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfiguration {
     pub paused: bool,
-    pub schedule: Option<FlowConfigurationSchedule>,
-    pub batching: Option<FlowConfigurationBatching>,
+    pub ingest: Option<FlowConfigurationIngest>,
+    pub transform: Option<FlowConfigurationTransform>,
     pub compaction: Option<FlowConfigurationCompaction>,
     pub reset: Option<FlowConfigurationReset>,
 }
@@ -40,25 +42,18 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
     fn from(value: kamu_flow_system::FlowConfigurationState) -> Self {
         Self {
             paused: !value.is_active(),
-            batching: if let FlowConfigurationRule::BatchingRule(condition) = &value.rule {
+            transform: if let FlowConfigurationRule::TransformRule(condition) = &value.rule {
                 Some((*condition).into())
+            } else {
+                None
+            },
+            ingest: if let FlowConfigurationRule::IngestRule(ingest_rule) = &value.rule {
+                Some(ingest_rule.clone().into())
             } else {
                 None
             },
             reset: if let FlowConfigurationRule::ResetRule(condition) = &value.rule {
                 Some(condition.clone().into())
-            } else {
-                None
-            },
-            schedule: if let FlowConfigurationRule::Schedule(schedule) = &value.rule {
-                match schedule {
-                    Schedule::TimeDelta(time_delta) => Some(FlowConfigurationSchedule::TimeDelta(
-                        time_delta.every.into(),
-                    )),
-                    Schedule::Cron(cron) => {
-                        Some(FlowConfigurationSchedule::Cron(cron.clone().into()))
-                    }
-                }
             } else {
                 None
             },
@@ -79,6 +74,26 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
     }
 }
 
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowConfigurationIngest {
+    pub schedule: FlowConfigurationSchedule,
+    pub fetch_uncacheable: bool,
+}
+
+impl From<IngestRule> for FlowConfigurationIngest {
+    fn from(value: IngestRule) -> Self {
+        Self {
+            fetch_uncacheable: value.fetch_uncacheable,
+            schedule: match value.schedule_condition {
+                Schedule::TimeDelta(time_delta) => {
+                    FlowConfigurationSchedule::TimeDelta(time_delta.every.into())
+                }
+                Schedule::Cron(cron) => FlowConfigurationSchedule::Cron(cron.clone().into()),
+            },
+        }
+    }
+}
+
 #[derive(Union, Clone, PartialEq, Eq)]
 pub enum FlowConfigurationSchedule {
     TimeDelta(TimeDelta),
@@ -86,13 +101,13 @@ pub enum FlowConfigurationSchedule {
 }
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowConfigurationBatching {
+pub struct FlowConfigurationTransform {
     pub min_records_to_await: u64,
     pub max_batching_interval: TimeDelta,
 }
 
-impl From<BatchingRule> for FlowConfigurationBatching {
-    fn from(value: BatchingRule) -> Self {
+impl From<TransformRule> for FlowConfigurationTransform {
+    fn from(value: TransformRule) -> Self {
         Self {
             min_records_to_await: value.min_records_to_await(),
             max_batching_interval: (*value.max_batching_interval()).into(),
@@ -263,13 +278,13 @@ impl From<chrono::Duration> for TimeDelta {
 
 #[derive(OneofObject)]
 pub enum FlowRunConfiguration {
-    Schedule(ScheduleInput),
-    Batching(BatchingConditionInput),
+    Transform(TransformConditionInput),
     Compaction(CompactionConditionInput),
+    Ingest(IngestConditionInput),
     Reset(ResetConditionInput),
 }
 
-#[derive(OneofObject)]
+#[derive(OneofObject, Clone)]
 pub enum ScheduleInput {
     TimeDelta(TimeDeltaInput),
     /// Supported CRON syntax: min hour dayOfMonth month dayOfWeek
@@ -307,7 +322,7 @@ impl From<&TimeDeltaInput> for chrono::Duration {
 }
 
 #[derive(InputObject)]
-pub struct BatchingConditionInput {
+pub struct TransformConditionInput {
     pub min_records_to_await: u64,
     pub max_batching_interval: TimeDeltaInput,
 }
@@ -362,6 +377,34 @@ pub struct CompactionConditionMetadataOnly {
     pub recursive: bool,
 }
 
+#[derive(InputObject, Clone)]
+pub struct IngestConditionInput {
+    /// Flag indicates to ignore cache during ingest step for API calls
+    pub fetch_uncacheable: bool,
+    pub schedule: ScheduleInput,
+}
+
+impl TryFrom<IngestConditionInput> for IngestRule {
+    type Error = ScheduleCronError;
+
+    fn try_from(value: IngestConditionInput) -> std::result::Result<Self, Self::Error> {
+        let schedule = match value.schedule {
+            ScheduleInput::TimeDelta(td) => {
+                Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
+            }
+            ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
+                Schedule::try_from_5component_cron_expression(&cron_5component_expression)?
+            }
+        };
+        Ok(Self {
+            fetch_uncacheable: value.fetch_uncacheable,
+            schedule_condition: schedule,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl FlowRunConfiguration {
     pub async fn try_into_snapshot(
         ctx: &Context<'_>,
@@ -372,9 +415,10 @@ impl FlowRunConfiguration {
         match dataset_flow_type {
             DatasetFlowType::Ingest => {
                 if let Some(flow_run_configuration) = flow_run_configuration_maybe {
-                    if let Self::Schedule(schedule_input) = flow_run_configuration {
-                        return Ok(Some(FlowConfigurationSnapshot::Schedule(
-                            match schedule_input {
+                    if let Self::Ingest(ingest_input) = flow_run_configuration {
+                        return Ok(Some(FlowConfigurationSnapshot::Ingest(IngestRule {
+                            fetch_uncacheable: ingest_input.fetch_uncacheable,
+                            schedule_condition: match &ingest_input.schedule {
                                 ScheduleInput::TimeDelta(td) => {
                                     Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
                                 }
@@ -390,7 +434,7 @@ impl FlowRunConfiguration {
                                     }
                                 })?,
                             },
-                        )));
+                        })));
                     }
                     return Err(FlowInvalidRunConfigurations {
                         error: "Incompatible flow run configuration and dataset flow type"
@@ -400,15 +444,15 @@ impl FlowRunConfiguration {
             }
             DatasetFlowType::ExecuteTransform => {
                 if let Some(flow_run_configuration) = flow_run_configuration_maybe {
-                    if let Self::Batching(batching_input) = flow_run_configuration {
-                        return Ok(Some(FlowConfigurationSnapshot::Batching(
-                            BatchingRule::new_checked(
-                                batching_input.min_records_to_await,
-                                batching_input.max_batching_interval.clone().into(),
+                    if let Self::Transform(transform_input) = flow_run_configuration {
+                        return Ok(Some(FlowConfigurationSnapshot::Transform(
+                            TransformRule::new_checked(
+                                transform_input.min_records_to_await,
+                                transform_input.max_batching_interval.clone().into(),
                             )
                             .map_err(|_| {
                                 FlowInvalidRunConfigurations {
-                                    error: "Invalid batching flow run configuration".to_string(),
+                                    error: "Invalid transform flow run configuration".to_string(),
                                 }
                             })?,
                         )));

@@ -322,12 +322,13 @@ async fn test_pause_resume_account_flows() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_config_time_delta_mutation(
+    let mutation_code = FlowConfigHarness::set_ingest_config_time_delta_mutation(
         &foo_create_result.dataset_handle.id,
         "INGEST",
         false,
         1,
         "DAYS",
+        false,
     );
     let response = schema
         .execute(
@@ -528,12 +529,13 @@ async fn test_account_configs_all_paused() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_config_time_delta_mutation(
+    let mutation_code = FlowConfigHarness::set_ingest_config_time_delta_mutation(
         &bar_create_result.dataset_handle.id,
         "INGEST",
         false,
         1,
         "DAYS",
+        false,
     );
     let response = schema
         .execute(
@@ -773,25 +775,43 @@ impl FlowConfigHarness {
                                           ... on FlowDescriptionDatasetExecuteTransform {
                                               datasetId
                                               transformResult {
-                                                  numBlocks
-                                                  numRecords
+                                                __typename
+                                                ... on FlowDescriptionUpdateResultUpToDate {
+                                                    uncacheable
+                                                }
+                                                ... on FlowDescriptionUpdateResultSuccess {
+                                                    numBlocks
+                                                    numRecords
+                                                }
                                               }
                                           }
                                           ... on FlowDescriptionDatasetPollingIngest {
-                                              datasetId
-                                              ingestResult {
-                                                  numBlocks
-                                                  numRecords
-                                              }
+                                            datasetId
+                                            ingestResult {
+                                                __typename
+                                                ... on FlowDescriptionUpdateResultUpToDate {
+                                                    uncacheable
+                                                }
+                                                ... on FlowDescriptionUpdateResultSuccess {
+                                                    numBlocks
+                                                    numRecords
+                                                }
+                                            }
                                           }
                                           ... on FlowDescriptionDatasetPushIngest {
                                               datasetId
                                               sourceName
                                               inputRecordsCount
                                               ingestResult {
-                                                  numBlocks
-                                                  numRecords
-                                              }
+                                                __typename
+                                                ... on FlowDescriptionUpdateResultUpToDate {
+                                                    uncacheable
+                                                }
+                                                ... on FlowDescriptionUpdateResultSuccess {
+                                                    numBlocks
+                                                    numRecords
+                                                }
+                                            }
                                           }
                                       }
                                       status
@@ -844,7 +864,7 @@ impl FlowConfigHarness {
                                           __typename
                                           ... on FlowStartConditionBatching {
                                               accumulatedRecordsCount
-                                              activeBatchingRule {
+                                              activeTransformRule {
                                                   __typename
                                                   minRecordsToAwait
                                                   maxBatchingInterval {
@@ -1010,12 +1030,13 @@ impl FlowConfigHarness {
         .replace("<account_name>", account_name)
     }
 
-    fn set_config_time_delta_mutation(
+    fn set_ingest_config_time_delta_mutation(
         id: &DatasetID,
         dataset_flow_type: &str,
         paused: bool,
         every: u64,
         unit: &str,
+        feach_uncacheable: bool,
     ) -> String {
         indoc!(
             r#"
@@ -1024,11 +1045,14 @@ impl FlowConfigHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             configs {
-                                setConfigSchedule (
+                                setConfigIngest (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    schedule: {
-                                        timeDelta: { every: <every>, unit: "<unit>" }
+                                    ingest: {
+                                        fetchUncacheable: <feach_uncacheable>,
+                                        schedule: {
+                                            timeDelta: { every: <every>, unit: "<unit>" }
+                                        }
                                     }
                                 ) {
                                     __typename,
@@ -1037,14 +1061,17 @@ impl FlowConfigHarness {
                                         config {
                                             __typename
                                             paused
-                                            schedule {
-                                                __typename
-                                                ... on TimeDelta {
-                                                    every
-                                                    unit
+                                            ingest {
+                                                fetchUncacheable
+                                                schedule {
+                                                    __typename
+                                                    ... on TimeDelta {
+                                                        every
+                                                        unit
+                                                    }
                                                 }
                                             }
-                                            batching {
+                                            transform {
                                                 __typename
                                             }
                                             compaction {
@@ -1063,6 +1090,10 @@ impl FlowConfigHarness {
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<paused>", if paused { "true" } else { "false" })
+        .replace(
+            "<feach_uncacheable>",
+            if feach_uncacheable { "true" } else { "false" },
+        )
         .replace("<every>", every.to_string().as_str())
         .replace("<unit>", unit)
     }

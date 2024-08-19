@@ -188,7 +188,7 @@ impl std::fmt::Display for FlowSystemTestListener {
                             FlowStartCondition::Batching(b) => write!(
                                 f,
                                 " Batching({}, until={}ms)",
-                                b.active_batching_rule.min_records_to_await(),
+                                b.active_transform_rule.min_records_to_await(),
                                 (b.batching_deadline - initial_time).num_milliseconds(),
                             )?,
                             FlowStartCondition::Executor(e) => {
