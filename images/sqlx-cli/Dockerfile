@@ -1,7 +1,7 @@
 ################################################################################
 # Builder
 ################################################################################
-FROM rust:1.78-alpine as builder
+FROM rust:1.78-alpine AS builder
 
 ARG VERSION
 
@@ -24,7 +24,7 @@ RUN cargo binstall sqlx-cli@$VERSION -y
 
 FROM alpine:latest
 
-LABEL org.opencontainers.image.source https://github.com/kamu-data/kamu-cli
+LABEL org.opencontainers.image.source=https://github.com/kamu-data/kamu-cli
 
 ################################################################################
 

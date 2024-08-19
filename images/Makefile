@@ -105,24 +105,37 @@ kamu-base-with-env-var-storage-push:
 
 ################################################################################
 
+sqlx-cli sqlx-cli-push: SQLX_CLI_IMAGE_EXISTS = $(shell \
+		docker manifest inspect $(IMAGE_REPO)/sqlx-cli:$(IMAGE_SQLX_TAG) > /dev/null 2>&1 \
+			&& echo yes \
+			|| echo no \
+	)
+
 
 .PHONY: sqlx-cli
 sqlx-cli:
-	docker build \
-		--build-arg VERSION=$(SQLX_VERSION) \
-		-t $(IMAGE_REPO)/sqlx-cli:$(IMAGE_SQLX_TAG) \
-		sqlx-cli/
+	@if [ "$(SQLX_CLI_IMAGE_EXISTS)" = "yes" ]; then \
+		echo "sqlx-cli:$(IMAGE_SQLX_TAG) image exists, skip this step" ; \
+	else \
+		docker build \
+			--build-arg VERSION=$(SQLX_VERSION) \
+			-t $(IMAGE_REPO)/sqlx-cli:$(IMAGE_SQLX_TAG) \
+			sqlx-cli/ \
+			; \
+	fi
 
 
 .PHONY: sqlx-push
 sqlx-cli-push:
-	docker push $(IMAGE_REPO)/sqlx-cli:$(IMAGE_SQLX_TAG)
-
-	docker tag $(IMAGE_REPO)/sqlx-cli:$(IMAGE_SQLX_TAG) $(IMAGE_REPO)/sqlx-cli:$(SQLX_VERSION)
-	docker push $(IMAGE_REPO)/sqlx-cli:$(SQLX_VERSION)
-
-	docker tag $(IMAGE_REPO)/sqlx-cli:$(IMAGE_SQLX_TAG) $(IMAGE_REPO)/sqlx-cli:latest
-	docker push $(IMAGE_REPO)/sqlx-cli:latest
+	@if [ "$(SQLX_CLI_IMAGE_EXISTS)" = "yes" ]; then \
+		echo "sqlx-cli:$(IMAGE_SQLX_TAG) image exists, skip this step" ; \
+	else \
+		docker push $(IMAGE_REPO)/sqlx-cli:$(IMAGE_SQLX_TAG) ; \
+		docker tag $(IMAGE_REPO)/sqlx-cli:$(IMAGE_SQLX_TAG) $(IMAGE_REPO)/sqlx-cli:$(SQLX_VERSION) ; \
+		docker push $(IMAGE_REPO)/sqlx-cli:$(SQLX_VERSION) ; \
+		docker tag $(IMAGE_REPO)/sqlx-cli:$(IMAGE_SQLX_TAG) $(IMAGE_REPO)/sqlx-cli:latest ; \
+		docker push $(IMAGE_REPO)/sqlx-cli:latest ; \
+	fi
 
 
 ################################################################################
@@ -137,7 +150,7 @@ sqlx-cli-with-migrations:
 		image
 
 
-.PHONY: sqlx-push
+.PHONY: sqlx-cli-with-migrations-push
 sqlx-cli-with-migrations-push:
 	make -C sqlx-cli-with-migrations/ \
 		IMAGE_REPO=$(IMAGE_REPO) \
