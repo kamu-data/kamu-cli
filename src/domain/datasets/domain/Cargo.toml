@@ -42,7 +42,7 @@ thiserror = { version = "1", default-features = false }
 uuid = { version = "1", default-features = false, features = ["v4"] }
 
 # Optional
-sqlx = { optional = true, version = "0.7", default-features = false, features = [
+sqlx = { optional = true, version = "0.8", default-features = false, features = [
     "macros",
 ] }
 

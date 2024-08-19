@@ -41,7 +41,7 @@
       {
         "name": "is_admin: _",
         "ordinal": 7,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "provider",

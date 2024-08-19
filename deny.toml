@@ -61,6 +61,7 @@ deny = [
     { name = "prost", deny-multiple-versions = true },
     # { name = "reqwest", deny-multiple-versions = true },
     # { name = "rustls", deny-multiple-versions = true },
+    { name = "sqlx", deny-multiple-versions = true },
     { name = "tokio", deny-multiple-versions = true },
     { name = "tonic", deny-multiple-versions = true },
 ]
@@ -109,5 +110,7 @@ allow-org = { github = [
 [advisories]
 yanked = "deny"
 # TODO: Remove when patches are available
-#       See more: https://rustsec.org/advisories/RUSTSEC-2023-0071.html
-ignore = ["RUSTSEC-2023-0071"]
+ignore = [
+    "RUSTSEC-2023-0071", # https://rustsec.org/advisories/RUSTSEC-2023-0071.html
+    "RUSTSEC-2024-0363"  # https://rustsec.org/advisories/RUSTSEC-2024-0363
+]
