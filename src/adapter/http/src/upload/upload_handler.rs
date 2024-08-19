@@ -10,9 +10,12 @@
 use bytes::Bytes;
 use http_common::{ApiError, IntoApiError, ResultIntoApiError};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use serde_json::{json, Value};
+use kamu_core::MediaType;
+use serde::de::IntoDeserializer as _;
+use serde::Deserialize as _;
 use thiserror::Error;
 
+use super::{UploadContext, UploadTokenBase64Json};
 use crate::axum_utils::ensure_authenticated_account;
 use crate::{MakeUploadContextError, SaveUploadError, UploadService};
 
@@ -23,13 +26,14 @@ use crate::{MakeUploadContextError, SaveUploadError, UploadService};
 pub struct PlatformFileUploadQuery {
     file_name: String,
     content_length: usize,
-    content_type: String,
+    #[serde(default, deserialize_with = "empty_string_as_none")]
+    content_type: Option<MediaType>,
 }
 
 pub async fn platform_file_upload_prepare_post_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
     axum::extract::Query(query): axum::extract::Query<PlatformFileUploadQuery>,
-) -> Result<axum::Json<Value>, ApiError> {
+) -> Result<axum::Json<UploadContext>, ApiError> {
     let account_id = ensure_authenticated_account(&catalog).api_err()?;
 
     let upload_service = catalog.get_one::<dyn UploadService>().unwrap();
@@ -42,7 +46,7 @@ pub async fn platform_file_upload_prepare_post_handler(
         )
         .await
     {
-        Ok(upload_context) => Ok(axum::Json(json!(upload_context))),
+        Ok(upload_context) => Ok(axum::Json(upload_context)),
         Err(e) => match e {
             MakeUploadContextError::TooLarge(e) => Err(ApiError::bad_request(e)),
             MakeUploadContextError::Internal(e) => Err(e.api_err()),
@@ -54,7 +58,7 @@ pub async fn platform_file_upload_prepare_post_handler(
 
 #[derive(serde::Deserialize)]
 pub struct UploadFromPath {
-    upload_token: String,
+    upload_token: UploadTokenBase64Json,
 }
 
 #[allow(clippy::unused_async)]
@@ -74,7 +78,7 @@ pub async fn platform_file_upload_post_handler(
     match upload_local_service
         .save_upload(
             &account_id,
-            &upload_param.upload_token,
+            &upload_param.upload_token.0,
             file_data.len(),
             file_data,
         )
@@ -128,3 +132,15 @@ async fn find_correct_multi_part_field(
 struct ExpectingFilePartOnlyError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn empty_string_as_none<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de>,
+{
+    let opt = Option::<String>::deserialize(de)?;
+    match opt.as_deref() {
+        None | Some("") => Ok(None),
+        Some(s) => T::deserialize(s.into_deserializer()).map(Some),
+    }
+}

@@ -23,11 +23,13 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_http::{
-    decode_upload_token_payload,
     FileUploadLimitConfig,
     UploadContext,
     UploadServiceLocal,
+    UploadToken,
+    UploadTokenBase64Json,
 };
+use kamu_core::MediaType;
 use time_source::SystemTimeSourceDefault;
 
 use crate::harness::{await_client_server_flow, TestAPIServer};
@@ -107,6 +109,15 @@ impl Harness {
         self.api_server.local_addr().to_string()
     }
 
+    fn mock_upload_token(&self) -> UploadTokenBase64Json {
+        UploadTokenBase64Json(UploadToken {
+            upload_id: "123".to_string(),
+            file_name: "someFile.json".to_string(),
+            content_length: 123,
+            content_type: Some(MediaType::JSON.to_owned()),
+        })
+    }
+
     fn upload_prepare_url(&self, file_name: &str, content_type: &str, file_size: usize) -> String {
         format!(
             "http://{}/platform/file/upload/prepare?fileName={file_name}&contentType={content_type}&contentLength={file_size}",
@@ -126,13 +137,14 @@ impl Harness {
             .add(PATTERN.len());
 
         let url_suffix = &upload_url[pos..];
-        let upload_token_payload = decode_upload_token_payload(url_suffix).unwrap();
+        let upload_token: UploadTokenBase64Json = url_suffix.parse().unwrap();
+        let upload_token = upload_token.0;
 
         cache_dir
             .join("uploads")
             .join(DEFAULT_ACCOUNT_ID.as_multibase().to_string())
-            .join(upload_token_payload.upload_id)
-            .join(upload_token_payload.file_name)
+            .join(upload_token.upload_id)
+            .join(upload_token.file_name)
     }
 
     async fn api_server_run(self) -> Result<(), InternalError> {
@@ -147,6 +159,7 @@ async fn test_attempt_upload_file_unauthorized() {
     let harness = Harness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", 100);
     let upload_main_url = harness.upload_main_url();
+    let upload_token = harness.mock_upload_token();
 
     let client = async move {
         let client = reqwest::Client::new();
@@ -163,7 +176,7 @@ async fn test_attempt_upload_file_unauthorized() {
         );
 
         let upload_main_reponse = client
-            .post(format!("{upload_main_url}/someUploadToken"))
+            .post(format!("{upload_main_url}/{upload_token}"))
             .multipart(
                 reqwest::multipart::Form::new().part(
                     "file",
@@ -262,6 +275,7 @@ async fn test_attempt_upload_file_that_is_too_large() {
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
     let upload_main_url = harness.upload_main_url();
     let access_token = harness.access_token.clone();
+    let upload_token = harness.mock_upload_token();
 
     let client = async move {
         let client = reqwest::Client::new();
@@ -280,7 +294,7 @@ async fn test_attempt_upload_file_that_is_too_large() {
         );
 
         let upload_main_reponse = client
-            .post(format!("{upload_main_url}/someUploadToken"))
+            .post(format!("{upload_main_url}/{upload_token}"))
             .bearer_auth(access_token.clone())
             .multipart(
                 reqwest::multipart::Form::new().part(

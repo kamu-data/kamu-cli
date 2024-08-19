@@ -21,6 +21,8 @@ use super::{ReadError, Reader, UnsupportedMediaTypeError};
 pub trait DataFormatRegistry: Send + Sync {
     fn list_formats(&self) -> Vec<DataFormatDesc>;
 
+    fn format_by_file_extension(&self, ext: &str) -> Option<DataFormatDesc>;
+
     fn format_of(&self, conf: &odf::ReadStep) -> DataFormatDesc;
 
     // TODO: Avoid `async` poisoning by datafusion
@@ -54,12 +56,14 @@ pub trait DataFormatRegistry: Send + Sync {
 pub struct DataFormatDesc {
     pub short_name: &'static str,
     pub media_type: MediaTypeRef<'static>,
+    pub file_extensions: &'static [&'static str],
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Consider a crate
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
 pub struct MediaType(pub String);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,9 +81,10 @@ impl MediaType {
     pub const NDGEOJSON: MediaTypeRef<'static> = MediaTypeRef("application/x-ndgeojson");
     /// See: <https://issues.apache.org/jira/browse/PARQUET-1889>
     pub const PARQUET: MediaTypeRef<'static> = MediaTypeRef("application/vnd.apache.parquet");
-    /// No standard found
-    pub const ESRI_SHAPEFILE: MediaTypeRef<'static> =
-        MediaTypeRef("application/vnd.esri.shapefile");
+    /// Multiple in use
+    /// See: <https://www.iana.org/assignments/media-types/application/vnd.shp>
+    /// See: <https://en.wikipedia.org/wiki/Shapefile>
+    pub const ESRI_SHAPEFILE: MediaTypeRef<'static> = MediaTypeRef("application/vnd.shp");
 }
 
 impl<'a> MediaTypeRef<'a> {

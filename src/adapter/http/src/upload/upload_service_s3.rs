@@ -15,12 +15,13 @@ use bytes::Bytes;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu::utils::s3_context::S3Context;
+use kamu_core::MediaType;
 use opendatafabric::AccountID;
 use tokio::io::AsyncRead;
 use uuid::Uuid;
 
+use super::{UploadToken, UploadTokenBase64Json};
 use crate::{
-    make_upload_token,
     ContentTooLargeError,
     FileUploadLimitConfig,
     MakeUploadContextError,
@@ -58,7 +59,7 @@ impl UploadService for UploadServiceS3 {
         &self,
         account_id: &AccountID,
         file_name: String,
-        content_type: String,
+        content_type: Option<MediaType>,
         content_length: usize,
     ) -> Result<UploadContext, MakeUploadContextError> {
         if content_length > self.upload_config.max_file_size_in_bytes() {
@@ -89,7 +90,12 @@ impl UploadService for UploadServiceS3 {
             .await
             .map_err(|e| MakeUploadContextError::Internal(e.int_err()))?;
 
-        let upload_token = make_upload_token(upload_id, file_name, content_type, content_length);
+        let upload_token = UploadTokenBase64Json(UploadToken {
+            upload_id,
+            file_name,
+            content_length,
+            content_type,
+        });
 
         Ok(UploadContext {
             upload_url: String::from(presigned_request.uri()),
@@ -139,7 +145,7 @@ impl UploadService for UploadServiceS3 {
     async fn save_upload(
         &self,
         _: &AccountID,
-        _: &str,
+        _: &UploadToken,
         _: usize,
         _: Bytes,
     ) -> Result<(), SaveUploadError> {
