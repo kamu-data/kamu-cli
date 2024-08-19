@@ -146,6 +146,7 @@ impl AddCommand {
     pub async fn create_datasets_from_snapshots(
         &self,
         snapshots: Vec<DatasetSnapshot>,
+        create_options: CreateDatasetFromSnapshotUseCaseOptions,
     ) -> Vec<(
         DatasetAlias,
         Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
@@ -156,7 +157,11 @@ impl AddCommand {
         let mut ret = Vec::new();
         for snapshot in snapshots_ordered {
             let alias = snapshot.name.clone();
-            let res = self.create_dataset_from_snapshot.execute(snapshot).await;
+            let res = self
+                .create_dataset_from_snapshot
+                .execute(snapshot, &create_options)
+                .await;
+
             ret.push((alias, res));
         }
         ret
@@ -300,7 +305,17 @@ impl Command for AddCommand {
             }
         };
 
-        let mut add_results = self.create_datasets_from_snapshots(snapshots).await;
+        let create_options = CreateDatasetFromSnapshotUseCaseOptions {
+            is_multi_tenant_workspace: self.multi_tenant,
+            dataset_visibility: if self.publicly_available {
+                DatasetVisibility::PubliclyAvailable
+            } else {
+                DatasetVisibility::Private
+            },
+        };
+        let mut add_results = self
+            .create_datasets_from_snapshots(snapshots, create_options)
+            .await;
 
         add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(id_b));
 

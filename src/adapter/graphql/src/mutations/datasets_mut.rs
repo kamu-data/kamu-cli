@@ -110,7 +110,10 @@ impl DatasetsMut {
         let create_from_snapshot =
             from_catalog::<dyn domain::CreateDatasetFromSnapshotUseCase>(ctx).unwrap();
 
-        let result = match create_from_snapshot.execute(snapshot).await {
+        // TODO: read param from input
+        let options = Default::default();
+
+        let result = match create_from_snapshot.execute(snapshot, &options).await {
             Ok(result) => {
                 let dataset = Dataset::from_ref(ctx, &result.dataset_handle.as_local_ref()).await?;
                 CreateDatasetFromSnapshotResult::Success(CreateDatasetResultSuccess { dataset })
