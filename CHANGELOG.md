@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.196.0] - 2024-08-19
 ### Added
 - The `/ingest` endpoint will try to infer the media type of file by extension if not specified explicitly during upload. 
    This resolves the problem with `415 Unsupported Media Type` errors when uploading `.ndjson` files from the Web UI.
@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added macro `database_transactional_test!()` to minimize boilerplate code
 ### Changed
 - `sqlx` v0.8
+- Renamed `setConfigSchedule` GQL api to `setConfigIngest`. Also extended
+  `setConfigIngest` with new field `fetchUncacheable` which indicates to ingone cache
+  during ingest step
 
 ## [0.195.1] - 2024-08-16
 ### Fixed
