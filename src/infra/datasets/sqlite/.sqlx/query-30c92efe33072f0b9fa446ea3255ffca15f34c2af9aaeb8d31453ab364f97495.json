@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE\n            FROM dataset_entries\n            WHERE dataset_id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "30c92efe33072f0b9fa446ea3255ffca15f34c2af9aaeb8d31453ab364f97495"
+}

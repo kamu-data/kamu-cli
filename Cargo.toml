@@ -58,6 +58,7 @@ members = [
     ## ReBAC
     "src/infra/auth-rebac/inmem",
     "src/infra/auth-rebac/repo-tests",
+    "src/infra/auth-rebac/sqlite",
     ## Outbox
     "src/infra/messaging-outbox/repo-tests",
     "src/infra/messaging-outbox/inmem",
@@ -150,6 +151,7 @@ kamu-task-system-repo-tests = { version = "0.196.0", path = "src/infra/task-syst
 ## ReBAC
 kamu-auth-rebac-inmem = { version = "0.196.0", path = "src/infra/auth-rebac/inmem", default-features = false }
 kamu-auth-rebac-repo-tests = { version = "0.196.0", path = "src/infra/auth-rebac/repo-tests", default-features = false }
+kamu-auth-rebac-sqlite = { version = "0.196.0", path = "src/infra/auth-rebac/sqlite", default-features = false }
 ## Outbox
 kamu-messaging-outbox-inmem = { version = "0.196.0", path = "src/infra/messaging-outbox/inmem", default-features = false }
 kamu-messaging-outbox-postgres = { version = "0.196.0", path = "src/infra/messaging-outbox/postgres", default-features = false }

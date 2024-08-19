@@ -5258,6 +5258,8 @@ dependencies = [
  "async-trait",
  "internal-error",
  "opendatafabric",
+ "sqlx",
+ "strum 0.26.3",
  "thiserror",
 ]
 
@@ -5266,9 +5268,11 @@ name = "kamu-auth-rebac-inmem"
 version = "0.196.0"
 dependencies = [
  "async-trait",
+ "database-common-macros",
  "dill",
  "kamu-auth-rebac",
  "kamu-auth-rebac-repo-tests",
+ "test-group",
  "test-log",
  "tokio",
 ]
@@ -5291,6 +5295,23 @@ dependencies = [
  "futures",
  "kamu-auth-rebac",
  "opendatafabric",
+]
+
+[[package]]
+name = "kamu-auth-rebac-sqlite"
+version = "0.196.0"
+dependencies = [
+ "async-trait",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "internal-error",
+ "kamu-auth-rebac",
+ "kamu-auth-rebac-repo-tests",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "tokio",
 ]
 
 [[package]]
@@ -5622,12 +5643,15 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
+ "database-common-macros",
  "dill",
  "internal-error",
+ "kamu-accounts-inmem",
  "kamu-datasets",
  "kamu-datasets-repo-tests",
  "opendatafabric",
  "secrecy",
+ "test-group",
  "test-log",
  "thiserror",
  "tokio",
@@ -5663,6 +5687,7 @@ dependencies = [
  "chrono",
  "database-common",
  "dill",
+ "kamu-accounts",
  "kamu-datasets",
  "opendatafabric",
  "secrecy",
@@ -5697,8 +5722,10 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
+ "database-common-macros",
  "dill",
  "internal-error",
+ "kamu-accounts-sqlite",
  "kamu-datasets",
  "kamu-datasets-repo-tests",
  "opendatafabric",

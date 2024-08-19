@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE\n            FROM auth_rebac_properties\n            WHERE entity_type = $1\n              AND entity_id = $2\n              AND property_name = $3\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "e457ca5a06b4ea78c4c6afd03b3ac9defac91af3857a49a44758c188984bcad1"
+}

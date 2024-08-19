@@ -7,91 +7,81 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_try_get_properties_from_nonexistent_entity() {
-    let harness = InmemRebacRepositoryHarness::new();
-
-    kamu_auth_rebac_repo_tests::test_try_get_properties_from_nonexistent_entity(&harness.catalog)
-        .await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_auth_rebac_repo_tests::test_try_get_properties_from_nonexistent_entity,
+    harness = InMemoryRebacRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_set_property() {
-    let harness = InmemRebacRepositoryHarness::new();
-
-    kamu_auth_rebac_repo_tests::test_set_property(&harness.catalog).await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_try_delete_property_from_nonexistent_entity() {
-    let harness = InmemRebacRepositoryHarness::new();
-
-    kamu_auth_rebac_repo_tests::test_try_delete_property_from_nonexistent_entity(&harness.catalog)
-        .await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_auth_rebac_repo_tests::test_set_property,
+    harness = InMemoryRebacRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_try_delete_nonexistent_property_from_entity() {
-    let harness = InmemRebacRepositoryHarness::new();
-
-    kamu_auth_rebac_repo_tests::test_try_delete_nonexistent_property_from_entity(&harness.catalog)
-        .await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_auth_rebac_repo_tests::test_try_delete_property_from_nonexistent_entity,
+    harness = InMemoryRebacRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_delete_property_from_entity() {
-    let harness = InmemRebacRepositoryHarness::new();
-
-    kamu_auth_rebac_repo_tests::test_delete_property_from_entity(&harness.catalog).await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_try_insert_duplicate_entities_relation() {
-    let harness = InmemRebacRepositoryHarness::new();
-
-    kamu_auth_rebac_repo_tests::test_try_insert_duplicate_entities_relation(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_auth_rebac_repo_tests::test_try_delete_nonexistent_property_from_entity,
+    harness = InMemoryRebacRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_delete_entities_relation() {
-    let harness = InmemRebacRepositoryHarness::new();
-
-    kamu_auth_rebac_repo_tests::test_delete_entities_relation(&harness.catalog).await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_get_relations_crossover_test() {
-    let harness = InmemRebacRepositoryHarness::new();
-
-    kamu_auth_rebac_repo_tests::test_get_relations_crossover_test(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_auth_rebac_repo_tests::test_delete_property_from_entity,
+    harness = InMemoryRebacRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct InmemRebacRepositoryHarness {
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_auth_rebac_repo_tests::test_try_insert_duplicate_entities_relation,
+    harness = InMemoryRebacRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_auth_rebac_repo_tests::test_delete_entities_relation,
+    harness = InMemoryRebacRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_auth_rebac_repo_tests::test_get_relations_crossover_test,
+    harness = InMemoryRebacRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct InMemoryRebacRepositoryHarness {
     catalog: Catalog,
 }
 
-impl InmemRebacRepositoryHarness {
+impl InMemoryRebacRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
 
@@ -102,3 +92,5 @@ impl InmemRebacRepositoryHarness {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

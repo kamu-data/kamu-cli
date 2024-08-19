@@ -6,7 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.196.0] - 2024-08-19
 ### Added
-- The `/ingest` endpoint will try to infer the media type of a file by extension if not specified explicitly during upload. This resolves the problem with `415 Unsupported Media Type` errors when uploading `.ndjson` files from the Web UI.
+- The `/ingest` endpoint will try to infer the media type of file by extension if not specified explicitly during upload. 
+   This resolves the problem with `415 Unsupported Media Type` errors when uploading `.ndjson` files from the Web UI.
+- Private Datasets, preparation work:
+  - Added SQLite-specific implementation of ReBAC repository
+  - Added SQLite-specific implementation of `DatasetEntryRepository`
+- `internal-error` crate:
+  - Added `InternalError::reason()` to get the cause of an error
+  - Added methods to `ResultIntoInternal`:
+    - `map_int_err()` - shortcut for `result.int_err().map_err(...)` combination
+    - `context_int_err()` - ability to add a context message to an error
+- Added macro `database_transactional_test!()` to minimize boilerplate code
 ### Changed
 - `sqlx` v0.8
 - Renamed `setConfigSchedule` GQL api to `setConfigIngest`. Also extended
@@ -20,9 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.195.0] - 2024-08-16
 ### Added
 - Reliable transaction-based internal cross-domain message passing component (`MessageOutbox`), replacing `EventBus`
-   - Metadata-driven producer/consumer annotations
-   - Immediate and transaction-backed message delivery
-   - Background transactional message processor, respecting client idempotence 
+  - Metadata-driven producer/consumer annotations
+  - Immediate and transaction-backed message delivery
+  - Background transactional message processor, respecting client idempotence 
 - Persistent storage for flow configuration events
 ### Changed
 - Upgraded to `datafusion v41` (#713)
