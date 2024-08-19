@@ -12,7 +12,7 @@ use opendatafabric::*;
 use url::Url;
 
 use crate::commands::*;
-use crate::{accounts, cli_arguments, odf_server, CommandInterpretationFailed, WorkspaceService};
+use crate::{accounts, odf_server, CommandInterpretationFailed, WorkspaceService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,11 +38,11 @@ pub fn get_command(
                 submatches.get_flag("recursive"),
                 submatches.get_flag("replace"),
                 submatches.get_flag("stdin"),
-                submatches.get_flag(*cli_arguments::add::PUBLIC),
+                submatches.get_flag("public"),
                 cli_catalog.get_one()?,
                 workspace_svc.is_multi_tenant_workspace(),
             ))
-        },
+        }
         Some(("complete", submatches)) => {
             let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
             let in_workspace =

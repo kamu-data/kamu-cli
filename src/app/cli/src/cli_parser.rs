@@ -13,7 +13,6 @@ use std::path::PathBuf;
 use clap::{value_parser, Arg, ArgAction, Command};
 
 use super::cli_value_parser::*;
-use crate::cli_arguments;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -107,7 +106,8 @@ pub fn cli() -> Command {
                             .action(ArgAction::Append)
                             .index(1)
                             .help("Dataset manifest reference(s) (path, or URL)"),
-                        cli_arguments::add::PUBLIC.to_clap_arg_long()
+                        Arg::new("public")
+                            .long("public")
                             .hide(true)
                             .action(ArgAction::SetTrue)
                             .help("Mark the added dataset as publicly available"),

@@ -14,7 +14,7 @@ use kamu::domain::*;
 use opendatafabric::*;
 
 use super::{common, BatchError, CLIError, Command};
-use crate::{cli_arguments, OutputConfig};
+use crate::OutputConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -228,10 +228,9 @@ impl Command for AddCommand {
             ));
         }
         if !self.multi_tenant && self.publicly_available {
-            return Err(CLIError::usage_error(format!(
-                "Only multi-tenant repositories support the '{}' argument",
-                *cli_arguments::add::PUBLIC
-            )));
+            return Err(CLIError::usage_error(
+                "Only multi-tenant repositories support the 'public' argument",
+            ));
         }
 
         Ok(())
