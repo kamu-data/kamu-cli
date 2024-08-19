@@ -24,12 +24,6 @@ pub fn get_staging_name() -> String {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// General logic for creating a Dataset from a Snapshot.
-///
-/// # Arguments
-///
-/// * `maybe_rebac_service` - Pass `None` as argument if this is a single-tenant
-///   repository
 pub(crate) async fn create_dataset_from_snapshot_impl<
     TRepository: DatasetRepositoryExt + DatasetRepositoryWriter,
 >(
