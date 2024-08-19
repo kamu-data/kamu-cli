@@ -387,6 +387,7 @@ impl DatasetEnvVarsHarness {
                     .name("foo")
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
+                &Default::default(),
             )
             .await
             .unwrap()

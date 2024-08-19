@@ -48,7 +48,11 @@ async fn test_create_root_dataset_fron_snapshot() {
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    harness.use_case.execute(snapshot).await.unwrap();
+    harness
+        .use_case
+        .execute(snapshot, &Default::default())
+        .await
+        .unwrap();
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
 }
@@ -87,8 +91,18 @@ async fn test_create_derived_dataset_fron_snapshot() {
         )
         .build();
 
-    harness.use_case.execute(snapshot_root).await.unwrap();
-    harness.use_case.execute(snapshot_derived).await.unwrap();
+    let options = Default::default();
+
+    harness
+        .use_case
+        .execute(snapshot_root, &options)
+        .await
+        .unwrap();
+    harness
+        .use_case
+        .execute(snapshot_derived, &options)
+        .await
+        .unwrap();
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
     assert_matches!(harness.check_dataset_exists(&alias_bar).await, Ok(_));

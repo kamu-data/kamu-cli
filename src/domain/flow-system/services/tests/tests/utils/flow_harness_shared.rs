@@ -224,7 +224,7 @@ impl FlowHarness {
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
-                publicly_available,
+                &Default::default(),
             )
             .await
             .unwrap()
@@ -251,7 +251,7 @@ impl FlowHarness {
                             .build(),
                     )
                     .build(),
-                publicly_available,
+                &Default::default(),
             )
             .await
             .unwrap();
