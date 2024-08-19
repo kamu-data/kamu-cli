@@ -79,6 +79,38 @@ async fn test_mark_existing_access_token_revorked(sqlite_pool: SqlitePool) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(database, postgres)]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
+async fn test_create_duplicate_active_access_token(sqlite_pool: SqlitePool) {
+    let harness = SqliteAccessTokenRepositoryHarness::new(sqlite_pool);
+
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_create_duplicate_active_access_token(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(database, postgres)]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
+async fn test_create_duplicate_access_token_err(sqlite_pool: SqlitePool) {
+    let harness = SqliteAccessTokenRepositoryHarness::new(sqlite_pool);
+
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_create_duplicate_access_token_err(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(database, sqlite)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
 async fn test_mark_non_existing_access_token_revorked(sqlite_pool: SqlitePool) {

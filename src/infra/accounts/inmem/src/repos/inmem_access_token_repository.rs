@@ -78,7 +78,8 @@ impl AccessTokenRepository for InMemoryAccessTokenRepository {
             ));
         }
         if let Some(existing_token_id) = guard.token_ids_by_name.get(&access_token.token_name)
-            && guard.tokens_by_id.contains_key(existing_token_id)
+            && let Some(existing_token) = guard.tokens_by_id.get(existing_token_id)
+            && existing_token.revoked_at.is_none()
         {
             return Err(CreateAccessTokenError::Duplicate(
                 CreateAccessTokenErrorDuplicate {

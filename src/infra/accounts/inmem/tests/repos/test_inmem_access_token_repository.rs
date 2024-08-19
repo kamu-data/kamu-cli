@@ -45,6 +45,22 @@ async fn test_mark_existing_access_token_revorked() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_create_duplicate_active_access_token() {
+    let harness = InmemAccessTokenRepositoryHarness::new();
+    kamu_accounts_repo_tests::test_create_duplicate_active_access_token(&harness.catalog).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_create_duplicate_access_token_err() {
+    let harness = InmemAccessTokenRepositoryHarness::new();
+    kamu_accounts_repo_tests::test_create_duplicate_access_token_err(&harness.catalog).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_mark_non_existing_access_token_revorked() {
     let harness = InmemAccessTokenRepositoryHarness::new();
     kamu_accounts_repo_tests::test_mark_non_existing_access_token_revorked(&harness.catalog).await;
