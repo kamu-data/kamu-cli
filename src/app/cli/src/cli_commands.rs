@@ -22,27 +22,22 @@ pub fn get_command(
     arg_matches: &clap::ArgMatches,
 ) -> Result<Box<dyn Command>, CLIError> {
     let command: Box<dyn Command> = match arg_matches.subcommand() {
-        Some(("add", submatches)) => {
-            let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
-
-            Box::new(AddCommand::new(
-                cli_catalog.get_one()?,
-                cli_catalog.get_one()?,
-                cli_catalog.get_one()?,
-                cli_catalog.get_one()?,
-                submatches
-                    .get_many("manifest")
-                    .unwrap_or_default()
-                    .map(String::as_str),
-                submatches.get_one("name").cloned(),
-                submatches.get_flag("recursive"),
-                submatches.get_flag("replace"),
-                submatches.get_flag("stdin"),
-                submatches.get_flag("public"),
-                cli_catalog.get_one()?,
-                workspace_svc.is_multi_tenant_workspace(),
-            ))
-        }
+        Some(("add", submatches)) => Box::new(AddCommand::new(
+            cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
+            submatches
+                .get_many("manifest")
+                .unwrap_or_default()
+                .map(String::as_str),
+            submatches.get_one("name").cloned(),
+            submatches.get_flag("recursive"),
+            submatches.get_flag("replace"),
+            submatches.get_flag("stdin"),
+            submatches.get_flag("public"),
+            cli_catalog.get_one()?,
+        )),
         Some(("complete", submatches)) => {
             let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
             let in_workspace =

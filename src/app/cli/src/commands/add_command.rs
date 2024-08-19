@@ -30,7 +30,6 @@ pub struct AddCommand {
     stdin: bool,
     publicly_available: bool,
     output_config: Arc<OutputConfig>,
-    multi_tenant: bool,
 }
 
 impl AddCommand {
@@ -46,7 +45,6 @@ impl AddCommand {
         stdin: bool,
         publicly_available: bool,
         output_config: Arc<OutputConfig>,
-        multi_tenant: bool,
     ) -> Self
     where
         I: Iterator<Item = &'s str>,
@@ -63,7 +61,6 @@ impl AddCommand {
             stdin,
             publicly_available,
             output_config,
-            multi_tenant,
         }
     }
 
@@ -227,7 +224,7 @@ impl Command for AddCommand {
                 "Name override can be used only when adding a single manifest",
             ));
         }
-        if !self.multi_tenant && self.publicly_available {
+        if !self.dataset_repo.is_multi_tenant() && self.publicly_available {
             return Err(CLIError::usage_error(
                 "Only multi-tenant repositories support the 'public' argument",
             ));
