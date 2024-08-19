@@ -18,7 +18,32 @@ pub trait CreateDatasetFromSnapshotUseCase: Send + Sync {
     async fn execute(
         &self,
         snapshot: DatasetSnapshot,
+        options: &CreateDatasetFromSnapshotUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default)]
+pub struct CreateDatasetFromSnapshotUseCaseOptions {
+    pub is_multi_tenant_workspace: bool,
+    pub dataset_visibility: DatasetVisibility,
+}
+
+#[derive(Debug, Default)]
+pub enum DatasetVisibility {
+    #[default]
+    Private,
+    PubliclyAvailable,
+}
+
+impl DatasetVisibility {
+    pub fn allows_public_read(&self) -> bool {
+        match self {
+            DatasetVisibility::Private => false,
+            DatasetVisibility::PubliclyAvailable => true,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
