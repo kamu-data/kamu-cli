@@ -36,6 +36,8 @@ use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use url::Url;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const FILE_DATA_ARRAY_SIZE: usize = 1_572_864;
 const AMOUNT_OF_BLOCKS_TO_APPEND: usize = 70;
 
@@ -78,9 +80,8 @@ async fn setup_dataset(
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
-    let publicly_available = true;
     let _ = dataset_repo
-        .create_dataset_from_snapshot(snapshot, publicly_available)
+        .create_dataset_from_snapshot(snapshot)
         .await
         .unwrap()
         .create_dataset_result
@@ -225,3 +226,5 @@ fn bench_with_10_parallels(c: &mut Criterion) {
 
 criterion_group!(benches, bench_with_1_parallel, bench_with_10_parallels);
 criterion_main!(benches);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

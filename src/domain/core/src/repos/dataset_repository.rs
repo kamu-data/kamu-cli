@@ -248,7 +248,6 @@ pub enum CreateDatasetFromSnapshotError {
     InvalidSnapshot(#[from] InvalidSnapshotError),
     #[error(transparent)]
     MissingInputs(#[from] MissingInputsError),
-
     #[error(transparent)]
     NameCollision(#[from] NameCollisionError),
     #[error(transparent)]

@@ -15,7 +15,6 @@ use chrono::{DateTime, Utc};
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_auth_rebac::RebacService;
 use kamu_core::*;
 use opendatafabric::*;
 use time_source::SystemTimeSource;
@@ -34,7 +33,6 @@ pub struct DatasetRepositoryS3 {
     registry_cache: Option<Arc<S3RegistryCache>>,
     metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
     system_time_source: Arc<dyn SystemTimeSource>,
-    rebac_service: Arc<dyn RebacService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,7 +55,6 @@ impl DatasetRepositoryS3 {
         registry_cache: Option<Arc<S3RegistryCache>>,
         metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
         system_time_source: Arc<dyn SystemTimeSource>,
-        rebac_service: Arc<dyn RebacService>,
     ) -> Self {
         Self {
             s3_context,
@@ -66,7 +63,6 @@ impl DatasetRepositoryS3 {
             registry_cache,
             metadata_cache_local_fs_path,
             system_time_source,
-            rebac_service,
         }
     }
 
@@ -487,18 +483,7 @@ impl DatasetRepositoryWriter for DatasetRepositoryS3 {
         &self,
         snapshot: DatasetSnapshot,
     ) -> Result<CreateDatasetFromSnapshotResult, CreateDatasetFromSnapshotError> {
-        // TODO: Introduce CreateDatasetOpts with Visibility::Public
-        let publicly_available = true;
-
-        create_dataset_from_snapshot_impl(
-            self,
-            // TODO: move to the use case?
-            Some(self.rebac_service.as_ref()),
-            snapshot,
-            self.system_time_source.now(),
-            publicly_available,
-        )
-        .await
+        create_dataset_from_snapshot_impl(self, snapshot, self.system_time_source.now()).await
     }
 
     async fn rename_dataset(

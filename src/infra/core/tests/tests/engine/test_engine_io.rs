@@ -121,10 +121,9 @@ async fn test_engine_io_common<
         .build();
 
     let root_alias = root_snapshot.name.clone();
-    let publicly_available = true;
 
     dataset_repo
-        .create_dataset_from_snapshot(root_snapshot, publicly_available)
+        .create_dataset_from_snapshot(root_snapshot)
         .await
         .unwrap();
 
@@ -153,10 +152,9 @@ async fn test_engine_io_common<
         .build();
 
     let deriv_alias = deriv_snapshot.name.clone();
-    let publicly_available = true;
 
     let dataset_deriv = dataset_repo
-        .create_dataset_from_snapshot(deriv_snapshot, publicly_available)
+        .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()
         .create_dataset_result

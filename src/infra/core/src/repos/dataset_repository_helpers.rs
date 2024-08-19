@@ -9,7 +9,6 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::*;
-use kamu_auth_rebac::{DatasetPropertyName, RebacService};
 use kamu_core::*;
 use opendatafabric::*;
 use random_names::get_random_name;
@@ -35,10 +34,8 @@ pub(crate) async fn create_dataset_from_snapshot_impl<
     TRepository: DatasetRepositoryExt + DatasetRepositoryWriter,
 >(
     dataset_repo: &TRepository,
-    maybe_rebac_service: Option<&dyn RebacService>,
     mut snapshot: DatasetSnapshot,
     system_time: DateTime<Utc>,
-    publicly_available: bool,
 ) -> Result<CreateDatasetFromSnapshotResult, CreateDatasetFromSnapshotError> {
     // Validate / resolve events
     for event in &mut snapshot.metadata {
@@ -169,15 +166,6 @@ pub(crate) async fn create_dataset_from_snapshot_impl<
         }?;
 
         sequence_number += 1;
-    }
-
-    if let Some(rebac_service) = maybe_rebac_service {
-        let property = DatasetPropertyName::allows_public_read(publicly_available);
-
-        rebac_service
-            .set_dataset_property(&create_result.dataset_handle.id, property.0, &property.1)
-            .await
-            .int_err()?;
     }
 
     chain

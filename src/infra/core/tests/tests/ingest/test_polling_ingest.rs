@@ -1135,10 +1135,8 @@ impl IngestTestHarness {
     }
 
     async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) {
-        let publicly_available = true;
-
         self.dataset_repo
-            .create_dataset_from_snapshot(dataset_snapshot, publicly_available)
+            .create_dataset_from_snapshot(dataset_snapshot)
             .await
             .unwrap();
     }

@@ -154,9 +154,8 @@ async fn do_test_sync(
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
-    let publicly_available = true;
     let b1 = dataset_repo
-        .create_dataset_from_snapshot(snapshot, publicly_available)
+        .create_dataset_from_snapshot(snapshot)
         .await
         .unwrap()
         .create_dataset_result

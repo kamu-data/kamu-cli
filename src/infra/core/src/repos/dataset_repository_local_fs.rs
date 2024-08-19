@@ -14,7 +14,6 @@ use async_trait::async_trait;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_auth_rebac::RebacService;
 use kamu_core::*;
 use opendatafabric::*;
 use time_source::SystemTimeSource;
@@ -28,7 +27,6 @@ pub struct DatasetRepositoryLocalFs {
     storage_strategy: Box<dyn DatasetStorageStrategy>,
     thrash_lock: tokio::sync::Mutex<()>,
     system_time_source: Arc<dyn SystemTimeSource>,
-    rebac_service: Arc<dyn RebacService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,7 +38,6 @@ impl DatasetRepositoryLocalFs {
         current_account_subject: Arc<CurrentAccountSubject>,
         multi_tenant: bool,
         system_time_source: Arc<dyn SystemTimeSource>,
-        rebac_service: Arc<dyn RebacService>,
     ) -> Self {
         Self {
             storage_strategy: if multi_tenant {
@@ -53,7 +50,6 @@ impl DatasetRepositoryLocalFs {
             },
             thrash_lock: tokio::sync::Mutex::new(()),
             system_time_source,
-            rebac_service,
         }
     }
 
@@ -290,23 +286,7 @@ impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
         &self,
         snapshot: DatasetSnapshot,
     ) -> Result<CreateDatasetFromSnapshotResult, CreateDatasetFromSnapshotError> {
-        // TODO: Introduce CreateDatasetOpts with Visibility::Public
-        let publicly_available = true;
-
-        let maybe_rebac_service = if self.storage_strategy.is_multi_tenant() {
-            Some(self.rebac_service.as_ref())
-        } else {
-            None
-        };
-
-        create_dataset_from_snapshot_impl(
-            self,
-            maybe_rebac_service,
-            snapshot,
-            self.system_time_source.now(),
-            publicly_available,
-        )
-        .await
+        create_dataset_from_snapshot_impl(self, snapshot, self.system_time_source.now()).await
     }
 
     async fn rename_dataset(
