@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT property_name, property_value\n            FROM auth_rebac_properties\n            WHERE entity_type = $1\n              AND entity_id = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "property_name",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "property_value",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "a829d962cffe81b0ecf19ca197215f0d4676ce963b97fff46acb441946c0f6e4"
+}

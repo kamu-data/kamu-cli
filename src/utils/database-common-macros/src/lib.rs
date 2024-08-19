@@ -12,6 +12,7 @@ use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::{
     parse_macro_input,
+    parse_str,
     FnArg,
     GenericArgument,
     Ident,
@@ -19,6 +20,7 @@ use syn::{
     LitStr,
     Pat,
     PatTupleStruct,
+    Path,
     PathArguments,
     Token,
     Type,
@@ -290,6 +292,170 @@ pub fn transactional_method(attr: TokenStream, item: TokenStream) -> TokenStream
     };
 
     TokenStream::from(updated_method)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// #[database_transactional_test]
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[proc_macro]
+pub fn database_transactional_test(input: TokenStream) -> TokenStream {
+    let DatabaseTransactionalTestInputArgs {
+        storage,
+        fixture,
+        harness,
+        extra_test_groups,
+    } = parse_macro_input!(input as DatabaseTransactionalTestInputArgs);
+
+    let test_function_name = fixture.segments.last().unwrap().ident.clone();
+
+    let extra_test_groups = if let Some(extra_test_groups) = extra_test_groups {
+        parse_str(extra_test_groups.value().as_str()).unwrap()
+    } else {
+        quote! {}
+    };
+
+    let output = match storage.to_string().as_str() {
+        "inmem" => quote! {
+            #[test_group::group(#extra_test_groups)]
+            #[test_log::test(tokio::test)]
+            async fn #test_function_name () {
+                let harness = #harness ::new();
+
+                #fixture (&harness.catalog).await;
+            }
+        },
+        "postgres" => quote! {
+            #[test_group::group(database, postgres, #extra_test_groups)]
+            #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
+            async fn #test_function_name (pg_pool: sqlx::PgPool) {
+                let harness = #harness ::new(pg_pool);
+
+                database_common::DatabaseTransactionRunner::new(harness.catalog)
+                    .transactional(|catalog| async move {
+                        #fixture (&catalog).await;
+
+                        Ok::<_, internal_error::InternalError>(())
+                    })
+                    .await
+                    .unwrap();
+            }
+        },
+        "mysql" => quote! {
+            #[test_group::group(database, mysql, #extra_test_groups)]
+            #[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
+            async fn #test_function_name (mysql_pool: sqlx::MySqlPool) {
+                let harness = #harness ::new(mysql_pool);
+
+                database_common::DatabaseTransactionRunner::new(harness.catalog)
+                    .transactional(|catalog| async move {
+                        #fixture (&catalog).await;
+
+                        Ok::<_, internal_error::InternalError>(())
+                    })
+                    .await
+                    .unwrap();
+            }
+        },
+        "sqlite" => quote! {
+            #[test_group::group(database, sqlite, #extra_test_groups)]
+            #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
+            async fn #test_function_name (sqlite_pool: sqlx::SqlitePool) {
+                let harness = #harness ::new(sqlite_pool);
+
+                database_common::DatabaseTransactionRunner::new(harness.catalog)
+                    .transactional(|catalog| async move {
+                        #fixture (&catalog).await;
+
+                        Ok::<_, internal_error::InternalError>(())
+                    })
+                    .await
+                    .unwrap();
+            }
+        },
+        unexpected => {
+            panic!(
+                "Unexpected E2E test storage: \"{unexpected}\"!\nAllowable values: \"inmem\", \
+                 \"postgres\", \"mysql\", and \"sqlite\"."
+            );
+        }
+    };
+
+    output.into()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct DatabaseTransactionalTestInputArgs {
+    pub storage: Ident,
+    pub fixture: Path,
+    pub harness: Ident,
+    pub extra_test_groups: Option<LitStr>,
+}
+
+impl Parse for DatabaseTransactionalTestInputArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut storage = None;
+        let mut fixture = None;
+        let mut harness = None;
+        let mut extra_test_groups = None;
+
+        while !input.is_empty() {
+            let key: Ident = input.parse()?;
+
+            input.parse::<Token![=]>()?;
+
+            match key.to_string().as_str() {
+                "storage" => {
+                    let value: Ident = input.parse()?;
+
+                    storage = Some(value);
+                }
+                "fixture" => {
+                    let value: Path = input.parse()?;
+
+                    fixture = Some(value);
+                }
+                "harness" => {
+                    let value: Ident = input.parse()?;
+
+                    harness = Some(value);
+                }
+                "extra_test_groups" => {
+                    let value: LitStr = input.parse()?;
+
+                    extra_test_groups = Some(value);
+                }
+                unexpected_key => panic!(
+                    "Unexpected key: {unexpected_key}\nAllowable values: \"storage\", \
+                     \"fixture\", \"options\", and \"extra_test_groups\"."
+                ),
+            };
+
+            if input.peek(Token![,]) {
+                input.parse::<Token![,]>()?;
+            }
+        }
+
+        let Some(storage) = storage else {
+            panic!("Mandatory parameter \"storage\" not found");
+        };
+
+        let Some(fixture) = fixture else {
+            panic!("Mandatory parameter \"fixture\" not found");
+        };
+
+        let Some(harness) = harness else {
+            panic!("Mandatory parameter \"harness\" not found");
+        };
+
+        Ok(DatabaseTransactionalTestInputArgs {
+            storage,
+            fixture,
+            harness,
+            extra_test_groups,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

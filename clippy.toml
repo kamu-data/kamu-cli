@@ -1,1 +1,2 @@
 unreadable-literal-lint-fractions = false
+disallowed-macros = ["std::dbg"]

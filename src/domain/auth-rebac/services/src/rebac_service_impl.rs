@@ -217,10 +217,7 @@ fn map_delete_entity_property_result(
     match res {
         Ok(_) => Ok(()),
         Err(err) => match err {
-            DeleteEntityPropertyError::EntityNotFound(e) => {
-                Err(UnsetEntityPropertyError::NotFound(e))
-            }
-            DeleteEntityPropertyError::PropertyNotFound(_) => Ok(()),
+            DeleteEntityPropertyError::NotFound(_) => Ok(()),
             DeleteEntityPropertyError::Internal(e) => Err(UnsetEntityPropertyError::Internal(e)),
         },
     }

@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT object_entity_type as \"entity_type: EntityType\",\n                   object_entity_id as entity_id,\n                   relationship\n            FROM auth_rebac_relations\n            WHERE subject_entity_type = $1\n              AND subject_entity_id = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "entity_type: EntityType",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "entity_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "relationship",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "989b577a9c446253f3b5cc1635a93f5bb24503af6e9a408f2caf230816446741"
+}

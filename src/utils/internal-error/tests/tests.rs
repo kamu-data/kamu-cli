@@ -7,12 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#![feature(assert_matches)]
 #![feature(error_generic_member_access)]
+#![feature(never_type)]
 
+use std::assert_matches::assert_matches;
 use std::backtrace::Backtrace;
 use std::error::Error;
 
 use internal_error::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
 #[error("A")]
@@ -35,12 +40,14 @@ fn test_reuses_backtrace_one_layer() {
     assert!(std::ptr::eq(inner_bt, outer_bt));
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, thiserror::Error)]
 #[error("B")]
 struct B {
     #[source]
     #[backtrace]
-    source: Box<dyn std::error::Error + Send + Sync>,
+    source: BoxedError,
 }
 
 #[test]
@@ -62,12 +69,16 @@ fn test_reuses_backtrace_two_layers() {
     assert!(std::ptr::eq(inner_bt, outer_bt));
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, thiserror::Error)]
 #[error("C")]
 struct C {
     #[source]
-    source: Box<dyn std::error::Error + Send + Sync>,
+    source: BoxedError,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn test_creates_backtrace_when_unavailable() {
@@ -87,3 +98,49 @@ fn test_creates_backtrace_when_unavailable() {
 
     assert!(!std::ptr::eq(inner_bt, outer_bt));
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_creates_the_bail_error() {
+    let error: Result<!, _> = InternalError::bail("Oh, no, something went wrong");
+
+    assert_matches!(
+        error,
+        Err(e)
+            if e.reason() == "Internal error: Oh, no, something went wrong"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+#[error("Input value is not an integer")]
+struct IntegerParsingError;
+
+#[test]
+fn test_creates_the_correct_reason_without_context() {
+    let error = IntegerParsingError {}.int_err();
+
+    assert_eq!(
+        error.reason(),
+        "Internal error: Input value is not an integer"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_creates_the_correct_reason_wit_context() {
+    let definitely_not_a_number = "λ";
+    let error: Result<!, _> =
+        Err(IntegerParsingError {}).context_int_err(format!("value '{definitely_not_a_number}'"));
+
+    assert_matches!(
+        error,
+        Err(e)
+            if e.reason() == "Internal error: Input value is not an integer (context: value 'λ')"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

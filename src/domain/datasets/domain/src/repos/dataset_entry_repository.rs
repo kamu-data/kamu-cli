@@ -33,8 +33,10 @@ pub trait DatasetEntryRepository: Send + Sync {
         owner_id: &AccountID,
     ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByOwnerIdError>;
 
-    async fn save_dataset_entry(&self, dataset: &DatasetEntry)
-        -> Result<(), SaveDatasetEntryError>;
+    async fn save_dataset_entry(
+        &self,
+        dataset_entry: &DatasetEntry,
+    ) -> Result<(), SaveDatasetEntryError>;
 
     async fn update_dataset_entry_name(
         &self,
@@ -114,6 +116,9 @@ pub enum SaveDatasetEntryError {
     Duplicate(#[from] SaveDatasetEntryErrorDuplicate),
 
     #[error(transparent)]
+    NameCollision(#[from] DatasetEntryNameCollisionError),
+
+    #[error(transparent)]
     Internal(InternalError),
 }
 
@@ -144,7 +149,7 @@ pub enum UpdateDatasetEntryNameError {
 }
 
 #[derive(Error, Debug)]
-#[error("Dataset entry with name {dataset_name} already exists")]
+#[error("Dataset entry with name {dataset_name} for same owner already exists")]
 pub struct DatasetEntryNameCollisionError {
     pub dataset_name: DatasetName,
 }
