@@ -11,7 +11,7 @@
       {
         "name": "max_message_id",
         "ordinal": 1,
-        "type_info": "Int"
+        "type_info": "Integer"
       }
     ],
     "parameters": {

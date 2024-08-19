@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Added
 - The `/ingest` endpoint will try to infer the media type of a file by extension if not specified explicitly during upload. This resolves the problem with `415 Unsupported Media Type` errors when uploading `.ndjson` files from the Web UI.
+### Changed
+- `sqlx` v0.8
 
 ## [0.195.1] - 2024-08-16
 ### Fixed

@@ -9,7 +9,6 @@
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL | PRIMARY_KEY | NO_DEFAULT_VALUE",
-          "char_set": 224,
           "max_size": 400
         }
       },
@@ -19,7 +18,6 @@
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
-          "char_set": 224,
           "max_size": 400
         }
       },
@@ -29,7 +27,6 @@
         "type_info": {
           "type": "VarString",
           "flags": "UNIQUE_KEY",
-          "char_set": 224,
           "max_size": 1280
         }
       },
@@ -39,7 +36,6 @@
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL | NO_DEFAULT_VALUE",
-          "char_set": 224,
           "max_size": 800
         }
       },
@@ -49,7 +45,6 @@
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | ENUM | NO_DEFAULT_VALUE",
-          "char_set": 224,
           "max_size": 48
         }
       },
@@ -59,7 +54,6 @@
         "type_info": {
           "type": "VarString",
           "flags": "",
-          "char_set": 224,
           "max_size": 4000
         }
       },
@@ -69,7 +63,6 @@
         "type_info": {
           "type": "Timestamp",
           "flags": "NOT_NULL | UNSIGNED | BINARY | NO_DEFAULT_VALUE",
-          "char_set": 63,
           "max_size": 26
         }
       },
@@ -79,7 +72,6 @@
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL | NO_DEFAULT_VALUE",
-          "char_set": 63,
           "max_size": 4
         }
       },
@@ -89,7 +81,6 @@
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL | NO_DEFAULT_VALUE",
-          "char_set": 224,
           "max_size": 100
         }
       },
@@ -99,7 +90,6 @@
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
-          "char_set": 224,
           "max_size": 400
         }
       }

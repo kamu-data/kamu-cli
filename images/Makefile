@@ -4,7 +4,7 @@ IMAGE_JUPYTER_TAG = 0.6.2
 
 KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "kamu") | .version')
 
-SQLX_VERSION = 0.7.4
+SQLX_VERSION = 0.8.0
 IMAGE_SQLX_TAG = $(SQLX_VERSION)-1
 
 ################################################################################

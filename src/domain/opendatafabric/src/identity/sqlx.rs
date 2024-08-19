@@ -14,7 +14,7 @@ macro_rules! impl_sqlx {
             &'r str: sqlx::Decode<'r, DB>,
         {
             fn decode(
-                value: <DB as sqlx::database::HasValueRef<'r>>::ValueRef,
+                value: <DB as sqlx::database::Database>::ValueRef<'r>,
             ) -> Result<Self, sqlx::error::BoxDynError> {
                 let value = <&str as sqlx::Decode<DB>>::decode(value)?;
                 let value = $typ::from_did_str(value)?;
