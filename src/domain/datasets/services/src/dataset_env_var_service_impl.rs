@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common::DatabasePaginationOpts;
+use database_common::PaginationOpts;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::{
@@ -107,7 +107,7 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
     async fn get_all_dataset_env_vars_by_dataset_id(
         &self,
         dataset_id: &DatasetID,
-        pagination: Option<DatabasePaginationOpts>,
+        pagination: Option<PaginationOpts>,
     ) -> Result<DatasetEnvVarListing, GetDatasetEnvVarError> {
         let total_count = self
             .dataset_env_var_repository
@@ -119,11 +119,8 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
                 list: vec![],
             });
         }
-        let database_pagination = pagination.unwrap_or(DatabasePaginationOpts {
-            // We assume that it is impossible to reach dataset env vars count bigger
-            // than max i64 value
-            #[allow(clippy::cast_possible_wrap)]
-            limit: total_count as i64,
+        let database_pagination = pagination.unwrap_or(PaginationOpts {
+            limit: total_count,
             offset: 0,
         });
 

@@ -22,6 +22,7 @@ doctest = false
 
 
 [dependencies]
+database-common = { workspace = true }
 enum-variants = { workspace = true }
 event-sourcing = { workspace = true }
 messaging-outbox = { workspace = true }
@@ -32,5 +33,6 @@ kamu-core = { workspace = true }
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 serde = { version = "1", features = ["derive"] }
+sqlx = { version = "0.8", default-features = false, features = ["macros"] }
 thiserror = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }

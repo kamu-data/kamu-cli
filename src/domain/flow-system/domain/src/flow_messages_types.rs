@@ -28,17 +28,17 @@ impl Message for FlowConfigurationUpdatedMessage {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlowServiceUpdatedMessage {
+pub struct FlowExecutorUpdatedMessage {
     pub update_time: DateTime<Utc>,
-    pub update_details: FlowServiceUpdateDetails,
+    pub update_details: FlowExecutorUpdateDetails,
 }
 
-impl Message for FlowServiceUpdatedMessage {}
+impl Message for FlowExecutorUpdatedMessage {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum FlowServiceUpdateDetails {
+pub enum FlowExecutorUpdateDetails {
     Loaded,
     ExecutedTimeslot,
     FlowRunning,

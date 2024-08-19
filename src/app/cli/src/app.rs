@@ -340,10 +340,6 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
 
-    b.add::<kamu_task_system_services::TaskSchedulerImpl>();
-
-    b.add::<kamu_task_system_services::TaskExecutorImpl>();
-
     b.add::<DependencyGraphServiceInMemory>();
 
     b.add::<DatasetOwnershipServiceInMemory>();
@@ -356,12 +352,13 @@ pub fn configure_base_catalog(
     b.add::<DeleteDatasetUseCaseImpl>();
     b.add::<RenameDatasetUseCaseImpl>();
 
-    b.add::<kamu_flow_system_services::FlowConfigurationServiceImpl>();
-    b.add::<kamu_flow_system_services::FlowServiceImpl>();
-    b.add_value(kamu_flow_system_inmem::domain::FlowServiceRunConfig::new(
+    kamu_task_system_services::register_dependencies(&mut b);
+
+    b.add_value(kamu_flow_system_inmem::domain::FlowExecutorConfig::new(
         chrono::Duration::try_seconds(1).unwrap(),
         chrono::Duration::try_minutes(1).unwrap(),
     ));
+    kamu_flow_system_services::register_dependencies(&mut b);
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 

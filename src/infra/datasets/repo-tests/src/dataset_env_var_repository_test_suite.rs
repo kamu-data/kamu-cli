@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use chrono::{SubsecRound, Utc};
-use database_common::DatabasePaginationOpts;
+use database_common::PaginationOpts;
 use dill::Catalog;
 use kamu_datasets::{
     DatasetEnvVar,
@@ -48,7 +48,7 @@ pub async fn test_missing_dataset_env_var_not_found(catalog: &Catalog) {
     let dataset_env_vars = dataset_env_var_repo
         .get_all_dataset_env_vars_by_dataset_id(
             &DatasetID::new_seeded_ed25519(b"foo"),
-            &DatabasePaginationOpts {
+            &PaginationOpts {
                 offset: 0,
                 limit: 5,
             },
@@ -97,7 +97,7 @@ pub async fn test_insert_and_get_dataset_env_var(catalog: &Catalog) {
     let db_dataset_env_vars = dataset_env_var_repo
         .get_all_dataset_env_vars_by_dataset_id(
             &dataset_id,
-            &DatabasePaginationOpts {
+            &PaginationOpts {
                 offset: 0,
                 limit: 5,
             },
@@ -151,7 +151,7 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
     let mut db_dataset_env_vars = dataset_env_var_repo
         .get_all_dataset_env_vars_by_dataset_id(
             &dataset_id,
-            &DatabasePaginationOpts {
+            &PaginationOpts {
                 offset: 0,
                 limit: 5,
             },
@@ -219,7 +219,7 @@ pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
     let db_dataset_env_vars = dataset_env_var_repo
         .get_all_dataset_env_vars_by_dataset_id(
             &dataset_id,
-            &DatabasePaginationOpts {
+            &PaginationOpts {
                 offset: 0,
                 limit: 5,
             },

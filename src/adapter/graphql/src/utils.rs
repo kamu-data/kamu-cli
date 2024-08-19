@@ -106,8 +106,11 @@ pub(crate) async fn get_task(
     ctx: &Context<'_>,
     task_id: ts::TaskID,
 ) -> Result<ts::TaskState, InternalError> {
-    let task_scheduler = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
-    task_scheduler.get_task(task_id).await.int_err()
+    let task_event_store = from_catalog::<dyn ts::TaskEventStore>(ctx).unwrap();
+    let task = ts::Task::load(task_id, task_event_store.as_ref())
+        .await
+        .int_err()?;
+    Ok(task.into())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

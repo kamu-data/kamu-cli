@@ -10,6 +10,7 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
+use database_common::PaginationOpts;
 use event_sourcing::EventStore;
 use opendatafabric::{AccountID, DatasetID};
 
@@ -20,7 +21,13 @@ use crate::*;
 #[async_trait::async_trait]
 pub trait FlowEventStore: EventStore<FlowState> {
     /// Generates new unique flow identifier
-    fn new_flow_id(&self) -> FlowID;
+    async fn new_flow_id(&self) -> Result<FlowID, InternalError>;
+
+    /// Attempts to access the pending (unfinished) flow ID for the given key
+    async fn try_get_pending_flow(
+        &self,
+        flow_key: &FlowKey,
+    ) -> Result<Option<FlowID>, InternalError>;
 
     /// Returns last run statistics for the dataset flow of certain type
     async fn get_dataset_flow_run_stats(
@@ -41,8 +48,8 @@ pub trait FlowEventStore: EventStore<FlowState> {
     fn get_all_flow_ids_by_dataset(
         &self,
         dataset_id: &DatasetID,
-        filters: DatasetFlowFilters,
-        pagination: FlowPaginationOpts,
+        filters: &DatasetFlowFilters,
+        pagination: PaginationOpts,
     ) -> FlowIDStream;
 
     /// Returns IDs of the flow initiators associated with the specified
@@ -63,9 +70,9 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Applies filters/pagination, if specified
     fn get_all_flow_ids_by_datasets(
         &self,
-        dataset_id: HashSet<DatasetID>,
+        dataset_ids: HashSet<DatasetID>,
         filters: &DatasetFlowFilters,
-        pagination: FlowPaginationOpts,
+        pagination: PaginationOpts,
     ) -> FlowIDStream;
 
     /// Returns IDs of the system flows  in reverse chronological order based on
@@ -73,8 +80,8 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Applies filters/pagination, if specified
     fn get_all_system_flow_ids(
         &self,
-        filters: SystemFlowFilters,
-        pagination: FlowPaginationOpts,
+        filters: &SystemFlowFilters,
+        pagination: PaginationOpts,
     ) -> FlowIDStream;
 
     /// Returns number of system flows matching filters, if specified
@@ -83,22 +90,19 @@ pub trait FlowEventStore: EventStore<FlowState> {
         filters: &SystemFlowFilters,
     ) -> Result<usize, InternalError>;
 
-    /// Returns IDs of the flows of any type in reverse chronological order
-    /// based on creation time
-    /// TODO: not used yet, evaluate need in filters
-    fn get_all_flow_ids(&self, pagination: FlowPaginationOpts) -> FlowIDStream<'_>;
+    /// Returns IDs of the flows of any type matching the given filters in
+    /// reverse chronological order based on creation time
+    fn get_all_flow_ids(
+        &self,
+        filters: &AllFlowFilters,
+        pagination: PaginationOpts,
+    ) -> FlowIDStream<'_>;
 
-    /// Returns number of all flows
-    async fn get_count_all_flows(&self) -> Result<usize, InternalError>;
+    /// Returns number of all flows, matching filters
+    async fn get_count_all_flows(&self, filters: &AllFlowFilters) -> Result<usize, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Copy, Clone)]
-pub struct FlowPaginationOpts {
-    pub offset: usize,
-    pub limit: usize,
-}
 
 #[derive(Default, Debug, Clone)]
 pub struct DatasetFlowFilters {
@@ -122,6 +126,12 @@ pub struct SystemFlowFilters {
     pub by_initiator: Option<InitiatorFilter>,
 }
 
+#[derive(Default, Debug, Clone)]
+pub struct AllFlowFilters {
+    pub by_flow_status: Option<FlowStatus>,
+    pub by_initiator: Option<InitiatorFilter>,
+}
+
 #[derive(Debug, Clone)]
 pub enum InitiatorFilter {
     System,
@@ -130,7 +140,7 @@ pub enum InitiatorFilter {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FlowRunStats {
     pub last_success_time: Option<DateTime<Utc>>,
     pub last_attempt_time: Option<DateTime<Utc>>,

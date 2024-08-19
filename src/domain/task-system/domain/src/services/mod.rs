@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod task_executor;
+mod task_logical_plan_runner;
 mod task_scheduler;
 
 pub use task_executor::*;
+pub use task_logical_plan_runner::*;
 pub use task_scheduler::*;

@@ -9,7 +9,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use database_common::DatabasePaginationOpts;
+use database_common::PaginationOpts;
 use opendatafabric::AccountID;
 use uuid::Uuid;
 
@@ -42,7 +42,7 @@ pub trait AccessTokenService: Sync + Send {
     async fn get_access_tokens_by_account_id(
         &self,
         account_id: &AccountID,
-        pagination: &DatabasePaginationOpts,
+        pagination: &PaginationOpts,
     ) -> Result<AccessTokenListing, GetAccessTokenError>;
 
     async fn revoke_access_token(&self, token_id: &Uuid) -> Result<(), RevokeTokenError>;

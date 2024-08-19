@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use database_common::{DatabasePaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use opendatafabric::AccountID;
@@ -150,7 +150,7 @@ impl AccessTokenRepository for MySqlAccessTokenRepository {
     async fn get_access_tokens_by_account_id(
         &self,
         account_id: &AccountID,
-        pagination: &DatabasePaginationOpts,
+        pagination: &PaginationOpts,
     ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
         let mut tr = self.transaction.lock().await;
 
@@ -174,8 +174,8 @@ impl AccessTokenRepository for MySqlAccessTokenRepository {
               LIMIT ? OFFSET ?
               "#,
             account_id.to_string(),
-            pagination.limit,
-            pagination.offset,
+            i64::try_from(pagination.limit).unwrap(),
+            i64::try_from(pagination.offset).unwrap(),
         )
         .fetch_all(connection_mut)
         .await

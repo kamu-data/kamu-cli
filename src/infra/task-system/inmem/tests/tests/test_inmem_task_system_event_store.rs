@@ -9,7 +9,7 @@
 
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_task_system_inmem::*;
+use kamu_task_system_inmem::InMemoryTaskEventStore;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,6 +53,30 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_task_system_repo_tests::test_event_store_try_get_queued_single_task,
+    harness = InMemoryTaskSystemEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_task_system_repo_tests::test_event_store_try_get_queued_multiple_tasks,
+    harness = InMemoryTaskSystemEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_task_system_repo_tests::test_event_store_get_running_tasks,
+    harness = InMemoryTaskSystemEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct InMemoryTaskSystemEventStoreHarness {
     catalog: Catalog,
 }
@@ -60,7 +84,7 @@ struct InMemoryTaskSystemEventStoreHarness {
 impl InMemoryTaskSystemEventStoreHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
-        catalog_builder.add::<InMemoryTaskSystemEventStore>();
+        catalog_builder.add::<InMemoryTaskEventStore>();
 
         Self {
             catalog: catalog_builder.build(),

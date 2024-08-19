@@ -10,6 +10,7 @@
 mod compaction_rule;
 mod flow_key;
 mod flow_run_snapshot;
+mod flow_task_metadata;
 mod flow_type;
 mod ingest_rule;
 mod reset_rule;
@@ -19,6 +20,7 @@ mod transform_rule;
 pub use compaction_rule::*;
 pub use flow_key::*;
 pub use flow_run_snapshot::*;
+pub use flow_task_metadata::*;
 pub use flow_type::*;
 pub use ingest_rule::*;
 pub use reset_rule::*;

@@ -33,7 +33,7 @@ impl Task {
 
     /// Life-cycle status of a task
     async fn status(&self) -> TaskStatus {
-        (&self.state.status).into()
+        (&self.state.status()).into()
     }
 
     /// Whether the task was ordered to be cancelled
@@ -44,10 +44,7 @@ impl Task {
     /// Describes a certain final outcome of the task once it reaches the
     /// "finished" status
     async fn outcome(&self) -> Option<TaskOutcome> {
-        match &self.state.status {
-            ts::TaskStatus::Queued | ts::TaskStatus::Running => None,
-            ts::TaskStatus::Finished(outcome) => Some(outcome.into()),
-        }
+        self.state.outcome.as_ref().map(Into::into)
     }
 
     /// Time when task was originally created and placed in a queue

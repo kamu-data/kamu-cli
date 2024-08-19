@@ -46,15 +46,6 @@ impl Query {
         Accounts
     }
 
-    /// Task-related functionality group.
-    ///
-    /// Tasks are units of scheduling that can perform many functions like
-    /// ingesting new data, running dataset transformations, answering ad-hoc
-    /// queries etc.
-    async fn tasks(&self) -> Tasks {
-        Tasks
-    }
-
     /// Search-related functionality group
     async fn search(&self) -> Search {
         Search
@@ -98,14 +89,6 @@ impl Mutation {
     /// system. This groups deals with their identities and permissions.
     async fn accounts(&self) -> AccountsMut {
         AccountsMut
-    }
-
-    /// Tasks-related functionality group.
-    ///
-    /// Tasks are units of work scheduled and executed by the system to query
-    /// and process data.
-    async fn tasks(&self) -> TasksMut {
-        TasksMut
     }
 }
 

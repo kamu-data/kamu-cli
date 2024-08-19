@@ -49,6 +49,7 @@ async fn test_deliver_messages_of_one_type() {
     };
 
     let harness = TransactionalOutboxProcessorHarness::new();
+    harness.outbox_processor.pre_run().await.unwrap();
 
     harness
         .outbox
@@ -63,7 +64,14 @@ async fn test_deliver_messages_of_one_type() {
 
     // Posted, but not delivered yet!
     harness.check_delivered_messages(&[], &[], &[], &[]);
-    harness.check_consumption_boundaries(&[]).await;
+    harness
+        .check_consumption_boundaries(&[
+            (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
+        ])
+        .await;
 
     // Run relay iteration
     harness
@@ -96,6 +104,7 @@ async fn test_deliver_messages_of_two_types() {
     };
 
     let harness = TransactionalOutboxProcessorHarness::new();
+    harness.outbox_processor.pre_run().await.unwrap();
 
     harness
         .outbox
@@ -110,7 +119,14 @@ async fn test_deliver_messages_of_two_types() {
 
     // Posted, but not delivered yet!
     harness.check_delivered_messages(&[], &[], &[], &[]);
-    harness.check_consumption_boundaries(&[]).await;
+    harness
+        .check_consumption_boundaries(&[
+            (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
+        ])
+        .await;
 
     // Run relay iteration
     harness
@@ -144,6 +160,7 @@ async fn test_deliver_messages_multiple_consumers() {
     };
 
     let harness = TransactionalOutboxProcessorHarness::new();
+    harness.outbox_processor.pre_run().await.unwrap();
 
     harness
         .outbox
@@ -158,7 +175,14 @@ async fn test_deliver_messages_multiple_consumers() {
 
     // Posted, but not delivered yet!
     harness.check_delivered_messages(&[], &[], &[], &[]);
-    harness.check_consumption_boundaries(&[]).await;
+    harness
+        .check_consumption_boundaries(&[
+            (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
+        ])
+        .await;
 
     // Run relay iteration
     harness
@@ -190,6 +214,7 @@ async fn test_deliver_messages_multiple_consumers() {
 #[test_log::test(tokio::test)]
 async fn test_deliver_messages_with_partial_consumption() {
     let harness = TransactionalOutboxProcessorHarness::new();
+    harness.outbox_processor.pre_run().await.unwrap();
 
     let message_texts = ["foo", "bar", "baz", "super", "duper"];
     for message_text in message_texts {
@@ -208,7 +233,7 @@ async fn test_deliver_messages_with_partial_consumption() {
     // Let's assume some initial partial boundaries
     harness
         .outbox_consumption_repository
-        .create_consumption_boundary(OutboxMessageConsumptionBoundary {
+        .update_consumption_boundary(OutboxMessageConsumptionBoundary {
             producer_name: TEST_PRODUCER_C.to_string(),
             consumer_name: "TestMessageConsumerC1".to_string(),
             last_consumed_message_id: OutboxMessageID::new(2),
@@ -217,7 +242,7 @@ async fn test_deliver_messages_with_partial_consumption() {
         .unwrap();
     harness
         .outbox_consumption_repository
-        .create_consumption_boundary(OutboxMessageConsumptionBoundary {
+        .update_consumption_boundary(OutboxMessageConsumptionBoundary {
             producer_name: TEST_PRODUCER_C.to_string(),
             consumer_name: "TestMessageConsumerC2".to_string(),
             last_consumed_message_id: OutboxMessageID::new(4),
@@ -229,6 +254,8 @@ async fn test_deliver_messages_with_partial_consumption() {
     harness.check_delivered_messages(&[], &[], &[], &[]);
     harness
         .check_consumption_boundaries(&[
+            (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 2),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 4),
         ])
@@ -352,8 +379,6 @@ impl TransactionalOutboxProcessorHarness {
         let mut boundaries: Vec<_> = self
             .outbox_consumption_repository
             .list_consumption_boundaries()
-            .await
-            .unwrap()
             .try_collect()
             .await
             .unwrap();

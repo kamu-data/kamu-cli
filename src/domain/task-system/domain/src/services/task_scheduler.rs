@@ -9,7 +9,6 @@
 
 use event_sourcing::LoadError;
 use kamu_core::DatasetNotFoundError;
-use opendatafabric::DatasetID;
 use tokio_stream::Stream;
 
 use crate::*;
@@ -18,16 +17,12 @@ use crate::*;
 
 #[async_trait::async_trait]
 pub trait TaskScheduler: Sync + Send {
-    /// Creates a new task from provided logical plan
-    async fn create_task(&self, plan: LogicalPlan) -> Result<TaskState, CreateTaskError>;
-
-    /// Returns page of states of tasks associated with a given dataset ordered
-    /// by creation time from newest to oldest
-    async fn list_tasks_by_dataset(
+    /// Creates a new task from provided logical plan & metadata
+    async fn create_task(
         &self,
-        dataset_id: &DatasetID,
-        pagination: TaskPaginationOpts,
-    ) -> Result<TaskStateListing, ListTasksByDatasetError>;
+        plan: LogicalPlan,
+        metadata: Option<TaskMetadata>,
+    ) -> Result<TaskState, CreateTaskError>;
 
     /// Returns current state of a given task
     async fn get_task(&self, task_id: TaskID) -> Result<TaskState, GetTaskError>;
@@ -35,12 +30,8 @@ pub trait TaskScheduler: Sync + Send {
     /// Attempts to cancel the given task
     async fn cancel_task(&self, task_id: TaskID) -> Result<TaskState, CancelTaskError>;
 
-    /// Blocks until the next task is available for execution and takes it out
-    /// of the queue (called by [TaskExecutor])
-    async fn take(&self) -> Result<TaskID, TakeTaskError>;
-
-    /// A non-blocking version of [TaskScheduler::take()]
-    async fn try_take(&self) -> Result<Option<TaskID>, TakeTaskError>;
+    /// Takes the earliest available queued task, if any, without blocking
+    async fn try_take(&self) -> Result<Option<Task>, TakeTaskError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

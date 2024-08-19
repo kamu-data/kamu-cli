@@ -71,7 +71,7 @@ impl AccountRepository for MySqlAccountRepository {
                         CreateAccountDuplicateField::Name
                     } else if mysql_error_message.contains("for key 'idx_accounts_email'") {
                         CreateAccountDuplicateField::Email
-                    } else if mysql_error_message.contains("for key 'idx_provider_identity_key'") {
+                    } else if mysql_error_message.contains("for key 'idx_accounts_provider_identity_key'") {
                         CreateAccountDuplicateField::ProviderIdentityKey
                     } else {
                         tracing::error!("Unexpected MySQL error message: {}", mysql_error_message);

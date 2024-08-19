@@ -21,12 +21,13 @@ use tokio::task::yield_now;
 pub(crate) struct TaskDriver {
     time_source: Arc<dyn SystemTimeSource>,
     outbox: Arc<dyn Outbox>,
-    task_event_store: Arc<dyn TaskSystemEventStore>,
+    task_event_store: Arc<dyn TaskEventStore>,
     args: TaskDriverArgs,
 }
 
 pub(crate) struct TaskDriverArgs {
     pub(crate) task_id: TaskID,
+    pub(crate) task_metadata: TaskMetadata,
     pub(crate) dataset_id: Option<DatasetID>,
     pub(crate) run_since_start: Duration,
     pub(crate) finish_in_with: Option<(Duration, TaskOutcome)>,
@@ -37,7 +38,7 @@ impl TaskDriver {
     pub(crate) fn new(
         time_source: Arc<dyn SystemTimeSource>,
         outbox: Arc<dyn Outbox>,
-        task_event_store: Arc<dyn TaskSystemEventStore>,
+        task_event_store: Arc<dyn TaskEventStore>,
         args: TaskDriverArgs,
     ) -> Self {
         Self {
@@ -66,6 +67,7 @@ impl TaskDriver {
                 TaskProgressMessage::running(
                     start_time + self.args.run_since_start,
                     self.args.task_id,
+                    self.args.task_metadata.clone(),
                 ),
             )
             .await
@@ -82,6 +84,7 @@ impl TaskDriver {
                     TaskProgressMessage::finished(
                         start_time + self.args.run_since_start + finish_in,
                         self.args.task_id,
+                        self.args.task_metadata,
                         with_outcome,
                     ),
                 )

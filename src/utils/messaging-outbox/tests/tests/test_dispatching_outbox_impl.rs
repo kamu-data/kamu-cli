@@ -255,8 +255,6 @@ impl DispatchingOutboxHarness {
         let outbox_messages: Vec<_> = self
             .outbox_message_repository
             .get_producer_messages(producer_name, OutboxMessageID::new(0), 10)
-            .await
-            .unwrap()
             .try_collect()
             .await
             .unwrap();

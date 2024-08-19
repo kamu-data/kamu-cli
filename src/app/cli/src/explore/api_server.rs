@@ -22,7 +22,7 @@ use indoc::indoc;
 use internal_error::*;
 use kamu::domain::{Protocols, ServerUrlConfig};
 use kamu_adapter_http::e2e::e2e_router;
-use kamu_flow_system_inmem::domain::FlowService;
+use kamu_flow_system_inmem::domain::FlowExecutor;
 use kamu_task_system_inmem::domain::TaskExecutor;
 use messaging_outbox::OutboxTransactionalProcessor;
 use time_source::SystemTimeSource;
@@ -37,7 +37,7 @@ pub struct APIServer {
         axum::routing::IntoMakeService<axum::Router>,
     >,
     task_executor: Arc<dyn TaskExecutor>,
-    flow_service: Arc<dyn FlowService>,
+    flow_executor: Arc<dyn FlowExecutor>,
     outbox_processor: Arc<OutboxTransactionalProcessor>,
     time_source: Arc<dyn SystemTimeSource>,
     maybe_shutdown_notify: Option<Arc<Notify>>,
@@ -57,7 +57,7 @@ impl APIServer {
         // behalf of the system, as they are automatically scheduled
         let task_executor = cli_catalog.get_one().unwrap();
 
-        let flow_service = cli_catalog.get_one().unwrap();
+        let flow_executor = cli_catalog.get_one().unwrap();
 
         let outbox_processor = cli_catalog.get_one().unwrap();
 
@@ -172,7 +172,7 @@ impl APIServer {
         Self {
             server,
             task_executor,
-            flow_service,
+            flow_executor,
             outbox_processor,
             time_source,
             maybe_shutdown_notify,
@@ -181,6 +181,13 @@ impl APIServer {
 
     pub fn local_addr(&self) -> SocketAddr {
         self.server.local_addr()
+    }
+
+    pub async fn pre_run(&self) -> Result<(), InternalError> {
+        self.task_executor.pre_run().await?;
+        self.flow_executor.pre_run(self.time_source.now()).await?;
+        self.outbox_processor.pre_run().await?;
+        Ok(())
     }
 
     pub async fn run(self) -> Result<(), InternalError> {
@@ -201,7 +208,7 @@ impl APIServer {
             res = server_run_fut => { res.int_err() },
             res = self.outbox_processor.run() => { res.int_err() },
             res = self.task_executor.run() => { res.int_err() },
-            res = self.flow_service.run(self.time_source.now()) => { res.int_err() }
+            res = self.flow_executor.run() => { res.int_err() }
         }
     }
 }

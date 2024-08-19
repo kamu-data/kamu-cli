@@ -10,6 +10,7 @@
 use kamu_core::{CompactionResult, PullResult, PullResultUpToDate};
 use kamu_task_system::{self as ts, ResetDatasetTaskError, UpdateDatasetTaskError};
 use opendatafabric::{DatasetID, Multihash};
+use serde::{Deserialize, Serialize};
 use ts::TaskError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +36,7 @@ impl FlowOutcome {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowResult {
     Empty,
     DatasetUpdate(FlowResultDatasetUpdate),
@@ -84,31 +85,31 @@ impl From<&TaskError> for FlowError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowResultDatasetUpdate {
     Changed(FlowResultDatasetUpdateChanged),
     UpToDate(FlowResultDatasetUpdateUpToDate),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowResultDatasetUpdateChanged {
     pub old_head: Option<Multihash>,
     pub new_head: Multihash,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowResultDatasetUpdateUpToDate {
     pub uncacheable: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowResultDatasetCompact {
     pub new_head: Multihash,
     pub old_num_blocks: usize,
     pub new_num_blocks: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowResultDatasetReset {
     pub new_head: Multihash,
 }
