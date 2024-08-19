@@ -6,7 +6,7 @@ CREATE TABLE auth_rebac_properties
     property_value VARCHAR(50)  NOT NULL
 );
 
-CREATE INDEX idx_uniq_entity
+CREATE INDEX idx_entity
     ON auth_rebac_properties (entity_type, entity_id);
 
 CREATE UNIQUE INDEX idx_uniq_entity_property_name
