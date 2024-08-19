@@ -147,6 +147,10 @@ impl DataFormatRegistry for DataFormatRegistryImpl {
     ) -> Result<ReadStep, UnsupportedMediaTypeError> {
         match MediaTypeRef(media_type.0.as_str()) {
             MediaType::CSV => Ok(ReadStepCsv {
+                // Assuming header is present if we don't have any previous schema.
+                // TODO: This should be replaced with proper inference
+                // See: https://github.com/kamu-data/kamu-node/issues/99
+                header: Some(schema.is_none()),
                 schema,
                 ..Default::default()
             }
