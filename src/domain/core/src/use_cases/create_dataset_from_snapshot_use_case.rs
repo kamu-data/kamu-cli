@@ -29,6 +29,7 @@ pub struct CreateDatasetFromSnapshotUseCaseOptions {
     pub dataset_visibility: DatasetVisibility,
 }
 
+// Used primarily for tests
 impl Default for CreateDatasetFromSnapshotUseCaseOptions {
     fn default() -> Self {
         Self {

@@ -730,11 +730,11 @@ type DatasetsMut {
 	"""
 	Creates a new empty dataset
 	"""
-	createEmpty(datasetKind: DatasetKind!, datasetAlias: DatasetAlias!): CreateDatasetResult!
+	createEmpty(datasetKind: DatasetKind!, datasetAlias: DatasetAlias!, datasetPubliclyAvailable: Boolean): CreateDatasetResult!
 	"""
 	Creates a new dataset from provided DatasetSnapshot manifest
 	"""
-	createFromSnapshot(snapshot: String!, snapshotFormat: MetadataManifestFormat!): CreateDatasetFromSnapshotResult!
+	createFromSnapshot(snapshot: String!, snapshotFormat: MetadataManifestFormat!, datasetPubliclyAvailable: Boolean): CreateDatasetFromSnapshotResult!
 }
 
 """
