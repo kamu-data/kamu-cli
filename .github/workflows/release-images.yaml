@@ -43,6 +43,11 @@ jobs:
           make kamu-base-with-data-mt
           make kamu-base-with-env-var-storage
 
+      - name: Build sqlx-cli image
+        run: |
+          cd images/
+          make sqlx-cli
+
       - name: Build sqlx-cli image with migrations
         run: |
           cd images/
@@ -55,4 +60,5 @@ jobs:
           make kamu-base-with-data-push
           make kamu-base-with-data-mt-push
           make kamu-base-with-env-var-storage-push
+          make sqlx-cli-push
           make sqlx-cli-with-migrations-push
