@@ -28,7 +28,7 @@ use time_source::SystemTimeSource;
 use tokio::io::AsyncRead;
 
 use crate::axum_utils::ensure_authenticated_account;
-use crate::{upload_token_into_stream, UploadService, UploadTokenIntoStreamError};
+use crate::{UploadService, UploadTokenBase64Json, UploadTokenIntoStreamError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,7 +36,7 @@ use crate::{upload_token_into_stream, UploadService, UploadTokenIntoStreamError}
 #[serde(rename_all = "camelCase")]
 pub struct IngestQueryParams {
     source_name: Option<String>,
-    upload_token: Option<String>,
+    upload_token: Option<UploadTokenBase64Json>,
 }
 
 struct IngestTaskArguments {
@@ -61,8 +61,30 @@ pub async fn dataset_ingest_handler(
     headers: HeaderMap,
     body_stream: axum::extract::BodyStream,
 ) -> Result<(), ApiError> {
-    let arguments = if params.upload_token.is_some() {
-        resolve_ready_upload_arguments(&catalog, &params).await?
+    let is_ingest_from_upload = params.upload_token.is_some();
+
+    let arguments = if let Some(upload_token) = params.upload_token {
+        let account_id = ensure_authenticated_account(&catalog).api_err()?;
+
+        let upload_svc = catalog.get_one::<dyn UploadService>().unwrap();
+
+        let data_stream = upload_svc
+            .upload_token_into_stream(&account_id, &upload_token.0)
+            .await
+            .map_err(|e| match e {
+                UploadTokenIntoStreamError::ContentLengthMismatch(e) => ApiError::bad_request(e),
+                UploadTokenIntoStreamError::Internal(e) => e.api_err(),
+            })?;
+
+        let media_type = upload_token
+            .0
+            .content_type
+            .or_else(|| media_type_from_file_extension(&catalog, &upload_token.0.file_name));
+
+        IngestTaskArguments {
+            data_stream,
+            media_type,
+        }
     } else {
         let media_type = headers
             .get(http::header::CONTENT_TYPE)
@@ -94,7 +116,7 @@ pub async fn dataset_ingest_handler(
             PushIngestOpts {
                 media_type: arguments.media_type,
                 source_event_time,
-                auto_create_push_source: params.upload_token.is_some(),
+                auto_create_push_source: is_ingest_from_upload,
             },
             None,
         )
@@ -114,35 +136,6 @@ pub async fn dataset_ingest_handler(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn resolve_ready_upload_arguments(
-    catalog: &Catalog,
-    params: &IngestQueryParams,
-) -> Result<IngestTaskArguments, ApiError> {
-    let upload_token = params
-        .upload_token
-        .as_ref()
-        .expect("Upload token must be present");
-
-    let account_id = ensure_authenticated_account(catalog).api_err()?;
-
-    let upload_svc = catalog.get_one::<dyn UploadService>().unwrap();
-
-    let (data_stream, media_type) =
-        upload_token_into_stream(upload_svc.as_ref(), &account_id, upload_token)
-            .await
-            .map_err(|e| match e {
-                UploadTokenIntoStreamError::ContentLengthMismatch(e) => ApiError::bad_request(e),
-                UploadTokenIntoStreamError::Internal(e) => e.api_err(),
-            })?;
-
-    Ok(IngestTaskArguments {
-        data_stream,
-        media_type: Some(media_type),
-    })
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 fn get_header<T, E: std::error::Error + Send + Sync + 'static>(
     headers: &HeaderMap,
     key: &str,
@@ -155,6 +148,20 @@ fn get_header<T, E: std::error::Error + Send + Sync + 'static>(
     let v = v.to_str().map_err(ApiError::bad_request)?;
 
     parse(v).map(Some).map_err(ApiError::bad_request)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Consider making file name an optional parameter of the ingest to use
+// for type inference
+fn media_type_from_file_extension(catalog: &Catalog, file_name: &str) -> Option<MediaType> {
+    let fmt_reg = catalog.get_one::<dyn DataFormatRegistry>().unwrap();
+
+    std::path::PathBuf::from(file_name)
+        .extension()
+        .and_then(|s| s.to_str())
+        .and_then(|ext| fmt_reg.format_by_file_extension(ext))
+        .map(|fmt| fmt.media_type.to_owned())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

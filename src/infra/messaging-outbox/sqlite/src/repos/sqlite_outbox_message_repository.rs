@@ -123,7 +123,7 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
             .map(|r| {
                 (
                     r.producer_name.unwrap(),
-                    OutboxMessageID::new(i64::from(r.max_message_id)),
+                    OutboxMessageID::new(r.max_message_id),
                 )
             })
             .collect())

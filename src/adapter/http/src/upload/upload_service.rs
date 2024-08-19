@@ -9,11 +9,10 @@
 
 use base64::Engine;
 use bytes::Bytes;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 use kamu_core::MediaType;
 use opendatafabric::AccountID;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use thiserror::Error;
 use tokio::io::AsyncRead;
 
@@ -25,7 +24,7 @@ pub trait UploadService: Send + Sync {
         &self,
         account_id: &AccountID,
         file_name: String,
-        content_type: String,
+        content_type: Option<MediaType>,
         content_length: usize,
     ) -> Result<UploadContext, MakeUploadContextError>;
 
@@ -46,10 +45,40 @@ pub trait UploadService: Send + Sync {
     async fn save_upload(
         &self,
         account_id: &AccountID,
-        upload_token: &str,
+        upload_token: &UploadToken,
         content_length: usize,
         file_data: Bytes,
     ) -> Result<(), SaveUploadError>;
+
+    async fn upload_token_into_stream(
+        &self,
+        account_id: &AccountID,
+        upload_token: &UploadToken,
+    ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError> {
+        let actual_data_size = self
+            .upload_reference_size(account_id, &upload_token.upload_id, &upload_token.file_name)
+            .await
+            .map_err(UploadTokenIntoStreamError::Internal)?;
+
+        if actual_data_size != upload_token.content_length {
+            let e = ContentLengthMismatchError {
+                actual: actual_data_size,
+                declared: upload_token.content_length,
+            };
+            return Err(UploadTokenIntoStreamError::ContentLengthMismatch(e));
+        }
+
+        let stream = self
+            .upload_reference_into_stream(
+                account_id,
+                &upload_token.upload_id,
+                &upload_token.file_name,
+            )
+            .await
+            .map_err(UploadTokenIntoStreamError::Internal)?;
+
+        Ok(stream)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +91,7 @@ pub struct UploadContext {
     pub use_multipart: bool,
     pub headers: Vec<(String, String)>,
     pub fields: Vec<(String, String)>,
-    pub upload_token: String,
+    pub upload_token: UploadTokenBase64Json,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -145,82 +174,90 @@ impl FileUploadLimitConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn make_upload_token(
-    upload_id: String,
-    file_name: String,
-    content_type: String,
-    content_length: usize,
-) -> String {
-    let payload = UploadTokenPayload {
-        upload_id,
-        file_name,
-        content_type,
-        content_length,
-    };
-
-    let payload_json = json!(payload).to_string();
-    base64::engine::general_purpose::URL_SAFE.encode(payload_json)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub fn decode_upload_token_payload(
-    upload_token: &str,
-) -> Result<UploadTokenPayload, InternalError> {
-    let payload_json_bytes = base64::engine::general_purpose::URL_SAFE
-        .decode(upload_token)
-        .int_err()?;
-    let payload_json = String::from_utf8(payload_json_bytes).int_err()?;
-    serde_json::from_str(&payload_json).int_err()
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+#[serde_with::serde_as]
+#[serde_with::skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
-pub struct UploadTokenPayload {
+pub struct UploadToken {
     pub upload_id: String,
     pub file_name: String,
-    pub content_type: String,
     pub content_length: usize,
+    pub content_type: Option<MediaType>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn upload_token_into_stream(
-    upload_svc: &dyn UploadService,
-    account_id: &AccountID,
-    upload_token: &str,
-) -> Result<(Box<dyn AsyncRead + Send + Unpin>, MediaType), UploadTokenIntoStreamError> {
-    let upload_token_payload =
-        decode_upload_token_payload(upload_token).map_err(UploadTokenIntoStreamError::Internal)?;
+#[derive(Debug)]
+pub struct UploadTokenBase64Json(pub UploadToken);
 
-    let actual_data_size = upload_svc
-        .upload_reference_size(
-            account_id,
-            &upload_token_payload.upload_id,
-            &upload_token_payload.file_name,
-        )
-        .await
-        .map_err(UploadTokenIntoStreamError::Internal)?;
+impl std::fmt::Display for UploadTokenBase64Json {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let payload_json = serde_json::to_string(&self.0).unwrap();
+        let payload_b64 = base64::engine::general_purpose::URL_SAFE.encode(payload_json);
+        write!(f, "{payload_b64}")
+    }
+}
 
-    if actual_data_size != upload_token_payload.content_length {
-        let e = ContentLengthMismatchError {
-            actual: actual_data_size,
-            declared: upload_token_payload.content_length,
-        };
-        return Err(UploadTokenIntoStreamError::ContentLengthMismatch(e));
+impl std::str::FromStr for UploadTokenBase64Json {
+    type Err = UploadTokenBase64JsonDecodeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let payload_json_bytes = base64::engine::general_purpose::URL_SAFE
+            .decode(s)
+            .map_err(UploadTokenBase64JsonDecodeError::new)?;
+        let payload_json = std::str::from_utf8(&payload_json_bytes)
+            .map_err(UploadTokenBase64JsonDecodeError::new)?;
+        let upload_token =
+            serde_json::from_str(payload_json).map_err(UploadTokenBase64JsonDecodeError::new)?;
+        Ok(Self(upload_token))
+    }
+}
+
+impl Serialize for UploadTokenBase64Json {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let payload_b64 = self.to_string();
+        serializer.serialize_str(&payload_b64)
+    }
+}
+
+struct UploadTokenBase64JsonVisitor;
+impl<'de> serde::de::Visitor<'de> for UploadTokenBase64JsonVisitor {
+    type Value = UploadTokenBase64Json;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a base64-encoded json for UploadToken")
     }
 
-    let stream = upload_svc
-        .upload_reference_into_stream(
-            account_id,
-            &upload_token_payload.upload_id,
-            &upload_token_payload.file_name,
-        )
-        .await
-        .map_err(UploadTokenIntoStreamError::Internal)?;
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        v.parse().map_err(E::custom)
+    }
+}
+impl<'de> Deserialize<'de> for UploadTokenBase64Json {
+    fn deserialize<D>(deserializer: D) -> Result<UploadTokenBase64Json, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_str(UploadTokenBase64JsonVisitor)
+    }
+}
 
-    Ok((stream, MediaType(upload_token_payload.content_type)))
+#[derive(Debug, thiserror::Error)]
+#[error("{message}")]
+pub struct UploadTokenBase64JsonDecodeError {
+    pub message: String,
+}
+
+impl UploadTokenBase64JsonDecodeError {
+    pub fn new(err: impl std::error::Error) -> Self {
+        Self {
+            message: err.to_string(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

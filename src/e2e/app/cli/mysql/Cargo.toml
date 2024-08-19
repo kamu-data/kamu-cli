@@ -30,7 +30,7 @@ kamu-cli-e2e-repo-tests = { workspace = true }
 
 indoc = "2"
 paste = "1"
-sqlx = { version = "0.7", default-features = false, features = [
+sqlx = { version = "0.8", default-features = false, features = [
     "macros",
     "mysql",
 ] }
