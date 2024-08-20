@@ -5066,8 +5066,6 @@ dependencies = [
  "internal-error",
  "kamu",
  "kamu-accounts",
- "kamu-auth-rebac-inmem",
- "kamu-auth-rebac-services",
  "kamu-core",
  "messaging-outbox",
  "opendatafabric",
