@@ -300,9 +300,8 @@ If you'd like to contribute [start here](https://docs.kamu.dev/contrib/).
 
 [Tutorials]: https://docs.kamu.dev/cli/learn/learning-materials/
 [Examples]: https://docs.kamu.dev/cli/learn/examples/
-[Docs]: https://docs.kamu.dev/cli/
-[Documentation]: https://docs.kamu.dev/cli/
-[Demo]: https://docs.kamu.dev/cli/get-started/self-serve-demo/
+[Docs]: https://docs.kamu.dev/welcome/
+[Demo]: https://demo.kamu.dev/
 [FAQ]: https://docs.kamu.dev/cli/get-started/faq/
 [Chat]: https://discord.gg/nU6TXRQNXC
 [Contributing]: https://docs.kamu.dev/contrib/
