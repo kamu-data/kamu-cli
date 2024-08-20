@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Many examples were simplified due to ident normalization changes
 ### Fixed
 - Crash in `kamu login` command on 5XX server responses
+- The push smart protocol now delivers internal errors to the client
 ### Added
 - HTTP sources now include `User-Agent` header that defaults to `kamu-cli/{major}.{minor}.{patch}`
 - Externalized configuration of HTTP source parameters like timeouts and redirects

@@ -209,7 +209,23 @@ impl AxumServerPushProtocolInstance {
             {
                 Ok(head) => Some(head),
                 Err(GetRefError::NotFound(_)) => None,
-                Err(e) => return Err(PushServerError::Internal(e.int_err())),
+                Err(e) => {
+                    let int_err = e.int_err();
+                    axum_write_close_payload::<DatasetPushResponse>(
+                        &mut self.socket,
+                        Err(DatasetPushRequestError::Internal(DatasetInternalError {
+                            error_message: int_err.reason(),
+                        })),
+                    )
+                    .await
+                    .map_err(|e| {
+                        PushServerError::WriteFailed(PushWriteError::new(
+                            e,
+                            PushPhase::MetadataRequest,
+                        ))
+                    })?;
+                    return Err(PushServerError::Internal(int_err));
+                }
             }
         } else {
             None
@@ -294,14 +310,33 @@ impl AxumServerPushProtocolInstance {
 
         let mut object_transfer_strategies: Vec<PushObjectTransferStrategy> = Vec::new();
         for r in request.object_files {
-            let transfer_strategy = prepare_push_object_transfer_strategy(
+            let transfer_strategy = match prepare_push_object_transfer_strategy(
                 dataset.as_ref(),
                 &r,
                 &self.dataset_url,
                 &self.maybe_bearer_header,
             )
             .await
-            .map_err(PushServerError::Internal)?;
+            {
+                Ok(res) => res,
+                Err(e) => {
+                    let int_err = e.int_err();
+                    axum_write_close_payload::<DatasetPushResponse>(
+                        &mut self.socket,
+                        Err(DatasetPushRequestError::Internal(DatasetInternalError {
+                            error_message: int_err.reason(),
+                        })),
+                    )
+                    .await
+                    .map_err(|e| {
+                        PushServerError::WriteFailed(PushWriteError::new(
+                            e,
+                            PushPhase::MetadataRequest,
+                        ))
+                    })?;
+                    return Err(PushServerError::Internal(int_err));
+                }
+            };
 
             object_transfer_strategies.push(transfer_strategy);
         }

@@ -11,6 +11,7 @@ use std::fmt::{self, Display};
 
 use internal_error::InternalError;
 use kamu_core::{InvalidIntervalError, RefCASError, RefCollisionError};
+use serde::Serialize;
 use thiserror::Error;
 
 use super::phases::*;
@@ -179,6 +180,33 @@ pub enum PushServerError {
         #[backtrace]
         InternalError,
     ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Serialize)]
+pub struct ServerInternalError {
+    details: String,
+}
+
+impl ServerInternalError {
+    pub fn new(msg: &str) -> Self {
+        Self {
+            details: msg.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for ServerInternalError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.details)
+    }
+}
+
+impl std::error::Error for ServerInternalError {
+    fn description(&self) -> &str {
+        &self.details
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
