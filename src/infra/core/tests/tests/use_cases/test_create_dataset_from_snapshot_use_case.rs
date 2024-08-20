@@ -18,6 +18,7 @@ use kamu::{
     DatasetRepositoryWriter,
 };
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac::{MockRebacRepository, RebacService};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{
@@ -35,14 +36,18 @@ use time_source::SystemTimeSourceDefault;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_create_root_dataset_fron_snapshot() {
+async fn test_create_root_dataset_from_snapshot() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
-    // Expact only DatasetCreated message for "foo"
+    // Expect only DatasetCreated message for "foo"
     let mut mock_outbox = MockOutbox::new();
     CreateFromSnapshotUseCaseHarness::add_outbox_dataset_created_expectation(&mut mock_outbox, 1);
 
-    let harness = CreateFromSnapshotUseCaseHarness::new(mock_outbox);
+    let harness = CreateFromSnapshotUseCaseHarness::new(
+        mock_outbox,
+        Workspace::SingleTenant,
+        RebacServiceVariant::InMemory,
+    );
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
@@ -50,23 +55,32 @@ async fn test_create_root_dataset_fron_snapshot() {
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    harness
+    let create_res = harness
         .use_case
         .execute(snapshot, &Default::default())
         .await
         .unwrap();
 
+    // Properties are set for multi-tenants only
+    assert_matches!(
+        harness
+            .rebac_service
+            .get_dataset_properties(&create_res.dataset_handle.id)
+            .await,
+        Ok(props)
+            if props.is_empty()
+    );
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_create_derived_dataset_fron_snapshot() {
+async fn test_create_derived_dataset_from_snapshot() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
     let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
 
-    // Expact DatasetCreated messages for "foo" and "bar".
+    // Expect DatasetCreated messages for "foo" and "bar"
     // Expect DatasetDependenciesUpdated message for "bar"
     let mut mock_outbox = MockOutbox::new();
     CreateFromSnapshotUseCaseHarness::add_outbox_dataset_created_expectation(&mut mock_outbox, 2);
@@ -75,7 +89,11 @@ async fn test_create_derived_dataset_fron_snapshot() {
         1,
     );
 
-    let harness = CreateFromSnapshotUseCaseHarness::new(mock_outbox);
+    let harness = CreateFromSnapshotUseCaseHarness::new(
+        mock_outbox,
+        Workspace::SingleTenant,
+        RebacServiceVariant::InMemory,
+    );
 
     let snapshot_root = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
@@ -95,12 +113,12 @@ async fn test_create_derived_dataset_fron_snapshot() {
 
     let options = Default::default();
 
-    harness
+    let foo_create_res = harness
         .use_case
         .execute(snapshot_root, &options)
         .await
         .unwrap();
-    harness
+    let bar_create_res = harness
         .use_case
         .execute(snapshot_derived, &options)
         .await
@@ -108,29 +126,77 @@ async fn test_create_derived_dataset_fron_snapshot() {
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
     assert_matches!(harness.check_dataset_exists(&alias_bar).await, Ok(_));
+
+    // Properties are set for multi-tenants only
+    assert_matches!(
+        harness
+            .rebac_service
+            .get_dataset_properties(&foo_create_res.dataset_handle.id)
+            .await,
+        Ok(props)
+            if props.is_empty()
+    );
+    assert_matches!(
+        harness
+            .rebac_service
+            .get_dataset_properties(&bar_create_res.dataset_handle.id)
+            .await,
+        Ok(props)
+            if props.is_empty()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Copy, Clone)]
+enum Workspace {
+    SingleTenant,
+    // TODO: remove
+    #[allow(dead_code)]
+    MultiTenant,
+}
+
+impl Workspace {
+    fn is_multi_tenant(self) -> bool {
+        match self {
+            Workspace::SingleTenant => false,
+            Workspace::MultiTenant => true,
+        }
+    }
+}
+
+enum RebacServiceVariant {
+    InMemory,
+    // TODO: remove
+    #[allow(dead_code)]
+    Mocked(MockRebacRepository),
+}
 
 struct CreateFromSnapshotUseCaseHarness {
     _temp_dir: tempfile::TempDir,
     catalog: Catalog,
     use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
+    pub rebac_service: Arc<dyn RebacService>,
 }
 
 impl CreateFromSnapshotUseCaseHarness {
-    fn new(mock_outbox: MockOutbox) -> Self {
+    fn new(
+        mock_outbox: MockOutbox,
+        workspace: Workspace,
+        rebac_service_kind: RebacServiceVariant,
+    ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+        let mut b = dill::CatalogBuilder::new();
+
+        b.add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
-                    .with_multi_tenant(false),
+                    .with_multi_tenant(workspace.is_multi_tenant()),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
@@ -138,18 +204,26 @@ impl CreateFromSnapshotUseCaseHarness {
             .add::<SystemTimeSourceDefault>()
             .add_value(mock_outbox)
             .bind::<dyn Outbox, MockOutbox>()
-            .add::<InMemoryRebacRepository>()
-            .add::<RebacServiceImpl>()
-            .build();
+            .add::<RebacServiceImpl>();
+
+        match rebac_service_kind {
+            RebacServiceVariant::InMemory => b.add::<InMemoryRebacRepository>(),
+            RebacServiceVariant::Mocked(mock_rebac_repo) => b.add_value(mock_rebac_repo),
+        };
+
+        let catalog = b.build();
 
         let use_case = catalog
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
             .unwrap();
 
+        let rebac_service = catalog.get_one::<dyn RebacService>().unwrap();
+
         Self {
             _temp_dir: tempdir,
             catalog,
             use_case,
+            rebac_service,
         }
     }
 
