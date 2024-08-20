@@ -14,6 +14,7 @@ use datafusion::datasource::file_format::file_compression_type::FileCompressionT
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
+use kamu_data_utils::data::dataframe_ext::DataFrameExt;
 use opendatafabric::*;
 
 use crate::*;
@@ -79,6 +80,19 @@ impl Reader for ReaderNdJson {
             .read_json(path.to_str().unwrap(), options)
             .await
             .int_err()?;
+
+        let df = if self
+            .ctx
+            .state()
+            .config()
+            .options()
+            .sql_parser
+            .enable_ident_normalization
+        {
+            df.column_names_to_lowercase().int_err()?
+        } else {
+            df
+        };
 
         Ok(df)
     }

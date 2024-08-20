@@ -368,6 +368,7 @@ impl PushIngestServiceImpl {
             .await?;
 
         let df = reader.read(input_data_path).await?;
+        tracing::debug!(schema = ?df.schema(), "Reader created a dataframe");
 
         Ok(Some(df))
     }

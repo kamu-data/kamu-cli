@@ -693,7 +693,8 @@ async fn test_ingest_polling_bad_column_names_preserve() {
                 .build(),
         )
         .push_event(SetVocab {
-            event_time_column: Some("Date (UTC)".to_string()),
+            // Note: lowercase is explained in DataFrameExt::column_names_to_lowercase
+            event_time_column: Some("date (utc)".to_string()),
             ..Default::default()
         })
         .build();
@@ -724,16 +725,16 @@ async fn test_ingest_polling_bad_column_names_preserve() {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  REQUIRED INT32 Date (UTC) (DATE);
-                  REQUIRED BYTE_ARRAY City Name (STRING);
-                  REQUIRED INT64 Population;
+                  REQUIRED INT32 date (utc) (DATE);
+                  REQUIRED BYTE_ARRAY city name (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
             indoc!(
                 r#"
                 +--------+----+----------------------+------------+-----------+------------+
-                | offset | op | system_time          | Date (UTC) | City Name | Population |
+                | offset | op | system_time          | date (utc) | city name | population |
                 +--------+----+----------------------+------------+-----------+------------+
                 | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-01 | A         | 1000       |
                 | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-01 | B         | 2000       |
@@ -773,12 +774,13 @@ async fn test_ingest_polling_bad_column_names_rename() {
                 .preprocess(TransformSql {
                     engine: "datafusion".to_string(),
                     version: None,
+                    // Note: lowercase is explained in DataFrameExt::column_names_to_lowercase
                     query: Some(
                         r#"
                     select
-                        to_timestamp_millis("Timestamp (UTC)") as event_time,
-                        "City Name" as city,
-                        "Population" as population
+                        to_timestamp_millis("timestamp (utc)") as event_time,
+                        "city name" as city,
+                        population
                     from input
                     "#
                         .to_string(),
