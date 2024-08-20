@@ -52,6 +52,28 @@ impl Default for SourceConfig {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
+pub struct HttpSourceConfig {
+    /// Value to use for User-Agent header
+    pub user_agent: String,
+    /// Timeout for the connect phase of the HTTP client
+    pub connect_timeout: std::time::Duration,
+    /// Maximum number of redirects to follow
+    pub max_redirects: usize,
+}
+
+impl Default for HttpSourceConfig {
+    fn default() -> Self {
+        Self {
+            user_agent: concat!("kamu/", env!("CARGO_PKG_VERSION")).to_string(),
+            connect_timeout: std::time::Duration::from_secs(30),
+            max_redirects: 10,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
 pub struct MqttSourceConfig {
     /// Time in milliseconds to wait for MQTT broker to send us some data after
     /// which we will consider that we have "caught up" and end the polling
@@ -112,6 +134,7 @@ pub struct EthRpcEndpoint {
 pub struct FetchService {
     container_runtime: Arc<ContainerRuntime>,
     source_config: Arc<SourceConfig>,
+    http_source_config: Arc<HttpSourceConfig>,
     mqtt_source_config: Arc<MqttSourceConfig>,
     eth_source_config: Arc<EthereumSourceConfig>,
     dataset_key_value_svc: Arc<dyn DatasetKeyValueService>,
@@ -126,6 +149,7 @@ impl FetchService {
     pub fn new(
         container_runtime: Arc<ContainerRuntime>,
         source_config: Option<Arc<SourceConfig>>,
+        http_source_config: Option<Arc<HttpSourceConfig>>,
         mqtt_source_config: Option<Arc<MqttSourceConfig>>,
         eth_source_config: Option<Arc<EthereumSourceConfig>>,
         dataset_key_value_svc: Arc<dyn DatasetKeyValueService>,
@@ -134,6 +158,7 @@ impl FetchService {
         Self {
             container_runtime,
             source_config: source_config.unwrap_or_default(),
+            http_source_config: http_source_config.unwrap_or_default(),
             mqtt_source_config: mqtt_source_config.unwrap_or_default(),
             eth_source_config: eth_source_config.unwrap_or_default(),
             dataset_key_value_svc,
@@ -645,10 +670,6 @@ impl FetchService {
         }))
     }
 
-    // TODO: Externalize configuration
-    const HTTP_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
-    const HTTP_MAX_REDIRECTS: usize = 10;
-
     // TODO: PERF: Consider compression
     async fn fetch_http(
         &self,
@@ -662,9 +683,17 @@ impl FetchService {
     ) -> Result<FetchResult, PollingIngestError> {
         use tokio::io::AsyncWriteExt;
 
-        let client = reqwest::Client::builder()
-            .connect_timeout(Self::HTTP_CONNECT_TIMEOUT)
-            .redirect(reqwest::redirect::Policy::limited(Self::HTTP_MAX_REDIRECTS))
+        let mut client_builder = reqwest::Client::builder();
+
+        if !self.http_source_config.user_agent.is_empty() {
+            client_builder = client_builder.user_agent(&self.http_source_config.user_agent);
+        }
+
+        let client = client_builder
+            .connect_timeout(self.http_source_config.connect_timeout)
+            .redirect(reqwest::redirect::Policy::limited(
+                self.http_source_config.max_redirects,
+            ))
             .build()
             .int_err()?;
 

@@ -1265,6 +1265,7 @@ impl FetchTestHarness {
             None,
             None,
             None,
+            None,
             Arc::new(DatasetKeyValueServiceSysEnv::new()),
             Arc::new(RunInfoDir::new(temp_dir.path().join("run"))),
         );

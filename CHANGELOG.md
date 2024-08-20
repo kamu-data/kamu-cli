@@ -9,8 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Push ingest from `csv` format will default to `header: true` in case schema was not explicitly provided
 - Access token with duplicate names can be created if such name exists but was revoked
 ### Fixed
-- Crash of kamu logic command with invalid access token
+- Crash in `kamu login` command on 5XX server responses
 ### Added
+- HTTP sources now include `User-Agent` header that defaults to `kamu-cli/{major}.{minor}.{patch}`
+- Externalized configuration of HTTP source parameters like timeouts and redirects
 - CI: build `sqlx-cli` image if it is missing
 
 ## [0.196.0] - 2024-08-19

@@ -54,6 +54,7 @@ async fn test_engine_io_common<
             None,
             None,
             None,
+            None,
             dataset_env_var_sys_env,
             run_info_dir.clone(),
         )),

@@ -553,6 +553,16 @@ pub fn register_config_in_catalog(
             .source
             .as_ref()
             .unwrap()
+            .http
+            .as_ref()
+            .unwrap()
+            .to_infra_cfg(),
+    );
+    catalog_builder.add_value(
+        config
+            .source
+            .as_ref()
+            .unwrap()
             .mqtt
             .as_ref()
             .unwrap()

@@ -222,6 +222,8 @@ pub struct SourceConfig {
     /// resumable source and commit data, leaving the rest for the next
     /// iteration. This ensures that one data slice doesn't become too big.
     pub target_records_per_slice: Option<u64>,
+    /// HTTP-specific configuration
+    pub http: Option<HttpSourceConfig>,
     /// MQTT-specific configuration
     #[merge(strategy = merge_recursive)]
     pub mqtt: Option<MqttSourceConfig>,
@@ -234,6 +236,7 @@ impl SourceConfig {
     pub fn new() -> Self {
         Self {
             target_records_per_slice: None,
+            http: None,
             mqtt: None,
             ethereum: None,
         }
@@ -241,6 +244,7 @@ impl SourceConfig {
 
     fn sample() -> Self {
         Self {
+            http: Some(HttpSourceConfig::sample()),
             mqtt: Some(MqttSourceConfig::sample()),
             ethereum: Some(EthereumSourceConfig::sample()),
             ..Self::default()
@@ -259,8 +263,56 @@ impl Default for SourceConfig {
         let infra_cfg = kamu::ingest::SourceConfig::default();
         Self {
             target_records_per_slice: Some(infra_cfg.target_records_per_slice),
+            http: Some(HttpSourceConfig::default()),
             mqtt: Some(MqttSourceConfig::default()),
             ethereum: Some(EthereumSourceConfig::default()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct HttpSourceConfig {
+    /// Value to use for User-Agent header
+    pub user_agent: Option<String>,
+    /// Timeout for the connect phase of the HTTP client
+    pub connect_timeout: Option<DurationString>,
+    /// Maximum number of redirects to follow
+    pub max_redirects: Option<usize>,
+}
+
+impl HttpSourceConfig {
+    pub fn new() -> Self {
+        Self {
+            user_agent: None,
+            connect_timeout: None,
+            max_redirects: None,
+        }
+    }
+
+    fn sample() -> Self {
+        Self { ..Self::default() }
+    }
+
+    pub fn to_infra_cfg(&self) -> kamu::ingest::HttpSourceConfig {
+        kamu::ingest::HttpSourceConfig {
+            user_agent: self.user_agent.clone().unwrap(),
+            connect_timeout: (*self.connect_timeout.as_ref().unwrap()).into(),
+            max_redirects: self.max_redirects.unwrap(),
+        }
+    }
+}
+
+impl Default for HttpSourceConfig {
+    fn default() -> Self {
+        let infra_cfg = kamu::ingest::HttpSourceConfig::default();
+        Self {
+            user_agent: Some(concat!("kamu-cli/", env!("CARGO_PKG_VERSION")).to_string()),
+            connect_timeout: Some(DurationString::from(infra_cfg.connect_timeout)),
+            max_redirects: Some(infra_cfg.max_redirects),
         }
     }
 }
