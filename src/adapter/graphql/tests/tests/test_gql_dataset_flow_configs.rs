@@ -18,6 +18,8 @@ use kamu::{
     DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
 };
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{
     auth,
     CreateDatasetFromSnapshotUseCase,
@@ -1586,7 +1588,9 @@ impl FlowConfigHarness {
                 .add::<DependencyGraphServiceInMemory>()
                 .add::<FlowConfigurationServiceImpl>()
                 .add::<InMemoryFlowConfigurationEventStore>()
-                .add::<DatabaseTransactionRunner>();
+                .add::<DatabaseTransactionRunner>()
+                .add::<InMemoryRebacRepository>()
+                .add::<RebacServiceImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

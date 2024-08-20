@@ -18,6 +18,8 @@ use kamu::{
     DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
 };
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{auth, CreateDatasetFromSnapshotUseCase, CreateDatasetResult, DatasetRepository};
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_datasets_inmem::InMemoryDatasetEnvVarRepository;
@@ -358,7 +360,9 @@ impl DatasetEnvVarsHarness {
                 .add::<DependencyGraphServiceInMemory>()
                 .add::<DatabaseTransactionRunner>()
                 .add::<DatasetEnvVarServiceImpl>()
-                .add::<InMemoryDatasetEnvVarRepository>();
+                .add::<InMemoryDatasetEnvVarRepository>()
+                .add::<InMemoryRebacRepository>()
+                .add::<RebacServiceImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

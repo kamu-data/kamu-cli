@@ -13,6 +13,8 @@ use dill::Component;
 use domain::DatasetRepository;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::CreateDatasetFromSnapshotUseCase;
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
 use tempfile::TempDir;
@@ -48,6 +50,8 @@ impl LocalFsRepoHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<InMemoryRebacRepository>()
+            .add::<RebacServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>();
 
         let catalog = b.build();

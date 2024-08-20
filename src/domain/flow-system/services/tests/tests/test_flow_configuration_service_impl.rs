@@ -18,6 +18,8 @@ use futures::TryStreamExt;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
@@ -459,7 +461,9 @@ impl FlowConfigurationHarness {
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<DeleteDatasetUseCaseImpl>();
+            .add::<DeleteDatasetUseCaseImpl>()
+            .add::<InMemoryRebacRepository>()
+            .add::<RebacServiceImpl>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

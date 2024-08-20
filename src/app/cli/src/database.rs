@@ -43,6 +43,9 @@ pub fn configure_database_components(
 
             b.add::<kamu_messaging_outbox_postgres::PostgresOutboxMessageRepository>();
             b.add::<kamu_messaging_outbox_postgres::PostgresOutboxMessageConsumptionRepository>();
+
+            // TODO: Private Datasets: implement database-related version
+            b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
         }
         DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
             MySqlPlugin::init_database_components(b);
@@ -56,6 +59,9 @@ pub fn configure_database_components(
 
             b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageRepository>();
             b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageConsumptionRepository>();
+
+            // TODO: Private Datasets: implement database-related version
+            b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 
             // TODO: Task & Flow System MySQL versions
         }

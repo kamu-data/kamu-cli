@@ -19,6 +19,8 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
@@ -53,6 +55,8 @@ async fn setup_repo() -> RepoFixture {
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+        .add::<InMemoryRebacRepository>()
+        .add::<RebacServiceImpl>()
         .build();
 
     let create_dataset_from_snapshot = catalog

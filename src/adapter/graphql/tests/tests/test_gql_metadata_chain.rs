@@ -15,6 +15,8 @@ use dill::Component;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::serde::yaml::YamlMetadataEventSerializer;
@@ -538,7 +540,9 @@ impl GraphQLMetadataChainHarness {
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<InMemoryRebacRepository>()
+                .add::<RebacServiceImpl>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

@@ -12,6 +12,8 @@ use dill::Component;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
@@ -37,6 +39,8 @@ async fn test_search_query() {
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+        .add::<InMemoryRebacRepository>()
+        .add::<RebacServiceImpl>()
         .build();
 
     let create_dataset_from_snapshot = cat

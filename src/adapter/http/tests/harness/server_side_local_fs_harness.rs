@@ -114,7 +114,6 @@ impl ServerSideLocalFsHarness {
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CommitDatasetEventUseCaseImpl>()
-                .add::<ObjectStoreBuilderLocalFs>()
                 .add::<InMemoryRebacRepository>()
                 .add::<RebacServiceImpl>();
 

@@ -18,6 +18,8 @@ use kamu::{
     DatasetRepositoryWriter,
 };
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{
     CreateDatasetFromSnapshotUseCase,
     DatasetLifecycleMessage,
@@ -136,6 +138,8 @@ impl CreateFromSnapshotUseCaseHarness {
             .add::<SystemTimeSourceDefault>()
             .add_value(mock_outbox)
             .bind::<dyn Outbox, MockOutbox>()
+            .add::<InMemoryRebacRepository>()
+            .add::<RebacServiceImpl>()
             .build();
 
         let use_case = catalog

@@ -19,6 +19,8 @@ use kamu::{
     S3RegistryCache,
 };
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{CreateDatasetFromSnapshotUseCase, DatasetRepository};
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
 use time_source::SystemTimeSourceDefault;
@@ -53,6 +55,8 @@ impl S3RepoHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()
+            .add::<InMemoryRebacRepository>()
+            .add::<RebacServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>();
 
         if registry_caching {
