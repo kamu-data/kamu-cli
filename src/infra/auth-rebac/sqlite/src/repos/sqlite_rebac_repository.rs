@@ -51,11 +51,11 @@ impl SqliteRebacRepository {
 
 #[async_trait::async_trait]
 impl RebacRepository for SqliteRebacRepository {
-    async fn set_entity_property(
+    async fn set_entity_property<'a>(
         &self,
-        entity: &Entity,
+        entity: &Entity<'a>,
         property_name: PropertyName,
-        property_value: &PropertyValue,
+        property_value: &PropertyValue<'a>,
     ) -> Result<(), SetEntityPropertyError> {
         let mut tr = self.transaction.lock().await;
 
@@ -86,9 +86,9 @@ impl RebacRepository for SqliteRebacRepository {
         Ok(())
     }
 
-    async fn delete_entity_property(
+    async fn delete_entity_property<'a>(
         &self,
-        entity: &Entity,
+        entity: &Entity<'a>,
         property_name: PropertyName,
     ) -> Result<(), DeleteEntityPropertyError> {
         let mut tr = self.transaction.lock().await;
@@ -124,10 +124,10 @@ impl RebacRepository for SqliteRebacRepository {
         Ok(())
     }
 
-    async fn get_entity_properties(
+    async fn get_entity_properties<'a, 'b>(
         &self,
-        entity: &Entity,
-    ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError> {
+        entity: &Entity<'a>,
+    ) -> Result<Vec<(PropertyName, PropertyValue<'b>)>, GetEntityPropertiesError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr
@@ -159,11 +159,11 @@ impl RebacRepository for SqliteRebacRepository {
             .map_err(GetEntityPropertiesError::Internal)
     }
 
-    async fn insert_entities_relation(
+    async fn insert_entities_relation<'a>(
         &self,
-        subject_entity: &Entity,
+        subject_entity: &Entity<'a>,
         relationship: Relation,
-        object_entity: &Entity,
+        object_entity: &Entity<'a>,
     ) -> Result<(), InsertEntitiesRelationError> {
         let mut tr = self.transaction.lock().await;
 
@@ -204,11 +204,11 @@ impl RebacRepository for SqliteRebacRepository {
         Ok(())
     }
 
-    async fn delete_entities_relation(
+    async fn delete_entities_relation<'a>(
         &self,
-        subject_entity: &Entity,
+        subject_entity: &Entity<'a>,
         relationship: Relation,
-        object_entity: &Entity,
+        object_entity: &Entity<'a>,
     ) -> Result<(), DeleteEntitiesRelationError> {
         let mut tr = self.transaction.lock().await;
 
@@ -252,10 +252,10 @@ impl RebacRepository for SqliteRebacRepository {
         Ok(())
     }
 
-    async fn get_subject_entity_relations(
+    async fn get_subject_entity_relations<'a, 'b>(
         &self,
-        subject_entity: &Entity,
-    ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsError> {
+        subject_entity: &Entity<'a>,
+    ) -> Result<Vec<EntityWithRelation<'b>>, SubjectEntityRelationsError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr
@@ -289,11 +289,11 @@ impl RebacRepository for SqliteRebacRepository {
             .map_err(SubjectEntityRelationsError::Internal)
     }
 
-    async fn get_subject_entity_relations_by_object_type(
+    async fn get_subject_entity_relations_by_object_type<'a, 'b>(
         &self,
-        subject_entity: &Entity,
+        subject_entity: &Entity<'a>,
         object_entity_type: EntityType,
-    ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsByObjectTypeError> {
+    ) -> Result<Vec<EntityWithRelation<'b>>, SubjectEntityRelationsByObjectTypeError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr
@@ -329,10 +329,10 @@ impl RebacRepository for SqliteRebacRepository {
             .map_err(SubjectEntityRelationsByObjectTypeError::Internal)
     }
 
-    async fn get_relations_between_entities(
+    async fn get_relations_between_entities<'a>(
         &self,
-        subject_entity: &Entity,
-        object_entity: &Entity,
+        subject_entity: &Entity<'a>,
+        object_entity: &Entity<'a>,
     ) -> Result<Vec<Relation>, GetRelationsBetweenEntitiesError> {
         let mut tr = self.transaction.lock().await;
 
