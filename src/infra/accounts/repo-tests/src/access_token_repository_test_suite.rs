@@ -154,6 +154,82 @@ pub async fn test_mark_existing_access_token_revorked(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_create_duplicate_active_access_token(catalog: &Catalog) {
+    let access_token = make_test_access_token("foo", None, "wasya");
+    let access_token_duplicate = make_test_access_token("foo", None, "wasya");
+
+    let account = make_test_account(
+        "wasya",
+        kamu_adapter_oauth::PROVIDER_GITHUB,
+        GITHUB_ACCOUNT_ID_WASYA,
+    );
+
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let access_token_repo = catalog.get_one::<dyn AccessTokenRepository>().unwrap();
+
+    account_repo.create_account(&account).await.unwrap();
+    access_token_repo
+        .save_access_token(&access_token)
+        .await
+        .unwrap();
+
+    let db_access_token = access_token_repo
+        .get_token_by_id(&access_token.id)
+        .await
+        .unwrap();
+
+    assert_eq!(db_access_token.revoked_at, None);
+
+    let revoke_time = Utc::now().round_subsecs(6);
+    let revoke_result = access_token_repo
+        .mark_revoked(&access_token.id, revoke_time)
+        .await;
+
+    assert!(revoke_result.is_ok());
+
+    let create_result = access_token_repo
+        .save_access_token(&access_token_duplicate)
+        .await;
+    assert!(create_result.is_ok());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_create_duplicate_access_token_err(catalog: &Catalog) {
+    let access_token = make_test_access_token("foo", None, "wasya");
+    let access_token_duplicate = make_test_access_token("foo", None, "wasya");
+
+    let account = make_test_account(
+        "wasya",
+        kamu_adapter_oauth::PROVIDER_GITHUB,
+        GITHUB_ACCOUNT_ID_WASYA,
+    );
+
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let access_token_repo = catalog.get_one::<dyn AccessTokenRepository>().unwrap();
+
+    account_repo.create_account(&account).await.unwrap();
+    access_token_repo
+        .save_access_token(&access_token)
+        .await
+        .unwrap();
+
+    let db_access_token = access_token_repo
+        .get_token_by_id(&access_token.id)
+        .await
+        .unwrap();
+
+    assert_eq!(db_access_token.revoked_at, None);
+    assert_matches!(
+        access_token_repo
+            .save_access_token(&access_token_duplicate)
+            .await,
+        Err(CreateAccessTokenError::Duplicate(_))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_mark_non_existing_access_token_revorked(catalog: &Catalog) {
     let access_token = make_test_access_token("foo", None, "wasya");
 

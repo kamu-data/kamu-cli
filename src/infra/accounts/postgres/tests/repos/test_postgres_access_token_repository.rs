@@ -111,6 +111,38 @@ async fn test_find_account_by_active_token_id(pg_pool: PgPool) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(database, postgres)]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
+async fn test_create_duplicate_active_access_token(pg_pool: PgPool) {
+    let harness = PostgresAccessTokenRepositoryHarness::new(pg_pool);
+
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_create_duplicate_active_access_token(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(database, postgres)]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
+async fn test_create_duplicate_access_token_err(pg_pool: PgPool) {
+    let harness = PostgresAccessTokenRepositoryHarness::new(pg_pool);
+
+    DatabaseTransactionRunner::new(harness.catalog)
+        .transactional(|catalog| async move {
+            kamu_accounts_repo_tests::test_create_duplicate_access_token_err(&catalog).await;
+            Ok::<_, InternalError>(())
+        })
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct PostgresAccessTokenRepositoryHarness {
     catalog: Catalog,
 }

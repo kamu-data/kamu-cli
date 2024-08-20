@@ -114,7 +114,7 @@ impl AuthenticationServiceImpl {
         &self,
         access_token: &str,
     ) -> Result<AccessTokenType, AccessTokenError> {
-        if &access_token[..2] == ACCESS_TOKEN_PREFIX {
+        if access_token.len() > 2 && &access_token[..2] == ACCESS_TOKEN_PREFIX {
             return KamuAccessToken::decode(access_token)
                 .map_err(|err| AccessTokenError::Invalid(Box::new(err)))
                 .map(AccessTokenType::KamuAccessToken);

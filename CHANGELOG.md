@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Changed
 - Push ingest from `csv` format will default to `header: true` in case schema was not explicitly provided
+- Access token with duplicate names can be created if such name exists but was revoked
+### Fixed
+- Crash of kamu logic command with invalid access token
 ### Added
 - CI: build `sqlx-cli` image if it is missing
 
