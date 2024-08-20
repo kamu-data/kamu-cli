@@ -20,6 +20,7 @@ use kamu_core::{
     CreateDatasetFromSnapshotUseCaseOptions,
     CreateDatasetResult,
     DatasetLifecycleMessage,
+    DatasetRepository,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
@@ -33,6 +34,7 @@ use crate::DatasetRepositoryWriter;
 #[interface(dyn CreateDatasetFromSnapshotUseCase)]
 pub struct CreateDatasetFromSnapshotUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
+    dataset_repo_reader: Arc<dyn DatasetRepository>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     rebac_service: Arc<dyn RebacService>,
     outbox: Arc<dyn Outbox>,
@@ -41,12 +43,14 @@ pub struct CreateDatasetFromSnapshotUseCaseImpl {
 impl CreateDatasetFromSnapshotUseCaseImpl {
     pub fn new(
         current_account_subject: Arc<CurrentAccountSubject>,
+        dataset_repo_reader: Arc<dyn DatasetRepository>,
         dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
         rebac_service: Arc<dyn RebacService>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             current_account_subject,
+            dataset_repo_reader,
             dataset_repo_writer,
             rebac_service,
             outbox,
@@ -69,7 +73,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             .create_dataset_from_snapshot(snapshot)
             .await?;
 
-        let is_multi_tenant_workspace = self.dataset_repo_writer.is_multi_tenant();
+        let is_multi_tenant_workspace = self.dataset_repo_reader.is_multi_tenant();
         // TODO: Test fail scenario -- do we need clean-up in that case?
         let created_dataset_id = &create_dataset_result.dataset_handle.id;
 

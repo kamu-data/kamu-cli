@@ -13,7 +13,7 @@ use opendatafabric::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DatasetRepositoryWriter: DatasetRepository + Sync + Send {
+pub trait DatasetRepositoryWriter: Sync + Send {
     async fn create_dataset(
         &self,
         dataset_alias: &DatasetAlias,
