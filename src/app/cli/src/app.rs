@@ -35,6 +35,7 @@ use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStu
 use tracing::{warn, Instrument};
 
 use crate::accounts::AccountService;
+use crate::config::DatabaseConfig;
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
@@ -102,6 +103,17 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     let maybe_db_connection_settings = config
         .database
         .clone()
+        .or_else(|| {
+            // TODO: Run migrations
+
+            // If not explicitly configured, a SQLite database is used for a multi-tenant
+            // workspace
+            if is_multi_tenant_workspace {
+                Some(DatabaseConfig::sqlite_database_in_dot_kamu_dir())
+            } else {
+                None
+            }
+        })
         .and_then(try_build_db_connection_settings);
 
     // Configure application

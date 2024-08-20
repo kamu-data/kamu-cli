@@ -614,6 +614,12 @@ impl DatabaseConfig {
             port: Some(DatabaseProvider::Postgres.default_port()),
         })
     }
+
+    pub fn sqlite_database_in_dot_kamu_dir() -> Self {
+        Self::Sqlite(SqliteDatabaseConfig {
+            database_path: ".kamu/workspace.sqlite.db".into(),
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
