@@ -18,13 +18,15 @@ use kamu::{
     DatasetRepositoryWriter,
 };
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac::{MockRebacRepository, RebacService};
+use kamu_auth_rebac::{MockRebacRepository, PropertyName, RebacService};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{
     CreateDatasetFromSnapshotUseCase,
+    CreateDatasetFromSnapshotUseCaseOptions,
     DatasetLifecycleMessage,
     DatasetRepository,
+    DatasetVisibility,
     GetDatasetError,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
@@ -46,7 +48,7 @@ async fn test_create_root_dataset_from_snapshot() {
     let harness = CreateFromSnapshotUseCaseHarness::new(
         mock_outbox,
         Workspace::SingleTenant,
-        RebacServiceVariant::InMemory,
+        RebacRepositoryVariant::InMemory,
     );
 
     let snapshot = MetadataFactory::dataset_snapshot()
@@ -92,7 +94,7 @@ async fn test_create_derived_dataset_from_snapshot() {
     let harness = CreateFromSnapshotUseCaseHarness::new(
         mock_outbox,
         Workspace::SingleTenant,
-        RebacServiceVariant::InMemory,
+        RebacRepositoryVariant::InMemory,
     );
 
     let snapshot_root = MetadataFactory::dataset_snapshot()
@@ -148,11 +150,73 @@ async fn test_create_derived_dataset_from_snapshot() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_created_datasets_have_the_correct_visibility_attribute() {
+    let alias_private = DatasetAlias::new(None, DatasetName::new_unchecked("private"));
+    let alias_public = DatasetAlias::new(None, DatasetName::new_unchecked("public"));
+
+    // Expect DatasetCreated messages for "private" and "public"
+    // Expect DatasetDependenciesUpdated message for "private"
+    let mut mock_outbox = MockOutbox::new();
+    CreateFromSnapshotUseCaseHarness::add_outbox_dataset_created_expectation(&mut mock_outbox, 2);
+
+    let harness = CreateFromSnapshotUseCaseHarness::new(
+        mock_outbox,
+        Workspace::MultiTenant,
+        RebacRepositoryVariant::InMemory,
+    );
+
+    {
+        let snapshot = MetadataFactory::dataset_snapshot()
+            .name(alias_private.clone())
+            .kind(DatasetKind::Root)
+            .push_event(MetadataFactory::set_polling_source().build())
+            .build();
+        let options = CreateDatasetFromSnapshotUseCaseOptions {
+            dataset_visibility: DatasetVisibility::Private,
+        };
+
+        let private_create_res = harness.use_case.execute(snapshot, &options).await.unwrap();
+
+        assert_matches!(
+            harness
+                .rebac_service
+                .get_dataset_properties(&private_create_res.dataset_handle.id)
+                .await,
+            Ok(props)
+                if props == [PropertyName::dataset_allows_public_read(false)]
+        );
+        assert_matches!(harness.check_dataset_exists(&alias_private).await, Ok(_));
+    };
+    {
+        let snapshot = MetadataFactory::dataset_snapshot()
+            .name(alias_public.clone())
+            .kind(DatasetKind::Root)
+            .push_event(MetadataFactory::set_polling_source().build())
+            .build();
+        let options = CreateDatasetFromSnapshotUseCaseOptions {
+            dataset_visibility: DatasetVisibility::PubliclyAvailable,
+        };
+
+        let public_create_res = harness.use_case.execute(snapshot, &options).await.unwrap();
+
+        assert_matches!(
+            harness
+                .rebac_service
+                .get_dataset_properties(&public_create_res.dataset_handle.id)
+                .await,
+            Ok(props)
+                if props == [PropertyName::dataset_allows_public_read(true)]
+        );
+        assert_matches!(harness.check_dataset_exists(&alias_public).await, Ok(_));
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Copy, Clone)]
 enum Workspace {
     SingleTenant,
-    // TODO: remove
-    #[allow(dead_code)]
     MultiTenant,
 }
 
@@ -165,7 +229,7 @@ impl Workspace {
     }
 }
 
-enum RebacServiceVariant {
+enum RebacRepositoryVariant {
     InMemory,
     // TODO: remove
     #[allow(dead_code)]
@@ -183,7 +247,7 @@ impl CreateFromSnapshotUseCaseHarness {
     fn new(
         mock_outbox: MockOutbox,
         workspace: Workspace,
-        rebac_service_kind: RebacServiceVariant,
+        rebac_repo_variant: RebacRepositoryVariant,
     ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
@@ -206,9 +270,14 @@ impl CreateFromSnapshotUseCaseHarness {
             .bind::<dyn Outbox, MockOutbox>()
             .add::<RebacServiceImpl>();
 
-        match rebac_service_kind {
-            RebacServiceVariant::InMemory => b.add::<InMemoryRebacRepository>(),
-            RebacServiceVariant::Mocked(mock_rebac_repo) => b.add_value(mock_rebac_repo),
+        match rebac_repo_variant {
+            RebacRepositoryVariant::InMemory => {
+                b.add::<InMemoryRebacRepository>();
+            }
+            RebacRepositoryVariant::Mocked(mock_rebac_repo) => {
+                b.add_value(mock_rebac_repo)
+                    .bind::<dyn RebacRepository, MockRebacRepository>();
+            }
         };
 
         let catalog = b.build();
