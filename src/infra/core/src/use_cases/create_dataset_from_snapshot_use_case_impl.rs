@@ -56,6 +56,37 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
             outbox,
         }
     }
+
+    async fn handle_multi_tenant_case(
+        &self,
+        create_dataset_result: &CreateDatasetResult,
+        options: &CreateDatasetFromSnapshotUseCaseOptions,
+    ) -> Result<(), CreateDatasetFromSnapshotError> {
+        // Trying to set the ReBAC property
+        let allows = options.dataset_visibility.is_publicly_available();
+        let (name, value) = DatasetPropertyName::allows_public_read(allows);
+
+        let set_rebac_property_res = self
+            .rebac_service
+            .set_dataset_property(&create_dataset_result.dataset_handle.id, name, &value)
+            .await
+            .map_int_err(CreateDatasetFromSnapshotError::Internal);
+
+        // If setting fails, try to clean up the created dataset
+        if let Err(set_rebac_property_err) = set_rebac_property_res {
+            self.dataset_repo_writer
+                .delete_dataset(&create_dataset_result.dataset_handle)
+                .await
+                // Return a deletion error if there is one
+                .map_int_err(CreateDatasetFromSnapshotError::Internal)?;
+
+            // On successful deletion, return the property setting error
+            return Err(set_rebac_property_err);
+        }
+
+        // Dataset created and property set
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -74,24 +105,17 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             .await?;
 
         let is_multi_tenant_workspace = self.dataset_repo_reader.is_multi_tenant();
-        // TODO: Test fail scenario -- do we need clean-up in that case?
-        let created_dataset_id = &create_dataset_result.dataset_handle.id;
 
         if is_multi_tenant_workspace {
-            let allows = options.dataset_visibility.is_publicly_available();
-            let (name, value) = DatasetPropertyName::allows_public_read(allows);
-
-            self.rebac_service
-                .set_dataset_property(created_dataset_id, name, &value)
-                .await
-                .int_err()?;
+            self.handle_multi_tenant_case(&create_dataset_result, options)
+                .await?;
         }
 
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
-                    created_dataset_id.clone(),
+                    create_dataset_result.dataset_handle.id.clone(),
                     match self.current_account_subject.as_ref() {
                         CurrentAccountSubject::Anonymous(_) => {
                             panic!("Anonymous account cannot create dataset");
@@ -107,7 +131,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                 .post_message(
                     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
                     DatasetLifecycleMessage::dependencies_updated(
-                        created_dataset_id.clone(),
+                        create_dataset_result.dataset_handle.id.clone(),
                         new_upstream_ids,
                     ),
                 )
