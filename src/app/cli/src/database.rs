@@ -71,6 +71,8 @@ pub fn configure_database_components(
 
             b.add::<kamu_messaging_outbox_sqlite::SqliteOutboxMessageRepository>();
             b.add::<kamu_messaging_outbox_sqlite::SqliteOutboxMessageConsumptionRepository>();
+
+            b.add::<kamu_auth_rebac_sqlite::SqliteRebacRepository>();
         }
     }
 

@@ -5388,6 +5388,7 @@ dependencies = [
  "kamu-adapter-odata",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
+ "kamu-auth-rebac-sqlite",
  "kamu-cli-puppet",
  "kamu-data-utils",
  "kamu-datafusion-cli",

@@ -91,6 +91,7 @@ kamu-messaging-outbox-sqlite = { workspace = true }
 
 kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
+kamu-auth-rebac-sqlite = { workspace = true }
 
 # CLI
 chrono-humanize = "0.2"                                           # Human readable durations
