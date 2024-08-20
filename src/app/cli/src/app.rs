@@ -266,8 +266,6 @@ pub fn prepare_dependencies_graph_repository(
         .add_value(current_account_subject)
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<DependencyGraphServiceInMemory>()
-        .add::<InMemoryRebacRepository>()
-        .add::<RebacServiceImpl>()
         // Don't add its own initializer, leave optional dependency uninitialized
         .build();
 
