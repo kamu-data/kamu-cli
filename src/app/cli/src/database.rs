@@ -93,6 +93,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_flow_system_inmem::InMemoryFlowEventStore>();
     b.add::<kamu_task_system_inmem::InMemoryTaskSystemEventStore>();
     b.add::<kamu_datasets_inmem::InMemoryDatasetEnvVarRepository>();
+    b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 
     NoOpDatabasePlugin::init_database_components(b);
 }
