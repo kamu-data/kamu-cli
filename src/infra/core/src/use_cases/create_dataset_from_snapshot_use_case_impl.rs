@@ -74,7 +74,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         let created_dataset_id = &create_dataset_result.dataset_handle.id;
 
         if is_multi_tenant_workspace {
-            let allows = options.dataset_visibility.allows_public_read();
+            let allows = options.dataset_visibility.is_publicly_available();
             let (name, value) = DatasetPropertyName::allows_public_read(allows);
 
             self.rebac_service

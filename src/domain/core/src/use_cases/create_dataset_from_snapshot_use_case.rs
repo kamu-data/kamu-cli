@@ -40,14 +40,21 @@ impl Default for CreateDatasetFromSnapshotUseCaseOptions {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum DatasetVisibility {
     Private,
     PubliclyAvailable,
 }
 
 impl DatasetVisibility {
-    pub fn allows_public_read(&self) -> bool {
+    pub fn is_private(&self) -> bool {
+        match self {
+            DatasetVisibility::Private => true,
+            DatasetVisibility::PubliclyAvailable => false,
+        }
+    }
+
+    pub fn is_publicly_available(&self) -> bool {
         match self {
             DatasetVisibility::Private => false,
             DatasetVisibility::PubliclyAvailable => true,

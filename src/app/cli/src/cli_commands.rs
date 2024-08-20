@@ -35,7 +35,8 @@ pub fn get_command(
             submatches.get_flag("recursive"),
             submatches.get_flag("replace"),
             submatches.get_flag("stdin"),
-            submatches.get_flag("public"),
+            // Safety: This argument has a default value
+            *submatches.get_one("visibility").unwrap(),
             cli_catalog.get_one()?,
         )),
         Some(("complete", submatches)) => {

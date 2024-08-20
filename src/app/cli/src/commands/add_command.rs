@@ -28,7 +28,7 @@ pub struct AddCommand {
     recursive: bool,
     replace: bool,
     stdin: bool,
-    publicly_available: bool,
+    dataset_visibility: DatasetVisibility,
     output_config: Arc<OutputConfig>,
 }
 
@@ -43,7 +43,7 @@ impl AddCommand {
         recursive: bool,
         replace: bool,
         stdin: bool,
-        publicly_available: bool,
+        dataset_visibility: DatasetVisibility,
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
@@ -59,7 +59,7 @@ impl AddCommand {
             recursive,
             replace,
             stdin,
-            publicly_available,
+            dataset_visibility,
             output_config,
         }
     }
@@ -202,9 +202,9 @@ impl AddCommand {
         }
         ordered
     }
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait(?Send)]
 impl Command for AddCommand {
@@ -224,9 +224,9 @@ impl Command for AddCommand {
                 "Name override can be used only when adding a single manifest",
             ));
         }
-        if !self.dataset_repo.is_multi_tenant() && self.publicly_available {
+        if !self.dataset_repo.is_multi_tenant() && !self.dataset_visibility.is_private() {
             return Err(CLIError::usage_error(
-                "Only multi-tenant repositories support the 'public' argument",
+                "Only multi-tenant workspaces support non-private dataset visibility",
             ));
         }
 
@@ -302,11 +302,7 @@ impl Command for AddCommand {
         };
 
         let create_options = CreateDatasetFromSnapshotUseCaseOptions {
-            dataset_visibility: if self.publicly_available {
-                DatasetVisibility::PubliclyAvailable
-            } else {
-                DatasetVisibility::Private
-            },
+            dataset_visibility: self.dataset_visibility,
         };
         let mut add_results = self
             .create_datasets_from_snapshots(snapshots, create_options)
