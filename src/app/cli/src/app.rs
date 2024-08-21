@@ -745,17 +745,12 @@ fn prepare_run_dir(run_dir: &Path) {
     if run_dir.exists() {
         std::fs::remove_dir_all(run_dir).unwrap_or_else(|e| {
             panic!(
-                "Unable to clean up run directory {}: {}",
+                "Unable to clean up run directory {}: {e}",
                 run_dir.display(),
-                e
             )
         });
         std::fs::create_dir(run_dir).unwrap_or_else(|e| {
-            panic!(
-                "Unable to create run directory {}: {}",
-                run_dir.display(),
-                e
-            )
+            panic!("Unable to create run directory {}: {e}", run_dir.display(),)
         });
     }
 }
