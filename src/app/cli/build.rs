@@ -18,5 +18,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .all_rustc()
         .all_cargo()
         .emit()?;
+
+    println!("cargo:rerun-if-changed=migrations");
+
     Ok(())
 }
