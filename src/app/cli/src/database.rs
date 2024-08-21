@@ -13,6 +13,8 @@ use database_common::*;
 use dill::{Catalog, CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
 use secrecy::SecretString;
+use sqlx::migrate::Migrator;
+use sqlx::SqlitePool;
 
 use crate::config::{DatabaseConfig, DatabaseCredentialSourceConfig, RemoteDatabaseConfig};
 
@@ -232,6 +234,23 @@ fn init_database_password_provider(b: &mut CatalogBuilder, raw_db_config: &Datab
             }
         },
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static SQLITE_MIGRATOR: Migrator = sqlx::migrate!("../../../migrations/sqlite");
+
+pub async fn apply_migrations(catalog: &Catalog) {
+    let db_connection_settings = catalog.get_one::<DatabaseConnectionSettings>().unwrap();
+
+    match db_connection_settings.provider {
+        DatabaseProvider::Sqlite => {}
+        _ => panic!("Applying migrations is only available for SQLite"),
+    }
+
+    let pool = catalog.get_one::<SqlitePool>().unwrap();
+
+    SQLITE_MIGRATOR.run(&*pool).await.expect("Migration failed");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -180,11 +180,16 @@ regex = "1"
 secrecy = "0.10"
 shlex = "1" # Parsing partial input for custom completions
 signal-hook = "0.3" # Signal handling
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio-rustls",
+    "migrate",
+    "sqlite"
+] }
+tempfile = "3"
+thiserror = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false, features = ["io-util"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["net"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io"] }
-tempfile = "3"
-thiserror = { version = "1", default-features = false }
 url = "2"
 urlencoding = "2"
 whoami = "1.5"

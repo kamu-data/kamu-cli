@@ -5574,6 +5574,7 @@ dependencies = [
  "serde_yaml",
  "shlex",
  "signal-hook",
+ "sqlx",
  "tempfile",
  "test-log",
  "thiserror",

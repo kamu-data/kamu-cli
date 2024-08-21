@@ -40,6 +40,7 @@ use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
 use crate::{
+    apply_migrations,
     cli,
     cli_commands,
     config,
@@ -173,6 +174,9 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         let final_base_catalog = if let Some(db_config) = database_config {
             // Connect database and obtain a connection pool
             let catalog_with_pool = connect_database_initially(&base_catalog).await?;
+
+            // Apply migrations to the connected database
+            apply_migrations(&catalog_with_pool).await;
 
             // Periodically refresh password in the connection pool, if configured
             spawn_password_refreshing_job(&db_config, &catalog_with_pool).await;
