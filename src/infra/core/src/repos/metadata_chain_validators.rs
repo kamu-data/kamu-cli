@@ -787,10 +787,11 @@ impl<'a> MetadataChainVisitor for ValidateExecuteTransformVisitor<'a> {
         }
 
         // Validate event advances some state
+        // Note that there can be no data, checkpoint, or watermark in cases when all
+        // inputs only had source state updates
         if e.new_data.is_none()
             && e.new_checkpoint.as_ref().map(|v| &v.physical_hash) == e.prev_checkpoint.as_ref()
             && e.new_watermark.as_ref() == prev_watermark
-            // All inputs had new blocks that only update source state?
             && e.query_inputs.iter().all(|i| i.new_block_hash.is_none())
         {
             return Err(AppendValidationError::no_op_event(
