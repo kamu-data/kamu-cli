@@ -418,12 +418,21 @@ impl ContainerRuntime {
     pub fn get_runtime_host_addr(&self) -> String {
         match self.config.runtime {
             ContainerRuntimeType::Podman => "127.0.0.1".to_owned(),
-            ContainerRuntimeType::Docker => std::env::var("DOCKER_HOST")
-                .ok()
-                .and_then(|s| url::Url::parse(&s).ok())
-                .map_or("127.0.0.1".to_owned(), |url| {
-                    format!("{}", url.host().unwrap())
-                }),
+            ContainerRuntimeType::Docker => {
+                if let Some(url) = std::env::var("DOCKER_HOST")
+                    .ok()
+                    .and_then(|s| url::Url::parse(&s).ok())
+                {
+                    if url.scheme() == "unix" {
+                        // Rootless docker
+                        "127.0.0.1".to_owned()
+                    } else {
+                        format!("{}", url.host().unwrap())
+                    }
+                } else {
+                    "127.0.0.1".to_owned()
+                }
+            }
         }
     }
 
