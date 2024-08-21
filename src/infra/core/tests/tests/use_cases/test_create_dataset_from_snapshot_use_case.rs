@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use dill::{Catalog, Component};
+use internal_error::InternalError;
 use kamu::testing::MetadataFactory;
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -18,10 +19,17 @@ use kamu::{
     DatasetRepositoryWriter,
 };
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac::{MockRebacRepository, PropertyName, RebacService};
+use kamu_auth_rebac::{
+    MockRebacRepository,
+    PropertyName,
+    RebacRepository,
+    RebacService,
+    SetEntityPropertyError,
+};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{
+    CreateDatasetFromSnapshotError,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetFromSnapshotUseCaseOptions,
     DatasetLifecycleMessage,
@@ -214,6 +222,55 @@ async fn test_created_datasets_have_the_correct_visibility_attribute() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_clearing_the_dataset_if_a_rebac_property_setting_error() {
+    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+
+    // Don't expect any messages
+    let mut mock_outbox = MockOutbox::new();
+    CreateFromSnapshotUseCaseHarness::add_outbox_dataset_created_expectation(&mut mock_outbox, 0);
+
+    let mut mock_rebac_repo = MockRebacRepository::new();
+
+    mock_rebac_repo
+        .expect_set_entity_property()
+        .once()
+        .return_once(|_entity, _property_name, _property_value| {
+            InternalError::bail("ran out of coal to run the database")
+                .map_err(SetEntityPropertyError::Internal)
+        });
+
+    let harness = CreateFromSnapshotUseCaseHarness::new(
+        mock_outbox,
+        Workspace::MultiTenant,
+        RebacRepositoryVariant::Mocked(mock_rebac_repo),
+    );
+
+    let snapshot = MetadataFactory::dataset_snapshot()
+        .name(alias_foo.clone())
+        .kind(DatasetKind::Root)
+        .push_event(MetadataFactory::set_polling_source().build())
+        .build();
+
+    let create_res = harness
+        .use_case
+        .execute(snapshot, &Default::default())
+        .await;
+
+    assert_matches!(
+        create_res.err().unwrap(),
+        CreateDatasetFromSnapshotError::Internal(e)
+            if e.reason() == "Internal error: ran out of coal to run the database"
+    );
+    assert_matches!(
+        harness.check_dataset_exists(&alias_foo).await,
+        Err(GetDatasetError::NotFound(e))
+            if e.dataset_ref == alias_foo.into()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Copy, Clone)]
 enum Workspace {
     SingleTenant,
@@ -231,8 +288,6 @@ impl Workspace {
 
 enum RebacRepositoryVariant {
     InMemory,
-    // TODO: remove
-    #[allow(dead_code)]
     Mocked(MockRebacRepository),
 }
 
@@ -285,7 +340,6 @@ impl CreateFromSnapshotUseCaseHarness {
         let use_case = catalog
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
             .unwrap();
-
         let rebac_service = catalog.get_one::<dyn RebacService>().unwrap();
 
         Self {

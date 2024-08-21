@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac::{DatasetPropertyName, RebacService};
+use kamu_auth_rebac::{DatasetPropertyName, RebacService, SetEntityPropertyError};
 use kamu_core::{
     CreateDatasetFromSnapshotError,
     CreateDatasetFromSnapshotResult,
@@ -70,7 +70,9 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
             .rebac_service
             .set_dataset_property(&create_dataset_result.dataset_handle.id, name, &value)
             .await
-            .map_int_err(CreateDatasetFromSnapshotError::Internal);
+            .map_err(|err| match err {
+                SetEntityPropertyError::Internal(e) => CreateDatasetFromSnapshotError::Internal(e),
+            });
 
         // If setting fails, try to clean up the created dataset
         if let Err(set_rebac_property_err) = set_rebac_property_res {
