@@ -41,7 +41,10 @@ impl SqlitePlugin {
 
     #[tracing::instrument(level = "info", skip_all)]
     fn open_sqlite_pool(db_connection_settings: &DatabaseConnectionSettings) -> SqlitePool {
-        let sqlite_options = SqliteConnectOptions::new().filename(&db_connection_settings.host);
+        let sqlite_options = SqliteConnectOptions::new()
+            .filename(&db_connection_settings.host)
+            .create_if_missing(true);
+
         SqlitePoolOptions::new()
             .max_connections(1)
             .connect_lazy_with(sqlite_options)
