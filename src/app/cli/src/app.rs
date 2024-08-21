@@ -100,20 +100,20 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
-    let maybe_db_connection_settings = config
-        .database
-        .clone()
-        .or_else(|| {
+    let database_config = config.database.clone().or_else(|| {
+        // If not explicitly configured, a SQLite database is used for a multi-tenant
+        // workspace
+        if is_multi_tenant_workspace {
             // TODO: Run migrations
 
-            // If not explicitly configured, a SQLite database is used for a multi-tenant
-            // workspace
-            if is_multi_tenant_workspace {
-                Some(DatabaseConfig::sqlite_database_in_dot_kamu_dir())
-            } else {
-                None
-            }
-        })
+            Some(DatabaseConfig::sqlite_database())
+        } else {
+            None
+        }
+    });
+
+    let maybe_db_connection_settings = database_config
+        .as_ref()
         .and_then(try_build_db_connection_settings);
 
     // Configure application
@@ -137,7 +137,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         if let Some(db_connection_settings) = maybe_db_connection_settings.as_ref() {
             configure_database_components(
                 &mut base_catalog_builder,
-                config.database.as_ref().unwrap(),
+                database_config.as_ref().unwrap(),
                 db_connection_settings.clone(),
             );
         } else {
@@ -170,7 +170,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         let base_catalog = base_catalog_builder.build();
 
         // Database requires extra actions:
-        let final_base_catalog = if let Some(db_config) = config.database {
+        let final_base_catalog = if let Some(db_config) = database_config {
             // Connect database and obtain a connection pool
             let catalog_with_pool = connect_database_initially(&base_catalog).await?;
 

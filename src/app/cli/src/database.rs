@@ -109,10 +109,10 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn try_build_db_connection_settings(
-    raw_db_config: DatabaseConfig,
+    raw_db_config: &DatabaseConfig,
 ) -> Option<DatabaseConnectionSettings> {
-    fn convert(c: RemoteDatabaseConfig, provider: DatabaseProvider) -> DatabaseConnectionSettings {
-        DatabaseConnectionSettings::new(provider, c.database_name, c.host, c.port)
+    fn convert(c: &RemoteDatabaseConfig, provider: DatabaseProvider) -> DatabaseConnectionSettings {
+        DatabaseConnectionSettings::new(provider, c.database_name.clone(), c.host.clone(), c.port)
     }
 
     match raw_db_config {

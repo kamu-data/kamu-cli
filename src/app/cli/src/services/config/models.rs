@@ -615,9 +615,9 @@ impl DatabaseConfig {
         })
     }
 
-    pub fn sqlite_database_in_dot_kamu_dir() -> Self {
+    pub fn sqlite_database() -> Self {
         Self::Sqlite(SqliteDatabaseConfig {
-            database_path: ".kamu/workspace.sqlite.db".into(),
+            database_path: "kamu.sqlite.db".into(),
         })
     }
 }
