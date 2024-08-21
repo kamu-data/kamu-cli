@@ -15,6 +15,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use secrecy::SecretString;
 use sqlx::migrate::Migrator;
 use sqlx::SqlitePool;
+use tracing::warn;
 
 use crate::config::{DatabaseConfig, DatabaseCredentialSourceConfig, RemoteDatabaseConfig};
 
@@ -245,7 +246,11 @@ pub async fn apply_migrations(catalog: &Catalog) {
 
     match db_connection_settings.provider {
         DatabaseProvider::Sqlite => {}
-        _ => panic!("Applying migrations is only available for SQLite"),
+        _ => {
+            warn!("Skip applying migrations: available only for SQLite");
+
+            return;
+        }
     }
 
     let pool = catalog.get_one::<SqlitePool>().unwrap();
