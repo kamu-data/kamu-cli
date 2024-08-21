@@ -214,14 +214,15 @@ impl AxumServerPushProtocolInstance {
                     axum_write_close_payload::<DatasetPushResponse>(
                         &mut self.socket,
                         Err(DatasetPushRequestError::Internal(DatasetInternalError {
-                            error_message: int_err.reason(),
+                            phase: TransferPhase::Push(PushPhase::InitialRequest),
+                            error_message: "Internal error".to_string(),
                         })),
                     )
                     .await
                     .map_err(|e| {
                         PushServerError::WriteFailed(PushWriteError::new(
                             e,
-                            PushPhase::MetadataRequest,
+                            PushPhase::InitialRequest,
                         ))
                     })?;
                     return Err(PushServerError::Internal(int_err));
@@ -324,6 +325,7 @@ impl AxumServerPushProtocolInstance {
                     axum_write_close_payload::<DatasetPushResponse>(
                         &mut self.socket,
                         Err(DatasetPushRequestError::Internal(DatasetInternalError {
+                            phase: TransferPhase::Push(PushPhase::MetadataRequest),
                             error_message: int_err.reason(),
                         })),
                     )

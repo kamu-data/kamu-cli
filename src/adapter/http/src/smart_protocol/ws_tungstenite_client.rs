@@ -97,9 +97,11 @@ impl WsSmartTransferProtocolClient {
                 );
                 Ok(success)
             }
-            Err(DatasetPullRequestError::Internal(e)) => Err(PullClientError::Internal(
-                InternalError::new(Box::new(ClientInternalError::new(e.error_message.as_str()))),
-            )),
+            Err(DatasetPullRequestError::Internal(e)) => {
+                Err(PullClientError::Internal(InternalError::new(Box::new(
+                    ClientInternalError::new(e.error_message.as_str(), e.phase),
+                ))))
+            }
             Err(DatasetPullRequestError::InvalidInterval(DatasetPullInvalidIntervalError {
                 head,
                 tail,
@@ -226,9 +228,11 @@ impl WsSmartTransferProtocolClient {
                 tracing::debug!("Push response accepted");
                 Ok(success)
             }
-            Err(DatasetPushRequestError::Internal(e)) => Err(PushClientError::Internal(
-                InternalError::new(Box::new(ClientInternalError::new(e.error_message.as_str()))),
-            )),
+            Err(DatasetPushRequestError::Internal(e)) => {
+                Err(PushClientError::Internal(InternalError::new(Box::new(
+                    ClientInternalError::new(e.error_message.as_str(), e.phase),
+                ))))
+            }
             Err(DatasetPushRequestError::InvalidHead(e)) => {
                 Err(PushClientError::InvalidHead(RefCASError {
                     actual: e.actual_head.clone(),
@@ -320,7 +324,7 @@ impl WsSmartTransferProtocolClient {
                     }
                     DatasetPushObjectsTransferError::Internal(err) => {
                         PushClientError::Internal(InternalError::new(Box::new(
-                            ClientInternalError::new(err.error_message.as_str()),
+                            ClientInternalError::new(err.error_message.as_str(), err.phase),
                         )))
                     }
                 })?;

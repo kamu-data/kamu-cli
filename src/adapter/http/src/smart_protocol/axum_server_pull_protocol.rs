@@ -140,6 +140,7 @@ impl AxumServerPullProtocolInstance {
                     tracing::debug!("Sending internal error: {:?}", e);
                     DatasetPullResponse::Err(DatasetPullRequestError::Internal(
                         DatasetInternalError {
+                            phase: TransferPhase::Pull(PullPhase::InitialRequest),
                             error_message: e.to_string(),
                         },
                     ))

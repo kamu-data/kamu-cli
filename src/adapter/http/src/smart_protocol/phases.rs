@@ -9,21 +9,63 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+use std::fmt;
+
+use serde::{Deserialize, Serialize};
+
 #[allow(clippy::enum_variant_names)]
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum PullPhase {
     InitialRequest,
     MetadataRequest,
     ObjectsRequest,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum PushPhase {
     InitialRequest,
     MetadataRequest,
     ObjectsRequest,
     ObjectsUploadProgress,
     CompleteRequest,
+}
+
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum TransferPhase {
+    Pull(PullPhase),
+    Push(PushPhase),
+}
+
+impl fmt::Display for PullPhase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let phase = match self {
+            PullPhase::InitialRequest => "Initial Request",
+            PullPhase::MetadataRequest => "Metadata Request",
+            PullPhase::ObjectsRequest => "Objects Request",
+        };
+        write!(f, "Pull Phase: {phase}")
+    }
+}
+
+impl fmt::Display for PushPhase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let phase = match self {
+            PushPhase::InitialRequest => "Initial Request",
+            PushPhase::MetadataRequest => "Metadata Request",
+            PushPhase::ObjectsRequest => "Objects Request",
+            PushPhase::ObjectsUploadProgress => "Objects Upload Progress",
+            PushPhase::CompleteRequest => "Complete Request",
+        };
+        write!(f, "Push Phase: {phase}")
+    }
+}
+impl fmt::Display for TransferPhase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TransferPhase::Pull(phase) => write!(f, "{phase}"),
+            TransferPhase::Push(phase) => write!(f, "{phase}"),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

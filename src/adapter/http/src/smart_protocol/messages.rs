@@ -12,6 +12,8 @@ use opendatafabric::{DatasetID, Multihash};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+use super::phases::TransferPhase;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Initial dataset pull request message
@@ -246,6 +248,7 @@ pub struct HeaderRow {
 // Transfer URL
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetInternalError {
+    pub phase: TransferPhase,
     pub error_message: String,
 }
 
