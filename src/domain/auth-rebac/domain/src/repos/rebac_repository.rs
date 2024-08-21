@@ -8,14 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use mockall::automock;
 use thiserror::Error;
 
 use crate::{Entity, EntityType, EntityWithRelation, PropertyName, PropertyValue, Relation};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg_attr(feature = "testing", automock)]
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait RebacRepository: Send + Sync {
     // Properties
