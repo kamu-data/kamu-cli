@@ -31,6 +31,7 @@ use kamu_flow_system_services::{
 };
 use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
+use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{warn, Instrument};
 

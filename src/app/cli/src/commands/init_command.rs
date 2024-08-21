@@ -41,7 +41,7 @@ impl Command for InitCommand {
         false
     }
 
-    async fn before_run(&self) -> Result<(), CLIError> {
+    async fn validate_args(&self) -> Result<(), CLIError> {
         if !self.workspace_layout.root_dir.is_dir() {
             return Ok(());
         }

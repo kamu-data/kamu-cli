@@ -13,9 +13,6 @@ use database_common::*;
 use dill::{Catalog, CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
 use secrecy::SecretString;
-use sqlx::migrate::Migrator;
-use sqlx::SqlitePool;
-use tracing::warn;
 
 use crate::config::{DatabaseConfig, DatabaseCredentialSourceConfig, RemoteDatabaseConfig};
 
