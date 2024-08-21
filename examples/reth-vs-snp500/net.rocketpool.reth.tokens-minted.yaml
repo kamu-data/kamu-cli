@@ -44,7 +44,7 @@ content:
             'TokensMinted' as event_name,
             event.to as to,
             cast(event.amount as double) / pow(10.0, 18) as amount,
-            cast(event."ethAmount" as double) / pow(10.0, 18) as eth_amount
+            cast(event.ethAmount as double) / pow(10.0, 18) as eth_amount
           from input
       merge:
         kind: Append

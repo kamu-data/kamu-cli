@@ -44,7 +44,7 @@ content:
             'TokensBurned' as event_name,
             event.from as from,
             cast(event.amount as double) / pow(10.0, 18) as amount,
-            cast(event."ethAmount" as double) / pow(10.0, 18) as eth_amount
+            cast(event.ethAmount as double) / pow(10.0, 18) as eth_amount
           from input
       merge:
         kind: Append

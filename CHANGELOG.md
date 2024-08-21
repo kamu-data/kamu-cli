@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Changed
+- **Breaking:** Using DataFusion's [`enable_ident_normalization = false`](https://datafusion.apache.org/user-guide/configs.html) setting to work with upper case identifiers without needing to put quotes everywhere. This may impact your root and derivative datasets.
 - Push ingest from `csv` format will default to `header: true` in case schema was not explicitly provided
 - Access token with duplicate names can be created if such name exists but was revoked
 ### Fixed

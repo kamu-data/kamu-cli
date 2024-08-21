@@ -38,7 +38,7 @@ content:
             log_index,
             token_symbol,
             event_name,
-            from as holder_address,
+            "from" as holder_address,
             amount,
             eth_amount
           from tokens_burned

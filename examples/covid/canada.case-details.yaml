@@ -16,38 +16,41 @@ content:
       transform:
         kind: Sql
         engine: datafusion
+        # Note the `order by` to guarantee stability of the output for verification
         query: |
-          select
-            'AB' as province,
-            id,
-            reported_date,
-            gender,
-            location
+          select * from (
+            select
+              'AB' as province,
+              id,
+              reported_date,
+              gender,
+              location
             from "covid19.alberta.case-details.hm"
-          union all
-          select
-            'BC' as province,
-            id,
-            reported_date,
-            gender,
-            location
+            union all
+            select
+              'BC' as province,
+              id,
+              reported_date,
+              gender,
+              location
             from "covid19.british-columbia.case-details.hm"
-          union all
-          select
-            'ON' as province,
-            id,
-            reported_date,
-            gender,
-            location
+            union all
+            select
+              'ON' as province,
+              id,
+              reported_date,
+              gender,
+              location
             from "covid19.ontario.case-details.hm"
-          union all
-          select
-            'QC' as province,
-            id,
-            reported_date,
-            gender,
-            location
+            union all
+            select
+              'QC' as province,
+              id,
+              reported_date,
+              gender,
+              location
             from "covid19.quebec.case-details.hm"
+          ) order by reported_date, province, id
     - kind: SetVocab
       eventTimeColumn: reported_date
     - kind: SetInfo

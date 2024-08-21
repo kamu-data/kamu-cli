@@ -25,12 +25,12 @@ content:
         # not providing us any viable primary key to deduplicate records on
         query: |
           select
-            to_timestamp("Reported_Date") as reported_date,
-            "Classification_Reported" as classification,
-            cast(row_number() over (order by "Reported_Date") as bigint) as id,
-            "HA" as ha,
-            "Sex" as sex,
-            "Age_Group" as age_group
+            to_timestamp(Reported_Date) as reported_date,
+            Classification_Reported as classification,
+            cast(row_number() over (order by Reported_Date) as bigint) as id,
+            HA as ha,
+            Sex as sex,
+            Age_Group as age_group
           from input
       # How to combine newly-ingested data with data that is already in the dataset
       merge:

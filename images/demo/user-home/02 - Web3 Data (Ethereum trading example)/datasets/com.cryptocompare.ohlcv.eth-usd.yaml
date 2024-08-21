@@ -20,8 +20,8 @@ content:
           - volumefrom DOUBLE
           - volumeto DOUBLE
           - close DOUBLE
-          - '"conversionType" STRING'
-          - '"conversionSymbol" STRING'
+          - conversionType STRING
+          - conversionSymbol STRING
       preprocess:
         kind: Sql
         engine: datafusion
@@ -36,8 +36,8 @@ content:
             close,
             volumefrom,
             volumeto,
-            "conversionType" as conversion_type,
-            "conversionSymbol" as conversion_symbol
+            conversionType as conversion_type,
+            conversionSymbol as conversion_symbol
           from input
       merge:
         kind: Ledger

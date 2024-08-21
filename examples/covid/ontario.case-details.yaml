@@ -29,18 +29,18 @@ content:
         engine: datafusion
         query: |
           SELECT
-            cast("Row_ID" as bigint) as id,
-            to_timestamp(coalesce("Case_Reported_Date", "Test_Reported_Date")) as case_reported_date,
+            cast(Row_ID as bigint) as id,
+            to_timestamp(coalesce(Case_Reported_Date, Test_Reported_Date)) as case_reported_date,
             case
-              when "Test_Reported_Date" != '' then to_timestamp("Test_Reported_Date")
+              when Test_Reported_Date != '' then to_timestamp(Test_Reported_Date)
               else null
             end as test_reported_date,
-            "Outcome1" as outcome,
-            "Reporting_PHU_City" as city,
-            "Client_Gender" as gender,
-            "Age_Group" as age_group,
-            "Reporting_PHU_Latitude" as latitude,
-            "Reporting_PHU_Longitude" as longitude
+            Outcome1 as outcome,
+            Reporting_PHU_City as city,
+            Client_Gender as gender,
+            Age_Group as age_group,
+            Reporting_PHU_Latitude as latitude,
+            Reporting_PHU_Longitude as longitude
           FROM input
       merge:
         kind: Ledger

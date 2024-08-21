@@ -25,25 +25,25 @@ content:
         engine: datafusion
         query: |
           SELECT
-            to_timestamp_seconds(cast("timeStamp" as bigint)) as block_time,
-            "blockNumber" as block_number,
-            "blockHash" as block_hash,
+            to_timestamp_seconds(cast(timeStamp as bigint)) as block_time,
+            blockNumber as block_number,
+            blockHash as block_hash,
             'eth' as symbol,
-            "hash" as transaction_hash,
-            "transactionIndex" as transaction_index,
-            "nonce",
+            hash as transaction_hash,
+            transactionIndex as transaction_index,
+            nonce,
             "from",
-            "to",
-            "value",
-            "input",
-            "isError",
-            "txreceipt_status",
-            "contractAddress" as contract_address,
-            "gas",
-            "gasPrice" as gas_price,
-            "gasUsed" as gas_used,
-            "cumulativeGasUsed" as cumulative_gas_used,
-            "confirmations"
+            to,
+            value,
+            input,
+            isError,
+            txreceipt_status,
+            contractAddress as contract_address,
+            gas,
+            gasPrice as gas_price,
+            gasUsed as gas_used,
+            cumulativeGasUsed as cumulative_gas_used,
+            confirmations
           FROM input
       merge:
         kind: Ledger
