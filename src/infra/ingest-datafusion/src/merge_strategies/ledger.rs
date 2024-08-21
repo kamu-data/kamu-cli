@@ -45,7 +45,12 @@ impl MergeStrategy for MergeStrategyLedger {
         let new_records = if prev.is_none() {
             // Validate PK columns exist
             new.clone()
-                .select(self.primary_key.iter().map(col).collect())
+                .select(
+                    self.primary_key
+                        .iter()
+                        .map(|name| col(Column::from_name(name)))
+                        .collect(),
+                )
                 .int_err()?;
 
             new
@@ -71,6 +76,6 @@ impl MergeStrategy for MergeStrategyLedger {
     }
 
     fn sort_order(&self) -> Vec<Expr> {
-        vec![col(&self.vocab.event_time_column).sort(true, true)]
+        vec![col(Column::from_name(&self.vocab.event_time_column)).sort(true, true)]
     }
 }

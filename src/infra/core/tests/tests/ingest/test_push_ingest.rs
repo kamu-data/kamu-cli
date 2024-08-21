@@ -471,6 +471,104 @@ async fn test_ingest_push_schema_stability() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// See: https://github.com/apache/datafusion/issues/7460
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_sql_case_sensitivity() {
+    let harness = IngestTestHarness::new();
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(DatasetKind::Root)
+        .push_event(
+            MetadataFactory::add_push_source()
+                .read(ReadStepNdJson::default())
+                .merge(MergeStrategyAppend {})
+                .preprocess(TransformSql {
+                    engine: "datafusion".into(),
+                    version: None,
+                    query: Some(
+                        indoc!(
+                            r#"
+                            select
+                                lower,
+                                MIXed,
+                                mixED,
+                                mixED as mixed,
+                                UPPER
+                            from input
+                            "#
+                        )
+                        .into(),
+                    ),
+                    queries: None,
+                    temporal_tables: None,
+                })
+                .build(),
+        )
+        .build();
+
+    let dataset_alias = dataset_snapshot.name.clone();
+    let dataset_ref = dataset_alias.as_local_ref();
+
+    harness.create_dataset(dataset_snapshot).await;
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
+
+    let src_path = harness.temp_dir.path().join("data.ndjson");
+    std::fs::write(
+        &src_path,
+        indoc!(
+            r#"
+            {"lower": "lower", "MIXed": "MIXed", "mixED": "mixED", "UPPER": "UPPER"}
+            "#
+        ),
+    )
+    .unwrap();
+
+    harness
+        .push_ingest_svc
+        .ingest_from_url(
+            &dataset_ref,
+            None,
+            url::Url::from_file_path(&src_path).unwrap(),
+            PushIngestOpts::default(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT32 op;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY lower (STRING);
+                  OPTIONAL BYTE_ARRAY MIXed (STRING);
+                  OPTIONAL BYTE_ARRAY mixED (STRING);
+                  OPTIONAL BYTE_ARRAY mixed (STRING);
+                  OPTIONAL BYTE_ARRAY UPPER (STRING);
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----+----------------------+----------------------+-------+-------+-------+-------+-------+
+                | offset | op | system_time          | event_time           | lower | MIXed | mixED | mixed | UPPER |
+                +--------+----+----------------------+----------------------+-------+-------+-------+-------+-------+
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | lower | MIXed | mixED | mixED | UPPER |
+                +--------+----+----------------------+----------------------+-------+-------+-------+-------+-------+
+                "#
+            ),
+        )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_repo: Arc<DatasetRepositoryLocalFs>,

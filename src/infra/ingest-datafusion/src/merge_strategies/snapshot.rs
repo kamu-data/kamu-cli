@@ -95,20 +95,30 @@ impl MergeStrategySnapshot {
                         datafusion::logical_expr::BuiltInWindowFunction::RowNumber,
                     ),
                     args: Vec::new(),
-                    partition_by: self.primary_key.iter().map(col).collect(),
-                    order_by: vec![col(&self.vocab.offset_column).sort(false, false)],
+                    partition_by: self
+                        .primary_key
+                        .iter()
+                        .map(|name| col(Column::from_name(name)))
+                        .collect(),
+                    order_by: vec![
+                        col(Column::from_name(&self.vocab.offset_column)).sort(false, false)
+                    ],
                     window_frame: datafusion::logical_expr::WindowFrame::new(Some(false)),
                     null_treatment: None,
                 },
             )
             .alias(rank_col)])
             .int_err()?
-            .filter(col(rank_col).eq(lit(1)).and(or(
-                // TODO: Cast to `u8` after Spark is updated
-                // See: https://github.com/kamu-data/kamu-cli/issues/445
-                col(&self.vocab.operation_type_column).eq(lit(Op::Append as i32)),
-                col(&self.vocab.operation_type_column).eq(lit(Op::CorrectTo as i32)),
-            )))
+            .filter(
+                col(Column::from_name(rank_col)).eq(lit(1)).and(or(
+                    // TODO: Cast to `u8` after Spark is updated
+                    // See: https://github.com/kamu-data/kamu-cli/issues/445
+                    col(Column::from_name(&self.vocab.operation_type_column))
+                        .eq(lit(Op::Append as i32)),
+                    col(Column::from_name(&self.vocab.operation_type_column))
+                        .eq(lit(Op::CorrectTo as i32)),
+                )),
+            )
             .int_err()?
             .without_columns(&[rank_col])
             .int_err()?;
@@ -337,7 +347,12 @@ impl MergeStrategy for MergeStrategySnapshot {
         if prev.is_none() {
             // Validate PK columns exist
             new.clone()
-                .select(self.primary_key.iter().map(col).collect())
+                .select(
+                    self.primary_key
+                        .iter()
+                        .map(|name| col(Column::from_name(name)))
+                        .collect(),
+                )
                 .int_err()?;
 
             // Consider all records as appends
@@ -372,9 +387,9 @@ impl MergeStrategy for MergeStrategySnapshot {
         // sort records by primary key and then by operation type
         self.primary_key
             .iter()
-            .map(|c| col(c).sort(true, true))
+            .map(|c| col(Column::from_name(c)).sort(true, true))
             .chain(std::iter::once(
-                col(&self.vocab.operation_type_column).sort(true, true),
+                col(Column::from_name(&self.vocab.operation_type_column)).sort(true, true),
             ))
             .collect()
     }

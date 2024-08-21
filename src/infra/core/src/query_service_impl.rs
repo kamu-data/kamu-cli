@@ -52,9 +52,18 @@ impl QueryServiceImpl {
     }
 
     fn session_context(&self, options: QueryOptions) -> SessionContext {
-        let cfg = SessionConfig::new()
+        let mut cfg = SessionConfig::new()
             .with_information_schema(true)
             .with_default_catalog_and_schema("kamu", "kamu");
+
+        // Forcing cese-sensitive identifiers in case-insensitive language seems to
+        // be a lesser evil than following DataFusion's default behavior of forcing
+        // identifiers to lowercase instead of case-insensitive matching.
+        //
+        // See: https://github.com/apache/datafusion/issues/7460
+        // TODO: Consider externalizing this config (e.g. by allowing custom engine
+        // options in transform DTOs)
+        cfg.options_mut().sql_parser.enable_ident_normalization = false;
 
         let runtime_config = RuntimeConfig {
             object_store_registry: self.object_store_registry.clone().as_datafusion_registry(),
@@ -331,12 +340,16 @@ impl QueryService for QueryServiceImpl {
             .into();
 
         let df = df
-            .sort(vec![col(&vocab.offset_column).sort(false, true)])?
+            .sort(vec![
+                col(Column::from_name(&vocab.offset_column)).sort(false, true)
+            ])?
             .limit(
                 usize::try_from(skip).unwrap(),
                 Some(usize::try_from(limit).unwrap()),
             )?
-            .sort(vec![col(&vocab.offset_column).sort(true, false)])?;
+            .sort(vec![
+                col(Column::from_name(&vocab.offset_column)).sort(true, false)
+            ])?;
 
         Ok(df)
     }

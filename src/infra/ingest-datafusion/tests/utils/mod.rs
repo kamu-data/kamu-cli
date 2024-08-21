@@ -61,14 +61,14 @@ pub async fn assert_dfs_equivalent(
             .schema()
             .fields()
             .iter()
-            .map(|f| col(f.name()).sort(false, true))
+            .map(|f| col(Column::from_name(f.name())).sort(false, true))
             .collect();
 
         let rhs_cols = rhs
             .schema()
             .fields()
             .iter()
-            .map(|f| col(f.name()).sort(false, true))
+            .map(|f| col(Column::from_name(f.name())).sort(false, true))
             .collect();
 
         (lhs.sort(lhs_cols).unwrap(), rhs.sort(rhs_cols).unwrap())

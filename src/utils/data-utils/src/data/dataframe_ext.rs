@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::Path;
-
 use datafusion::error::Result;
-use datafusion::parquet::file::properties::WriterProperties;
 use datafusion::prelude::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DataFrameExt
@@ -22,6 +21,8 @@ where
 
     fn without_columns(self, cols: &[&str]) -> Result<Self>;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl DataFrameExt for DataFrame {
@@ -52,17 +53,4 @@ impl DataFrameExt for DataFrame {
 
         self.select(columns)
     }
-}
-
-#[async_trait::async_trait]
-pub trait SessionContextExt
-where
-    Self: Sized,
-{
-    async fn write_parquet_single_file(
-        &self,
-        df: DataFrame,
-        path: &Path,
-        writer_properties: Option<WriterProperties>,
-    ) -> Result<()>;
 }

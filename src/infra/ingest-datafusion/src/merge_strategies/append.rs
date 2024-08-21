@@ -44,6 +44,6 @@ impl MergeStrategy for MergeStrategyAppend {
     }
 
     fn sort_order(&self) -> Vec<Expr> {
-        vec![col(&self.vocab.event_time_column).sort(true, true)]
+        vec![col(Column::from_name(&self.vocab.event_time_column)).sort(true, true)]
     }
 }

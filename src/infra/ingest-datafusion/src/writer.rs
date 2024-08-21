@@ -306,7 +306,7 @@ impl DataWriterDataFusion {
                 // TODO: Using `case` expression instead of `coalesce()` due to DataFusion bug
                 // See: https://github.com/apache/arrow-datafusion/issues/8790
                 when(
-                    col(&self.meta.vocab.event_time_column).is_null(),
+                    col(Column::from_name(&self.meta.vocab.event_time_column)).is_null(),
                     cast(
                         Expr::Literal(ScalarValue::TimestampMillisecond(
                             Some(fallback_event_time.timestamp_millis()),
@@ -315,7 +315,7 @@ impl DataWriterDataFusion {
                         event_time_data_type,
                     ),
                 )
-                .otherwise(col(&self.meta.vocab.event_time_column))
+                .otherwise(col(Column::from_name(&self.meta.vocab.event_time_column)))
                 .int_err()?,
             )
             .int_err()?;
@@ -349,7 +349,7 @@ impl DataWriterDataFusion {
             .with_column(
                 &self.meta.vocab.offset_column,
                 cast(
-                    col(&self.meta.vocab.offset_column as &str)
+                    col(Column::from_name(&self.meta.vocab.offset_column))
                         + lit(i64::try_from(start_offset).unwrap() - 1),
                     // TODO: Replace with UInt64 after Spark is updated
                     // See: https://github.com/kamu-data/kamu-cli/issues/445
@@ -510,10 +510,10 @@ impl DataWriterDataFusion {
             .aggregate(
                 vec![],
                 vec![
-                    min(col(&self.meta.vocab.offset_column)),
-                    max(col(&self.meta.vocab.offset_column)),
+                    min(col(Column::from_name(&self.meta.vocab.offset_column))),
+                    max(col(Column::from_name(&self.meta.vocab.offset_column))),
                     // TODO: Add support for more watermark strategies
-                    max(col(&self.meta.vocab.event_time_column)),
+                    max(col(Column::from_name(&self.meta.vocab.event_time_column))),
                 ],
             )
             .int_err()?;

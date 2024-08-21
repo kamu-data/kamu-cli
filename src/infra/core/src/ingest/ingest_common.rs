@@ -54,7 +54,16 @@ pub fn new_session_context(object_store_registry: Arc<dyn ObjectStoreRegistry>) 
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::prelude::*;
 
-    let config = SessionConfig::new().with_default_catalog_and_schema("kamu", "kamu");
+    let mut config = SessionConfig::new().with_default_catalog_and_schema("kamu", "kamu");
+
+    // Forcing cese-sensitive identifiers in case-insensitive language seems to
+    // be a lesser evil than following DataFusion's default behavior of forcing
+    // identifiers to lowercase instead of case-insensitive matching.
+    //
+    // See: https://github.com/apache/datafusion/issues/7460
+    // TODO: Consider externalizing this config (e.g. by allowing custom engine
+    // options in transform DTOs)
+    config.options_mut().sql_parser.enable_ident_normalization = false;
 
     let runtime_config = RuntimeConfig {
         object_store_registry: object_store_registry.as_datafusion_registry(),

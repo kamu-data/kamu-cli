@@ -1080,9 +1080,19 @@ impl FetchService {
         }
 
         // Setup Datafusion context
-        let cfg = SessionConfig::new()
+        let mut cfg = SessionConfig::new()
             .with_target_partitions(1)
             .with_coalesce_batches(false);
+
+        // Forcing cese-sensitive identifiers in case-insensitive language seems to
+        // be a lesser evil than following DataFusion's default behavior of forcing
+        // identifiers to lowercase instead of case-insensitive matching.
+        //
+        // See: https://github.com/apache/datafusion/issues/7460
+        // TODO: Consider externalizing this config (e.g. by allowing custom engine
+        // options in transform DTOs)
+        cfg.options_mut().sql_parser.enable_ident_normalization = false;
+
         let mut ctx = SessionContext::new_with_config(cfg);
         datafusion_ethers::udf::register_all(&mut ctx).unwrap();
         ctx.register_catalog(

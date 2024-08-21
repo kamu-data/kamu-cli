@@ -283,7 +283,7 @@ impl CompactionServiceImpl {
                     .int_err()?
                     // TODO: PERF: Consider passing sort order hint to `read_parquet` to let DF now
                     // that the data is already pre-sorted
-                    .sort(vec![col(offset_column).sort(true, false)])
+                    .sort(vec![col(Column::from_name(offset_column)).sort(true, false)])
                     .int_err()?;
 
                 let new_file_path =
