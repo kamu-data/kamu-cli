@@ -274,6 +274,8 @@ impl TransformServiceImpl {
             .await?;
 
         // Nothing to do?
+        // TODO: Detect the situation where inputs only had source updates and skip
+        // running the engine
         if inputs
             .iter()
             .all(|i| i.data_slices.is_empty() && i.explicit_watermarks.is_empty())
