@@ -415,7 +415,7 @@ impl TestHarness {
                         ..Default::default()
                     })
                     .build(),
-                &Default::default(),
+                Default::default(),
             )
             .await
             .unwrap();

@@ -3261,7 +3261,7 @@ impl FlowRunsHarness {
                     .name("foo")
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
-                &Default::default(),
+                Default::default(),
             )
             .await
             .unwrap()
@@ -3284,7 +3284,7 @@ impl FlowRunsHarness {
                             .build(),
                     )
                     .build(),
-                &Default::default(),
+                Default::default(),
             )
             .await
             .unwrap()

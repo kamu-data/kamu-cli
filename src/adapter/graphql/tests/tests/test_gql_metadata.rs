@@ -70,7 +70,7 @@ async fn test_current_push_sources() {
                 .kind(DatasetKind::Root)
                 .name("foo")
                 .build(),
-            &Default::default(),
+            Default::default(),
         )
         .await
         .unwrap();

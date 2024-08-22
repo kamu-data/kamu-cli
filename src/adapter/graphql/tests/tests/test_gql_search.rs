@@ -53,7 +53,7 @@ async fn test_search_query() {
                 .kind(DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
-            &Default::default(),
+            Default::default(),
         )
         .await
         .unwrap();

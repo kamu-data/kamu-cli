@@ -18,13 +18,13 @@ pub trait CreateDatasetFromSnapshotUseCase: Send + Sync {
     async fn execute(
         &self,
         snapshot: DatasetSnapshot,
-        options: &CreateDatasetFromSnapshotUseCaseOptions,
+        options: CreateDatasetFromSnapshotUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct CreateDatasetFromSnapshotUseCaseOptions {
     pub dataset_visibility: DatasetVisibility,
 }

@@ -125,10 +125,7 @@ impl DatasetsMut {
 
         let create_options = CreateDatasetFromSnapshotUseCaseOptions { dataset_visibility };
 
-        let result = match create_from_snapshot
-            .execute(snapshot, &create_options)
-            .await
-        {
+        let result = match create_from_snapshot.execute(snapshot, create_options).await {
             Ok(result) => {
                 let dataset = Dataset::from_ref(ctx, &result.dataset_handle.as_local_ref()).await?;
                 CreateDatasetFromSnapshotResult::Success(CreateDatasetResultSuccess { dataset })

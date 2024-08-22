@@ -96,7 +96,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
     async fn execute(
         &self,
         snapshot: DatasetSnapshot,
-        options: &CreateDatasetFromSnapshotUseCaseOptions,
+        options: CreateDatasetFromSnapshotUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
         let CreateDatasetFromSnapshotResult {
             create_dataset_result,
@@ -109,7 +109,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         let is_multi_tenant_workspace = self.dataset_repo_reader.is_multi_tenant();
 
         if is_multi_tenant_workspace {
-            self.handle_multi_tenant_case(&create_dataset_result, options)
+            self.handle_multi_tenant_case(&create_dataset_result, &options)
                 .await?;
         }
 

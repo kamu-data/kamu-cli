@@ -67,7 +67,7 @@ async fn test_create_root_dataset_from_snapshot() {
 
     let create_res = harness
         .use_case
-        .execute(snapshot, &Default::default())
+        .execute(snapshot, Default::default())
         .await
         .unwrap();
 
@@ -125,12 +125,12 @@ async fn test_create_derived_dataset_from_snapshot() {
 
     let foo_create_res = harness
         .use_case
-        .execute(snapshot_root, &options)
+        .execute(snapshot_root, options)
         .await
         .unwrap();
     let bar_create_res = harness
         .use_case
-        .execute(snapshot_derived, &options)
+        .execute(snapshot_derived, options)
         .await
         .unwrap();
 
@@ -184,7 +184,7 @@ async fn test_created_datasets_have_the_correct_visibility_attribute() {
             dataset_visibility: DatasetVisibility::Private,
         };
 
-        let private_create_res = harness.use_case.execute(snapshot, &options).await.unwrap();
+        let private_create_res = harness.use_case.execute(snapshot, options).await.unwrap();
 
         assert_matches!(
             harness
@@ -206,7 +206,7 @@ async fn test_created_datasets_have_the_correct_visibility_attribute() {
             dataset_visibility: DatasetVisibility::PubliclyAvailable,
         };
 
-        let public_create_res = harness.use_case.execute(snapshot, &options).await.unwrap();
+        let public_create_res = harness.use_case.execute(snapshot, options).await.unwrap();
 
         assert_matches!(
             harness
@@ -252,10 +252,7 @@ async fn test_clearing_the_dataset_if_a_rebac_property_setting_error() {
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_res = harness
-        .use_case
-        .execute(snapshot, &Default::default())
-        .await;
+    let create_res = harness.use_case.execute(snapshot, Default::default()).await;
 
     assert_matches!(
         create_res.err().unwrap(),

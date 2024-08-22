@@ -156,7 +156,7 @@ impl AddCommand {
             let alias = snapshot.name.clone();
             let res = self
                 .create_dataset_from_snapshot
-                .execute(snapshot, &create_options)
+                .execute(snapshot, create_options)
                 .await;
 
             ret.push((alias, res));

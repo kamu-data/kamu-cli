@@ -70,7 +70,7 @@ async fn setup_repo() -> RepoFixture {
                 .kind(DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
-            &Default::default(),
+            Default::default(),
         )
         .await
         .unwrap();

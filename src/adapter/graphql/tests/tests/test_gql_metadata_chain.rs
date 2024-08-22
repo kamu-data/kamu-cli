@@ -188,7 +188,7 @@ async fn metadata_chain_append_event() {
                 .name("foo")
                 .kind(DatasetKind::Root)
                 .build(),
-            &Default::default(),
+            Default::default(),
         )
         .await
         .unwrap();
@@ -273,7 +273,7 @@ async fn metadata_update_readme_new() {
                 .name("foo")
                 .kind(DatasetKind::Root)
                 .build(),
-            &Default::default(),
+            Default::default(),
         )
         .await
         .unwrap();

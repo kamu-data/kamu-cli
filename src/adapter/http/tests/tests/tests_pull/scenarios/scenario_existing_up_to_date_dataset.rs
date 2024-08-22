@@ -51,7 +51,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingUpToDateDatasetScenario
                     .push_event(MetadataFactory::set_polling_source().build())
                     .push_event(MetadataFactory::set_data_schema().build())
                     .build(),
-                &Default::default(),
+                Default::default(),
             )
             .await
             .unwrap();

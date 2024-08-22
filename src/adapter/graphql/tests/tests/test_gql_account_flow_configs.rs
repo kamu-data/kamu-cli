@@ -745,7 +745,7 @@ impl FlowConfigHarness {
                     .name(dataset_alias)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
-                &Default::default(),
+                Default::default(),
             )
             .await
             .unwrap()

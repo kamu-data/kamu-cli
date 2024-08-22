@@ -648,7 +648,7 @@ impl DataIngestHarness {
                         vec![]
                     },
                 },
-                &Default::default(),
+                Default::default(),
             )
             .await
             .unwrap()
