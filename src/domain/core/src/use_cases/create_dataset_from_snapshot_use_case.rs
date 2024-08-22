@@ -40,8 +40,9 @@ impl Default for CreateDatasetFromSnapshotUseCaseOptions {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub enum DatasetVisibility {
+    #[default]
     Private,
     PubliclyAvailable,
 }
