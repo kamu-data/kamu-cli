@@ -18,7 +18,7 @@ use kamu::{
     DatasetRepositoryWriter,
 };
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac::{MockRebacRepository, PropertyName, RebacRepository, RebacService};
+use kamu_auth_rebac::{PropertyName, RebacService};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{
@@ -48,7 +48,6 @@ async fn test_create_root_dataset_from_snapshot() {
     let harness = CreateFromSnapshotUseCaseHarness::new(
         Workspace::SingleTenant,
         OutboxVariantVariant::Mocked(mock_outbox),
-        RebacRepositoryVariant::InMemory,
     );
 
     let snapshot = MetadataFactory::dataset_snapshot()
@@ -94,7 +93,6 @@ async fn test_create_derived_dataset_from_snapshot() {
     let harness = CreateFromSnapshotUseCaseHarness::new(
         Workspace::SingleTenant,
         OutboxVariantVariant::Mocked(mock_outbox),
-        RebacRepositoryVariant::InMemory,
     );
 
     let snapshot_root = MetadataFactory::dataset_snapshot()
@@ -158,7 +156,6 @@ async fn test_created_datasets_have_the_correct_visibility_attribute() {
     let harness = CreateFromSnapshotUseCaseHarness::new(
         Workspace::MultiTenant,
         OutboxVariantVariant::OutboxImmediate,
-        RebacRepositoryVariant::InMemory,
     );
 
     {
@@ -209,52 +206,6 @@ async fn test_created_datasets_have_the_correct_visibility_attribute() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[tokio::test]
-async fn test_clearing_the_dataset_if_a_rebac_property_setting_error() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-
-    // Don't expect any messages
-    let mut mock_outbox = MockOutbox::new();
-    CreateFromSnapshotUseCaseHarness::add_outbox_dataset_created_expectation(&mut mock_outbox, 0);
-
-    let mut mock_rebac_repo = MockRebacRepository::new();
-
-    mock_rebac_repo
-        .expect_set_entity_property()
-        .once()
-        .return_once(|_entity, _property_name, _property_value| {
-            InternalError::bail("ran out of coal to run the database")
-                .map_err(SetEntityPropertyError::Internal)
-        });
-
-    let harness = CreateFromSnapshotUseCaseHarness::new(
-        mock_outbox,
-        Workspace::MultiTenant,
-        RebacRepositoryVariant::Mocked(mock_rebac_repo),
-    );
-
-    let snapshot = MetadataFactory::dataset_snapshot()
-        .name(alias_foo.clone())
-        .kind(DatasetKind::Root)
-        .push_event(MetadataFactory::set_polling_source().build())
-        .build();
-
-    let create_res = harness.use_case.execute(snapshot, Default::default()).await;
-
-    assert_matches!(
-        create_res.err().unwrap(),
-        CreateDatasetFromSnapshotError::Internal(e)
-            if e.reason() == "Internal error: ran out of coal to run the database"
-    );
-    assert_matches!(
-        harness.check_dataset_exists(&alias_foo).await,
-        Err(GetDatasetError::NotFound(e))
-            if e.dataset_ref == alias_foo.into()
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Copy, Clone)]
 enum Workspace {
     SingleTenant,
@@ -275,11 +226,6 @@ enum OutboxVariantVariant {
     Mocked(MockOutbox),
 }
 
-enum RebacRepositoryVariant {
-    InMemory,
-    Mocked(MockRebacRepository),
-}
-
 struct CreateFromSnapshotUseCaseHarness {
     _temp_dir: tempfile::TempDir,
     catalog: Catalog,
@@ -288,11 +234,7 @@ struct CreateFromSnapshotUseCaseHarness {
 }
 
 impl CreateFromSnapshotUseCaseHarness {
-    fn new(
-        workspace: Workspace,
-        outbox_variant: OutboxVariantVariant,
-        rebac_repo_variant: RebacRepositoryVariant,
-    ) -> Self {
+    fn new(workspace: Workspace, outbox_variant: OutboxVariantVariant) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
         let datasets_dir = tempdir.path().join("datasets");
@@ -310,6 +252,7 @@ impl CreateFromSnapshotUseCaseHarness {
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<SystemTimeSourceDefault>()
+            .add::<InMemoryRebacRepository>()
             .add::<RebacServiceImpl>();
 
         match outbox_variant {
@@ -327,16 +270,6 @@ impl CreateFromSnapshotUseCaseHarness {
             }
             OutboxVariantVariant::Mocked(mock_outbox) => {
                 b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
-            }
-        };
-
-        match rebac_repo_variant {
-            RebacRepositoryVariant::InMemory => {
-                b.add::<InMemoryRebacRepository>();
-            }
-            RebacRepositoryVariant::Mocked(mock_rebac_repo) => {
-                b.add_value(mock_rebac_repo)
-                    .bind::<dyn RebacRepository, MockRebacRepository>();
             }
         };
 

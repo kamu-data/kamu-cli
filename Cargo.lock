@@ -5278,7 +5278,6 @@ version = "0.198.0"
 dependencies = [
  "async-trait",
  "internal-error",
- "mockall",
  "opendatafabric",
  "sqlx",
  "strum 0.26.3",

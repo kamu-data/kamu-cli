@@ -76,11 +76,11 @@ impl InMemoryRebacRepository {
 
 #[async_trait::async_trait]
 impl RebacRepository for InMemoryRebacRepository {
-    async fn set_entity_property<'a>(
+    async fn set_entity_property(
         &self,
-        entity: &Entity<'a>,
+        entity: &Entity,
         property_name: PropertyName,
-        property_value: &PropertyValue<'a>,
+        property_value: &PropertyValue,
     ) -> Result<(), SetEntityPropertyError> {
         let mut writable_state = self.state.write().await;
 
@@ -94,9 +94,9 @@ impl RebacRepository for InMemoryRebacRepository {
         Ok(())
     }
 
-    async fn delete_entity_property<'a>(
+    async fn delete_entity_property(
         &self,
-        entity: &Entity<'a>,
+        entity: &Entity,
         property_name: PropertyName,
     ) -> Result<(), DeleteEntityPropertyError> {
         let mut writable_state = self.state.write().await;
@@ -118,10 +118,10 @@ impl RebacRepository for InMemoryRebacRepository {
         Ok(())
     }
 
-    async fn get_entity_properties<'a, 'b>(
+    async fn get_entity_properties(
         &self,
-        entity: &Entity<'a>,
-    ) -> Result<Vec<(PropertyName, PropertyValue<'b>)>, GetEntityPropertiesError> {
+        entity: &Entity,
+    ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError> {
         let readable_state = self.state.read().await;
 
         let maybe_entity_properties = readable_state.entities_properties_map.get(entity);
@@ -138,11 +138,11 @@ impl RebacRepository for InMemoryRebacRepository {
         Ok(properties)
     }
 
-    async fn insert_entities_relation<'a>(
+    async fn insert_entities_relation(
         &self,
-        subject_entity: &Entity<'a>,
+        subject_entity: &Entity,
         relationship: Relation,
-        object_entity: &Entity<'a>,
+        object_entity: &Entity,
     ) -> Result<(), InsertEntitiesRelationError> {
         let mut writable_state = self.state.write().await;
 
@@ -162,11 +162,11 @@ impl RebacRepository for InMemoryRebacRepository {
         Ok(())
     }
 
-    async fn delete_entities_relation<'a>(
+    async fn delete_entities_relation(
         &self,
-        subject_entity: &Entity<'a>,
+        subject_entity: &Entity,
         relationship: Relation,
-        object_entity: &Entity<'a>,
+        object_entity: &Entity,
     ) -> Result<(), DeleteEntitiesRelationError> {
         let mut writable_state = self.state.write().await;
 
@@ -184,10 +184,10 @@ impl RebacRepository for InMemoryRebacRepository {
         Ok(())
     }
 
-    async fn get_subject_entity_relations<'a, 'b>(
+    async fn get_subject_entity_relations(
         &self,
-        subject_entity: &Entity<'a>,
-    ) -> Result<Vec<EntityWithRelation<'b>>, SubjectEntityRelationsError> {
+        subject_entity: &Entity,
+    ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsError> {
         let res = self
             .get_rows(|row| {
                 if row.subject_entity == *subject_entity {
@@ -204,11 +204,11 @@ impl RebacRepository for InMemoryRebacRepository {
         Ok(res)
     }
 
-    async fn get_subject_entity_relations_by_object_type<'a, 'b>(
+    async fn get_subject_entity_relations_by_object_type(
         &self,
-        subject_entity: &Entity<'a>,
+        subject_entity: &Entity,
         object_entity_type: EntityType,
-    ) -> Result<Vec<EntityWithRelation<'b>>, SubjectEntityRelationsByObjectTypeError> {
+    ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsByObjectTypeError> {
         let res = self
             .get_rows(|row| {
                 if row.subject_entity == *subject_entity
@@ -227,10 +227,10 @@ impl RebacRepository for InMemoryRebacRepository {
         Ok(res)
     }
 
-    async fn get_relations_between_entities<'a>(
+    async fn get_relations_between_entities(
         &self,
-        subject_entity: &Entity<'a>,
-        object_entity: &Entity<'a>,
+        subject_entity: &Entity,
+        object_entity: &Entity,
     ) -> Result<Vec<Relation>, GetRelationsBetweenEntitiesError> {
         let res = self
             .get_rows(|row| {

@@ -420,8 +420,6 @@ pub fn configure_base_catalog(
         MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     );
 
-    b.add::<RebacServiceImpl>();
-
     b
 }
 

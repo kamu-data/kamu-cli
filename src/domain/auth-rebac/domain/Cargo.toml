@@ -23,7 +23,6 @@ doctest = false
 
 [features]
 sqlx = ["dep:sqlx"]
-testing = ["dep:mockall"]
 
 
 [dependencies]
@@ -35,7 +34,6 @@ strum = { version = "0.26", features = ["derive"] }
 thiserror = { version = "1", default-features = false }
 
 # Optional
-mockall = { optional = true, version = "0.11" }
 sqlx = { optional = true, version = "0.8", default-features = false, features = [
     "macros",
 ] }
