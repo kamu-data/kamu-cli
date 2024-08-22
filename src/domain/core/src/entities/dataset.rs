@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use ::serde::{Deserialize, Serialize};
 use async_trait::async_trait;
 use auth::DatasetActionUnauthorizedError;
 use chrono::{DateTime, Utc};
@@ -255,3 +256,30 @@ impl From<CheckpointRef> for Option<OwnedFile> {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub enum DatasetVisibility {
+    #[default]
+    Private,
+    PubliclyAvailable,
+}
+
+impl DatasetVisibility {
+    pub fn is_private(&self) -> bool {
+        match self {
+            DatasetVisibility::Private => true,
+            DatasetVisibility::PubliclyAvailable => false,
+        }
+    }
+
+    pub fn is_publicly_available(&self) -> bool {
+        match self {
+            DatasetVisibility::Private => false,
+            DatasetVisibility::PubliclyAvailable => true,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

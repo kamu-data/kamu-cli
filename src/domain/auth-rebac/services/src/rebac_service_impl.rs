@@ -9,7 +9,8 @@
 
 use std::sync::Arc;
 
-use dill::{component, interface};
+use dill::{component, interface, meta, Catalog};
+use internal_error::InternalError;
 use kamu_auth_rebac::{
     AccountPropertyName,
     AccountToDatasetRelation,
@@ -30,23 +31,62 @@ use kamu_auth_rebac::{
     SubjectEntityRelationsError,
     UnsetEntityPropertyError,
 };
+use kamu_core::{DatasetLifecycleMessage, DatasetLifecycleMessageCreated, DatasetRepository};
+use messaging_outbox::{MessageConsumer, MessageConsumerT};
 use opendatafabric::{AccountID, DatasetID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RebacServiceImpl {
     rebac_repo: Arc<dyn RebacRepository>,
+    dataset_repo_reader: Arc<dyn DatasetRepository>,
 }
 
 #[component(pub)]
 #[interface(dyn RebacService)]
 impl RebacServiceImpl {
-    pub fn new(rebac_repo: Arc<dyn RebacRepository>) -> Self {
-        Self { rebac_repo }
+    pub fn new(
+        rebac_repo: Arc<dyn RebacRepository>,
+        dataset_repo_reader: Arc<dyn DatasetRepository>,
+    ) -> Self {
+        Self {
+            rebac_repo,
+            dataset_repo_reader,
+        }
+    }
+
+    pub async fn handle_dataset_lifecycle_created_message(
+        &self,
+        message: &DatasetLifecycleMessageCreated,
+    ) -> Result<(), InternalError> {
+        let is_single_tenant_workspace = !self.dataset_repo_reader.is_multi_tenant();
+
+        if is_single_tenant_workspace {
+            // We don't need ReBAC within one user
+            return Ok(());
+        }
+
+        // Trying to set the ReBAC property
+        let allows = message.dataset_visibility.is_publicly_available();
+        let (name, value) = DatasetPropertyName::allows_public_read(allows);
+
+        self.set_dataset_property(&message.dataset_id, name, &value)
+            .await
+            .map_err(|err| match err {
+                SetEntityPropertyError::Internal(e) => e,
+            })
     }
 }
 
 #[async_trait::async_trait]
+#[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
+#[meta(MessageConsumerMeta {
+    consumer_name: MESSAGE_CONSUMER_KAMU_REBAC_SERVICE,
+    feeding_producers: &[
+        MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+    ],
+    durability: MessageConsumptionDurability::Durable,
+})]
 impl RebacService for RebacServiceImpl {
     async fn set_account_property(
         &self,
@@ -209,6 +249,40 @@ impl RebacService for RebacServiceImpl {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl MessageConsumer for RebacServiceImpl {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl MessageConsumerT<DatasetLifecycleMessage> for RebacServiceImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: &DatasetLifecycleMessage,
+    ) -> Result<(), InternalError> {
+        match message {
+            DatasetLifecycleMessage::Created(message) => {
+                self.handle_dataset_lifecycle_created_message(message).await
+            }
+
+            DatasetLifecycleMessage::Deleted(_message) => {
+                // TODO: handle the message
+                Ok(())
+            }
+
+            DatasetLifecycleMessage::DependenciesUpdated(_message) => {
+                // TODO: handle the message
+                Ok(())
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn map_delete_entity_property_result(

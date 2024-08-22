@@ -16,6 +16,7 @@ use kamu_core::{
     CreateDatasetResult,
     CreateDatasetUseCase,
     DatasetLifecycleMessage,
+    DatasetVisibility,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
@@ -70,6 +71,8 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
                         }
                         CurrentAccountSubject::Logged(l) => l.account_id.clone(),
                     },
+                    // TODO: decide what to do about it -- use Default::default()?
+                    DatasetVisibility::Private,
                 ),
             )
             .await?;

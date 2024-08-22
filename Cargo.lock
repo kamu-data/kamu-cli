@@ -5315,8 +5315,12 @@ dependencies = [
  "async-trait",
  "dill",
  "futures",
+ "internal-error",
  "kamu-auth-rebac",
+ "kamu-core",
+ "messaging-outbox",
  "opendatafabric",
+ "tracing",
 ]
 
 [[package]]

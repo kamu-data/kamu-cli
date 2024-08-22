@@ -13,6 +13,8 @@ use opendatafabric::{DatasetID, DatasetKind, Multihash};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, skip_serializing_none};
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO: Summary should carry pointers to all refs
 // and specify values that change between refs per each "branch"
 #[serde_as]
@@ -31,3 +33,5 @@ pub struct DatasetSummary {
     pub data_size: u64,
     pub checkpoints_size: u64,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

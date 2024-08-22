@@ -10,9 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::ResultIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac::{DatasetPropertyName, RebacService, SetEntityPropertyError};
 use kamu_core::{
     CreateDatasetFromSnapshotError,
     CreateDatasetFromSnapshotResult,
@@ -20,7 +18,6 @@ use kamu_core::{
     CreateDatasetFromSnapshotUseCaseOptions,
     CreateDatasetResult,
     DatasetLifecycleMessage,
-    DatasetRepository,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
@@ -34,60 +31,21 @@ use crate::DatasetRepositoryWriter;
 #[interface(dyn CreateDatasetFromSnapshotUseCase)]
 pub struct CreateDatasetFromSnapshotUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
-    dataset_repo_reader: Arc<dyn DatasetRepository>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
-    rebac_service: Arc<dyn RebacService>,
     outbox: Arc<dyn Outbox>,
 }
 
 impl CreateDatasetFromSnapshotUseCaseImpl {
     pub fn new(
         current_account_subject: Arc<CurrentAccountSubject>,
-        dataset_repo_reader: Arc<dyn DatasetRepository>,
         dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
-        rebac_service: Arc<dyn RebacService>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             current_account_subject,
-            dataset_repo_reader,
             dataset_repo_writer,
-            rebac_service,
             outbox,
         }
-    }
-
-    async fn handle_multi_tenant_case(
-        &self,
-        create_dataset_result: &CreateDatasetResult,
-        options: &CreateDatasetFromSnapshotUseCaseOptions,
-    ) -> Result<(), CreateDatasetFromSnapshotError> {
-        // Trying to set the ReBAC property
-        let allows = options.dataset_visibility.is_publicly_available();
-        let (name, value) = DatasetPropertyName::allows_public_read(allows);
-
-        let set_rebac_property_res = self
-            .rebac_service
-            .set_dataset_property(&create_dataset_result.dataset_handle.id, name, &value)
-            .await
-            .map_err(|err| match err {
-                SetEntityPropertyError::Internal(e) => CreateDatasetFromSnapshotError::Internal(e),
-            });
-
-        // If setting fails, try to clean up the created dataset
-        if let Err(set_rebac_property_err) = set_rebac_property_res {
-            self.dataset_repo_writer
-                .delete_dataset(&create_dataset_result.dataset_handle)
-                .await
-                // Return a deletion error if there is one
-                .map_int_err(CreateDatasetFromSnapshotError::Internal)?;
-
-            // On successful deletion, return the property setting error
-            return Err(set_rebac_property_err);
-        }
-
-        // Dataset created and property set
-        Ok(())
     }
 }
 
@@ -106,13 +64,6 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             .create_dataset_from_snapshot(snapshot)
             .await?;
 
-        let is_multi_tenant_workspace = self.dataset_repo_reader.is_multi_tenant();
-
-        if is_multi_tenant_workspace {
-            self.handle_multi_tenant_case(&create_dataset_result, &options)
-                .await?;
-        }
-
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
@@ -124,6 +75,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                         }
                         CurrentAccountSubject::Logged(l) => l.account_id.clone(),
                     },
+                    options.dataset_visibility,
                 ),
             )
             .await?;

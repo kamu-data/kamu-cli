@@ -9,7 +9,7 @@
 
 use opendatafabric::DatasetSnapshot;
 
-use crate::{CreateDatasetFromSnapshotError, CreateDatasetResult};
+use crate::{CreateDatasetFromSnapshotError, CreateDatasetResult, DatasetVisibility};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,31 +34,6 @@ impl Default for CreateDatasetFromSnapshotUseCaseOptions {
     fn default() -> Self {
         Self {
             dataset_visibility: DatasetVisibility::PubliclyAvailable,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Copy, Clone, Default)]
-pub enum DatasetVisibility {
-    #[default]
-    Private,
-    PubliclyAvailable,
-}
-
-impl DatasetVisibility {
-    pub fn is_private(&self) -> bool {
-        match self {
-            DatasetVisibility::Private => true,
-            DatasetVisibility::PubliclyAvailable => false,
-        }
-    }
-
-    pub fn is_publicly_available(&self) -> bool {
-        match self {
-            DatasetVisibility::Private => false,
-            DatasetVisibility::PubliclyAvailable => true,
         }
     }
 }
