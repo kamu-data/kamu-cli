@@ -10,6 +10,8 @@
 // Re-exports
 pub use kamu_auth_rebac as domain;
 
+mod messages;
 mod rebac_service_impl;
 
+pub use messages::*;
 pub use rebac_service_impl::*;

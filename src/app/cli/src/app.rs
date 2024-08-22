@@ -399,6 +399,8 @@ pub fn configure_base_catalog(
 
     b.add::<DatabaseTransactionRunner>();
 
+    b.add::<RebacServiceImpl>();
+
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()
             .with_consumer_filter(messaging_outbox::ConsumerFilter::BestEffortConsumers),

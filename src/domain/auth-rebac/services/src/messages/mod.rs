@@ -9,4 +9,4 @@
 
 mod rebac_message_consumers;
 
-pub use auth_rebac_message_consumers::*;
+pub use rebac_message_consumers::*;

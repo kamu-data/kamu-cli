@@ -31,9 +31,21 @@ use kamu_auth_rebac::{
     SubjectEntityRelationsError,
     UnsetEntityPropertyError,
 };
-use kamu_core::{DatasetLifecycleMessage, DatasetLifecycleMessageCreated, DatasetRepository};
-use messaging_outbox::{MessageConsumer, MessageConsumerT};
+use kamu_core::{
+    DatasetLifecycleMessage,
+    DatasetLifecycleMessageCreated,
+    DatasetRepository,
+    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+};
+use messaging_outbox::{
+    MessageConsumer,
+    MessageConsumerMeta,
+    MessageConsumerT,
+    MessageConsumptionDurability,
+};
 use opendatafabric::{AccountID, DatasetID};
+
+use crate::MESSAGE_CONSUMER_KAMU_REBAC_SERVICE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,6 +56,15 @@ pub struct RebacServiceImpl {
 
 #[component(pub)]
 #[interface(dyn RebacService)]
+#[interface(dyn MessageConsumer)]
+#[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
+#[meta(MessageConsumerMeta {
+    consumer_name: MESSAGE_CONSUMER_KAMU_REBAC_SERVICE,
+    feeding_producers: &[
+        MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+    ],
+    durability: MessageConsumptionDurability::Durable,
+})]
 impl RebacServiceImpl {
     pub fn new(
         rebac_repo: Arc<dyn RebacRepository>,
@@ -79,14 +100,6 @@ impl RebacServiceImpl {
 }
 
 #[async_trait::async_trait]
-#[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
-#[meta(MessageConsumerMeta {
-    consumer_name: MESSAGE_CONSUMER_KAMU_REBAC_SERVICE,
-    feeding_producers: &[
-        MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-    ],
-    durability: MessageConsumptionDurability::Durable,
-})]
 impl RebacService for RebacServiceImpl {
     async fn set_account_property(
         &self,

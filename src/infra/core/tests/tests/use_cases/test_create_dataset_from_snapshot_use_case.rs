@@ -11,7 +11,6 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use dill::{Catalog, Component};
-use internal_error::InternalError;
 use kamu::testing::MetadataFactory;
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -19,17 +18,10 @@ use kamu::{
     DatasetRepositoryWriter,
 };
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac::{
-    MockRebacRepository,
-    PropertyName,
-    RebacRepository,
-    RebacService,
-    SetEntityPropertyError,
-};
+use kamu_auth_rebac::{MockRebacRepository, PropertyName, RebacRepository, RebacService};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{
-    CreateDatasetFromSnapshotError,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetFromSnapshotUseCaseOptions,
     DatasetLifecycleMessage,
@@ -38,7 +30,7 @@ use kamu_core::{
     GetDatasetError,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use messaging_outbox::{MockOutbox, Outbox};
+use messaging_outbox::{register_message_dispatcher, MockOutbox, Outbox, OutboxImmediateImpl};
 use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetKind, DatasetName};
 use time_source::SystemTimeSourceDefault;
@@ -54,8 +46,8 @@ async fn test_create_root_dataset_from_snapshot() {
     CreateFromSnapshotUseCaseHarness::add_outbox_dataset_created_expectation(&mut mock_outbox, 1);
 
     let harness = CreateFromSnapshotUseCaseHarness::new(
-        mock_outbox,
         Workspace::SingleTenant,
+        OutboxVariantVariant::Mocked(mock_outbox),
         RebacRepositoryVariant::InMemory,
     );
 
@@ -100,8 +92,8 @@ async fn test_create_derived_dataset_from_snapshot() {
     );
 
     let harness = CreateFromSnapshotUseCaseHarness::new(
-        mock_outbox,
         Workspace::SingleTenant,
+        OutboxVariantVariant::Mocked(mock_outbox),
         RebacRepositoryVariant::InMemory,
     );
 
@@ -163,14 +155,9 @@ async fn test_created_datasets_have_the_correct_visibility_attribute() {
     let alias_private = DatasetAlias::new(None, DatasetName::new_unchecked("private"));
     let alias_public = DatasetAlias::new(None, DatasetName::new_unchecked("public"));
 
-    // Expect DatasetCreated messages for "private" and "public"
-    // Expect DatasetDependenciesUpdated message for "private"
-    let mut mock_outbox = MockOutbox::new();
-    CreateFromSnapshotUseCaseHarness::add_outbox_dataset_created_expectation(&mut mock_outbox, 2);
-
     let harness = CreateFromSnapshotUseCaseHarness::new(
-        mock_outbox,
         Workspace::MultiTenant,
+        OutboxVariantVariant::OutboxImmediate,
         RebacRepositoryVariant::InMemory,
     );
 
@@ -283,6 +270,11 @@ impl Workspace {
     }
 }
 
+enum OutboxVariantVariant {
+    OutboxImmediate,
+    Mocked(MockOutbox),
+}
+
 enum RebacRepositoryVariant {
     InMemory,
     Mocked(MockRebacRepository),
@@ -297,8 +289,8 @@ struct CreateFromSnapshotUseCaseHarness {
 
 impl CreateFromSnapshotUseCaseHarness {
     fn new(
-        mock_outbox: MockOutbox,
         workspace: Workspace,
+        outbox_variant: OutboxVariantVariant,
         rebac_repo_variant: RebacRepositoryVariant,
     ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
@@ -318,9 +310,25 @@ impl CreateFromSnapshotUseCaseHarness {
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<SystemTimeSourceDefault>()
-            .add_value(mock_outbox)
-            .bind::<dyn Outbox, MockOutbox>()
             .add::<RebacServiceImpl>();
+
+        match outbox_variant {
+            OutboxVariantVariant::OutboxImmediate => {
+                b.add_builder(
+                    OutboxImmediateImpl::builder()
+                        .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+                )
+                .bind::<dyn Outbox, OutboxImmediateImpl>();
+
+                register_message_dispatcher::<DatasetLifecycleMessage>(
+                    &mut b,
+                    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                );
+            }
+            OutboxVariantVariant::Mocked(mock_outbox) => {
+                b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
+            }
+        };
 
         match rebac_repo_variant {
             RebacRepositoryVariant::InMemory => {
