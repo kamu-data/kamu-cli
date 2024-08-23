@@ -21,7 +21,7 @@ use opendatafabric::{AccountID, DatasetID};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_dataset_flow_empty_filters_distingush_dataset() {
+async fn test_dataset_flow_empty_filters_distinguish_dataset() {
     let (flow_event_store, task_event_store) = make_event_stores();
 
     let always_happy_filters = DatasetFlowFilters::default();
