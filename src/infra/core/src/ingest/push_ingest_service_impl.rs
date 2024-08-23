@@ -234,7 +234,15 @@ impl PushIngestServiceImpl {
                 )
                 .await?
             } else {
-                Some(df)
+                Some(
+                    ingest_common::preprocess_default(
+                        df,
+                        &args.push_source.read,
+                        args.data_writer.vocab(),
+                        &args.opts.schema_inference,
+                    )
+                    .int_err()?,
+                )
             }
         } else {
             tracing::info!("Read produced an empty data frame");

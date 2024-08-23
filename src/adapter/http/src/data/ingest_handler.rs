@@ -117,6 +117,7 @@ pub async fn dataset_ingest_handler(
                 media_type: arguments.media_type,
                 source_event_time,
                 auto_create_push_source: is_ingest_from_upload,
+                schema_inference: SchemaInferenceOpts::default(),
             },
             None,
         )

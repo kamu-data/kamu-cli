@@ -264,7 +264,15 @@ impl PollingIngestServiceImpl {
                 )
                 .await?
             } else {
-                Some(df)
+                Some(
+                    ingest_common::preprocess_default(
+                        df,
+                        &args.polling_source.read,
+                        args.data_writer.vocab(),
+                        &args.options.schema_inference,
+                    )
+                    .int_err()?,
+                )
             }
         } else {
             tracing::info!("Read produced an empty data frame");

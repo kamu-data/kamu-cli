@@ -140,6 +140,7 @@ impl PullCommand {
                         fetch_uncacheable: self.fetch_uncacheable,
                         exhaust_sources: true,
                         dataset_env_vars: HashMap::new(),
+                        schema_inference: SchemaInferenceOpts::default(),
                     },
                     sync_options: SyncOptions {
                         force: self.force,

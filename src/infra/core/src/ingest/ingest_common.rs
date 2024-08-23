@@ -9,8 +9,9 @@
 
 use std::sync::Arc;
 
+use datafusion::arrow::datatypes::DataType;
 use datafusion::prelude::*;
-use internal_error::ResultIntoInternal;
+use internal_error::*;
 use kamu_core::engine::*;
 use kamu_core::{ObjectStoreRegistry, *};
 use opendatafabric::*;
@@ -46,6 +47,129 @@ pub(crate) async fn preprocess(
         .await?;
 
     Ok(response.output_data)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Called when source does not specify an explicit preprocessing step to
+/// perform best-effort processing.
+///
+/// Currently we use it to automatically:
+/// - Rename columns that conflict with system columns
+/// - Coerce event time column's type, if present, into a timestamp
+pub fn preprocess_default(
+    df: DataFrame,
+    read_step: &ReadStep,
+    vocab: &DatasetVocabulary,
+    opts: &SchemaInferenceOpts,
+) -> Result<DataFrame, datafusion::error::DataFusionError> {
+    let df = if read_step.schema().is_none() && opts.rename_on_conflict_with_system_column {
+        let system_cols = [
+            &vocab.offset_column,
+            &vocab.operation_type_column,
+            &vocab.system_time_column,
+        ];
+
+        let mut select = Vec::new();
+        let mut noop = true;
+
+        for field in df.schema().fields() {
+            let col_orig = col(Column::from_name(field.name()));
+            if system_cols.contains(&field.name()) {
+                let new_name = format!("_{}", field.name());
+
+                tracing::debug!(
+                    old_name = field.name(),
+                    new_name,
+                    "Inference: Renaming field that conflicts with a system column"
+                );
+
+                noop = false;
+                select.push(col_orig.alias(new_name));
+            } else {
+                select.push(col_orig);
+            }
+        }
+
+        if noop {
+            df
+        } else {
+            df.select(select)?
+        }
+    } else {
+        df
+    };
+
+    let df = if read_step.schema().is_none() && opts.coerce_event_time_column_type {
+        let mut select = Vec::new();
+        let mut noop = true;
+
+        for field in df.schema().fields() {
+            let col_orig = col(Column::from_name(field.name()));
+            if *field.name() != vocab.event_time_column {
+                select.push(col_orig);
+                continue;
+            }
+
+            match field.data_type() {
+                DataType::Int16
+                | DataType::Int32
+                | DataType::Int64
+                | DataType::UInt16
+                | DataType::UInt32
+                | DataType::UInt64 => {
+                    noop = false;
+
+                    tracing::debug!(
+                        column_name = field.name(),
+                        original_data_type = ?field.data_type(),
+                        "Inference: Treating numeric event time column as a UNIX timestamp in seconds"
+                    );
+
+                    select.push(
+                        Expr::ScalarFunction(
+                            datafusion::logical_expr::expr::ScalarFunction::new_udf(
+                                datafusion::functions::datetime::to_timestamp_seconds(),
+                                vec![col_orig],
+                            ),
+                        )
+                        .alias(field.name()),
+                    );
+                }
+                // TODO: Support using timestamp formats specified in read block
+                DataType::Utf8 => {
+                    noop = false;
+
+                    tracing::debug!(
+                        column_name = field.name(),
+                        original_data_type = ?field.data_type(),
+                        "Inference: Treating symbolic event time column as an RFC3339 timestamp"
+                    );
+
+                    select.push(
+                        Expr::ScalarFunction(
+                            datafusion::logical_expr::expr::ScalarFunction::new_udf(
+                                datafusion::functions::datetime::to_timestamp_millis(),
+                                vec![col_orig],
+                            ),
+                        )
+                        .alias(field.name()),
+                    );
+                }
+                _ => select.push(col_orig),
+            }
+        }
+
+        if noop {
+            df
+        } else {
+            df.select(select)?
+        }
+    } else {
+        df
+    };
+
+    Ok(df)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

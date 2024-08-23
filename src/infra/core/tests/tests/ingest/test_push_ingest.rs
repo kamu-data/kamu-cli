@@ -471,6 +471,247 @@ async fn test_ingest_push_schema_stability() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_inference_automatic_coercion_of_event_time_from_string() {
+    let harness = IngestTestHarness::new();
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(DatasetKind::Root)
+        .push_event(
+            // Note: not setting schema or adding a preprocess step to trigger inference
+            MetadataFactory::add_push_source()
+                .read(ReadStepNdJson::default())
+                .merge(MergeStrategyAppend {})
+                .build(),
+        )
+        .build();
+
+    let dataset_alias = dataset_snapshot.name.clone();
+    let dataset_ref = dataset_alias.as_local_ref();
+
+    harness.create_dataset(dataset_snapshot).await;
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
+
+    let src_path = harness.temp_dir.path().join("data.ndjson");
+    std::fs::write(
+        &src_path,
+        indoc!(
+            r#"
+            {"event_time": "2020-01-02T01:02:03.123456789Z", "foo": "bar"}
+            "#
+        ),
+    )
+    .unwrap();
+
+    harness
+        .push_ingest_svc
+        .ingest_from_url(
+            &dataset_ref,
+            None,
+            url::Url::from_file_path(&src_path).unwrap(),
+            PushIngestOpts {
+                schema_inference: SchemaInferenceOpts {
+                    coerce_event_time_column_type: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT32 op;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY foo (STRING);
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----+----------------------+--------------------------+-----+
+                | offset | op | system_time          | event_time               | foo |
+                +--------+----+----------------------+--------------------------+-----+
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-02T01:02:03.123Z | bar |
+                +--------+----+----------------------+--------------------------+-----+
+                "#
+            ),
+        )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_inference_automatic_coercion_of_event_time_from_unixtime() {
+    let harness = IngestTestHarness::new();
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(DatasetKind::Root)
+        .push_event(
+            // Note: not setting schema or adding a preprocess step to trigger inference
+            MetadataFactory::add_push_source()
+                .read(ReadStepNdJson::default())
+                .merge(MergeStrategyAppend {})
+                .build(),
+        )
+        .build();
+
+    let dataset_alias = dataset_snapshot.name.clone();
+    let dataset_ref = dataset_alias.as_local_ref();
+
+    harness.create_dataset(dataset_snapshot).await;
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
+
+    let src_path = harness.temp_dir.path().join("data.ndjson");
+    std::fs::write(
+        &src_path,
+        indoc!(
+            r#"
+            {"event_time": 1577926923, "foo": "bar"}
+            "#
+        ),
+    )
+    .unwrap();
+
+    harness
+        .push_ingest_svc
+        .ingest_from_url(
+            &dataset_ref,
+            None,
+            url::Url::from_file_path(&src_path).unwrap(),
+            PushIngestOpts {
+                schema_inference: SchemaInferenceOpts {
+                    coerce_event_time_column_type: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT32 op;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY foo (STRING);
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----+----------------------+----------------------+-----+
+                | offset | op | system_time          | event_time           | foo |
+                +--------+----+----------------------+----------------------+-----+
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-02T01:02:03Z | bar |
+                +--------+----+----------------------+----------------------+-----+
+                "#
+            ),
+        )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_inference_automatic_renaming_of_conflicting_columns() {
+    let harness = IngestTestHarness::new();
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(DatasetKind::Root)
+        .push_event(
+            // Note: not setting schema or adding a preprocess step to trigger inference
+            MetadataFactory::add_push_source()
+                .read(ReadStepNdJson::default())
+                .merge(MergeStrategyAppend {})
+                .build(),
+        )
+        .build();
+
+    let dataset_alias = dataset_snapshot.name.clone();
+    let dataset_ref = dataset_alias.as_local_ref();
+
+    harness.create_dataset(dataset_snapshot).await;
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
+
+    let src_path = harness.temp_dir.path().join("data.ndjson");
+    std::fs::write(
+        &src_path,
+        indoc!(
+            r#"
+            {"op": 123, "foo": "bar"}
+            "#
+        ),
+    )
+    .unwrap();
+
+    harness
+        .push_ingest_svc
+        .ingest_from_url(
+            &dataset_ref,
+            None,
+            url::Url::from_file_path(&src_path).unwrap(),
+            PushIngestOpts {
+                schema_inference: SchemaInferenceOpts {
+                    coerce_event_time_column_type: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT32 op;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY foo (STRING);
+                  OPTIONAL INT64 _op;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----+----------------------+----------------------+-----+-----+
+                | offset | op | system_time          | event_time           | foo | _op |
+                +--------+----+----------------------+----------------------+-----+-----+
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | bar | 123 |
+                +--------+----+----------------------+----------------------+-----+-----+
+                "#
+            ),
+        )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // See: https://github.com/apache/datafusion/issues/7460
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]

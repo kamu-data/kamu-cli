@@ -60,9 +60,14 @@ pub trait PushIngestService: Send + Sync {
 
 #[derive(Debug, Default)]
 pub struct PushIngestOpts {
+    /// MIME type of the content
     pub media_type: Option<MediaType>,
+    /// Event time to use if data does not contain such column itself
     pub source_event_time: Option<DateTime<Utc>>,
+    /// Whether to automatically create a push source if it doesn't exist
     pub auto_create_push_source: bool,
+    /// Schema inference configuration
+    pub schema_inference: SchemaInferenceOpts,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

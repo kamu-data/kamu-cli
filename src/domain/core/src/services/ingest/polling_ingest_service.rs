@@ -64,6 +64,28 @@ pub struct PollingIngestOptions {
     /// Dataset env vars to use if such presented in dataset metadata
     /// to use during fetch phase
     pub dataset_env_vars: HashMap<String, DatasetEnvVar>,
+    /// Schema inference configuration
+    pub schema_inference: SchemaInferenceOpts,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct SchemaInferenceOpts {
+    /// Whether to auto-rename a column if it conflicts with one of the system
+    /// columns
+    pub rename_on_conflict_with_system_column: bool,
+    /// Whether to attempt to coerce the event time column into a timestamp
+    pub coerce_event_time_column_type: bool,
+}
+
+impl Default for SchemaInferenceOpts {
+    fn default() -> Self {
+        Self {
+            rename_on_conflict_with_system_column: true,
+            coerce_event_time_column_type: true,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
