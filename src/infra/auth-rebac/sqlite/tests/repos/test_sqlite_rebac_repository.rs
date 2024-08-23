@@ -57,6 +57,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = kamu_auth_rebac_repo_tests::test_delete_entity_properties,
+    harness = SqliteRebacRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = kamu_auth_rebac_repo_tests::test_try_insert_duplicate_entities_relation,
     harness = SqliteRebacRepositoryHarness
 );

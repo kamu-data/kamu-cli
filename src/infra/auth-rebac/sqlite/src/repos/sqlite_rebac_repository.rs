@@ -137,9 +137,36 @@ impl RebacRepository for SqliteRebacRepository {
 
     async fn delete_entity_properties(
         &self,
-        _entity: &Entity,
+        entity: &Entity,
     ) -> Result<(), DeleteEntityPropertiesError> {
-        todo!()
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(DeleteEntityPropertiesError::Internal)?;
+
+        let entity_id_as_str = entity.entity_id.as_ref();
+
+        let delete_result = sqlx::query!(
+            r#"
+            DELETE
+            FROM auth_rebac_properties
+            WHERE entity_type = $1
+              AND entity_id = $2
+            "#,
+            entity.entity_type,
+            entity_id_as_str,
+        )
+        .execute(&mut *connection_mut)
+        .await
+        .map_int_err(DeleteEntityPropertiesError::Internal)?;
+
+        if delete_result.rows_affected() == 0 {
+            return Err(DeleteEntityPropertiesError::not_found(entity));
+        }
+
+        Ok(())
     }
 
     async fn get_entity_properties(
