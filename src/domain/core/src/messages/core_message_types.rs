@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use messaging_outbox::Message;
-use opendatafabric::{AccountID, DatasetID};
+use opendatafabric::{AccountID, DatasetID, DatasetName};
 use serde::{Deserialize, Serialize};
 
 use crate::DatasetVisibility;
@@ -20,6 +20,7 @@ pub enum DatasetLifecycleMessage {
     Created(DatasetLifecycleMessageCreated),
     DependenciesUpdated(DatasetLifecycleMessageDependenciesUpdated),
     Deleted(DatasetLifecycleMessageDeleted),
+    Renamed(DatasetLifecycleMessageRenamed),
 }
 
 impl DatasetLifecycleMessage {
@@ -44,6 +45,13 @@ impl DatasetLifecycleMessage {
 
     pub fn deleted(dataset_id: DatasetID) -> Self {
         Self::Deleted(DatasetLifecycleMessageDeleted { dataset_id })
+    }
+
+    pub fn renamed(dataset_id: DatasetID, new_name: DatasetName) -> Self {
+        Self::Renamed(DatasetLifecycleMessageRenamed {
+            dataset_id,
+            new_name,
+        })
     }
 }
 
@@ -71,6 +79,14 @@ pub struct DatasetLifecycleMessageDependenciesUpdated {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetLifecycleMessageDeleted {
     pub dataset_id: DatasetID,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DatasetLifecycleMessageRenamed {
+    pub dataset_id: DatasetID,
+    pub new_name: DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
