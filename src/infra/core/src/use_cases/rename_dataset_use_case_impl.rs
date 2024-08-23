@@ -11,15 +11,7 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
-use kamu_core::{
-    DatasetLifecycleMessage,
-    DatasetRepository,
-    GetDatasetError,
-    RenameDatasetError,
-    RenameDatasetUseCase,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-};
-use messaging_outbox::{Outbox, OutboxExt};
+use kamu_core::{DatasetRepository, GetDatasetError, RenameDatasetError, RenameDatasetUseCase};
 use opendatafabric::{DatasetName, DatasetRef};
 
 use crate::DatasetRepositoryWriter;
@@ -30,7 +22,6 @@ pub struct RenameDatasetUseCaseImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    outbox: Arc<dyn Outbox>,
 }
 
 #[component(pub)]
@@ -40,13 +31,11 @@ impl RenameDatasetUseCaseImpl {
         dataset_repo: Arc<dyn DatasetRepository>,
         dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             dataset_repo,
             dataset_repo_writer,
             dataset_action_authorizer,
-            outbox,
         }
     }
 }
@@ -70,14 +59,6 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
 
         self.dataset_repo_writer
             .rename_dataset(&dataset_handle, new_name)
-            .await?;
-
-        // TODO: tests
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-                DatasetLifecycleMessage::renamed(dataset_handle.id.clone(), new_name.clone()),
-            )
             .await?;
 
         Ok(())

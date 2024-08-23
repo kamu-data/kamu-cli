@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::{AccountID, DatasetID, DatasetName};
+use opendatafabric::{AccountID, DatasetID};
 use thiserror::Error;
 
 use crate::{
@@ -22,7 +22,6 @@ use crate::{
     GetEntityPropertiesError,
     PropertyName,
     PropertyValue,
-    RenameEntityError,
     SetEntityPropertyError,
     SubjectEntityRelationsError,
 };
@@ -63,12 +62,6 @@ pub trait RebacService: Send + Sync {
         dataset_id: &DatasetID,
         property_name: DatasetPropertyName,
     ) -> Result<(), UnsetEntityPropertyError>;
-
-    async fn rename_dataset(
-        &self,
-        dataset_id: &DatasetID,
-        new_name: &DatasetName,
-    ) -> Result<(), RenameEntityError>;
 
     async fn delete_dataset_properties(
         &self,

@@ -17,7 +17,6 @@ use kamu_auth_rebac::{
     DeleteEntityPropertiesError,
     DeleteEntityPropertyError,
     Entity,
-    EntityId,
     EntityType,
     EntityWithRelation,
     GetEntityPropertiesError,
@@ -27,7 +26,6 @@ use kamu_auth_rebac::{
     PropertyValue,
     RebacRepository,
     Relation,
-    RenameEntityError,
     SetEntityPropertyError,
     SubjectEntityRelationsByObjectTypeError,
     SubjectEntityRelationsError,
@@ -119,14 +117,6 @@ impl RebacRepository for InMemoryRebacRepository {
         }
 
         Ok(())
-    }
-
-    async fn rename_entity(
-        &self,
-        _entity: &Entity,
-        _new_entity_id: &EntityId,
-    ) -> Result<(), RenameEntityError> {
-        todo!()
     }
 
     async fn delete_entity_properties(

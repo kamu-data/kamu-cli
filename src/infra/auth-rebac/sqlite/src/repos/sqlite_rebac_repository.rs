@@ -15,7 +15,6 @@ use kamu_auth_rebac::{
     DeleteEntityPropertiesError,
     DeleteEntityPropertyError,
     Entity,
-    EntityId,
     EntityType,
     EntityWithRelation,
     EntityWithRelationRowModel,
@@ -28,7 +27,6 @@ use kamu_auth_rebac::{
     RebacRepository,
     Relation,
     RelationRowModel,
-    RenameEntityError,
     SetEntityPropertyError,
     SubjectEntityRelationsByObjectTypeError,
     SubjectEntityRelationsError,
@@ -125,14 +123,6 @@ impl RebacRepository for SqliteRebacRepository {
         }
 
         Ok(())
-    }
-
-    async fn rename_entity(
-        &self,
-        _entity: &Entity,
-        _new_entity_id: &EntityId,
-    ) -> Result<(), RenameEntityError> {
-        todo!()
     }
 
     async fn delete_entity_properties(

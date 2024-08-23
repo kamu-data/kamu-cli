@@ -28,7 +28,6 @@ use kamu_auth_rebac::{
     RebacRepository,
     RebacService,
     Relation,
-    RenameEntityError,
     SetEntityPropertyError,
     SubjectEntityRelationsError,
     UnsetEntityPropertyError,
@@ -37,7 +36,6 @@ use kamu_core::{
     DatasetLifecycleMessage,
     DatasetLifecycleMessageCreated,
     DatasetLifecycleMessageDeleted,
-    DatasetLifecycleMessageRenamed,
     DatasetRepository,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
@@ -47,7 +45,7 @@ use messaging_outbox::{
     MessageConsumerT,
     MessageConsumptionDurability,
 };
-use opendatafabric::{AccountID, DatasetID, DatasetName};
+use opendatafabric::{AccountID, DatasetID};
 
 use crate::MESSAGE_CONSUMER_KAMU_REBAC_SERVICE;
 
@@ -103,19 +101,6 @@ impl RebacServiceImpl {
             .map_err(|err| match err {
                 DeleteEntityPropertiesError::NotFound(e) => e.int_err(),
                 DeleteEntityPropertiesError::Internal(e) => e,
-            })
-    }
-
-    pub async fn handle_dataset_lifecycle_renamed_message(
-        &self,
-        message: &DatasetLifecycleMessageRenamed,
-    ) -> Result<(), InternalError> {
-        self.rename_dataset(&message.dataset_id, &message.new_name)
-            .await
-            .map_err(|err| match err {
-                RenameEntityError::NotFound(e) => e.int_err(),
-                RenameEntityError::NameCollision(e) => e.int_err(),
-                RenameEntityError::Internal(e) => e,
             })
     }
 }
@@ -194,20 +179,6 @@ impl RebacService for RebacServiceImpl {
         self.rebac_repo
             .delete_entity_property(&dataset_id_entity, property_name.into())
             .map(map_delete_entity_property_result)
-            .await
-    }
-
-    async fn rename_dataset(
-        &self,
-        dataset_id: &DatasetID,
-        new_name: &DatasetName,
-    ) -> Result<(), RenameEntityError> {
-        let dataset_id = dataset_id.as_did_str().to_stack_string();
-        let dataset_id_entity = Entity::new_dataset(dataset_id.as_str());
-        let new_name = new_name.as_str().into();
-
-        self.rebac_repo
-            .rename_entity(&dataset_id_entity, &new_name)
             .await
     }
 
@@ -337,10 +308,6 @@ impl MessageConsumerT<DatasetLifecycleMessage> for RebacServiceImpl {
 
             DatasetLifecycleMessage::Deleted(message) => {
                 self.handle_dataset_lifecycle_deleted_message(message).await
-            }
-
-            DatasetLifecycleMessage::Renamed(message) => {
-                self.handle_dataset_lifecycle_renamed_message(message).await
             }
 
             DatasetLifecycleMessage::DependenciesUpdated(_) => {
