@@ -7,40 +7,49 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
+use database_common_macros::database_transactional_test;
+use dill::{Catalog, CatalogBuilder};
 use kamu_flow_system_inmem::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_event_store_empty() {
-    let catalog = CatalogBuilder::new()
-        .add::<InMemoryFlowConfigurationEventStore>()
-        .build();
-
-    kamu_flow_system_repo_tests::test_event_store_empty(&catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_flow_system_repo_tests::test_event_store_empty,
+    harness = InMemoryFlowConfigurationEventStoreHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_event_store_get_streams() {
-    let catalog = CatalogBuilder::new()
-        .add::<InMemoryFlowConfigurationEventStore>()
-        .build();
-
-    kamu_flow_system_repo_tests::test_event_store_get_streams(&catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_flow_system_repo_tests::test_event_store_get_streams,
+    harness = InMemoryFlowConfigurationEventStoreHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_event_store_get_events_with_windowing() {
-    let catalog = CatalogBuilder::new()
-        .add::<InMemoryFlowConfigurationEventStore>()
-        .build();
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_flow_system_repo_tests::test_event_store_get_events_with_windowing,
+    harness = InMemoryFlowConfigurationEventStoreHarness
+);
 
-    kamu_flow_system_repo_tests::test_event_store_get_events_with_windowing(&catalog).await;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct InMemoryFlowConfigurationEventStoreHarness {
+    pub catalog: Catalog,
+}
+
+impl InMemoryFlowConfigurationEventStoreHarness {
+    pub fn new() -> Self {
+        let mut catalog_builder = CatalogBuilder::new();
+        catalog_builder.add::<InMemoryFlowConfigurationEventStore>();
+
+        Self {
+            catalog: catalog_builder.build(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
