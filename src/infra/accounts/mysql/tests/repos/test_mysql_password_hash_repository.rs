@@ -7,43 +7,27 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabaseTransactionRunner, MySqlTransactionManager};
+use database_common::MySqlTransactionManager;
+use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use internal_error::InternalError;
 use kamu_accounts_mysql::MySqlAccountRepository;
 use sqlx::MySqlPool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, mysql)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
-async fn test_no_password_stored(mysql_pool: MySqlPool) {
-    let harness = MySqlPasswordHashRepositoryHarness::new(mysql_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_no_password_stored(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = mysql,
+    fixture = kamu_accounts_repo_tests::test_no_password_stored,
+    harness = MySqlPasswordHashRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, mysql)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
-async fn test_store_couple_account_passwords(mysql_pool: MySqlPool) {
-    let harness = MySqlPasswordHashRepositoryHarness::new(mysql_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_store_couple_account_passwords(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = mysql,
+    fixture = kamu_accounts_repo_tests::test_store_couple_account_passwords,
+    harness = MySqlPasswordHashRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
