@@ -17,7 +17,7 @@ use sqlx::MySqlPool;
 
 database_transactional_test!(
     storage = mysql,
-    fixture = kamu_accounts_repo_tests::test_missing_account_not_found,
+    fixture = kamu_accounts_repo_tests::test_missing_access_token_not_found,
     harness = MySqlAccessTokenRepositoryHarness
 );
 
@@ -42,6 +42,22 @@ database_transactional_test!(
 database_transactional_test!(
     storage = mysql,
     fixture = kamu_accounts_repo_tests::test_mark_existing_access_token_revoked,
+    harness = MySqlAccessTokenRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = mysql,
+    fixture = kamu_accounts_repo_tests::test_create_duplicate_active_access_token,
+    harness = MySqlAccessTokenRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = mysql,
+    fixture = kamu_accounts_repo_tests::test_create_duplicate_access_token_err,
     harness = MySqlAccessTokenRepositoryHarness
 );
 
@@ -81,3 +97,5 @@ impl MySqlAccessTokenRepositoryHarness {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
