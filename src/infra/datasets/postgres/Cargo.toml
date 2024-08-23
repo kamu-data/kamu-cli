@@ -23,6 +23,7 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+database-common-macros = { workspace = true }
 kamu-datasets = { workspace = true, features = ["sqlx"] }
 internal-error = { workspace = true }
 opendatafabric = { workspace = true, features = ["sqlx-postgres"] }
