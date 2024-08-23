@@ -131,9 +131,20 @@ impl RebacRepository for InMemoryRebacRepository {
 
     async fn delete_entity_properties(
         &self,
-        _entity: &Entity,
+        entity: &Entity,
     ) -> Result<(), DeleteEntityPropertiesError> {
-        todo!()
+        let mut writable_state = self.state.write().await;
+
+        let not_found = writable_state
+            .entities_properties_map
+            .remove(&entity.clone().into_owned())
+            .is_none();
+
+        if not_found {
+            return Err(DeleteEntityPropertiesError::not_found(entity));
+        };
+
+        Ok(())
     }
 
     async fn get_entity_properties(

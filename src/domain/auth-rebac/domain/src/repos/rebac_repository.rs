@@ -46,7 +46,6 @@ pub trait RebacRepository: Send + Sync {
         new_entity_id: &EntityId,
     ) -> Result<(), RenameEntityError>;
 
-    // TODO: cover with tests
     async fn delete_entity_properties(
         &self,
         entity: &Entity,
@@ -159,10 +158,18 @@ pub struct EntityNameCollisionError {
 #[derive(Error, Debug)]
 pub enum DeleteEntityPropertiesError {
     #[error(transparent)]
-    NotFound(EntityPropertyNotFoundError),
+    NotFound(EntityNotFoundError),
 
     #[error(transparent)]
     Internal(InternalError),
+}
+
+impl DeleteEntityPropertiesError {
+    pub fn not_found(entity: &Entity) -> Self {
+        Self::NotFound(EntityNotFoundError {
+            entity: entity.clone().into_owned(),
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
