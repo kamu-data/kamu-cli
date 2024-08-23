@@ -170,7 +170,7 @@ Recommendation: for ease of reading, use the following order:
 ### Changed
 - Upgraded `sqlx` crate to v0.8
 - Renamed `setConfigSchedule` GQL api to `setConfigIngest`. Also extended
-  `setConfigIngest` with new field `fetchUncacheable` which indicates to ingone cache
+  `setConfigIngest` with new field `fetchUncacheable` which indicates to ignore cache
   during ingest step
 
 ## [0.195.1] - 2024-08-16
