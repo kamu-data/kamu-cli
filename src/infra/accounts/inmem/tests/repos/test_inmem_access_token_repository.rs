@@ -7,80 +7,81 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_missing_access_token_not_found() {
-    let harness = InmemAccessTokenRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_missing_access_token_not_found(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_missing_access_token_not_found,
+    harness = InMemoryAccessTokenRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_insert_and_locate_access_token() {
-    let harness = InmemAccessTokenRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_insert_and_locate_access_token(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_access_token,
+    harness = InMemoryAccessTokenRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_insert_and_locate_multiple_access_tokens() {
-    let harness = InmemAccessTokenRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_insert_and_locate_multiple_access_tokens(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_multiple_access_tokens,
+    harness = InMemoryAccessTokenRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_mark_existing_access_token_revorked() {
-    let harness = InmemAccessTokenRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_mark_existing_access_token_revoked(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_mark_existing_access_token_revoked,
+    harness = InMemoryAccessTokenRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_create_duplicate_active_access_token() {
-    let harness = InmemAccessTokenRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_create_duplicate_active_access_token(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_create_duplicate_active_access_token,
+    harness = InMemoryAccessTokenRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_create_duplicate_access_token_err() {
-    let harness = InmemAccessTokenRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_create_duplicate_access_token_err(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_create_duplicate_access_token_err,
+    harness = InMemoryAccessTokenRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_mark_non_existing_access_token_revorked() {
-    let harness = InmemAccessTokenRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_mark_non_existing_access_token_revorked(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_mark_non_existing_access_token_revoked,
+    harness = InMemoryAccessTokenRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_find_account_by_active_token_id() {
-    let harness = InmemAccessTokenRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_find_account_by_active_token_id(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_find_account_by_active_token_id,
+    harness = InMemoryAccessTokenRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct InmemAccessTokenRepositoryHarness {
+struct InMemoryAccessTokenRepositoryHarness {
     catalog: Catalog,
 }
 
-impl InmemAccessTokenRepositoryHarness {
+impl InMemoryAccessTokenRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryAccessTokenRepository>();
