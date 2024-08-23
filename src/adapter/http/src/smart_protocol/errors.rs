@@ -174,11 +174,7 @@ pub enum PushServerError {
     WriteFailed(PushWriteError),
 
     #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
+    Internal(PhaseInternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -248,3 +244,19 @@ impl fmt::Display for ObjectUploadError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub struct PhaseInternalError {
+    pub phase: TransferPhase,
+    pub error: InternalError,
+}
+
+impl fmt::Display for PhaseInternalError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Smart protocol phase internal error: phase={}, error={}",
+            self.phase, self.error
+        )
+    }
+}

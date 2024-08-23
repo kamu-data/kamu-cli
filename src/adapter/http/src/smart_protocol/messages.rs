@@ -36,7 +36,7 @@ pub struct DatasetPullSuccessResponse {
 // Unsuccessful response to initial dataset pull request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum DatasetPullRequestError {
-    Internal(DatasetInternalError),
+    Internal(TransferInternalError),
     InvalidInterval(DatasetPullInvalidIntervalError),
 }
 
@@ -101,7 +101,7 @@ pub struct DatasetPushRequestAccepted {}
 // Unsuccessful response to initial dataset push request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum DatasetPushRequestError {
-    Internal(DatasetInternalError),
+    Internal(TransferInternalError),
     InvalidHead(DatasetPushInvalidHeadError),
 }
 
@@ -143,7 +143,7 @@ pub struct DatasetPushObjectsTransferAccepted {
 /// Push phase 2: unsuccessful response push object transfer request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum DatasetPushObjectsTransferError {
-    Internal(DatasetInternalError),
+    Internal(TransferInternalError),
     RefCollision(DatasetPushObjectsTransferRefCollisionError),
 }
 
@@ -245,9 +245,8 @@ pub struct HeaderRow {
     pub value: String,
 }
 
-// Transfer URL
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct DatasetInternalError {
+pub struct TransferInternalError {
     pub phase: TransferPhase,
     pub error_message: String,
 }

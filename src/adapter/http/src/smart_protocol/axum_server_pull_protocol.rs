@@ -48,7 +48,7 @@ impl AxumServerPullProtocolInstance {
         let pull_request = match self.handle_pull_request_initiation().await {
             Ok(pull_request) => pull_request,
             Err(e) => {
-                tracing::debug!("Pull process aborted with error: {}", e);
+                tracing::error!("Pull process aborted with error: {}", e);
                 return;
             }
         };
@@ -57,7 +57,7 @@ impl AxumServerPullProtocolInstance {
             match self.try_handle_pull_metadata_request(pull_request).await {
                 Ok(received) => received,
                 Err(e) => {
-                    tracing::debug!("Pull process aborted with error: {}", e);
+                    tracing::error!("Pull process aborted with error: {}", e);
                     return;
                 }
             };
@@ -67,7 +67,7 @@ impl AxumServerPullProtocolInstance {
                 let should_continue = match self.try_handle_pull_objects_request().await {
                     Ok(should_continue) => should_continue,
                     Err(e) => {
-                        tracing::debug!("Pull process aborted with error: {}", e);
+                        tracing::error!("Pull process aborted with error: {}", e);
                         return;
                     }
                 };
@@ -139,7 +139,7 @@ impl AxumServerPullProtocolInstance {
                 Err(PrepareDatasetTransferEstimateError::Internal(e)) => {
                     tracing::debug!("Sending internal error: {:?}", e);
                     DatasetPullResponse::Err(DatasetPullRequestError::Internal(
-                        DatasetInternalError {
+                        TransferInternalError {
                             phase: TransferPhase::Pull(PullPhase::InitialRequest),
                             error_message: e.to_string(),
                         },
