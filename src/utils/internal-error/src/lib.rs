@@ -46,7 +46,7 @@ impl InternalError {
     }
 
     pub fn bail<T>(reason: impl Into<String>) -> Result<T, Self> {
-        Err(Self::new(InternalErrorBail::new(reason)))
+        Err(reason.into().int_err())
     }
 
     pub fn with_context(mut self, context: impl Into<String>) -> Self {
@@ -63,22 +63,6 @@ impl InternalError {
         };
 
         reason
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-#[error("{reason}")]
-struct InternalErrorBail {
-    reason: String,
-}
-
-impl InternalErrorBail {
-    pub fn new(reason: impl Into<String>) -> Self {
-        Self {
-            reason: reason.into(),
-        }
     }
 }
 
