@@ -10,15 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Fixed -->
 
 ## Unreleased
-### Added
-- Private Datasets, update `CreateDatasetFromSnapshotUseCase`:
+- Private Datasets, ReBAC integration: 
+  - ReBAC properties update based `DatasetLifecycleMessage`'s:
   - `kamu add`: added hidden `--visibility private|public` argument, assumed to be used in multi-tenant case
   - GQL: `DatasetsMut`:
-    - `createEmpty()`: added optional `datasetPubliclyAvailable` argument
-    - `createFromSnapshot()`: added optional `datasetPubliclyAvailable` argument
-### Changed
-- Private Datasets, update `CreateDatasetFromSnapshotUseCase`:
-  - Setting ReBAC properties, in case of a multi-tenant workspace
+    - `createEmpty()`: added optional `datasetVisibility` argument
+    - `createFromSnapshot()`: added optional `datasetVisibility` argument
 
 ## [0.198.0] - 2024-08-27
 ### Changed
