@@ -120,6 +120,7 @@ async fn create_test_dataset(
             &DatasetAlias::new(account_name, DatasetName::new_unchecked("foo")),
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                 .build_typed(),
+            Default::default(),
         )
         .await
         .unwrap()

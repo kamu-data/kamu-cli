@@ -45,6 +45,7 @@ async fn test_metadata_chain_events() {
                 event: MetadataFactory::seed(DatasetKind::Root).build(),
                 sequence_number: 0,
             },
+            Default::default(),
         )
         .await
         .unwrap();

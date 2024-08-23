@@ -43,6 +43,7 @@ async fn test_create_root_dataset() {
             &alias_foo,
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                 .build_typed(),
+            Default::default(),
         )
         .await
         .unwrap();

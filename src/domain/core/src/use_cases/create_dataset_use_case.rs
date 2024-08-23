@@ -9,21 +9,34 @@
 
 use opendatafabric::{DatasetAlias, MetadataBlockTyped, Seed};
 
-use crate::{CreateDatasetError, CreateDatasetResult};
+use crate::{CreateDatasetError, CreateDatasetResult, DatasetVisibility};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait CreateDatasetUseCase: Send + Sync {
-    // TODO: Add "options" that specify the visibility dataset
-    //
-    //       Based on: Private Datasets: Update use case: Pushing a dataset
-    //                 https://github.com/kamu-data/kamu-cli/issues/728
     async fn execute(
         &self,
         dataset_alias: &DatasetAlias,
         seed_block: MetadataBlockTyped<Seed>,
+        options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone)]
+pub struct CreateDatasetUseCaseOptions {
+    pub dataset_visibility: DatasetVisibility,
+}
+
+// Used primarily for tests
+impl Default for CreateDatasetUseCaseOptions {
+    fn default() -> Self {
+        Self {
+            dataset_visibility: DatasetVisibility::PubliclyAvailable,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

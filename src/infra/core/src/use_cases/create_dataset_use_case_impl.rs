@@ -15,8 +15,8 @@ use kamu_core::{
     CreateDatasetError,
     CreateDatasetResult,
     CreateDatasetUseCase,
+    CreateDatasetUseCaseOptions,
     DatasetLifecycleMessage,
-    DatasetVisibility,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
@@ -54,6 +54,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         &self,
         dataset_alias: &DatasetAlias,
         seed_block: MetadataBlockTyped<Seed>,
+        options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
         let create_result = self
             .dataset_repo_writer
@@ -71,9 +72,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
                         }
                         CurrentAccountSubject::Logged(l) => l.account_id.clone(),
                     },
-                    // TODO: Private Datasets: Update use case: Pushing a dataset
-                    //       https://github.com/kamu-data/kamu-cli/issues/728
-                    DatasetVisibility::Private,
+                    options.dataset_visibility,
                 ),
             )
             .await?;
