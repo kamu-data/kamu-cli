@@ -5698,7 +5698,6 @@ version = "0.197.0"
 dependencies = [
  "chrono",
  "database-common",
- "database-common-macros",
  "dill",
  "kamu-accounts",
  "kamu-datasets",
