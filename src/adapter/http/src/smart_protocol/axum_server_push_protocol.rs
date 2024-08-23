@@ -206,9 +206,9 @@ impl AxumServerPushProtocolInstance {
         };
 
         let response = if push_request.current_head == actual_head {
-            DatasetPushResponse::Ok(DatasetPushRequestAccepted {})
+            Ok(DatasetPushRequestAccepted {})
         } else {
-            DatasetPushResponse::Err(DatasetPushRequestError::InvalidHead(
+            Err(DatasetPushRequestError::InvalidHead(
                 DatasetPushInvalidHeadError {
                     actual_head: push_request.current_head.clone(),
                     expected_head: actual_head,

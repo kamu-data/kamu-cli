@@ -71,7 +71,8 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
                         }
                         CurrentAccountSubject::Logged(l) => l.account_id.clone(),
                     },
-                    // TODO: decide what to do about it -- use Default::default()?
+                    // TODO: Private Datasets: Update use case: Pushing a dataset
+                    //       https://github.com/kamu-data/kamu-cli/issues/728
                     DatasetVisibility::Private,
                 ),
             )
