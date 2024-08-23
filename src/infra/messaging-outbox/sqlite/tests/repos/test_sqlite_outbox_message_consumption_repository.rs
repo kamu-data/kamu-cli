@@ -7,94 +7,51 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabaseTransactionRunner, SqliteTransactionManager};
+use database_common::SqliteTransactionManager;
+use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use internal_error::InternalError;
 use kamu_messaging_outbox_sqlite::SqliteOutboxMessageConsumptionRepository;
 use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_no_outbox_consumptions_initially(sqlite_pool: SqlitePool) {
-    let harness = SqliteOutboxMessageConsumptionRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_messaging_outbox_repo_tests::test_no_outbox_consumptions_initially(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_messaging_outbox_repo_tests::test_no_outbox_consumptions_initially,
+    harness = SqliteOutboxMessageConsumptionRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_create_consumption(sqlite_pool: SqlitePool) {
-    let harness = SqliteOutboxMessageConsumptionRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_messaging_outbox_repo_tests::test_create_consumption(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_messaging_outbox_repo_tests::test_create_consumption,
+    harness = SqliteOutboxMessageConsumptionRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_update_existing_consumption(sqlite_pool: SqlitePool) {
-    let harness = SqliteOutboxMessageConsumptionRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_messaging_outbox_repo_tests::test_update_existing_consumption(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_messaging_outbox_repo_tests::test_update_existing_consumption,
+    harness = SqliteOutboxMessageConsumptionRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_cannot_update_consumption_before_creation(sqlite_pool: SqlitePool) {
-    let harness = SqliteOutboxMessageConsumptionRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_messaging_outbox_repo_tests::test_cannot_update_consumption_before_creation(
-                &catalog,
-            )
-            .await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_messaging_outbox_repo_tests::test_cannot_update_consumption_before_creation,
+    harness = SqliteOutboxMessageConsumptionRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_multiple_boundaries(sqlite_pool: SqlitePool) {
-    let harness = SqliteOutboxMessageConsumptionRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_messaging_outbox_repo_tests::test_multiple_boundaries(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_messaging_outbox_repo_tests::test_multiple_boundaries,
+    harness = SqliteOutboxMessageConsumptionRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
