@@ -15,8 +15,8 @@ use kamu_core::{
     CreateDatasetFromSnapshotError,
     CreateDatasetFromSnapshotResult,
     CreateDatasetFromSnapshotUseCase,
-    CreateDatasetFromSnapshotUseCaseOptions,
     CreateDatasetResult,
+    CreateDatasetUseCaseOptions,
     DatasetLifecycleMessage,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
@@ -54,7 +54,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
     async fn execute(
         &self,
         snapshot: DatasetSnapshot,
-        options: CreateDatasetFromSnapshotUseCaseOptions,
+        options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
         let CreateDatasetFromSnapshotResult {
             create_dataset_result,

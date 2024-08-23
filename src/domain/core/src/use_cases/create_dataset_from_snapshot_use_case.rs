@@ -9,7 +9,7 @@
 
 use opendatafabric::DatasetSnapshot;
 
-use crate::{CreateDatasetFromSnapshotError, CreateDatasetResult, DatasetVisibility};
+use crate::{CreateDatasetFromSnapshotError, CreateDatasetResult, CreateDatasetUseCaseOptions};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,24 +18,8 @@ pub trait CreateDatasetFromSnapshotUseCase: Send + Sync {
     async fn execute(
         &self,
         snapshot: DatasetSnapshot,
-        options: CreateDatasetFromSnapshotUseCaseOptions,
+        options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Copy, Clone)]
-pub struct CreateDatasetFromSnapshotUseCaseOptions {
-    pub dataset_visibility: DatasetVisibility,
-}
-
-// Used primarily for tests
-impl Default for CreateDatasetFromSnapshotUseCaseOptions {
-    fn default() -> Self {
-        Self {
-            dataset_visibility: DatasetVisibility::PubliclyAvailable,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

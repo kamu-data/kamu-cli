@@ -143,7 +143,7 @@ impl AddCommand {
     pub async fn create_datasets_from_snapshots(
         &self,
         snapshots: Vec<DatasetSnapshot>,
-        create_options: CreateDatasetFromSnapshotUseCaseOptions,
+        create_options: CreateDatasetUseCaseOptions,
     ) -> Vec<(
         DatasetAlias,
         Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
@@ -301,7 +301,7 @@ impl Command for AddCommand {
             }
         };
 
-        let create_options = CreateDatasetFromSnapshotUseCaseOptions {
+        let create_options = CreateDatasetUseCaseOptions {
             dataset_visibility: self.dataset_visibility,
         };
         let mut add_results = self

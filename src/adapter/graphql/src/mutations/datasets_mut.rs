@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{self as domain, CreateDatasetFromSnapshotUseCaseOptions, DatasetRepositoryExt};
+use kamu_core::{self as domain, CreateDatasetUseCaseOptions, DatasetRepositoryExt};
 use opendatafabric as odf;
 
 use crate::mutations::DatasetMut;
@@ -123,7 +123,7 @@ impl DatasetsMut {
         let create_from_snapshot =
             from_catalog::<dyn domain::CreateDatasetFromSnapshotUseCase>(ctx).unwrap();
 
-        let create_options = CreateDatasetFromSnapshotUseCaseOptions { dataset_visibility };
+        let create_options = CreateDatasetUseCaseOptions { dataset_visibility };
 
         let result = match create_from_snapshot.execute(snapshot, create_options).await {
             Ok(result) => {

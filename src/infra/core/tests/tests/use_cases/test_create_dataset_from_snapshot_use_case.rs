@@ -23,7 +23,7 @@ use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{
     CreateDatasetFromSnapshotUseCase,
-    CreateDatasetFromSnapshotUseCaseOptions,
+    CreateDatasetUseCaseOptions,
     DatasetLifecycleMessage,
     DatasetRepository,
     DatasetVisibility,
@@ -164,7 +164,7 @@ async fn test_created_datasets_have_the_correct_visibility_attribute() {
             .kind(DatasetKind::Root)
             .push_event(MetadataFactory::set_polling_source().build())
             .build();
-        let options = CreateDatasetFromSnapshotUseCaseOptions {
+        let options = CreateDatasetUseCaseOptions {
             dataset_visibility: DatasetVisibility::Private,
         };
 
@@ -186,7 +186,7 @@ async fn test_created_datasets_have_the_correct_visibility_attribute() {
             .kind(DatasetKind::Root)
             .push_event(MetadataFactory::set_polling_source().build())
             .build();
-        let options = CreateDatasetFromSnapshotUseCaseOptions {
+        let options = CreateDatasetUseCaseOptions {
             dataset_visibility: DatasetVisibility::PubliclyAvailable,
         };
 
