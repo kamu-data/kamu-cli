@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Changed
+- If a polling/push source does not declare a `read` schema or a `preprocess` step (which is the case when ingesting data from a file upload) we apply the following new inference rules:
+  - If `event_time` column is present - we will try to coerce it into a timestamp:
+    - strings will be parsed as RFC3339 date-times
+    - integers will be treated as UNIX timestamps in seconds
+  - Columns with names that conflict with system columns will get renamed
+
 ## [0.197.0] - 2024-08-22
 ### Changed
 - **Breaking:** Using DataFusion's [`enable_ident_normalization = false`](https://datafusion.apache.org/user-guide/configs.html) setting to work with upper case identifiers without needing to put quotes everywhere. This may impact your root and derivative datasets.
