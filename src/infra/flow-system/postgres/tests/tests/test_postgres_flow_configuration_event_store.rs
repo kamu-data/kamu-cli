@@ -7,62 +7,36 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabaseTransactionRunner, PostgresTransactionManager};
+use database_common::PostgresTransactionManager;
+use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use internal_error::InternalError;
 use kamu_flow_system_postgres::PostgresFlowConfigurationEventStore;
 use sqlx::PgPool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_event_store_empty(pg_pool: PgPool) {
-    let harness = PostgresFlowConfigurationEventStoreHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_flow_system_repo_tests::test_event_store_empty(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_flow_system_repo_tests::test_event_store_empty,
+    harness = PostgresFlowConfigurationEventStoreHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_event_store_get_streams(pg_pool: PgPool) {
-    let harness = PostgresFlowConfigurationEventStoreHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_flow_system_repo_tests::test_event_store_get_streams(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_flow_system_repo_tests::test_event_store_get_streams,
+    harness = PostgresFlowConfigurationEventStoreHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_event_store_get_events_with_windowing(pg_pool: PgPool) {
-    let harness = PostgresFlowConfigurationEventStoreHarness::new(pg_pool);
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_flow_system_repo_tests::test_event_store_get_events_with_windowing,
+    harness = PostgresFlowConfigurationEventStoreHarness
+);
 
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_flow_system_repo_tests::test_event_store_get_events_with_windowing(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct PostgresFlowConfigurationEventStoreHarness {
