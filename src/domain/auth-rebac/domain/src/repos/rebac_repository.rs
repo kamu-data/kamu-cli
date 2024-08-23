@@ -10,7 +10,15 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{Entity, EntityType, EntityWithRelation, PropertyName, PropertyValue, Relation};
+use crate::{
+    Entity,
+    EntityId,
+    EntityType,
+    EntityWithRelation,
+    PropertyName,
+    PropertyValue,
+    Relation,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,6 +38,13 @@ pub trait RebacRepository: Send + Sync {
         entity: &Entity,
         property_name: PropertyName,
     ) -> Result<(), DeleteEntityPropertyError>;
+
+    // TODO: cover with tests
+    async fn rename_entity(
+        &self,
+        entity: &Entity,
+        new_entity_id: &EntityId,
+    ) -> Result<(), RenameEntityError>;
 
     // TODO: cover with tests
     async fn delete_entity_properties(
@@ -117,6 +132,26 @@ pub struct EntityNotFoundError {
 pub struct EntityPropertyNotFoundError {
     pub entity: Entity<'static>,
     pub property_name: PropertyName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum RenameEntityError {
+    #[error(transparent)]
+    NotFound(EntityNotFoundError),
+
+    #[error(transparent)]
+    NameCollision(EntityNameCollisionError),
+
+    #[error(transparent)]
+    Internal(InternalError),
+}
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("Entity with name {entity_id} already exists")]
+pub struct EntityNameCollisionError {
+    pub entity_id: EntityId<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
