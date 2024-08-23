@@ -44,6 +44,7 @@ uuid = "1"
 
 
 [dev-dependencies]
+database-common-macros = { workspace = true }
 kamu-messaging-outbox-repo-tests = { workspace = true }
 
 test-group = { version = "1" }

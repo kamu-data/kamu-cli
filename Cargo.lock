@@ -5967,6 +5967,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
+ "database-common-macros",
  "dill",
  "futures",
  "internal-error",
