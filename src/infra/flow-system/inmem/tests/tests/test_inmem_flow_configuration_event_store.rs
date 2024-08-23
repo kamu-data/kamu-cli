@@ -38,7 +38,7 @@ database_transactional_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct InMemoryFlowConfigurationEventStoreHarness {
-    pub catalog: Catalog,
+    catalog: Catalog,
 }
 
 impl InMemoryFlowConfigurationEventStoreHarness {

@@ -54,7 +54,7 @@ database_transactional_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct InMemoryTaskSystemEventStoreHarness {
-    pub catalog: Catalog,
+    catalog: Catalog,
 }
 
 impl InMemoryTaskSystemEventStoreHarness {
