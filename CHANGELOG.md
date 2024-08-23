@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - strings will be parsed as RFC3339 date-times
     - integers will be treated as UNIX timestamps in seconds
   - Columns with names that conflict with system columns will get renamed
+- All tests related to databases use the `database_transactional_test` macro
+- Some skipped tests will now also be run
+- Access token with duplicate names can be created if such name exists but was revoked (now for MySQL as well)
 ### Fixed
 - Derivative transform crash when input datasets have `AddData` events but don't have any Parquet files yet
 
