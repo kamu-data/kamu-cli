@@ -10,12 +10,13 @@
 use std::sync::Arc;
 
 use dill::{component, interface, meta, Catalog};
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_auth_rebac::{
     AccountPropertyName,
     AccountToDatasetRelation,
     DatasetPropertyName,
     DeleteEntitiesRelationError,
+    DeleteEntityPropertiesError,
     DeleteEntityPropertyError,
     Entity,
     EntityWithRelation,
@@ -34,6 +35,7 @@ use kamu_auth_rebac::{
 use kamu_core::{
     DatasetLifecycleMessage,
     DatasetLifecycleMessageCreated,
+    DatasetLifecycleMessageDeleted,
     DatasetRepository,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
@@ -80,14 +82,6 @@ impl RebacServiceImpl {
         &self,
         message: &DatasetLifecycleMessageCreated,
     ) -> Result<(), InternalError> {
-        let is_single_tenant_workspace = !self.dataset_repo_reader.is_multi_tenant();
-
-        if is_single_tenant_workspace {
-            // We don't need ReBAC within one user
-            return Ok(());
-        }
-
-        // Trying to set the ReBAC property
         let allows = message.dataset_visibility.is_publicly_available();
         let (name, value) = DatasetPropertyName::allows_public_read(allows);
 
@@ -95,6 +89,18 @@ impl RebacServiceImpl {
             .await
             .map_err(|err| match err {
                 SetEntityPropertyError::Internal(e) => e,
+            })
+    }
+
+    pub async fn handle_dataset_lifecycle_deleted_message(
+        &self,
+        message: &DatasetLifecycleMessageDeleted,
+    ) -> Result<(), InternalError> {
+        self.delete_dataset_properties(&message.dataset_id)
+            .await
+            .map_err(|err| match err {
+                DeleteEntityPropertiesError::NotFound(e) => e.int_err(),
+                DeleteEntityPropertiesError::Internal(e) => e,
             })
     }
 }
@@ -173,6 +179,18 @@ impl RebacService for RebacServiceImpl {
         self.rebac_repo
             .delete_entity_property(&dataset_id_entity, property_name.into())
             .map(map_delete_entity_property_result)
+            .await
+    }
+
+    async fn delete_dataset_properties(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<(), DeleteEntityPropertiesError> {
+        let dataset_id = dataset_id.as_did_str().to_stack_string();
+        let dataset_id_entity = Entity::new_dataset(dataset_id.as_str());
+
+        self.rebac_repo
+            .delete_entity_properties(&dataset_id_entity)
             .await
     }
 
@@ -276,20 +294,23 @@ impl MessageConsumerT<DatasetLifecycleMessage> for RebacServiceImpl {
         _: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
+        let is_single_tenant_workspace = !self.dataset_repo_reader.is_multi_tenant();
+
+        if is_single_tenant_workspace {
+            // We don't need ReBAC within one user
+            return Ok(());
+        }
+
         match message {
             DatasetLifecycleMessage::Created(message) => {
                 self.handle_dataset_lifecycle_created_message(message).await
             }
 
-            DatasetLifecycleMessage::Deleted(_message) => {
-                // TODO: handle the message
-                Ok(())
+            DatasetLifecycleMessage::Deleted(message) => {
+                self.handle_dataset_lifecycle_deleted_message(message).await
             }
 
-            DatasetLifecycleMessage::DependenciesUpdated(_message) => {
-                // TODO: handle the message
-                Ok(())
-            }
+            DatasetLifecycleMessage::DependenciesUpdated(_message) => Ok(()),
         }
     }
 }

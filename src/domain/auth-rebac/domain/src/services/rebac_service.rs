@@ -16,6 +16,7 @@ use crate::{
     AccountToDatasetRelation,
     DatasetPropertyName,
     DeleteEntitiesRelationError,
+    DeleteEntityPropertiesError,
     EntityNotFoundError,
     EntityWithRelation,
     GetEntityPropertiesError,
@@ -61,6 +62,11 @@ pub trait RebacService: Send + Sync {
         dataset_id: &DatasetID,
         property_name: DatasetPropertyName,
     ) -> Result<(), UnsetEntityPropertyError>;
+
+    async fn delete_dataset_properties(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<(), DeleteEntityPropertiesError>;
 
     async fn get_dataset_properties(
         &self,

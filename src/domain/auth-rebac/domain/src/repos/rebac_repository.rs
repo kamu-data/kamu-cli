@@ -31,6 +31,12 @@ pub trait RebacRepository: Send + Sync {
         property_name: PropertyName,
     ) -> Result<(), DeleteEntityPropertyError>;
 
+    // TODO: cover with tests
+    async fn delete_entity_properties(
+        &self,
+        entity: &Entity,
+    ) -> Result<(), DeleteEntityPropertiesError>;
+
     async fn get_entity_properties(
         &self,
         entity: &Entity,
@@ -111,6 +117,17 @@ pub struct EntityNotFoundError {
 pub struct EntityPropertyNotFoundError {
     pub entity: Entity<'static>,
     pub property_name: PropertyName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DeleteEntityPropertiesError {
+    #[error(transparent)]
+    NotFound(EntityPropertyNotFoundError),
+
+    #[error(transparent)]
+    Internal(InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

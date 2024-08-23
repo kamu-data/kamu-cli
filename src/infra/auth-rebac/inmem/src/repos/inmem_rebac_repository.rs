@@ -14,6 +14,7 @@ use std::sync::Arc;
 use dill::{component, interface, scope, Singleton};
 use kamu_auth_rebac::{
     DeleteEntitiesRelationError,
+    DeleteEntityPropertiesError,
     DeleteEntityPropertyError,
     Entity,
     EntityType,
@@ -116,6 +117,13 @@ impl RebacRepository for InMemoryRebacRepository {
         }
 
         Ok(())
+    }
+
+    async fn delete_entity_properties(
+        &self,
+        _entity: &Entity,
+    ) -> Result<(), DeleteEntityPropertiesError> {
+        todo!()
     }
 
     async fn get_entity_properties(
