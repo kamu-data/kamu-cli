@@ -5039,6 +5039,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
+ "database-common-macros",
  "dill",
  "internal-error",
  "kamu-accounts",

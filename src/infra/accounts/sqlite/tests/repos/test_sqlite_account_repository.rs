@@ -7,189 +7,99 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabaseTransactionRunner, SqliteTransactionManager};
+use database_common::SqliteTransactionManager;
+use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use internal_error::InternalError;
 use kamu_accounts_sqlite::SqliteAccountRepository;
 use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_missing_account_not_found(sqlite_pool: SqlitePool) {
-    let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_missing_account_not_found(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_accounts_repo_tests::test_missing_account_not_found,
+    harness = SqliteAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_insert_and_locate_cli_account(sqlite_pool: SqlitePool) {
-    let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_insert_and_locate_password_account(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_password_account,
+    harness = SqliteAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_insert_and_locate_github_account(sqlite_pool: SqlitePool) {
-    let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_insert_and_locate_github_account(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_github_account,
+    harness = SqliteAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_insert_and_locate_multiple_github_account(sqlite_pool: SqlitePool) {
-    let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_insert_and_locate_multiple_github_account(&catalog)
-                .await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_multiple_github_account,
+    harness = SqliteAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_insert_and_locate_account_without_email(sqlite_pool: SqlitePool) {
-    let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_insert_and_locate_account_without_email(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_account_without_email,
+    harness = SqliteAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_duplicate_password_account_id(sqlite_pool: SqlitePool) {
-    let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_duplicate_password_account_id(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_accounts_repo_tests::test_duplicate_password_account_id,
+    harness = SqliteAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_duplicate_password_account_email(sqlite_pool: SqlitePool) {
-    let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_duplicate_password_account_email(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_accounts_repo_tests::test_duplicate_password_account_email,
+    harness = SqliteAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_duplicate_github_account_id(sqlite_pool: SqlitePool) {
-    let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_duplicate_github_account_id(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_accounts_repo_tests::test_duplicate_github_account_id,
+    harness = SqliteAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_duplicate_github_account_name(sqlite_pool: SqlitePool) {
-    let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_duplicate_github_account_name(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_accounts_repo_tests::test_duplicate_github_account_name,
+    harness = SqliteAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_duplicate_github_account_provider_identity(sqlite_pool: SqlitePool) {
-    let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_duplicate_github_account_provider_identity(&catalog)
-                .await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_accounts_repo_tests::test_duplicate_github_account_provider_identity,
+    harness = SqliteAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_duplicate_github_account_email(sqlite_pool: SqlitePool) {
-    let harness = SqliteAccountRepositoryHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_duplicate_github_account_email(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_accounts_repo_tests::test_duplicate_github_account_email,
+    harness = SqliteAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
