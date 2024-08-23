@@ -608,7 +608,6 @@ pub fn command_needs_transaction(arg_matches: &clap::ArgMatches) -> Result<bool,
             Some(_) => Ok(false),
             None => Err(CommandInterpretationFailed.into()),
         },
-        Some(("add", _)) => Ok(true),
         Some(_) => Ok(false),
         None => Err(CommandInterpretationFailed.into()),
     }
