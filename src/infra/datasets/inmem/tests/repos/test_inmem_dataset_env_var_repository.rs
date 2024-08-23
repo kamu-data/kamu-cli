@@ -7,54 +7,50 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_datasets_inmem::InMemoryDatasetEnvVarRepository;
 use kamu_datasets_repo_tests::dataset_env_var_repo;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_missing_dataset_env_var_not_found() {
-    let harness = InMemoryDatasetEnvVarRepositoryHarness::new();
-
-    dataset_env_var_repo::test_missing_dataset_env_var_not_found(&harness.catalog).await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_insert_and_get_dataset_env_var() {
-    let harness = InMemoryDatasetEnvVarRepositoryHarness::new();
-
-    dataset_env_var_repo::test_insert_and_get_dataset_env_var(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_env_var_repo::test_missing_dataset_env_var_not_found,
+    harness = InMemoryDatasetEnvVarRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_insert_and_get_multiple_dataset_env_vars() {
-    let harness = InMemoryDatasetEnvVarRepositoryHarness::new();
-
-    dataset_env_var_repo::test_insert_and_get_multiple_dataset_env_vars(&harness.catalog).await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_delete_dataset_env_vars() {
-    let harness = InMemoryDatasetEnvVarRepositoryHarness::new();
-
-    dataset_env_var_repo::test_delete_dataset_env_vars(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_env_var_repo::test_insert_and_get_dataset_env_var,
+    harness = InMemoryDatasetEnvVarRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_modify_dataset_env_vars() {
-    let harness = InMemoryDatasetEnvVarRepositoryHarness::new();
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_env_var_repo::test_insert_and_get_multiple_dataset_env_vars,
+    harness = InMemoryDatasetEnvVarRepositoryHarness
+);
 
-    dataset_env_var_repo::test_modify_dataset_env_vars(&harness.catalog).await;
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_env_var_repo::test_delete_dataset_env_vars,
+    harness = InMemoryDatasetEnvVarRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_env_var_repo::test_modify_dataset_env_vars,
+    harness = InMemoryDatasetEnvVarRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -72,3 +68,5 @@ impl InMemoryDatasetEnvVarRepositoryHarness {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
