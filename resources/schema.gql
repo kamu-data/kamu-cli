@@ -947,7 +947,7 @@ type FlowConfigurationCompactionRule {
 }
 
 type FlowConfigurationIngest {
-	schedule: FlowConfigurationSchedule!
+	schedule: FlowConfigurationSchedule
 	fetchUncacheable: Boolean!
 }
 
@@ -1240,7 +1240,7 @@ input IngestConditionInput {
 	Flag indicates to ignore cache during ingest step for API calls
 	"""
 	fetchUncacheable: Boolean!
-	schedule: ScheduleInput!
+	schedule: ScheduleInput
 }
 
 input InitiatorFilterInput @oneOf {

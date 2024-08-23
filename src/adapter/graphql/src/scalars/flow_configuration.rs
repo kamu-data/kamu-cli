@@ -76,7 +76,7 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfigurationIngest {
-    pub schedule: FlowConfigurationSchedule,
+    pub schedule: Option<FlowConfigurationSchedule>,
     pub fetch_uncacheable: bool,
 }
 
@@ -84,12 +84,12 @@ impl From<IngestRule> for FlowConfigurationIngest {
     fn from(value: IngestRule) -> Self {
         Self {
             fetch_uncacheable: value.fetch_uncacheable,
-            schedule: match value.schedule_condition {
+            schedule: value.schedule_condition.map(|schedule| match schedule {
                 Schedule::TimeDelta(time_delta) => {
                     FlowConfigurationSchedule::TimeDelta(time_delta.every.into())
                 }
                 Schedule::Cron(cron) => FlowConfigurationSchedule::Cron(cron.clone().into()),
-            },
+            }),
         }
     }
 }
@@ -381,20 +381,24 @@ pub struct CompactionConditionMetadataOnly {
 pub struct IngestConditionInput {
     /// Flag indicates to ignore cache during ingest step for API calls
     pub fetch_uncacheable: bool,
-    pub schedule: ScheduleInput,
+    pub schedule: Option<ScheduleInput>,
 }
 
 impl TryFrom<IngestConditionInput> for IngestRule {
     type Error = ScheduleCronError;
 
     fn try_from(value: IngestConditionInput) -> std::result::Result<Self, Self::Error> {
-        let schedule = match value.schedule {
-            ScheduleInput::TimeDelta(td) => {
-                Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
-            }
-            ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
-                Schedule::try_from_5component_cron_expression(&cron_5component_expression)?
-            }
+        let schedule = if let Some(schedule) = value.schedule {
+            Some(match schedule {
+                ScheduleInput::TimeDelta(td) => {
+                    Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
+                }
+                ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
+                    Schedule::try_from_5component_cron_expression(&cron_5component_expression)?
+                }
+            })
+        } else {
+            None
         };
         Ok(Self {
             fetch_uncacheable: value.fetch_uncacheable,
@@ -418,21 +422,25 @@ impl FlowRunConfiguration {
                     if let Self::Ingest(ingest_input) = flow_run_configuration {
                         return Ok(Some(FlowConfigurationSnapshot::Ingest(IngestRule {
                             fetch_uncacheable: ingest_input.fetch_uncacheable,
-                            schedule_condition: match &ingest_input.schedule {
-                                ScheduleInput::TimeDelta(td) => {
-                                    Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
-                                }
-                                ScheduleInput::Cron5ComponentExpression(
-                                    cron_5component_expression,
-                                ) => Schedule::try_from_5component_cron_expression(
-                                    cron_5component_expression,
-                                )
-                                .map_err(|_| {
-                                    FlowInvalidRunConfigurations {
-                                        error: "Invalid schedule flow run configuration"
-                                            .to_string(),
+                            schedule_condition: if let Some(schedule) = &ingest_input.schedule {
+                                Some(match schedule {
+                                    ScheduleInput::TimeDelta(td) => {
+                                        Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
                                     }
-                                })?,
+                                    ScheduleInput::Cron5ComponentExpression(
+                                        cron_5component_expression,
+                                    ) => Schedule::try_from_5component_cron_expression(
+                                        cron_5component_expression,
+                                    )
+                                    .map_err(|_| {
+                                        FlowInvalidRunConfigurations {
+                                            error: "Invalid schedule flow run configuration"
+                                                .to_string(),
+                                        }
+                                    })?,
+                                })
+                            } else {
+                                None
                             },
                         })));
                     }

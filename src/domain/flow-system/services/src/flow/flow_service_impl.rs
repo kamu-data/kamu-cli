@@ -218,12 +218,14 @@ impl FlowServiceImpl {
                     | FlowConfigurationRule::Schedule(_)
                     | FlowConfigurationRule::ResetRule(_) => (),
                     FlowConfigurationRule::IngestRule(ingest_rule) => {
-                        self.enqueue_scheduled_auto_polling_flow(
-                            start_time,
-                            &flow_key,
-                            &ingest_rule.schedule_condition,
-                        )
-                        .await?;
+                        if let Some(schedule_condition) = &ingest_rule.schedule_condition {
+                            self.enqueue_scheduled_auto_polling_flow(
+                                start_time,
+                                &flow_key,
+                                schedule_condition,
+                            )
+                            .await?;
+                        }
                     }
                 }
             }

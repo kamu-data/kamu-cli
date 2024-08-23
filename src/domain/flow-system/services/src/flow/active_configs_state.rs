@@ -79,13 +79,15 @@ impl ActiveConfigsState {
 
     pub fn try_get_flow_schedule(&self, flow_key: &FlowKey) -> Option<Schedule> {
         match flow_key {
-            FlowKey::Dataset(flow_key) => self
-                .dataset_ingest_rules
-                .get(
+            FlowKey::Dataset(flow_key) => {
+                if let Some(ingest_rule) = self.dataset_ingest_rules.get(
                     BorrowedFlowKeyDataset::new(&flow_key.dataset_id, flow_key.flow_type)
                         .as_trait(),
-                )
-                .map(|ingest_rule| ingest_rule.schedule_condition.clone()),
+                ) {
+                    return ingest_rule.schedule_condition.clone();
+                }
+                None
+            }
             FlowKey::System(flow_key) => self.system_schedules.get(&flow_key.flow_type).cloned(),
         }
     }

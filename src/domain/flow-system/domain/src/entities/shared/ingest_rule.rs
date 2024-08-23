@@ -18,5 +18,5 @@ pub struct IngestRule {
     pub fetch_uncacheable: bool,
     // ToDo: Schedule should be on higher level and not mixed up
     // with general configuration rules
-    pub schedule_condition: Schedule,
+    pub schedule_condition: Option<Schedule>,
 }

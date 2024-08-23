@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Changed
+- Make `schedule` configuration optional in `FlowConfigurationIngest` type for GQL flow mutations
+
 ## [0.197.0] - 2024-08-22
 ### Changed
 - **Breaking:** Using DataFusion's [`enable_ident_normalization = false`](https://datafusion.apache.org/user-guide/configs.html) setting to work with upper case identifiers without needing to put quotes everywhere. This may impact your root and derivative datasets.

@@ -48,7 +48,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(60).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(60).unwrap().into()),
             },
         )
         .await;
@@ -178,10 +178,10 @@ async fn test_cron_config() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Schedule::Cron(ScheduleCron {
+                schedule_condition: Some(Schedule::Cron(ScheduleCron {
                     source_5component_cron_expression: String::from("<irrelevant>"),
                     cron_schedule: cron::Schedule::from_str("*/5 * * * * *").unwrap(),
-                }),
+                })),
             },
         )
         .await;
@@ -284,7 +284,7 @@ async fn test_manual_trigger() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(90).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(90).unwrap().into()),
             },
         )
         .await;
@@ -498,7 +498,7 @@ async fn test_ingest_trigger_with_ingest_config() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: true,
-                schedule_condition: Duration::try_milliseconds(90).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(90).unwrap().into()),
             },
         )
         .await;
@@ -2095,7 +2095,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(50).unwrap().into()),
             },
         )
         .await;
@@ -2106,7 +2106,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(80).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(80).unwrap().into()),
             },
         )
         .await;
@@ -2184,7 +2184,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 harness.resume_dataset_flow(start_time + Duration::try_milliseconds(80).unwrap(), foo_id.clone(), DatasetFlowType::Ingest).await;
                 harness.set_dataset_flow_ingest(start_time + Duration::try_milliseconds(80).unwrap(), bar_id.clone(), DatasetFlowType::Ingest, IngestRule {
                   fetch_uncacheable: false,
-                  schedule_condition: Duration::try_milliseconds(70).unwrap().into(),
+                  schedule_condition: Some(Duration::try_milliseconds(70).unwrap().into()),
               }).await;
                 test_flow_listener
                     .make_a_snapshot(start_time + Duration::try_milliseconds(80).unwrap())
@@ -2316,7 +2316,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(100).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(100).unwrap().into()),
             },
         )
         .await;
@@ -2328,7 +2328,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(60).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(60).unwrap().into()),
             },
         )
         .await;
@@ -2540,7 +2540,7 @@ async fn test_dataset_deleted() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(50).unwrap().into()),
             },
         )
         .await;
@@ -2551,7 +2551,7 @@ async fn test_dataset_deleted() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(70).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(70).unwrap().into()),
             },
         )
         .await;
@@ -2745,7 +2745,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 DatasetFlowType::Ingest,
                 IngestRule {
                     fetch_uncacheable: false,
-                    schedule_condition: Duration::try_milliseconds(40).unwrap().into(),
+                    schedule_condition: Some(Duration::try_milliseconds(40).unwrap().into()),
                 },
             )
             .await;
@@ -2966,7 +2966,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(80).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(80).unwrap().into()),
             },
         )
         .await;
@@ -3364,7 +3364,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(50).unwrap().into()),
             },
         )
         .await;
@@ -3376,7 +3376,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(150).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(150).unwrap().into()),
             },
         )
         .await;
@@ -3844,7 +3844,7 @@ async fn test_batching_condition_records_reached() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(50).unwrap().into()),
             },
         )
         .await;
@@ -4168,7 +4168,7 @@ async fn test_batching_condition_timeout() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(50).unwrap().into()),
             },
         )
         .await;
@@ -4444,7 +4444,7 @@ async fn test_batching_condition_watermark() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(40).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(40).unwrap().into()),
             },
         )
         .await;
@@ -4777,7 +4777,7 @@ async fn test_batching_condition_with_2_inputs() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(80).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(80).unwrap().into()),
             },
         )
         .await;
@@ -4789,7 +4789,7 @@ async fn test_batching_condition_with_2_inputs() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(120).unwrap().into(),
+                schedule_condition: Some(Duration::try_milliseconds(120).unwrap().into()),
             },
         )
         .await;
