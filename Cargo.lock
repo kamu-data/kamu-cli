@@ -6053,11 +6053,15 @@ version = "0.197.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "database-common",
+ "database-common-macros",
  "dill",
  "futures",
+ "internal-error",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
  "opendatafabric",
+ "test-group",
  "test-log",
  "tokio",
 ]
