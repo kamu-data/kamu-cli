@@ -114,7 +114,7 @@ pub async fn test_insert_and_locate_multiple_access_tokens(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_mark_existing_access_token_revorked(catalog: &Catalog) {
+pub async fn test_mark_existing_access_token_revoked(catalog: &Catalog) {
     let access_token = make_test_access_token("foo", None, "wasya");
     let account = make_test_account(
         "wasya",

@@ -70,7 +70,7 @@ async fn test_mark_existing_access_token_revorked(pg_pool: PgPool) {
 
     DatabaseTransactionRunner::new(harness.catalog)
         .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_mark_existing_access_token_revorked(&catalog).await;
+            kamu_accounts_repo_tests::test_mark_existing_access_token_revoked(&catalog).await;
             Ok::<_, InternalError>(())
         })
         .await

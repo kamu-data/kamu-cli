@@ -39,7 +39,7 @@ async fn test_insert_and_locate_multiple_access_tokens() {
 #[test_log::test(tokio::test)]
 async fn test_mark_existing_access_token_revorked() {
     let harness = InmemAccessTokenRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_mark_existing_access_token_revorked(&harness.catalog).await;
+    kamu_accounts_repo_tests::test_mark_existing_access_token_revoked(&harness.catalog).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

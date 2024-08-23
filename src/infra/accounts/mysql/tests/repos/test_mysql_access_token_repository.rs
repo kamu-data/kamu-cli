@@ -41,7 +41,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = mysql,
-    fixture = kamu_accounts_repo_tests::test_mark_existing_access_token_revorked,
+    fixture = kamu_accounts_repo_tests::test_mark_existing_access_token_revoked,
     harness = MySqlAccessTokenRepositoryHarness
 );
 
