@@ -23,7 +23,6 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-database-common-macros = { workspace = true }
 kamu-accounts = { workspace = true }
 opendatafabric = { workspace = true }
 internal-error = { workspace = true }
@@ -37,6 +36,7 @@ uuid = "1"
 
 
 [dev-dependencies]
+database-common-macros = { workspace = true }
 kamu-accounts-repo-tests = { workspace = true }
 
 test-group = { version = "1" }
