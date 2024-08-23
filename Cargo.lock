@@ -5946,10 +5946,12 @@ version = "0.197.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "database-common-macros",
  "dill",
  "internal-error",
  "kamu-messaging-outbox-repo-tests",
  "messaging-outbox",
+ "test-group",
  "test-log",
  "thiserror",
  "tokio",

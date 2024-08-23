@@ -7,59 +7,57 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_messaging_outbox_inmem::InMemoryOutboxMessageConsumptionRepository;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_no_outbox_consumptions_initially() {
-    let harness = InmemOutboxMessageConsumptionRepositoryHarness::new();
-    kamu_messaging_outbox_repo_tests::test_no_outbox_consumptions_initially(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_messaging_outbox_repo_tests::test_no_outbox_consumptions_initially,
+    harness = InMemoryOutboxMessageConsumptionRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_create_consumption() {
-    let harness = InmemOutboxMessageConsumptionRepositoryHarness::new();
-    kamu_messaging_outbox_repo_tests::test_create_consumption(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_messaging_outbox_repo_tests::test_create_consumption,
+    harness = InMemoryOutboxMessageConsumptionRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_update_existing_consumption() {
-    let harness = InmemOutboxMessageConsumptionRepositoryHarness::new();
-    kamu_messaging_outbox_repo_tests::test_update_existing_consumption(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_messaging_outbox_repo_tests::test_update_existing_consumption,
+    harness = InMemoryOutboxMessageConsumptionRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_cannot_update_consumption_before_creation() {
-    let harness = InmemOutboxMessageConsumptionRepositoryHarness::new();
-    kamu_messaging_outbox_repo_tests::test_cannot_update_consumption_before_creation(
-        &harness.catalog,
-    )
-    .await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_messaging_outbox_repo_tests::test_cannot_update_consumption_before_creation,
+    harness = InMemoryOutboxMessageConsumptionRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_multiple_boundaries() {
-    let harness = InmemOutboxMessageConsumptionRepositoryHarness::new();
-    kamu_messaging_outbox_repo_tests::test_multiple_boundaries(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_messaging_outbox_repo_tests::test_multiple_boundaries,
+    harness = InMemoryOutboxMessageConsumptionRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct InmemOutboxMessageConsumptionRepositoryHarness {
+struct InMemoryOutboxMessageConsumptionRepositoryHarness {
     catalog: Catalog,
 }
 
-impl InmemOutboxMessageConsumptionRepositoryHarness {
+impl InMemoryOutboxMessageConsumptionRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryOutboxMessageConsumptionRepository>();
