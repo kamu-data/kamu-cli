@@ -57,7 +57,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = mysql,
-    fixture = kamu_accounts_repo_tests::test_create_duplicate_access_token_err,
+    fixture = kamu_accounts_repo_tests::test_create_duplicate_access_token_error,
     harness = MySqlAccessTokenRepositoryHarness
 );
 

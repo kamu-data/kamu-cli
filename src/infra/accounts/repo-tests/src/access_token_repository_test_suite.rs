@@ -195,7 +195,7 @@ pub async fn test_create_duplicate_active_access_token(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_create_duplicate_access_token_err(catalog: &Catalog) {
+pub async fn test_create_duplicate_access_token_error(catalog: &Catalog) {
     let access_token = make_test_access_token("foo", None, "wasya");
     let access_token_duplicate = make_test_access_token("foo", None, "wasya");
 
