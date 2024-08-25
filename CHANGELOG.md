@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - strings will be parsed as RFC3339 date-times
     - integers will be treated as UNIX timestamps in seconds
   - Columns with names that conflict with system columns will get renamed
+### Fixed
+- Derivative transform crash when input datasets have `AddData` events but don't have any Parquet files yet
 
 ## [0.197.0] - 2024-08-22
 ### Changed

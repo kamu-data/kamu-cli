@@ -313,7 +313,7 @@ impl TransformServiceImpl {
             .await
             .int_err()?
             .into_event()
-            .map(|event| event.last_offset())
+            .and_then(|event| event.last_offset())
             .is_none())
     }
 
