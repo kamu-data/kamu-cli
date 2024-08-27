@@ -11,6 +11,7 @@ use axum::extract::ws::{CloseFrame, Message};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use super::messages::SMART_TRANSFER_PROTOCOL_SERVER_VERSION;
 use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,9 +21,10 @@ pub async fn axum_read_payload<TMessagePayload: DeserializeOwned>(
 ) -> Result<TMessagePayload, ReadMessageError> {
     match socket.recv().await {
         Some(msg) => match msg {
-            Ok(Message::Text(raw_message)) => {
-                ws_common::parse_payload::<TMessagePayload>(raw_message.as_str())
-            }
+            Ok(Message::Text(raw_message)) => ws_common::get_payload_message::<TMessagePayload>(
+                raw_message.as_str(),
+                SMART_TRANSFER_PROTOCOL_SERVER_VERSION,
+            ),
             Ok(Message::Close(_)) => Err(ReadMessageError::Closed),
             Ok(_) => Err(ReadMessageError::NonTextMessageReceived),
             Err(e) => Err(ReadMessageError::SocketError(Box::new(e))),
@@ -37,7 +39,10 @@ pub(crate) async fn axum_write_payload<TMessagePayload: Serialize>(
     socket: &mut axum::extract::ws::WebSocket,
     payload: TMessagePayload,
 ) -> Result<(), WriteMessageError> {
-    let payload_as_json_string = ws_common::combine_payload::<TMessagePayload>(payload)?;
+    let payload_as_json_string = ws_common::combine_payload::<TMessagePayload>(
+        payload,
+        SMART_TRANSFER_PROTOCOL_SERVER_VERSION,
+    )?;
 
     let message = axum::extract::ws::Message::Text(payload_as_json_string);
     let send_result = socket.send(message).await;
@@ -53,7 +58,10 @@ pub(crate) async fn axum_write_close_payload<TMessagePayload: Serialize>(
     socket: &mut axum::extract::ws::WebSocket,
     payload: TMessagePayload,
 ) -> Result<(), WriteMessageError> {
-    let payload_as_json_string = ws_common::combine_payload::<TMessagePayload>(payload)?;
+    let payload_as_json_string = ws_common::combine_payload::<TMessagePayload>(
+        payload,
+        SMART_TRANSFER_PROTOCOL_SERVER_VERSION,
+    )?;
     let close_frame = CloseFrame {
         // Code will be mapped CloseCode::Error type on client side
         code: 1011,

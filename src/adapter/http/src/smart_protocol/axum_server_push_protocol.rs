@@ -35,6 +35,7 @@ use super::messages::*;
 use super::phases::*;
 use super::protocol_dataset_helper::*;
 use crate::smart_protocol::*;
+use crate::ws_common::ReadMessageError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -98,6 +99,25 @@ impl AxumServerPushProtocolInstance {
                       error_msg = %e,
                       "Push process aborted with internal error",
                     );
+                }
+                PushServerError::ReadFailed(err) => {
+                    if let ReadMessageError::IncompatibleVersion = &err.read_error {
+                        if let Err(write_err) = axum_write_close_payload::<DatasetPushResponse>(
+                            &mut self.socket,
+                            Err(DatasetPushRequestError::Internal(TransferInternalError {
+                                phase: TransferPhase::Push(PushPhase::InitialRequest),
+                                error_message: "Incompatible version.".to_string(),
+                            })),
+                        )
+                        .await
+                        {
+                            tracing::error!(
+                              error = ?write_err,
+                              error_msg = %write_err,
+                              "Failed to send error to client with error",
+                            );
+                        };
+                    }
                 }
                 _ => tracing::error!(
                   error = ?e,

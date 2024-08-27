@@ -47,8 +47,8 @@ impl Display for PullReadError {
 
 #[derive(Error, Debug)]
 pub struct PushReadError {
-    read_error: ReadMessageError,
-    push_phase: PushPhase,
+    pub read_error: ReadMessageError,
+    pub push_phase: PushPhase,
 }
 
 impl PushReadError {

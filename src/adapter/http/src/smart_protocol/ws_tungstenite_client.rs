@@ -863,14 +863,18 @@ async fn read_payload<TMessagePayload: DeserializeOwned>(
     use tokio_stream::StreamExt;
     match stream.next().await {
         Some(msg) => match msg {
-            Ok(Message::Text(raw_message)) => {
-                ws_common::get_payload_message::<TMessagePayload>(raw_message.as_str())
-            }
+            Ok(Message::Text(raw_message)) => ws_common::get_payload_message::<TMessagePayload>(
+                raw_message.as_str(),
+                SMART_TRANSFER_PROTOCOL_CLIENT_VERSION,
+            ),
             Ok(Message::Close(close_frame_maybe)) => {
                 if let Some(close_frame) = close_frame_maybe
                     && close_frame.code == CloseCode::Error
                 {
-                    return ws_common::get_payload_message::<TMessagePayload>(&close_frame.reason);
+                    return ws_common::get_payload_message::<TMessagePayload>(
+                        &close_frame.reason,
+                        SMART_TRANSFER_PROTOCOL_CLIENT_VERSION,
+                    );
                 }
                 Err(ReadMessageError::ClientDisconnected)
             }
@@ -887,7 +891,10 @@ async fn write_payload<TMessagePayload: Serialize>(
     socket: &mut TungsteniteStream,
     payload: TMessagePayload,
 ) -> Result<(), WriteMessageError> {
-    let payload_as_json_string = ws_common::payload_to_json::<TMessagePayload>(payload)?;
+    let payload_as_json_string = ws_common::combine_payload::<TMessagePayload>(
+        payload,
+        SMART_TRANSFER_PROTOCOL_CLIENT_VERSION,
+    )?;
 
     let message = Message::Text(payload_as_json_string);
     let send_result = socket.send(message).await;
