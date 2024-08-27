@@ -10,8 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Fixed -->
 
 ## Unreleased
+### Added
 - Private Datasets, ReBAC integration: 
-  - ReBAC properties update based `DatasetLifecycleMessage`'s:
+  - ReBAC properties update based on `DatasetLifecycleMessage`'s:
   - `kamu add`: added hidden `--visibility private|public` argument, assumed to be used in multi-tenant case
   - GQL: `DatasetsMut`:
     - `createEmpty()`: added optional `datasetVisibility` argument
