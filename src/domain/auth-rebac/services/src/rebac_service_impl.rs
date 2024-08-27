@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, interface, meta, Catalog};
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_auth_rebac::{
     AccountPropertyName,
     AccountToDatasetRelation,
@@ -89,9 +89,7 @@ impl RebacServiceImpl {
 
         self.set_dataset_property(&message.dataset_id, name, &value)
             .await
-            .map_err(|err| match err {
-                SetEntityPropertyError::Internal(e) => e,
-            })
+            .int_err()
     }
 
     async fn handle_dataset_lifecycle_deleted_message(
@@ -100,10 +98,7 @@ impl RebacServiceImpl {
     ) -> Result<(), InternalError> {
         self.delete_dataset_properties(&message.dataset_id)
             .await
-            .map_err(|err| match err {
-                DeleteEntityPropertiesError::NotFound(e) => e.int_err(),
-                DeleteEntityPropertiesError::Internal(e) => e,
-            })
+            .int_err()
     }
 }
 
