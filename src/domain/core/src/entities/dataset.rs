@@ -262,22 +262,24 @@ impl From<CheckpointRef> for Option<OwnedFile> {
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum DatasetVisibility {
     #[default]
+    #[serde(alias = "private")]
     Private,
-    PubliclyAvailable,
+    #[serde(alias = "public")]
+    Public,
 }
 
 impl DatasetVisibility {
     pub fn is_private(&self) -> bool {
         match self {
             DatasetVisibility::Private => true,
-            DatasetVisibility::PubliclyAvailable => false,
+            DatasetVisibility::Public => false,
         }
     }
 
     pub fn is_publicly_available(&self) -> bool {
         match self {
             DatasetVisibility::Private => false,
-            DatasetVisibility::PubliclyAvailable => true,
+            DatasetVisibility::Public => true,
         }
     }
 }

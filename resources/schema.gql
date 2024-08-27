@@ -705,7 +705,7 @@ scalar DatasetRef
 
 enum DatasetVisibility {
 	PRIVATE
-	PUBLICLY_AVAILABLE
+	PUBLIC
 }
 
 type Datasets {

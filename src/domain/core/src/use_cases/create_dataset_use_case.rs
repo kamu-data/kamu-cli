@@ -34,7 +34,7 @@ pub struct CreateDatasetUseCaseOptions {
 impl Default for CreateDatasetUseCaseOptions {
     fn default() -> Self {
         Self {
-            dataset_visibility: DatasetVisibility::PubliclyAvailable,
+            dataset_visibility: DatasetVisibility::Public,
         }
     }
 }

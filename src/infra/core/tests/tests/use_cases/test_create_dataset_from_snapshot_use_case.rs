@@ -189,7 +189,7 @@ async fn test_created_datasets_have_the_correct_visibility_attribute() {
             .push_event(MetadataFactory::set_polling_source().build())
             .build();
         let options = CreateDatasetUseCaseOptions {
-            dataset_visibility: DatasetVisibility::PubliclyAvailable,
+            dataset_visibility: DatasetVisibility::Public,
         };
 
         let public_create_res = harness.use_case.execute(snapshot, options).await.unwrap();
