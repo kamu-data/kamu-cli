@@ -276,7 +276,7 @@ impl DatasetVisibility {
         }
     }
 
-    pub fn is_publicly_available(&self) -> bool {
+    pub fn is_public(&self) -> bool {
         match self {
             DatasetVisibility::Private => false,
             DatasetVisibility::Public => true,

@@ -52,7 +52,7 @@ impl MultiTenantRebacDatasetLifecycleMessageConsumer {
         &self,
         message: &DatasetLifecycleMessageCreated,
     ) -> Result<(), InternalError> {
-        let allows = message.dataset_visibility.is_publicly_available();
+        let allows = message.dataset_visibility.is_public();
         let (name, value) = DatasetPropertyName::allows_public_read(allows);
 
         self.rebac_service
