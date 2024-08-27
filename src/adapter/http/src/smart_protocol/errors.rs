@@ -170,6 +170,9 @@ pub enum PushServerError {
     WriteFailed(PushWriteError),
 
     #[error(transparent)]
+    RefCollision(RefCollisionError),
+
+    #[error(transparent)]
     Internal(PhaseInternalError),
 }
 

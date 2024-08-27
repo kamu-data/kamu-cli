@@ -25,6 +25,7 @@ use kamu_core::{
     DatasetVisibility,
     GetRefError,
     HashedMetadataBlock,
+    RefCollisionError,
 };
 use opendatafabric::{AsTypedBlock, DatasetRef};
 use url::Url;
@@ -171,7 +172,7 @@ impl AxumServerPushProtocolInstance {
                     Ok(create_result) => self.dataset = Some(create_result.dataset),
                     Err(err) => {
                         if let CreateDatasetError::RefCollision(err) = &err {
-                            axum_write_close_payload::<DatasetPushObjectsTransferResponse>(
+                            axum_write_payload::<DatasetPushObjectsTransferResponse>(
                                 &mut self.socket,
                                 DatasetPushObjectsTransferResponse::Err(
                                     DatasetPushObjectsTransferError::RefCollision(
@@ -188,7 +189,10 @@ impl AxumServerPushProtocolInstance {
                                     PushPhase::InitialRequest,
                                 ))
                             })?;
-                        };
+                            return Err(PushServerError::RefCollision(RefCollisionError {
+                                id: err.id.clone(),
+                            }));
+                        }
                         return Err(PushServerError::Internal(PhaseInternalError {
                             phase: TransferPhase::Push(PushPhase::ObjectsUploadProgress),
                             error: err.int_err(),
