@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.198.0] - 2024-08-27
 ### Changed
 - If a polling/push source does not declare a `read` schema or a `preprocess` step (which is the case when ingesting data from a file upload) we apply the following new inference rules:
   - If `event_time` column is present - we will try to coerce it into a timestamp:
@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All tests related to databases use the `database_transactional_test` macro
 - Some skipped tests will now also be run
 - Access token with duplicate names can be created if such name exists but was revoked (now for MySQL as well)
+- Updated `sqlx` crate to address [RUSTSEC-2024-0363](https://rustsec.org/advisories/RUSTSEC-2024-0363)
 ### Fixed
 - Derivative transform crash when input datasets have `AddData` events but don't have any Parquet files yet
 

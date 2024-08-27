@@ -112,5 +112,4 @@ yanked = "deny"
 # TODO: Remove when patches are available
 ignore = [
     "RUSTSEC-2023-0071", # https://rustsec.org/advisories/RUSTSEC-2023-0071.html
-    "RUSTSEC-2024-0363"  # https://rustsec.org/advisories/RUSTSEC-2024-0363
 ]
