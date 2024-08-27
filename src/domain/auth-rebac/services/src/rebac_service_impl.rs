@@ -78,7 +78,7 @@ impl RebacServiceImpl {
         }
     }
 
-    pub async fn handle_dataset_lifecycle_created_message(
+    async fn handle_dataset_lifecycle_created_message(
         &self,
         message: &DatasetLifecycleMessageCreated,
     ) -> Result<(), InternalError> {
@@ -92,7 +92,7 @@ impl RebacServiceImpl {
             })
     }
 
-    pub async fn handle_dataset_lifecycle_deleted_message(
+    async fn handle_dataset_lifecycle_deleted_message(
         &self,
         message: &DatasetLifecycleMessageDeleted,
     ) -> Result<(), InternalError> {
