@@ -9,7 +9,7 @@
 
 use std::path::{Path, PathBuf};
 
-use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
@@ -104,7 +104,7 @@ impl ReaderNdGeoJson {
 
 #[async_trait::async_trait]
 impl Reader for ReaderNdGeoJson {
-    async fn input_schema(&self) -> Option<Schema> {
+    async fn input_schema(&self) -> Option<SchemaRef> {
         self.inner.input_schema().await
     }
 

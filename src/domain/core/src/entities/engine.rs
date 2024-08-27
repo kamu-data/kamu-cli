@@ -123,10 +123,10 @@ pub struct TransformRequestInputExt {
     /// `(prevOffset, newOffset]` interval of data records that will be
     /// considered in this transaction.
     pub new_offset: Option<u64>,
+    /// Arrow schema of the slices
+    pub schema: SchemaRef,
     /// List of data files that will be read
     pub data_slices: Vec<Multihash>,
-    /// TODO: replace with actual schema
-    pub schema_slice: Multihash,
     /// TODO: remove?
     pub explicit_watermarks: Vec<Watermark>,
 }
@@ -137,9 +137,13 @@ pub struct TransformResponseExt {
     pub new_offset_interval: Option<OffsetInterval>,
     /// Watermark advanced by the transaction, if any
     pub new_watermark: Option<DateTime<Utc>>,
+    /// Schema of the output
+    /// TODO: This field should be made required once all engines are updated
+    pub output_schema: Option<SchemaRef>,
     /// New checkpoint written by the engine, if any
     pub new_checkpoint: Option<OwnedFile>,
-    /// Data produced by the operation, if any
+    /// Data produced by the operation, if any. Must be `None` if offset
+    /// interval is empty.
     pub new_data: Option<OwnedFile>,
 }
 

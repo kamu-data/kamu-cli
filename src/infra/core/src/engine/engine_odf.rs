@@ -180,28 +180,49 @@ impl ODFEngine {
         new_data_path: PathBuf,
         new_checkpoint_path: PathBuf,
     ) -> Result<TransformResponseExt, EngineError> {
-        let new_data = if engine_response.new_offset_interval.is_some() {
-            if !new_data_path.exists() {
-                return Err(EngineError::contract_error(
-                    "Engine did not write a response data file",
-                    Vec::new(),
-                ));
-            }
+        let (new_data, output_schema) = if new_data_path.exists() {
             if new_data_path.is_symlink() || !new_data_path.is_file() {
                 return Err(EngineError::contract_error(
                     "Engine wrote data not as a plain file",
                     Vec::new(),
                 ));
             }
-            Some(OwnedFile::new(new_data_path))
+
+            // Read output schema
+            let output_schema =
+                datafusion::parquet::arrow::arrow_reader::ArrowReaderMetadata::load(
+                    &std::fs::File::open(&new_data_path).int_err()?,
+                    Default::default(),
+                )
+                .int_err()?
+                .schema()
+                .clone();
+
+            let new_data = OwnedFile::new(new_data_path);
+
+            // Clean up the data file if it's empty - it was produced only to provide us the
+            // schema
+            let new_data = if engine_response.new_offset_interval.is_none() {
+                None
+            } else {
+                Some(new_data)
+            };
+
+            (new_data, Some(output_schema))
         } else {
-            if new_data_path.exists() {
+            if engine_response.new_offset_interval.is_some() {
                 return Err(EngineError::contract_error(
-                    "Engine wrote data file while the output slice is empty",
+                    "Engine did not write a response data file",
                     Vec::new(),
                 ));
             }
-            None
+
+            tracing::warn!(
+                "Engine didn't write a data file when output slice is empty - in future this will \
+                 be considered an error"
+            );
+
+            (None, None)
         };
 
         let new_checkpoint = if new_checkpoint_path.exists() {
@@ -219,6 +240,7 @@ impl ODFEngine {
         Ok(TransformResponseExt {
             new_offset_interval: engine_response.new_offset_interval,
             new_watermark: engine_response.new_watermark,
+            output_schema,
             new_checkpoint,
             new_data,
         })

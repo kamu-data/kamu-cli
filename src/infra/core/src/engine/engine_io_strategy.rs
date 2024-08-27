@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use container_runtime::*;
+use datafusion::arrow::datatypes::SchemaRef;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::engine::*;
 use kamu_core::*;
@@ -95,9 +96,11 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
         request: TransformRequestExt,
         operation_dir: &Path,
     ) -> Result<MaterializedEngineRequest, InternalError> {
+        let host_in_dir = operation_dir.join("in");
         let host_out_dir = operation_dir.join("out");
         let host_out_data_path = host_out_dir.join("data");
         let host_out_checkpoint_path = host_out_dir.join("checkpoint");
+        std::fs::create_dir(&host_in_dir).int_err()?;
         std::fs::create_dir(&host_out_dir).int_err()?;
 
         let container_in_dir = PathBuf::from("/opt/engine/in");
@@ -122,7 +125,6 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
                 .dataset_repo
                 .get_dataset_by_handle(&input.dataset_handle);
 
-            let mut schema_file = None;
             let mut data_paths = Vec::new();
             for hash in input.data_slices {
                 let container_path = self
@@ -134,24 +136,8 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
                     )
                     .await?;
 
-                if hash == input.schema_slice {
-                    schema_file = Some(container_path.clone());
-                }
-
                 data_paths.push(container_path);
             }
-
-            let schema_file = if let Some(schema_file) = schema_file {
-                schema_file
-            } else {
-                self.materialize_object(
-                    input_dataset.as_data_repo(),
-                    &input.schema_slice,
-                    &container_in_dir,
-                    &mut volumes,
-                )
-                .await?
-            };
 
             let offset_interval = if let Some(new_offset) = input.new_offset {
                 Some(OffsetInterval {
@@ -160,6 +146,16 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
                 })
             } else {
                 None
+            };
+
+            let schema_file = {
+                let name = format!("schema-{}", input.dataset_handle.id.as_multibase());
+                let host_path = host_in_dir.join(&name);
+                let container_path = container_in_dir.join(&name);
+                write_schema_file(&input.schema, &host_path).await?;
+
+                volumes.push((host_path, container_path.clone(), VolumeAccess::ReadOnly).into());
+                container_path
             };
 
             query_inputs.push(TransformRequestInput {
@@ -301,7 +297,6 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
                 .dataset_repo
                 .get_dataset_by_handle(&input.dataset_handle);
 
-            let mut schema_file = None;
             let mut data_paths = Vec::new();
             for hash in input.data_slices {
                 let container_path = self
@@ -314,25 +309,8 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
                     )
                     .await?;
 
-                if hash == input.schema_slice {
-                    schema_file = Some(container_path.clone());
-                }
-
                 data_paths.push(container_path);
             }
-
-            let schema_file = if let Some(schema_file) = schema_file {
-                schema_file
-            } else {
-                self.materialize_object(
-                    input_dataset.as_data_repo(),
-                    &input.schema_slice,
-                    &host_in_dir,
-                    &container_in_dir,
-                    &mut volumes,
-                )
-                .await?
-            };
 
             let offset_interval = if let Some(new_offset) = input.new_offset {
                 Some(OffsetInterval {
@@ -341,6 +319,16 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
                 })
             } else {
                 None
+            };
+
+            let schema_file = {
+                let name = format!("schema-{}", input.dataset_handle.id.as_multibase());
+                let host_path = host_in_dir.join(&name);
+                let container_path = container_in_dir.join(&name);
+                write_schema_file(&input.schema, &host_path).await?;
+
+                volumes.push((host_path, container_path.clone(), VolumeAccess::ReadOnly).into());
+                container_path
             };
 
             query_inputs.push(TransformRequestInput {
@@ -375,6 +363,38 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
             volumes,
         })
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Remove in favor of passing serialized schema
+async fn write_schema_file(schema: &SchemaRef, path: &Path) -> Result<(), InternalError> {
+    use datafusion::prelude::*;
+
+    let ctx = SessionContext::new();
+    let df = ctx
+        .read_batch(datafusion::arrow::array::RecordBatch::new_empty(
+            schema.clone(),
+        ))
+        .int_err()?;
+
+    // TODO: Keep in sync with `DataWriterDataFusion`
+    df.write_parquet(
+        path.to_str().unwrap(),
+        datafusion::dataframe::DataFrameWriteOptions::new().with_single_file_output(true),
+        Some(datafusion::config::TableParquetOptions {
+            global: datafusion::config::ParquetOptions {
+                writer_version: "1.0".into(),
+                compression: Some("snappy".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+    )
+    .await
+    .int_err()?;
+
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

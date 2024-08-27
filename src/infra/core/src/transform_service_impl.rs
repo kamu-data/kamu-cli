@@ -112,36 +112,27 @@ impl TransformServiceImpl {
 
     async fn commit_execute_transform(
         dataset_repo: Arc<dyn DatasetRepository>,
-        mut request: TransformRequestExt,
+        request: TransformRequestExt,
         response: TransformResponseExt,
     ) -> Result<TransformResult, TransformError> {
-        use datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
-
         let old_head = request.head.clone();
+        let mut new_head = old_head.clone();
 
         let dataset = dataset_repo.get_dataset_by_handle(&request.dataset_handle);
 
-        // Read new schema
-        let new_schema = if let Some(out_data) = &response.new_data {
-            let file = std::fs::File::open(out_data.as_path()).int_err()?;
-            let schema = ParquetRecordBatchReaderBuilder::try_new(file)
-                .int_err()?
-                .schema()
-                .clone();
-            Some(schema)
-        } else {
-            None
+        if response.output_schema.is_none() {
+            tracing::warn!("Engine did not produce a schema. In future this will become an error.");
         };
 
         if let Some(prev_schema) = request.schema {
             // Validate schema
-            if let Some(new_schema) = new_schema {
+            if let Some(new_schema) = response.output_schema {
                 DataWriterDataFusion::validate_output_schema_equivalence(&prev_schema, &new_schema)
                     .int_err()?;
             }
         } else {
             // Set schema upon first transform
-            if let Some(new_schema) = new_schema {
+            if let Some(new_schema) = response.output_schema {
                 // TODO: make schema commit atomic with data
                 let commit_schema_result = dataset
                     .commit_event(
@@ -149,15 +140,14 @@ impl TransformServiceImpl {
                         CommitOpts {
                             block_ref: &request.block_ref,
                             system_time: Some(request.system_time),
-                            prev_block_hash: Some(Some(&request.head)),
+                            prev_block_hash: Some(Some(&new_head)),
                             check_object_refs: false,
                             update_block_ref: true,
                         },
                     )
                     .await?;
 
-                // Advance head
-                request.head = commit_schema_result.new_head;
+                new_head = commit_schema_result.new_head;
             }
         }
 
@@ -169,7 +159,7 @@ impl TransformServiceImpl {
             new_watermark: response.new_watermark,
         };
 
-        let commit_result = dataset
+        match dataset
             .commit_execute_transform(
                 params,
                 response.new_data,
@@ -177,17 +167,29 @@ impl TransformServiceImpl {
                 CommitOpts {
                     block_ref: &request.block_ref,
                     system_time: Some(request.system_time),
-                    prev_block_hash: Some(Some(&request.head)),
+                    prev_block_hash: Some(Some(&new_head)),
                     check_object_refs: true,
                     update_block_ref: true,
                 },
             )
-            .await?;
+            .await
+        {
+            Ok(res) => {
+                new_head = res.new_head;
+                Ok(())
+            }
+            Err(CommitError::MetadataAppendError(AppendError::InvalidBlock(
+                AppendValidationError::NoOpEvent(_),
+            ))) => Ok(()),
+            Err(err) => Err(err),
+        }?;
 
-        Ok(TransformResult::Updated {
-            old_head,
-            new_head: commit_result.new_head,
-        })
+        assert_ne!(
+            old_head, new_head,
+            "Commit did not update neither schema nor data"
+        );
+
+        Ok(TransformResult::Updated { old_head, new_head })
     }
 
     // TODO: PERF: Avoid multiple passes over metadata chain
@@ -245,17 +247,6 @@ impl TransformServiceImpl {
         };
         tracing::debug!(?source, "Transforming using source");
 
-        // Check if all inputs are non-empty
-        if futures::stream::iter(&source.inputs)
-            .map(|input| input.dataset_ref.id().unwrap().as_local_ref())
-            .then(|input_ref| async move { self.is_never_pulled(&input_ref).await })
-            .any_ok(|never_pulled| *never_pulled)
-            .await?
-        {
-            tracing::info!("Not processing because one of the inputs was never pulled");
-            return Ok(None);
-        }
-
         // Prepare inputs
         let input_states: Vec<(&TransformInput, Option<&ExecuteTransformInput>)> =
             if let Some(query) = &prev_query {
@@ -274,11 +265,16 @@ impl TransformServiceImpl {
             .await?;
 
         // Nothing to do?
+        // Note that we're considering a schema here, as even if there is no data to
+        // process we would like to run the transform to establish the schema of the
+        // output.
+        //
         // TODO: Detect the situation where inputs only had source updates and skip
         // running the engine
         if inputs
             .iter()
             .all(|i| i.data_slices.is_empty() && i.explicit_watermarks.is_empty())
+            && schema.is_some()
         {
             return Ok(None);
         }
@@ -296,25 +292,6 @@ impl TransformServiceImpl {
             inputs,
             prev_checkpoint: prev_query.and_then(|q| q.new_checkpoint.map(|c| c.physical_hash)),
         }))
-    }
-
-    // TODO: Allow derivative datasets to function with inputs containing no data
-    // This will require passing the schema explicitly instead of relying on a file
-    async fn is_never_pulled(&self, dataset_ref: &DatasetRef) -> Result<bool, InternalError> {
-        let dataset = self
-            .dataset_repo
-            .find_dataset_by_ref(dataset_ref)
-            .await
-            .int_err()?;
-
-        Ok(dataset
-            .as_metadata_chain()
-            .last_data_block()
-            .await
-            .int_err()?
-            .into_event()
-            .and_then(|event| event.last_offset())
-            .is_none())
     }
 
     async fn get_transform_input(
@@ -395,6 +372,21 @@ impl TransformServiceImpl {
         let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
         let input_chain = dataset.as_metadata_chain();
 
+        // Find schema
+        // TODO: Make single-pass via multi-visitor
+        let schema = dataset
+            .as_metadata_chain()
+            .accept_one(SearchSetDataSchemaVisitor::new())
+            .await
+            .int_err()?
+            .into_event()
+            .map(|e| e.schema_as_arrow())
+            .transpose()
+            .int_err()?
+            .ok_or_else(|| InputSchemaNotDefinedError {
+                dataset_handle: dataset_handle.clone(),
+            })?;
+
         // Collect unprocessed input blocks
         let blocks_unprocessed = if let Some(new_block_hash) = &query_input.new_block_hash {
             input_chain
@@ -428,22 +420,6 @@ impl TransformServiceImpl {
             }
         }
 
-        // TODO: Migrate to providing schema directly
-        // TODO: Will not work with schema evolution
-        let schema_slice = if let Some(h) = data_slices.last() {
-            h.clone()
-        } else {
-            input_chain
-                .last_data_block_with_new_data()
-                .await
-                .int_err()?
-                .into_event()
-                .and_then(|event| event.new_data)
-                .map(|new_data| new_data.physical_hash)
-                // Already checked that none of the inputs are empty
-                .unwrap()
-        };
-
         let vocab = match vocab_hint {
             Some(v) => v,
             None => self.get_vocab(&dataset_handle.as_local_ref()).await?,
@@ -460,7 +436,7 @@ impl TransformServiceImpl {
             prev_offset: query_input.prev_offset,
             new_offset: query_input.new_offset,
             data_slices,
-            schema_slice,
+            schema,
             explicit_watermarks,
         };
 
@@ -696,56 +672,74 @@ impl TransformServiceImpl {
             .await?;
 
         // TODO: There might be more operations to do
-        // TODO: Inject time source
-        let next_operation = self
+        match self
             .get_next_operation(&dataset_handle, self.time_source.now())
-            .await;
-
-        if options.reset_derivatives_on_diverged_input
-            && let Err(transform_err) = &next_operation
-            && let TransformError::InvalidInterval(_) = transform_err
+            .await
         {
-            let compaction_result = self
-                .compaction_svc
-                .compact_dataset(
-                    &dataset_handle,
-                    CompactionOptions {
-                        keep_metadata_only: true,
-                        ..Default::default()
+            Ok(Some(operation)) => {
+                let dataset_repo = self.dataset_repo.clone();
+                Self::do_transform(
+                    self.engine_provisioner.clone(),
+                    operation,
+                    |request, response| async move {
+                        Self::commit_execute_transform(dataset_repo, request, response).await
                     },
-                    None,
+                    listener,
                 )
                 .await
-                .int_err()?;
+            }
+            Ok(None) => {
+                listener.begin();
+                listener.success(&TransformResult::UpToDate);
+                Ok(TransformResult::UpToDate)
+            }
+            // TODO: Trapping the error to preserve old behavior - we should consider
+            // surfacing it and handling on upper layers
+            Err(TransformError::InputSchemaNotDefined(e)) => {
+                tracing::info!(
+                    input = %e.dataset_handle,
+                    "Not processing because one of the inputs was never pulled",
+                );
+                listener.begin();
+                listener.success(&TransformResult::UpToDate);
+                Ok(TransformResult::UpToDate)
+            }
+            Err(err @ TransformError::InvalidInterval(_))
+                if options.reset_derivatives_on_diverged_input =>
+            {
+                tracing::warn!(
+                    error = %err,
+                    "Interval error detected - resetting on diverged input",
+                );
 
-            if let CompactionResult::Success { .. } = compaction_result {
-                return self
-                    .transform_impl(
+                let compaction_result = self
+                    .compaction_svc
+                    .compact_dataset(
+                        &dataset_handle,
+                        CompactionOptions {
+                            keep_metadata_only: true,
+                            ..Default::default()
+                        },
+                        None,
+                    )
+                    .await
+                    .int_err()?;
+
+                if let CompactionResult::Success { .. } = compaction_result {
+                    // Recursing to try again after compaction
+                    self.transform_impl(
                         dataset_ref.clone(),
                         TransformOptions {
                             reset_derivatives_on_diverged_input: false,
                         },
                         Some(listener),
                     )
-                    .await;
+                    .await
+                } else {
+                    Err(err)
+                }
             }
-        }
-
-        if let Some(operation) = next_operation? {
-            let dataset_repo = self.dataset_repo.clone();
-            Self::do_transform(
-                self.engine_provisioner.clone(),
-                operation,
-                |request, response| async move {
-                    Self::commit_execute_transform(dataset_repo, request, response).await
-                },
-                listener,
-            )
-            .await
-        } else {
-            listener.begin();
-            listener.success(&TransformResult::UpToDate);
-            Ok(TransformResult::UpToDate)
+            Err(e) => Err(e),
         }
     }
 }

@@ -239,18 +239,17 @@ impl QueryServiceImpl {
 
         let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
 
-        let schema_opt = dataset
+        let schema = dataset
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(_, b)| b.event.into_variant::<SetDataSchema>())
-            .try_first()
+            .accept_one(SearchSetDataSchemaVisitor::new())
             .await
+            .int_err()?
+            .into_event()
+            .map(|e| e.schema_as_arrow())
+            .transpose()
             .int_err()?;
 
-        match schema_opt {
-            Some(schema) => Ok(Option::from(schema.schema_as_arrow().unwrap())),
-            None => Ok(None),
-        }
+        Ok(schema)
     }
 
     #[tracing::instrument(level = "debug", skip_all)]

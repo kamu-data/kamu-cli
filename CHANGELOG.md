@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Changed -->
 <!--- - Fixed -->
 
+## Unreleased
+### Added
+- Container sources env vars now allow string interpolation
+### Changed
+- Schema propagation improvements:
+  - Dataset schema will be defined upon first ingest, even if no records were returned by the source
+  - Schema will also be defined for derivative datasets even if no records produced by the transformation
+  - Above ensures that datasets that for a long time don't produce any data will not block data pipelines
+
 ## [0.198.1] - 2024-08-28
 ### Added
 - Private Datasets, ReBAC integration: 

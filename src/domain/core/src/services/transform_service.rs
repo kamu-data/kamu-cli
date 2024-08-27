@@ -119,6 +119,12 @@ pub enum TransformError {
         TransformNotDefinedError,
     ),
     #[error(transparent)]
+    InputSchemaNotDefined(
+        #[from]
+        #[backtrace]
+        InputSchemaNotDefinedError,
+    ),
+    #[error(transparent)]
     EngineProvisioningError(
         #[from]
         #[backtrace]
@@ -156,9 +162,21 @@ pub enum TransformError {
     ),
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, thiserror::Error)]
 #[error("Dataset does not define a transform")]
 pub struct TransformNotDefinedError {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+#[error("Dataset {dataset_handle} has not defined a schema yet")]
+pub struct InputSchemaNotDefinedError {
+    pub dataset_handle: DatasetHandle,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl From<GetDatasetError> for TransformError {
     fn from(v: GetDatasetError) -> Self {
@@ -177,3 +195,5 @@ impl From<auth::DatasetActionUnauthorizedError> for TransformError {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -96,7 +96,7 @@ async fn test_data_writer_happy_path() {
     .await;
 
     assert_eq!(
-        res.new_block.event.new_watermark.as_ref(),
+        res.add_data_block.unwrap().event.new_watermark.as_ref(),
         Some(&harness.source_event_time)
     );
 
@@ -159,7 +159,12 @@ async fn test_data_writer_happy_path() {
     .await;
 
     assert_eq!(
-        res.new_block.event.new_watermark.as_ref(),
+        res.add_data_block
+            .as_ref()
+            .unwrap()
+            .event
+            .new_watermark
+            .as_ref(),
         Some(&harness.source_event_time)
     );
 
@@ -167,7 +172,7 @@ async fn test_data_writer_happy_path() {
     assert_eq!(schema_block_hash, harness.get_last_schema_block().await.0);
 
     // Round 3 (nothing to commit)
-    let prev_watermark = res.new_block.event.new_watermark.unwrap();
+    let prev_watermark = res.add_data_block.unwrap().event.new_watermark.unwrap();
     harness.set_system_time(Utc.with_ymd_and_hms(2010, 1, 3, 12, 0, 0).unwrap());
     harness.set_source_event_time(Utc.with_ymd_and_hms(2000, 1, 3, 12, 0, 0).unwrap());
 
@@ -215,11 +220,13 @@ async fn test_data_writer_happy_path() {
         .await
         .unwrap();
 
-    assert_eq!(res.new_block.event.new_data, None);
+    let new_block = res.add_data_block.unwrap();
+
+    assert_eq!(new_block.event.new_data, None);
     // Watermark is carried
-    assert_eq!(res.new_block.event.new_watermark, Some(prev_watermark));
+    assert_eq!(new_block.event.new_watermark, Some(prev_watermark));
     // Source state updated
-    assert_eq!(res.new_block.event.new_source_state, Some(source_state));
+    assert_eq!(new_block.event.new_source_state, Some(source_state));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -471,7 +478,8 @@ async fn test_data_writer_ledger_orders_by_event_time() {
     .await;
 
     assert_eq!(
-        res.new_block
+        res.add_data_block
+            .unwrap()
             .event
             .new_watermark
             .as_ref()
@@ -546,7 +554,8 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
     .await;
 
     assert_eq!(
-        res.new_block
+        res.add_data_block
+            .unwrap()
             .event
             .new_watermark
             .as_ref()
@@ -610,7 +619,8 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
     .await;
 
     assert_eq!(
-        res.new_block
+        res.add_data_block
+            .unwrap()
             .event
             .new_watermark
             .as_ref()

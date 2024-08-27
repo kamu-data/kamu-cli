@@ -62,6 +62,7 @@ impl Engine for EngineStub {
         Ok(TransformResponseExt {
             new_offset_interval: None,
             new_watermark: Some(Utc::now()),
+            output_schema: None,
             new_checkpoint: None,
             new_data: None,
         })

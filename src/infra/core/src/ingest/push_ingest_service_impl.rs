@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use datafusion::arrow::array::RecordBatch;
 use datafusion::prelude::{DataFrame, SessionContext};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::ingest::*;
@@ -245,7 +246,7 @@ impl PushIngestServiceImpl {
                 )
             }
         } else {
-            tracing::info!("Read produced an empty data frame");
+            tracing::info!("Read did not produce a data frame");
             None
         };
 
@@ -266,6 +267,8 @@ impl PushIngestServiceImpl {
                 },
             )
             .await;
+
+        tracing::debug!(?stage_result, "Staged the write operation");
 
         match stage_result {
             Ok(staged) => {
@@ -349,12 +352,6 @@ impl PushIngestServiceImpl {
         input_data_path: &Path,
         args: &PushIngestArgs,
     ) -> Result<Option<DataFrame>, PushIngestError> {
-        if input_data_path.metadata().int_err()?.len() == 0 {
-            tracing::info!(path = ?input_data_path, "Early return due to an empty
-        file");
-            return Ok(None);
-        }
-
         let conf = if let Some(media_type) = &args.opts.media_type {
             let conf = self
                 .data_format_registry
@@ -374,6 +371,28 @@ impl PushIngestServiceImpl {
             .data_format_registry
             .get_reader(args.ctx.clone(), conf, temp_path)
             .await?;
+
+        if input_data_path.metadata().int_err()?.len() == 0 {
+            if let Some(read_schema) = reader.input_schema().await {
+                tracing::info!(
+                    path = ?input_data_path,
+                    "Returning an empty data frame as input file is empty",
+                );
+
+                let df = args
+                    .ctx
+                    .read_batch(RecordBatch::new_empty(read_schema))
+                    .int_err()?;
+
+                return Ok(Some(df));
+            }
+
+            tracing::info!(
+                path = ?input_data_path,
+                "Skipping ingest due to an empty file and empty read schema",
+            );
+            return Ok(None);
+        }
 
         let df = reader.read(input_data_path).await?;
         tracing::debug!(schema = ?df.schema(), "Reader created a dataframe");

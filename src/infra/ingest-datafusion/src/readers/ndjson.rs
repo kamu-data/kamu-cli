@@ -8,8 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use std::path::Path;
+use std::sync::Arc;
 
-use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::datasource::file_format::file_compression_type::FileCompressionType;
 use datafusion::prelude::*;
 use internal_error::*;
@@ -22,7 +23,7 @@ use crate::*;
 
 pub struct ReaderNdJson {
     ctx: SessionContext,
-    schema: Option<Schema>,
+    schema: Option<SchemaRef>,
     conf: ReadStepNdJson,
 }
 
@@ -31,7 +32,9 @@ impl ReaderNdJson {
 
     pub async fn new(ctx: SessionContext, conf: ReadStepNdJson) -> Result<Self, ReadError> {
         Ok(Self {
-            schema: super::from_ddl_schema(&ctx, &conf.schema).await?,
+            schema: super::from_ddl_schema(&ctx, &conf.schema)
+                .await?
+                .map(Arc::new),
             ctx,
             conf,
         })
@@ -42,7 +45,7 @@ impl ReaderNdJson {
 
 #[async_trait::async_trait]
 impl Reader for ReaderNdJson {
-    async fn input_schema(&self) -> Option<Schema> {
+    async fn input_schema(&self) -> Option<SchemaRef> {
         self.schema.clone()
     }
 
@@ -64,7 +67,7 @@ impl Reader for ReaderNdJson {
         let options = NdJsonReadOptions {
             file_extension: path.extension().and_then(|s| s.to_str()).unwrap_or(""),
             table_partition_cols: Vec::new(),
-            schema: self.schema.as_ref(),
+            schema: self.schema.as_deref(),
             schema_infer_max_records: Self::DEFAULT_INFER_SCHEMA_ROWS,
             // TODO: PERF: Reader support compression, thus we could detect decompress step and
             // optimize the ingest plan to avoid writing uncompressed data to disc or having to

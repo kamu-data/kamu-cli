@@ -14,7 +14,7 @@ use std::process::Stdio;
 use std::sync::Arc;
 
 use container_runtime::*;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::*;
 use kamu_core::engine::ProcessError;
 use kamu_core::*;
 use kamu_datasets::DatasetEnvVar;
@@ -208,9 +208,13 @@ impl FetchService {
 
         let has_more = new_has_more_data_path.exists();
 
-        if target_path.metadata().int_err()?.len() == 0
-            && prev_source_state == source_state.as_ref()
-        {
+        if source_state.is_some() && source_state.as_ref() == prev_source_state {
+            if target_path.metadata().int_err()?.len() != 0 {
+                Err(ContainerProtocolError::new(
+                    "Source state didn't change but some output data was returned",
+                )
+                .int_err())?;
+            }
             Ok(FetchResult::UpToDate)
         } else {
             Ok(FetchResult::Updated(FetchResultUpdated {
@@ -219,6 +223,22 @@ impl FetchService {
                 has_more,
                 zero_copy_path: None,
             }))
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+#[error("Container protocol error: {message}")]
+struct ContainerProtocolError {
+    pub message: String,
+}
+
+impl ContainerProtocolError {
+    fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
         }
     }
 }

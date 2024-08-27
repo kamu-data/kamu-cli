@@ -10,7 +10,10 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::common::DFSchema;
 use datafusion::prelude::*;
+use futures::TryStreamExt;
 use kamu_core::*;
 use opendatafabric::*;
 
@@ -27,6 +30,20 @@ impl DatasetDataHelper {
 
     pub fn new_with_context(dataset: Arc<dyn Dataset>, ctx: SessionContext) -> Self {
         Self { dataset, ctx }
+    }
+
+    pub async fn data_slice_count(&self) -> usize {
+        let v: Vec<_> = self
+            .dataset
+            .as_metadata_chain()
+            .iter_blocks()
+            .filter_data_stream_blocks()
+            .filter_map_ok(|(_, b)| b.event.new_data.map(|_| 1))
+            .try_collect()
+            .await
+            .unwrap();
+
+        v.iter().sum()
     }
 
     pub async fn get_last_block_typed<T: VariantOf<MetadataEvent>>(&self) -> MetadataBlockTyped<T> {
@@ -93,6 +110,18 @@ impl DatasetDataHelper {
             .unwrap()
     }
 
+    pub async fn get_latest_data_schema(&self) -> SchemaRef {
+        self.dataset
+            .as_metadata_chain()
+            .accept_one(SearchSetDataSchemaVisitor::new())
+            .await
+            .unwrap()
+            .into_event()
+            .unwrap()
+            .schema_as_arrow()
+            .unwrap()
+    }
+
     pub async fn get_last_set_data_schema_block(&self) -> MetadataBlockTyped<SetDataSchema> {
         self.dataset
             .as_metadata_chain()
@@ -101,6 +130,14 @@ impl DatasetDataHelper {
             .unwrap()
             .into_block()
             .unwrap()
+    }
+
+    pub async fn assert_latest_set_schema_eq(&self, expected: &str) {
+        let schema = self.get_latest_data_schema().await;
+        let df_schema =
+            DFSchema::from_unqualified_fields(schema.as_ref().clone().fields, Default::default())
+                .unwrap();
+        kamu_data_utils::testing::assert_schema_eq(&df_schema, expected);
     }
 
     pub async fn assert_last_data_schema_eq(&self, expected: &str) {

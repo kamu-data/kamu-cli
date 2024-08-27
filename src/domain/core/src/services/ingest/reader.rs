@@ -10,7 +10,7 @@
 use std::backtrace::Backtrace;
 use std::path::Path;
 
-use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
 use internal_error::*;
 
@@ -22,7 +22,7 @@ use internal_error::*;
 pub trait Reader: Send + Sync {
     /// Returns schema that the input will be coerced into, if such schema
     /// is defined explicitly.
-    async fn input_schema(&self) -> Option<Schema>;
+    async fn input_schema(&self) -> Option<SchemaRef>;
 
     /// Returns a [DataFrame] with a logical plan set up to read the data.
     ///

@@ -86,7 +86,7 @@ pub struct WriteDataOpts {
 pub struct WriteDataResult {
     pub old_head: odf::Multihash,
     pub new_head: odf::Multihash,
-    pub new_block: odf::MetadataBlockTyped<odf::AddData>,
+    pub add_data_block: Option<odf::MetadataBlockTyped<odf::AddData>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,8 +95,11 @@ pub struct WriteDataResult {
 #[derive(Debug)]
 pub struct StageDataResult {
     pub system_time: DateTime<Utc>,
-    pub add_data: AddDataParams,
+    /// Set when `SetDataSchema` event needs to be committed
     pub new_schema: Option<SchemaRef>,
+    /// Set when `AddData` event needs to be committed
+    pub add_data: Option<AddDataParams>,
+    /// Set when commmit will contains some data
     pub data_file: Option<OwnedFile>,
 }
 

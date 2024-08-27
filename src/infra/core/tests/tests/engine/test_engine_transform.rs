@@ -26,6 +26,8 @@ use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use opendatafabric::*;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct DatasetHelper {
     dataset: Arc<dyn Dataset>,
     tempdir: PathBuf,
@@ -209,57 +211,82 @@ impl DatasetHelper {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct TestHarness {
+    tempdir: tempfile::TempDir,
+    dataset_repo: Arc<DatasetRepositoryLocalFs>,
+    ingest_svc: Arc<dyn PollingIngestService>,
+    push_ingest_svc: Arc<dyn PushIngestService>,
+    transform_svc: Arc<dyn TransformService>,
+    time_source: Arc<SystemTimeSourceStub>,
+}
+
+impl TestHarness {
+    fn new() -> Self {
+        let tempdir = tempfile::tempdir().unwrap();
+        let run_info_dir = tempdir.path().join("run");
+        let cache_dir = tempdir.path().join("cache");
+        let datasets_dir = tempdir.path().join("datasets");
+        std::fs::create_dir(&run_info_dir).unwrap();
+        std::fs::create_dir(&cache_dir).unwrap();
+        std::fs::create_dir(&datasets_dir).unwrap();
+
+        let catalog = dill::CatalogBuilder::new()
+            .add_value(ContainerRuntimeConfig::default())
+            .add_value(RunInfoDir::new(run_info_dir))
+            .add_value(CacheDir::new(cache_dir))
+            .add::<ContainerRuntime>()
+            .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add_value(CurrentAccountSubject::new_test())
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(datasets_dir)
+                    .with_multi_tenant(false),
+            )
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add_value(EngineProvisionerLocalConfig::default())
+            .add::<EngineProvisionerLocal>()
+            .add_value(ObjectStoreRegistryImpl::new(vec![Arc::new(
+                ObjectStoreBuilderLocalFs::new(),
+            )]))
+            .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
+            .add::<DataFormatRegistryImpl>()
+            .add::<FetchService>()
+            .add::<PollingIngestServiceImpl>()
+            .add::<PushIngestServiceImpl>()
+            .add::<TransformServiceImpl>()
+            .add::<CompactionServiceImpl>()
+            .add::<DatasetKeyValueServiceSysEnv>()
+            .add_value(SystemTimeSourceStub::new_set(
+                Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
+            ))
+            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+            .build();
+
+        Self {
+            tempdir,
+            dataset_repo: catalog.get_one().unwrap(),
+            ingest_svc: catalog.get_one().unwrap(),
+            push_ingest_svc: catalog.get_one().unwrap(),
+            transform_svc: catalog.get_one().unwrap(),
+            time_source: catalog.get_one().unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO: Remove `test_retractions` flag once RisingWave can handle them without
 // crashing
 async fn test_transform_common(transform: Transform, test_retractions: bool) {
-    let tempdir = tempfile::tempdir().unwrap();
-    let run_info_dir = tempdir.path().join("run");
-    let cache_dir = tempdir.path().join("cache");
-    let datasets_dir = tempdir.path().join("datasets");
-    std::fs::create_dir(&run_info_dir).unwrap();
-    std::fs::create_dir(&cache_dir).unwrap();
-    std::fs::create_dir(&datasets_dir).unwrap();
-
-    let catalog = dill::CatalogBuilder::new()
-        .add_value(ContainerRuntimeConfig::default())
-        .add_value(RunInfoDir::new(run_info_dir))
-        .add_value(CacheDir::new(cache_dir))
-        .add::<ContainerRuntime>()
-        .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
-        .add_value(CurrentAccountSubject::new_test())
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(false),
-        )
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .add_value(EngineProvisionerLocalConfig::default())
-        .add::<EngineProvisionerLocal>()
-        .add_value(ObjectStoreRegistryImpl::new(vec![Arc::new(
-            ObjectStoreBuilderLocalFs::new(),
-        )]))
-        .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
-        .add::<DataFormatRegistryImpl>()
-        .add::<FetchService>()
-        .add::<PollingIngestServiceImpl>()
-        .add::<TransformServiceImpl>()
-        .add::<CompactionServiceImpl>()
-        .add::<DatasetKeyValueServiceSysEnv>()
-        .add_value(SystemTimeSourceStub::new_set(
-            Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
-        ))
-        .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
-        .build();
-
-    let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
-    let ingest_svc = catalog.get_one::<dyn PollingIngestService>().unwrap();
-    let transform_svc = catalog.get_one::<dyn TransformService>().unwrap();
+    let harness = TestHarness::new();
 
     ///////////////////////////////////////////////////////////////////////////
     // Root setup
     ///////////////////////////////////////////////////////////////////////////
 
-    let src_path = tempdir.path().join("data.csv");
+    let src_path = harness.tempdir.path().join("data.csv");
     std::fs::write(
         &src_path,
         indoc!(
@@ -298,12 +325,14 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
 
     let root_alias = root_snapshot.name.clone();
 
-    dataset_repo
+    harness
+        .dataset_repo
         .create_dataset_from_snapshot(root_snapshot)
         .await
         .unwrap();
 
-    ingest_svc
+    harness
+        .ingest_svc
         .ingest(
             &root_alias.as_local_ref(),
             PollingIngestOptions::default(),
@@ -329,20 +358,23 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
 
     let deriv_alias = deriv_snapshot.name.clone();
 
-    let dataset = dataset_repo
+    let dataset = harness
+        .dataset_repo
         .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()
         .create_dataset_result
         .dataset;
 
-    let deriv_helper = DatasetHelper::new(dataset.clone(), tempdir.path());
+    let deriv_helper = DatasetHelper::new(dataset.clone(), harness.tempdir.path());
     let deriv_data_helper = DatasetDataHelper::new(dataset);
 
-    let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
-    time_source.set(Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap());
+    harness
+        .time_source
+        .set(Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap());
 
-    let res = transform_svc
+    let res = harness
+        .transform_svc
         .transform(
             &deriv_alias.as_local_ref(),
             TransformOptions::default(),
@@ -409,7 +441,8 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
     )
     .unwrap();
 
-    ingest_svc
+    harness
+        .ingest_svc
         .ingest(
             &root_alias.as_local_ref(),
             PollingIngestOptions::default(),
@@ -418,9 +451,12 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .await
         .unwrap();
 
-    time_source.set(Utc.with_ymd_and_hms(2050, 1, 3, 12, 0, 0).unwrap());
+    harness
+        .time_source
+        .set(Utc.with_ymd_and_hms(2050, 1, 3, 12, 0, 0).unwrap());
 
-    let res = transform_svc
+    let res = harness
+        .transform_svc
         .transform(
             &deriv_alias.as_local_ref(),
             TransformOptions::default(),
@@ -475,7 +511,8 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .rewrite_last_data_block_with_equivalent_different_encoding()
         .await;
 
-    let verify_result = transform_svc
+    let verify_result = harness
+        .transform_svc
         .verify_transform(&deriv_alias.as_local_ref(), (None, None), None)
         .await;
 
@@ -489,7 +526,8 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .rewrite_last_data_block_with_different_data()
         .await;
 
-    let verify_result = transform_svc
+    let verify_result = harness
+        .transform_svc
         .verify_transform(&deriv_alias.as_local_ref(), (None, None), None)
         .await;
 
@@ -498,6 +536,8 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         Err(VerificationError::DataNotReproducible(_))
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized, engine, transform, spark)]
 #[test_log::test(tokio::test)]
@@ -518,6 +558,8 @@ async fn test_transform_with_engine_spark() {
     )
     .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized, engine, transform, flink)]
 #[test_log::test(tokio::test)]
@@ -541,6 +583,8 @@ async fn test_transform_with_engine_flink() {
     .await;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized, engine, transform, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_transform_with_engine_datafusion() {
@@ -560,6 +604,8 @@ async fn test_transform_with_engine_datafusion() {
     )
     .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // See: https://github.com/kamu-data/kamu-cli/issues/599
 #[test_group::group(containerized, engine, transform, risingwave)]
@@ -581,6 +627,8 @@ async fn test_transform_with_engine_risingwave() {
     )
     .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Accounts for engine-specific quirks in the schema
 fn normalize_schema(s: &DFSchema, engine: &str) -> DFSchema {
@@ -622,4 +670,207 @@ fn normalize_schema(s: &DFSchema, engine: &str) -> DFSchema {
     }
 
     DFSchema::new_with_metadata(fields, s.metadata().clone()).unwrap()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized, engine, transform, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_transform_empty_inputs() {
+    let harness = TestHarness::new();
+    harness
+        .time_source
+        .set(Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap());
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Root setup
+    ///////////////////////////////////////////////////////////////////////////
+
+    let root = harness
+        .dataset_repo
+        .create_dataset_from_snapshot(
+            MetadataFactory::dataset_snapshot()
+                .name("root")
+                .kind(DatasetKind::Root)
+                .build(),
+        )
+        .await
+        .unwrap()
+        .create_dataset_result;
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Derivative setup
+    ///////////////////////////////////////////////////////////////////////////
+
+    let deriv_snapshot = MetadataFactory::dataset_snapshot()
+        .name("deriv")
+        .kind(DatasetKind::Derivative)
+        .push_event(
+            MetadataFactory::set_transform()
+                .inputs_from_refs([&root.dataset_handle.alias])
+                .transform(
+                    MetadataFactory::transform()
+                        .engine("datafusion")
+                        .query("select event_time, city, 'CA' as country, population from root")
+                        .build(),
+                )
+                .build(),
+        )
+        .build();
+
+    let deriv = harness
+        .dataset_repo
+        .create_dataset_from_snapshot(deriv_snapshot)
+        .await
+        .unwrap()
+        .create_dataset_result;
+
+    // let deriv_helper = DatasetHelper::new(dataset.clone(),
+    // harness.tempdir.path()); let deriv_data_helper =
+    // DatasetDataHelper::new(dataset);
+
+    ///////////////////////////////////////////////////////////////////////////
+    // 1: Input doesn't have schema yet - skip update completely
+    ///////////////////////////////////////////////////////////////////////////
+
+    let res = harness
+        .transform_svc
+        .transform(
+            &deriv.dataset_handle.as_local_ref(),
+            TransformOptions::default(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(res, TransformResult::UpToDate);
+
+    ///////////////////////////////////////////////////////////////////////////
+    // 2: Input has schema, but no data - transorm will establish output schema
+    ///////////////////////////////////////////////////////////////////////////
+
+    root.dataset
+        .commit_event(
+            MetadataFactory::add_push_source()
+                .read(ReadStepNdJson {
+                    schema: Some(vec![
+                        "city STRING".to_string(),
+                        "population INT".to_string(),
+                    ]),
+                    ..Default::default()
+                })
+                .build()
+                .into(),
+            CommitOpts {
+                system_time: Some(harness.time_source.now()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    let ingest_result = harness
+        .push_ingest_svc
+        .ingest_from_file_stream(
+            &root.dataset_handle.as_local_ref(),
+            None,
+            Box::new(tokio::io::BufReader::new(std::io::Cursor::new(b""))),
+            PushIngestOpts::default(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(ingest_result, PushIngestResult::Updated { .. });
+
+    let res = harness
+        .transform_svc
+        .transform(
+            &deriv.dataset_handle.as_local_ref(),
+            TransformOptions::default(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(res, TransformResult::Updated { .. });
+
+    let deriv_helper = DatasetDataHelper::new(deriv.dataset.clone());
+
+    deriv_helper
+        .assert_latest_set_schema_eq(indoc!(
+            r#"
+            message arrow_schema {
+              OPTIONAL INT64 offset;
+              REQUIRED INT32 op;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL BYTE_ARRAY city (STRING);
+              REQUIRED BYTE_ARRAY country (STRING);
+              OPTIONAL INT32 population;
+            }
+            "#
+        ))
+        .await;
+
+    assert_eq!(deriv_helper.data_slice_count().await, 0);
+
+    ///////////////////////////////////////////////////////////////////////////
+    // 3: Input gets some data
+    ///////////////////////////////////////////////////////////////////////////
+
+    let ingest_result = harness
+        .push_ingest_svc
+        .ingest_from_file_stream(
+            &root.dataset_handle.as_local_ref(),
+            None,
+            Box::new(tokio::io::BufReader::new(std::io::Cursor::new(
+                br#"{"city": "A", "population": 100}"#,
+            ))),
+            PushIngestOpts::default(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(ingest_result, PushIngestResult::Updated { .. });
+
+    let res = harness
+        .transform_svc
+        .transform(
+            &deriv.dataset_handle.as_local_ref(),
+            TransformOptions::default(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(res, TransformResult::Updated { .. });
+
+    deriv_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT32 op;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY city (STRING);
+                  REQUIRED BYTE_ARRAY country (STRING);
+                  OPTIONAL INT32 population;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----+----------------------+----------------------+------+---------+------------+
+                | offset | op | system_time          | event_time           | city | country | population |
+                +--------+----+----------------------+----------------------+------+---------+------------+
+                | 0      | 0  | 2050-01-02T12:00:00Z | 2050-01-02T12:00:00Z | A    | CA      | 100        |
+                +--------+----+----------------------+----------------------+------+---------+------------+
+                "#
+            ),
+        )
+        .await;
 }

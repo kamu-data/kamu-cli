@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use datafusion::arrow::array::RecordBatch;
 use datafusion::prelude::{DataFrame, SessionContext};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::ingest::*;
@@ -275,7 +276,7 @@ impl PollingIngestServiceImpl {
                 )
             }
         } else {
-            tracing::info!("Read produced an empty data frame");
+            tracing::info!("Read did not produce a data frame");
             None
         };
 
@@ -525,11 +526,6 @@ impl PollingIngestServiceImpl {
     ) -> Result<Option<DataFrame>, PollingIngestError> {
         let input_data_path = prep_result.data.path(&self.cache_dir);
 
-        if !input_data_path.exists() || input_data_path.metadata().int_err()?.len() == 0 {
-            tracing::info!(path = ?input_data_path, "Early return due to an empty file");
-            return Ok(None);
-        }
-
         let temp_path = args.operation_dir.join("reader.tmp");
         let reader = self
             .data_format_registry
@@ -539,6 +535,28 @@ impl PollingIngestServiceImpl {
                 temp_path,
             )
             .await?;
+
+        if !input_data_path.exists() || input_data_path.metadata().int_err()?.len() == 0 {
+            if let Some(read_schema) = reader.input_schema().await {
+                tracing::info!(
+                    path = ?input_data_path,
+                    "Returning an empty data frame as input file is empty",
+                );
+
+                let df = args
+                    .ctx
+                    .read_batch(RecordBatch::new_empty(read_schema))
+                    .int_err()?;
+
+                return Ok(Some(df));
+            }
+
+            tracing::info!(
+                path = ?input_data_path,
+                "Skipping ingest due to an empty file and empty read schema",
+            );
+            return Ok(None);
+        }
 
         let df = reader.read(&input_data_path).await?;
 

@@ -614,7 +614,7 @@ impl DataWriter for DataWriterDataFusion {
 
         let staged = StageDataResult {
             system_time: opts.system_time,
-            add_data,
+            add_data: Some(add_data),
             new_schema: None,
             data_file: None,
         };
@@ -721,98 +721,118 @@ impl DataWriter for DataWriterDataFusion {
             (add_data, None, None)
         };
 
-        // Do we have anything to commit?
-        if add_data.new_offset_interval.is_none()
-            && add_data.new_watermark == self.meta.prev_watermark
-            && add_data.new_source_state == self.meta.prev_source_state
-        {
-            Err(EmptyCommitError {}.into())
+        // Do we need to commit `SetDataSchema` event?
+        let new_schema = if self.meta.schema.is_none() {
+            new_schema
         } else {
+            None
+        };
+
+        // Do we have anything to commit in `AddData` event?
+        let add_data = if add_data.new_offset_interval.is_some()
+            || add_data.new_watermark != self.meta.prev_watermark
+            || add_data.new_source_state != self.meta.prev_source_state
+        {
+            Some(add_data)
+        } else {
+            None
+        };
+
+        if new_schema.is_some() || add_data.is_some() {
             Ok(StageDataResult {
                 system_time: opts.system_time,
                 add_data,
                 new_schema,
                 data_file,
             })
+        } else {
+            Err(EmptyCommitError {}.into())
         }
     }
 
     #[tracing::instrument(level = "info", skip_all)]
     async fn commit(&mut self, staged: StageDataResult) -> Result<WriteDataResult, CommitError> {
+        assert!(staged.new_schema.is_some() || staged.add_data.is_some());
+
         let old_head = self.meta.head.clone();
 
-        // Commit schema if it was not previously defined
-        if self.meta.schema.is_none() {
-            if let Some(new_schema) = staged.new_schema {
-                // TODO: Make commit of schema and data atomic
-                let commit_schema_result = self
-                    .dataset
-                    .commit_event(
-                        odf::SetDataSchema::new(&new_schema).into(),
-                        CommitOpts {
-                            block_ref: &self.block_ref,
-                            system_time: Some(staged.system_time),
-                            prev_block_hash: Some(Some(&self.meta.head)),
-                            check_object_refs: false,
-                            update_block_ref: true,
-                        },
-                    )
-                    .await?;
+        // Commit `SetDataSchema` event
+        if let Some(new_schema) = staged.new_schema {
+            // TODO: Make commit of schema and data atomic
+            let commit_schema_result = self
+                .dataset
+                .commit_event(
+                    odf::SetDataSchema::new(&new_schema).into(),
+                    CommitOpts {
+                        block_ref: &self.block_ref,
+                        system_time: Some(staged.system_time),
+                        prev_block_hash: Some(Some(&self.meta.head)),
+                        check_object_refs: false,
+                        update_block_ref: true,
+                    },
+                )
+                .await?;
 
-                // Update state
-                self.meta.head = commit_schema_result.new_head;
-                self.meta.schema = Some(new_schema);
+            // Update state
+            self.meta.head = commit_schema_result.new_head;
+            self.meta.schema = Some(new_schema);
+        }
+
+        // Commit `AddData` event
+        let add_data_block = if let Some(add_data) = staged.add_data {
+            let commit_data_result = self
+                .dataset
+                .commit_add_data(
+                    add_data,
+                    staged.data_file,
+                    None,
+                    CommitOpts {
+                        block_ref: &self.block_ref,
+                        system_time: Some(staged.system_time),
+                        prev_block_hash: Some(Some(&self.meta.head)),
+                        check_object_refs: false,
+                        update_block_ref: true,
+                    },
+                )
+                .await?;
+
+            // Update state for the next append
+            let new_block = self
+                .dataset
+                .as_metadata_chain()
+                .get_block(&commit_data_result.new_head)
+                .await
+                .int_err()?
+                .into_typed::<odf::AddData>()
+                .unwrap();
+
+            self.meta.head = commit_data_result.new_head;
+
+            if let Some(new_data) = &new_block.event.new_data {
+                self.meta.prev_offset = Some(new_data.offset_interval.end);
+                self.meta.data_slices.push(new_data.physical_hash.clone());
             }
-        }
 
-        let commit_data_result = self
-            .dataset
-            .commit_add_data(
-                staged.add_data,
-                staged.data_file,
-                None,
-                CommitOpts {
-                    block_ref: &self.block_ref,
-                    system_time: Some(staged.system_time),
-                    prev_block_hash: Some(Some(&self.meta.head)),
-                    check_object_refs: false,
-                    update_block_ref: true,
-                },
-            )
-            .await?;
+            self.meta.prev_checkpoint = new_block
+                .event
+                .new_checkpoint
+                .as_ref()
+                .map(|c| c.physical_hash.clone());
 
-        // Update state for the next append
-        let new_block = self
-            .dataset
-            .as_metadata_chain()
-            .get_block(&commit_data_result.new_head)
-            .await
-            .int_err()?
-            .into_typed::<odf::AddData>()
-            .unwrap();
+            self.meta.prev_watermark = new_block.event.new_watermark;
+            self.meta
+                .prev_source_state
+                .clone_from(&new_block.event.new_source_state);
 
-        self.meta.head = commit_data_result.new_head.clone();
-
-        if let Some(new_data) = &new_block.event.new_data {
-            self.meta.prev_offset = Some(new_data.offset_interval.end);
-            self.meta.data_slices.push(new_data.physical_hash.clone());
-        }
-
-        self.meta.prev_checkpoint = new_block
-            .event
-            .new_checkpoint
-            .as_ref()
-            .map(|c| c.physical_hash.clone());
-
-        self.meta.prev_watermark = new_block.event.new_watermark;
-        self.meta
-            .prev_source_state
-            .clone_from(&new_block.event.new_source_state);
+            Some(new_block)
+        } else {
+            None
+        };
 
         Ok(WriteDataResult {
             old_head,
-            new_head: commit_data_result.new_head,
-            new_block,
+            new_head: self.meta.head.clone(),
+            add_data_block,
         })
     }
 }

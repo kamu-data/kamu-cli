@@ -906,10 +906,7 @@ async fn test_fetch_container_batch_size_default() {
         command: Some(vec!["sh".to_owned()]),
         args: Some(vec![
             "-c".to_owned(),
-            format!(
-                "env | grep -q {ODF_BATCH_SIZE}={}",
-                SourceConfig::default().target_records_per_slice
-            ),
+            "env | grep ODF_BATCH_SIZE".to_owned(),
         ]),
         env: None,
     });
@@ -929,7 +926,15 @@ async fn test_fetch_container_batch_size_default() {
         .await
         .unwrap();
 
-    assert_matches!(res, FetchResult::UpToDate);
+    assert_matches!(res, FetchResult::Updated(_));
+
+    assert_eq!(
+        std::str::from_utf8(&std::fs::read(target_path).unwrap()).unwrap(),
+        format!(
+            "ODF_BATCH_SIZE={}\n",
+            SourceConfig::default().target_records_per_slice
+        ),
+    );
 }
 
 #[test_group::group(containerized)]
@@ -945,7 +950,7 @@ async fn test_fetch_container_batch_size_set() {
         command: Some(vec!["sh".to_owned()]),
         args: Some(vec![
             "-c".to_owned(),
-            format!("env | grep -q {ODF_BATCH_SIZE}={custom_batch_size}"),
+            "env | grep ODF_BATCH_SIZE".to_owned(),
         ]),
         env: Some(vec![EnvVar {
             name: ODF_BATCH_SIZE.to_owned(),
@@ -968,7 +973,12 @@ async fn test_fetch_container_batch_size_set() {
         .await
         .unwrap();
 
-    assert_matches!(res, FetchResult::UpToDate);
+    assert_matches!(res, FetchResult::Updated(_));
+
+    assert_eq!(
+        std::str::from_utf8(&std::fs::read(target_path).unwrap()).unwrap(),
+        format!("ODF_BATCH_SIZE={custom_batch_size}\n"),
+    );
 }
 
 #[test_group::group(containerized)]
@@ -1043,7 +1053,7 @@ async fn test_fetch_container_has_more_no_data() {
         .await
         .unwrap();
 
-    assert_matches!(res, FetchResult::UpToDate);
+    assert_matches!(res, FetchResult::Updated(_));
     assert!(target_path.exists());
     assert_eq!(std::fs::read_to_string(&target_path).unwrap(), "");
 }
