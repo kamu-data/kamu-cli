@@ -25,18 +25,9 @@ pub trait CreateDatasetUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct CreateDatasetUseCaseOptions {
     pub dataset_visibility: DatasetVisibility,
-}
-
-// Used primarily for tests
-impl Default for CreateDatasetUseCaseOptions {
-    fn default() -> Self {
-        Self {
-            dataset_visibility: DatasetVisibility::Public,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
