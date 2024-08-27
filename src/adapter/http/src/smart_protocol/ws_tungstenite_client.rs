@@ -864,13 +864,13 @@ async fn read_payload<TMessagePayload: DeserializeOwned>(
     match stream.next().await {
         Some(msg) => match msg {
             Ok(Message::Text(raw_message)) => {
-                ws_common::parse_payload::<TMessagePayload>(raw_message.as_str())
+                ws_common::get_payload_message::<TMessagePayload>(raw_message.as_str())
             }
             Ok(Message::Close(close_frame_maybe)) => {
                 if let Some(close_frame) = close_frame_maybe
                     && close_frame.code == CloseCode::Error
                 {
-                    return ws_common::parse_payload::<TMessagePayload>(&close_frame.reason);
+                    return ws_common::get_payload_message::<TMessagePayload>(&close_frame.reason);
                 }
                 Err(ReadMessageError::ClientDisconnected)
             }

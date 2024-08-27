@@ -16,6 +16,11 @@ use super::phases::TransferPhase;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const SMART_TRANSFER_PROTOCOL_CLIENT_VERSION: i32 = 1;
+pub const SMART_TRANSFER_PROTOCOL_SERVER_VERSION: i32 = 1;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Initial dataset pull request message
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullRequest {
@@ -252,3 +257,9 @@ pub struct TransferInternalError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct ProtocolPayload<TMessagePayload> {
+    pub version: i32,
+    pub message: TMessagePayload,
+}

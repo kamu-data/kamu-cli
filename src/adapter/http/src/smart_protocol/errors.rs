@@ -9,7 +9,7 @@
 
 use std::fmt::{self, Display};
 
-use internal_error::InternalError;
+use internal_error::{BoxedError, InternalError};
 use kamu_core::{InvalidIntervalError, RefCASError, RefCollisionError};
 use thiserror::Error;
 
@@ -135,11 +135,7 @@ pub enum PullServerError {
     WriteFailed(PullWriteError),
 
     #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
+    Internal(PhaseInternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -258,5 +254,51 @@ impl fmt::Display for PhaseInternalError {
             "Smart protocol phase internal error: phase={}, error={}",
             self.phase, self.error
         )
+    }
+}
+
+impl From<PhaseInternalError> for PushServerError {
+    fn from(value: PhaseInternalError) -> Self {
+        PushServerError::Internal(value)
+    }
+}
+
+impl From<PhaseInternalError> for PullServerError {
+    fn from(value: PhaseInternalError) -> Self {
+        PullServerError::Internal(value)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait ErrorIntoProtocolInternal {
+    fn protocol_int_err(self, phase: TransferPhase) -> PhaseInternalError;
+}
+
+impl<E> ErrorIntoProtocolInternal for E
+where
+    E: Into<BoxedError>,
+{
+    fn protocol_int_err(self, phase: TransferPhase) -> PhaseInternalError {
+        PhaseInternalError {
+            phase,
+            error: InternalError::new(self),
+        }
+    }
+}
+
+pub trait ResultIntoProtocolInternal<OK> {
+    fn protocol_int_err(self, phase: TransferPhase) -> Result<OK, PhaseInternalError>;
+}
+
+impl<OK, E> ResultIntoProtocolInternal<OK> for Result<OK, E>
+where
+    E: Into<BoxedError>,
+{
+    fn protocol_int_err(self, phase: TransferPhase) -> Result<OK, PhaseInternalError> {
+        match self {
+            Ok(ok) => Ok(ok),
+            Err(e) => Err(e.protocol_int_err(phase)),
+        }
     }
 }

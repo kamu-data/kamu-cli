@@ -37,7 +37,7 @@ pub(crate) async fn axum_write_payload<TMessagePayload: Serialize>(
     socket: &mut axum::extract::ws::WebSocket,
     payload: TMessagePayload,
 ) -> Result<(), WriteMessageError> {
-    let payload_as_json_string = ws_common::payload_to_json::<TMessagePayload>(payload)?;
+    let payload_as_json_string = ws_common::combine_payload::<TMessagePayload>(payload)?;
 
     let message = axum::extract::ws::Message::Text(payload_as_json_string);
     let send_result = socket.send(message).await;
@@ -53,7 +53,7 @@ pub(crate) async fn axum_write_close_payload<TMessagePayload: Serialize>(
     socket: &mut axum::extract::ws::WebSocket,
     payload: TMessagePayload,
 ) -> Result<(), WriteMessageError> {
-    let payload_as_json_string = ws_common::payload_to_json::<TMessagePayload>(payload)?;
+    let payload_as_json_string = ws_common::combine_payload::<TMessagePayload>(payload)?;
     let close_frame = CloseFrame {
         // Code will be mapped CloseCode::Error type on client side
         code: 1011,
