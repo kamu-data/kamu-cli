@@ -7,107 +7,75 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabaseTransactionRunner, MySqlTransactionManager};
+use database_common::MySqlTransactionManager;
+use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use internal_error::InternalError;
 use kamu_accounts_mysql::{MySqlAccessTokenRepository, MySqlAccountRepository};
 use sqlx::MySqlPool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, mysql)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
-async fn test_missing_access_token_not_found(mysql_pool: MySqlPool) {
-    let harness = MySqlAccessTokenRepositoryHarness::new(mysql_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_missing_account_not_found(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = mysql,
+    fixture = kamu_accounts_repo_tests::test_missing_access_token_not_found,
+    harness = MySqlAccessTokenRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, mysql)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
-async fn test_insert_and_locate_access_token(mysql_pool: MySqlPool) {
-    let harness = MySqlAccessTokenRepositoryHarness::new(mysql_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_insert_and_locate_access_token(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = mysql,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_access_token,
+    harness = MySqlAccessTokenRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, mysql)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
-async fn test_insert_and_locate_multiple_access_tokens(mysql_pool: MySqlPool) {
-    let harness = MySqlAccessTokenRepositoryHarness::new(mysql_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_insert_and_locate_multiple_access_tokens(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = mysql,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_multiple_access_tokens,
+    harness = MySqlAccessTokenRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, mysql)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
-async fn test_mark_existing_access_token_revorked(mysql_pool: MySqlPool) {
-    let harness = MySqlAccessTokenRepositoryHarness::new(mysql_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_mark_existing_access_token_revorked(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = mysql,
+    fixture = kamu_accounts_repo_tests::test_mark_existing_access_token_revoked,
+    harness = MySqlAccessTokenRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, mysql)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
-async fn test_mark_non_existing_access_token_revorked(mysql_pool: MySqlPool) {
-    let harness = MySqlAccessTokenRepositoryHarness::new(mysql_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_mark_non_existing_access_token_revorked(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = mysql,
+    fixture = kamu_accounts_repo_tests::test_create_duplicate_active_access_token,
+    harness = MySqlAccessTokenRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, mysql)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/mysql"))]
-async fn test_find_account_by_active_token_id(mysql_pool: MySqlPool) {
-    let harness = MySqlAccessTokenRepositoryHarness::new(mysql_pool);
+database_transactional_test!(
+    storage = mysql,
+    fixture = kamu_accounts_repo_tests::test_create_duplicate_access_token_error,
+    harness = MySqlAccessTokenRepositoryHarness
+);
 
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_find_account_by_active_token_id(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = mysql,
+    fixture = kamu_accounts_repo_tests::test_mark_non_existing_access_token_revoked,
+    harness = MySqlAccessTokenRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = mysql,
+    fixture = kamu_accounts_repo_tests::test_find_account_by_active_token_id,
+    harness = MySqlAccessTokenRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -129,3 +97,5 @@ impl MySqlAccessTokenRepositoryHarness {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

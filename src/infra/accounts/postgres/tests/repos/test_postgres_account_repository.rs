@@ -7,189 +7,99 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabaseTransactionRunner, PostgresTransactionManager};
+use database_common::PostgresTransactionManager;
+use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use internal_error::InternalError;
 use kamu_accounts_postgres::PostgresAccountRepository;
 use sqlx::PgPool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_missing_account_not_found(pg_pool: PgPool) {
-    let harness = PostgresAccountRepositoryHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_missing_account_not_found(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_missing_account_not_found,
+    harness = PostgresAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_insert_and_locate_cli_account(pg_pool: PgPool) {
-    let harness = PostgresAccountRepositoryHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_insert_and_locate_password_account(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_password_account,
+    harness = PostgresAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_insert_and_locate_github_account(pg_pool: PgPool) {
-    let harness = PostgresAccountRepositoryHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_insert_and_locate_github_account(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_github_account,
+    harness = PostgresAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_insert_and_locate_multiple_github_account(pg_pool: PgPool) {
-    let harness = PostgresAccountRepositoryHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_insert_and_locate_multiple_github_account(&catalog)
-                .await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_multiple_github_account,
+    harness = PostgresAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_insert_and_locate_account_without_email(pg_pool: PgPool) {
-    let harness = PostgresAccountRepositoryHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_insert_and_locate_account_without_email(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_account_without_email,
+    harness = PostgresAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_duplicate_password_account_id(pg_pool: PgPool) {
-    let harness = PostgresAccountRepositoryHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_duplicate_password_account_id(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_duplicate_password_account_id,
+    harness = PostgresAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_duplicate_password_account_email(pg_pool: PgPool) {
-    let harness = PostgresAccountRepositoryHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_duplicate_password_account_email(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_duplicate_password_account_email,
+    harness = PostgresAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_duplicate_github_account_id(pg_pool: PgPool) {
-    let harness = PostgresAccountRepositoryHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_duplicate_github_account_id(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_duplicate_github_account_id,
+    harness = PostgresAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_duplicate_github_account_name(pg_pool: PgPool) {
-    let harness = PostgresAccountRepositoryHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_duplicate_github_account_name(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_duplicate_github_account_name,
+    harness = PostgresAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_duplicate_github_account_provider_identity(pg_pool: PgPool) {
-    let harness = PostgresAccountRepositoryHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_duplicate_github_account_provider_identity(&catalog)
-                .await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_duplicate_github_account_provider_identity,
+    harness = PostgresAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_duplicate_github_account_email(pg_pool: PgPool) {
-    let harness = PostgresAccountRepositoryHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_accounts_repo_tests::test_duplicate_github_account_email(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_duplicate_github_account_email,
+    harness = PostgresAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -114,7 +114,7 @@ pub async fn test_insert_and_locate_multiple_access_tokens(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_mark_existing_access_token_revorked(catalog: &Catalog) {
+pub async fn test_mark_existing_access_token_revoked(catalog: &Catalog) {
     let access_token = make_test_access_token("foo", None, "wasya");
     let account = make_test_account(
         "wasya",
@@ -195,7 +195,7 @@ pub async fn test_create_duplicate_active_access_token(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_create_duplicate_access_token_err(catalog: &Catalog) {
+pub async fn test_create_duplicate_access_token_error(catalog: &Catalog) {
     let access_token = make_test_access_token("foo", None, "wasya");
     let access_token_duplicate = make_test_access_token("foo", None, "wasya");
 
@@ -230,7 +230,7 @@ pub async fn test_create_duplicate_access_token_err(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_mark_non_existing_access_token_revorked(catalog: &Catalog) {
+pub async fn test_mark_non_existing_access_token_revoked(catalog: &Catalog) {
     let access_token = make_test_access_token("foo", None, "wasya");
 
     let access_token_repo = catalog.get_one::<dyn AccessTokenRepository>().unwrap();
@@ -287,3 +287,5 @@ pub async fn test_find_account_by_active_token_id(catalog: &Catalog) {
         .await;
     assert_matches!(db_account_res, Err(FindAccountByTokenError::NotFound(_)));
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,62 +7,65 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
+use database_common_macros::database_transactional_test;
+use dill::{Catalog, CatalogBuilder};
 use kamu_task_system_inmem::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_event_store_empty() {
-    let catalog = CatalogBuilder::new()
-        .add::<InMemoryTaskSystemEventStore>()
-        .build();
-
-    kamu_task_system_repo_tests::test_event_store_empty(&catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_task_system_repo_tests::test_event_store_empty,
+    harness = InMemoryTaskSystemEventStoreHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_event_store_get_streams() {
-    let catalog = CatalogBuilder::new()
-        .add::<InMemoryTaskSystemEventStore>()
-        .build();
-
-    kamu_task_system_repo_tests::test_event_store_get_streams(&catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_task_system_repo_tests::test_event_store_get_streams,
+    harness = InMemoryTaskSystemEventStoreHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_event_store_get_events_with_windowing() {
-    let catalog = CatalogBuilder::new()
-        .add::<InMemoryTaskSystemEventStore>()
-        .build();
-
-    kamu_task_system_repo_tests::test_event_store_get_events_with_windowing(&catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_task_system_repo_tests::test_event_store_get_events_with_windowing,
+    harness = InMemoryTaskSystemEventStoreHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_event_store_get_events_by_tasks() {
-    let catalog = CatalogBuilder::new()
-        .add::<InMemoryTaskSystemEventStore>()
-        .build();
-
-    kamu_task_system_repo_tests::test_event_store_get_events_by_tasks(&catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_task_system_repo_tests::test_event_store_get_events_by_tasks,
+    harness = InMemoryTaskSystemEventStoreHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_event_store_get_dataset_tasks() {
-    let catalog = CatalogBuilder::new()
-        .add::<InMemoryTaskSystemEventStore>()
-        .build();
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_task_system_repo_tests::test_event_store_get_dataset_tasks,
+    harness = InMemoryTaskSystemEventStoreHarness
+);
 
-    kamu_task_system_repo_tests::test_event_store_get_dataset_tasks(&catalog).await;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct InMemoryTaskSystemEventStoreHarness {
+    catalog: Catalog,
+}
+
+impl InMemoryTaskSystemEventStoreHarness {
+    pub fn new() -> Self {
+        let mut catalog_builder = CatalogBuilder::new();
+        catalog_builder.add::<InMemoryTaskSystemEventStore>();
+
+        Self {
+            catalog: catalog_builder.build(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

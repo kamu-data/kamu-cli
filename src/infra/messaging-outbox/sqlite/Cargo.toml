@@ -43,6 +43,7 @@ tracing = { version = "0.1", default-features = false }
 
 
 [dev-dependencies]
+database-common-macros = { workspace = true }
 kamu-messaging-outbox-repo-tests = { workspace = true }
 
 test-group = { version = "1" }

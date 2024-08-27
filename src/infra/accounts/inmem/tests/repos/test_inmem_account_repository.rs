@@ -7,106 +7,105 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_inmem::InMemoryAccountRepository;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_missing_account_not_found() {
-    let harness = InmemAccountRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_missing_account_not_found(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_missing_account_not_found,
+    harness = InMemoryAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_insert_and_locate_cli_account() {
-    let harness = InmemAccountRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_insert_and_locate_password_account(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_password_account,
+    harness = InMemoryAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_insert_and_locate_github_account() {
-    let harness = InmemAccountRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_insert_and_locate_github_account(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_github_account,
+    harness = InMemoryAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_insert_and_locate_multiple_github_account() {
-    let harness = InmemAccountRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_insert_and_locate_multiple_github_account(&harness.catalog)
-        .await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_multiple_github_account,
+    harness = InMemoryAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_insert_and_locate_account_without_email() {
-    let harness = InmemAccountRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_insert_and_locate_account_without_email(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_insert_and_locate_account_without_email,
+    harness = InMemoryAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_duplicate_password_account_id() {
-    let harness = InmemAccountRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_duplicate_password_account_id(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_duplicate_password_account_id,
+    harness = InMemoryAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_duplicate_password_account_email() {
-    let harness = InmemAccountRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_duplicate_password_account_email(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_duplicate_password_account_email,
+    harness = InMemoryAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_duplicate_github_account_id() {
-    let harness = InmemAccountRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_duplicate_github_account_id(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_duplicate_github_account_id,
+    harness = InMemoryAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_duplicate_github_account_name() {
-    let harness = InmemAccountRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_duplicate_github_account_name(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_duplicate_github_account_name,
+    harness = InMemoryAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_duplicate_github_account_provider_identity() {
-    let harness = InmemAccountRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_duplicate_github_account_provider_identity(&harness.catalog)
-        .await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_duplicate_github_account_provider_identity,
+    harness = InMemoryAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_duplicate_github_account_email() {
-    let harness = InmemAccountRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_duplicate_github_account_email(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_duplicate_github_account_email,
+    harness = InMemoryAccountRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct InmemAccountRepositoryHarness {
+struct InMemoryAccountRepositoryHarness {
     catalog: Catalog,
 }
 
-impl InmemAccountRepositoryHarness {
+impl InMemoryAccountRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryAccountRepository>();

@@ -7,91 +7,51 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabaseTransactionRunner, SqliteTransactionManager};
+use database_common::SqliteTransactionManager;
+use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_task_system::InternalError;
 use kamu_task_system_sqlite::SqliteTaskSystemEventStore;
 use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_event_store_empty(sqlite_pool: SqlitePool) {
-    let harness = SqliteTaskSystemEventStoreHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_task_system_repo_tests::test_event_store_empty(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_task_system_repo_tests::test_event_store_empty,
+    harness = SqliteTaskSystemEventStoreHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_event_store_get_streams(sqlite_pool: SqlitePool) {
-    let harness = SqliteTaskSystemEventStoreHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_task_system_repo_tests::test_event_store_get_streams(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_task_system_repo_tests::test_event_store_get_streams,
+    harness = SqliteTaskSystemEventStoreHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_event_store_get_events_with_windowing(sqlite_pool: SqlitePool) {
-    let harness = SqliteTaskSystemEventStoreHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_task_system_repo_tests::test_event_store_get_events_with_windowing(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_task_system_repo_tests::test_event_store_get_events_with_windowing,
+    harness = SqliteTaskSystemEventStoreHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_event_store_get_events_by_tasks(sqlite_pool: SqlitePool) {
-    let harness = SqliteTaskSystemEventStoreHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_task_system_repo_tests::test_event_store_get_events_by_tasks(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_task_system_repo_tests::test_event_store_get_events_by_tasks,
+    harness = SqliteTaskSystemEventStoreHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, sqlite)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-async fn test_event_store_get_dataset_tasks(sqlite_pool: SqlitePool) {
-    let harness = SqliteTaskSystemEventStoreHarness::new(sqlite_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_task_system_repo_tests::test_event_store_get_dataset_tasks(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_task_system_repo_tests::test_event_store_get_dataset_tasks,
+    harness = SqliteTaskSystemEventStoreHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

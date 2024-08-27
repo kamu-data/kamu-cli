@@ -23,7 +23,6 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-database-common-macros = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 kamu-accounts = { workspace = true }
@@ -52,6 +51,7 @@ serde_with = { version = "3", default-features = false }
 
 [dev-dependencies]
 database-common = { workspace = true }
+database-common-macros = { workspace = true }
 kamu = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }

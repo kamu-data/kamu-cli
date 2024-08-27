@@ -87,14 +87,10 @@ impl AccessTokenRepository for MySqlAccessTokenRepository {
         .execute(connection_mut)
         .await
         .map_err(|e: sqlx::Error| match e {
-            sqlx::Error::Database(e) => {
-                if e.is_unique_violation() {
-                    CreateAccessTokenError::Duplicate(CreateAccessTokenErrorDuplicate {
-                        access_token_name: access_token.token_name.clone(),
-                    })
-                } else {
-                    CreateAccessTokenError::Internal(e.int_err())
-                }
+            sqlx::Error::Database(e) if e.is_unique_violation() => {
+                CreateAccessTokenError::Duplicate(CreateAccessTokenErrorDuplicate {
+                    access_token_name: access_token.token_name.clone(),
+                })
             }
             _ => CreateAccessTokenError::Internal(e.int_err()),
         })?;
@@ -146,8 +142,7 @@ impl AccessTokenRepository for MySqlAccessTokenRepository {
         )
         .fetch_one(connection_mut)
         .await
-        .int_err()
-        .map_err(GetAccessTokenError::Internal)?;
+        .map_int_err(GetAccessTokenError::Internal)?;
 
         Ok(usize::try_from(access_token_count).unwrap_or(0))
     }
@@ -184,8 +179,7 @@ impl AccessTokenRepository for MySqlAccessTokenRepository {
         )
         .fetch_all(connection_mut)
         .await
-        .int_err()
-        .map_err(GetAccessTokenError::Internal)?;
+        .map_int_err(GetAccessTokenError::Internal)?;
 
         Ok(access_token_rows.into_iter().map(Into::into).collect())
     }
@@ -226,8 +220,7 @@ impl AccessTokenRepository for MySqlAccessTokenRepository {
         )
         .execute(&mut *connection_mut)
         .await
-        .int_err()
-        .map_err(RevokeTokenError::Internal)?;
+        .map_int_err(RevokeTokenError::Internal)?;
 
         Ok(())
     }
@@ -267,8 +260,7 @@ impl AccessTokenRepository for MySqlAccessTokenRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(FindAccountByTokenError::Internal)?;
+        .map_int_err(FindAccountByTokenError::Internal)?;
 
         if let Some(account_row) = maybe_account_row {
             if token_hash != account_row.token_hash.as_slice() {
@@ -284,3 +276,5 @@ impl AccessTokenRepository for MySqlAccessTokenRepository {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

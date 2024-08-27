@@ -7,32 +7,33 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_inmem::InMemoryAccountRepository;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_no_password_stored() {
-    let harness = InmemPasswordHashRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_no_password_stored(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_no_password_stored,
+    harness = InMemoryPasswordHashRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_store_couple_account_passwords() {
-    let harness = InmemPasswordHashRepositoryHarness::new();
-    kamu_accounts_repo_tests::test_store_couple_account_passwords(&harness.catalog).await;
-}
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_store_couple_account_passwords,
+    harness = InMemoryPasswordHashRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct InmemPasswordHashRepositoryHarness {
+struct InMemoryPasswordHashRepositoryHarness {
     catalog: Catalog,
 }
 
-impl InmemPasswordHashRepositoryHarness {
+impl InMemoryPasswordHashRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryAccountRepository>();

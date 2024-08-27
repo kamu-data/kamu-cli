@@ -42,6 +42,7 @@ uuid = "1"
 
 
 [dev-dependencies]
+database-common-macros = { workspace = true }
 kamu-accounts-repo-tests = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }

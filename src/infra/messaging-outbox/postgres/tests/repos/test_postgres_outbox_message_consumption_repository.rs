@@ -7,93 +7,51 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabaseTransactionRunner, PostgresTransactionManager};
+use database_common::PostgresTransactionManager;
+use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use internal_error::InternalError;
 use kamu_messaging_outbox_postgres::PostgresOutboxMessageConsumptionRepository;
 use sqlx::PgPool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_no_outbox_consumptions_initially(pg_pool: PgPool) {
-    let harness = PostgresOutboxMessageConsumptionRepositoryHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_messaging_outbox_repo_tests::test_no_outbox_consumptions_initially(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_messaging_outbox_repo_tests::test_no_outbox_consumptions_initially,
+    harness = PostgresOutboxMessageConsumptionRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_create_consumption(pg_pool: PgPool) {
-    let harness = PostgresOutboxMessageConsumptionRepositoryHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_messaging_outbox_repo_tests::test_create_consumption(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_messaging_outbox_repo_tests::test_create_consumption,
+    harness = PostgresOutboxMessageConsumptionRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_update_existing_consumption(pg_pool: PgPool) {
-    let harness = PostgresOutboxMessageConsumptionRepositoryHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_messaging_outbox_repo_tests::test_update_existing_consumption(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_messaging_outbox_repo_tests::test_update_existing_consumption,
+    harness = PostgresOutboxMessageConsumptionRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_cannot_update_consumption_before_creation(pg_pool: PgPool) {
-    let harness = PostgresOutboxMessageConsumptionRepositoryHarness::new(pg_pool);
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_messaging_outbox_repo_tests::test_cannot_update_consumption_before_creation,
+    harness = PostgresOutboxMessageConsumptionRepositoryHarness
+);
 
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_messaging_outbox_repo_tests::test_cannot_update_consumption_before_creation(
-                &catalog,
-            )
-            .await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(database, postgres)]
-#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-async fn test_multiple_boundaries(pg_pool: PgPool) {
-    let harness = PostgresOutboxMessageConsumptionRepositoryHarness::new(pg_pool);
-
-    DatabaseTransactionRunner::new(harness.catalog)
-        .transactional(|catalog| async move {
-            kamu_messaging_outbox_repo_tests::test_multiple_boundaries(&catalog).await;
-            Ok::<_, InternalError>(())
-        })
-        .await
-        .unwrap();
-}
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_messaging_outbox_repo_tests::test_multiple_boundaries,
+    harness = PostgresOutboxMessageConsumptionRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
