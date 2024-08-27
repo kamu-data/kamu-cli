@@ -28,8 +28,8 @@ type Harness = MultiTenantRebacDatasetLifecycleMessageConsumerHarness;
 async fn test_rebac_properties_added() {
     let harness = Harness::new();
 
-    let (_, dataset_id_1) = DatasetID::new_generated_ed25519();
-    let (_, dataset_id_2) = DatasetID::new_generated_ed25519();
+    let (_, public_dataset_id) = DatasetID::new_generated_ed25519();
+    let (_, private_dataset_id) = DatasetID::new_generated_ed25519();
     let (_, owner_id) = AccountID::new_generated_ed25519();
 
     // Pre-checks
@@ -37,7 +37,7 @@ async fn test_rebac_properties_added() {
         assert_matches!(
             harness
                 .rebac_service
-                .get_dataset_properties(&dataset_id_1)
+                .get_dataset_properties(&public_dataset_id)
                 .await,
             Ok(props)
                 if props.is_empty()
@@ -45,7 +45,7 @@ async fn test_rebac_properties_added() {
         assert_matches!(
             harness
                 .rebac_service
-                .get_dataset_properties(&dataset_id_2)
+                .get_dataset_properties(&private_dataset_id)
                 .await,
             Ok(props)
                 if props.is_empty()
@@ -56,14 +56,14 @@ async fn test_rebac_properties_added() {
     {
         harness
             .consume_message(DatasetLifecycleMessage::created(
-                dataset_id_1.clone(),
+                public_dataset_id.clone(),
                 owner_id.clone(),
                 DatasetVisibility::Public,
             ))
             .await;
         harness
             .consume_message(DatasetLifecycleMessage::created(
-                dataset_id_2.clone(),
+                private_dataset_id.clone(),
                 owner_id,
                 DatasetVisibility::Private,
             ))
@@ -75,7 +75,7 @@ async fn test_rebac_properties_added() {
         assert_matches!(
             harness
                 .rebac_service
-                .get_dataset_properties(&dataset_id_1)
+                .get_dataset_properties(&public_dataset_id)
                 .await,
             Ok(props)
                 if props == vec![PropertyName::dataset_allows_public_read(true)]
@@ -83,7 +83,7 @@ async fn test_rebac_properties_added() {
         assert_matches!(
             harness
                 .rebac_service
-                .get_dataset_properties(&dataset_id_2)
+                .get_dataset_properties(&private_dataset_id)
                 .await,
             Ok(props)
                 if props == vec![PropertyName::dataset_allows_public_read(false)]
