@@ -4857,9 +4857,6 @@ dependencies = [
  "kamu-accounts",
  "kamu-accounts-inmem",
  "kamu-accounts-services",
- "kamu-auth-rebac",
- "kamu-auth-rebac-inmem",
- "kamu-auth-rebac-services",
  "kamu-core",
  "kamu-data-utils",
  "kamu-datasets",
@@ -5310,9 +5307,13 @@ dependencies = [
  "futures",
  "internal-error",
  "kamu-auth-rebac",
+ "kamu-auth-rebac-inmem",
  "kamu-core",
  "messaging-outbox",
  "opendatafabric",
+ "serde_json",
+ "test-log",
+ "tokio",
  "tracing",
 ]
 
