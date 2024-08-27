@@ -9,8 +9,7 @@
 
 use std::sync::Arc;
 
-use dill::{component, interface, meta, Catalog};
-use internal_error::{InternalError, ResultIntoInternal};
+use dill::{component, interface};
 use kamu_auth_rebac::{
     AccountPropertyName,
     AccountToDatasetRelation,
@@ -34,71 +33,19 @@ use kamu_auth_rebac::{
     SubjectEntityRelationsError,
     UnsetEntityPropertyError,
 };
-use kamu_core::{
-    DatasetLifecycleMessage,
-    DatasetLifecycleMessageCreated,
-    DatasetLifecycleMessageDeleted,
-    DatasetRepository,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-};
-use messaging_outbox::{
-    MessageConsumer,
-    MessageConsumerMeta,
-    MessageConsumerT,
-    MessageConsumptionDurability,
-};
 use opendatafabric::{AccountID, DatasetID};
-
-use crate::MESSAGE_CONSUMER_KAMU_REBAC_SERVICE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RebacServiceImpl {
     rebac_repo: Arc<dyn RebacRepository>,
-    dataset_repo_reader: Arc<dyn DatasetRepository>,
 }
 
 #[component(pub)]
 #[interface(dyn RebacService)]
-#[interface(dyn MessageConsumer)]
-#[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
-#[meta(MessageConsumerMeta {
-    consumer_name: MESSAGE_CONSUMER_KAMU_REBAC_SERVICE,
-    feeding_producers: &[
-        MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-    ],
-    durability: MessageConsumptionDurability::Durable,
-})]
 impl RebacServiceImpl {
-    pub fn new(
-        rebac_repo: Arc<dyn RebacRepository>,
-        dataset_repo_reader: Arc<dyn DatasetRepository>,
-    ) -> Self {
-        Self {
-            rebac_repo,
-            dataset_repo_reader,
-        }
-    }
-
-    async fn handle_dataset_lifecycle_created_message(
-        &self,
-        message: &DatasetLifecycleMessageCreated,
-    ) -> Result<(), InternalError> {
-        let allows = message.dataset_visibility.is_publicly_available();
-        let (name, value) = DatasetPropertyName::allows_public_read(allows);
-
-        self.set_dataset_property(&message.dataset_id, name, &value)
-            .await
-            .int_err()
-    }
-
-    async fn handle_dataset_lifecycle_deleted_message(
-        &self,
-        message: &DatasetLifecycleMessageDeleted,
-    ) -> Result<(), InternalError> {
-        self.delete_dataset_properties(&message.dataset_id)
-            .await
-            .int_err()
+    pub fn new(rebac_repo: Arc<dyn RebacRepository>) -> Self {
+        Self { rebac_repo }
     }
 }
 
@@ -289,44 +236,6 @@ impl RebacService for RebacServiceImpl {
             .await?;
 
         Ok(object_entities)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl MessageConsumer for RebacServiceImpl {}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl MessageConsumerT<DatasetLifecycleMessage> for RebacServiceImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
-    async fn consume_message(
-        &self,
-        _: &Catalog,
-        message: &DatasetLifecycleMessage,
-    ) -> Result<(), InternalError> {
-        let is_single_tenant_workspace = !self.dataset_repo_reader.is_multi_tenant();
-
-        if is_single_tenant_workspace {
-            // We don't need ReBAC within one user
-            return Ok(());
-        }
-
-        match message {
-            DatasetLifecycleMessage::Created(message) => {
-                self.handle_dataset_lifecycle_created_message(message).await
-            }
-
-            DatasetLifecycleMessage::Deleted(message) => {
-                self.handle_dataset_lifecycle_deleted_message(message).await
-            }
-
-            DatasetLifecycleMessage::DependenciesUpdated(_) => {
-                // No action required
-                Ok(())
-            }
-        }
     }
 }
 

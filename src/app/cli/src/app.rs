@@ -20,7 +20,7 @@ use kamu_accounts::*;
 use kamu_accounts_services::PredefinedAccountsRegistrator;
 use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
-use kamu_auth_rebac_services::RebacServiceImpl;
+use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
 use kamu_flow_system_inmem::domain::FlowConfigurationUpdatedMessage;
 use kamu_flow_system_services::MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE;
@@ -400,6 +400,10 @@ pub fn configure_base_catalog(
     b.add::<DatabaseTransactionRunner>();
 
     b.add::<RebacServiceImpl>();
+
+    if multi_tenant_workspace {
+        b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
+    }
 
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()
