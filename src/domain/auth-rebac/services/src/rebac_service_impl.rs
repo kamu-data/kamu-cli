@@ -141,7 +141,6 @@ impl RebacService for RebacServiceImpl {
             Ok(_) => Ok(()),
             Err(err) => match err {
                 DeleteEntityPropertiesError::NotFound(_) => Ok(()),
-                // TODO: use into()
                 DeleteEntityPropertiesError::Internal(e) => Err(DeletePropertiesError::Internal(e)),
             },
         }
