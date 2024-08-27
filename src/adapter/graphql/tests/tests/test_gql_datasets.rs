@@ -14,8 +14,6 @@ use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use mockall::predicate::eq;
@@ -696,9 +694,7 @@ impl GraphQLDatasetsHarness {
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
                 .add_value(mock_authentication_service)
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-                .add::<InMemoryRebacRepository>()
-                .add::<RebacServiceImpl>();
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

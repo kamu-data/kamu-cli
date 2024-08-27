@@ -19,8 +19,6 @@ use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::{DatasetRepositoryLocalFs, DatasetRepositoryWriter};
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use kamu_data_utils::testing::{assert_data_eq, assert_schema_eq};
 use kamu_ingest_datafusion::*;
@@ -950,8 +948,6 @@ impl Harness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add::<InMemoryRebacRepository>()
-            .add::<RebacServiceImpl>()
             .build();
 
         let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();

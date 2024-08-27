@@ -16,8 +16,6 @@ use internal_error::ResultIntoInternal;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use opendatafabric::*;
@@ -594,9 +592,7 @@ impl DependencyGraphHarness {
             .add::<DependencyGraphServiceInMemory>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<CommitDatasetEventUseCaseImpl>()
-            .add::<DeleteDatasetUseCaseImpl>()
-            .add::<InMemoryRebacRepository>()
-            .add::<RebacServiceImpl>();
+            .add::<DeleteDatasetUseCaseImpl>();
 
         register_message_dispatcher::<DatasetLifecycleMessage>(
             &mut b,

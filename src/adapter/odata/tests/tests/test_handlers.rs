@@ -17,8 +17,6 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::RebacServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -363,9 +361,7 @@ impl TestHarness {
                 .add::<EngineProvisionerNull>()
                 .add::<PushIngestServiceImpl>()
                 .add::<QueryServiceImpl>()
-                .add_value(ServerUrlConfig::new_test(None))
-                .add::<InMemoryRebacRepository>()
-                .add::<RebacServiceImpl>();
+                .add_value(ServerUrlConfig::new_test(None));
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

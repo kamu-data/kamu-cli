@@ -41,8 +41,6 @@ use kamu::{
     ObjectStoreRegistryImpl,
 };
 use kamu_accounts::{AuthenticationService, MockAuthenticationService};
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::RebacServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -112,9 +110,7 @@ impl ServerSideS3Harness {
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CommitDatasetEventUseCaseImpl>()
-                .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
-                .add::<InMemoryRebacRepository>()
-                .add::<RebacServiceImpl>();
+                .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

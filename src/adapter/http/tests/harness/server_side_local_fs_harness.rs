@@ -38,8 +38,6 @@ use kamu::{
     ObjectStoreRegistryImpl,
 };
 use kamu_accounts::{AuthenticationService, MockAuthenticationService};
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::RebacServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use tempfile::TempDir;
@@ -113,9 +111,7 @@ impl ServerSideLocalFsHarness {
                 .add::<AppendDatasetMetadataBatchUseCaseImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-                .add::<CommitDatasetEventUseCaseImpl>()
-                .add::<InMemoryRebacRepository>()
-                .add::<RebacServiceImpl>();
+                .add::<CommitDatasetEventUseCaseImpl>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

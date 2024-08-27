@@ -17,8 +17,6 @@ use kamu::testing::*;
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::RebacServiceImpl;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
 use url::Url;
@@ -115,14 +113,12 @@ async fn do_test_sync(
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
         .add::<DummySmartTransferProtocolClient>()
-        .add::<InMemoryRebacRepository>()
-        .add::<RebacServiceImpl>()
         .build();
 
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
     let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
 
-    // Dataset does not exist locally / remotely //////////////////////////////
+    // Dataset does not exist locally / remotely
     assert_matches!(
         sync_svc
             .sync(

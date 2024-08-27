@@ -15,8 +15,6 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::RebacServiceImpl;
 use opendatafabric::*;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
@@ -187,8 +185,6 @@ impl ResetTestHarness {
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<ResetServiceImpl>()
-            .add::<InMemoryRebacRepository>()
-            .add::<RebacServiceImpl>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();

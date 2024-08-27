@@ -38,8 +38,6 @@ use kamu_accounts::{
 };
 use kamu_accounts_inmem::InMemoryAccessTokenRepository;
 use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::{
     auth,
     CompactionResult,
@@ -3202,9 +3200,7 @@ impl FlowRunsHarness {
             .add::<InMemoryAccessTokenRepository>()
             .add_value(JwtAuthenticationConfig::default())
             .add::<DatasetOwnershipServiceInMemory>()
-            .add::<DatabaseTransactionRunner>()
-            .add::<InMemoryRebacRepository>()
-            .add::<RebacServiceImpl>();
+            .add::<DatabaseTransactionRunner>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

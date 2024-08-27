@@ -67,8 +67,6 @@ container-runtime = { workspace = true }
 messaging-outbox = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
-kamu-auth-rebac-inmem = { workspace = true }
-kamu-auth-rebac-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }

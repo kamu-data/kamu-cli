@@ -43,8 +43,6 @@ tracing = "0.1"
 
 
 [dev-dependencies]
-kamu-auth-rebac-inmem = { workspace = true }
-kamu-auth-rebac-services = { workspace = true }
 messaging-outbox = { workspace = true }
 time-source = { workspace = true }
 

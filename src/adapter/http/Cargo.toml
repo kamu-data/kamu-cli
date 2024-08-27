@@ -80,8 +80,6 @@ uuid = { version = "1", default-features = false, features = ["v4"] }
 container-runtime = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
-kamu-auth-rebac-inmem = { workspace = true }
-kamu-auth-rebac-services = { workspace = true }
 kamu-datasets-services = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
