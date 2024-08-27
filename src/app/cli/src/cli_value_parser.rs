@@ -136,13 +136,8 @@ pub(crate) fn value_parse_url(url_str: &str) -> Result<Url, String> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn value_parse_dataset_visibility(value: &str) -> Result<DatasetVisibility, String> {
-    let res = match value {
-        "private" => DatasetVisibility::Private,
-        "public" => DatasetVisibility::PubliclyAvailable,
-        _ => return Err("Dataset visibility must be one of values: private, public".into()),
-    };
-
-    Ok(res)
+    // Allows us to parse enum values without additional dependencies
+    serde_yaml::from_str(value).map_err(|e| e.to_string())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
