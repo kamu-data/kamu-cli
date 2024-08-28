@@ -15,7 +15,10 @@ use kamu_auth_rebac::{
     AccountToDatasetRelation,
     DatasetPropertyName,
     DeleteEntitiesRelationError,
+    DeleteEntityPropertiesError,
     DeleteEntityPropertyError,
+    DeletePropertiesError,
+    DeleteRelationError,
     Entity,
     EntityWithRelation,
     GetEntityPropertiesError,
@@ -123,6 +126,26 @@ impl RebacService for RebacServiceImpl {
             .await
     }
 
+    async fn delete_dataset_properties(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<(), DeletePropertiesError> {
+        let dataset_id = dataset_id.as_did_str().to_stack_string();
+        let dataset_id_entity = Entity::new_dataset(dataset_id.as_str());
+
+        match self
+            .rebac_repo
+            .delete_entity_properties(&dataset_id_entity)
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(err) => match err {
+                DeleteEntityPropertiesError::NotFound(_) => Ok(()),
+                DeleteEntityPropertiesError::Internal(e) => Err(DeletePropertiesError::Internal(e)),
+            },
+        }
+    }
+
     async fn get_dataset_properties(
         &self,
         dataset_id: &DatasetID,
@@ -175,22 +198,28 @@ impl RebacService for RebacServiceImpl {
         account_id: &AccountID,
         relationship: AccountToDatasetRelation,
         dataset_id: &DatasetID,
-    ) -> Result<(), DeleteEntitiesRelationError> {
+    ) -> Result<(), DeleteRelationError> {
         let account_id = account_id.as_did_str().to_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
 
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_id_entity = Entity::new_dataset(dataset_id.as_str());
 
-        self.rebac_repo
+        match self
+            .rebac_repo
             .delete_entities_relation(
                 &account_entity,
                 Relation::AccountToDataset(relationship),
                 &dataset_id_entity,
             )
-            .await?;
-
-        Ok(())
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(err) => match err {
+                DeleteEntitiesRelationError::NotFound(_) => Ok(()),
+                DeleteEntitiesRelationError::Internal(e) => Err(DeleteRelationError::Internal(e)),
+            },
+        }
     }
 
     async fn get_account_dataset_relations(
@@ -209,6 +238,8 @@ impl RebacService for RebacServiceImpl {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn map_delete_entity_property_result(

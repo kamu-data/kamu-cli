@@ -5305,8 +5305,16 @@ dependencies = [
  "async-trait",
  "dill",
  "futures",
+ "internal-error",
  "kamu-auth-rebac",
+ "kamu-auth-rebac-inmem",
+ "kamu-core",
+ "messaging-outbox",
  "opendatafabric",
+ "serde_json",
+ "test-log",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -5375,6 +5383,9 @@ dependencies = [
  "kamu-adapter-http",
  "kamu-adapter-oauth",
  "kamu-adapter-odata",
+ "kamu-auth-rebac-inmem",
+ "kamu-auth-rebac-services",
+ "kamu-auth-rebac-sqlite",
  "kamu-cli-puppet",
  "kamu-data-utils",
  "kamu-datafusion-cli",

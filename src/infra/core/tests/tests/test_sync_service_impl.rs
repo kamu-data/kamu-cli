@@ -23,6 +23,8 @@ use url::Url;
 
 use crate::utils::IpfsDaemon;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const FILE_DATA_ARRAY_SIZE: usize = 32;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,7 +118,7 @@ async fn do_test_sync(
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
     let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
 
-    // Dataset does not exist locally / remotely //////////////////////////////
+    // Dataset does not exist locally / remotely
     assert_matches!(
         sync_svc
             .sync(

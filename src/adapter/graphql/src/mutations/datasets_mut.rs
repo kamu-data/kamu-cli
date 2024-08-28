@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{self as domain, DatasetRepositoryExt};
+use kamu_core::{self as domain, CreateDatasetUseCaseOptions, DatasetRepositoryExt};
 use opendatafabric as odf;
 
 use crate::mutations::DatasetMut;
@@ -39,6 +39,9 @@ impl DatasetsMut {
         ctx: &Context<'_>,
         dataset_kind: DatasetKind,
         dataset_alias: DatasetAlias,
+        // TODO: Private Datasets: GQL: make new parameters mandatory, after frontend update
+        //       https://github.com/kamu-data/kamu-cli/issues/780
+        dataset_visibility: Option<DatasetVisibility>,
     ) -> Result<CreateDatasetResult> {
         match self
             .create_from_snapshot_impl(
@@ -48,6 +51,7 @@ impl DatasetsMut {
                     kind: dataset_kind.into(),
                     metadata: Vec::new(),
                 },
+                dataset_visibility.map(Into::into).unwrap_or_default(),
             )
             .await?
         {
@@ -69,6 +73,9 @@ impl DatasetsMut {
         ctx: &Context<'_>,
         snapshot: String,
         snapshot_format: MetadataManifestFormat,
+        // TODO: Private Datasets: GQL: make new parameters mandatory, after frontend update
+        //       https://github.com/kamu-data/kamu-cli/issues/780
+        dataset_visibility: Option<DatasetVisibility>,
     ) -> Result<CreateDatasetFromSnapshotResult> {
         use odf::serde::DatasetSnapshotDeserializer;
 
@@ -94,23 +101,31 @@ impl DatasetsMut {
             }
         };
 
-        self.create_from_snapshot_impl(ctx, snapshot).await
+        self.create_from_snapshot_impl(
+            ctx,
+            snapshot,
+            dataset_visibility.map(Into::into).unwrap_or_default(),
+        )
+        .await
     }
 
     // TODO: Multi-tenancy
     // TODO: Multi-tenant resolution for derivative dataset inputs (should it only
-    // work by ID?)
+    //       work by ID?)
     #[allow(unused_variables)]
     #[graphql(skip)]
     async fn create_from_snapshot_impl(
         &self,
         ctx: &Context<'_>,
         snapshot: odf::DatasetSnapshot,
+        dataset_visibility: domain::DatasetVisibility,
     ) -> Result<CreateDatasetFromSnapshotResult> {
         let create_from_snapshot =
             from_catalog::<dyn domain::CreateDatasetFromSnapshotUseCase>(ctx).unwrap();
 
-        let result = match create_from_snapshot.execute(snapshot).await {
+        let create_options = CreateDatasetUseCaseOptions { dataset_visibility };
+
+        let result = match create_from_snapshot.execute(snapshot, create_options).await {
             Ok(result) => {
                 let dataset = Dataset::from_ref(ctx, &result.dataset_handle.as_local_ref()).await?;
                 CreateDatasetFromSnapshotResult::Success(CreateDatasetResultSuccess { dataset })

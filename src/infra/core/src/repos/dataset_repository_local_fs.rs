@@ -53,22 +53,6 @@ impl DatasetRepositoryLocalFs {
         }
     }
 
-    pub fn create(
-        root: impl Into<PathBuf>,
-        current_account_subject: Arc<CurrentAccountSubject>,
-        multi_tenant: bool,
-        system_time_source: Arc<dyn SystemTimeSource>,
-    ) -> Result<Self, std::io::Error> {
-        let root = root.into();
-        std::fs::create_dir_all(&root)?;
-        Ok(Self::new(
-            root,
-            current_account_subject,
-            multi_tenant,
-            system_time_source,
-        ))
-    }
-
     fn build_dataset(layout: DatasetLayout) -> Arc<dyn Dataset> {
         Arc::new(DatasetImpl::new(
             MetadataChainImpl::new(

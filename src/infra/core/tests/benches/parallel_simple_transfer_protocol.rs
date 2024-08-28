@@ -36,6 +36,8 @@ use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use url::Url;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const FILE_DATA_ARRAY_SIZE: usize = 1_572_864;
 const AMOUNT_OF_BLOCKS_TO_APPEND: usize = 70;
 
@@ -224,3 +226,5 @@ fn bench_with_10_parallels(c: &mut Criterion) {
 
 criterion_group!(benches, bench_with_1_parallel, bench_with_10_parallels);
 criterion_main!(benches);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

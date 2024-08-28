@@ -9,6 +9,7 @@
 
 use std::str::FromStr;
 
+use kamu::domain::DatasetVisibility;
 use opendatafabric::{
     DatasetName,
     DatasetRef,
@@ -19,6 +20,8 @@ use opendatafabric::{
     RepoName,
 };
 use url::Url;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn value_parse_dataset_ref_pattern_local(s: &str) -> Result<DatasetRefPattern, String> {
     match DatasetRefPattern::from_str(s) {
@@ -31,6 +34,8 @@ pub(crate) fn value_parse_dataset_ref_pattern_local(s: &str) -> Result<DatasetRe
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn value_parse_dataset_ref_pattern_any(s: &str) -> Result<DatasetRefAnyPattern, String> {
     match DatasetRefAnyPattern::from_str(s) {
         Ok(dataset_ref_pattern) => Ok(dataset_ref_pattern),
@@ -42,6 +47,8 @@ pub(crate) fn value_parse_dataset_ref_pattern_any(s: &str) -> Result<DatasetRefA
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn value_parse_dataset_name(s: &str) -> Result<DatasetName, String> {
     match DatasetName::try_from(s) {
         Ok(v) => Ok(v),
@@ -52,6 +59,8 @@ pub(crate) fn value_parse_dataset_name(s: &str) -> Result<DatasetName, String> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn value_parse_dataset_ref_local(s: &str) -> Result<DatasetRef, String> {
     match DatasetRef::try_from(s) {
         Ok(v) => Ok(v),
@@ -60,6 +69,8 @@ pub(crate) fn value_parse_dataset_ref_local(s: &str) -> Result<DatasetRef, Strin
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn value_parse_dataset_ref_remote(s: &str) -> Result<DatasetRefRemote, String> {
     match DatasetRefRemote::try_from(s) {
@@ -70,6 +81,8 @@ pub(crate) fn value_parse_dataset_ref_remote(s: &str) -> Result<DatasetRefRemote
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn value_parse_repo_name(s: &str) -> Result<RepoName, String> {
     match RepoName::try_from(s) {
         Ok(v) => Ok(v),
@@ -77,12 +90,16 @@ pub(crate) fn value_parse_repo_name(s: &str) -> Result<RepoName, String> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn value_parse_multihash(s: &str) -> Result<Multihash, String> {
     match Multihash::from_multibase(s) {
         Ok(v) => Ok(v),
         Err(_) => Err("Block hash must be a valid multihash string".to_string()),
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn validate_log_filter(s: &str) -> Result<String, String> {
     let items: Vec<_> = s.split(',').collect();
@@ -96,6 +113,8 @@ pub(crate) fn validate_log_filter(s: &str) -> Result<String, String> {
     }
     Ok(s.to_string())
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn value_parse_url(url_str: &str) -> Result<Url, String> {
     let parse_result = Url::parse(url_str);
@@ -113,3 +132,12 @@ pub(crate) fn value_parse_url(url_str: &str) -> Result<Url, String> {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn value_parse_dataset_visibility(value: &str) -> Result<DatasetVisibility, String> {
+    // Allows us to parse enum values without additional dependencies
+    serde_yaml::from_str(value).map_err(|e| e.to_string())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -44,6 +44,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewEmptyDatasetScenario<TServer
                     ))
                     .kind(DatasetKind::Root)
                     .build(),
+                Default::default(),
             )
             .await
             .unwrap();

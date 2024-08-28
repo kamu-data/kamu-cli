@@ -9,7 +9,7 @@
 
 use opendatafabric::DatasetSnapshot;
 
-use crate::{CreateDatasetFromSnapshotError, CreateDatasetResult};
+use crate::{CreateDatasetFromSnapshotError, CreateDatasetResult, CreateDatasetUseCaseOptions};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,6 +18,7 @@ pub trait CreateDatasetFromSnapshotUseCase: Send + Sync {
     async fn execute(
         &self,
         snapshot: DatasetSnapshot,
+        options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
 }
 

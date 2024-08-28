@@ -748,6 +748,7 @@ impl GraphQLDatasetsHarness {
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
+                Default::default(),
             )
             .await
             .unwrap()
@@ -774,6 +775,7 @@ impl GraphQLDatasetsHarness {
                             .build(),
                     )
                     .build(),
+                Default::default(),
             )
             .await
             .unwrap()

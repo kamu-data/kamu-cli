@@ -143,6 +143,7 @@ impl DatasetAuthorizerHarness {
                 alias,
                 MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                     .build_typed(),
+                Default::default(),
             )
             .await
             .unwrap()

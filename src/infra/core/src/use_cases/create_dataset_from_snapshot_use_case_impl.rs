@@ -16,6 +16,7 @@ use kamu_core::{
     CreateDatasetFromSnapshotResult,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetResult,
+    CreateDatasetUseCaseOptions,
     DatasetLifecycleMessage,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
@@ -53,6 +54,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
     async fn execute(
         &self,
         snapshot: DatasetSnapshot,
+        options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
         let CreateDatasetFromSnapshotResult {
             create_dataset_result,
@@ -73,6 +75,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                         }
                         CurrentAccountSubject::Logged(l) => l.account_id.clone(),
                     },
+                    options.dataset_visibility,
                 ),
             )
             .await?;

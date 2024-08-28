@@ -19,6 +19,8 @@ use opendatafabric::*;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_reset_dataset_with_2revisions_drop_last() {
     let harness = ResetTestHarness::new();
@@ -44,6 +46,8 @@ async fn test_reset_dataset_with_2revisions_drop_last() {
     assert_eq!(new_head, summary.last_block_hash);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_reset_dataset_with_2revisions_without_changes() {
     let harness = ResetTestHarness::new();
@@ -68,6 +72,8 @@ async fn test_reset_dataset_with_2revisions_without_changes() {
     let summary = harness.get_dataset_summary(&test_case.dataset_handle).await;
     assert_eq!(current_head, summary.last_block_hash);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_reset_dataset_to_non_existing_block_fails() {
@@ -245,3 +251,5 @@ impl ResetTestHarness {
         self.dataset_repo.get_dataset_by_handle(dataset_handle)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

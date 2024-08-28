@@ -15,6 +15,7 @@ mod data_schema;
 mod dataset_endpoints;
 mod dataset_env_var;
 mod dataset_id_name;
+mod dataset_visibility;
 mod engine_desc;
 mod event_id;
 mod flow_configuration;
@@ -35,6 +36,7 @@ pub(crate) use data_schema::*;
 pub(crate) use dataset_endpoints::*;
 pub(crate) use dataset_env_var::*;
 pub(crate) use dataset_id_name::*;
+pub(crate) use dataset_visibility::*;
 pub(crate) use engine_desc::*;
 pub(crate) use event_id::*;
 pub(crate) use flow_configuration::*;
@@ -46,6 +48,8 @@ pub(crate) use os_path::*;
 pub(crate) use pagination::*;
 pub(crate) use task_id::*;
 pub(crate) use task_status_outcome::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! simple_scalar {
     ($name: ident, $source_type: ty) => {
@@ -92,3 +96,5 @@ macro_rules! simple_scalar {
 }
 
 pub(crate) use simple_scalar;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

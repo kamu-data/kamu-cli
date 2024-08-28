@@ -11,6 +11,8 @@ use messaging_outbox::Message;
 use opendatafabric::{AccountID, DatasetID};
 use serde::{Deserialize, Serialize};
 
+use crate::DatasetVisibility;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -21,10 +23,15 @@ pub enum DatasetLifecycleMessage {
 }
 
 impl DatasetLifecycleMessage {
-    pub fn created(dataset_id: DatasetID, owner_account_id: AccountID) -> Self {
+    pub fn created(
+        dataset_id: DatasetID,
+        owner_account_id: AccountID,
+        dataset_visibility: DatasetVisibility,
+    ) -> Self {
         Self::Created(DatasetLifecycleMessageCreated {
             dataset_id,
             owner_account_id,
+            dataset_visibility,
         })
     }
 
@@ -48,6 +55,8 @@ impl Message for DatasetLifecycleMessage {}
 pub struct DatasetLifecycleMessageCreated {
     pub dataset_id: DatasetID,
     pub owner_account_id: AccountID,
+    #[serde(default)]
+    pub dataset_visibility: DatasetVisibility,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

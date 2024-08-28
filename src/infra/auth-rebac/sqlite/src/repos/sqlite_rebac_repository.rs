@@ -12,6 +12,7 @@ use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::{
     DeleteEntitiesRelationError,
+    DeleteEntityPropertiesError,
     DeleteEntityPropertyError,
     Entity,
     EntityType,
@@ -119,6 +120,40 @@ impl RebacRepository for SqliteRebacRepository {
 
         if delete_result.rows_affected() == 0 {
             return Err(DeleteEntityPropertyError::not_found(entity, property_name));
+        }
+
+        Ok(())
+    }
+
+    async fn delete_entity_properties(
+        &self,
+        entity: &Entity,
+    ) -> Result<(), DeleteEntityPropertiesError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(DeleteEntityPropertiesError::Internal)?;
+
+        let entity_id_as_str = entity.entity_id.as_ref();
+
+        let delete_result = sqlx::query!(
+            r#"
+            DELETE
+            FROM auth_rebac_properties
+            WHERE entity_type = $1
+              AND entity_id = $2
+            "#,
+            entity.entity_type,
+            entity_id_as_str,
+        )
+        .execute(&mut *connection_mut)
+        .await
+        .map_int_err(DeleteEntityPropertiesError::Internal)?;
+
+        if delete_result.rows_affected() == 0 {
+            return Err(DeleteEntityPropertiesError::not_found(entity));
         }
 
         Ok(())

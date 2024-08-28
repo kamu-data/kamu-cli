@@ -41,12 +41,9 @@ impl PropertyName {
     }
 
     pub fn dataset_allows_public_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
-        let value = if allows { "true" } else { "false" };
+        let property = DatasetPropertyName::allows_public_read(allows);
 
-        (
-            Self::Dataset(DatasetPropertyName::AllowsPublicRead),
-            value.into(),
-        )
+        (Self::Dataset(property.0), property.1)
     }
 
     pub fn property_group(&self) -> &'static str {
@@ -120,6 +117,14 @@ impl FromStr for PropertyName {
 pub enum DatasetPropertyName {
     AllowsAnonymousRead,
     AllowsPublicRead,
+}
+
+impl DatasetPropertyName {
+    pub fn allows_public_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
+        let value = if allows { "true" } else { "false" };
+
+        (DatasetPropertyName::AllowsPublicRead, value.into())
+    }
 }
 
 impl From<DatasetPropertyName> for PropertyName {

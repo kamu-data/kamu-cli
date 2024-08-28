@@ -106,6 +106,13 @@ pub fn cli() -> Command {
                             .action(ArgAction::Append)
                             .index(1)
                             .help("Dataset manifest reference(s) (path, or URL)"),
+                        Arg::new("visibility")
+                            .long("visibility")
+                            .hide(true)
+                            .value_name("VIS")
+                            .value_parser(value_parse_dataset_visibility)
+                            .default_value("private")
+                            .help("Changing the visibility of the added dataset"),
                     ])
                     .after_help(indoc::indoc!(
                         r#"

@@ -16,6 +16,7 @@ use dill::Catalog;
 use kamu_auth_rebac::{
     DatasetPropertyName,
     DeleteEntitiesRelationError,
+    DeleteEntityPropertiesError,
     DeleteEntityPropertyError,
     Entity,
     EntityType,
@@ -187,6 +188,78 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
             get_res,
             Ok(actual_properties)
                 if actual_properties == expected_properties
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_entity_properties(catalog: &Catalog) {
+    let rebac_repo = catalog.get_one::<dyn RebacRepository>().unwrap();
+
+    let entity = Entity::new_dataset("bar");
+    let anon_read_property = PropertyName::dataset_allows_anonymous_read(true);
+
+    {
+        let set_res = rebac_repo
+            .set_entity_property(&entity, anon_read_property.0, &anon_read_property.1)
+            .await;
+
+        assert_matches!(set_res, Ok(_));
+    }
+
+    let public_read_property = PropertyName::dataset_allows_public_read(true);
+
+    {
+        let set_res = rebac_repo
+            .set_entity_property(&entity, public_read_property.0, &public_read_property.1)
+            .await;
+
+        assert_matches!(set_res, Ok(_));
+    }
+
+    {
+        let get_res = rebac_repo.get_entity_properties(&entity).await;
+        let mut expected_properties =
+            vec![anon_read_property.clone(), public_read_property.clone()];
+
+        expected_properties.sort();
+
+        match get_res {
+            Ok(mut actual_properties) => {
+                actual_properties.sort();
+
+                assert_eq!(expected_properties, actual_properties);
+            }
+            Err(e) => {
+                panic!("A successful result was expected, but an error was received: {e}");
+            }
+        }
+    }
+
+    {
+        let delete_res = rebac_repo.delete_entity_properties(&entity).await;
+
+        assert_matches!(delete_res, Ok(_));
+    }
+
+    {
+        let get_res = rebac_repo.get_entity_properties(&entity).await;
+
+        assert_matches!(
+            get_res,
+            Ok(actual_properties)
+                if actual_properties.is_empty()
+        );
+    }
+
+    {
+        let delete_res = rebac_repo.delete_entity_properties(&entity).await;
+
+        assert_matches!(
+            delete_res,
+            Err(DeleteEntityPropertiesError::NotFound(e))
+                if e.entity == entity
         );
     }
 }

@@ -26,25 +26,29 @@ pub enum EntityType {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub type EntityId<'a> = Cow<'a, str>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Entity<'a> {
     pub entity_type: EntityType,
-    pub entity_id: Cow<'a, str>,
+    pub entity_id: EntityId<'a>,
 }
 
 impl<'a> Entity<'a> {
-    pub fn new(entity_type: EntityType, entity_id: impl Into<Cow<'a, str>>) -> Self {
+    pub fn new(entity_type: EntityType, entity_id: impl Into<EntityId<'a>>) -> Self {
         Self {
             entity_type,
             entity_id: entity_id.into(),
         }
     }
 
-    pub fn new_account(entity_id: impl Into<Cow<'a, str>>) -> Self {
+    pub fn new_account(entity_id: impl Into<EntityId<'a>>) -> Self {
         Self::new(EntityType::Account, entity_id)
     }
 
-    pub fn new_dataset(entity_id: impl Into<Cow<'a, str>>) -> Self {
+    pub fn new_dataset(entity_id: impl Into<EntityId<'a>>) -> Self {
         Self::new(EntityType::Dataset, entity_id)
     }
 
@@ -69,13 +73,13 @@ impl<'a> EntityWithRelation<'a> {
         Self { entity, relation }
     }
 
-    pub fn new_account(entity_id: impl Into<Cow<'a, str>>, relation: Relation) -> Self {
+    pub fn new_account(entity_id: impl Into<EntityId<'a>>, relation: Relation) -> Self {
         let account_entity = Entity::new_account(entity_id);
 
         Self::new(account_entity, relation)
     }
 
-    pub fn new_dataset(entity_id: impl Into<Cow<'a, str>>, relation: Relation) -> Self {
+    pub fn new_dataset(entity_id: impl Into<EntityId<'a>>, relation: Relation) -> Self {
         let dataset_entity = Entity::new_dataset(entity_id);
 
         Self::new(dataset_entity, relation)

@@ -66,6 +66,7 @@ impl Harness {
                 MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                     .system_time(system_time)
                     .build_typed(),
+                Default::default(),
             )
             .await
             .unwrap();

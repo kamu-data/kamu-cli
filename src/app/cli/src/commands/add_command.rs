@@ -28,6 +28,7 @@ pub struct AddCommand {
     recursive: bool,
     replace: bool,
     stdin: bool,
+    dataset_visibility: DatasetVisibility,
     output_config: Arc<OutputConfig>,
 }
 
@@ -42,6 +43,7 @@ impl AddCommand {
         recursive: bool,
         replace: bool,
         stdin: bool,
+        dataset_visibility: DatasetVisibility,
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
@@ -57,6 +59,7 @@ impl AddCommand {
             recursive,
             replace,
             stdin,
+            dataset_visibility,
             output_config,
         }
     }
@@ -77,12 +80,12 @@ impl AddCommand {
             .map(|r| std::path::Path::new(r).join("**").join("*.yaml"))
             .flat_map(|p| {
                 glob::glob(p.to_str().unwrap())
-                    .unwrap_or_else(|e| panic!("Failed to read glob {}: {}", p.display(), e))
+                    .unwrap_or_else(|e| panic!("Failed to read glob {}: {e}", p.display()))
             })
             .map(Result::unwrap)
             .filter(|p| {
                 self.is_snapshot_file(p)
-                    .unwrap_or_else(|e| panic!("Error while reading file {}: {}", p.display(), e))
+                    .unwrap_or_else(|e| panic!("Error while reading file {}: {e}", p.display()))
             });
 
         let mut res = Vec::new();
@@ -140,6 +143,7 @@ impl AddCommand {
     pub async fn create_datasets_from_snapshots(
         &self,
         snapshots: Vec<DatasetSnapshot>,
+        create_options: CreateDatasetUseCaseOptions,
     ) -> Vec<(
         DatasetAlias,
         Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
@@ -150,7 +154,11 @@ impl AddCommand {
         let mut ret = Vec::new();
         for snapshot in snapshots_ordered {
             let alias = snapshot.name.clone();
-            let res = self.create_dataset_from_snapshot.execute(snapshot).await;
+            let res = self
+                .create_dataset_from_snapshot
+                .execute(snapshot, create_options)
+                .await;
+
             ret.push((alias, res));
         }
         ret
@@ -194,13 +202,13 @@ impl AddCommand {
         }
         ordered
     }
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait(?Send)]
 impl Command for AddCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn before_run(&self) -> Result<(), CLIError> {
         if self.stdin && !self.snapshot_refs.is_empty() {
             return Err(CLIError::usage_error(
                 "Cannot specify --stdin and positional arguments at the same time",
@@ -216,7 +224,16 @@ impl Command for AddCommand {
                 "Name override can be used only when adding a single manifest",
             ));
         }
+        if !self.dataset_repo.is_multi_tenant() && !self.dataset_visibility.is_private() {
+            return Err(CLIError::usage_error(
+                "Only multi-tenant workspaces support non-private dataset visibility",
+            ));
+        }
 
+        Ok(())
+    }
+
+    async fn run(&mut self) -> Result<(), CLIError> {
         let load_results = if self.recursive {
             self.load_recursive().await
         } else if self.stdin {
@@ -276,14 +293,20 @@ impl Command for AddCommand {
                     return Err(CLIError::Aborted);
                 }
 
-                // TODO: delete permissions should be checked in multi-tenant scenario
+                // TODO: Private Datasets: delete permissions should be checked in multi-tenant
+                //                         scenario
                 for hdl in already_exist {
                     self.delete_dataset.execute_via_handle(&hdl).await?;
                 }
             }
         };
 
-        let mut add_results = self.create_datasets_from_snapshots(snapshots).await;
+        let create_options = CreateDatasetUseCaseOptions {
+            dataset_visibility: self.dataset_visibility,
+        };
+        let mut add_results = self
+            .create_datasets_from_snapshots(snapshots, create_options)
+            .await;
 
         add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(id_b));
 

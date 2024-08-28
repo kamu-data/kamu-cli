@@ -15,6 +15,7 @@ use kamu_core::{
     CreateDatasetError,
     CreateDatasetResult,
     CreateDatasetUseCase,
+    CreateDatasetUseCaseOptions,
     DatasetLifecycleMessage,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
@@ -53,6 +54,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         &self,
         dataset_alias: &DatasetAlias,
         seed_block: MetadataBlockTyped<Seed>,
+        options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
         let create_result = self
             .dataset_repo_writer
@@ -70,6 +72,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
                         }
                         CurrentAccountSubject::Logged(l) => l.account_id.clone(),
                     },
+                    options.dataset_visibility,
                 ),
             )
             .await?;

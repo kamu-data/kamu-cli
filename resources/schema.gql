@@ -703,6 +703,11 @@ type DatasetPermissions {
 
 scalar DatasetRef
 
+enum DatasetVisibility {
+	PRIVATE
+	PUBLIC
+}
+
 type Datasets {
 	"""
 	Returns dataset by its ID
@@ -730,11 +735,11 @@ type DatasetsMut {
 	"""
 	Creates a new empty dataset
 	"""
-	createEmpty(datasetKind: DatasetKind!, datasetAlias: DatasetAlias!): CreateDatasetResult!
+	createEmpty(datasetKind: DatasetKind!, datasetAlias: DatasetAlias!, datasetVisibility: DatasetVisibility): CreateDatasetResult!
 	"""
 	Creates a new dataset from provided DatasetSnapshot manifest
 	"""
-	createFromSnapshot(snapshot: String!, snapshotFormat: MetadataManifestFormat!): CreateDatasetFromSnapshotResult!
+	createFromSnapshot(snapshot: String!, snapshotFormat: MetadataManifestFormat!, datasetVisibility: DatasetVisibility): CreateDatasetFromSnapshotResult!
 }
 
 """

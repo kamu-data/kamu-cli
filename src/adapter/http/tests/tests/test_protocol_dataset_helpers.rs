@@ -464,6 +464,7 @@ async fn create_test_case(server_harness: &dyn ServerSideHarness) -> TestCase {
                 .push_event(MetadataFactory::set_polling_source().build())
                 .push_event(MetadataFactory::set_data_schema().build())
                 .build(),
+            Default::default(),
         )
         .await
         .unwrap();

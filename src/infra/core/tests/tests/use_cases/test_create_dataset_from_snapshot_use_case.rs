@@ -33,10 +33,10 @@ use time_source::SystemTimeSourceDefault;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_create_root_dataset_fron_snapshot() {
+async fn test_create_root_dataset_from_snapshot() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
-    // Expact only DatasetCreated message for "foo"
+    // Expect only DatasetCreated message for "foo"
     let mut mock_outbox = MockOutbox::new();
     CreateFromSnapshotUseCaseHarness::add_outbox_dataset_created_expectation(&mut mock_outbox, 1);
 
@@ -48,19 +48,21 @@ async fn test_create_root_dataset_fron_snapshot() {
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    harness.use_case.execute(snapshot).await.unwrap();
-
-    assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
+    harness
+        .use_case
+        .execute(snapshot, Default::default())
+        .await
+        .unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_create_derived_dataset_fron_snapshot() {
+async fn test_create_derived_dataset_from_snapshot() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
     let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
 
-    // Expact DatasetCreated messages for "foo" and "bar".
+    // Expect DatasetCreated messages for "foo" and "bar"
     // Expect DatasetDependenciesUpdated message for "bar"
     let mut mock_outbox = MockOutbox::new();
     CreateFromSnapshotUseCaseHarness::add_outbox_dataset_created_expectation(&mut mock_outbox, 2);
@@ -87,8 +89,18 @@ async fn test_create_derived_dataset_fron_snapshot() {
         )
         .build();
 
-    harness.use_case.execute(snapshot_root).await.unwrap();
-    harness.use_case.execute(snapshot_derived).await.unwrap();
+    let options = Default::default();
+
+    harness
+        .use_case
+        .execute(snapshot_root, options)
+        .await
+        .unwrap();
+    harness
+        .use_case
+        .execute(snapshot_derived, options)
+        .await
+        .unwrap();
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
     assert_matches!(harness.check_dataset_exists(&alias_bar).await, Ok(_));
@@ -109,8 +121,9 @@ impl CreateFromSnapshotUseCaseHarness {
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+        let mut b = dill::CatalogBuilder::new();
+
+        b.add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
@@ -119,19 +132,16 @@ impl CreateFromSnapshotUseCaseHarness {
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
-            .add::<SystemTimeSourceDefault>()
             .add_value(mock_outbox)
             .bind::<dyn Outbox, MockOutbox>()
-            .build();
+            .add::<SystemTimeSourceDefault>();
 
-        let use_case = catalog
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
+        let catalog = b.build();
 
         Self {
             _temp_dir: tempdir,
+            use_case: catalog.get_one().unwrap(),
             catalog,
-            use_case,
         }
     }
 

@@ -14,6 +14,7 @@ use std::sync::Arc;
 use dill::{component, interface, scope, Singleton};
 use kamu_auth_rebac::{
     DeleteEntitiesRelationError,
+    DeleteEntityPropertiesError,
     DeleteEntityPropertyError,
     Entity,
     EntityType,
@@ -114,6 +115,24 @@ impl RebacRepository for InMemoryRebacRepository {
         if property_not_found {
             return Err(DeleteEntityPropertyError::not_found(entity, property_name));
         }
+
+        Ok(())
+    }
+
+    async fn delete_entity_properties(
+        &self,
+        entity: &Entity,
+    ) -> Result<(), DeleteEntityPropertiesError> {
+        let mut writable_state = self.state.write().await;
+
+        let not_found = writable_state
+            .entities_properties_map
+            .remove(&entity.clone().into_owned())
+            .is_none();
+
+        if not_found {
+            return Err(DeleteEntityPropertiesError::not_found(entity));
+        };
 
         Ok(())
     }

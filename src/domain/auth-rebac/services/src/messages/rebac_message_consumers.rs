@@ -7,13 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// Re-exports
-pub use kamu_auth_rebac as domain;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mod messages;
-mod multi_tenant_rebac_dataset_lifecycle_message_consumer;
-mod rebac_service_impl;
+pub const MESSAGE_CONSUMER_KAMU_REBAC_SERVICE: &str = "dev.kamu.domain.auth-rebac.RebacService";
 
-pub use messages::*;
-pub use multi_tenant_rebac_dataset_lifecycle_message_consumer::*;
-pub use rebac_service_impl::*;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

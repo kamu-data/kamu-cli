@@ -20,7 +20,9 @@ use kamu_core::{
     CorruptedSourceError,
     CreateDatasetError,
     CreateDatasetUseCase,
+    CreateDatasetUseCaseOptions,
     Dataset,
+    DatasetVisibility,
     GetRefError,
     HashedMetadataBlock,
 };
@@ -117,11 +119,19 @@ impl AxumServerPushProtocolInstance {
                     })
                     .int_err()?;
 
+                // TODO: Read the visibility parameter from CLI
+                //
+                //       Private Datasets: Update use case: Pushing a dataset
+                //       https://github.com/kamu-data/kamu-cli/issues/728
+                let create_options = CreateDatasetUseCaseOptions {
+                    dataset_visibility: DatasetVisibility::Private,
+                };
+
                 let create_result = DatabaseTransactionRunner::new(self.catalog.clone())
                     .transactional_with(
                         |create_dataset_use_case: Arc<dyn CreateDatasetUseCase>| async move {
                             create_dataset_use_case
-                                .execute(dataset_alias, seed_block)
+                                .execute(dataset_alias, seed_block, create_options)
                                 .await
                         },
                     )
@@ -206,9 +216,9 @@ impl AxumServerPushProtocolInstance {
         };
 
         let response = if push_request.current_head == actual_head {
-            DatasetPushResponse::Ok(DatasetPushRequestAccepted {})
+            Ok(DatasetPushRequestAccepted {})
         } else {
-            DatasetPushResponse::Err(DatasetPushRequestError::InvalidHead(
+            Err(DatasetPushRequestError::InvalidHead(
                 DatasetPushInvalidHeadError {
                     actual_head: push_request.current_head.clone(),
                     expected_head: actual_head,
