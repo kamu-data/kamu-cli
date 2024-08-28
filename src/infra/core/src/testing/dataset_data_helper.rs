@@ -33,17 +33,14 @@ impl DatasetDataHelper {
     }
 
     pub async fn data_slice_count(&self) -> usize {
-        let v: Vec<_> = self
-            .dataset
+        self.dataset
             .as_metadata_chain()
             .iter_blocks()
             .filter_data_stream_blocks()
             .filter_map_ok(|(_, b)| b.event.new_data.map(|_| 1))
-            .try_collect()
+            .try_fold(0, |a, b| async move { Ok(a + b) })
             .await
-            .unwrap();
-
-        v.iter().sum()
+            .unwrap()
     }
 
     pub async fn get_last_block_typed<T: VariantOf<MetadataEvent>>(&self) -> MetadataBlockTyped<T> {

@@ -536,7 +536,10 @@ impl PollingIngestServiceImpl {
             )
             .await?;
 
-        if !input_data_path.exists() || input_data_path.metadata().int_err()?.len() == 0 {
+        let input_is_missing_or_empty =
+            !input_data_path.exists() || input_data_path.metadata().int_err()?.len() == 0;
+
+        if input_is_missing_or_empty {
             if let Some(read_schema) = reader.input_schema().await {
                 tracing::info!(
                     path = ?input_data_path,
