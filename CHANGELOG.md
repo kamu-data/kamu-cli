@@ -24,6 +24,11 @@ Recommendation: for ease of reading, use the following order:
 ### Fixed
 - Open Telemetry integration fixes
 
+## Unreleased
+### Changed
+- If not explicitly configured, a SQLite database is used for a multi-tenant workspace
+- If a SQLite database is used, built-in migrations are automatically applied
+
 ## [0.202.0] - 2024-09-20
 ### Changed
 - Major dependency upgrades:
@@ -121,9 +126,6 @@ Recommendation: for ease of reading, use the following order:
   - GQL: `DatasetsMut`:
     - `createEmpty()`: added optional `datasetVisibility` argument
     - `createFromSnapshot()`: added optional `datasetVisibility` argument
-### Changed
-- If not explicitly configured, a SQLite database is used for a multi-tenant workspace
-- If a SQLite database is used, built-in migrations are automatically applied
 
 ## [0.198.0] - 2024-08-27
 ### Changed
