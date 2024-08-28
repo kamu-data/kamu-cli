@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Changed -->
 <!--- - Fixed -->
 
-## Unreleased
+## [0.198.1] - 2024-08-28
 ### Added
 - Private Datasets, ReBAC integration: 
   - ReBAC properties update based on `DatasetLifecycleMessage`'s:
