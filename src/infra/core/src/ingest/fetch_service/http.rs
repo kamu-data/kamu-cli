@@ -18,12 +18,13 @@ use opendatafabric::*;
 use url::Url;
 
 use super::*;
+use crate::PollingSourceState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl FetchService {
     // TODO: PERF: Consider compression
-    pub(crate) async fn fetch_http(
+    pub(super) async fn fetch_http(
         &self,
         url: Url,
         headers: Vec<RequestHeader>,
@@ -147,6 +148,12 @@ impl FetchService {
             has_more: false,
             zero_copy_path: None,
         }))
+    }
+
+    fn parse_http_date_time(val: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc2822(val)
+            .unwrap_or_else(|e| panic!("Failed to parse Last-Modified header {val}: {e}"))
+            .into()
     }
 }
 

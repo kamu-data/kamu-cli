@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::Arc;
@@ -16,9 +17,11 @@ use container_runtime::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::engine::ProcessError;
 use kamu_core::*;
+use kamu_datasets::DatasetEnvVar;
 use opendatafabric::*;
 
 use super::*;
+use crate::PollingSourceState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +29,7 @@ impl FetchService {
     // TODO: Progress reporting
     // TODO: Env var security
     // TODO: Allow containers to output watermarks
-    pub(crate) async fn fetch_container(
+    pub(super) async fn fetch_container(
         &self,
         operation_id: &str,
         fetch: &FetchStepContainer,

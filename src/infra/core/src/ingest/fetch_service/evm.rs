@@ -18,6 +18,7 @@ use kamu_datasets::DatasetEnvVar;
 use opendatafabric::*;
 
 use super::*;
+use crate::PollingSourceState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,7 +36,6 @@ impl FetchService {
     // to scan through block ranges.
     //
     // TODO: Account for re-orgs
-    #[cfg(feature = "ingest-evm")]
     pub(crate) async fn fetch_ethereum_logs(
         &self,
         fetch: &FetchStepEthereumLogs,
@@ -49,6 +49,8 @@ impl FetchService {
         use datafusion::prelude::*;
         use datafusion_ethers::convert::*;
         use datafusion_ethers::stream::*;
+
+        use crate::PollingSourceState;
 
         // Alloy does not support newlines in log signatures, but it's nice for
         // formatting

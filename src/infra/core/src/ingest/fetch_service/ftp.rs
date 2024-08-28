@@ -20,8 +20,7 @@ use super::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl FetchService {
-    #[cfg(feature = "ingest-ftp")]
-    pub(crate) async fn fetch_ftp(
+    pub(super) async fn fetch_ftp(
         url: Url,
         target_path: &Path,
         system_time: &DateTime<Utc>,
@@ -40,7 +39,6 @@ impl FetchService {
     // TODO: convert to non-blocking
     // TODO: not implementing caching as some FTP servers throw errors at us
     // when we request filetime :(
-    #[cfg(feature = "ingest-ftp")]
     fn fetch_ftp_impl(
         url: &Url,
         target_path: &Path,

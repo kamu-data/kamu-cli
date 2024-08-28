@@ -10,17 +10,18 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use chrono::{DateTime, SubsecRound, Utc};
+use chrono::{DateTime, SubsecRound, TimeZone as _, Utc};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::*;
 
 use super::*;
+use crate::PollingSourceState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl FetchService {
-    pub(crate) fn fetch_files_glob(
+    pub(super) fn fetch_files_glob(
         fglob: &FetchStepFilesGlob,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
@@ -151,6 +152,44 @@ impl FetchService {
             has_more: false,
             zero_copy_path: Some(path.to_path_buf()),
         }))
+    }
+
+    fn extract_event_time_from_path(
+        filename: &str,
+        src: &EventTimeSourceFromPath,
+    ) -> Result<DateTime<Utc>, PollingIngestError> {
+        let time_re = regex::Regex::new(&src.pattern).int_err()?;
+
+        let time_fmt = match src.timestamp_format {
+            Some(ref fmt) => fmt,
+            None => "%Y-%m-%d",
+        };
+
+        if let Some(capture) = time_re.captures(filename) {
+            if let Some(group) = capture.get(1) {
+                match DateTime::parse_from_str(group.as_str(), time_fmt) {
+                    Ok(dt) => Ok(dt.into()),
+                    Err(_) => {
+                        let date = chrono::NaiveDate::parse_from_str(group.as_str(), time_fmt)
+                            .map_err(|e| EventTimeSourceError::bad_pattern(time_fmt, e))?;
+                        let time = date.and_hms_opt(0, 0, 0).unwrap();
+                        Ok(Utc.from_local_datetime(&time).unwrap())
+                    }
+                }
+            } else {
+                Err(EventTimeSourceError::failed_extract(format!(
+                    "Pattern {} doesn't have group 1",
+                    src.pattern
+                ))
+                .into())
+            }
+        } else {
+            Err(EventTimeSourceError::failed_extract(format!(
+                "Failed to match pattern {} to {}",
+                src.pattern, filename
+            ))
+            .into())
+        }
     }
 }
 
