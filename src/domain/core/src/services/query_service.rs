@@ -10,7 +10,6 @@
 use std::collections::BTreeMap;
 
 use datafusion::arrow;
-use datafusion::error::DataFusionError;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::{DataFrame, SessionContext};
 use internal_error::InternalError;
@@ -206,6 +205,27 @@ pub enum QueryError {
         #[backtrace]
         InternalError,
     ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Wraps [`datafusion::error::DataFusionError`] error to attach a backtrace at
+/// the earliest point
+#[derive(Error, Debug)]
+#[error("DataFusion error")]
+pub struct DataFusionError {
+    #[from]
+    pub source: datafusion::error::DataFusionError,
+    pub backtrace: std::backtrace::Backtrace,
+}
+
+impl From<datafusion::error::DataFusionError> for QueryError {
+    fn from(value: datafusion::error::DataFusionError) -> Self {
+        Self::DataFusionError(DataFusionError {
+            source: value,
+            backtrace: std::backtrace::Backtrace::capture(),
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

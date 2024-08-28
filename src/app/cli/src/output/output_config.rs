@@ -9,6 +9,8 @@
 
 use std::path::PathBuf;
 
+use datafusion::arrow::datatypes::Schema;
+
 use super::records_writers::*;
 pub use super::records_writers::{ColumnFormat, RecordsFormat};
 
@@ -25,7 +27,11 @@ pub struct OutputConfig {
 }
 
 impl OutputConfig {
-    pub fn get_records_writer(&self, fmt: RecordsFormat) -> Box<dyn RecordsWriter> {
+    pub fn get_records_writer(
+        &self,
+        schema: &Schema,
+        fmt: RecordsFormat,
+    ) -> Box<dyn RecordsWriter> {
         match self.format {
             OutputFormat::Csv => Box::new(CsvWriter::new(
                 std::io::stdout(),
@@ -40,7 +46,7 @@ impl OutputConfig {
             }
             OutputFormat::JsonAoA => Box::new(JsonArrayOfArraysWriter::new(std::io::stdout())),
             OutputFormat::NdJson => Box::new(JsonLineDelimitedWriter::new(std::io::stdout())),
-            OutputFormat::Table => Box::new(TableWriter::new(fmt, std::io::stdout())),
+            OutputFormat::Table => Box::new(TableWriter::new(schema, fmt, std::io::stdout())),
         }
     }
 }

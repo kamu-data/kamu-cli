@@ -119,11 +119,12 @@ impl SqlShellCommand {
             .await
             .map_err(CLIError::failure)?;
 
-        let records = res.df.collect().await.map_err(CLIError::failure)?;
-
         let mut writer = self
             .output_config
-            .get_records_writer(RecordsFormat::default());
+            .get_records_writer(res.df.schema().as_arrow(), RecordsFormat::default());
+
+        let records = res.df.collect().await.map_err(CLIError::failure)?;
+
         writer.write_batches(&records)?;
         writer.finish()?;
 

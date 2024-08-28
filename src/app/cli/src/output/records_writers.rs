@@ -11,7 +11,7 @@ use std::any::Any;
 
 use chrono::{DateTime, Utc};
 use datafusion::arrow::array::ArrayRef;
-use datafusion::arrow::datatypes::DataType;
+use datafusion::arrow::datatypes::{DataType, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::util::display::array_value_to_string;
 use kamu_data_utils::data::format::WriterError;
@@ -324,7 +324,6 @@ pub struct ColumnFormatRef<'a> {
 pub struct TableWriter<W> {
     out: W,
     format: RecordsFormat,
-    header_written: bool,
     rows_written: usize,
     num_columns: usize,
     table: Table,
@@ -333,16 +332,21 @@ pub struct TableWriter<W> {
 impl<W> TableWriter<W> {
     // TODO: prettytable is hard to print out into a generic Writer
     // as it wants tty output to implement term::Terminal trait
-    pub fn new(format: RecordsFormat, out: W) -> Self {
+    pub fn new(schema: &Schema, format: RecordsFormat, out: W) -> Self {
         let mut table = Table::new();
         table.set_format(Self::get_table_format());
+
+        let mut header = Vec::new();
+        for field in schema.fields() {
+            header.push(Cell::new(field.name()).style_spec("bc"));
+        }
+        table.set_titles(Row::new(header));
 
         Self {
             out,
             format,
-            header_written: false,
             rows_written: 0,
-            num_columns: 0,
+            num_columns: schema.fields().len(),
             table,
         }
     }
@@ -372,16 +376,6 @@ where
     W: std::io::Write,
 {
     fn write_batch(&mut self, records: &RecordBatch) -> Result<(), WriterError> {
-        if !self.header_written {
-            let mut header = Vec::new();
-            for field in records.schema().fields() {
-                header.push(Cell::new(field.name()).style_spec("bc"));
-            }
-            self.table.set_titles(Row::new(header));
-            self.header_written = true;
-            self.num_columns = records.schema().fields().len();
-        }
-
         for row in 0..records.num_rows() {
             let mut cells = Vec::new();
             for col in 0..records.num_columns() {

@@ -25,17 +25,19 @@ fn humanize_quantity(num: u64) -> String {
 
 #[test_log::test(tokio::test)]
 async fn test_records_format() {
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("num", DataType::UInt64, false),
+        Field::new("str", DataType::Utf8, true),
+        Field::new("bin", DataType::Binary, true),
+        Field::new(
+            "time",
+            DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("UTC"))),
+            false,
+        ),
+    ]));
+
     let records = RecordBatch::try_new(
-        Arc::new(Schema::new(vec![
-            Field::new("num", DataType::UInt64, false),
-            Field::new("str", DataType::Utf8, true),
-            Field::new("bin", DataType::Binary, true),
-            Field::new(
-                "time",
-                DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("UTC"))),
-                false,
-            ),
-        ])),
+        schema.clone(),
         vec![
             Arc::new(UInt64Array::from(vec![0, 1000])),
             Arc::new(StringArray::from(vec![
@@ -70,7 +72,7 @@ async fn test_records_format() {
     ]);
 
     let mut buf = Vec::new();
-    let mut writer = TableWriter::new(fmt, &mut buf);
+    let mut writer = TableWriter::new(&schema, fmt, &mut buf);
     writer.write_batch(&records).unwrap();
     writer.finish().unwrap();
 

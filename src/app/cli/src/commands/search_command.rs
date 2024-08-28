@@ -119,7 +119,7 @@ impl Command for SearchCommand {
         }
 
         let records = RecordBatch::try_new(
-            schema,
+            schema.clone(),
             vec![
                 Arc::new(StringArray::from(alias)),
                 Arc::new(StringArray::from(kind)),
@@ -131,7 +131,9 @@ impl Command for SearchCommand {
         )
         .unwrap();
 
-        let mut writer = self.output_config.get_records_writer(records_format);
+        let mut writer = self
+            .output_config
+            .get_records_writer(&schema, records_format);
         writer.write_batch(&records)?;
         writer.finish()?;
 

@@ -85,7 +85,7 @@ impl From<QueryError> for DataQueryResult {
     fn from(e: QueryError) -> Self {
         match e {
             QueryError::DatasetNotFound(e) => DataQueryResult::invalid_sql(e.to_string()),
-            QueryError::DataFusionError(e) => e.into(),
+            QueryError::DataFusionError(e) => e.source.into(),
             QueryError::DatasetSchemaNotAvailable(_) => unreachable!(),
             QueryError::Access(e) => DataQueryResult::unauthorized(e.to_string()),
             QueryError::Internal(e) => DataQueryResult::internal(e.to_string()),

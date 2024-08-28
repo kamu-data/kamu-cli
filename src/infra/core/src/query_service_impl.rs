@@ -193,18 +193,6 @@ impl QueryServiceImpl {
 
         let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
 
-        let summary = dataset
-            .get_summary(GetSummaryOpts::default())
-            .await
-            .int_err()?;
-
-        if summary.num_records == 0 {
-            return Err(DatasetSchemaNotAvailableError {
-                dataset_ref: dataset_ref.clone(),
-            }
-            .into());
-        }
-
         let ctx = self.session_context(QueryOptions {
             aliases: Some(BTreeMap::from([(
                 dataset_handle.alias.to_string(),
@@ -328,6 +316,15 @@ impl QueryService for QueryServiceImpl {
         limit: u64,
     ) -> Result<DataFrame, QueryError> {
         let (dataset, df) = self.single_dataset(dataset_ref, Some(skip + limit)).await?;
+
+        // Our custom catalog provider resolves schemas lazily, so the dataset will be
+        // found even if it's empty and its schema will be empty, but we decide not to
+        // propagate this special case to the users and return an error instead
+        if df.schema().fields().is_empty() {
+            Err(DatasetSchemaNotAvailableError {
+                dataset_ref: dataset_ref.clone(),
+            })?;
+        }
 
         let vocab: DatasetVocabulary = dataset
             .as_metadata_chain()

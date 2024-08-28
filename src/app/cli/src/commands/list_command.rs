@@ -218,9 +218,11 @@ impl Command for ListCommand {
             .with_default_column_format(ColumnFormat::default().with_null_value("-"))
             .with_column_formats(self.column_formats(show_owners));
 
-        let mut writer = self.output_config.get_records_writer(records_format);
-
         let schema = Arc::new(Schema::new(self.schema_fields(show_owners)));
+
+        let mut writer = self
+            .output_config
+            .get_records_writer(&schema, records_format);
 
         let mut id: Vec<String> = Vec::new();
         let mut name: Vec<String> = Vec::new();

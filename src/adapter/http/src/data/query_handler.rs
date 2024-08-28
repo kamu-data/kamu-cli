@@ -23,7 +23,6 @@ use axum::response::Json;
 use database_common_macros::transactional_handler;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::common::DFSchema;
-use datafusion::error::DataFusionError;
 use dill::Catalog;
 use http_common::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
@@ -51,12 +50,14 @@ pub async fn dataset_query_handler_post(
     {
         Ok(res) => res,
         Err(QueryError::DatasetNotFound(err)) => Err(ApiError::not_found(err))?,
-        Err(QueryError::DataFusionError(DataFusionError::SQL(err, _))) => {
-            Err(ApiError::bad_request(err))?
-        }
-        Err(QueryError::DataFusionError(err @ DataFusionError::Plan(_))) => {
-            Err(ApiError::bad_request(err))?
-        }
+        Err(QueryError::DataFusionError(DataFusionError {
+            source: datafusion::error::DataFusionError::SQL(err, _),
+            ..
+        })) => Err(ApiError::bad_request(err))?,
+        Err(QueryError::DataFusionError(DataFusionError {
+            source: err @ datafusion::error::DataFusionError::Plan(_),
+            ..
+        })) => Err(ApiError::bad_request(err))?,
         Err(e) => Err(e.int_err().api_err())?,
     };
 

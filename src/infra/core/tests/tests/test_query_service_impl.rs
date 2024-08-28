@@ -410,7 +410,7 @@ async fn test_dataset_tail_empty_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(2, true),
     );
 
     let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
@@ -532,9 +532,10 @@ async fn test_dataset_sql_unauthorized_common(catalog: dill::Catalog, tempdir: &
 
     assert_matches!(
         result,
-        Err(QueryError::DataFusionError(
-            datafusion::common::DataFusionError::Plan(s)
-        ))  if s.contains("table 'kamu.kamu.foo' not found")
+        Err(QueryError::DataFusionError(DataFusionError {
+            source: datafusion::common::DataFusionError::Plan(s),
+            ..
+        }))  if s.contains("table 'kamu.kamu.foo' not found")
     );
 }
 
@@ -577,9 +578,10 @@ async fn test_sql_statement_not_found() {
 
     assert_matches!(
         result,
-        Err(QueryError::DataFusionError(
-            ::datafusion::common::DataFusionError::Plan(s)
-        ))  if s.contains("table 'kamu.kamu.does_not_exist' not found")
+        Err(QueryError::DataFusionError(DataFusionError {
+            source: ::datafusion::common::DataFusionError::Plan(s),
+            ..
+        }))  if s.contains("table 'kamu.kamu.does_not_exist' not found")
     );
 }
 
