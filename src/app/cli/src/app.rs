@@ -514,6 +514,12 @@ pub fn configure_cli_catalog(
 
 #[tracing::instrument(level = "info", skip_all)]
 async fn initialize_components(cli_catalog: &Catalog) -> Result<(), CLIError> {
+    // Pre-initialization of the singleton is necessary to avoid a situation where,
+    // during the execution of short commands (e.g., `kamu add`),
+    // the service instance is created with a catalog that holds a transaction,
+    // which could potentially lead to a transaction leak.
+    let _flow_service = cli_catalog.get_one::<kamu_flow_system_services::FlowServiceImpl>()?;
+
     // TODO: Generalize on-startup initialization into a trait
     DatabaseTransactionRunner::new(cli_catalog.clone())
         .transactional(|transactional_catalog| async move {
