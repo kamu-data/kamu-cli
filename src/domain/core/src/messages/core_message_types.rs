@@ -55,6 +55,7 @@ impl Message for DatasetLifecycleMessage {}
 pub struct DatasetLifecycleMessageCreated {
     pub dataset_id: DatasetID,
     pub owner_account_id: AccountID,
+    #[serde(default)]
     pub dataset_visibility: DatasetVisibility,
 }
 
