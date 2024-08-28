@@ -49,12 +49,11 @@ impl DatasetKeyValueServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
 impl DatasetKeyValueService for DatasetKeyValueServiceImpl {
-    async fn find_dataset_env_var_value_by_key<'a>(
+    fn find_dataset_env_var_value_by_key(
         &self,
         dataset_env_var_key: &str,
-        dataset_env_vars: &'a HashMap<String, DatasetEnvVar>,
+        dataset_env_vars: &HashMap<String, DatasetEnvVar>,
     ) -> Result<DatasetEnvVarValue, FindDatasetEnvVarError> {
         if let Some(existing_dataset_env_var) = dataset_env_vars.get(dataset_env_var_key) {
             let exposed_value = existing_dataset_env_var

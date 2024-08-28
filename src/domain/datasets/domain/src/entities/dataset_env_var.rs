@@ -180,6 +180,14 @@ impl DatasetEnvVarValue {
             Self::Secret(secret_value) => secret_value.expose_secret(),
         }
     }
+
+    pub fn into_exposed_value(self) -> String {
+        match self {
+            Self::Regular(value) => value,
+            // TODO: Secrecy crate does not provide a way to extract inner value
+            Self::Secret(secret_value) => secret_value.expose_secret().to_owned(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

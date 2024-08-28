@@ -32,6 +32,7 @@ impl FetchService {
         fetch: &FetchStepContainer,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
+        dataset_env_vars: &HashMap<String, DatasetEnvVar>,
         listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, PollingIngestError> {
         // Pull image
@@ -89,13 +90,13 @@ impl FetchService {
         if let Some(env_vars) = &fetch.env {
             for EnvVar { name, value } in env_vars {
                 let value = if let Some(value) = value {
-                    Cow::from(value)
+                    self.template_string(value, dataset_env_vars)?
                 } else {
-                    // TODO: This is insecure: passthrough envvars
-                    let value =
-                        std::env::var(name).map_err(|_| IngestParameterNotFound::new(name))?;
+                    let value = self
+                        .dataset_key_value_svc
+                        .find_dataset_env_var_value_by_key(name, dataset_env_vars)?;
 
-                    Cow::from(value)
+                    Cow::from(value.into_exposed_value())
                 };
 
                 if name == ODF_BATCH_SIZE {

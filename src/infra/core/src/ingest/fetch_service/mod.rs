@@ -99,10 +99,8 @@ impl FetchService {
 
         match fetch_step {
             FetchStep::Url(furl) => {
-                let url = self.template_url(&furl.url, dataset_env_vars).await?;
-                let headers = self
-                    .template_headers(&furl.headers, dataset_env_vars)
-                    .await?;
+                let url = self.template_url(&furl.url, dataset_env_vars)?;
+                let headers = self.template_headers(&furl.headers, dataset_env_vars)?;
 
                 match url.scheme() {
                     "file" => Self::fetch_file(
@@ -145,6 +143,7 @@ impl FetchService {
                     fetch,
                     prev_source_state,
                     target_path,
+                    dataset_env_vars,
                     &listener,
                 )
                 .await
@@ -191,16 +190,16 @@ impl FetchService {
         }
     }
 
-    async fn template_url(
+    fn template_url(
         &self,
         url_tpl: &str,
         dataset_env_vars: &HashMap<String, DatasetEnvVar>,
     ) -> Result<Url, PollingIngestError> {
-        let url = self.template_string(url_tpl, dataset_env_vars).await?;
+        let url = self.template_string(url_tpl, dataset_env_vars)?;
         Ok(Url::parse(&url).int_err()?)
     }
 
-    async fn template_headers(
+    fn template_headers(
         &self,
         headers_tpl: &Option<Vec<RequestHeader>>,
         dataset_env_vars: &HashMap<String, DatasetEnvVar>,
@@ -211,8 +210,7 @@ impl FetchService {
             let hdr = RequestHeader {
                 name: htpl.name.clone(),
                 value: self
-                    .template_string(&htpl.value, dataset_env_vars)
-                    .await?
+                    .template_string(&htpl.value, dataset_env_vars)?
                     .into_owned(),
             };
             res.push(hdr);
@@ -220,7 +218,7 @@ impl FetchService {
         Ok(res)
     }
 
-    async fn template_string<'a>(
+    fn template_string<'a>(
         &self,
         s: &'a str,
         dataset_env_vars: &'a HashMap<String, DatasetEnvVar>,
@@ -235,11 +233,11 @@ impl FetchService {
 
                 if let Some(cenv) = re_env.captures(ctpl.get(1).unwrap().as_str().trim()) {
                     let env_name = cenv.get(1).unwrap().as_str();
+
                     let dataset_env_var_secret_value = self
                         .dataset_key_value_svc
-                        .find_dataset_env_var_value_by_key(env_name, dataset_env_vars)
-                        .await
-                        .int_err()?;
+                        .find_dataset_env_var_value_by_key(env_name, dataset_env_vars)?;
+
                     s.to_mut()
                         .replace_range(tpl_range, dataset_env_var_secret_value.get_exposed_value());
                 } else {
