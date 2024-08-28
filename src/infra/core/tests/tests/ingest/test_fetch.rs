@@ -825,6 +825,77 @@ async fn test_fetch_container_ok() {
 
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
+async fn test_fetch_container_env_vars() {
+    let harness = FetchTestHarness::new();
+
+    let target_path = harness.temp_dir.path().join("fetched.bin");
+
+    let fetch_step = FetchStep::Container(FetchStepContainer {
+        image: BUSYBOX.to_owned(),
+        command: Some(vec!["sh".to_owned()]),
+        args: Some(vec!["-c".to_owned(), "env | grep KAMU_TEST".to_owned()]),
+        env: Some(vec![
+            EnvVar {
+                name: "KAMU_TEST_EXPLICIT".to_owned(),
+                value: Some("VAL".to_owned()),
+            },
+            EnvVar {
+                name: "KAMU_TEST_TEMPLATED".to_owned(),
+                value: Some("tpl_${{ env.KAMU_TEST_PROPAGATED }}".to_owned()),
+            },
+            EnvVar {
+                name: "KAMU_TEST_PROPAGATED".to_owned(),
+                value: None,
+            },
+        ]),
+    });
+
+    let res = harness
+        .fetch_svc
+        .fetch(
+            &mock_dataset_handle(),
+            &generate_unique_operation_id(),
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            &HashMap::from([(
+                "KAMU_TEST_PROPAGATED".to_owned(),
+                kamu_datasets::DatasetEnvVar::new(
+                    "KAMU_TEST_PROPAGATED",
+                    Utc::now(),
+                    &kamu_datasets::DatasetEnvVarValue::Regular("foobar".to_owned()),
+                    &DatasetID::new_seeded_ed25519(b"doesnt-matter"),
+                    "",
+                )
+                .unwrap(),
+            )]),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(res, FetchResult::Updated(_));
+
+    let output = &std::fs::read(target_path).unwrap();
+    let mut lines: Vec<_> = std::str::from_utf8(output)
+        .unwrap()
+        .split_ascii_whitespace()
+        .collect();
+    lines.sort_unstable();
+
+    assert_eq!(
+        lines,
+        [
+            "KAMU_TEST_EXPLICIT=VAL",
+            "KAMU_TEST_PROPAGATED=foobar",
+            "KAMU_TEST_TEMPLATED=tpl_foobar"
+        ]
+    );
+}
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
 async fn test_fetch_container_batch_size_default() {
     let harness = FetchTestHarness::new();
 

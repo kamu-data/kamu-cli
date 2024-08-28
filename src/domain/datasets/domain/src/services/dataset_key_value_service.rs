@@ -16,12 +16,11 @@ use crate::{DatasetEnvVar, DatasetEnvVarNotFoundError, DatasetEnvVarValue};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
 pub trait DatasetKeyValueService: Sync + Send {
-    async fn find_dataset_env_var_value_by_key<'a>(
+    fn find_dataset_env_var_value_by_key(
         &self,
         dataset_env_var_key: &str,
-        dataset_env_vars: &'a HashMap<String, DatasetEnvVar>,
+        dataset_env_vars: &HashMap<String, DatasetEnvVar>,
     ) -> Result<DatasetEnvVarValue, FindDatasetEnvVarError>;
 }
 
@@ -30,10 +29,10 @@ pub trait DatasetKeyValueService: Sync + Send {
 #[derive(Error, Debug)]
 pub enum FindDatasetEnvVarError {
     #[error(transparent)]
-    NotFound(DatasetEnvVarNotFoundError),
+    NotFound(#[from] DatasetEnvVarNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

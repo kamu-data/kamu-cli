@@ -15,7 +15,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use container_runtime::ImagePullError;
 use internal_error::{BoxedError, InternalError};
-use kamu_datasets::DatasetEnvVar;
+use kamu_datasets::{DatasetEnvVar, FindDatasetEnvVarError};
 use opendatafabric::*;
 use thiserror::Error;
 
@@ -330,6 +330,17 @@ impl From<auth::DatasetActionUnauthorizedError> for PollingIngestError {
         match v {
             auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
             auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<FindDatasetEnvVarError> for PollingIngestError {
+    fn from(value: FindDatasetEnvVarError) -> Self {
+        match value {
+            FindDatasetEnvVarError::NotFound(e) => {
+                Self::ParameterNotFound(IngestParameterNotFound::new(e.dataset_env_var_key))
+            }
+            FindDatasetEnvVarError::Internal(e) => Self::Internal(e),
         }
     }
 }

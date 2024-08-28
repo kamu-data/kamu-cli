@@ -42,7 +42,7 @@ impl FetchService {
 
         // TODO: Reconsider password propagation
         if let (Some(username), Some(password)) = (&fetch.username, &fetch.password) {
-            let password = self.template_string(password, dataset_env_vars).await?;
+            let password = self.template_string(password, dataset_env_vars)?;
             opts.set_credentials(username, password);
         }
 

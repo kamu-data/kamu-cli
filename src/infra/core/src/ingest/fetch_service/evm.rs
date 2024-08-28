@@ -76,7 +76,7 @@ impl FetchService {
 
         // Setup node RPC client
         let node_url = if let Some(url) = &fetch.node_url {
-            self.template_url(url, dataset_env_vars).await?
+            self.template_url(url, dataset_env_vars)?
         } else if let Some(ep) = self
             .eth_source_config
             .get_endpoint_by_chain_id(fetch.chain_id.unwrap())
