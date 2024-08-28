@@ -257,9 +257,3 @@ pub struct TransferInternalError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct ProtocolPayload<TMessagePayload> {
-    pub version: i32,
-    pub message: TMessagePayload,
-}

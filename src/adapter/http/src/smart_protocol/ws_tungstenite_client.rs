@@ -10,6 +10,7 @@
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 
+use axum::headers::Header;
 use database_common::DatabaseTransactionRunner;
 use dill::*;
 use futures::SinkExt;
@@ -29,6 +30,7 @@ use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use url::Url;
 
+use super::VersionHeader;
 use crate::smart_protocol::errors::*;
 use crate::smart_protocol::messages::*;
 use crate::smart_protocol::phases::*;
@@ -518,6 +520,10 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         use tokio_tungstenite::tungstenite::client::IntoClientRequest;
         let mut request = pull_url.into_client_request().int_err()?;
+        request.headers_mut().append(
+            VersionHeader::name(),
+            http::HeaderValue::from(SMART_TRANSFER_PROTOCOL_CLIENT_VERSION),
+        );
         if let Some(access_token) = maybe_access_token {
             request.headers_mut().append(
                 http::header::AUTHORIZATION,
@@ -732,6 +738,10 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         use tokio_tungstenite::tungstenite::client::IntoClientRequest;
         let mut request = push_url.into_client_request().int_err()?;
+        request.headers_mut().append(
+            VersionHeader::name(),
+            http::HeaderValue::from(SMART_TRANSFER_PROTOCOL_CLIENT_VERSION),
+        );
         if let Some(access_token) = maybe_access_token {
             request.headers_mut().append(
                 http::header::AUTHORIZATION,
@@ -863,18 +873,14 @@ async fn read_payload<TMessagePayload: DeserializeOwned>(
     use tokio_stream::StreamExt;
     match stream.next().await {
         Some(msg) => match msg {
-            Ok(Message::Text(raw_message)) => ws_common::get_payload_message::<TMessagePayload>(
-                raw_message.as_str(),
-                SMART_TRANSFER_PROTOCOL_CLIENT_VERSION,
-            ),
+            Ok(Message::Text(raw_message)) => {
+                ws_common::parse_payload::<TMessagePayload>(raw_message.as_str())
+            }
             Ok(Message::Close(close_frame_maybe)) => {
                 if let Some(close_frame) = close_frame_maybe
                     && close_frame.code == CloseCode::Error
                 {
-                    return ws_common::get_payload_message::<TMessagePayload>(
-                        &close_frame.reason,
-                        SMART_TRANSFER_PROTOCOL_CLIENT_VERSION,
-                    );
+                    return ws_common::parse_payload::<TMessagePayload>(&close_frame.reason);
                 }
                 Err(ReadMessageError::ClientDisconnected)
             }
@@ -891,10 +897,7 @@ async fn write_payload<TMessagePayload: Serialize>(
     socket: &mut TungsteniteStream,
     payload: TMessagePayload,
 ) -> Result<(), WriteMessageError> {
-    let payload_as_json_string = ws_common::combine_payload::<TMessagePayload>(
-        payload,
-        SMART_TRANSFER_PROTOCOL_CLIENT_VERSION,
-    )?;
+    let payload_as_json_string = ws_common::payload_to_json::<TMessagePayload>(payload)?;
 
     let message = Message::Text(payload_as_json_string);
     let send_result = socket.send(message).await;

@@ -12,8 +12,6 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use thiserror::Error;
 
-use crate::smart_protocol::messages::ProtocolPayload;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
@@ -66,34 +64,23 @@ pub enum WriteMessageError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn get_payload_message<TMessagePayload: DeserializeOwned>(
+pub fn parse_payload<TMessagePayload: DeserializeOwned>(
     raw_message: &str,
-    expected_version: i32,
 ) -> Result<TMessagePayload, ReadMessageError> {
-    let parse_result = serde_json::from_str::<ProtocolPayload<TMessagePayload>>(raw_message);
+    let parse_result = serde_json::from_str::<TMessagePayload>(raw_message);
 
     match parse_result {
-        Ok(payload) => {
-            if payload.version != expected_version {
-                return Err(ReadMessageError::IncompatibleVersion);
-            };
-            Ok(payload.message)
-        }
+        Ok(payload) => Ok(payload),
         Err(e) => Err(ReadMessageError::SerdeError(e)),
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn combine_payload<TMessagePayload: Serialize>(
+pub fn payload_to_json<TMessagePayload: Serialize>(
     payload: TMessagePayload,
-    version: i32,
 ) -> Result<String, WriteMessageError> {
-    let protocol_payload = ProtocolPayload {
-        version,
-        message: payload,
-    };
-    let maybe_payload_as_json_string = serde_json::to_string(&protocol_payload);
+    let maybe_payload_as_json_string = serde_json::to_string(&payload);
 
     match maybe_payload_as_json_string {
         Ok(payload_as_json_string) => Ok(payload_as_json_string),
