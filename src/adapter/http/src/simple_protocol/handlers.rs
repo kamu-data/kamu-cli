@@ -30,13 +30,8 @@ use opendatafabric::{DatasetRef, Multihash};
 use url::Url;
 
 use crate::smart_protocol::messages::SMART_TRANSFER_PROTOCOL_SERVER_VERSION;
-use crate::smart_protocol::{
-    AxumServerPullProtocolInstance,
-    AxumServerPushProtocolInstance,
-    BearerHeader,
-    VersionHeader,
-    VersionHeaderTyped,
-};
+use crate::smart_protocol::{AxumServerPullProtocolInstance, AxumServerPushProtocolInstance};
+use crate::{BearerHeader, VersionHeader, VersionHeaderTyped};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -210,7 +205,7 @@ pub async fn dataset_push_ws_upgrade_handler(
         CurrentAccountSubject::Anonymous(_) => Err(ApiError::new_unauthorized()),
     }?;
     if !ensure_version_compatibility(version_header) {
-        return Err(ApiError::new_forbidden());
+        return Err(ApiError::incompatible_client_version());
     };
 
     let server_url_config = catalog.get_one::<ServerUrlConfig>().unwrap();
@@ -259,7 +254,7 @@ pub async fn dataset_pull_ws_upgrade_handler(
     maybe_bearer_header: Option<BearerHeader>,
 ) -> Result<axum::response::Response, ApiError> {
     if !ensure_version_compatibility(version_header) {
-        return Err(ApiError::new_forbidden());
+        return Err(ApiError::incompatible_client_version());
     };
     let server_url_config = catalog.get_one::<ServerUrlConfig>().unwrap();
     let dataset_url = get_base_dataset_url(uri, &server_url_config.protocols.base_url_rest, 1);

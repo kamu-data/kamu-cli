@@ -30,12 +30,12 @@ use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use url::Url;
 
-use super::VersionHeader;
 use crate::smart_protocol::errors::*;
 use crate::smart_protocol::messages::*;
 use crate::smart_protocol::phases::*;
 use crate::smart_protocol::protocol_dataset_helper::*;
 use crate::ws_common::{self, ReadMessageError, WriteMessageError};
+use crate::VersionHeader;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -754,6 +754,23 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Err(e) => {
                 tracing::debug!("Failed to connect to push URL: {}", e);
                 if let TungsteniteError::Http(response) = &e {
+                    match response.status() {
+                        http::StatusCode::FORBIDDEN => {
+                            return Err(SyncError::Access(AccessError::Forbidden(Box::new(e))))
+                        }
+                        http::StatusCode::UNAUTHORIZED => {
+                            return Err(SyncError::Access(AccessError::Unauthorized(Box::new(e))))
+                        }
+                        http::StatusCode::BAD_REQUEST => {
+                            if let Some(body) = response.body().as_ref()
+                                && let Ok(body_message) = std::str::from_utf8(body)
+                            {
+                                return InternalError::bail(body_message)
+                                    .map_err(SyncError::Internal);
+                            }
+                        }
+                        _ => {}
+                    }
                     if response.status() == http::StatusCode::FORBIDDEN {
                         return Err(SyncError::Access(AccessError::Forbidden(Box::new(e))));
                     } else if response.status() == http::StatusCode::UNAUTHORIZED {
@@ -779,6 +796,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 return Err(SyncError::Internal(e.int_err()));
             }
         };
+        println!("@@ finish push");
 
         match self
             .push_send_metadata_request(

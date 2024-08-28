@@ -26,8 +26,7 @@ use kamu_accounts::{
 use tower::{Layer, Service};
 
 use crate::axum_utils::*;
-use crate::smart_protocol::BearerHeader;
-use crate::AccessToken;
+use crate::{AccessToken, BearerHeader};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

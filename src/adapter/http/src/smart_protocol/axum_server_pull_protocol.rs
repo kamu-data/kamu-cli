@@ -19,6 +19,7 @@ use super::phases::*;
 use super::protocol_dataset_helper::*;
 use crate::smart_protocol::*;
 use crate::ws_common::ReadMessageError;
+use crate::BearerHeader;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

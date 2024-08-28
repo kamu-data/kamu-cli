@@ -23,9 +23,9 @@ use tar::Header;
 use thiserror::Error;
 use url::Url;
 
-use super::{BearerHeader, VersionHeader};
 use crate::smart_protocol::errors::ObjectUploadError;
 use crate::smart_protocol::messages::*;
+use crate::{BearerHeader, VersionHeader};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
