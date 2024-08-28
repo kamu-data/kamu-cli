@@ -196,6 +196,7 @@ pub fn new_session_context(object_store_registry: Arc<dyn ObjectStoreRegistry>) 
 
     let runtime = Arc::new(RuntimeEnv::new(runtime_config).unwrap());
 
+    #[allow(unused_mut)]
     let mut ctx = SessionContext::new_with_config_rt(config, runtime);
 
     // TODO: As part of the ODF spec we should let people opt-in into various
