@@ -28,6 +28,7 @@ Recommendation: for ease of reading, use the following order:
 ### Changed
 - If not explicitly configured, a SQLite database is used for a multi-tenant workspace
 - If a SQLite database is used, built-in migrations are automatically applied
+- Start processing added Outbox messages after successful command execution
 
 ## [0.202.0] - 2024-09-20
 ### Changed
