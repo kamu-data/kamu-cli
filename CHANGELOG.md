@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Added
 - Container sources allow string interpolation in env vars and command
+- Private Datasets
+  - `kamu push`: added `--visibility private|public` argument to specify the created dataset visibility
 ### Changed
 - Schema propagation improvements:
   - Dataset schema will be defined upon first ingest, even if no records were returned by the source
