@@ -201,11 +201,13 @@ impl WsSmartTransferProtocolClient {
         transfer_plan: TransferPlan,
         dst_head: Option<&Multihash>,
         force_update_if_diverged: bool,
+        visibility_for_created_dataset: DatasetVisibility,
     ) -> Result<DatasetPushRequestAccepted, PushClientError> {
         let push_request_message = DatasetPushRequest {
             current_head: dst_head.cloned(),
             transfer_plan,
             force_update_if_diverged,
+            visibility_for_created_dataset,
         };
 
         tracing::debug!("Sending push request: {:?}", push_request_message);
@@ -811,6 +813,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 transfer_plan,
                 dst_head,
                 transfer_options.force_update_if_diverged,
+                transfer_options.visibility_for_created_dataset,
             )
             .await
         {

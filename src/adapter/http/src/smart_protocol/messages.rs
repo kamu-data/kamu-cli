@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use kamu_core::DatasetVisibility;
 use opendatafabric::{DatasetID, Multihash};
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -115,6 +116,7 @@ pub struct DatasetPushRequest {
     pub current_head: Option<Multihash>,
     pub transfer_plan: TransferPlan,
     pub force_update_if_diverged: bool,
+    pub visibility_for_created_dataset: DatasetVisibility,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

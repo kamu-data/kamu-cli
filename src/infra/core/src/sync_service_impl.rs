@@ -257,7 +257,7 @@ impl SyncServiceImpl {
         &'a self,
         src: &SyncRef,
         dst_url: &Url,
-        force: bool,
+        opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
         let src_dataset = self.get_dataset_reader(src).await?;
@@ -291,7 +291,8 @@ impl SyncServiceImpl {
                 maybe_dst_head.as_ref(),
                 listener,
                 TransferOptions {
-                    force_update_if_diverged: force,
+                    force_update_if_diverged: opts.force,
+                    visibility_for_created_dataset: opts.dataset_visibility,
                     ..Default::default()
                 },
             )
@@ -600,7 +601,7 @@ impl SyncServiceImpl {
             }
             // * -> odf
             (_, SyncRef::Remote(dst_url)) if dst_url.is_odf_protocol() => {
-                self.sync_smart_push_transfer_protocol(&src, dst_url.as_ref(), opts.force, listener)
+                self.sync_smart_push_transfer_protocol(&src, dst_url.as_ref(), opts, listener)
                     .await
             }
             // * -> *

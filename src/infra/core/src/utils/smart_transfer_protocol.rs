@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_core::{Dataset, SyncError, SyncListener, SyncResult};
+use kamu_core::{Dataset, DatasetVisibility, SyncError, SyncListener, SyncResult};
 use opendatafabric::Multihash;
 use url::Url;
 
@@ -21,6 +21,7 @@ pub use super::simple_transfer_protocol::DatasetFactoryFn;
 pub struct TransferOptions {
     pub max_parallel_transfers: usize,
     pub force_update_if_diverged: bool,
+    pub visibility_for_created_dataset: DatasetVisibility,
 }
 
 impl Default for TransferOptions {
@@ -35,6 +36,7 @@ impl Default for TransferOptions {
         Self {
             max_parallel_transfers,
             force_update_if_diverged: false,
+            visibility_for_created_dataset: DatasetVisibility::Private,
         }
     }
 }

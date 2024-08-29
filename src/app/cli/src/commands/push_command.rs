@@ -147,6 +147,7 @@ impl PushCommand {
     fn sync_options(&self) -> SyncOptions {
         SyncOptions {
             force: self.force,
+            dataset_visibility: self.dataset_visibility,
             ..SyncOptions::default()
         }
     }

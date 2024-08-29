@@ -60,6 +60,9 @@ pub struct SyncOptions {
 
     /// Force synchronization, even if revisions have diverged
     pub force: bool,
+
+    /// Dataset visibility, in case of initial pushing
+    pub dataset_visibility: DatasetVisibility,
 }
 
 impl Default for SyncOptions {
@@ -68,6 +71,7 @@ impl Default for SyncOptions {
             trust_source: None,
             create_if_not_exists: true,
             force: false,
+            dataset_visibility: DatasetVisibility::Private,
         }
     }
 }
