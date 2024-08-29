@@ -10,6 +10,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use console::style as s;
 use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
@@ -194,15 +195,13 @@ impl Command for PushCommand {
             if updated != 0 {
                 eprintln!(
                     "{}",
-                    console::style(format!("{updated} dataset(s) pushed"))
-                        .green()
-                        .bold()
+                    s(format!("{updated} dataset(s) pushed")).green().bold()
                 );
             }
             if up_to_date != 0 {
                 eprintln!(
                     "{}",
-                    console::style(format!("{up_to_date} dataset(s) up-to-date"))
+                    s(format!("{up_to_date} dataset(s) up-to-date"))
                         .yellow()
                         .bold()
                 );
@@ -393,12 +392,12 @@ impl SyncListener for PrettySyncProgress {
 
     fn success(&self, result: &SyncResult) {
         let msg = match result {
-            SyncResult::UpToDate => console::style("Repository is up-to-date".to_owned()).yellow(),
+            SyncResult::UpToDate => s("Repository is up-to-date".to_owned()).yellow(),
             SyncResult::Updated {
                 ref new_head,
                 num_blocks,
                 ..
-            } => console::style(format!(
+            } => s(format!(
                 "Updated repository to {} ({} block(s))",
                 new_head.as_multibase().short(),
                 num_blocks
@@ -422,10 +421,8 @@ impl SyncListener for PrettySyncProgress {
             .multi_progress
             .add(Self::new_spinner(&self.local_ref, &self.remote_ref));
 
-        state.progress.finish_with_message(
-            console::style("Failed to sync dataset to repository")
-                .red()
-                .to_string(),
-        );
+        state
+            .progress
+            .finish_with_message(s("Failed to sync dataset to repository").red().to_string());
     }
 }
