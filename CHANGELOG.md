@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Added
-- Container sources env vars now allow string interpolation
+- Container sources allow string interpolation in env vars and command
 ### Changed
 - Schema propagation improvements:
   - Dataset schema will be defined upon first ingest, even if no records were returned by the source

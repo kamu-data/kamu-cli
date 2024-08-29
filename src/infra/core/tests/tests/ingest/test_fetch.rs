@@ -896,6 +896,53 @@ async fn test_fetch_container_env_vars() {
 
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
+async fn test_fetch_container_args_templating() {
+    let harness = FetchTestHarness::new();
+
+    let target_path = harness.temp_dir.path().join("fetched.bin");
+
+    let fetch_step = FetchStep::Container(FetchStepContainer {
+        image: BUSYBOX.to_owned(),
+        command: Some(vec!["sh".to_owned()]),
+        args: Some(vec!["-c".to_owned(), "echo ${{ env.VAR }}".to_owned()]),
+        env: None,
+    });
+
+    let res = harness
+        .fetch_svc
+        .fetch(
+            &mock_dataset_handle(),
+            &generate_unique_operation_id(),
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            &HashMap::from([(
+                "VAR".to_owned(),
+                kamu_datasets::DatasetEnvVar::new(
+                    "VAR",
+                    Utc::now(),
+                    &kamu_datasets::DatasetEnvVarValue::Regular("foobar".to_owned()),
+                    &DatasetID::new_seeded_ed25519(b"doesnt-matter"),
+                    "",
+                )
+                .unwrap(),
+            )]),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(res, FetchResult::Updated(_));
+
+    assert_eq!(
+        std::str::from_utf8(&std::fs::read(target_path).unwrap()).unwrap(),
+        "foobar\n",
+    );
+}
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
 async fn test_fetch_container_batch_size_default() {
     let harness = FetchTestHarness::new();
 
