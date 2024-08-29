@@ -172,6 +172,9 @@ impl Command for PushCommand {
             ));
         }
 
+        // todo как будет интернет проверить по рфц, делаем ли мы поддержку для all
+        // и/или рекурсив
+
         Ok(())
     }
 
@@ -207,6 +210,15 @@ impl Command for PushCommand {
                 );
             }
             if up_to_date != 0 {
+                if self.dataset_visibility != DatasetVisibility::default() {
+                    eprintln!(
+                        "{}",
+                        s("Dataset(s) have already been pushed -- the visibility marker ignored")
+                            .yellow()
+                            .bold()
+                    );
+                }
+
                 eprintln!(
                     "{}",
                     s(format!("{up_to_date} dataset(s) up-to-date"))
