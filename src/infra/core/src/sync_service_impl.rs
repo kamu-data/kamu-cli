@@ -21,14 +21,13 @@ use super::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use crate::utils::ipfs_wrapper::*;
 use crate::utils::simple_transfer_protocol::{DatasetFactoryFn, SimpleTransferProtocol};
 use crate::utils::smart_transfer_protocol::TransferOptions;
-use crate::DatasetRepositoryWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SyncServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     dataset_repo: Arc<dyn DatasetRepository>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    create_dataset_use_case: Arc<dyn CreateDatasetUseCase>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     dataset_factory: Arc<dyn DatasetFactory>,
     smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
@@ -43,7 +42,7 @@ impl SyncServiceImpl {
     pub fn new(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         dataset_repo: Arc<dyn DatasetRepository>,
-        dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+        create_dataset_use_case: Arc<dyn CreateDatasetUseCase>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         dataset_factory: Arc<dyn DatasetFactory>,
         smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
@@ -52,7 +51,7 @@ impl SyncServiceImpl {
         Self {
             remote_repo_reg,
             dataset_repo,
-            dataset_repo_writer,
+            create_dataset_use_case,
             dataset_action_authorizer,
             dataset_factory,
             smart_transfer_protocol,
@@ -145,12 +144,21 @@ impl SyncServiceImpl {
                     }
                     Err(GetDatasetError::NotFound(_)) if create_if_not_exists => {
                         let alias = local_ref.alias().unwrap().clone();
-                        let repo_writer = self.dataset_repo_writer.clone();
+                        let create_dataset_use_case = self.create_dataset_use_case.clone();
+
                         Ok((
                             None,
                             Some(Box::new(move |seed_block| {
                                 Box::pin(async move {
-                                    repo_writer.create_dataset(&alias, seed_block).await
+                                    // After retrieving the dataset externally, we default to
+                                    // private visibility.
+                                    let create_options = CreateDatasetUseCaseOptions {
+                                        dataset_visibility: DatasetVisibility::Private,
+                                    };
+
+                                    create_dataset_use_case
+                                        .execute(&alias, seed_block, create_options)
+                                        .await
                                 })
                             })),
                         ))

@@ -17,6 +17,7 @@ use kamu::testing::*;
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
 use url::Url;
@@ -113,6 +114,8 @@ async fn do_test_sync(
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
         .add::<DummySmartTransferProtocolClient>()
+        .add::<CreateDatasetUseCaseImpl>()
+        .add::<DummyOutboxImpl>()
         .build();
 
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();

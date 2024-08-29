@@ -14,6 +14,7 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
 use url::Url;
@@ -48,6 +49,8 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<SyncServiceImpl>()
         .add::<DummySmartTransferProtocolClient>()
         .add::<SearchServiceImpl>()
+        .add::<CreateDatasetUseCaseImpl>()
+        .add::<DummyOutboxImpl>()
         .build();
 
     let remote_repo_reg = catalog.get_one::<dyn RemoteRepositoryRegistry>().unwrap();

@@ -19,8 +19,11 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! n {
     ($s:expr) => {
@@ -106,6 +109,8 @@ macro_rules! refs_local {
     };
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn create_graph(
     repo: &DatasetRepositoryLocalFs,
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
@@ -141,7 +146,7 @@ async fn create_graph(
 // remote dataset
 async fn create_graph_remote(
     dataset_repo: Arc<dyn DatasetRepository>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    create_dataset_use_case: Arc<dyn CreateDatasetUseCase>,
     reg: Arc<RemoteRepositoryRegistryImpl>,
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
     to_import: Vec<DatasetAlias>,
@@ -168,7 +173,7 @@ async fn create_graph_remote(
     let sync_service = SyncServiceImpl::new(
         reg.clone(),
         dataset_repo,
-        dataset_repo_writer,
+        create_dataset_use_case,
         Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         Arc::new(DatasetFactoryImpl::new(
             IpfsGateway::default(),
@@ -192,6 +197,8 @@ async fn create_graph_remote(
             .unwrap();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_chain() {
@@ -241,6 +248,8 @@ async fn test_pull_batching_chain() {
         ]
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_chain_multi_tenant() {
@@ -292,6 +301,8 @@ async fn test_pull_batching_chain_multi_tenant() {
         ]
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_complex() {
@@ -350,6 +361,8 @@ async fn test_pull_batching_complex() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_complex_with_remote() {
     let tmp_dir = tempfile::tempdir().unwrap();
@@ -361,7 +374,7 @@ async fn test_pull_batching_complex_with_remote() {
     // D -----------/
     create_graph_remote(
         harness.dataset_repo.clone(),
-        harness.dataset_repo.clone(),
+        harness.create_dataset_use_case.clone(),
         harness.remote_repo_reg.clone(),
         vec![
             (n!("a"), names![]),
@@ -487,6 +500,8 @@ async fn test_pull_batching_complex_with_remote() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_sync_from() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
@@ -538,6 +553,8 @@ async fn test_sync_from() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_sync_from_url_and_local_ref() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
@@ -580,6 +597,8 @@ async fn test_sync_from_url_and_local_ref() {
         vec![DatasetRefRemote::try_from("http://example.com/odf/bar").unwrap()]
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_sync_from_url_and_local_multi_tenant_ref() {
@@ -624,6 +643,8 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_sync_from_url_only() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
@@ -667,6 +688,8 @@ async fn test_sync_from_url_only() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_sync_from_url_only_multi_tenant_case() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
@@ -709,6 +732,8 @@ async fn test_sync_from_url_only_multi_tenant_case() {
         vec![DatasetRefRemote::try_from("http://example.com/odf/bar").unwrap()]
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_set_watermark() {
@@ -777,6 +802,8 @@ async fn test_set_watermark() {
     assert_eq!(harness.num_blocks(&dataset_alias).await, 3);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_set_watermark_unauthorized() {
     let tmp_dir = tempfile::tempdir().unwrap();
@@ -802,6 +829,8 @@ async fn test_set_watermark_unauthorized() {
 
     assert_eq!(harness.num_blocks(&dataset_alias).await, 1);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_set_watermark_rejects_on_derivative() {
@@ -846,6 +875,7 @@ struct PullTestHarness {
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_svc: Arc<dyn PullService>,
+    create_dataset_use_case: Arc<dyn CreateDatasetUseCase>,
 }
 
 impl PullTestHarness {
@@ -889,19 +919,17 @@ impl PullTestHarness {
             .add_builder(TestSyncService::builder().with_calls(calls.clone()))
             .bind::<dyn SyncService, TestSyncService>()
             .add::<PullServiceImpl>()
+            .add::<CreateDatasetUseCaseImpl>()
+            .add::<DummyOutboxImpl>()
             .build();
-
-        let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
-        let remote_repo_reg = catalog.get_one::<RemoteRepositoryRegistryImpl>().unwrap();
-        let remote_alias_reg = catalog.get_one::<dyn RemoteAliasesRegistry>().unwrap();
-        let pull_svc = catalog.get_one::<dyn PullService>().unwrap();
 
         Self {
             calls,
-            dataset_repo,
-            remote_repo_reg,
-            remote_alias_reg,
-            pull_svc,
+            dataset_repo: catalog.get_one().unwrap(),
+            remote_repo_reg: catalog.get_one().unwrap(),
+            remote_alias_reg: catalog.get_one().unwrap(),
+            pull_svc: catalog.get_one().unwrap(),
+            create_dataset_use_case: catalog.get_one().unwrap(),
         }
     }
 
@@ -1225,3 +1253,5 @@ impl SyncService for TestSyncService {
         unimplemented!()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
