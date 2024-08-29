@@ -1,0 +1,70 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: abbcon.case-details
+  kind: Derivative
+  metadata:
+    - kind: SetTransform
+      inputs:
+        - datasetRef: covid19.british-columbia.case-details
+        - datasetRef: covid19.ontario.case-details
+        - datasetRef: covid19.alberta.case-details
+      transform:
+        kind: Sql
+        engine: datafusion
+        query: |
+          select
+            'BC' as province,
+            id,
+            reported_date,
+            sex as gender,
+            case when age_group = '<10' then '<20'
+                 when age_group = '10-19' then '<20' 
+                 when age_group = '20-29' then '20s'
+                 when age_group = '30-39' then '30s'
+                 when age_group = '40-49' then '40s'
+                 when age_group = '50-59' then '50s'
+                 when age_group = '60-69' then '60s'
+                 when age_group = '70-79' then '70s'
+                 when age_group = '80-89' then '80+'
+                 when age_group = '90+' then '80+'
+                 else 'UNKNOWN' end as age_group,
+            ha as location
+          from "covid19.british-columbia.case-details"
+          union all
+          select
+            'ON' as province,
+            id,
+            case_reported_date as reported_date,
+            case when lower(gender) = 'male' then 'M' 
+                 when lower(gender) = 'female' then 'F' 
+                 else 'U' end as gender,
+            case when age_group = '90+' then '80+' 
+                 else age_group end as age_group, 
+            city as location
+          from "covid19.ontario.case-details"
+          union all  
+          select
+            'AB' as province,
+            id,
+            date_reported as reported_date,
+            case when lower(gender) = 'male' then 'M' 
+                 when lower(gender) = 'female' then 'F' 
+                 else 'U' end as gender, 
+            case when age_group = 'Under 1 year' then '<20'
+                 when age_group = '1-4 years' then '<20'
+                 when age_group = '5-9 years' then '<20'
+                 when age_group = '10-19 years' then '<20' 
+                 when age_group = '20-29 years' then '20s'
+                 when age_group = '30-39 years' then '30s'
+                 when age_group = '40-49 years' then '40s'
+                 when age_group = '50-59 years' then '50s'
+                 when age_group = '60-69 years' then '60s'
+                 when age_group = '70-79 years' then '70s'
+                 when age_group = '80+ years' then '80+'
+                 when age_group = '90+' then '80+'
+                 else 'UNKNOWN' end as age_group,
+            zone as location
+          from "covid19.alberta.case-details"
+    - kind: SetVocab
+      eventTimeColumn: reported_date

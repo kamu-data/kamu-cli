@@ -48,39 +48,39 @@ content:
         engine: datafusion
         query: |
           select
-            pid,
-            legal_type,
-            folio,
-            land_coordinate,
-            zoning_district,
-            zoning_classification,
-            lot,
-            plan,
-            block,
-            district_lot,
-            from_civic_number,
-            to_civic_number,
-            street_name,
-            property_postal_code,
-            narrative_legal_line1,
-            narrative_legal_line2,
-            narrative_legal_line3,
-            narrative_legal_line4,
-            narrative_legal_line5,
-            current_land_value,
-            current_improvement_value,
-            tax_assessment_year,
-            previous_land_value,
-            previous_improvement_value,
-            year_built,
-            big_improvement_year,
-            tax_levy,
-            neighbourhood_code,
-            cast(concat(report_year, '-01-01') as date) as report_year
+            PID,
+            LEGAL_TYPE,
+            FOLIO,
+            LAND_COORDINATE,
+            ZONING_DISTRICT,
+            ZONING_CLASSIFICATION,
+            LOT,
+            PLAN,
+            BLOCK,
+            DISTRICT_LOT,
+            FROM_CIVIC_NUMBER,
+            TO_CIVIC_NUMBER,
+            STREET_NAME,
+            PROPERTY_POSTAL_CODE,
+            NARRATIVE_LEGAL_LINE1,
+            NARRATIVE_LEGAL_LINE2,
+            NARRATIVE_LEGAL_LINE3,
+            NARRATIVE_LEGAL_LINE4,
+            NARRATIVE_LEGAL_LINE5,
+            CURRENT_LAND_VALUE,
+            CURRENT_IMPROVEMENT_VALUE,
+            TAX_ASSESSMENT_YEAR,
+            PREVIOUS_LAND_VALUE,
+            PREVIOUS_IMPROVEMENT_VALUE,
+            YEAR_BUILT,
+            BIG_IMPROVEMENT_YEAR,
+            TAX_LEVY,
+            NEIGHBOURHOOD_CODE,
+            cast(concat(REPORT_YEAR, '-01-01') as date) as report_year
           from input
       merge:
         kind: Ledger
         primaryKey:
-          - pid
+          - PID
     - kind: SetVocab
       eventTimeColumn: report_year
