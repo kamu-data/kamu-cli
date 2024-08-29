@@ -535,6 +535,30 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Ok((ws_stream, _)) => ws_stream,
             Err(e) => {
                 tracing::debug!("Failed to connect to pull URL: {}", e);
+                if let TungsteniteError::Http(response) = &e {
+                    match response.status() {
+                        http::StatusCode::FORBIDDEN => {
+                            return Err(SyncError::Access(AccessError::Forbidden(Box::new(e))))
+                        }
+                        http::StatusCode::UNAUTHORIZED => {
+                            return Err(SyncError::Access(AccessError::Unauthorized(Box::new(e))))
+                        }
+                        http::StatusCode::BAD_REQUEST => {
+                            if let Some(body) = response.body().as_ref()
+                                && let Ok(body_message) = std::str::from_utf8(body)
+                            {
+                                return InternalError::bail(body_message)
+                                    .map_err(SyncError::Internal);
+                            }
+                        }
+                        _ => {}
+                    }
+                    if response.status() == http::StatusCode::FORBIDDEN {
+                        return Err(SyncError::Access(AccessError::Forbidden(Box::new(e))));
+                    } else if response.status() == http::StatusCode::UNAUTHORIZED {
+                        return Err(SyncError::Access(AccessError::Unauthorized(Box::new(e))));
+                    }
+                }
                 return Err(SyncError::Internal(e.int_err()));
             }
         };
