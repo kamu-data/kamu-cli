@@ -157,7 +157,7 @@ impl PushCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for PushCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn before_run(&self) -> Result<(), CLIError> {
         if self.refs.is_empty() && !self.all {
             return Err(CLIError::usage_error("Specify a dataset or pass --all"));
         }
@@ -168,6 +168,10 @@ impl Command for PushCommand {
             ));
         }
 
+        Ok(())
+    }
+
+    async fn run(&mut self) -> Result<(), CLIError> {
         let push_results = if self.output_config.is_tty
             && self.output_config.verbosity_level == 0
             && !self.output_config.quiet
