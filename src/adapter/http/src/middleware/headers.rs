@@ -13,14 +13,14 @@ use axum::TypedHeader;
 use http::{HeaderName, HeaderValue};
 
 pub type BearerHeader = TypedHeader<Authorization<Bearer>>;
-pub type VersionHeaderTyped = TypedHeader<VersionHeader>;
+pub type OdfSmtpVersionTyped = TypedHeader<OdfSmtpVersion>;
 
 #[derive(Debug)]
-pub struct VersionHeader(pub i32);
+pub struct OdfSmtpVersion(pub i32);
 
-impl Header for VersionHeader {
+impl Header for OdfSmtpVersion {
     fn name() -> &'static HeaderName {
-        static NAME: HeaderName = HeaderName::from_static("x-websocket-version");
+        static NAME: HeaderName = HeaderName::from_static("x-odf-smtp-version");
         &NAME
     }
 
@@ -31,7 +31,7 @@ impl Header for VersionHeader {
         if let Some(value) = values.next() {
             let value_str = value.to_str().map_err(|_| Error::invalid())?;
             let value_int = value_str.parse::<i32>().map_err(|_| Error::invalid())?;
-            Ok(VersionHeader(value_int))
+            Ok(OdfSmtpVersion(value_int))
         } else {
             Err(Error::invalid())
         }

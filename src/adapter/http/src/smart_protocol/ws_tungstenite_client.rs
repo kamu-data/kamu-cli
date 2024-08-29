@@ -35,7 +35,7 @@ use crate::smart_protocol::messages::*;
 use crate::smart_protocol::phases::*;
 use crate::smart_protocol::protocol_dataset_helper::*;
 use crate::ws_common::{self, ReadMessageError, WriteMessageError};
-use crate::VersionHeader;
+use crate::OdfSmtpVersion;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -521,8 +521,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         use tokio_tungstenite::tungstenite::client::IntoClientRequest;
         let mut request = pull_url.into_client_request().int_err()?;
         request.headers_mut().append(
-            VersionHeader::name(),
-            http::HeaderValue::from(SMART_TRANSFER_PROTOCOL_CLIENT_VERSION),
+            OdfSmtpVersion::name(),
+            http::HeaderValue::from(SMART_TRANSFER_PROTOCOL_VERSION),
         );
         if let Some(access_token) = maybe_access_token {
             request.headers_mut().append(
@@ -739,8 +739,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         use tokio_tungstenite::tungstenite::client::IntoClientRequest;
         let mut request = push_url.into_client_request().int_err()?;
         request.headers_mut().append(
-            VersionHeader::name(),
-            http::HeaderValue::from(SMART_TRANSFER_PROTOCOL_CLIENT_VERSION),
+            OdfSmtpVersion::name(),
+            http::HeaderValue::from(SMART_TRANSFER_PROTOCOL_VERSION),
         );
         if let Some(access_token) = maybe_access_token {
             request.headers_mut().append(
@@ -796,7 +796,6 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 return Err(SyncError::Internal(e.int_err()));
             }
         };
-        println!("@@ finish push");
 
         match self
             .push_send_metadata_request(

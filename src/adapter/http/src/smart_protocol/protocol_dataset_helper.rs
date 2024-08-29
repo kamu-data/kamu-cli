@@ -25,7 +25,7 @@ use url::Url;
 
 use crate::smart_protocol::errors::ObjectUploadError;
 use crate::smart_protocol::messages::*;
-use crate::{BearerHeader, VersionHeader};
+use crate::{BearerHeader, OdfSmtpVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -435,7 +435,7 @@ pub async fn prepare_pull_object_transfer_strategy(
                 url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
                 headers: get_simple_transfer_protocol_headers(
                     maybe_bearer_header,
-                    SMART_TRANSFER_PROTOCOL_SERVER_VERSION,
+                    SMART_TRANSFER_PROTOCOL_VERSION,
                 ),
                 expires_at: None,
             }),
@@ -485,7 +485,7 @@ fn get_simple_transfer_protocol_headers(
     version: i32,
 ) -> Vec<HeaderRow> {
     let mut headers = vec![HeaderRow {
-        name: VersionHeader::name().to_string(),
+        name: OdfSmtpVersion::name().to_string(),
         value: version.to_string(),
     }];
     if let Some(bearer) = maybe_bearer_header {
@@ -569,7 +569,7 @@ pub async fn prepare_push_object_transfer_strategy(
                     url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
                     headers: get_simple_transfer_protocol_headers(
                         maybe_bearer_header,
-                        SMART_TRANSFER_PROTOCOL_SERVER_VERSION,
+                        SMART_TRANSFER_PROTOCOL_VERSION,
                     ),
                     expires_at: None,
                 }),

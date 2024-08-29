@@ -29,9 +29,9 @@ use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::{DatasetRef, Multihash};
 use url::Url;
 
-use crate::smart_protocol::messages::SMART_TRANSFER_PROTOCOL_SERVER_VERSION;
+use crate::smart_protocol::messages::SMART_TRANSFER_PROTOCOL_VERSION;
 use crate::smart_protocol::{AxumServerPullProtocolInstance, AxumServerPushProtocolInstance};
-use crate::{BearerHeader, VersionHeader, VersionHeaderTyped};
+use crate::{BearerHeader, OdfSmtpVersion, OdfSmtpVersionTyped};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -196,7 +196,7 @@ pub async fn dataset_push_ws_upgrade_handler(
     axum::extract::Extension(dataset_ref): axum::extract::Extension<DatasetRef>,
     axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     uri: axum::extract::OriginalUri,
-    TypedHeader(VersionHeader(version_header)): VersionHeaderTyped,
+    TypedHeader(OdfSmtpVersion(version_header)): OdfSmtpVersionTyped,
     maybe_bearer_header: Option<BearerHeader>,
 ) -> Result<axum::response::Response, ApiError> {
     let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
@@ -204,9 +204,7 @@ pub async fn dataset_push_ws_upgrade_handler(
         CurrentAccountSubject::Logged(_) => Ok(()),
         CurrentAccountSubject::Anonymous(_) => Err(ApiError::new_unauthorized()),
     }?;
-    if !ensure_version_compatibility(version_header) {
-        return Err(ApiError::incompatible_client_version());
-    };
+    ensure_version_compatibility(version_header)?;
 
     let server_url_config = catalog.get_one::<ServerUrlConfig>().unwrap();
     let dataset_url = get_base_dataset_url(uri, &server_url_config.protocols.base_url_rest, 1);
@@ -250,12 +248,11 @@ pub async fn dataset_pull_ws_upgrade_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     uri: axum::extract::OriginalUri,
-    TypedHeader(VersionHeader(version_header)): VersionHeaderTyped,
+    TypedHeader(OdfSmtpVersion(version_header)): OdfSmtpVersionTyped,
     maybe_bearer_header: Option<BearerHeader>,
 ) -> Result<axum::response::Response, ApiError> {
-    if !ensure_version_compatibility(version_header) {
-        return Err(ApiError::incompatible_client_version());
-    };
+    ensure_version_compatibility(version_header)?;
+
     let server_url_config = catalog.get_one::<ServerUrlConfig>().unwrap();
     let dataset_url = get_base_dataset_url(uri, &server_url_config.protocols.base_url_rest, 1);
 
@@ -280,8 +277,11 @@ fn get_base_dataset_url(
     base_url_rest.join(path_string.as_str()).unwrap()
 }
 
-fn ensure_version_compatibility(client_version: i32) -> bool {
-    client_version == SMART_TRANSFER_PROTOCOL_SERVER_VERSION
+fn ensure_version_compatibility(expected_version: i32) -> Result<(), ApiError> {
+    if expected_version != SMART_TRANSFER_PROTOCOL_VERSION {
+        return Err(ApiError::incompatible_client_version());
+    }
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

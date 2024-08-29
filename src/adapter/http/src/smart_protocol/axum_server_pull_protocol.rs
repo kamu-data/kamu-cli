@@ -50,13 +50,35 @@ impl AxumServerPullProtocolInstance {
             Ok(_) => {
                 tracing::debug!("Pull process success");
             }
-            Err(e) => match &e {
-                PullServerError::Internal(int_err) => {
+            Err(ref e @ PullServerError::Internal(ref int_err)) => {
+                if let Err(write_err) = axum_write_close_payload::<DatasetPullResponse>(
+                    &mut self.socket,
+                    Err(DatasetPullRequestError::Internal(TransferInternalError {
+                        phase: int_err.phase.clone(),
+                        error_message: "Internal error".to_string(),
+                    })),
+                )
+                .await
+                {
+                    tracing::error!(
+                      error = ?write_err,
+                      error_msg = %write_err,
+                      "Failed to send error to client with error",
+                    );
+                };
+                tracing::error!(
+                  error = ?e,
+                  error_msg = %e,
+                  "Push process aborted with internal error",
+                );
+            }
+            Err(ref _e @ PullServerError::ReadFailed(ref err)) => {
+                if let ReadMessageError::IncompatibleVersion = err.read_error {
                     if let Err(write_err) = axum_write_close_payload::<DatasetPullResponse>(
                         &mut self.socket,
                         Err(DatasetPullRequestError::Internal(TransferInternalError {
-                            phase: int_err.phase.clone(),
-                            error_message: "Internal error".to_string(),
+                            phase: TransferPhase::Pull(PullPhase::InitialRequest),
+                            error_message: "Incompatible version.".to_string(),
                         })),
                     )
                     .await
@@ -67,18 +89,13 @@ impl AxumServerPullProtocolInstance {
                           "Failed to send error to client with error",
                         );
                     };
-                    tracing::error!(
-                      error = ?e,
-                      error_msg = %e,
-                      "Push process aborted with internal error",
-                    );
                 }
-                _ => tracing::error!(
-                  error = ?e,
-                  error_msg = %e,
-                  "Push process aborted with error",
-                ),
-            },
+            }
+            Err(e) => tracing::error!(
+              error = ?e,
+              error_msg = %e,
+              "Push process aborted with error",
+            ),
         }
 
         // After we finish processing to ensure graceful closing
@@ -86,11 +103,11 @@ impl AxumServerPullProtocolInstance {
         // custom clients without logic of close acknowledgment
         // we will give 5 secs timeout
         let timeout_duration = Duration::from_secs(5);
-        tokio::select! {
-            _ = wait_for_close(&mut self.socket) => {}
-            _ = tokio::time::sleep(timeout_duration) => {
-                tracing::debug!("Timeout reached, closing connection");
-            }
+        if tokio::time::timeout(timeout_duration, wait_for_close(&mut self.socket))
+            .await
+            .is_err()
+        {
+            tracing::debug!("Timeout reached, closing connection");
         };
     }
 
@@ -141,7 +158,7 @@ impl AxumServerPullProtocolInstance {
         let head = metadata_chain
             .resolve_ref(&BlockRef::Head)
             .await
-            .protocol_int_err(TransferPhase::Pull(PullPhase::InitialRequest))?;
+            .protocol_int_err(PullPhase::InitialRequest)?;
 
         let transfer_plan_result = prepare_dataset_transfer_plan(
             metadata_chain,
@@ -201,7 +218,7 @@ impl AxumServerPullProtocolInstance {
                 let head = metadata_chain
                     .resolve_ref(&BlockRef::Head)
                     .await
-                    .protocol_int_err(TransferPhase::Pull(PullPhase::MetadataRequest))?;
+                    .protocol_int_err(PullPhase::MetadataRequest)?;
 
                 let metadata_batch = prepare_dataset_metadata_batch(
                     metadata_chain,
@@ -210,7 +227,7 @@ impl AxumServerPullProtocolInstance {
                     pull_request.force_update_if_diverged,
                 )
                 .await
-                .protocol_int_err(TransferPhase::Pull(PullPhase::MetadataRequest))?;
+                .protocol_int_err(PullPhase::MetadataRequest)?;
 
                 tracing::debug!(
                     num_blocks = % metadata_batch.num_blocks,
@@ -259,7 +276,7 @@ impl AxumServerPullProtocolInstance {
                         &self.maybe_bearer_header,
                     )
                     .await
-                    .protocol_int_err(TransferPhase::Pull(PullPhase::ObjectsRequest))?;
+                    .protocol_int_err(PullPhase::ObjectsRequest)?;
 
                     object_transfer_strategies.push(transfer_strategy);
                 }

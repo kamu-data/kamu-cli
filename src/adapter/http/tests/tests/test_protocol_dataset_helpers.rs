@@ -14,9 +14,9 @@ use axum::headers::Header;
 use kamu::domain::Dataset;
 use kamu::testing::{MetadataFactory, TEST_BUCKET_NAME};
 use kamu_accounts::DUMMY_ACCESS_TOKEN;
-use kamu_adapter_http::smart_protocol::messages::{self, SMART_TRANSFER_PROTOCOL_CLIENT_VERSION};
+use kamu_adapter_http::smart_protocol::messages::{self, SMART_TRANSFER_PROTOCOL_VERSION};
 use kamu_adapter_http::smart_protocol::protocol_dataset_helper::*;
-use kamu_adapter_http::{BearerHeader, VersionHeader};
+use kamu_adapter_http::{BearerHeader, OdfSmtpVersion};
 use opendatafabric::{DatasetID, DatasetKind, Multihash};
 use url::Url;
 
@@ -123,8 +123,8 @@ async fn test_object_url_local_fs() {
             download_from_url == test_case.dataset_url.join(format!("data/{}", physical_hash.as_multibase()).as_str()).unwrap() &&
             download_from_headers == vec![
                 messages::HeaderRow {
-                    name: VersionHeader::name().to_string(),
-                    value: SMART_TRANSFER_PROTOCOL_CLIENT_VERSION.to_string(),
+                    name: OdfSmtpVersion::name().to_string(),
+                    value: SMART_TRANSFER_PROTOCOL_VERSION.to_string(),
                 },
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
@@ -153,8 +153,8 @@ async fn test_object_url_local_fs() {
             download_from_url == test_case.dataset_url.join(format!("checkpoints/{}", physical_hash.as_multibase()).as_str()).unwrap() &&
             download_from_headers == vec![
                 messages::HeaderRow {
-                    name: VersionHeader::name().to_string(),
-                    value: SMART_TRANSFER_PROTOCOL_CLIENT_VERSION.to_string(),
+                    name: OdfSmtpVersion::name().to_string(),
+                    value: SMART_TRANSFER_PROTOCOL_VERSION.to_string(),
                 },
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
@@ -206,8 +206,8 @@ async fn test_object_url_local_fs() {
             upload_to_url == test_case.dataset_url.join(format!("data/{}", physical_hash.as_multibase()).as_str()).unwrap() &&
             upload_to_headers == vec![
                 messages::HeaderRow {
-                    name: VersionHeader::name().to_string(),
-                    value: SMART_TRANSFER_PROTOCOL_CLIENT_VERSION.to_string(),
+                    name: OdfSmtpVersion::name().to_string(),
+                    value: SMART_TRANSFER_PROTOCOL_VERSION.to_string(),
                 },
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
@@ -235,8 +235,8 @@ async fn test_object_url_local_fs() {
             upload_to_url == test_case.dataset_url.join(format!("checkpoints/{}", physical_hash.as_multibase()).as_str()).unwrap() &&
             upload_to_headers == vec![
                 messages::HeaderRow {
-                    name: VersionHeader::name().to_string(),
-                    value: SMART_TRANSFER_PROTOCOL_CLIENT_VERSION.to_string(),
+                    name: OdfSmtpVersion::name().to_string(),
+                    value: SMART_TRANSFER_PROTOCOL_VERSION.to_string(),
                 },
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),

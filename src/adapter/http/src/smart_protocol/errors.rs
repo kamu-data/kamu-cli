@@ -20,8 +20,8 @@ use crate::ws_common::{ReadMessageError, WriteMessageError};
 
 #[derive(Error, Debug)]
 pub struct PullReadError {
-    read_error: ReadMessageError,
-    pull_phase: PullPhase,
+    pub read_error: ReadMessageError,
+    pub pull_phase: PullPhase,
 }
 
 impl PullReadError {
@@ -275,30 +275,40 @@ impl From<PhaseInternalError> for PullServerError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ErrorIntoProtocolInternal {
-    fn protocol_int_err(self, phase: TransferPhase) -> PhaseInternalError;
+    fn protocol_int_err<P>(self, phase: P) -> PhaseInternalError
+    where
+        P: Into<TransferPhase>;
 }
 
 impl<E> ErrorIntoProtocolInternal for E
 where
     E: Into<BoxedError>,
 {
-    fn protocol_int_err(self, phase: TransferPhase) -> PhaseInternalError {
+    fn protocol_int_err<P>(self, phase: P) -> PhaseInternalError
+    where
+        P: Into<TransferPhase>,
+    {
         PhaseInternalError {
-            phase,
+            phase: phase.into(),
             error: InternalError::new(self),
         }
     }
 }
 
 pub trait ResultIntoProtocolInternal<OK> {
-    fn protocol_int_err(self, phase: TransferPhase) -> Result<OK, PhaseInternalError>;
+    fn protocol_int_err<P>(self, phase: P) -> Result<OK, PhaseInternalError>
+    where
+        P: Into<TransferPhase>;
 }
 
 impl<OK, E> ResultIntoProtocolInternal<OK> for Result<OK, E>
 where
     E: Into<BoxedError>,
 {
-    fn protocol_int_err(self, phase: TransferPhase) -> Result<OK, PhaseInternalError> {
+    fn protocol_int_err<P>(self, phase: P) -> Result<OK, PhaseInternalError>
+    where
+        P: Into<TransferPhase>,
+    {
         match self {
             Ok(ok) => Ok(ok),
             Err(e) => Err(e.protocol_int_err(phase)),

@@ -36,6 +36,18 @@ pub enum TransferPhase {
     Push(PushPhase),
 }
 
+impl From<PullPhase> for TransferPhase {
+    fn from(value: PullPhase) -> Self {
+        Self::Pull(value)
+    }
+}
+
+impl From<PushPhase> for TransferPhase {
+    fn from(value: PushPhase) -> Self {
+        Self::Push(value)
+    }
+}
+
 impl fmt::Display for PullPhase {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let phase = match self {
