@@ -330,6 +330,8 @@ pub fn get_command(
             !push_matches.get_flag("no-alias"),
             push_matches.get_flag("force"),
             push_matches.get_one("to").cloned(),
+            // Safety: This argument has a default value
+            *push_matches.get_one("visibility").unwrap(),
             cli_catalog.get_one()?,
         )),
         Some(("rename", rename_matches)) => Box::new(RenameCommand::new(

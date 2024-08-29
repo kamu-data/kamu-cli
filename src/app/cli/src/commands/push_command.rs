@@ -35,6 +35,7 @@ pub struct PushCommand {
     add_aliases: bool,
     force: bool,
     to: Option<DatasetRefRemote>,
+    dataset_visibility: DatasetVisibility,
     output_config: Arc<OutputConfig>,
 }
 
@@ -50,6 +51,7 @@ impl PushCommand {
         add_aliases: bool,
         force: bool,
         to: Option<DatasetRefRemote>,
+        dataset_visibility: DatasetVisibility,
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
@@ -66,6 +68,7 @@ impl PushCommand {
             add_aliases,
             force,
             to,
+            dataset_visibility,
             output_config,
         }
     }
