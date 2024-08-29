@@ -12,13 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Added
 - Container sources allow string interpolation in env vars and command
-- Private Datasets
+- Private Datasets, changes related to Smart Transfer Protocol:
   - `kamu push`: added `--visibility private|public` argument to specify the created dataset visibility
+  - Send the visibility attribute in the initial request of the push flow
 ### Changed
 - Schema propagation improvements:
   - Dataset schema will be defined upon first ingest, even if no records were returned by the source
   - Schema will also be defined for derivative datasets even if no records produced by the transformation
   - Above ensures that datasets that for a long time don't produce any data will not block data pipelines
+- Smart Transfer Protocol: use `CreateDatasetUseCase` in case of creation at the time of the dataset pulling
 
 ## [0.198.1] - 2024-08-28
 ### Added
