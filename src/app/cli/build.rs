@@ -17,6 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .all_git()
         .all_rustc()
         .all_cargo()
+        .fail_on_error()
         .emit()?;
 
     // sqlx will cause kamu-cli to be rebuilt if already embedded migrations have
