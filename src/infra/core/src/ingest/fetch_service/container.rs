@@ -79,13 +79,20 @@ impl FetchService {
             .container_runtime
             .run_attached(&fetch.image)
             .container_name(format!("kamu-fetch-{operation_id}"))
-            .args(fetch.args.clone().unwrap_or_default())
             .volume((&out_dir, "/opt/odf/out"))
             .stdout(Stdio::piped())
             .stderr(stderr_file);
 
         if let Some(command) = &fetch.command {
             container_builder = container_builder.entry_point(command.join(" "));
+        }
+
+        if let Some(args) = &fetch.args {
+            container_builder = container_builder.args(
+                args.iter()
+                    .map(|arg| self.template_string(arg, dataset_env_vars))
+                    .collect::<Result<Vec<_>, _>>()?,
+            );
         }
 
         let mut batch_size = self.source_config.target_records_per_slice;
