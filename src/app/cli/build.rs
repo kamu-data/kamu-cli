@@ -9,10 +9,9 @@
 
 use std::error::Error;
 
-use vergen::EmitBuilder;
-
 fn main() -> Result<(), Box<dyn Error>> {
-    EmitBuilder::builder()
+    // Preparing the build information
+    vergen::EmitBuilder::builder()
         .all_build()
         .all_git()
         .all_rustc()
