@@ -30,6 +30,7 @@ pub(crate) async fn test_smart_push_new_dataset<TServerHarness: ServerSideHarnes
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref,
                 false,
+                DatasetVisibility::Private,
             )
             .await;
 
@@ -69,6 +70,7 @@ pub(crate) async fn test_smart_push_new_empty_dataset<TServerHarness: ServerSide
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref,
                 false,
+                DatasetVisibility::Private,
             )
             .await;
 
@@ -109,6 +111,7 @@ pub(crate) async fn test_smart_push_existing_up_to_date_dataset<
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref,
                 false,
+                DatasetVisibility::Private,
             )
             .await;
 
@@ -141,6 +144,7 @@ pub(crate) async fn test_smart_push_existing_evolved_dataset<TServerHarness: Ser
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref,
                 false,
+                DatasetVisibility::Private,
             )
             .await;
 
@@ -180,6 +184,7 @@ pub(crate) async fn test_smart_push_existing_diverged_dataset<TServerHarness: Se
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref,
                 true, /* diverged! */
+                DatasetVisibility::Private,
             )
             .await;
 
@@ -228,6 +233,7 @@ pub(crate) async fn test_smart_push_existing_dataset_fails_as_server_advanced<
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref,
                 false,
+                DatasetVisibility::Private,
             )
             .await;
 
@@ -257,6 +263,7 @@ pub(crate) async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref,
                 false,
+                DatasetVisibility::Private,
             )
             .await;
 
@@ -298,6 +305,7 @@ pub(crate) async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref,
                 false,
+                DatasetVisibility::Private,
             )
             .await;
 
