@@ -19,6 +19,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use url::Url;
 
+use crate::KAMU_WORKSPACE_DIR_NAME;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
@@ -615,9 +617,9 @@ impl DatabaseConfig {
         })
     }
 
-    pub fn sqlite_database() -> Self {
+    pub fn sqlite_database_in_workspace_dir() -> Self {
         Self::Sqlite(SqliteDatabaseConfig {
-            database_path: "kamu.sqlite.db".into(),
+            database_path: format!("{KAMU_WORKSPACE_DIR_NAME}/workspace.sqlite.db"),
         })
     }
 }

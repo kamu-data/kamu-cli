@@ -105,7 +105,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         // If not explicitly configured, a SQLite database is used for a multi-tenant
         // workspace
         if is_multi_tenant_workspace {
-            Some(DatabaseConfig::sqlite_database())
+            Some(DatabaseConfig::sqlite_database_in_workspace_dir())
         } else {
             None
         }
