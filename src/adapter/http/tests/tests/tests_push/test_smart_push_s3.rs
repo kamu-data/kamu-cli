@@ -24,6 +24,13 @@ test_client_server_s3_harness_permutations!(test_smart_push_shared, test_smart_p
 
 test_client_server_s3_harness_permutations!(
     test_smart_push_shared,
+    test_smart_push_new_dataset_as_public
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_client_server_s3_harness_permutations!(
+    test_smart_push_shared,
     test_smart_push_new_empty_dataset
 );
 

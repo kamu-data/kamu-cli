@@ -54,6 +54,45 @@ pub(crate) async fn test_smart_push_new_dataset<TServerHarness: ServerSideHarnes
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) async fn test_smart_push_new_dataset_as_public<TServerHarness: ServerSideHarness>(
+    a_client_harness: ClientSideHarness,
+    a_server_harness: TServerHarness,
+) {
+    let scenario = SmartPushNewDatasetScenario::prepare(a_client_harness, a_server_harness).await;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let push_result = scenario
+            .client_harness
+            .push_dataset_result(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+                false,
+                DatasetVisibility::Public,
+            )
+            .await;
+
+        assert_eq!(
+            SyncResult::Updated {
+                old_head: None,
+                new_head: scenario.client_commit_result.new_head,
+                num_blocks: 4,
+            },
+            push_result
+        );
+
+        DatasetTestHelper::assert_datasets_in_sync(
+            &scenario.server_dataset_layout,
+            &scenario.client_dataset_layout,
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) async fn test_smart_push_new_empty_dataset<TServerHarness: ServerSideHarness>(
     a_client_harness: ClientSideHarness,
     a_server_harness: TServerHarness,
