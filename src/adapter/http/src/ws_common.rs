@@ -25,6 +25,9 @@ pub enum ReadMessageError {
     #[error("Message is not in text format")]
     NonTextMessageReceived,
 
+    #[error("Incompatible message version. Please upgrade client version")]
+    IncompatibleVersion,
+
     #[error(transparent)]
     SerdeError(
         #[from]

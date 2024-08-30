@@ -10,6 +10,7 @@
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 
+use axum::headers::Header;
 use database_common::DatabaseTransactionRunner;
 use dill::*;
 use futures::SinkExt;
@@ -34,6 +35,7 @@ use crate::smart_protocol::messages::*;
 use crate::smart_protocol::phases::*;
 use crate::smart_protocol::protocol_dataset_helper::*;
 use crate::ws_common::{self, ReadMessageError, WriteMessageError};
+use crate::OdfSmtpVersion;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -97,9 +99,11 @@ impl WsSmartTransferProtocolClient {
                 );
                 Ok(success)
             }
-            Err(DatasetPullRequestError::Internal(e)) => Err(PullClientError::Internal(
-                InternalError::new(Box::new(ClientInternalError::new(e.error_message.as_str()))),
-            )),
+            Err(DatasetPullRequestError::Internal(e)) => {
+                Err(PullClientError::Internal(InternalError::new(Box::new(
+                    ClientInternalError::new(e.error_message.as_str(), e.phase),
+                ))))
+            }
             Err(DatasetPullRequestError::InvalidInterval(DatasetPullInvalidIntervalError {
                 head,
                 tail,
@@ -226,9 +230,11 @@ impl WsSmartTransferProtocolClient {
                 tracing::debug!("Push response accepted");
                 Ok(success)
             }
-            Err(DatasetPushRequestError::Internal(e)) => Err(PushClientError::Internal(
-                InternalError::new(Box::new(ClientInternalError::new(e.error_message.as_str()))),
-            )),
+            Err(DatasetPushRequestError::Internal(e)) => {
+                Err(PushClientError::Internal(InternalError::new(Box::new(
+                    ClientInternalError::new(e.error_message.as_str(), e.phase),
+                ))))
+            }
             Err(DatasetPushRequestError::InvalidHead(e)) => {
                 Err(PushClientError::InvalidHead(RefCASError {
                     actual: e.actual_head.clone(),
@@ -320,7 +326,7 @@ impl WsSmartTransferProtocolClient {
                     }
                     DatasetPushObjectsTransferError::Internal(err) => {
                         PushClientError::Internal(InternalError::new(Box::new(
-                            ClientInternalError::new(err.error_message.as_str()),
+                            ClientInternalError::new(err.error_message.as_str(), err.phase),
                         )))
                     }
                 })?;
@@ -514,6 +520,10 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         use tokio_tungstenite::tungstenite::client::IntoClientRequest;
         let mut request = pull_url.into_client_request().int_err()?;
+        request.headers_mut().append(
+            OdfSmtpVersion::name(),
+            http::HeaderValue::from(SMART_TRANSFER_PROTOCOL_VERSION),
+        );
         if let Some(access_token) = maybe_access_token {
             request.headers_mut().append(
                 http::header::AUTHORIZATION,
@@ -525,6 +535,30 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Ok((ws_stream, _)) => ws_stream,
             Err(e) => {
                 tracing::debug!("Failed to connect to pull URL: {}", e);
+                if let TungsteniteError::Http(response) = &e {
+                    match response.status() {
+                        http::StatusCode::FORBIDDEN => {
+                            return Err(SyncError::Access(AccessError::Forbidden(Box::new(e))))
+                        }
+                        http::StatusCode::UNAUTHORIZED => {
+                            return Err(SyncError::Access(AccessError::Unauthorized(Box::new(e))))
+                        }
+                        http::StatusCode::BAD_REQUEST => {
+                            if let Some(body) = response.body().as_ref()
+                                && let Ok(body_message) = std::str::from_utf8(body)
+                            {
+                                return InternalError::bail(body_message)
+                                    .map_err(SyncError::Internal);
+                            }
+                        }
+                        _ => {}
+                    }
+                    if response.status() == http::StatusCode::FORBIDDEN {
+                        return Err(SyncError::Access(AccessError::Forbidden(Box::new(e))));
+                    } else if response.status() == http::StatusCode::UNAUTHORIZED {
+                        return Err(SyncError::Access(AccessError::Unauthorized(Box::new(e))));
+                    }
+                }
                 return Err(SyncError::Internal(e.int_err()));
             }
         };
@@ -728,6 +762,10 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         use tokio_tungstenite::tungstenite::client::IntoClientRequest;
         let mut request = push_url.into_client_request().int_err()?;
+        request.headers_mut().append(
+            OdfSmtpVersion::name(),
+            http::HeaderValue::from(SMART_TRANSFER_PROTOCOL_VERSION),
+        );
         if let Some(access_token) = maybe_access_token {
             request.headers_mut().append(
                 http::header::AUTHORIZATION,
@@ -740,6 +778,23 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Err(e) => {
                 tracing::debug!("Failed to connect to push URL: {}", e);
                 if let TungsteniteError::Http(response) = &e {
+                    match response.status() {
+                        http::StatusCode::FORBIDDEN => {
+                            return Err(SyncError::Access(AccessError::Forbidden(Box::new(e))))
+                        }
+                        http::StatusCode::UNAUTHORIZED => {
+                            return Err(SyncError::Access(AccessError::Unauthorized(Box::new(e))))
+                        }
+                        http::StatusCode::BAD_REQUEST => {
+                            if let Some(body) = response.body().as_ref()
+                                && let Ok(body_message) = std::str::from_utf8(body)
+                            {
+                                return InternalError::bail(body_message)
+                                    .map_err(SyncError::Internal);
+                            }
+                        }
+                        _ => {}
+                    }
                     if response.status() == http::StatusCode::FORBIDDEN {
                         return Err(SyncError::Access(AccessError::Forbidden(Box::new(e))));
                     } else if response.status() == http::StatusCode::UNAUTHORIZED {

@@ -236,3 +236,36 @@ async fn test_smart_push_existing_ref_collision() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_push_incompatible_version_err() {
+    let scenario = SmartPushExistingRefCollisionScenarion::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            multi_tenant: true,
+            authenticated_remotely: true,
+        }),
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            multi_tenant: true,
+            authorized_writes: true,
+            base_catalog: None,
+        }),
+    )
+    .await;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let connet_result = scenario
+            .client_harness
+            .try_connect_to_websocket(scenario.server_dataset_ref.url().unwrap(), "push")
+            .await;
+
+        assert_matches!(connet_result, Err(msg) if {
+            msg == "Incompatible client version"
+        });
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

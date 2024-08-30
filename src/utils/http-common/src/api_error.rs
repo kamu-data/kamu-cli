@@ -116,6 +116,13 @@ impl ApiError {
     pub fn no_content(source: impl std::error::Error + Send + Sync + 'static) -> Self {
         Self::new(source, http::StatusCode::NO_CONTENT)
     }
+
+    pub fn incompatible_client_version() -> Self {
+        Self {
+            source: "Incompatible client version".into(),
+            status_code: http::StatusCode::BAD_REQUEST,
+        }
+    }
 }
 
 impl From<InternalError> for ApiError {

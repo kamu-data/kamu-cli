@@ -9,7 +9,7 @@
 
 use std::fmt::{self, Display};
 
-use internal_error::InternalError;
+use internal_error::{BoxedError, InternalError};
 use kamu_core::{InvalidIntervalError, RefCASError, RefCollisionError};
 use thiserror::Error;
 
@@ -20,8 +20,8 @@ use crate::ws_common::{ReadMessageError, WriteMessageError};
 
 #[derive(Error, Debug)]
 pub struct PullReadError {
-    read_error: ReadMessageError,
-    pull_phase: PullPhase,
+    pub read_error: ReadMessageError,
+    pub pull_phase: PullPhase,
 }
 
 impl PullReadError {
@@ -47,8 +47,8 @@ impl Display for PullReadError {
 
 #[derive(Error, Debug)]
 pub struct PushReadError {
-    read_error: ReadMessageError,
-    push_phase: PushPhase,
+    pub read_error: ReadMessageError,
+    pub push_phase: PushPhase,
 }
 
 impl PushReadError {
@@ -135,11 +135,7 @@ pub enum PullServerError {
     WriteFailed(PullWriteError),
 
     #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
+    Internal(PhaseInternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -174,11 +170,10 @@ pub enum PushServerError {
     WriteFailed(PushWriteError),
 
     #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
+    RefCollision(RefCollisionError),
+
+    #[error(transparent)]
+    Internal(PhaseInternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -209,12 +204,14 @@ pub enum PushClientError {
 
 #[derive(Debug)]
 pub struct ClientInternalError {
+    phase: TransferPhase,
     details: String,
 }
 
 impl ClientInternalError {
-    pub fn new(msg: &str) -> Self {
+    pub fn new(msg: &str, phase: TransferPhase) -> Self {
         Self {
+            phase,
             details: msg.to_string(),
         }
     }
@@ -222,7 +219,7 @@ impl ClientInternalError {
 
 impl fmt::Display for ClientInternalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.details)
+        write!(f, "{} during phase: {}", self.details, self.phase)
     }
 }
 
@@ -246,3 +243,75 @@ impl fmt::Display for ObjectUploadError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub struct PhaseInternalError {
+    pub phase: TransferPhase,
+    pub error: InternalError,
+}
+
+impl fmt::Display for PhaseInternalError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Smart protocol phase internal error: phase={}, error={}",
+            self.phase, self.error
+        )
+    }
+}
+
+impl From<PhaseInternalError> for PushServerError {
+    fn from(value: PhaseInternalError) -> Self {
+        PushServerError::Internal(value)
+    }
+}
+
+impl From<PhaseInternalError> for PullServerError {
+    fn from(value: PhaseInternalError) -> Self {
+        PullServerError::Internal(value)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait ErrorIntoProtocolInternal {
+    fn protocol_int_err<P>(self, phase: P) -> PhaseInternalError
+    where
+        P: Into<TransferPhase>;
+}
+
+impl<E> ErrorIntoProtocolInternal for E
+where
+    E: Into<BoxedError>,
+{
+    fn protocol_int_err<P>(self, phase: P) -> PhaseInternalError
+    where
+        P: Into<TransferPhase>,
+    {
+        PhaseInternalError {
+            phase: phase.into(),
+            error: InternalError::new(self),
+        }
+    }
+}
+
+pub trait ResultIntoProtocolInternal<OK> {
+    fn protocol_int_err<P>(self, phase: P) -> Result<OK, PhaseInternalError>
+    where
+        P: Into<TransferPhase>;
+}
+
+impl<OK, E> ResultIntoProtocolInternal<OK> for Result<OK, E>
+where
+    E: Into<BoxedError>,
+{
+    fn protocol_int_err<P>(self, phase: P) -> Result<OK, PhaseInternalError>
+    where
+        P: Into<TransferPhase>,
+    {
+        match self {
+            Ok(ok) => Ok(ok),
+            Err(e) => Err(e.protocol_int_err(phase)),
+        }
+    }
+}

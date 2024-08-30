@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ErrorIntoInternal;
 use kamu_core::{
     AppendDatasetMetadataBatchUseCase,
     BlockRef,
@@ -25,6 +25,7 @@ use kamu_core::{
     DatasetVisibility,
     GetRefError,
     HashedMetadataBlock,
+    RefCollisionError,
 };
 use opendatafabric::{AsTypedBlock, DatasetRef};
 use url::Url;
@@ -34,6 +35,8 @@ use super::messages::*;
 use super::phases::*;
 use super::protocol_dataset_helper::*;
 use crate::smart_protocol::*;
+use crate::ws_common::ReadMessageError;
+use crate::BearerHeader;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -75,9 +78,77 @@ impl AxumServerPushProtocolInstance {
             Ok(_) => {
                 tracing::debug!("Push process success");
             }
-            Err(e) => {
-                tracing::debug!("Push process aborted with error: {}", e);
+            Err(ref e @ PushServerError::Internal(ref int_err)) => {
+                if let Err(write_err) = axum_write_close_payload::<DatasetPushResponse>(
+                    &mut self.socket,
+                    Err(DatasetPushRequestError::Internal(TransferInternalError {
+                        phase: int_err.phase.clone(),
+                        error_message: "Internal error".to_string(),
+                    })),
+                )
+                .await
+                {
+                    tracing::error!(
+                      error = ?write_err,
+                      error_msg = %write_err,
+                      "Failed to send error to client with error",
+                    );
+                };
+                tracing::error!(
+                  error = ?e,
+                  error_msg = %e,
+                  "Push process aborted with internal error",
+                );
             }
+            Err(ref _e @ PushServerError::ReadFailed(ref err)) => {
+                if let ReadMessageError::IncompatibleVersion = err.read_error {
+                    if let Err(write_err) = axum_write_close_payload::<DatasetPushResponse>(
+                        &mut self.socket,
+                        Err(DatasetPushRequestError::Internal(TransferInternalError {
+                            phase: TransferPhase::Push(PushPhase::InitialRequest),
+                            error_message: "Incompatible version.".to_string(),
+                        })),
+                    )
+                    .await
+                    {
+                        tracing::error!(
+                          error = ?write_err,
+                          error_msg = %write_err,
+                          "Failed to send error to client with error",
+                        );
+                    };
+                }
+            }
+            Err(ref _e @ PushServerError::RefCollision(ref err)) => {
+                if let Err(write_err) = axum_write_payload::<DatasetPushObjectsTransferResponse>(
+                    &mut self.socket,
+                    DatasetPushObjectsTransferResponse::Err(
+                        DatasetPushObjectsTransferError::RefCollision(
+                            DatasetPushObjectsTransferRefCollisionError {
+                                dataset_id: err.id.clone(),
+                            },
+                        ),
+                    ),
+                )
+                .await
+                {
+                    tracing::error!(
+                      error = ?write_err,
+                      error_msg = %write_err,
+                      "Failed to send error to client with error",
+                    );
+                };
+                tracing::error!(
+                  error = ?err,
+                  error_msg = %err,
+                  "Push process aborted with error",
+                );
+            }
+            Err(e) => tracing::error!(
+              error = ?e,
+              error_msg = %e,
+              "Push process aborted with error",
+            ),
         }
 
         // After we finish processing to ensure graceful closing
@@ -85,11 +156,12 @@ impl AxumServerPushProtocolInstance {
         // custom clients without logic of close acknowledgment
         // we will give 5 secs timeout
         let timeout_duration = Duration::from_secs(5);
-        tokio::select! {
-            _ = wait_for_close(&mut self.socket) => {}
-            _ = tokio::time::sleep(timeout_duration) => {
-                tracing::debug!("Timeout reached, closing connection");
-            }
+
+        if tokio::time::timeout(timeout_duration, wait_for_close(&mut self.socket))
+            .await
+            .is_err()
+        {
+            tracing::debug!("Timeout reached, closing connection");
         };
     }
 
@@ -117,7 +189,12 @@ impl AxumServerPushProtocolInstance {
                             source: None,
                         }
                     })
-                    .int_err()?;
+                    .map_err(|e| {
+                        PushServerError::Internal(PhaseInternalError {
+                            phase: TransferPhase::Push(PushPhase::ObjectsUploadProgress),
+                            error: e.int_err(),
+                        })
+                    })?;
 
                 // TODO: Read the visibility parameter from CLI
                 //
@@ -138,27 +215,16 @@ impl AxumServerPushProtocolInstance {
                     .await;
                 match create_result {
                     Ok(create_result) => self.dataset = Some(create_result.dataset),
-                    Err(err) => {
-                        if let CreateDatasetError::RefCollision(err) = &err {
-                            axum_write_close_payload::<DatasetPushObjectsTransferResponse>(
-                                &mut self.socket,
-                                DatasetPushObjectsTransferResponse::Err(
-                                    DatasetPushObjectsTransferError::RefCollision(
-                                        DatasetPushObjectsTransferRefCollisionError {
-                                            dataset_id: err.id.clone(),
-                                        },
-                                    ),
-                                ),
-                            )
-                            .await
-                            .map_err(|e| {
-                                PushServerError::WriteFailed(PushWriteError::new(
-                                    e,
-                                    PushPhase::InitialRequest,
-                                ))
-                            })?;
-                        };
-                        return Err(err.int_err().into());
+                    Err(ref _e @ CreateDatasetError::RefCollision(ref err)) => {
+                        return Err(PushServerError::RefCollision(RefCollisionError {
+                            id: err.id.clone(),
+                        }));
+                    }
+                    Err(e) => {
+                        return Err(PushServerError::Internal(PhaseInternalError {
+                            phase: TransferPhase::Push(PushPhase::ObjectsUploadProgress),
+                            error: e.int_err(),
+                        }));
                     }
                 }
             }
@@ -209,7 +275,11 @@ impl AxumServerPushProtocolInstance {
             {
                 Ok(head) => Some(head),
                 Err(GetRefError::NotFound(_)) => None,
-                Err(e) => return Err(PushServerError::Internal(e.int_err())),
+                Err(e) => {
+                    return Err(PushServerError::Internal(
+                        e.protocol_int_err(PushPhase::InitialRequest),
+                    ))
+                }
             }
         } else {
             None
@@ -261,7 +331,8 @@ impl AxumServerPushProtocolInstance {
             push_metadata_request.new_blocks.num_blocks
         );
 
-        let new_blocks = decode_metadata_batch(&push_metadata_request.new_blocks).int_err()?;
+        let new_blocks = decode_metadata_batch(&push_metadata_request.new_blocks)
+            .protocol_int_err(PushPhase::InitialRequest)?;
 
         axum_write_payload::<DatasetPushMetadataAccepted>(
             &mut self.socket,
@@ -301,7 +372,7 @@ impl AxumServerPushProtocolInstance {
                 &self.maybe_bearer_header,
             )
             .await
-            .map_err(PushServerError::Internal)?;
+            .protocol_int_err(PushPhase::MetadataRequest)?;
 
             object_transfer_strategies.push(transfer_strategy);
         }
@@ -382,7 +453,7 @@ impl AxumServerPushProtocolInstance {
                 },
             )
             .await
-            .int_err()?;
+            .protocol_int_err(PushPhase::CompleteRequest)?;
 
         tracing::debug!("Sending completion confirmation");
 
