@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Changed -->
 <!--- - Fixed -->
 
-## Unreleased
+## [0.198.2] - 2024-08-30
 ### Added
 - Container sources allow string interpolation in env vars and command
 - Private Datasets, changes related to Smart Transfer Protocol:
