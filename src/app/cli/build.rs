@@ -19,7 +19,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         .all_cargo()
         .emit()?;
 
-    println!("cargo:rerun-if-changed=migrations");
+    // sqlx will cause kamu-cli to be rebuilt if already embedded migrations have
+    // changed.
+    //
+    // But if the migration was previously missing, the rebuild would not be
+    // triggered.
+    //
+    // To solve this, we tell the compiler to perform a rebuild
+    // in case of the migrations folder content has changed.
+    //
+    // NB. Working path: ./src/app/cli
+    println!("cargo:rerun-if-changed=../../../migrations/sqlite");
 
     Ok(())
 }
