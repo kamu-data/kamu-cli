@@ -179,6 +179,9 @@ jobs:
           DATABASE_URL: mariadb://root:root@localhost:3306/kamu-test
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::mysql::) ${{ matrix.nextest-exclusions-database-set-part }}'
 
+      - name: Generation of CLI reference
+        run: cargo test -p kamu-cli -- generate_reference_markdown
+
       # Not running on windows due to line ending differences
       - name: Check generated files
         if: "!contains(matrix.runs-on, 'windows')"
