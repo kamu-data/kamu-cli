@@ -20,7 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Dataset schema will be defined upon first ingest, even if no records were returned by the source
   - Schema will also be defined for derivative datasets even if no records produced by the transformation
   - Above ensures that datasets that for a long time don't produce any data will not block data pipelines
-- Smart Transfer Protocol: use `CreateDatasetUseCase` in case of creation at the time of the dataset pulling
+- Smart Transfer Protocol: 
+  - Use `CreateDatasetUseCase` in case of creation at the time of the dataset pulling
+  - Now requires the `x-odf-smtp-version` header, which is used to compare client and server versions to prevent issues with outdated clients
 
 ## [0.198.1] - 2024-08-28
 ### Added
