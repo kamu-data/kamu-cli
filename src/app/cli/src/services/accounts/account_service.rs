@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use clap::ArgMatches;
 use kamu_accounts::{PredefinedAccountsConfig, DEFAULT_ACCOUNT_NAME_STR};
 
 use crate::accounts::models::*;
@@ -34,21 +33,21 @@ impl AccountService {
     }
 
     pub fn current_account_indication(
-        arg_matches: &ArgMatches,
+        account: Option<String>,
         multi_tenant_workspace: bool,
         predefined_accounts_config: &PredefinedAccountsConfig,
     ) -> CurrentAccountIndication {
         let (current_account, user_name, specified_explicitly) = {
             let default_account_name = AccountService::default_account_name(multi_tenant_workspace);
 
-            if let Some(account) = arg_matches.get_one::<String>("account") {
+            if let Some(account) = account {
                 (
                     account.clone(),
-                    if account.eq(&default_account_name) {
+                    if *account == default_account_name {
                         default_account_name
                     } else {
-                        account.clone() // Use account as username, when there
-                                        // is no data
+                        // Use account as username, when there is no data
+                        account.clone()
                     },
                     true,
                 )
@@ -72,17 +71,17 @@ impl AccountService {
         CurrentAccountIndication::new(current_account, user_name, specified_explicitly, is_admin)
     }
 
-    pub fn related_account_indication(sub_matches: &ArgMatches) -> RelatedAccountIndication {
-        let target_account =
-            if let Some(target_account) = sub_matches.get_one::<String>("target-account") {
-                TargetAccountSelection::Specific {
-                    account_name: target_account.clone(),
-                }
-            } else if sub_matches.get_flag("all-accounts") {
-                TargetAccountSelection::AllUsers
-            } else {
-                TargetAccountSelection::Current
-            };
+    pub fn related_account_indication(
+        target_account: Option<String>,
+        all_accounts: bool,
+    ) -> RelatedAccountIndication {
+        let target_account = if let Some(account_name) = target_account {
+            TargetAccountSelection::Specific { account_name }
+        } else if all_accounts {
+            TargetAccountSelection::AllUsers
+        } else {
+            TargetAccountSelection::Current
+        };
 
         RelatedAccountIndication::new(target_account)
     }

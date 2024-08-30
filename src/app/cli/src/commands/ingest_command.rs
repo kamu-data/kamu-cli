@@ -39,7 +39,7 @@ pub struct IngestCommand {
 }
 
 impl IngestCommand {
-    pub fn new<'s, I, S1, S2, S3>(
+    pub fn new<I, S>(
         data_format_reg: Arc<dyn DataFormatRegistry>,
         dataset_repo: Arc<dyn DatasetRepository>,
         push_ingest_svc: Arc<dyn PushIngestService>,
@@ -47,17 +47,15 @@ impl IngestCommand {
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         dataset_ref: DatasetRef,
         files_refs: I,
-        source_name: Option<S1>,
-        event_time: Option<S2>,
+        source_name: Option<impl Into<String>>,
+        event_time: Option<impl Into<String>>,
         stdin: bool,
         recursive: bool,
-        input_format: Option<S3>,
+        input_format: Option<impl Into<String>>,
     ) -> Self
     where
-        I: Iterator<Item = &'s str>,
-        S1: Into<String>,
-        S2: Into<String>,
-        S3: Into<String>,
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
     {
         Self {
             data_format_reg,
@@ -66,7 +64,7 @@ impl IngestCommand {
             output_config,
             remote_alias_reg,
             dataset_ref,
-            files_refs: files_refs.map(ToString::to_string).collect(),
+            files_refs: files_refs.into_iter().map(Into::into).collect(),
             source_name: source_name.map(Into::into),
             event_time: event_time.map(Into::into),
             stdin,

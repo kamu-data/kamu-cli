@@ -90,7 +90,7 @@ impl Command for RepositoryListCommand {
         match self.output_config.format {
             OutputFormat::Table => self.print_pretty()?,
             OutputFormat::Csv => self.print_machine_readable()?,
-            _ => unimplemented!("Unsupported format: {:?}", self.output_config.format),
+            fmt => unimplemented!("Unsupported format: {fmt:?}"),
         }
 
         Ok(())

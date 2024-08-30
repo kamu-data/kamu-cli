@@ -34,6 +34,7 @@ use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
 use crate::{
+    cli,
     cli_commands,
     config,
     configure_database_components,
@@ -58,10 +59,7 @@ const VERBOSE_LOGGING_CONFIG: &str = "debug";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Errors before commands are executed are not output anywhere -- log them
-pub async fn run(
-    workspace_layout: WorkspaceLayout,
-    matches: clap::ArgMatches,
-) -> Result<(), CLIError> {
+pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<(), CLIError> {
     // Always capture backtraces for logging - we will separately decide whether to
     // display them to the user based on verbosity level
     if std::env::var_os("RUST_BACKTRACE").is_none() {
@@ -71,7 +69,8 @@ pub async fn run(
     // Sometimes (in the case of predefined users), we need to know whether the
     // workspace to be created will be multi-tenant or not right away, even before
     // the `kamu init` command itself is processed.
-    let init_multi_tenant_workspace = matches!(matches.subcommand(), Some(("init", arg_matches)) if arg_matches.get_flag("multi-tenant"));
+    let init_multi_tenant_workspace =
+        matches!(&args.command, cli::Command::Init(c) if c.multi_tenant);
     let workspace_svc = WorkspaceService::new(
         Arc::new(workspace_layout.clone()),
         init_multi_tenant_workspace,
@@ -81,18 +80,10 @@ pub async fn run(
     let is_multi_tenant_workspace = workspace_svc.is_multi_tenant_workspace();
     let config = load_config(&workspace_layout);
     let current_account = AccountService::current_account_indication(
-        &matches,
+        args.account.clone(),
         is_multi_tenant_workspace,
         config.users.as_ref().unwrap(),
     );
-
-    let system_time: Option<DateTime<Utc>> = matches
-        .get_one::<String>("system-time")
-        .map(|s| DateTime::parse_from_rfc3339(s))
-        .transpose()
-        .map_err(CLIError::usage_error_from)?
-        .map(Into::into);
-    let is_e2e_testing = matches.contains_id("e2e-output-data-path");
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
@@ -112,8 +103,8 @@ pub async fn run(
         let mut base_catalog_builder = configure_base_catalog(
             &workspace_layout,
             is_multi_tenant_workspace,
-            system_time,
-            is_e2e_testing,
+            args.system_time.map(Into::into),
+            args.e2e_output_data_path.is_some(),
         );
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
@@ -133,11 +124,10 @@ pub async fn run(
             .add_value(dependencies_graph_repository)
             .bind::<dyn DependencyGraphRepository, DependencyGraphRepositoryInMemory>();
 
-        let output_config = configure_output_format(&matches, &workspace_svc);
+        let output_config = configure_output_format(&args, &workspace_svc);
         base_catalog_builder.add_value(output_config.clone());
 
-        let no_color_output = matches.get_flag("no-color");
-        let guards = configure_logging(&output_config, &workspace_layout, no_color_output);
+        let guards = configure_logging(&output_config, &workspace_layout, args.no_color);
 
         tracing::info!(
             version = VERSION,
@@ -182,9 +172,9 @@ pub async fn run(
 
     initialize_components(&cli_catalog).await?;
 
-    let need_to_wrap_with_transaction = cli_commands::command_needs_transaction(&matches)?;
+    let need_to_wrap_with_transaction = cli_commands::command_needs_transaction(&args);
     let run_command = |catalog: Catalog| async move {
-        match cli_commands::get_command(&base_catalog, &catalog, &matches) {
+        match cli_commands::get_command(&base_catalog, &catalog, args) {
             Ok(mut command) => {
                 if command.needs_workspace() && !workspace_svc.is_in_workspace() {
                     Err(CLIError::usage_error_from(NotInWorkspace))
@@ -789,17 +779,10 @@ fn configure_logging(
 // Output format
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn configure_output_format(
-    matches: &clap::ArgMatches,
-    workspace_svc: &WorkspaceService,
-) -> OutputConfig {
+fn configure_output_format(args: &cli::Cli, workspace_svc: &WorkspaceService) -> OutputConfig {
     let is_tty = console::Term::stdout().features().is_attended();
 
-    let verbosity_level = matches.get_count("verbose");
-
-    let quiet = matches.get_flag("quiet");
-
-    let trace_file = if workspace_svc.is_in_workspace() && matches.get_flag("trace") {
+    let trace_file = if args.trace && workspace_svc.is_in_workspace() {
         Some(
             workspace_svc
                 .layout()
@@ -811,55 +794,18 @@ fn configure_output_format(
         None
     };
 
-    let format_str = get_output_format_recursive(matches, &super::cli());
-
-    let format = match format_str {
-        Some("csv") => OutputFormat::Csv,
-        Some("json") => OutputFormat::Json,
-        Some("ndjson") => OutputFormat::NdJson,
-        Some("json-soa") => OutputFormat::JsonSoA,
-        Some("json-aoa") => OutputFormat::JsonAoA,
-        Some("table") => OutputFormat::Table,
-        None | Some(_) => {
-            if is_tty {
-                OutputFormat::Table
-            } else {
-                OutputFormat::Json
-            }
-        }
-    };
+    let format = args.tabular_output_format().unwrap_or(if is_tty {
+        OutputFormat::Table
+    } else {
+        OutputFormat::Json
+    });
 
     OutputConfig {
-        quiet,
-        verbosity_level,
+        quiet: args.quiet,
+        verbosity_level: args.verbose,
         is_tty,
         format,
         trace_file,
-    }
-}
-
-fn get_output_format_recursive<'a>(
-    matches: &'a clap::ArgMatches,
-    cmd: &clap::Command,
-) -> Option<&'a str> {
-    if let Some((subcommand_name, submatches)) = matches.subcommand() {
-        let subcommand = cmd
-            .get_subcommands()
-            .find(|s| s.get_name() == subcommand_name)
-            .unwrap();
-        let has_output_format = subcommand
-            .get_opts()
-            .any(|opt| opt.get_id() == "output-format");
-
-        if has_output_format {
-            if let Some(fmt) = submatches.get_one("output-format").map(String::as_str) {
-                return Some(fmt);
-            }
-        }
-
-        get_output_format_recursive(submatches, subcommand)
-    } else {
-        None
     }
 }
 

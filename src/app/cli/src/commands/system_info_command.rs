@@ -18,28 +18,34 @@ use crate::{WorkspaceService, WorkspaceVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum SystemInfoOutputFormat {
+    Shell,
+    Json,
+    Yaml,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct SystemInfoCommand {
     output_config: Arc<OutputConfig>,
-    output_format: Option<String>,
+    output_format: Option<SystemInfoOutputFormat>,
     workspace_svc: Arc<WorkspaceService>,
     container_runtime: Arc<ContainerRuntime>,
 }
 
 impl SystemInfoCommand {
-    pub fn new<S>(
+    pub fn new(
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
         workspace_svc: Arc<WorkspaceService>,
-        output_format: Option<S>,
-    ) -> Self
-    where
-        S: Into<String>,
-    {
+        output_format: Option<SystemInfoOutputFormat>,
+    ) -> Self {
         Self {
             output_config,
-            container_runtime,
+            output_format,
             workspace_svc,
-            output_format: output_format.map(Into::into),
+            container_runtime,
         }
     }
 }
@@ -54,7 +60,7 @@ impl Command for SystemInfoCommand {
         write_output(
             SystemInfo::collect(&self.container_runtime, &self.workspace_svc).await,
             &self.output_config,
-            &self.output_format.as_ref(),
+            self.output_format,
         )?;
         Ok(())
     }
@@ -64,17 +70,17 @@ impl Command for SystemInfoCommand {
 
 pub struct VersionCommand {
     output_config: Arc<OutputConfig>,
-    output_format: Option<String>,
+    output_format: Option<SystemInfoOutputFormat>,
 }
 
 impl VersionCommand {
-    pub fn new<S>(output_config: Arc<OutputConfig>, output_format: Option<S>) -> Self
-    where
-        S: Into<String>,
-    {
+    pub fn new(
+        output_config: Arc<OutputConfig>,
+        output_format: Option<SystemInfoOutputFormat>,
+    ) -> Self {
         Self {
             output_config,
-            output_format: output_format.map(Into::into),
+            output_format,
         }
     }
 }
@@ -89,7 +95,7 @@ impl Command for VersionCommand {
         write_output(
             BuildInfo::collect(),
             &self.output_config,
-            &self.output_format.as_ref(),
+            self.output_format,
         )?;
         Ok(())
     }
@@ -100,21 +106,23 @@ impl Command for VersionCommand {
 fn write_output<T: serde::Serialize>(
     value: T,
     output_config: &OutputConfig,
-    output_format: &Option<impl AsRef<str>>,
+    output_format: Option<SystemInfoOutputFormat>,
 ) -> Result<(), InternalError> {
-    let output_format = if let Some(fmt) = output_format {
-        fmt.as_ref()
-    } else if output_config.is_tty {
-        "shell"
+    let output_format = output_format.unwrap_or(if output_config.is_tty {
+        SystemInfoOutputFormat::Shell
     } else {
-        "json"
-    };
+        SystemInfoOutputFormat::Json
+    });
 
     // TODO: Generalize this code in output config, just like we do for tabular
     // output
     match output_format {
-        "json" => serde_json::to_writer_pretty(std::io::stdout(), &value).int_err()?,
-        _ => serde_yaml::to_writer(std::io::stdout(), &value).int_err()?,
+        SystemInfoOutputFormat::Json => {
+            serde_json::to_writer_pretty(std::io::stdout(), &value).int_err()?;
+        }
+        SystemInfoOutputFormat::Yaml | SystemInfoOutputFormat::Shell => {
+            serde_yaml::to_writer(std::io::stdout(), &value).int_err()?;
+        }
     }
 
     Ok(())

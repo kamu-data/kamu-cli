@@ -37,13 +37,13 @@ impl SetWatermarkCommand {
     ) -> Self
     where
         S: Into<String>,
-        I: Iterator<Item = DatasetRefAnyPattern>,
+        I: IntoIterator<Item = DatasetRefAnyPattern>,
     {
         Self {
             dataset_repo,
             remote_alias_reg,
             pull_svc,
-            refs: refs.collect(),
+            refs: refs.into_iter().collect(),
             all,
             recursive,
             watermark: watermark.into(),

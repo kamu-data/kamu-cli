@@ -23,13 +23,17 @@ use tonic::Status;
 use super::{CLIError, Command};
 
 pub struct SqlServerFlightSqlCommand {
-    address: IpAddr,
-    port: u16,
+    address: Option<IpAddr>,
+    port: Option<u16>,
     query_svc: Arc<dyn QueryService>,
 }
 
 impl SqlServerFlightSqlCommand {
-    pub fn new(address: IpAddr, port: u16, query_svc: Arc<dyn QueryService>) -> Self {
+    pub fn new(
+        address: Option<IpAddr>,
+        port: Option<u16>,
+        query_svc: Arc<dyn QueryService>,
+    ) -> Self {
         Self {
             address,
             port,
@@ -48,7 +52,12 @@ impl Command for SqlServerFlightSqlCommand {
             }))
             .build();
 
-        let listener = TcpListener::bind((self.address, self.port)).await.unwrap();
+        let listener = TcpListener::bind((
+            self.address.unwrap_or("127.0.0.1".parse().unwrap()),
+            self.port.unwrap_or(0),
+        ))
+        .await
+        .unwrap();
         let addr = listener.local_addr().unwrap();
         tracing::info!("Listening on {addr:?}");
 

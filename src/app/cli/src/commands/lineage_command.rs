@@ -19,13 +19,25 @@ use opendatafabric::*;
 use super::{CLIError, Command};
 use crate::{OutputConfig, WorkspaceLayout};
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum LineageOutputFormat {
+    Shell,
+    Dot,
+    Csv,
+    Html,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct LineageCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     provenance_svc: Arc<dyn ProvenanceService>,
     workspace_layout: Arc<WorkspaceLayout>,
     dataset_refs: Vec<DatasetRef>,
     browse: bool,
-    output_format: Option<String>,
+    output_format: Option<LineageOutputFormat>,
     output_config: Arc<OutputConfig>,
 }
 
@@ -36,7 +48,7 @@ impl LineageCommand {
         workspace_layout: Arc<WorkspaceLayout>,
         dataset_refs: I,
         browse: bool,
-        output_format: Option<&str>,
+        output_format: Option<LineageOutputFormat>,
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
@@ -48,35 +60,34 @@ impl LineageCommand {
             workspace_layout,
             dataset_refs: dataset_refs.into_iter().collect(),
             browse,
-            output_format: output_format.map(ToOwned::to_owned),
+            output_format,
             output_config,
         }
     }
 
     fn get_visitor(&self) -> Box<dyn LineageVisitor> {
-        if self.output_format.is_none() {
-            return if self.output_config.is_tty {
-                if self.browse {
-                    Box::new(HtmlBrowseVisitor::new(
-                        self.workspace_layout.run_info_dir.join("lineage.html"),
-                    ))
+        match self.output_format {
+            None => {
+                if self.output_config.is_tty {
+                    if self.browse {
+                        Box::new(HtmlBrowseVisitor::new(
+                            self.workspace_layout.run_info_dir.join("lineage.html"),
+                        ))
+                    } else {
+                        Box::new(ShellVisitor::new())
+                    }
                 } else {
-                    Box::new(ShellVisitor::new())
+                    Box::new(CsvVisitor::new())
                 }
-            } else {
-                Box::new(CsvVisitor::new())
-            };
-        }
-
-        match self.output_format.as_ref().unwrap().as_str() {
-            "shell" => Box::new(ShellVisitor::new()),
-            "dot" => Box::new(DotVisitor::new(WriteAdapter(std::io::stdout()))),
-            "csv" => Box::new(CsvVisitor::new()),
-            "html" => Box::new(HtmlVisitor::new(WriteAdapter(std::io::stdout()))),
-            "html-browse" => Box::new(HtmlBrowseVisitor::new(
-                self.workspace_layout.run_info_dir.join("lineage.html"),
-            )),
-            _ => unimplemented!(),
+            }
+            Some(LineageOutputFormat::Shell) => Box::new(ShellVisitor::new()),
+            Some(LineageOutputFormat::Dot) => {
+                Box::new(DotVisitor::new(WriteAdapter(std::io::stdout())))
+            }
+            Some(LineageOutputFormat::Csv) => Box::new(CsvVisitor::new()),
+            Some(LineageOutputFormat::Html) => {
+                Box::new(HtmlVisitor::new(WriteAdapter(std::io::stdout())))
+            }
         }
     }
 }

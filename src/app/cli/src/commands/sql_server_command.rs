@@ -27,8 +27,8 @@ pub struct SqlServerCommand {
     engine_prov_config: Arc<EngineProvisionerLocalConfig>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
-    address: IpAddr,
-    port: u16,
+    address: Option<IpAddr>,
+    port: Option<u16>,
 }
 
 impl SqlServerCommand {
@@ -37,8 +37,8 @@ impl SqlServerCommand {
         engine_prov_config: Arc<EngineProvisionerLocalConfig>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
-        address: IpAddr,
-        port: u16,
+        address: Option<IpAddr>,
+        port: Option<u16>,
     ) -> Self {
         Self {
             workspace_layout,
@@ -78,12 +78,15 @@ impl Command for SqlServerCommand {
             None
         };
 
+        let address = self.address.unwrap_or("127.0.0.1".parse().unwrap());
+        let port = self.port.unwrap_or(10000);
+
         let mut spark = sql_shell
             .run_server(
                 &self.workspace_layout,
                 Vec::new(),
-                Some(&self.address),
-                Some(self.port),
+                Some(&address),
+                Some(port),
             )
             .await
             .int_err()?;
@@ -94,7 +97,7 @@ impl Command for SqlServerCommand {
         eprintln!(
             "{}\n  {}",
             s("SQL server is now running at:").green().bold(),
-            s(format!("jdbc:hive2://{}:{}", self.address, self.port)).bold(),
+            s(format!("jdbc:hive2://{address}:{port}")).bold(),
         );
         eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
 

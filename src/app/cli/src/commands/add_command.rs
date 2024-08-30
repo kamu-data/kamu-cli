@@ -33,7 +33,7 @@ pub struct AddCommand {
 }
 
 impl AddCommand {
-    pub fn new<'s, I>(
+    pub fn new<I, S>(
         resource_loader: Arc<dyn ResourceLoader>,
         dataset_repo: Arc<dyn DatasetRepository>,
         create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
@@ -47,14 +47,15 @@ impl AddCommand {
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
-        I: Iterator<Item = &'s str>,
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
     {
         Self {
             resource_loader,
             dataset_repo,
             create_dataset_from_snapshot,
             delete_dataset,
-            snapshot_refs: snapshot_refs_iter.map(ToOwned::to_owned).collect(),
+            snapshot_refs: snapshot_refs_iter.into_iter().map(Into::into).collect(),
             name,
             recursive,
             replace,

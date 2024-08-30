@@ -133,7 +133,7 @@ impl Command for AliasListCommand {
         match self.output_config.format {
             OutputFormat::Table => self.print_pretty(&datasets).await?,
             OutputFormat::Csv => self.print_machine_readable(&datasets).await?,
-            _ => unimplemented!("Unsupported format: {:?}", self.output_config.format),
+            fmt => unimplemented!("Unsupported format: {fmt:?}"),
         }
 
         Ok(())

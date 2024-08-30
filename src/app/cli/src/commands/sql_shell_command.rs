@@ -24,7 +24,17 @@ use crate::explore::SqlShellImpl;
 use crate::output::*;
 use crate::WorkspaceLayout;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub const DEFAULT_MAX_ROWS_FOR_OUTPUT: usize = 40;
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum SqlShellEngine {
+    Datafusion,
+    Spark,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SqlShellCommand {
     query_svc: Arc<dyn QueryService>,
@@ -34,7 +44,7 @@ pub struct SqlShellCommand {
     container_runtime: Arc<ContainerRuntime>,
     command: Option<String>,
     url: Option<String>,
-    engine: Option<String>,
+    engine: Option<SqlShellEngine>,
 }
 
 impl SqlShellCommand {
@@ -44,9 +54,9 @@ impl SqlShellCommand {
         engine_prov_config: Arc<EngineProvisionerLocalConfig>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
-        command: Option<&str>,
-        url: Option<&str>,
-        engine: Option<&str>,
+        command: Option<String>,
+        url: Option<String>,
+        engine: Option<SqlShellEngine>,
     ) -> Self {
         Self {
             query_svc,
@@ -54,9 +64,9 @@ impl SqlShellCommand {
             engine_prov_config,
             output_config,
             container_runtime,
-            command: command.map(ToOwned::to_owned),
-            url: url.map(ToOwned::to_owned),
-            engine: engine.map(ToOwned::to_owned),
+            command,
+            url,
+            engine,
         }
     }
 
@@ -157,12 +167,12 @@ impl SqlShellCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SqlShellCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let engine = self.engine.as_deref().unwrap_or("datafusion");
+        let engine = self.engine.unwrap_or(SqlShellEngine::Datafusion);
 
         match (engine, &self.command, &self.url) {
-            ("datafusion", None, None) => self.run_datafusion_cli_command().await,
-            ("datafusion", Some(_), None) => self.run_datafusion_command().await,
-            ("spark", _, _) => self.run_spark_shell().await,
+            (SqlShellEngine::Datafusion, None, None) => self.run_datafusion_cli_command().await,
+            (SqlShellEngine::Datafusion, Some(_), None) => self.run_datafusion_command().await,
+            (SqlShellEngine::Spark, _, _) => self.run_spark_shell().await,
             _ => unreachable!(),
         }
     }

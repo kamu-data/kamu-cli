@@ -14,19 +14,19 @@ To regenerate this schema from existing code, use the following command:
 * `add` — Add a new dataset or modify an existing one
 * `completions` — Generate tab-completion scripts for your shell
 * `config` — Get or set configuration options
-* `delete` — Delete a dataset
+* `delete [rm]` — Delete a dataset
 * `ingest` — Adds data to the root dataset according to its push source configuration
 * `init` — Initialize an empty workspace in the current directory
 * `inspect` — Group of commands for exploring dataset metadata
-* `list` — List all datasets in the workspace
+* `list [ls]` — List all datasets in the workspace
 * `log` — Shows dataset metadata history
-* `login` — Logs in to a remote Kamu server interactively
+* `login` — Authentiates with a remote ODF server interactively
 * `logout` — Logs out from a remote Kamu server
 * `new` — Creates a new dataset manifest from a template
 * `notebook` — Starts the notebook server for exploring the data in the workspace
 * `pull` — Pull new data into the datasets
 * `push` — Push local data into a repository
-* `rename` — Rename a dataset
+* `rename [mv]` — Rename a dataset
 * `reset` — Revert the dataset back to the specified state
 * `repo` — Manage set of tracked repositories
 * `search` — Searches for datasets in the registered repositories
@@ -45,8 +45,8 @@ To regenerate this schema from existing code, use the following command:
 * `--trace` — Record and visualize the command execution as perfetto.dev trace
 
 To get help for individual commands use:
-  kamu <command> -h
-  kamu <command> <sub-command> -h
+    kamu <command> -h
+    kamu <command> <sub-command> -h
 
 
 
@@ -55,7 +55,7 @@ To get help for individual commands use:
 
 Add a new dataset or modify an existing one
 
-**Usage:** `kamu add [OPTIONS] [manifest]...`
+**Usage:** `kamu add [OPTIONS] [MANIFEST]...`
 
 **Arguments:**
 
@@ -97,7 +97,7 @@ To add dataset from a repository see `kamu pull` command.
 
 Generate tab-completion scripts for your shell
 
-**Usage:** `kamu completions <shell>`
+**Usage:** `kamu completions <SHELL>`
 
 **Arguments:**
 
@@ -138,7 +138,7 @@ Get or set configuration options
 
 **Subcommands:**
 
-* `list` — Display current configuration combined from all config files
+* `list [ls]` — Display current configuration combined from all config files
 * `get` — Get current configuration value
 * `set` — Set or unset configuration value
 
@@ -188,7 +188,7 @@ Display current configuration combined from all config files
 
 Get current configuration value
 
-**Usage:** `kamu config get [OPTIONS] <cfgkey>`
+**Usage:** `kamu config get [OPTIONS] <CFGKEY>`
 
 **Arguments:**
 
@@ -205,7 +205,7 @@ Get current configuration value
 
 Set or unset configuration value
 
-**Usage:** `kamu config set [OPTIONS] <cfgkey> [value]`
+**Usage:** `kamu config set [OPTIONS] <CFGKEY> [VALUE]`
 
 **Arguments:**
 
@@ -222,7 +222,7 @@ Set or unset configuration value
 
 Delete a dataset
 
-**Usage:** `kamu delete [OPTIONS] [dataset]...`
+**Usage:** `kamu delete [OPTIONS] [DATASET]...`
 
 **Arguments:**
 
@@ -257,7 +257,7 @@ Delete local datasets matching pattern:
 
 Adds data to the root dataset according to its push source configuration
 
-**Usage:** `kamu ingest [OPTIONS] <dataset> [FILE]...`
+**Usage:** `kamu ingest [OPTIONS] <DATASET> [FILE]...`
 
 **Arguments:**
 
@@ -334,7 +334,7 @@ Group of commands for exploring dataset metadata
 
 Shows the dependency tree of a dataset
 
-**Usage:** `kamu inspect lineage [OPTIONS] <dataset>...`
+**Usage:** `kamu inspect lineage [OPTIONS] [DATASET]...`
 
 **Arguments:**
 
@@ -342,7 +342,7 @@ Shows the dependency tree of a dataset
 
 **Options:**
 
-* `-o`, `--output-format <FMT>` — Format of an output
+* `-o`, `--output-format <FMT>` — Format of the output
 
   Possible values: `shell`, `dot`, `csv`, `html`
 
@@ -371,7 +371,7 @@ Render the lineage graph into a png image (needs graphviz installed):
 
 Shows the transformations used by a derivative dataset
 
-**Usage:** `kamu inspect query <dataset>`
+**Usage:** `kamu inspect query <DATASET>`
 
 **Arguments:**
 
@@ -386,7 +386,7 @@ This command allows you to audit the transformations performed by a derivative d
 
 Shows the dataset schema
 
-**Usage:** `kamu inspect schema [OPTIONS] <dataset>`
+**Usage:** `kamu inspect schema [OPTIONS] <DATASET>`
 
 **Arguments:**
 
@@ -394,7 +394,7 @@ Shows the dataset schema
 
 **Options:**
 
-* `-o`, `--output-format <FMT>` — Format of an output
+* `-o`, `--output-format <FMT>` — Format of the output
 
   Possible values: `ddl`, `parquet`, `parquet-json`, `arrow-json`
 
@@ -422,11 +422,23 @@ List all datasets in the workspace
 
 **Options:**
 
-* `-w`, `--wide` — Show more details (repeat for more)
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
-  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`, `json-aoa`
+  Possible values:
+  - `csv`:
+    Comma-separated values
+  - `json`:
+    Array of Structures format
+  - `ndjson`:
+    One Json object per line - easily splittable format
+  - `json-soa`:
+    Structure of arrays - more compact and efficient format for encoding entire dataframe
+  - `json-aoa`:
+    Array of arrays - compact and efficient and preserves column order
+  - `table`:
+    A pretty human-readable table
 
+* `-w`, `--wide` — Show more details (repeat for more)
 
 **Examples:**
 
@@ -449,7 +461,7 @@ To get a machine-readable list of datasets:
 
 Shows dataset metadata history
 
-**Usage:** `kamu log [OPTIONS] <dataset>`
+**Usage:** `kamu log [OPTIONS] <DATASET>`
 
 **Arguments:**
 
@@ -457,11 +469,11 @@ Shows dataset metadata history
 
 **Options:**
 
-* `-o`, `--output-format <FMT>`
+* `-o`, `--output-format <FMT>` — Format of the output
 
-  Possible values: `yaml`
+  Possible values: `shell`, `yaml`
 
-* `-f`, `--filter <FLT>`
+* `-f`, `--filter <FLT>` — Types of events to include
 * `--limit <LIMIT>` — Maximum number of blocks to display
 
   Default value: `500`
@@ -495,9 +507,9 @@ Using a filter to inspect blocks containing query changes of a derivative datase
 
 ## `kamu login`
 
-Logs in to a remote Kamu server interactively
+Authentiates with a remote ODF server interactively
 
-**Usage:** `kamu login [OPTIONS] [server] [COMMAND]`
+**Usage:** `kamu login [OPTIONS] [SERVER] [COMMAND]`
 
 **Subcommands:**
 
@@ -512,7 +524,7 @@ Logs in to a remote Kamu server interactively
 
 * `--user` — Store access token in the user home folder rather than in the workspace
 * `--check` — Check whether existing authorization is still valid without triggering a login flow
-* `--access-token <ACCESS-TOKEN>` — Provide an existing access token
+* `--access-token <ACCESS_TOKEN>` — Provide an existing access token
 
 
 
@@ -520,12 +532,12 @@ Logs in to a remote Kamu server interactively
 
 Performs non-interactive login to a remote Kamu server via OAuth provider token
 
-**Usage:** `kamu login oauth [OPTIONS] <provider> <access-token> [server]`
+**Usage:** `kamu login oauth [OPTIONS] <PROVIDER> <ACCESS_TOKEN> [SERVER]`
 
 **Arguments:**
 
 * `<PROVIDER>` — Name of the OAuth provider, i.e. 'github'
-* `<ACCESS-TOKEN>` — OAuth provider access token
+* `<ACCESS_TOKEN>` — OAuth provider access token
 * `<SERVER>` — ODF backend server URL (defaults to kamu.dev)
 
 **Options:**
@@ -538,7 +550,7 @@ Performs non-interactive login to a remote Kamu server via OAuth provider token
 
 Performs non-interactive login to a remote Kamu server via login and password
 
-**Usage:** `kamu login password [OPTIONS] <login> <password> [server]`
+**Usage:** `kamu login password [OPTIONS] <LOGIN> <PASSWORD> [SERVER]`
 
 **Arguments:**
 
@@ -556,7 +568,7 @@ Performs non-interactive login to a remote Kamu server via login and password
 
 Logs out from a remote Kamu server
 
-**Usage:** `kamu logout [OPTIONS] [server]`
+**Usage:** `kamu logout [OPTIONS] [SERVER]`
 
 **Arguments:**
 
@@ -565,7 +577,7 @@ Logs out from a remote Kamu server
 **Options:**
 
 * `--user` — Drop access token stored in the user home folder rather than in the workspace
-* `-a`, `--all` — Log out of all logged in servers
+* `-a`, `--all` — Log out of all servers
 
 
 
@@ -573,7 +585,7 @@ Logs out from a remote Kamu server
 
 Creates a new dataset manifest from a template
 
-**Usage:** `kamu new [OPTIONS] <name>`
+**Usage:** `kamu new [OPTIONS] <NAME>`
 
 **Arguments:**
 
@@ -604,7 +616,7 @@ Starts the notebook server for exploring the data in the workspace
 **Options:**
 
 * `--address <ADDRESS>` — Expose HTTP server on specific network interface
-* `--http-port <HTTP-PORT>` — Expose HTTP server on specific port
+* `--http-port <HTTP_PORT>` — Expose HTTP server on specific port
 * `-e`, `--env <VAR>` — Propagate or set an environment variable in the notebook (e.g. `-e VAR` or `-e VAR=foo`)
 
 This command will run the Jupyter server and the Spark engine connected together, letting you query data with SQL before pulling it into the notebook for final processing and visualization.
@@ -618,7 +630,7 @@ For more information check out notebook examples at https://github.com/kamu-data
 
 Pull new data into the datasets
 
-**Usage:** `kamu pull [OPTIONS] [dataset]...`
+**Usage:** `kamu pull [OPTIONS] [DATASET]...`
 
 **Arguments:**
 
@@ -628,7 +640,7 @@ Pull new data into the datasets
 
 * `-a`, `--all` — Pull all datasets in the workspace
 * `-r`, `--recursive` — Also pull all transitive dependencies of specified datasets
-* `--fetch-uncacheable` — Pull latest data from the uncacheable data sources
+* `--fetch-uncacheable` — Pull latest data from uncacheable data sources
 * `--as <NAME>` — Local name of a dataset to use when syncing from a repository
 * `--no-alias` — Don't automatically add a remote push alias for this destination
 * `--set-watermark <TIME>` — Injects a manual watermark into the dataset to signify that no data is expected to arrive with event time that precedes it
@@ -680,7 +692,7 @@ Advance the watermark of a dataset:
 
 Push local data into a repository
 
-**Usage:** `kamu push [OPTIONS] [dataset]...`
+**Usage:** `kamu push [OPTIONS] [DATASET]...`
 
 **Arguments:**
 
@@ -696,6 +708,9 @@ Push local data into a repository
 * `--visibility <VIS>` — Changing the visibility of the initially pushed dataset(s)
 
   Default value: `private`
+
+  Possible values: `private`, `public`
+
 
 Use this command to share your new dataset or new data with others. All changes performed by this command are atomic and non-destructive. This command will analyze the state of the dataset at the repository and will only upload data and metadata that wasn't previously seen.
 
@@ -730,7 +745,7 @@ Add dataset to local IPFS node and update IPNS entry to the new CID:
 
 Rename a dataset
 
-**Usage:** `kamu rename <dataset> <name>`
+**Usage:** `kamu rename <DATASET> <NAME>`
 
 **Arguments:**
 
@@ -753,11 +768,11 @@ Renaming is often useful when you pull a remote dataset by URL, and it gets auto
 
 Revert the dataset back to the specified state
 
-**Usage:** `kamu reset [OPTIONS] <dataset> <hash>`
+**Usage:** `kamu reset [OPTIONS] <DATASET> <HASH>`
 
 **Arguments:**
 
-* `<DATASET>` — ID of the dataset
+* `<DATASET>` — Dataset reference
 * `<HASH>` — Hash of the block to reset to
 
 **Options:**
@@ -780,8 +795,8 @@ Manage set of tracked repositories
 **Subcommands:**
 
 * `add` — Adds a repository
-* `delete` — Deletes a reference to repository
-* `list` — Lists known repositories
+* `delete [rm]` — Deletes a reference to repository
+* `list [ls]` — Lists known repositories
 * `alias` — Manage set of remote aliases associated with datasets
 
 Repositories are nodes on the network that let users exchange datasets. In the most basic form, a repository can simply be a location where the dataset files are hosted over one of the supported file or object-based data transfer protocols. The owner of a dataset will have push privileges to this location, while other participants can pull data from it.
@@ -803,7 +818,7 @@ Add S3 bucket as a repository:
 
 Adds a repository
 
-**Usage:** `kamu repo add <name> <url>`
+**Usage:** `kamu repo add <NAME> <URL>`
 
 **Arguments:**
 
@@ -833,7 +848,7 @@ For ODF-compatible smart repositories use:
 
 Deletes a reference to repository
 
-**Usage:** `kamu repo delete [OPTIONS] [repository]...`
+**Usage:** `kamu repo delete [OPTIONS] [REPOSITORY]...`
 
 **Arguments:**
 
@@ -856,7 +871,19 @@ Lists known repositories
 
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
-  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`, `json-aoa`
+  Possible values:
+  - `csv`:
+    Comma-separated values
+  - `json`:
+    Array of Structures format
+  - `ndjson`:
+    One Json object per line - easily splittable format
+  - `json-soa`:
+    Structure of arrays - more compact and efficient format for encoding entire dataframe
+  - `json-aoa`:
+    Array of arrays - compact and efficient and preserves column order
+  - `table`:
+    A pretty human-readable table
 
 
 
@@ -869,9 +896,9 @@ Manage set of remote aliases associated with datasets
 
 **Subcommands:**
 
-* `list` — Lists remote aliases
 * `add` — Adds a remote alias to a dataset
-* `delete` — Deletes a remote alias associated with a dataset
+* `delete [rm]` — Deletes a remote alias associated with a dataset
+* `list [ls]` — Lists remote aliases
 
 When you pull and push datasets from repositories kamu uses aliases to let you avoid specifying the full remote reference each time. Aliases are usually created the first time you do a push or pull and saved for later. If you have an unusual setup (e.g. pushing to multiple repositories) you can use this command to manage the aliases.
 
@@ -892,30 +919,11 @@ Add a new pull alias:
 
 
 
-## `kamu repo alias list`
-
-Lists remote aliases
-
-**Usage:** `kamu repo alias list [OPTIONS] [dataset]`
-
-**Arguments:**
-
-* `<DATASET>` — Local dataset reference
-
-**Options:**
-
-* `-o`, `--output-format <FMT>` — Format to display the results in
-
-  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`, `json-aoa`
-
-
-
-
 ## `kamu repo alias add`
 
 Adds a remote alias to a dataset
 
-**Usage:** `kamu repo alias add [OPTIONS] <dataset> <alias>`
+**Usage:** `kamu repo alias add [OPTIONS] <DATASET> <ALIAS>`
 
 **Arguments:**
 
@@ -933,7 +941,7 @@ Adds a remote alias to a dataset
 
 Deletes a remote alias associated with a dataset
 
-**Usage:** `kamu repo alias delete [OPTIONS] <dataset> [alias]`
+**Usage:** `kamu repo alias delete [OPTIONS] <DATASET> [ALIAS]`
 
 **Arguments:**
 
@@ -943,8 +951,39 @@ Deletes a remote alias associated with a dataset
 **Options:**
 
 * `-a`, `--all` — Delete all aliases
-* `--push` — Add a push alias
-* `--pull` — Add a pull alias
+* `--push` — Delete a push alias
+* `--pull` — Delete a pull alias
+
+
+
+## `kamu repo alias list`
+
+Lists remote aliases
+
+**Usage:** `kamu repo alias list [OPTIONS] [DATASET]`
+
+**Arguments:**
+
+* `<DATASET>` — Local dataset reference
+
+**Options:**
+
+* `-o`, `--output-format <FMT>` — Format to display the results in
+
+  Possible values:
+  - `csv`:
+    Comma-separated values
+  - `json`:
+    Array of Structures format
+  - `ndjson`:
+    One Json object per line - easily splittable format
+  - `json-soa`:
+    Structure of arrays - more compact and efficient format for encoding entire dataframe
+  - `json-aoa`:
+    Array of arrays - compact and efficient and preserves column order
+  - `table`:
+    A pretty human-readable table
+
 
 
 
@@ -960,11 +999,23 @@ Searches for datasets in the registered repositories
 
 **Options:**
 
-* `--repo <REPO>` — Repository name(s) to search in
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
-  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`, `json-aoa`
+  Possible values:
+  - `csv`:
+    Comma-separated values
+  - `json`:
+    Array of Structures format
+  - `ndjson`:
+    One Json object per line - easily splittable format
+  - `json-soa`:
+    Structure of arrays - more compact and efficient format for encoding entire dataframe
+  - `json-aoa`:
+    Array of arrays - compact and efficient and preserves column order
+  - `table`:
+    A pretty human-readable table
 
+* `--repo <REPO>` — Repository name(s) to search in
 
 Search is delegated to the repository implementations and its capabilities depend on the type of the repo. Whereas smart repos may support advanced full-text search, simple storage-only repos may be limited to a substring search by dataset name.
 
@@ -993,17 +1044,29 @@ Executes an SQL query or drops you into an SQL shell
 
 **Options:**
 
-* `--url <URL>` — URL of a running JDBC server (e.g. jdbc:hive2://example.com:10000)
-* `-c`, `--command <CMD>` — SQL command to run
-* `--script <FILE>` — SQL script file to execute
-* `--engine <ENG>` — Engine type to use for this SQL session
-
-  Possible values: `spark`, `datafusion`
-
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
-  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`, `json-aoa`
+  Possible values:
+  - `csv`:
+    Comma-separated values
+  - `json`:
+    Array of Structures format
+  - `ndjson`:
+    One Json object per line - easily splittable format
+  - `json-soa`:
+    Structure of arrays - more compact and efficient format for encoding entire dataframe
+  - `json-aoa`:
+    Array of arrays - compact and efficient and preserves column order
+  - `table`:
+    A pretty human-readable table
 
+* `--engine <ENG>` — Engine type to use for this SQL session
+
+  Possible values: `datafusion`, `spark`
+
+* `--url <URL>` — URL of a running JDBC server (e.g. jdbc:hive2://example.com:10000)
+* `--command <CMD>` — SQL command to run
+* `--script <FILE>` — SQL script file to execute
 
 SQL shell allows you to explore data of all dataset in your workspace using one of the supported data processing engines. This can be a great way to prepare and test a query that you cal later turn into derivative dataset.
 
@@ -1041,11 +1104,8 @@ Run JDBC server only
 **Options:**
 
 * `--address <ADDRESS>` — Expose JDBC server on specific network interface
-
-  Default value: `127.0.0.1`
 * `--port <PORT>` — Expose JDBC server on specific port
-
-  Default value: `10000`
+* `--livy` — Run Livy server instead of Spark JDBC
 * `--flight-sql` — Run Flight SQL server instead of Spark JDBC
 
 
@@ -1058,31 +1118,15 @@ Command group for system-level functionality
 
 **Subcommands:**
 
-* `gc` — Runs garbage collection to clean up cached and unreachable objects in the workspace
-* `upgrade-workspace` — Upgrade the layout of a local workspace to the latest version
 * `api-server` — Run HTTP + GraphQL server
-* `info` — Summary of the system information
-* `diagnose` — Run basic system diagnose check
-* `ipfs` — IPFS helpers
-* `debug-token` — Validate a Kamu token
-* `generate-token` — Generate a platform token from a known secret for debugging
 * `compact` — Compact a dataset
-
-
-
-## `kamu system gc`
-
-Runs garbage collection to clean up cached and unreachable objects in the workspace
-
-**Usage:** `kamu system gc`
-
-
-
-## `kamu system upgrade-workspace`
-
-Upgrade the layout of a local workspace to the latest version
-
-**Usage:** `kamu system upgrade-workspace`
+* `debug-token` — Validate a Kamu token
+* `diagnose` — Run basic system diagnose check
+* `generate-token` — Generate a platform token from a known secret for debugging
+* `gc` — Runs garbage collection to clean up cached and unreachable objects in the workspace
+* `info` — Summary of the system information
+* `ipfs` — IPFS helpers
+* `upgrade-workspace` — Upgrade the layout of a local workspace to the latest version
 
 
 
@@ -1100,9 +1144,9 @@ Run HTTP + GraphQL server
 **Options:**
 
 * `--address <ADDRESS>` — Bind to a specific network interface
-* `--http-port <HTTP-PORT>` — Expose HTTP+GraphQL server on specific port
+* `--http-port <HTTP_PORT>` — Expose HTTP+GraphQL server on specific port
 * `--get-token` — Output a JWT token you can use to authorize API queries
-* `--external-address <EXTERNAL-ADDRESS>` — Allows changing the base URL used in the API. Can be handy when launching inside a container
+* `--external-address <EXTERNAL_ADDRESS>` — Allows changing the base URL used in the API. Can be handy when launching inside a container
 
 **Examples:**
 
@@ -1125,11 +1169,11 @@ Print out GraphQL API schema:
 
 Executes the GraphQL query and prints out the result
 
-**Usage:** `kamu system api-server gql-query [OPTIONS] <query>`
+**Usage:** `kamu system api-server gql-query [OPTIONS] <QUERY>`
 
 **Arguments:**
 
-* `<QUERY>`
+* `<QUERY>` — GQL query
 
 **Options:**
 
@@ -1145,90 +1189,15 @@ Prints the GraphQL schema
 
 
 
-## `kamu system info`
-
-Summary of the system information
-
-**Usage:** `kamu system info [OPTIONS]`
-
-**Options:**
-
-* `-o`, `--output-format <FMT>`
-
-  Possible values: `shell`, `json`, `yaml`
-
-
-
-
-## `kamu system diagnose`
-
-Run basic system diagnose check
-
-**Usage:** `kamu system diagnose`
-
-
-
-## `kamu system ipfs`
-
-IPFS helpers
-
-**Usage:** `kamu system ipfs <COMMAND>`
-
-**Subcommands:**
-
-* `add` — Adds the specified dataset to IPFS and returns the CID
-
-
-
-## `kamu system ipfs add`
-
-Adds the specified dataset to IPFS and returns the CID
-
-**Usage:** `kamu system ipfs add <dataset>`
-
-**Arguments:**
-
-* `<DATASET>` — Dataset reference
-
-
-
-## `kamu system debug-token`
-
-Validate a Kamu token
-
-**Usage:** `kamu system debug-token <token>`
-
-**Arguments:**
-
-* `<TOKEN>` — Kamu token
-
-
-
-## `kamu system generate-token`
-
-Generate a platform token from a known secret for debugging
-
-**Usage:** `kamu system generate-token [OPTIONS]`
-
-**Options:**
-
-* `--subject <SUBJECT>` — AccountID to generate token for
-* `--login <LOGIN>` — Account name to derive ID from (for predefined accounts only)
-* `--expiration-time-sec <EXPIRATION-TIME-SEC>` — Token expiration time in seconds
-
-  Default value: `3600`
-
-
-
 ## `kamu system compact`
 
 Compact a dataset
 
-**Usage:** `kamu system compact [OPTIONS] <dataset>...`
+**Usage:** `kamu system compact [OPTIONS] <DATASET>`
 
 **Arguments:**
 
-* `<DATASET>` — Local dataset reference(s)
+* `<DATASET>` — Local dataset reference
 
 **Options:**
 
@@ -1259,11 +1228,102 @@ Perform a history-altering hard compaction:
 
 
 
+## `kamu system debug-token`
+
+Validate a Kamu token
+
+**Usage:** `kamu system debug-token <TOKEN>`
+
+**Arguments:**
+
+* `<TOKEN>` — Access token
+
+
+
+## `kamu system diagnose`
+
+Run basic system diagnose check
+
+**Usage:** `kamu system diagnose`
+
+
+
+## `kamu system generate-token`
+
+Generate a platform token from a known secret for debugging
+
+**Usage:** `kamu system generate-token [OPTIONS]`
+
+**Options:**
+
+* `--subject <SUBJECT>` — Account ID to generate token for
+* `--login <LOGIN>` — Account name to derive ID from (for predefined accounts only)
+* `--expiration-time-sec <EXPIRATION_TIME_SEC>` — Token expiration time in seconds
+
+  Default value: `3600`
+
+
+
+## `kamu system gc`
+
+Runs garbage collection to clean up cached and unreachable objects in the workspace
+
+**Usage:** `kamu system gc`
+
+
+
+## `kamu system info`
+
+Summary of the system information
+
+**Usage:** `kamu system info [OPTIONS]`
+
+**Options:**
+
+* `-o`, `--output-format <FMT>` — Format of the output
+
+  Possible values: `shell`, `json`, `yaml`
+
+
+
+
+## `kamu system ipfs`
+
+IPFS helpers
+
+**Usage:** `kamu system ipfs <COMMAND>`
+
+**Subcommands:**
+
+* `add` — Adds the specified dataset to IPFS and returns the CID
+
+
+
+## `kamu system ipfs add`
+
+Adds the specified dataset to IPFS and returns the CID
+
+**Usage:** `kamu system ipfs add <DATASET>`
+
+**Arguments:**
+
+* `<DATASET>` — Dataset reference
+
+
+
+## `kamu system upgrade-workspace`
+
+Upgrade the layout of a local workspace to the latest version
+
+**Usage:** `kamu system upgrade-workspace`
+
+
+
 ## `kamu tail`
 
 Displays a sample of most recent records in a dataset
 
-**Usage:** `kamu tail [OPTIONS] <dataset>`
+**Usage:** `kamu tail [OPTIONS] <DATASET>`
 
 **Arguments:**
 
@@ -1271,16 +1331,28 @@ Displays a sample of most recent records in a dataset
 
 **Options:**
 
+* `-o`, `--output-format <FMT>` — Format to display the results in
+
+  Possible values:
+  - `csv`:
+    Comma-separated values
+  - `json`:
+    Array of Structures format
+  - `ndjson`:
+    One Json object per line - easily splittable format
+  - `json-soa`:
+    Structure of arrays - more compact and efficient format for encoding entire dataframe
+  - `json-aoa`:
+    Array of arrays - compact and efficient and preserves column order
+  - `table`:
+    A pretty human-readable table
+
 * `-n`, `--num-records <NUM>` — Number of records to display
 
   Default value: `10`
-* `-s`, `--skip-records <NUM>` — Number of initial records to skip before applying the limit
+* `-s`, `--skip-records <SKP>` — Number of initial records to skip before applying the limit
 
   Default value: `0`
-* `-o`, `--output-format <FMT>` — Format to display the results in
-
-  Possible values: `table`, `csv`, `json`, `ndjson`, `json-soa`, `json-aoa`
-
 
 This command can be thought of as a shortcut for:
 
@@ -1298,7 +1370,7 @@ Opens web interface
 **Options:**
 
 * `--address <ADDRESS>` — Expose HTTP server on specific network interface
-* `--http-port <HTTP-PORT>` — Which port to run HTTP server on
+* `--http-port <HTTP_PORT>` — Which port to run HTTP server on
 * `--get-token` — Output a JWT token you can use to authorize API queries
 
 Starts a built-in HTTP + GraphQL server and opens a pre-packaged Web UI application in your browser.
@@ -1320,7 +1392,7 @@ Start server on a specific port:
 
 Verifies the validity of a dataset
 
-**Usage:** `kamu verify [OPTIONS] <dataset>...`
+**Usage:** `kamu verify [OPTIONS] [DATASET]...`
 
 **Arguments:**
 
@@ -1373,7 +1445,7 @@ Outputs build information
 
 **Options:**
 
-* `-o`, `--output-format <FMT>`
+* `-o`, `--output-format <FMT>` — Format of the output
 
   Possible values: `shell`, `json`, `yaml`
 

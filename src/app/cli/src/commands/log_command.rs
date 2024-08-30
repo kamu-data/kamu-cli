@@ -23,11 +23,21 @@ use opendatafabric::{MetadataBlock, *};
 use super::{CLIError, Command};
 use crate::output::OutputConfig;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum MetadataLogOutputFormat {
+    Shell,
+    Yaml,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct LogCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     dataset_ref: DatasetRef,
-    output_format: Option<String>,
+    output_format: Option<MetadataLogOutputFormat>,
     filter: Option<String>,
     limit: usize,
     output_config: Arc<OutputConfig>,
@@ -38,8 +48,8 @@ impl LogCommand {
         dataset_repo: Arc<dyn DatasetRepository>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         dataset_ref: DatasetRef,
-        output_format: Option<&str>,
-        filter: Option<&str>,
+        output_format: Option<MetadataLogOutputFormat>,
+        filter: Option<String>,
         limit: usize,
         output_config: Arc<OutputConfig>,
     ) -> Self {
@@ -47,8 +57,8 @@ impl LogCommand {
             dataset_repo,
             dataset_action_authorizer,
             dataset_ref,
-            output_format: output_format.map(ToOwned::to_owned),
-            filter: filter.map(ToOwned::to_owned),
+            output_format,
+            filter,
             limit,
             output_config,
         }
@@ -89,14 +99,19 @@ impl Command for LogCommand {
             .await?;
 
         let mut renderer: Box<dyn MetadataRenderer> = match (
-            self.output_format.as_deref(),
+            self.output_format,
             self.output_config.is_tty && self.output_config.verbosity_level == 0,
         ) {
-            (None, true) => Box::new(PagedAsciiRenderer::new(id_to_alias_lookup, self.limit)),
-            (None, false) => Box::new(AsciiRenderer::new(id_to_alias_lookup, self.limit)),
-            (Some("yaml"), true) => Box::new(PagedYamlRenderer::new(self.limit)),
-            (Some("yaml"), false) => Box::new(YamlRenderer::new(self.limit)),
-            _ => panic!("Unexpected output format combination"),
+            (None | Some(MetadataLogOutputFormat::Shell), true) => {
+                Box::new(PagedAsciiRenderer::new(id_to_alias_lookup, self.limit))
+            }
+            (None | Some(MetadataLogOutputFormat::Shell), false) => {
+                Box::new(AsciiRenderer::new(id_to_alias_lookup, self.limit))
+            }
+            (Some(MetadataLogOutputFormat::Yaml), true) => {
+                Box::new(PagedYamlRenderer::new(self.limit))
+            }
+            (Some(MetadataLogOutputFormat::Yaml), false) => Box::new(YamlRenderer::new(self.limit)),
         };
 
         let dataset_handle = self

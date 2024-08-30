@@ -11,10 +11,11 @@ use std::fmt::{self, Write};
 use std::path::PathBuf;
 
 use clap::builder::PossibleValue;
+use clap::CommandFactory;
 
 #[test_log::test(tokio::test)]
 async fn generate_reference_markdown() {
-    let command = kamu_cli::cli_parser::cli();
+    let command = kamu_cli::cli::Cli::command();
     let markdown = generate_markdown_for_command(&command);
 
     let mut docs_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -107,14 +108,21 @@ fn build_command_markdown(
                 continue;
             }
 
+            let aliases = subcommand.get_visible_aliases().collect::<Vec<_>>();
+
             writeln!(
                 buffer,
-                "* `{}` — {}",
+                "* `{}{}` — {}",
                 subcommand.get_name(),
+                if aliases.is_empty() {
+                    String::new()
+                } else {
+                    format!(" [{}]", aliases.join(","))
+                },
                 match subcommand.get_about() {
                     Some(about) => about.to_string(),
                     None => String::new(),
-                }
+                },
             )?;
         }
 
@@ -157,7 +165,7 @@ fn build_command_markdown(
     assert!(command.get_before_help().is_none());
 
     if let Some(after_help) = command.get_after_help() {
-        writeln!(buffer, "{after_help}\n")?;
+        writeln!(buffer, "{}\n", after_help.to_string().trim_start())?;
     }
 
     // Recurse to write subcommands
@@ -249,7 +257,11 @@ fn write_arg_markdown(buffer: &mut String, arg: &clap::Arg) -> fmt::Result {
         .filter(|pv| !pv.is_hide_set())
         .collect();
 
-    if !possible_values.is_empty() {
+    let is_bool_flag = |pvals: &Vec<PossibleValue>| {
+        pvals.len() == 2 && pvals[0].get_name() == "true" && pvals[1].get_name() == "false"
+    };
+
+    if !possible_values.is_empty() && !is_bool_flag(&possible_values) {
         let any_have_help: bool = possible_values.iter().any(|pv| pv.get_help().is_some());
 
         if any_have_help {

@@ -9,22 +9,13 @@
 
 use std::str::FromStr;
 
-use kamu::domain::DatasetVisibility;
-use opendatafabric::{
-    DatasetName,
-    DatasetRef,
-    DatasetRefAnyPattern,
-    DatasetRefPattern,
-    DatasetRefRemote,
-    Multihash,
-    RepoName,
-};
+use opendatafabric as odf;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn value_parse_dataset_ref_pattern_local(s: &str) -> Result<DatasetRefPattern, String> {
-    match DatasetRefPattern::from_str(s) {
+pub(crate) fn dataset_ref_pattern(s: &str) -> Result<odf::DatasetRefPattern, String> {
+    match odf::DatasetRefPattern::from_str(s) {
         Ok(dataset_ref_pattern) => Ok(dataset_ref_pattern),
         Err(_) => Err(
             "Local reference should be in form: `did:odf:...`, `my.dataset.id`, or a wildcard \
@@ -36,8 +27,8 @@ pub(crate) fn value_parse_dataset_ref_pattern_local(s: &str) -> Result<DatasetRe
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn value_parse_dataset_ref_pattern_any(s: &str) -> Result<DatasetRefAnyPattern, String> {
-    match DatasetRefAnyPattern::from_str(s) {
+pub(crate) fn dataset_ref_pattern_any(s: &str) -> Result<odf::DatasetRefAnyPattern, String> {
+    match odf::DatasetRefAnyPattern::from_str(s) {
         Ok(dataset_ref_pattern) => Ok(dataset_ref_pattern),
         Err(_) => Err("Dataset reference should be in form: `my.dataset.id` or \
                        `repository/account/dataset-id` or `did:odf:...` or `scheme://some-url` \
@@ -49,8 +40,8 @@ pub(crate) fn value_parse_dataset_ref_pattern_any(s: &str) -> Result<DatasetRefA
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn value_parse_dataset_name(s: &str) -> Result<DatasetName, String> {
-    match DatasetName::try_from(s) {
+pub(crate) fn dataset_name(s: &str) -> Result<odf::DatasetName, String> {
+    match odf::DatasetName::try_from(s) {
         Ok(v) => Ok(v),
         Err(_) => Err(
             "Dataset name can only contain alphanumerics, dashes, and dots, e.g. `my.dataset-id`"
@@ -61,8 +52,8 @@ pub(crate) fn value_parse_dataset_name(s: &str) -> Result<DatasetName, String> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn value_parse_dataset_ref_local(s: &str) -> Result<DatasetRef, String> {
-    match DatasetRef::try_from(s) {
+pub(crate) fn dataset_ref(s: &str) -> Result<odf::DatasetRef, String> {
+    match odf::DatasetRef::try_from(s) {
         Ok(v) => Ok(v),
         Err(_) => {
             Err("Local reference should be in form: `did:odf:...` or `my.dataset.id`".to_string())
@@ -72,8 +63,8 @@ pub(crate) fn value_parse_dataset_ref_local(s: &str) -> Result<DatasetRef, Strin
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn value_parse_dataset_ref_remote(s: &str) -> Result<DatasetRefRemote, String> {
-    match DatasetRefRemote::try_from(s) {
+pub(crate) fn dataset_ref_remote(s: &str) -> Result<odf::DatasetRefRemote, String> {
+    match odf::DatasetRefRemote::try_from(s) {
         Ok(v) => Ok(v),
         Err(_) => Err("Remote reference should be in form: `did:odf:...` or \
                        `repository/account/dataset-id` or `scheme://some-url`"
@@ -83,8 +74,8 @@ pub(crate) fn value_parse_dataset_ref_remote(s: &str) -> Result<DatasetRefRemote
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn value_parse_repo_name(s: &str) -> Result<RepoName, String> {
-    match RepoName::try_from(s) {
+pub(crate) fn repo_name(s: &str) -> Result<odf::RepoName, String> {
+    match odf::RepoName::try_from(s) {
         Ok(v) => Ok(v),
         Err(_) => Err("RepositoryID can only contain alphanumerics, dashes, and dots".to_string()),
     }
@@ -92,8 +83,8 @@ pub(crate) fn value_parse_repo_name(s: &str) -> Result<RepoName, String> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn value_parse_multihash(s: &str) -> Result<Multihash, String> {
-    match Multihash::from_multibase(s) {
+pub(crate) fn multihash(s: &str) -> Result<odf::Multihash, String> {
+    match odf::Multihash::from_multibase(s) {
         Ok(v) => Ok(v),
         Err(_) => Err("Block hash must be a valid multihash string".to_string()),
     }
@@ -101,7 +92,7 @@ pub(crate) fn value_parse_multihash(s: &str) -> Result<Multihash, String> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn validate_log_filter(s: &str) -> Result<String, String> {
+pub(crate) fn log_filter(s: &str) -> Result<String, String> {
     let items: Vec<_> = s.split(',').collect();
     for item in items {
         match item {
@@ -116,28 +107,65 @@ pub(crate) fn validate_log_filter(s: &str) -> Result<String, String> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn value_parse_url(url_str: &str) -> Result<Url, String> {
-    let parse_result = Url::parse(url_str);
-    match parse_result {
-        Ok(url) => Ok(url),
-        Err(e) => {
-            // try attaching a default schema
-            if let url::ParseError::RelativeUrlWithoutBase = e {
-                let url_with_default_schema = format!("https://{url_str}");
-                let url = Url::parse(&url_with_default_schema).map_err(|e| e.to_string())?;
-                Ok(url)
-            } else {
-                Err(e.to_string())
+#[derive(Debug, Clone, Copy)]
+pub struct DateTimeRfc3339(chrono::DateTime<chrono::Utc>);
+
+impl From<DateTimeRfc3339> for chrono::DateTime<chrono::Utc> {
+    fn from(value: DateTimeRfc3339) -> Self {
+        value.0
+    }
+}
+
+impl std::str::FromStr for DateTimeRfc3339 {
+    type Err = chrono::ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let dt = chrono::DateTime::parse_from_rfc3339(s)?;
+        Ok(Self(dt.into()))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct UrlHttps(url::Url);
+
+impl From<UrlHttps> for url::Url {
+    fn from(value: UrlHttps) -> Self {
+        value.0
+    }
+}
+
+impl std::str::FromStr for UrlHttps {
+    type Err = url::ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match Url::parse(s) {
+            Ok(url) => Ok(Self(url)),
+            Err(url::ParseError::RelativeUrlWithoutBase) => {
+                // try attaching a default schema
+                Url::parse(&format!("https://{s}")).map(Self)
             }
+            Err(e) => Err(e),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn value_parse_dataset_visibility(value: &str) -> Result<DatasetVisibility, String> {
-    // Allows us to parse enum values without additional dependencies
-    serde_yaml::from_str(value).map_err(|e| e.to_string())
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum DatasetVisibility {
+    Private,
+    Public,
+}
+
+impl From<DatasetVisibility> for kamu::domain::DatasetVisibility {
+    fn from(value: DatasetVisibility) -> Self {
+        match value {
+            DatasetVisibility::Private => kamu::domain::DatasetVisibility::Private,
+            DatasetVisibility::Public => kamu::domain::DatasetVisibility::Public,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

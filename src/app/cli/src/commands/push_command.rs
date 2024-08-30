@@ -55,13 +55,13 @@ impl PushCommand {
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
-        I: Iterator<Item = DatasetRefAnyPattern>,
+        I: IntoIterator<Item = DatasetRefAnyPattern>,
     {
         Self {
             push_svc,
             dataset_repo,
             search_svc,
-            refs: refs.collect(),
+            refs: refs.into_iter().collect(),
             current_account_subject,
             all,
             recursive,

@@ -18,10 +18,20 @@ use super::{CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum SchemaOutputFormat {
+    Ddl,
+    Parquet,
+    ParquetJson,
+    ArrowJson,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct InspectSchemaCommand {
     query_svc: Arc<dyn QueryService>,
     dataset_ref: DatasetRef,
-    output_format: Option<String>,
+    output_format: Option<SchemaOutputFormat>,
     from_data_file: bool,
 }
 
@@ -29,13 +39,13 @@ impl InspectSchemaCommand {
     pub fn new(
         query_svc: Arc<dyn QueryService>,
         dataset_ref: DatasetRef,
-        output_format: Option<&str>,
+        output_format: Option<SchemaOutputFormat>,
         from_data_file: bool,
     ) -> Self {
         Self {
             query_svc,
             dataset_ref,
-            output_format: output_format.map(ToOwned::to_owned),
+            output_format,
             from_data_file,
         }
     }
@@ -168,15 +178,15 @@ impl InspectSchemaCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for InspectSchemaCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        match self.output_format.as_deref() {
-            None | Some("ddl") => {
+        match self.output_format {
+            None | Some(SchemaOutputFormat::Ddl) => {
                 if let Some(schema) = self.get_parquet_schema().await? {
                     self.print_schema_ddl(&schema);
                 } else {
                     self.print_schema_unavailable();
                 }
             }
-            Some("parquet") => {
+            Some(SchemaOutputFormat::Parquet) => {
                 if let Some(schema) = self.get_parquet_schema().await? {
                     kamu_data_utils::schema::format::write_schema_parquet(
                         &mut std::io::stdout(),
@@ -186,7 +196,7 @@ impl Command for InspectSchemaCommand {
                     self.print_schema_unavailable();
                 }
             }
-            Some("parquet-json") => {
+            Some(SchemaOutputFormat::ParquetJson) => {
                 if let Some(schema) = self.get_parquet_schema().await? {
                     kamu_data_utils::schema::format::write_schema_parquet_json(
                         &mut std::io::stdout(),
@@ -196,7 +206,7 @@ impl Command for InspectSchemaCommand {
                     self.print_schema_unavailable();
                 }
             }
-            Some("arrow-json") => {
+            Some(SchemaOutputFormat::ArrowJson) => {
                 if let Some(schema) = self.get_arrow_schema().await? {
                     kamu_data_utils::schema::format::write_schema_arrow_json(
                         &mut std::io::stdout(),
@@ -206,7 +216,6 @@ impl Command for InspectSchemaCommand {
                     self.print_schema_unavailable();
                 }
             }
-            _ => unreachable!(),
         }
 
         Ok(())

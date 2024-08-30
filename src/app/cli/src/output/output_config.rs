@@ -26,6 +26,18 @@ pub struct OutputConfig {
     pub trace_file: Option<PathBuf>,
 }
 
+impl Default for OutputConfig {
+    fn default() -> Self {
+        Self {
+            quiet: false,
+            verbosity_level: 0,
+            is_tty: false,
+            format: OutputFormat::Table,
+            trace_file: None,
+        }
+    }
+}
+
 impl OutputConfig {
     pub fn get_records_writer(
         &self,
@@ -53,30 +65,30 @@ impl OutputConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum OutputFormat {
+    /// Comma-separated values
+    #[clap(name = "csv")]
     Csv,
+
     /// Array of Structures format
+    #[clap(name = "json")]
     Json,
+
     /// One Json object per line - easily splittable format
+    #[clap(name = "ndjson")]
     NdJson,
+
     /// Structure of arrays - more compact and efficient format for encoding
     /// entire dataframe
+    #[clap(name = "json-soa")]
     JsonSoA,
-    /// Array of arrays - compact and efficient and preserves column order
-    JsonAoA,
-    /// A pretty human-readable table
-    Table,
-}
 
-impl Default for OutputConfig {
-    fn default() -> Self {
-        Self {
-            quiet: false,
-            verbosity_level: 0,
-            is_tty: false,
-            format: OutputFormat::Table,
-            trace_file: None,
-        }
-    }
+    /// Array of arrays - compact and efficient and preserves column order
+    #[clap(name = "json-aoa")]
+    JsonAoA,
+
+    /// A pretty human-readable table
+    #[clap(name = "table")]
+    Table,
 }

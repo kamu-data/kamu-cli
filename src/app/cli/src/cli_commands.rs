@@ -7,39 +7,35 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use clap::CommandFactory as _;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
-use url::Url;
 
 use crate::commands::*;
-use crate::{accounts, odf_server, CommandInterpretationFailed, WorkspaceService};
+use crate::{accounts, cli, odf_server, WorkspaceService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn get_command(
     base_catalog: &dill::Catalog,
     cli_catalog: &dill::Catalog,
-    arg_matches: &clap::ArgMatches,
+    args: cli::Cli,
 ) -> Result<Box<dyn Command>, CLIError> {
-    let command: Box<dyn Command> = match arg_matches.subcommand() {
-        Some(("add", submatches)) => Box::new(AddCommand::new(
+    let command: Box<dyn Command> = match args.command {
+        cli::Command::Add(c) => Box::new(AddCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            submatches
-                .get_many("manifest")
-                .unwrap_or_default()
-                .map(String::as_str),
-            submatches.get_one("name").cloned(),
-            submatches.get_flag("recursive"),
-            submatches.get_flag("replace"),
-            submatches.get_flag("stdin"),
-            // Safety: This argument has a default value
-            *submatches.get_one("visibility").unwrap(),
+            c.manifest,
+            c.name,
+            c.recursive,
+            c.replace,
+            c.stdin,
+            c.visibility.into(),
             cli_catalog.get_one()?,
         )),
-        Some(("complete", submatches)) => {
+        cli::Command::Complete(c) => {
             let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
             let in_workspace =
                 workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()?;
@@ -61,127 +57,97 @@ pub fn get_command(
                     None
                 },
                 cli_catalog.get_one()?,
-                crate::cli_parser::cli(),
-                submatches
-                    .get_one::<String>("input")
-                    .map(ToString::to_string)
-                    .unwrap(),
-                *(submatches.get_one("current").unwrap()),
+                crate::cli::Cli::command(),
+                c.input,
+                c.current,
             ))
         }
-        Some(("completions", submatches)) => Box::new(CompletionsCommand::new(
-            crate::cli_parser::cli(),
-            *submatches.get_one("shell").unwrap(),
-        )),
-        Some(("config", config_matches)) => match config_matches.subcommand() {
-            Some(("list", list_matches)) => Box::new(ConfigListCommand::new(
+        cli::Command::Completions(c) => {
+            Box::new(CompletionsCommand::new(crate::cli::Cli::command(), c.shell))
+        }
+        cli::Command::Config(c) => match c.subcommand {
+            cli::ConfigSubCommand::List(sc) => Box::new(ConfigListCommand::new(
                 cli_catalog.get_one()?,
-                list_matches.get_flag("user"),
-                list_matches.get_flag("with-defaults"),
+                sc.user,
+                sc.with_defaults,
             )),
-            Some(("get", get_matches)) => Box::new(ConfigGetCommand::new(
+            cli::ConfigSubCommand::Get(sc) => Box::new(ConfigGetCommand::new(
                 cli_catalog.get_one()?,
-                get_matches.get_flag("user"),
-                get_matches.get_flag("with-defaults"),
-                get_matches.get_one::<String>("cfgkey").unwrap().to_string(),
+                sc.user,
+                sc.with_defaults,
+                sc.cfgkey,
             )),
-            Some(("set", set_matches)) => Box::new(ConfigSetCommand::new(
+            cli::ConfigSubCommand::Set(sc) => Box::new(ConfigSetCommand::new(
                 cli_catalog.get_one()?,
-                set_matches.get_flag("user"),
-                set_matches.get_one::<String>("cfgkey").unwrap().to_string(),
-                set_matches.get_one("value").map(|s: &String| s.to_owned()),
+                sc.user,
+                sc.cfgkey,
+                sc.value,
             )),
-            _ => return Err(CommandInterpretationFailed.into()),
         },
-        Some(("delete", submatches)) => Box::new(DeleteCommand::new(
+        cli::Command::Delete(c) => Box::new(DeleteCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            validate_many_dataset_patterns(
-                cli_catalog,
-                submatches.get_many("dataset").unwrap_or_default().cloned(),
-            )?,
+            validate_many_dataset_patterns(cli_catalog, c.dataset)?,
             cli_catalog.get_one()?,
-            submatches.get_flag("all"),
-            submatches.get_flag("recursive"),
-            submatches.get_flag("yes"),
+            c.all,
+            c.recursive,
+            c.yes,
         )),
-        Some(("ingest", submatches)) => Box::new(IngestCommand::new(
+        cli::Command::Ingest(c) => Box::new(IngestCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            validate_dataset_ref(
-                cli_catalog,
-                submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
-            )?,
-            submatches
-                .get_many("file")
-                .unwrap_or_default()
-                .map(String::as_str),
-            submatches.get_one("source-name").map(String::as_str),
-            submatches.get_one("event-time").map(String::as_str),
-            submatches.get_flag("stdin"),
-            submatches.get_flag("recursive"),
-            submatches.get_one("input-format").map(String::as_str),
+            validate_dataset_ref(cli_catalog, c.dataset)?,
+            c.file.unwrap_or_default(),
+            c.source_name,
+            c.event_time,
+            c.stdin,
+            c.recursive,
+            c.input_format,
         )),
-        Some(("init", submatches)) => {
-            if submatches.get_flag("pull-images") {
+        cli::Command::Init(c) => {
+            if c.pull_images {
                 Box::new(PullImagesCommand::new(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
-                    submatches.get_flag("list-only"),
+                    c.list_only,
                 ))
             } else {
                 Box::new(InitCommand::new(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
-                    submatches.get_flag("exists-ok"),
-                    submatches.get_flag("multi-tenant"),
+                    c.exists_ok,
+                    c.multi_tenant,
                 ))
             }
         }
-        Some(("inspect", submatches)) => match submatches.subcommand() {
-            Some(("lineage", lin_matches)) => Box::new(LineageCommand::new(
+        cli::Command::Inspect(c) => match c.subcommand {
+            cli::InspectSubCommand::Lineage(sc) => Box::new(LineageCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
-                validate_many_dataset_refs(
-                    cli_catalog,
-                    lin_matches.get_many("dataset").unwrap().cloned(),
-                )?,
-                lin_matches.get_flag("browse"),
-                lin_matches.get_one("output-format").map(String::as_str),
+                validate_many_dataset_refs(cli_catalog, sc.dataset)?,
+                sc.browse,
+                sc.output_format,
                 cli_catalog.get_one()?,
             )),
-            Some(("query", query_matches)) => Box::new(InspectQueryCommand::new(
+            cli::InspectSubCommand::Query(sc) => Box::new(InspectQueryCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
-                validate_dataset_ref(
-                    cli_catalog,
-                    query_matches
-                        .get_one::<DatasetRef>("dataset")
-                        .unwrap()
-                        .clone(),
-                )?,
+                validate_dataset_ref(cli_catalog, sc.dataset)?,
                 cli_catalog.get_one()?,
             )),
-            Some(("schema", schema_matches)) => Box::new(InspectSchemaCommand::new(
+            cli::InspectSubCommand::Schema(sc) => Box::new(InspectSchemaCommand::new(
                 cli_catalog.get_one()?,
-                validate_dataset_ref(
-                    cli_catalog,
-                    schema_matches
-                        .get_one::<DatasetRef>("dataset")
-                        .unwrap()
-                        .clone(),
-                )?,
-                schema_matches.get_one("output-format").map(String::as_str),
-                schema_matches.get_flag("from-data-file"),
+                validate_dataset_ref(cli_catalog, sc.dataset)?,
+                sc.output_format,
+                sc.from_data_file,
             )),
-            _ => return Err(CommandInterpretationFailed.into()),
         },
-        Some(("list", submatches)) => {
+        cli::Command::List(c) => {
             let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
             let user_config = cli_catalog.get_one::<kamu_accounts::PredefinedAccountsConfig>()?;
 
@@ -189,114 +155,105 @@ pub fn get_command(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 accounts::AccountService::current_account_indication(
-                    arg_matches,
+                    args.account,
                     workspace_svc.is_multi_tenant_workspace(),
                     user_config.as_ref(),
                 ),
-                accounts::AccountService::related_account_indication(submatches),
+                accounts::AccountService::related_account_indication(
+                    c.target_account,
+                    c.all_accounts,
+                ),
                 cli_catalog.get_one()?,
-                submatches.get_count("wide"),
+                c.wide,
             ))
         }
-        Some(("log", submatches)) => Box::new(LogCommand::new(
+        cli::Command::Log(c) => Box::new(LogCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            validate_dataset_ref(
-                cli_catalog,
-                submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
-            )?,
-            submatches.get_one("output-format").map(String::as_str),
-            submatches.get_one("filter").map(String::as_str),
-            *(submatches.get_one("limit").unwrap()),
+            validate_dataset_ref(cli_catalog, c.dataset)?,
+            c.output_format,
+            c.filter,
+            c.limit,
             cli_catalog.get_one()?,
         )),
-        Some(("login", submatches)) => match submatches.subcommand() {
-            Some(("oauth", submatches)) => Box::new(LoginSilentCommand::new(
+        cli::Command::Login(c) => match c.subcommand {
+            Some(cli::LoginSubCommand::Oauth(sc)) => Box::new(LoginSilentCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
-                if submatches.get_flag("user") {
+                if sc.user {
                     odf_server::AccessTokenStoreScope::User
                 } else {
                     odf_server::AccessTokenStoreScope::Workspace
                 },
-                submatches.get_one::<Url>("server").cloned(),
+                sc.server.map(Into::into),
                 LoginSilentMode::OAuth(LoginSilentModeOAuth {
-                    provider: submatches.get_one("provider").cloned().unwrap(),
-                    access_token: submatches.get_one("access-token").cloned().unwrap(),
+                    provider: sc.provider,
+                    access_token: sc.access_token,
                 }),
             )),
-            Some(("password", submatches)) => Box::new(LoginSilentCommand::new(
+            Some(cli::LoginSubCommand::Password(sc)) => Box::new(LoginSilentCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
-                if submatches.get_flag("user") {
+                if sc.user {
                     odf_server::AccessTokenStoreScope::User
                 } else {
                     odf_server::AccessTokenStoreScope::Workspace
                 },
-                submatches.get_one::<Url>("server").cloned(),
+                sc.server.map(Into::into),
                 LoginSilentMode::Password(LoginSilentModePassword {
-                    login: submatches.get_one("login").cloned().unwrap(),
-                    password: submatches.get_one("password").cloned().unwrap(),
+                    login: sc.login,
+                    password: sc.password,
                 }),
             )),
-            Some(_) => return Err(CommandInterpretationFailed.into()),
             None => Box::new(LoginCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
-                if submatches.get_flag("user") {
+                if c.user {
                     odf_server::AccessTokenStoreScope::User
                 } else {
                     odf_server::AccessTokenStoreScope::Workspace
                 },
-                submatches.get_one::<Url>("server").cloned(),
-                submatches.get_one("access-token").cloned(),
-                submatches.get_flag("check"),
+                c.server.map(Into::into),
+                c.access_token,
+                c.check,
             )),
         },
-        Some(("logout", submatches)) => Box::new(LogoutCommand::new(
+        cli::Command::Logout(c) => Box::new(LogoutCommand::new(
             cli_catalog.get_one()?,
-            if submatches.get_flag("user") {
+            if c.user {
                 odf_server::AccessTokenStoreScope::User
             } else {
                 odf_server::AccessTokenStoreScope::Workspace
             },
-            submatches.get_one::<Url>("server").cloned(),
-            submatches.get_flag("all"),
+            c.server.map(Into::into),
+            c.all,
         )),
-        Some(("new", submatches)) => Box::new(NewDatasetCommand::new(
-            submatches.get_one::<DatasetName>("name").unwrap().clone(),
-            submatches.get_flag("root"),
-            submatches.get_flag("derivative"),
+        cli::Command::New(c) => Box::new(NewDatasetCommand::new(
+            c.name,
+            c.root,
+            c.derivative,
             None::<&str>,
         )),
-        Some(("notebook", submatches)) => Box::new(NotebookCommand::new(
+        cli::Command::Notebook(c) => Box::new(NotebookCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            submatches.get_one("address").copied(),
-            submatches.get_one("http-port").copied(),
-            submatches
-                .get_many("env")
-                .unwrap_or_default() // optional
-                .map(String::as_str),
+            c.address,
+            c.http_port,
+            c.env.unwrap_or_default(),
         )),
-        Some(("pull", submatches)) => {
-            let datasets = submatches.get_many("dataset").unwrap_or_default().cloned();
-
-            if submatches.contains_id("set-watermark") {
+        cli::Command::Pull(c) => {
+            if let Some(set_watermark) = c.set_watermark {
                 Box::new(SetWatermarkCommand::new(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
-                    datasets,
-                    submatches.get_flag("all"),
-                    submatches.get_flag("recursive"),
-                    submatches
-                        .get_one("set-watermark")
-                        .map(String::as_str)
-                        .unwrap(),
+                    c.dataset.unwrap_or_default(),
+                    c.all,
+                    c.recursive,
+                    set_watermark,
                 ))
             } else {
                 Box::new(PullCommand::new(
@@ -304,143 +261,116 @@ pub fn get_command(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
-                    datasets,
+                    c.dataset.unwrap_or_default(),
                     cli_catalog.get_one()?,
-                    submatches.get_flag("all"),
-                    submatches.get_flag("recursive"),
-                    submatches.get_flag("fetch-uncacheable"),
-                    submatches.get_one("as").cloned(),
-                    !submatches.get_flag("no-alias"),
-                    submatches.get_flag("force"),
-                    submatches.get_flag("reset-derivatives-on-diverged-input"),
+                    c.all,
+                    c.recursive,
+                    c.fetch_uncacheable,
+                    c.r#as,
+                    !c.no_alias,
+                    c.force,
+                    c.reset_derivatives_on_diverged_input,
                 ))
             }
         }
-        Some(("push", push_matches)) => Box::new(PushCommand::new(
+        cli::Command::Push(c) => Box::new(PushCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            push_matches
-                .get_many("dataset")
-                .unwrap_or_default()
-                .cloned(),
+            c.dataset.unwrap_or_default(),
             cli_catalog.get_one()?,
-            push_matches.get_flag("all"),
-            push_matches.get_flag("recursive"),
-            !push_matches.get_flag("no-alias"),
-            push_matches.get_flag("force"),
-            push_matches.get_one("to").cloned(),
-            // Safety: This argument has a default value
-            *push_matches.get_one("visibility").unwrap(),
+            c.all,
+            c.recursive,
+            !c.no_alias,
+            c.force,
+            c.to,
+            c.visibility.into(),
             cli_catalog.get_one()?,
         )),
-        Some(("rename", rename_matches)) => Box::new(RenameCommand::new(
+        cli::Command::Rename(c) => Box::new(RenameCommand::new(
             cli_catalog.get_one()?,
-            validate_dataset_ref(
-                cli_catalog,
-                rename_matches
-                    .get_one::<DatasetRef>("dataset")
-                    .unwrap()
-                    .clone(),
-            )?,
-            rename_matches.get_one("name").map(String::as_str).unwrap(),
+            validate_dataset_ref(cli_catalog, c.dataset)?,
+            c.name,
         )),
-        Some(("repo", repo_matches)) => match repo_matches.subcommand() {
-            Some(("add", add_matches)) => Box::new(RepositoryAddCommand::new(
+        cli::Command::Repo(c) => match c.subcommand {
+            cli::RepoSubCommand::Add(sc) => Box::new(RepositoryAddCommand::new(
                 cli_catalog.get_one()?,
-                add_matches.get_one::<RepoName>("name").unwrap().clone(),
-                add_matches.get_one("url").map(String::as_str).unwrap(),
+                sc.name,
+                sc.url,
             )),
-            Some(("delete", delete_matches)) => Box::new(RepositoryDeleteCommand::new(
+            cli::RepoSubCommand::Delete(sc) => Box::new(RepositoryDeleteCommand::new(
                 cli_catalog.get_one()?,
-                delete_matches
-                    .get_many("repository")
-                    .unwrap_or_default()
-                    .cloned(),
-                delete_matches.get_flag("all"),
-                delete_matches.get_flag("yes"),
+                sc.repository.unwrap_or_default(),
+                sc.all,
+                sc.yes,
             )),
-            Some(("list", _)) => Box::new(RepositoryListCommand::new(
+            cli::RepoSubCommand::List(_) => Box::new(RepositoryListCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
             )),
-            Some(("alias", alias_matches)) => match alias_matches.subcommand() {
-                Some(("add", add_matches)) => Box::new(AliasAddCommand::new(
+            cli::RepoSubCommand::Alias(sc) => match sc.subcommand {
+                cli::RepoAliasSubCommand::Add(ssc) => Box::new(AliasAddCommand::new(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
-                    add_matches
-                        .get_one::<DatasetRef>("dataset")
-                        .unwrap()
-                        .clone(),
-                    add_matches
-                        .get_one::<DatasetRefRemote>("alias")
-                        .unwrap()
-                        .clone(),
-                    add_matches.get_flag("pull"),
-                    add_matches.get_flag("push"),
+                    ssc.dataset,
+                    ssc.alias,
+                    ssc.pull,
+                    ssc.push,
                 )),
-                Some(("delete", delete_matches)) => Box::new(AliasDeleteCommand::new(
+                cli::RepoAliasSubCommand::Delete(ssc) => Box::new(AliasDeleteCommand::new(
                     cli_catalog.get_one()?,
-                    delete_matches
-                        .get_one::<DatasetRef>("dataset")
-                        .unwrap()
-                        .clone(),
-                    delete_matches.get_one("alias").cloned(),
-                    delete_matches.get_flag("all"),
-                    delete_matches.get_flag("pull"),
-                    delete_matches.get_flag("push"),
+                    ssc.dataset,
+                    ssc.alias,
+                    ssc.all,
+                    ssc.pull,
+                    ssc.push,
                 )),
-                Some(("list", list_matches)) => Box::new(AliasListCommand::new(
+                cli::RepoAliasSubCommand::List(ssc) => Box::new(AliasListCommand::new(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
-                    list_matches.get_one("dataset").cloned(),
+                    ssc.dataset,
                 )),
-                _ => return Err(CommandInterpretationFailed.into()),
             },
-            _ => return Err(CommandInterpretationFailed.into()),
         },
-        Some(("reset", submatches)) => Box::new(ResetCommand::new(
+        cli::Command::Reset(c) => Box::new(ResetCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            validate_dataset_ref(
-                cli_catalog,
-                submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
-            )?,
-            submatches.get_one::<Multihash>("hash").unwrap().clone(),
-            submatches.get_flag("yes"),
+            validate_dataset_ref(cli_catalog, c.dataset)?,
+            c.hash,
+            c.yes,
         )),
-        Some(("search", submatches)) => Box::new(SearchCommand::new(
+        cli::Command::Search(c) => Box::new(SearchCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            submatches.get_one("query").map(String::as_str),
-            submatches.get_many("repo").unwrap_or_default().cloned(),
+            c.query,
+            c.repo.unwrap_or_default(),
         )),
-        Some(("sql", submatches)) => match submatches.subcommand() {
+        cli::Command::Sql(c) => match c.subcommand {
             None => Box::new(SqlShellCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
-                submatches.get_one("command").map(String::as_str),
-                submatches.get_one("url").map(String::as_str),
-                submatches.get_one("engine").map(String::as_str),
+                c.command,
+                c.url,
+                c.engine,
             )),
-            Some(("server", server_matches)) => {
-                if server_matches.get_flag("livy") {
+            Some(cli::SqlSubCommand::Server(sc)) => {
+                if sc.livy {
                     Box::new(SqlServerLivyCommand::new(
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,
-                        *server_matches.get_one("address").unwrap(),
-                        *(server_matches.get_one("port").unwrap()),
+                        sc.address,
+                        sc.port,
                     ))
-                } else if server_matches.get_flag("flight-sql") {
+                } else if sc.flight_sql {
                     Box::new(SqlServerFlightSqlCommand::new(
-                        *server_matches.get_one("address").unwrap(),
-                        *(server_matches.get_one("port").unwrap()),
+                        sc.address,
+                        sc.port,
                         cli_catalog.get_one()?,
                     ))
                 } else {
@@ -449,19 +379,14 @@ pub fn get_command(
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,
-                        *server_matches.get_one("address").unwrap(),
-                        *(server_matches.get_one("port").unwrap()),
+                        sc.address,
+                        sc.port,
                     ))
                 }
             }
-            _ => return Err(CommandInterpretationFailed.into()),
         },
-        Some(("system", submatches)) => match submatches.subcommand() {
-            Some(("gc", _)) => Box::new(GcCommand::new(cli_catalog.get_one()?)),
-            Some(("upgrade-workspace", _)) => {
-                Box::new(UpgradeWorkspaceCommand::new(cli_catalog.get_one()?))
-            }
-            Some(("api-server", server_matches)) => match server_matches.subcommand() {
+        cli::Command::System(c) => match c.subcommand {
+            cli::SystemSubCommand::ApiServer(sc) => match sc.subcommand {
                 None => {
                     let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
 
@@ -470,91 +395,79 @@ pub fn get_command(
                         cli_catalog.clone(),
                         workspace_svc.is_multi_tenant_workspace(),
                         cli_catalog.get_one()?,
-                        server_matches.get_one("address").copied(),
-                        server_matches.get_one("http-port").copied(),
-                        server_matches.get_one("external-address").copied(),
-                        server_matches.get_flag("get-token"),
+                        sc.address,
+                        sc.http_port,
+                        sc.external_address,
+                        sc.get_token,
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,
-                        arg_matches.get_one("e2e-output-data-path").cloned(),
+                        args.e2e_output_data_path,
                     ))
                 }
-                Some(("gql-query", query_matches)) => Box::new(APIServerGqlQueryCommand::new(
-                    base_catalog.clone(),
-                    query_matches.get_one("query").map(String::as_str).unwrap(),
-                    query_matches.get_flag("full"),
-                )),
-                Some(("gql-schema", _)) => Box::new(APIServerGqlSchemaCommand {}),
-                _ => return Err(CommandInterpretationFailed.into()),
+                Some(cli::SystemApiServerSubCommand::GqlQuery(ssc)) => Box::new(
+                    APIServerGqlQueryCommand::new(base_catalog.clone(), ssc.query, ssc.full),
+                ),
+                Some(cli::SystemApiServerSubCommand::GqlSchema(_)) => {
+                    Box::new(APIServerGqlSchemaCommand {})
+                }
             },
-            Some(("info", info_matches)) => Box::new(SystemInfoCommand::new(
+            cli::SystemSubCommand::Compact(sc) => Box::new(CompactCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
-                info_matches.get_one("output-format").map(String::as_str),
+                validate_dataset_ref(cli_catalog, sc.dataset)?,
+                sc.max_slice_size,
+                sc.max_slice_records,
+                sc.hard,
+                sc.verify,
+                sc.keep_metadata_only,
             )),
-            Some(("diagnose", _)) => Box::new(SystemDiagnoseCommand::new(
+            cli::SystemSubCommand::Diagnose(_) => Box::new(SystemDiagnoseCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
             )),
-            Some(("debug-token", matches)) => Box::new(DebugTokenCommand::new(
+            cli::SystemSubCommand::DebugToken(sc) => {
+                Box::new(DebugTokenCommand::new(cli_catalog.get_one()?, sc.token))
+            }
+            cli::SystemSubCommand::E2e(sc) => Box::new(SystemE2ECommand::new(
+                sc.action,
+                sc.dataset,
                 cli_catalog.get_one()?,
-                matches.get_one("token").cloned().unwrap(),
             )),
-            Some(("generate-token", gen_matches)) => Box::new(GenerateTokenCommand::new(
+            cli::SystemSubCommand::Gc(_) => Box::new(GcCommand::new(cli_catalog.get_one()?)),
+            cli::SystemSubCommand::GenerateToken(sc) => Box::new(GenerateTokenCommand::new(
                 cli_catalog.get_one()?,
-                gen_matches.get_one("login").cloned(),
-                gen_matches.get_one("subject").cloned(),
-                *gen_matches.get_one::<usize>("expiration-time-sec").unwrap(),
+                sc.login,
+                sc.subject,
+                sc.expiration_time_sec,
             )),
-            Some(("ipfs", ipfs_matches)) => match ipfs_matches.subcommand() {
-                Some(("add", add_matches)) => Box::new(SystemIpfsAddCommand::new(
+            cli::SystemSubCommand::Info(sc) => Box::new(SystemInfoCommand::new(
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                sc.output_format,
+            )),
+            cli::SystemSubCommand::Ipfs(sc) => match sc.subcommand {
+                cli::SystemIpfsSubCommand::Add(ssc) => Box::new(SystemIpfsAddCommand::new(
                     cli_catalog.get_one()?,
-                    add_matches
-                        .get_one::<DatasetRef>("dataset")
-                        .unwrap()
-                        .clone(),
+                    ssc.dataset,
                 )),
-                _ => return Err(CommandInterpretationFailed.into()),
             },
-            Some(("compact", submatches)) => Box::new(CompactCommand::new(
-                cli_catalog.get_one()?,
-                cli_catalog.get_one()?,
-                cli_catalog.get_one()?,
-                validate_dataset_ref(
-                    cli_catalog,
-                    submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
-                )?,
-                *(submatches.get_one("max-slice-size").unwrap()),
-                *(submatches.get_one("max-slice-records").unwrap()),
-                submatches.get_flag("hard"),
-                submatches.get_flag("verify"),
-                submatches.get_flag("keep-metadata-only"),
-            )),
-            Some(("e2e", submatches)) => Box::new(SystemE2ECommand::new(
-                submatches
-                    .get_one::<String>("action")
-                    .map(String::as_str)
-                    .unwrap(),
-                submatches.get_one::<DatasetRef>("dataset").cloned(),
-                cli_catalog.get_one()?,
-            )),
-            _ => return Err(CommandInterpretationFailed.into()),
+            cli::SystemSubCommand::UpgradeWorkspace(_) => {
+                Box::new(UpgradeWorkspaceCommand::new(cli_catalog.get_one()?))
+            }
         },
-        Some(("tail", submatches)) => Box::new(TailCommand::new(
+        cli::Command::Tail(c) => Box::new(TailCommand::new(
             cli_catalog.get_one()?,
-            validate_dataset_ref(
-                cli_catalog,
-                submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
-            )?,
-            *(submatches.get_one("skip-records").unwrap()),
-            *(submatches.get_one("num-records").unwrap()),
+            validate_dataset_ref(cli_catalog, c.dataset)?,
+            c.skip_records,
+            c.num_records,
             cli_catalog.get_one()?,
         )),
-        Some(("ui", submatches)) => {
+        cli::Command::Ui(c) => {
             let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
 
             let current_account_subject = cli_catalog.get_one::<CurrentAccountSubject>()?;
@@ -574,45 +487,39 @@ pub fn get_command(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
-                submatches.get_one("address").copied(),
-                submatches.get_one("http-port").copied(),
-                submatches.get_flag("get-token"),
+                c.address,
+                c.http_port,
+                c.get_token,
             ))
         }
-        Some(("verify", submatches)) => Box::new(VerifyCommand::new(
+        cli::Command::Verify(c) => Box::new(VerifyCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            validate_many_dataset_patterns(
-                cli_catalog,
-                submatches.get_many("dataset").unwrap().cloned(),
-            )?
-            .into_iter(),
-            submatches.get_flag("recursive"),
-            submatches.get_flag("integrity"),
+            validate_many_dataset_patterns(cli_catalog, c.dataset)?.into_iter(),
+            c.recursive,
+            c.integrity,
         )),
-        Some(("version", submatches)) => Box::new(VersionCommand::new(
-            cli_catalog.get_one()?,
-            submatches.get_one("output-format").map(String::as_str),
-        )),
-        _ => return Err(CommandInterpretationFailed.into()),
+
+        cli::Command::Version(c) => {
+            Box::new(VersionCommand::new(cli_catalog.get_one()?, c.output_format))
+        }
     };
 
     Ok(command)
 }
 
-pub fn command_needs_transaction(arg_matches: &clap::ArgMatches) -> Result<bool, CLIError> {
-    match arg_matches.subcommand() {
-        Some(("system", system_matches)) => match system_matches.subcommand() {
-            Some(("generate-token", _)) => Ok(true),
-            Some(_) => Ok(false),
-            None => Err(CommandInterpretationFailed.into()),
+#[allow(clippy::match_like_matches_macro)]
+pub fn command_needs_transaction(args: &cli::Cli) -> bool {
+    match &args.command {
+        cli::Command::System(c) => match &c.subcommand {
+            cli::SystemSubCommand::GenerateToken(_) => true,
+            _ => false,
         },
-        Some(("delete", _)) => Ok(true),
-        Some(_) => Ok(false),
-        None => Err(CommandInterpretationFailed.into()),
+        cli::Command::Delete(_) => true,
+        _ => false,
     }
 }
 

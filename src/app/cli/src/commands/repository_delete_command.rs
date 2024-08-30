@@ -32,11 +32,11 @@ impl RepositoryDeleteCommand {
         no_confirmation: bool,
     ) -> Self
     where
-        I: Iterator<Item = RepoName>,
+        I: IntoIterator<Item = RepoName>,
     {
         Self {
             remote_repo_reg,
-            names: names.collect(),
+            names: names.into_iter().collect(),
             all,
             no_confirmation,
         }

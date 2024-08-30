@@ -27,8 +27,8 @@ pub struct SqlServerLivyCommand {
     jupyter_config: Arc<JupyterConfig>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
-    address: IpAddr,
-    port: u16,
+    address: Option<IpAddr>,
+    port: Option<u16>,
 }
 
 impl SqlServerLivyCommand {
@@ -37,8 +37,8 @@ impl SqlServerLivyCommand {
         jupyter_config: Arc<JupyterConfig>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
-        address: IpAddr,
-        port: u16,
+        address: Option<IpAddr>,
+        port: Option<u16>,
     ) -> Self {
         Self {
             workspace_layout,
@@ -81,12 +81,14 @@ impl Command for SqlServerLivyCommand {
             None
         };
 
-        let url = format!("{}:{}", self.address, self.port);
+        let address = self.address.unwrap_or("127.0.0.1".parse().unwrap());
+        let port = self.port.unwrap_or(10000);
+        let url = format!("{address}:{port}");
 
         livy_server
             .run(
-                &self.address.to_string(),
-                self.port,
+                &address.to_string(),
+                port,
                 &self.workspace_layout.datasets_dir,
                 &self.workspace_layout.run_info_dir,
                 self.output_config.verbosity_level > 0,

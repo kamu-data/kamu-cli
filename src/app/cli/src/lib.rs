@@ -15,29 +15,20 @@
 #![feature(duration_constructors)]
 
 pub mod app;
-pub use app::*;
-
-pub mod database;
-pub use database::*;
-
+pub mod cli;
 pub mod cli_commands;
-pub use cli_commands::*;
-
-pub mod cli_parser;
-pub use cli_parser::*;
-
 pub(crate) mod cli_value_parser;
-
 pub mod commands;
-pub use commands::*;
-
-pub mod explore;
-
+pub mod database;
 pub mod error;
 pub(crate) mod error_fmt;
-
+pub mod explore;
 pub mod output;
-pub use output::*;
-
 pub mod services;
+
+pub use app::*;
+pub use cli_commands::*;
+pub use commands::*;
+pub use database::*;
+pub use output::*;
 pub use services::*;
