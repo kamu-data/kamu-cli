@@ -831,6 +831,12 @@ pub fn cli() -> Command {
                             .long("force")
                             .action(ArgAction::SetTrue)
                             .help("Overwrite remote version with local, even if revisions have diverged"),
+                        Arg::new("visibility")
+                            .long("visibility")
+                            .value_name("VIS")
+                            .value_parser(value_parse_dataset_visibility)
+                            .default_value("private")
+                            .help("Changing the visibility of the initially pushed dataset(s)"),
                     ])
                     .after_help(indoc::indoc!(
                         r#"

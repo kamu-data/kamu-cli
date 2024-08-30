@@ -693,6 +693,9 @@ Push local data into a repository
 * `--no-alias` — Don't automatically add a remote push alias for this destination
 * `--to <REM>` — Remote alias or a URL to push to
 * `-f`, `--force` — Overwrite remote version with local, even if revisions have diverged
+* `--visibility <VIS>` — Changing the visibility of the initially pushed dataset(s)
+
+  Default value: `private`
 
 Use this command to share your new dataset or new data with others. All changes performed by this command are atomic and non-destructive. This command will analyze the state of the dataset at the repository and will only upload data and metadata that wasn't previously seen.
 

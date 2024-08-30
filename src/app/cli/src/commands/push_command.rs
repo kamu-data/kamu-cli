@@ -10,6 +10,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use console::style as s;
 use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
@@ -34,6 +35,7 @@ pub struct PushCommand {
     add_aliases: bool,
     force: bool,
     to: Option<DatasetRefRemote>,
+    dataset_visibility: DatasetVisibility,
     output_config: Arc<OutputConfig>,
 }
 
@@ -49,6 +51,7 @@ impl PushCommand {
         add_aliases: bool,
         force: bool,
         to: Option<DatasetRefRemote>,
+        dataset_visibility: DatasetVisibility,
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
@@ -65,6 +68,7 @@ impl PushCommand {
             add_aliases,
             force,
             to,
+            dataset_visibility,
             output_config,
         }
     }
@@ -143,6 +147,7 @@ impl PushCommand {
     fn sync_options(&self) -> SyncOptions {
         SyncOptions {
             force: self.force,
+            dataset_visibility: self.dataset_visibility,
             ..SyncOptions::default()
         }
     }
@@ -156,7 +161,7 @@ impl PushCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for PushCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn before_run(&self) -> Result<(), CLIError> {
         if self.refs.is_empty() && !self.all {
             return Err(CLIError::usage_error("Specify a dataset or pass --all"));
         }
@@ -167,6 +172,10 @@ impl Command for PushCommand {
             ));
         }
 
+        Ok(())
+    }
+
+    async fn run(&mut self) -> Result<(), CLIError> {
         let push_results = if self.output_config.is_tty
             && self.output_config.verbosity_level == 0
             && !self.output_config.quiet
@@ -194,15 +203,22 @@ impl Command for PushCommand {
             if updated != 0 {
                 eprintln!(
                     "{}",
-                    console::style(format!("{updated} dataset(s) pushed"))
-                        .green()
-                        .bold()
+                    s(format!("{updated} dataset(s) pushed")).green().bold()
                 );
             }
             if up_to_date != 0 {
+                if self.dataset_visibility != DatasetVisibility::default() {
+                    eprintln!(
+                        "{}",
+                        s("Dataset(s) have already been pushed -- the visibility marker ignored")
+                            .yellow()
+                            .bold()
+                    );
+                }
+
                 eprintln!(
                     "{}",
-                    console::style(format!("{up_to_date} dataset(s) up-to-date"))
+                    s(format!("{up_to_date} dataset(s) up-to-date"))
                         .yellow()
                         .bold()
                 );
@@ -393,12 +409,12 @@ impl SyncListener for PrettySyncProgress {
 
     fn success(&self, result: &SyncResult) {
         let msg = match result {
-            SyncResult::UpToDate => console::style("Repository is up-to-date".to_owned()).yellow(),
+            SyncResult::UpToDate => s("Repository is up-to-date".to_owned()).yellow(),
             SyncResult::Updated {
                 ref new_head,
                 num_blocks,
                 ..
-            } => console::style(format!(
+            } => s(format!(
                 "Updated repository to {} ({} block(s))",
                 new_head.as_multibase().short(),
                 num_blocks
@@ -422,10 +438,8 @@ impl SyncListener for PrettySyncProgress {
             .multi_progress
             .add(Self::new_spinner(&self.local_ref, &self.remote_ref));
 
-        state.progress.finish_with_message(
-            console::style("Failed to sync dataset to repository")
-                .red()
-                .to_string(),
-        );
+        state
+            .progress
+            .finish_with_message(s("Failed to sync dataset to repository").red().to_string());
     }
 }

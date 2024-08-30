@@ -22,7 +22,6 @@ use kamu_core::{
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
     Dataset,
-    DatasetVisibility,
     GetRefError,
     HashedMetadataBlock,
     RefCollisionError,
@@ -168,6 +167,7 @@ impl AxumServerPushProtocolInstance {
     async fn push_main_flow(&mut self) -> Result<(), PushServerError> {
         let push_request = self.handle_push_request_initiation().await?;
         let force_update_if_diverged = push_request.force_update_if_diverged;
+        let visibility_for_created_dataset = push_request.visibility_for_created_dataset;
 
         let mut new_blocks = self.try_handle_push_metadata_request(push_request).await?;
         if !new_blocks.is_empty() {
@@ -196,14 +196,9 @@ impl AxumServerPushProtocolInstance {
                         })
                     })?;
 
-                // TODO: Read the visibility parameter from CLI
-                //
-                //       Private Datasets: Update use case: Pushing a dataset
-                //       https://github.com/kamu-data/kamu-cli/issues/728
                 let create_options = CreateDatasetUseCaseOptions {
-                    dataset_visibility: DatasetVisibility::Private,
+                    dataset_visibility: visibility_for_created_dataset,
                 };
-
                 let create_result = DatabaseTransactionRunner::new(self.catalog.clone())
                     .transactional_with(
                         |create_dataset_use_case: Arc<dyn CreateDatasetUseCase>| async move {

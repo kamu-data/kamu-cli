@@ -330,6 +330,8 @@ pub fn get_command(
             !push_matches.get_flag("no-alias"),
             push_matches.get_flag("force"),
             push_matches.get_one("to").cloned(),
+            // Safety: This argument has a default value
+            *push_matches.get_one("visibility").unwrap(),
             cli_catalog.get_one()?,
         )),
         Some(("rename", rename_matches)) => Box::new(RenameCommand::new(
@@ -608,6 +610,7 @@ pub fn command_needs_transaction(arg_matches: &clap::ArgMatches) -> Result<bool,
             Some(_) => Ok(false),
             None => Err(CommandInterpretationFailed.into()),
         },
+        Some(("delete", _)) => Ok(true),
         Some(_) => Ok(false),
         None => Err(CommandInterpretationFailed.into()),
     }
