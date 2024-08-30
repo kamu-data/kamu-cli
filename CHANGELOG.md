@@ -15,7 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Private Datasets, changes related to Smart Transfer Protocol:
   - `kamu push`: added `--visibility private|public` argument to specify the created dataset visibility
   - Send the visibility attribute in the initial request of the push flow
-- CI: validate the CLI reference generation
 ### Changed
 - Schema propagation improvements:
   - Dataset schema will be defined upon first ingest, even if no records were returned by the source
