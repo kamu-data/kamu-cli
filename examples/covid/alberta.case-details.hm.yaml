@@ -30,7 +30,7 @@ content:
                  when age_group = '50-59 years' then '50s'
                  when age_group = '60-69 years' then '60s'
                  when age_group = '70-79 years' then '70s'
-                 when age_group = '80+ years' then '80s'
+                 when age_group = '80+ years' then '80+'
                  else 'UNKNOWN' end as age_group,
             zone as location
           from "covid19.alberta.case-details"

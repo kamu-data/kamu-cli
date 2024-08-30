@@ -26,8 +26,8 @@ content:
                  when age_group = '50-59' then '50s'
                  when age_group = '60-69' then '60s'
                  when age_group = '70-79' then '70s'
-                 when age_group = '80-89' then '80s'
-                 when age_group = '90+' then '90+'
+                 when age_group = '80-89' then '80+'
+                 when age_group = '90+' then '80+'
                  else 'UNKNOWN' end as age_group,
             ha as location
             FROM "covid19.british-columbia.case-details"
