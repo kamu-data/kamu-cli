@@ -159,6 +159,7 @@ pub async fn connect_database_initially(base_catalog: &Catalog) -> Result<Catalo
         }
         DatabaseProvider::Sqlite => {
             SqlitePlugin::catalog_with_connected_pool(base_catalog, &db_connection_settings)
+                .await
                 .int_err()
         }
     }
@@ -235,27 +236,6 @@ fn init_database_password_provider(b: &mut CatalogBuilder, raw_db_config: &Datab
             }
         },
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-static SQLITE_MIGRATOR: Migrator = sqlx::migrate!("../../../migrations/sqlite");
-
-pub async fn apply_migrations(catalog: &Catalog) {
-    let db_connection_settings = catalog.get_one::<DatabaseConnectionSettings>().unwrap();
-
-    match db_connection_settings.provider {
-        DatabaseProvider::Sqlite => {}
-        _ => {
-            warn!("Skip applying migrations: available only for SQLite");
-
-            return;
-        }
-    }
-
-    let pool = catalog.get_one::<SqlitePool>().unwrap();
-
-    SQLITE_MIGRATOR.run(&*pool).await.expect("Migration failed");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
