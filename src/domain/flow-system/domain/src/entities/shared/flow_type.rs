@@ -11,7 +11,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{CompactionRule, IngestRule, ResetRule, Schedule, TransformRule};
+use super::CompactionRuleFull;
+use crate::{CompactionRuleMetadataOnly, IngestRule, ResetRule, Schedule, TransformRule};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "dataset_flow_type", rename_all = "snake_case")]
@@ -32,13 +33,22 @@ impl DatasetFlowType {
         ]
     }
 
-    pub fn dataset_kind_restriction(&self) -> Option<opendatafabric::DatasetKind> {
+    pub fn dataset_kind_restriction(
+        &self,
+        flow_cofiguration_rule_type_maybe: Option<&str>,
+    ) -> Option<opendatafabric::DatasetKind> {
         match self {
-            DatasetFlowType::Ingest | DatasetFlowType::HardCompaction => {
-                Some(opendatafabric::DatasetKind::Root)
-            }
+            DatasetFlowType::Ingest => Some(opendatafabric::DatasetKind::Root),
             DatasetFlowType::ExecuteTransform => Some(opendatafabric::DatasetKind::Derivative),
             DatasetFlowType::Reset => None,
+            DatasetFlowType::HardCompaction => {
+                if let Some(flow_cofiguration_rule_type) = flow_cofiguration_rule_type_maybe
+                    && flow_cofiguration_rule_type == std::any::type_name::<CompactionRuleFull>()
+                {
+                    return Some(opendatafabric::DatasetKind::Root);
+                }
+                None
+            }
         }
     }
 
@@ -52,7 +62,8 @@ impl DatasetFlowType {
                 flow_configuration_type == std::any::type_name::<TransformRule>()
             }
             DatasetFlowType::HardCompaction => {
-                flow_configuration_type == std::any::type_name::<CompactionRule>()
+                flow_configuration_type == std::any::type_name::<CompactionRuleMetadataOnly>()
+                    || flow_configuration_type == std::any::type_name::<CompactionRuleFull>()
             }
             DatasetFlowType::Reset => flow_configuration_type == std::any::type_name::<ResetRule>(),
         }

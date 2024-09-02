@@ -321,29 +321,35 @@ impl From<&TimeDeltaInput> for chrono::Duration {
     }
 }
 
-#[derive(InputObject)]
+#[derive(InputObject, Clone)]
 pub struct TransformConditionInput {
     pub min_records_to_await: u64,
     pub max_batching_interval: TimeDeltaInput,
 }
 
-#[derive(OneofObject)]
+impl From<TransformConditionInput> for FlowRunConfiguration {
+    fn from(value: TransformConditionInput) -> Self {
+        Self::Transform(value)
+    }
+}
+
+#[derive(OneofObject, Clone)]
 pub enum PropagationMode {
     Custom(FlowConfigurationResetCustom),
     ToSeed(FlowConfigurationResetToSeedDummy),
 }
 
-#[derive(InputObject)]
+#[derive(InputObject, Clone)]
 pub struct FlowConfigurationResetCustom {
     pub new_head_hash: Multihash,
 }
 
-#[derive(InputObject)]
+#[derive(InputObject, Clone)]
 pub struct FlowConfigurationResetToSeedDummy {
     dummy: String,
 }
 
-#[derive(InputObject)]
+#[derive(InputObject, Clone)]
 pub struct ResetConditionInput {
     pub mode: PropagationMode,
     pub old_head_hash: Option<Multihash>,
@@ -359,7 +365,13 @@ impl ResetConditionInput {
     }
 }
 
-#[derive(OneofObject)]
+impl From<ResetConditionInput> for FlowRunConfiguration {
+    fn from(value: ResetConditionInput) -> Self {
+        Self::Reset(value)
+    }
+}
+
+#[derive(OneofObject, Clone)]
 pub enum CompactionConditionInput {
     Full(CompactionConditionFull),
     MetadataOnly(CompactionConditionMetadataOnly),
@@ -372,9 +384,15 @@ pub struct CompactionConditionFull {
     pub recursive: bool,
 }
 
-#[derive(InputObject)]
+#[derive(InputObject, Clone)]
 pub struct CompactionConditionMetadataOnly {
     pub recursive: bool,
+}
+
+impl From<CompactionConditionInput> for FlowRunConfiguration {
+    fn from(value: CompactionConditionInput) -> Self {
+        Self::Compaction(value)
+    }
 }
 
 #[derive(InputObject, Clone)]
@@ -400,6 +418,12 @@ impl TryFrom<IngestConditionInput> for IngestRule {
             fetch_uncacheable: value.fetch_uncacheable,
             schedule_condition: schedule,
         })
+    }
+}
+
+impl From<IngestConditionInput> for FlowRunConfiguration {
+    fn from(value: IngestConditionInput) -> Self {
+        Self::Ingest(value)
     }
 }
 
@@ -536,6 +560,20 @@ impl FlowRunConfiguration {
             }
         }
         Ok(None)
+    }
+
+    pub fn configuration_rule_type(&self) -> &'static str {
+        match self {
+            Self::Compaction(compaction_input) => match compaction_input {
+                CompactionConditionInput::Full(_) => std::any::type_name::<CompactionRuleFull>(),
+                CompactionConditionInput::MetadataOnly(_) => {
+                    std::any::type_name::<CompactionRuleMetadataOnly>()
+                }
+            },
+            Self::Ingest(_) => std::any::type_name::<IngestRule>(),
+            Self::Transform(_) => std::any::type_name::<TransformRule>(),
+            Self::Reset(_) => std::any::type_name::<ResetRule>(),
+        }
     }
 }
 

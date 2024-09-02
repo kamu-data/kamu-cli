@@ -67,9 +67,12 @@ pub(crate) async fn ensure_expected_dataset_kind(
     ctx: &Context<'_>,
     dataset_handle: &odf::DatasetHandle,
     dataset_flow_type: DatasetFlowType,
+    flow_run_configuration: Option<&FlowRunConfiguration>,
 ) -> Result<Option<FlowIncompatibleDatasetKind>> {
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
-    match dataset_flow_type.dataset_kind_restriction() {
+    match dataset_flow_type.dataset_kind_restriction(
+        flow_run_configuration.map(FlowRunConfiguration::configuration_rule_type),
+    ) {
         Some(expected_kind) => {
             let dataset = utils::get_dataset(ctx, dataset_handle);
 
@@ -176,10 +179,10 @@ pub(crate) async fn ensure_flow_preconditions(
 
 pub(crate) fn ensure_set_config_flow_supported(
     dataset_flow_type: DatasetFlowType,
-    flow_configuration_type: &'static str,
+    flow_configuration: &FlowRunConfiguration,
 ) -> bool {
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
-    dataset_flow_type.config_restriction(flow_configuration_type)
+    dataset_flow_type.config_restriction(flow_configuration.configuration_rule_type())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

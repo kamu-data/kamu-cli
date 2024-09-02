@@ -44,8 +44,13 @@ impl DatasetFlowRunsMut {
         dataset_flow_type: DatasetFlowType,
         flow_run_configuration: Option<FlowRunConfiguration>,
     ) -> Result<TriggerFlowResult> {
-        if let Some(e) =
-            ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
+        if let Some(e) = ensure_expected_dataset_kind(
+            ctx,
+            &self.dataset_handle,
+            dataset_flow_type,
+            flow_run_configuration.as_ref(),
+        )
+        .await?
         {
             return Ok(TriggerFlowResult::IncompatibleDatasetKind(e));
         }
