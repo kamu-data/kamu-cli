@@ -26,7 +26,6 @@ use super::{
     ensure_expected_dataset_kind,
     ensure_flow_preconditions,
     ensure_scheduling_permission,
-    ensure_set_config_flow_supported,
     FlowIncompatibleDatasetKind,
     FlowPreconditionsNotMet,
 };
@@ -55,11 +54,10 @@ impl DatasetFlowConfigsMut {
         ingest: IngestConditionInput,
     ) -> Result<SetFlowConfigResult> {
         let flow_run_config: FlowRunConfiguration = ingest.clone().into();
-        if !ensure_set_config_flow_supported(dataset_flow_type, &flow_run_config) {
-            return Ok(SetFlowConfigResult::TypeIsNotSupported(
-                FlowTypeIsNotSupported,
-            ));
-        }
+        if let Err(err) = flow_run_config.check_type_compatible(&dataset_flow_type) {
+            return Ok(SetFlowConfigResult::TypeIsNotSupported(err));
+        };
+
         if let Some(e) = ensure_expected_dataset_kind(
             ctx,
             &self.dataset_handle,
@@ -110,11 +108,10 @@ impl DatasetFlowConfigsMut {
         transform: TransformConditionInput,
     ) -> Result<SetFlowTransformConfigResult> {
         let flow_run_config: FlowRunConfiguration = transform.clone().into();
-        if !ensure_set_config_flow_supported(dataset_flow_type, &flow_run_config) {
-            return Ok(SetFlowTransformConfigResult::TypeIsNotSupported(
-                FlowTypeIsNotSupported,
-            ));
-        }
+        if let Err(err) = flow_run_config.check_type_compatible(&dataset_flow_type) {
+            return Ok(SetFlowTransformConfigResult::TypeIsNotSupported(err));
+        };
+
         let transform_rule = match TransformRule::new_checked(
             transform.min_records_to_await,
             transform.max_batching_interval.into(),
@@ -175,11 +172,9 @@ impl DatasetFlowConfigsMut {
         compaction_args: CompactionConditionInput,
     ) -> Result<SetFlowCompactionConfigResult> {
         let flow_run_config: FlowRunConfiguration = compaction_args.clone().into();
-        if !ensure_set_config_flow_supported(dataset_flow_type, &flow_run_config) {
-            return Ok(SetFlowCompactionConfigResult::TypeIsNotSupported(
-                FlowTypeIsNotSupported,
-            ));
-        }
+        if let Err(err) = flow_run_config.check_type_compatible(&dataset_flow_type) {
+            return Ok(SetFlowCompactionConfigResult::TypeIsNotSupported(err));
+        };
 
         let compaction_rule = match compaction_args {
             CompactionConditionInput::Full(compaction_input) => {

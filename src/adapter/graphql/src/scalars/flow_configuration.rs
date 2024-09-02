@@ -24,7 +24,7 @@ use kamu_flow_system::{
 };
 use opendatafabric::DatasetHandle;
 
-use crate::mutations::FlowInvalidRunConfigurations;
+use crate::mutations::{FlowInvalidRunConfigurations, FlowTypeIsNotSupported};
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -560,6 +560,64 @@ impl FlowRunConfiguration {
             }
         }
         Ok(None)
+    }
+
+    pub fn check_type_compatible(
+        &self,
+        flow_type: &DatasetFlowType,
+    ) -> Result<(), FlowTypeIsNotSupported> {
+        match self {
+            Self::Ingest(_) => {
+                if flow_type != &DatasetFlowType::Ingest {
+                    return Err(FlowTypeIsNotSupported);
+                }
+            }
+            Self::Transform(_) => {
+                if flow_type != &DatasetFlowType::ExecuteTransform {
+                    return Err(FlowTypeIsNotSupported);
+                }
+            }
+            Self::Compaction(_) => {
+                if flow_type != &DatasetFlowType::HardCompaction {
+                    return Err(FlowTypeIsNotSupported);
+                }
+            }
+            Self::Reset(_) => {
+                if flow_type != &DatasetFlowType::Reset {
+                    return Err(FlowTypeIsNotSupported);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn check_dataset_kind_compatible(
+        &self,
+        flow_type: &DatasetFlowType,
+    ) -> Result<(), FlowTypeIsNotSupported> {
+        match self {
+            Self::Ingest(_) => {
+                if flow_type != &DatasetFlowType::Ingest {
+                    return Err(FlowTypeIsNotSupported);
+                }
+            }
+            Self::Transform(_) => {
+                if flow_type != &DatasetFlowType::ExecuteTransform {
+                    return Err(FlowTypeIsNotSupported);
+                }
+            }
+            Self::Compaction(_) => {
+                if flow_type != &DatasetFlowType::HardCompaction {
+                    return Err(FlowTypeIsNotSupported);
+                }
+            }
+            Self::Reset(_) => {
+                if flow_type != &DatasetFlowType::Reset {
+                    return Err(FlowTypeIsNotSupported);
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn configuration_rule_type(&self) -> &'static str {
