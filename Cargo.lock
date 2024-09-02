@@ -1305,7 +1305,7 @@ dependencies = [
 
 [[package]]
 name = "async-utils"
-version = "0.198.1"
+version = "0.198.2"
 dependencies = [
  "async-trait",
 ]
@@ -5603,7 +5603,6 @@ dependencies = [
  "serde_yaml",
  "shlex",
  "signal-hook",
- "sqlx",
  "tempfile",
  "test-log",
  "thiserror",
