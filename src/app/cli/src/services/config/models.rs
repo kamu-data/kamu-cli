@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::Path;
+
+use const_format::concatcp;
 use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
 use database_common::DatabaseProvider;
 use duration_string::DurationString;
@@ -599,6 +602,13 @@ pub enum DatabaseConfig {
     MariaDB(RemoteDatabaseConfig),
 }
 
+pub const DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME: &str = "workspace.sqlite.db";
+pub const SQLITE_DATABASE_IN_WORKSPACE_PATH: &str = concatcp!(
+    KAMU_WORKSPACE_DIR_NAME,
+    '/',
+    DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME
+);
+
 impl DatabaseConfig {
     pub fn sample() -> Self {
         Self::Postgres(RemoteDatabaseConfig {
@@ -617,9 +627,17 @@ impl DatabaseConfig {
         })
     }
 
+    pub fn sqlite_database_in(dir: &Path) -> Self {
+        let file_path = dir.join(DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME);
+
+        Self::Sqlite(SqliteDatabaseConfig {
+            database_path: file_path.to_str().unwrap().into(),
+        })
+    }
+
     pub fn sqlite_database_in_workspace_dir() -> Self {
         Self::Sqlite(SqliteDatabaseConfig {
-            database_path: format!("{KAMU_WORKSPACE_DIR_NAME}/workspace.sqlite.db"),
+            database_path: SQLITE_DATABASE_IN_WORKSPACE_PATH.into(),
         })
     }
 }
