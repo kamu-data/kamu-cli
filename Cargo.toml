@@ -1,6 +1,7 @@
 [workspace]
 members = [
     # Utils
+    "src/utils/async-utils",
     "src/utils/container-runtime",
     "src/utils/data-utils",
     "src/utils/database-common",
@@ -92,6 +93,7 @@ resolver = "2"
 kamu-cli = { version = "0.203.1", path = "src/app/cli", default-features = false }
 
 # Utils
+async-utils = { version = "0.203.1", path = "src/utils/async-utils", default-features = false }
 container-runtime = { version = "0.203.1", path = "src/utils/container-runtime", default-features = false }
 database-common = { version = "0.203.1", path = "src/utils/database-common", default-features = false }
 database-common-macros = { version = "0.203.1", path = "src/utils/database-common-macros", default-features = false }
