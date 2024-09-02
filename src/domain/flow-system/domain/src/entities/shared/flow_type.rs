@@ -43,11 +43,12 @@ impl DatasetFlowType {
             DatasetFlowType::Reset => None,
             DatasetFlowType::HardCompaction => {
                 if let Some(flow_cofiguration_rule_type) = flow_cofiguration_rule_type_maybe
-                    && flow_cofiguration_rule_type == std::any::type_name::<CompactionRuleFull>()
+                    && flow_cofiguration_rule_type
+                        == std::any::type_name::<CompactionRuleMetadataOnly>()
                 {
-                    return Some(opendatafabric::DatasetKind::Root);
+                    return None;
                 }
-                None
+                Some(opendatafabric::DatasetKind::Root)
             }
         }
     }
