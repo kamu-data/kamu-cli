@@ -33,23 +33,13 @@ impl DatasetFlowType {
         ]
     }
 
-    pub fn dataset_kind_restriction(
-        &self,
-        flow_cofiguration_rule_type_maybe: Option<&str>,
-    ) -> Option<opendatafabric::DatasetKind> {
+    pub fn dataset_kind_restriction(&self) -> Option<opendatafabric::DatasetKind> {
         match self {
-            DatasetFlowType::Ingest => Some(opendatafabric::DatasetKind::Root),
-            DatasetFlowType::ExecuteTransform => Some(opendatafabric::DatasetKind::Derivative),
-            DatasetFlowType::Reset => None,
-            DatasetFlowType::HardCompaction => {
-                if let Some(flow_cofiguration_rule_type) = flow_cofiguration_rule_type_maybe
-                    && flow_cofiguration_rule_type
-                        == std::any::type_name::<CompactionRuleMetadataOnly>()
-                {
-                    return None;
-                }
+            DatasetFlowType::Ingest | DatasetFlowType::HardCompaction => {
                 Some(opendatafabric::DatasetKind::Root)
             }
+            DatasetFlowType::ExecuteTransform => Some(opendatafabric::DatasetKind::Derivative),
+            DatasetFlowType::Reset => None,
         }
     }
 

@@ -67,12 +67,15 @@ pub(crate) async fn ensure_expected_dataset_kind(
     ctx: &Context<'_>,
     dataset_handle: &odf::DatasetHandle,
     dataset_flow_type: DatasetFlowType,
-    flow_run_configuration: Option<&FlowRunConfiguration>,
+    flow_run_configuration_maybe: Option<&FlowRunConfiguration>,
 ) -> Result<Option<FlowIncompatibleDatasetKind>> {
+    if let Some(FlowRunConfiguration::Compaction(CompactionConditionInput::MetadataOnly(_))) =
+        flow_run_configuration_maybe
+    {
+        return Ok(None);
+    }
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
-    match dataset_flow_type.dataset_kind_restriction(
-        flow_run_configuration.map(FlowRunConfiguration::configuration_rule_type),
-    ) {
+    match dataset_flow_type.dataset_kind_restriction() {
         Some(expected_kind) => {
             let dataset = utils::get_dataset(ctx, dataset_handle);
 

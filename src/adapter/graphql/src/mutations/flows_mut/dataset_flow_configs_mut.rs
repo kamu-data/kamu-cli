@@ -54,7 +54,7 @@ impl DatasetFlowConfigsMut {
         ingest: IngestConditionInput,
     ) -> Result<SetFlowConfigResult> {
         let flow_run_config: FlowRunConfiguration = ingest.clone().into();
-        if let Err(err) = flow_run_config.check_type_compatible(&dataset_flow_type) {
+        if let Err(err) = flow_run_config.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowConfigResult::TypeIsNotSupported(err));
         };
 
@@ -108,7 +108,7 @@ impl DatasetFlowConfigsMut {
         transform: TransformConditionInput,
     ) -> Result<SetFlowTransformConfigResult> {
         let flow_run_config: FlowRunConfiguration = transform.clone().into();
-        if let Err(err) = flow_run_config.check_type_compatible(&dataset_flow_type) {
+        if let Err(err) = flow_run_config.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowTransformConfigResult::TypeIsNotSupported(err));
         };
 
@@ -172,7 +172,7 @@ impl DatasetFlowConfigsMut {
         compaction_args: CompactionConditionInput,
     ) -> Result<SetFlowCompactionConfigResult> {
         let flow_run_config: FlowRunConfiguration = compaction_args.clone().into();
-        if let Err(err) = flow_run_config.check_type_compatible(&dataset_flow_type) {
+        if let Err(err) = flow_run_config.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowCompactionConfigResult::TypeIsNotSupported(err));
         };
 
