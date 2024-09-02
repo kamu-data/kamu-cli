@@ -62,7 +62,7 @@ struct WebUILoginInstructions {
 struct WebUIFeatureFlags {
     enable_logout: bool,
     enable_scheduling: bool,
-    enable_dataset_env_vars_managment: bool,
+    enable_dataset_env_vars_management: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -82,7 +82,7 @@ impl WebUIServer {
         current_account_name: AccountName,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         file_upload_limit_config: Arc<FileUploadLimitConfig>,
-        enable_dataset_env_vars_managment: bool,
+        enable_dataset_env_vars_management: bool,
         address: Option<IpAddr>,
         port: Option<u16>,
     ) -> Result<Self, InternalError> {
@@ -122,13 +122,13 @@ impl WebUIServer {
                 enable_logout: false,
                 // No way to configure scheduling of datasets
                 enable_scheduling: false,
-                enable_dataset_env_vars_managment,
+                enable_dataset_env_vars_management,
             },
         };
 
         let access_token = Self::acquire_access_token(base_catalog.clone(), &login_instructions)
             .await
-            .expect("Token not retreieved");
+            .expect("Token not retrieved");
 
         let web_ui_url = Url::parse(&web_ui_url).expect("URL failed to parse");
 
