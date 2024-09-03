@@ -11,9 +11,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::CompactionRuleFull;
-use crate::{CompactionRuleMetadataOnly, IngestRule, ResetRule, Schedule, TransformRule};
-
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "dataset_flow_type", rename_all = "snake_case")]
 pub enum DatasetFlowType {
@@ -40,23 +37,6 @@ impl DatasetFlowType {
             }
             DatasetFlowType::ExecuteTransform => Some(opendatafabric::DatasetKind::Derivative),
             DatasetFlowType::Reset => None,
-        }
-    }
-
-    pub fn config_restriction(&self, flow_configuration_type: &'static str) -> bool {
-        match self {
-            DatasetFlowType::Ingest => {
-                flow_configuration_type == std::any::type_name::<Schedule>()
-                    || flow_configuration_type == std::any::type_name::<IngestRule>()
-            }
-            DatasetFlowType::ExecuteTransform => {
-                flow_configuration_type == std::any::type_name::<TransformRule>()
-            }
-            DatasetFlowType::HardCompaction => {
-                flow_configuration_type == std::any::type_name::<CompactionRuleMetadataOnly>()
-                    || flow_configuration_type == std::any::type_name::<CompactionRuleFull>()
-            }
-            DatasetFlowType::Reset => flow_configuration_type == std::any::type_name::<ResetRule>(),
         }
     }
 }
