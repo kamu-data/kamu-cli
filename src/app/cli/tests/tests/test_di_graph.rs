@@ -16,35 +16,35 @@ use kamu_cli::{self, OutputConfig, WorkspaceLayout};
 
 #[test_log::test(tokio::test)]
 async fn test_di_cli_graph_validates_st() {
-    test_di_cli_graph_validates(false).await
+    test_di_cli_graph_validates(false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_di_cli_graph_validates_mt() {
-    test_di_cli_graph_validates(true).await
+    test_di_cli_graph_validates(true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_di_server_graph_validates_st() {
-    test_di_server_graph_validates(false).await
+    test_di_server_graph_validates(false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_di_server_graph_validates_mt() {
-    test_di_server_graph_validates(true).await
+    test_di_server_graph_validates(true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_di_cli_graph_validates(multi_tenant_workspace: bool) {
+fn test_di_cli_graph_validates(multi_tenant_workspace: bool) {
     let temp_dir = tempfile::tempdir().unwrap();
     let workspace_layout = WorkspaceLayout::new(temp_dir.path());
     let mut base_catalog_builder =
@@ -76,7 +76,7 @@ async fn test_di_cli_graph_validates(multi_tenant_workspace: bool) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_di_server_graph_validates(multi_tenant_workspace: bool) {
+fn test_di_server_graph_validates(multi_tenant_workspace: bool) {
     let temp_dir = tempfile::tempdir().unwrap();
     let workspace_layout = WorkspaceLayout::new(temp_dir.path());
     let mut base_catalog_builder =
