@@ -15,7 +15,36 @@ use kamu_cli::{self, OutputConfig, WorkspaceLayout};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_di_cli_graph_validates() {
+async fn test_di_cli_graph_validates_st() {
+    test_di_cli_graph_validates(false).await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_di_cli_graph_validates_mt() {
+    test_di_cli_graph_validates(true).await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_di_server_graph_validates_st() {
+    test_di_server_graph_validates(false).await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_di_server_graph_validates_mt() {
+    test_di_server_graph_validates(true).await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_di_cli_graph_validates(multi_tenant_workspace: bool) {
     let temp_dir = tempfile::tempdir().unwrap();
     let workspace_layout = WorkspaceLayout::new(temp_dir.path());
     let mut base_catalog_builder =
@@ -26,11 +55,10 @@ async fn test_di_cli_graph_validates() {
     kamu_cli::register_config_in_catalog(
         &kamu_cli::config::CLIConfig::default(),
         &mut base_catalog_builder,
-        false,
+        multi_tenant_workspace,
     );
     let base_catalog = base_catalog_builder.build();
 
-    let multi_tenant_workspace = true;
     let mut cli_catalog_builder =
         kamu_cli::configure_cli_catalog(&base_catalog, multi_tenant_workspace);
 
@@ -48,8 +76,7 @@ async fn test_di_cli_graph_validates() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_di_server_graph_validates() {
+async fn test_di_server_graph_validates(multi_tenant_workspace: bool) {
     let temp_dir = tempfile::tempdir().unwrap();
     let workspace_layout = WorkspaceLayout::new(temp_dir.path());
     let mut base_catalog_builder =
@@ -60,11 +87,10 @@ async fn test_di_server_graph_validates() {
     kamu_cli::register_config_in_catalog(
         &kamu_cli::config::CLIConfig::default(),
         &mut base_catalog_builder,
-        false,
+        multi_tenant_workspace,
     );
     let base_catalog = base_catalog_builder.build();
 
-    let multi_tenant_workspace = true;
     let mut cli_catalog_builder =
         kamu_cli::configure_server_catalog(&base_catalog, multi_tenant_workspace);
 
