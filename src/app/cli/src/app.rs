@@ -126,7 +126,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             &workspace_layout,
             is_multi_tenant_workspace,
             args.system_time.map(Into::into),
-            args.e2e_output_data_path.is_some(),
         );
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
@@ -340,7 +339,6 @@ pub fn configure_base_catalog(
     workspace_layout: &WorkspaceLayout,
     multi_tenant_workspace: bool,
     system_time: Option<DateTime<Utc>>,
-    is_e2e_testing: bool,
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
