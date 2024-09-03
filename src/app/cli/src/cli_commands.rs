@@ -529,6 +529,18 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
     }
 }
 
+#[allow(clippy::match_like_matches_macro)]
+pub fn command_needs_server_components(args: &cli::Cli) -> bool {
+    match &args.command {
+        cli::Command::System(c) => match &c.subcommand {
+            cli::SystemSubCommand::ApiServer(_) => true,
+            _ => false,
+        },
+        cli::Command::Ui(_) => true,
+        _ => false,
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Dataset reference validation
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
