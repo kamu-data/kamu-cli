@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Changed -->
 <!--- - Fixed -->
 
+### Unreleased
+### Changed
+- Get Data Panel: use SmTP for pull & push links 
+
 ## [0.198.2] - 2024-08-30
 ### Added
 - Container sources allow string interpolation in env vars and command

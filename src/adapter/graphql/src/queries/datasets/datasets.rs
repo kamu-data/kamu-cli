@@ -144,12 +144,14 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let maybe_acccount = Account::from_account_name(ctx, account_name.into()).await?;
-        if let Some(account) = maybe_acccount {
+        let maybe_account = Account::from_account_name(ctx, account_name.into()).await?;
+
+        if let Some(account) = maybe_account {
             self.by_account_impl(ctx, account, page, per_page).await
         } else {
             let page = page.unwrap_or(0);
             let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+
             Ok(DatasetConnection::new(vec![], page, per_page, 0))
         }
     }

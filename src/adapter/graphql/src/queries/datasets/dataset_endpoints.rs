@@ -63,7 +63,7 @@ impl<'a> DatasetEndpoints<'a> {
     #[allow(clippy::unused_async)]
     async fn cli(&self) -> Result<CliProtocolDesc> {
         let url = format!(
-            "{}{}",
+            "odf+{}{}",
             self.config.protocols.base_url_rest,
             // to respect both kinds of workspaces: single-tenant & multi-tenant
             self.dataset_handle.alias
