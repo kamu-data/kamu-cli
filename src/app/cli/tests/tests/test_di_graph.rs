@@ -7,9 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
-
-use dill::*;
 use kamu::domain::ServerUrlConfig;
 use kamu_accounts::{CurrentAccountSubject, JwtAuthenticationConfig};
 use kamu_adapter_http::AccessToken;
@@ -36,12 +33,11 @@ async fn test_di_cli_graph_validates() {
     let multi_tenant_workspace = true;
     let mut cli_catalog_builder =
         kamu_cli::configure_cli_catalog(&base_catalog, multi_tenant_workspace);
+
     cli_catalog_builder.add_value(CurrentAccountSubject::new_test());
     cli_catalog_builder.add_value(JwtAuthenticationConfig::default());
-    cli_catalog_builder.add_value(ServerUrlConfig::new_test(None));
-    cli_catalog_builder.add_value(AccessToken::new("some-test-token"));
 
-    let validate_result = cli_catalog_builder.validate().ignore::<WorkspaceLayout>();
+    let validate_result = cli_catalog_builder.validate();
 
     assert!(
         validate_result.is_ok(),
@@ -71,6 +67,7 @@ async fn test_di_server_graph_validates() {
     let multi_tenant_workspace = true;
     let mut cli_catalog_builder =
         kamu_cli::configure_server_catalog(&base_catalog, multi_tenant_workspace);
+
     cli_catalog_builder.add_value(CurrentAccountSubject::new_test());
     cli_catalog_builder.add_value(JwtAuthenticationConfig::default());
     cli_catalog_builder.add_value(ServerUrlConfig::new_test(None));
@@ -81,7 +78,11 @@ async fn test_di_server_graph_validates() {
     // manually
     let validate_result = cli_catalog_builder.validate();
 
-    assert_matches!(validate_result, Ok(_));
+    assert!(
+        validate_result.is_ok(),
+        "{}",
+        validate_result.err().unwrap()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
