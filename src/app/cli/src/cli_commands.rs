@@ -524,8 +524,7 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
             cli::SystemSubCommand::GenerateToken(_) => true,
             _ => false,
         },
-        cli::Command::Add(_) => true,
-        cli::Command::Delete(_) => true,
+        cli::Command::Add(_) | cli::Command::Delete(_) => true,
         _ => false,
     }
 }
