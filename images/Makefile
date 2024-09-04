@@ -36,7 +36,7 @@ kamu-base-feature-branch \
 	kamu-base-with-data-feature-branch-push \
 	kamu-base-with-data-mt-feature-branch \
 	kamu-base-with-data-mt-feature-branch-push \
-		: FEATURE_TAG = $(shell ./scripts/get-feature-image-tag.sh)
+		: FEATURE_TAG = $(shell git describe --tags --exact-match | grep -E "^.+-v[0-9]+$$")
 
 ################################################################################
 
