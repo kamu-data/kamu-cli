@@ -3,8 +3,6 @@ on:
   push:
     tags:
       - v[0-9]+.[0-9]+.[0-9]+*
-    branches:
-      - master
 env:
   PACKAGE_NAME: kamu-cli
   BINARY_NAME: kamu
