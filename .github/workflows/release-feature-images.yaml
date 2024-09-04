@@ -2,7 +2,7 @@ name: release-feature-images
 on:
   push:
     tags:
-      - v[0-9]+
+      - feature-*-v[0-9]+
 env:
   # AWS credentials (needed only to list a bucket)
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
