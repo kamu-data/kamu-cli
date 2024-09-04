@@ -2,6 +2,12 @@ KAMU_VERSION=$(shell cargo metadata --format-version 1 | jq -r '.packages[] | se
 IMAGE_REPO=ghcr.io/kamu-data
 TAG=latest-with-data-mt
 
+ifdef TAG_POSTFIX
+TAG:=$(TAG)-$(TAG_POSTFIX)
+endif
+
+################################################################################
+
 
 .PHONY: image
 image:
@@ -22,3 +28,6 @@ workspace:
 	mkdir -p workspace && \
 	cd workspace/ && \
 	../init-workspace.py
+
+
+################################################################################

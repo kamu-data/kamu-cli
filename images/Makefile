@@ -30,6 +30,16 @@ jupyter-multi-arch:
 
 ################################################################################
 
+kamu-base-feature-branch \
+	kamu-base-feature-branch-push \
+	kamu-base-with-data-feature-branch \
+	kamu-base-with-data-feature-branch-push \
+	kamu-base-with-data-mt-feature-branch \
+	kamu-base-with-data-mt-feature-branch-push \
+		: FEATURE_TAG = $(shell ./scripts/get-feature-image-tag.sh)
+
+################################################################################
+
 
 .PHONY: kamu-base
 kamu-base:
@@ -46,6 +56,29 @@ kamu-base-push:
 	docker push $(IMAGE_REPO)/kamu-base:latest
 
 
+.PHONY: kamu-base-feature-branch
+kamu-base-feature-branch:
+	@if [ -z $(FEATURE_TAG) ]; then \
+		echo "Error getting FEATURE_TAG"; \
+		exit 1; \
+	fi
+
+	docker build \
+		--build-arg KAMU_VERSION=$(KAMU_VERSION) \
+		-t $(IMAGE_REPO)/kamu-base:$(KAMU_VERSION)-$(FEATURE_TAG) \
+		kamu-base/
+
+
+.PHONY: kamu-base-feature-branch-push
+kamu-base-feature-branch-push:
+	@if [ -z $(FEATURE_TAG) ]; then \
+		echo "Error getting FEATURE_TAG"; \
+		exit 1; \
+	fi
+
+	docker push $(IMAGE_REPO)/kamu-base:$(KAMU_VERSION)-$(FEATURE_TAG)
+
+
 ################################################################################
 
 
@@ -57,11 +90,39 @@ kamu-base-with-data:
 		workspace image
 
 
+.PHONY: kamu-base-with-data-feature-branch
+kamu-base-with-data-feature-branch:
+	@if [ -z $(FEATURE_TAG) ]; then \
+		echo "Error getting FEATURE_TAG"; \
+		exit 1; \
+	fi
+
+	make -C kamu-base-with-data/ \
+		IMAGE_REPO=$(IMAGE_REPO) \
+		KAMU_VERSION=$(KAMU_VERSION) \
+		TAG_POSTFIX=$(FEATURE_TAG) \
+		workspace image
+
+
 .PHONY: kamu-base-with-data-push
 kamu-base-with-data-push:
 	make -C kamu-base-with-data/ \
 		IMAGE_REPO=$(IMAGE_REPO) \
 		KAMU_VERSION=$(KAMU_VERSION) \
+		image-push
+
+
+.PHONY: kamu-base-with-data-feature-branch-push
+kamu-base-with-data-feature-branch-push:
+	@if [ -z $(FEATURE_TAG) ]; then \
+		echo "Error getting FEATURE_TAG"; \
+		exit 1; \
+	fi
+
+	make -C kamu-base-with-data/ \
+		IMAGE_REPO=$(IMAGE_REPO) \
+		KAMU_VERSION=$(KAMU_VERSION) \
+		TAG_POSTFIX=$(FEATURE_TAG) \
 		image-push
 
 
@@ -76,11 +137,39 @@ kamu-base-with-data-mt:
 		workspace image
 
 
+.PHONY: kamu-base-with-data-mt-feature-branch
+kamu-base-with-data-mt-feature-branch:
+	@if [ -z $(FEATURE_TAG) ]; then \
+		echo "Error getting FEATURE_TAG"; \
+		exit 1; \
+	fi
+
+	make -C kamu-base-with-data-mt/ \
+		IMAGE_REPO=$(IMAGE_REPO) \
+		KAMU_VERSION=$(KAMU_VERSION) \
+		TAG_POSTFIX=$(FEATURE_TAG) \
+		workspace image
+
+
 .PHONY: kamu-base-with-data-mt-push
 kamu-base-with-data-mt-push:
 	make -C kamu-base-with-data-mt/ \
 		IMAGE_REPO=$(IMAGE_REPO) \
 		KAMU_VERSION=$(KAMU_VERSION) \
+		image-push
+
+
+.PHONY: kamu-base-with-data-mt-feature-branch-push
+kamu-base-with-data-mt-feature-branch-push:
+	@if [ -z $(FEATURE_TAG) ]; then \
+		echo "Error getting FEATURE_TAG"; \
+		exit 1; \
+	fi
+
+	make -C kamu-base-with-data-mt/ \
+		IMAGE_REPO=$(IMAGE_REPO) \
+		KAMU_VERSION=$(KAMU_VERSION) \
+		TAG_POSTFIX=$(FEATURE_TAG) \
 		image-push
 
 
@@ -95,11 +184,39 @@ kamu-base-with-env-var-storage:
 		workspace image
 
 
+.PHONY: kamu-base-with-env-var-storage-branch
+kamu-base-with-env-var-storage-branch:
+	@if [ -z $(FEATURE_TAG) ]; then \
+		echo "Error getting FEATURE_TAG"; \
+		exit 1; \
+	fi
+
+	make -C kamu-base-with-env-var-storage/ \
+		IMAGE_REPO=$(IMAGE_REPO) \
+		KAMU_VERSION=$(KAMU_VERSION) \
+		TAG_POSTFIX=$(FEATURE_TAG) \
+		workspace image
+
+
 .PHONY: kamu-base-with-env-var-storage-push
 kamu-base-with-env-var-storage-push:
 	make -C kamu-base-with-env-var-storage/ \
 		IMAGE_REPO=$(IMAGE_REPO) \
 		KAMU_VERSION=$(KAMU_VERSION) \
+		image-push
+
+
+.PHONY: kamu-base-with-env-var-storage-push-feature-branch-push
+kamu-base-with-env-var-storage-push-feature-branch-push:
+	@if [ -z $(FEATURE_TAG) ]; then \
+		echo "Error getting FEATURE_TAG"; \
+		exit 1; \
+	fi
+
+	make -C kamu-base-with-env-var-storage/ \
+		IMAGE_REPO=$(IMAGE_REPO) \
+		KAMU_VERSION=$(KAMU_VERSION) \
+		TAG_POSTFIX=$(FEATURE_TAG) \
 		image-push
 
 
@@ -157,5 +274,6 @@ sqlx-cli-with-migrations-push:
 		KAMU_VERSION=$(KAMU_VERSION) \
 		IMAGE_SQLX_TAG=$(IMAGE_SQLX_TAG) \
 		image-push
+
 
 ################################################################################
