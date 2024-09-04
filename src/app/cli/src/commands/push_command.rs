@@ -35,7 +35,7 @@ pub struct PushCommand {
     add_aliases: bool,
     force: bool,
     to: Option<DatasetRefRemote>,
-    dataset_visibility: DatasetVisibility,
+    dataset_visibility: DatasetPublicity,
     output_config: Arc<OutputConfig>,
 }
 
@@ -51,7 +51,7 @@ impl PushCommand {
         add_aliases: bool,
         force: bool,
         to: Option<DatasetRefRemote>,
-        dataset_visibility: DatasetVisibility,
+        dataset_visibility: DatasetPublicity,
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
@@ -207,7 +207,7 @@ impl Command for PushCommand {
                 );
             }
             if up_to_date != 0 {
-                if self.dataset_visibility != DatasetVisibility::default() {
+                if self.dataset_visibility != DatasetPublicity::default() {
                     eprintln!(
                         "{}",
                         s("Dataset(s) have already been pushed -- the visibility marker ignored")

@@ -455,6 +455,10 @@ type Dataset {
 	Various endpoints for interacting with data
 	"""
 	endpoints: DatasetEndpoints!
+	"""
+	Access to dataset properties
+	"""
+	properties: DatasetProperties!
 }
 
 scalar DatasetAlias
@@ -687,6 +691,10 @@ type DatasetMut {
 	Manually advances the watermark of a root dataset
 	"""
 	setWatermark(watermark: DateTime!): SetWatermarkResult!
+	"""
+	Set visibility for the dataset
+	"""
+	setVisibility(visibility: DatasetVisibilityInput!): SetDatasetPropertyResultSuccess!
 }
 
 scalar DatasetName
@@ -699,11 +707,22 @@ type DatasetPermissions {
 	canSchedule: Boolean!
 }
 
-scalar DatasetRef
+type DatasetProperties {
+	visibility: DatasetVisibility!
+}
 
-enum DatasetVisibility {
+enum DatasetPublicity {
 	PRIVATE
 	PUBLIC
+}
+
+scalar DatasetRef
+
+union DatasetVisibility = PrivateDatasetVisibility | PublicDatasetVisibility
+
+input DatasetVisibilityInput @oneOf {
+	private: PrivateDatasetVisibilityInput
+	public: PublicDatasetVisibilityInput
 }
 
 type Datasets {
@@ -733,11 +752,11 @@ type DatasetsMut {
 	"""
 	Creates a new empty dataset
 	"""
-	createEmpty(datasetKind: DatasetKind!, datasetAlias: DatasetAlias!, datasetVisibility: DatasetVisibility): CreateDatasetResult!
+	createEmpty(datasetKind: DatasetKind!, datasetAlias: DatasetAlias!, datasetVisibility: DatasetPublicity): CreateDatasetResult!
 	"""
 	Creates a new dataset from provided DatasetSnapshot manifest
 	"""
-	createFromSnapshot(snapshot: String!, snapshotFormat: MetadataManifestFormat!, datasetVisibility: DatasetVisibility): CreateDatasetFromSnapshotResult!
+	createFromSnapshot(snapshot: String!, snapshotFormat: MetadataManifestFormat!, datasetVisibility: DatasetPublicity): CreateDatasetFromSnapshotResult!
 }
 
 """
@@ -1457,9 +1476,25 @@ type PrepStepPipe {
 	command: [String!]!
 }
 
+type PrivateDatasetVisibility {
+	dummy: String
+}
+
+input PrivateDatasetVisibilityInput {
+	dummy: String
+}
+
 input PropagationMode @oneOf {
 	custom: FlowConfigurationResetCustom
 	toSeed: FlowConfigurationResetToSeedDummy
+}
+
+type PublicDatasetVisibility {
+	anonymousAvailable: Boolean!
+}
+
+input PublicDatasetVisibilityInput {
+	anonymousAvailable: Boolean!
 }
 
 type Query {
@@ -1667,6 +1702,11 @@ type SetAttachments {
 
 type SetDataSchema {
 	schema: DataSchema!
+}
+
+type SetDatasetPropertyResultSuccess {
+	dummy: String
+	message: String!
 }
 
 interface SetFlowCompactionConfigResult {

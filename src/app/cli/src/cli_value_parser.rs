@@ -159,11 +159,11 @@ pub enum DatasetVisibility {
     Public,
 }
 
-impl From<DatasetVisibility> for kamu::domain::DatasetVisibility {
+impl From<DatasetVisibility> for kamu::domain::DatasetPublicity {
     fn from(value: DatasetVisibility) -> Self {
         match value {
-            DatasetVisibility::Private => kamu::domain::DatasetVisibility::Private,
-            DatasetVisibility::Public => kamu::domain::DatasetVisibility::Public,
+            DatasetVisibility::Private => kamu::domain::DatasetPublicity::Private,
+            DatasetVisibility::Public => kamu::domain::DatasetPublicity::Public,
         }
     }
 }

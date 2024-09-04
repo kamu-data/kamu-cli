@@ -9,13 +9,21 @@
 
 use chrono::{DateTime, Utc};
 use domain::{DeleteDatasetError, RenameDatasetError};
+use kamu_auth_rebac::{PropertyValue, SetEntityPropertyError};
 use kamu_core::{self as domain};
 use opendatafabric as odf;
 
-use super::{DatasetEnvVarsMut, DatasetFlowsMut, DatasetMetadataMut};
+use crate::mutations::{
+    ensure_account_owns_dataset,
+    DatasetEnvVarsMut,
+    DatasetFlowsMut,
+    DatasetMetadataMut,
+};
 use crate::prelude::*;
 use crate::utils::ensure_dataset_env_vars_enabled;
 use crate::LoggedInGuard;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct DatasetMut {
@@ -147,6 +155,104 @@ impl DatasetMut {
             Err(e) => Err(e.int_err().into()),
         }
     }
+
+    /// Set visibility for the dataset
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn set_visibility(
+        &self,
+        ctx: &Context<'_>,
+        visibility: DatasetVisibilityInput,
+    ) -> Result<SetDatasetPropertyResultSuccess> {
+        let rebac_svc = from_catalog::<dyn kamu_auth_rebac::RebacService>(ctx).unwrap();
+
+        let (allows_public_read, allows_anonymous_read) = match visibility {
+            DatasetVisibilityInput::Private(_) => (false, false),
+            DatasetVisibilityInput::Public(PublicDatasetVisibility {
+                anonymous_available,
+            }) => (true, anonymous_available),
+        };
+
+        {
+            let (name, value) =
+                kamu_auth_rebac::DatasetPropertyName::allows_public_read(allows_public_read);
+            let res = rebac_svc
+                .set_dataset_property(&self.dataset_handle.id, name, &value)
+                .await;
+        }
+
+        // let res = rebac_svc
+        //     .set_dataset_property(&self.dataset_handle.id, property_name,
+        // &property_value)     .await;
+
+        Ok(SetDatasetPropertyResultSuccess::default())
+
+        // Ok(())
+
+        // let res = rebac_svc
+        //     .set_dataset_property(&self.dataset_handle.id, property_name,
+        // &property_value)     .await;
+
+        // ensure_account_owns_dataset(ctx, &self.dataset_handle).await?;
+        //
+        // let (name, value) =
+        // kamu_auth_rebac::DatasetPropertyName::allows_public_read(yes);
+        //
+        // self.set_property(ctx, name, value).await
+    }
+
+    // /// Set visibility for the dataset
+    // #[graphql(guard = "LoggedInGuard::new()")]
+    // async fn set_publicly_available(
+    //     &self,
+    //     ctx: &Context<'_>,
+    //     yes: bool,
+    // ) -> Result<SetDatasetPropertyResultSuccess> {
+    //     ensure_account_owns_dataset(ctx, &self.dataset_handle).await?;
+    //
+    //     let (name, value) =
+    // kamu_auth_rebac::DatasetPropertyName::allows_public_read(yes);
+    //
+    //     self.set_property(ctx, name, value).await
+    // }
+    //
+    // /// Changing dataset availability for anonymous users
+    // #[graphql(guard = "LoggedInGuard::new()")]
+    // async fn set_anonymous_available(
+    //     &self,
+    //     ctx: &Context<'_>,
+    //     yes: bool,
+    // ) -> Result<SetDatasetPropertyResultSuccess> {
+    //     ensure_account_owns_dataset(ctx, &self.dataset_handle).await?;
+    //
+    //     let (name, value) =
+    // kamu_auth_rebac::DatasetPropertyName::allows_anonymous_read(yes);
+    //
+    //     self.set_property(ctx, name, value).await
+    // }
+
+    // #[graphql(skip)]
+    // async fn set_property(
+    //     &self,
+    //     ctx: &Context<'_>,
+    //     property_name: kamu_auth_rebac::DatasetPropertyName,
+    //     property_value: PropertyValue<'_>,
+    // ) -> Result<SetDatasetPropertyResultSuccess> {
+    //     let rebac_svc = from_catalog::<dyn
+    // kamu_auth_rebac::RebacService>(ctx).unwrap();
+    //
+    //     let res = rebac_svc
+    //         .set_dataset_property(&self.dataset_handle.id, property_name,
+    // &property_value)         .await;
+    //
+    //     match res {
+    //         Ok(_) => Ok(SetDatasetPropertyResultSuccess {
+    //             updated_property: property_name.into(),
+    //         }),
+    //         Err(e) => match e {
+    //             SetEntityPropertyError::Internal(ie) => Err(ie.into()),
+    //         },
+    //     }
+    // }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -236,6 +342,53 @@ impl DeleteResultDanglingReference {
             self.not_deleted_dataset,
             self.dangling_child_refs.len()
         )
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(OneofObject)]
+pub enum DatasetVisibilityInput {
+    Private(PrivateDatasetVisibility),
+    Public(PublicDatasetVisibility),
+}
+
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
+pub enum DatasetVisibility {
+    Private(PrivateDatasetVisibility),
+    Public(PublicDatasetVisibility),
+}
+
+#[derive(SimpleObject, InputObject, Debug, Clone, PartialEq, Eq)]
+#[graphql(input_name = "PrivateDatasetVisibilityInput")]
+pub struct PrivateDatasetVisibility {
+    _dummy: Option<String>,
+}
+
+#[derive(SimpleObject, InputObject, Debug, Clone, PartialEq, Eq)]
+#[graphql(input_name = "PublicDatasetVisibilityInput")]
+pub struct PublicDatasetVisibility {
+    anonymous_available: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface, Debug)]
+#[graphql(field(name = "message", ty = "String"))]
+pub enum SetDatasetPropertyResult {
+    Success(SetDatasetPropertyResultSuccess),
+}
+
+#[derive(SimpleObject, Debug, Default)]
+#[graphql(complex)]
+pub struct SetDatasetPropertyResultSuccess {
+    _dummy: Option<String>,
+}
+
+#[ComplexObject]
+impl SetDatasetPropertyResultSuccess {
+    async fn message(&self) -> String {
+        "Updated".to_string()
     }
 }
 

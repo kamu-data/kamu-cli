@@ -25,6 +25,7 @@ mod multihash;
 mod odf_generated;
 mod os_path;
 mod pagination;
+mod rebac;
 mod task_id;
 mod task_status_outcome;
 
@@ -46,6 +47,7 @@ pub(crate) use multihash::*;
 pub(crate) use odf_generated::*;
 pub(crate) use os_path::*;
 pub(crate) use pagination::*;
+pub(crate) use rebac::*;
 pub(crate) use task_id::*;
 pub(crate) use task_status_outcome::*;
 

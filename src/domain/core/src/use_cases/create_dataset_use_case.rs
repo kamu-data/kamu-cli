@@ -9,7 +9,7 @@
 
 use opendatafabric::{DatasetAlias, MetadataBlockTyped, Seed};
 
-use crate::{CreateDatasetError, CreateDatasetResult, DatasetVisibility};
+use crate::{CreateDatasetError, CreateDatasetResult, DatasetPublicity};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,7 +27,7 @@ pub trait CreateDatasetUseCase: Send + Sync {
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct CreateDatasetUseCaseOptions {
-    pub dataset_visibility: DatasetVisibility,
+    pub dataset_visibility: DatasetPublicity,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -149,7 +149,7 @@ impl RebacService for RebacServiceImpl {
     async fn get_dataset_properties(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError> {
+    ) -> Result<Vec<(DatasetPropertyName, PropertyValue)>, GetEntityPropertiesError> {
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_id_entity = Entity::new_dataset(dataset_id.as_str());
 
@@ -158,7 +158,13 @@ impl RebacService for RebacServiceImpl {
             .get_entity_properties(&dataset_id_entity)
             .await?;
 
-        Ok(properties)
+        Ok(properties
+            .into_iter()
+            .map(|(name, value)| match name {
+                PropertyName::Dataset(dataset_property_name) => (dataset_property_name, value),
+                PropertyName::Account(_) => unreachable!(),
+            })
+            .collect())
     }
 
     async fn insert_account_dataset_relation(

@@ -41,7 +41,7 @@ impl DatasetsMut {
         dataset_alias: DatasetAlias,
         // TODO: Private Datasets: GQL: make new parameters mandatory, after frontend update
         //       https://github.com/kamu-data/kamu-cli/issues/780
-        dataset_visibility: Option<DatasetVisibility>,
+        dataset_visibility: Option<DatasetPublicity>,
     ) -> Result<CreateDatasetResult> {
         match self
             .create_from_snapshot_impl(
@@ -75,7 +75,7 @@ impl DatasetsMut {
         snapshot_format: MetadataManifestFormat,
         // TODO: Private Datasets: GQL: make new parameters mandatory, after frontend update
         //       https://github.com/kamu-data/kamu-cli/issues/780
-        dataset_visibility: Option<DatasetVisibility>,
+        dataset_visibility: Option<DatasetPublicity>,
     ) -> Result<CreateDatasetFromSnapshotResult> {
         use odf::serde::DatasetSnapshotDeserializer;
 
@@ -118,7 +118,7 @@ impl DatasetsMut {
         &self,
         ctx: &Context<'_>,
         snapshot: odf::DatasetSnapshot,
-        dataset_visibility: domain::DatasetVisibility,
+        dataset_visibility: domain::DatasetPublicity,
     ) -> Result<CreateDatasetFromSnapshotResult> {
         let create_from_snapshot =
             from_catalog::<dyn domain::CreateDatasetFromSnapshotUseCase>(ctx).unwrap();

@@ -69,7 +69,7 @@ pub trait RebacService: Send + Sync {
     async fn get_dataset_properties(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError>;
+    ) -> Result<Vec<(DatasetPropertyName, PropertyValue)>, GetEntityPropertiesError>;
 
     // Relations
     async fn insert_account_dataset_relation(

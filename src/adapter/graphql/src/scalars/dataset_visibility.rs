@@ -14,25 +14,25 @@ use crate::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DatasetVisibility {
+pub enum DatasetPublicity {
     Private,
     Public,
 }
 
-impl From<domain::DatasetVisibility> for DatasetVisibility {
-    fn from(value: domain::DatasetVisibility) -> Self {
+impl From<domain::DatasetPublicity> for DatasetPublicity {
+    fn from(value: domain::DatasetPublicity) -> Self {
         match value {
-            domain::DatasetVisibility::Private => Self::Private,
-            domain::DatasetVisibility::Public => Self::Public,
+            domain::DatasetPublicity::Private => Self::Private,
+            domain::DatasetPublicity::Public => Self::Public,
         }
     }
 }
 
-impl From<DatasetVisibility> for domain::DatasetVisibility {
-    fn from(value: DatasetVisibility) -> Self {
+impl From<DatasetPublicity> for domain::DatasetPublicity {
+    fn from(value: DatasetPublicity) -> Self {
         match value {
-            DatasetVisibility::Private => domain::DatasetVisibility::Private,
-            DatasetVisibility::Public => domain::DatasetVisibility::Public,
+            DatasetPublicity::Private => domain::DatasetPublicity::Private,
+            DatasetPublicity::Public => domain::DatasetPublicity::Public,
         }
     }
 }

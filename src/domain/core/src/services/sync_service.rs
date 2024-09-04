@@ -62,7 +62,7 @@ pub struct SyncOptions {
     pub force: bool,
 
     /// Dataset visibility, in case of initial pushing
-    pub dataset_visibility: DatasetVisibility,
+    pub dataset_visibility: DatasetPublicity,
 }
 
 impl Default for SyncOptions {
@@ -71,7 +71,7 @@ impl Default for SyncOptions {
             trust_source: None,
             create_if_not_exists: true,
             force: false,
-            dataset_visibility: DatasetVisibility::Private,
+            dataset_visibility: DatasetPublicity::Private,
         }
     }
 }

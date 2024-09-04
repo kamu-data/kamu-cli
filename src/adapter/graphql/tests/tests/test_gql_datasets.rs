@@ -30,6 +30,7 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 #[test_log::test(tokio::test)]
 async fn dataset_by_id_does_not_exist() {
     let harness = GraphQLDatasetsHarness::new(false).await;
+    // todo response?
     let res = harness.execute_anonymous_query(indoc!(
             r#"
             {
@@ -42,6 +43,8 @@ async fn dataset_by_id_does_not_exist() {
             "#
         ))
         .await;
+
+    // todo assert match?
     assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
@@ -340,6 +343,8 @@ async fn dataset_create_from_snapshot_malformed() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// todo добавить тесты
+
 #[test_log::test(tokio::test)]
 async fn dataset_rename_success() {
     let harness = GraphQLDatasetsHarness::new(false).await;
@@ -600,6 +605,55 @@ async fn dataset_delete_dangling_ref() {
         })
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// #[test_log::test(tokio::test)]
+// async fn dataset_view_permissions() {
+//     let harness = GraphQLDatasetsHarness::new(false).await;
+//
+//     let foo_result = harness
+//         .create_root_dataset(None, DatasetName::new_unchecked("foo"))
+//         .await;
+//
+//     let request_code = indoc!(
+//         r#"
+//         query {
+//             datasets {
+//                 byId (datasetId: "<id>") {
+//                     permissions {
+//                         canView
+//                         canDelete
+//                         canRename
+//                         canCommit
+//                         canSchedule
+//                     }
+//                 }
+//             }
+//         }
+//         "#
+//     )
+//     .replace("<id>", &foo_result.dataset_handle.id.to_string());
+//
+//     let res = harness.execute_authorized_query(request_code).await;
+//     assert!(res.is_ok(), "{res:?}");
+//     assert_eq!(
+//         res.data,
+//         value!({
+//             "datasets": {
+//                 "byId": {
+//                     "permissions": {
+//                         "canView": true,
+//                         "canDelete": true,
+//                         "canRename": true,
+//                         "canCommit": true,
+//                         "canSchedule": true,
+//                     }
+//                 }
+//             }
+//         })
+//     );
+// }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

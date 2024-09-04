@@ -202,7 +202,7 @@ impl WsSmartTransferProtocolClient {
         transfer_plan: TransferPlan,
         dst_head: Option<&Multihash>,
         force_update_if_diverged: bool,
-        visibility_for_created_dataset: DatasetVisibility,
+        visibility_for_created_dataset: DatasetPublicity,
     ) -> Result<DatasetPushRequestAccepted, PushClientError> {
         let push_request_message = DatasetPushRequest {
             current_head: dst_head.cloned(),

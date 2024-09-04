@@ -18,6 +18,9 @@ pub const PROPERTY_GROUP_SEPARATOR: &str = "/";
 const PROPERTY_GROUP_DATASET: &str = "dataset";
 const PROPERTY_GROUP_ACCOUNT: &str = "account";
 
+pub const PROPERTY_VALUE_BOOLEAN_TRUE: &str = "true";
+pub const PROPERTY_VALUE_BOOLEAN_FALSE: &str = "false";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type PropertyValue<'a> = Cow<'a, str>;
@@ -32,15 +35,15 @@ pub enum PropertyName {
 
 impl PropertyName {
     pub fn dataset_allows_anonymous_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
-        let property = DatasetPropertyName::allows_anonymous_read(allows);
+        let (name, value) = DatasetPropertyName::allows_anonymous_read(allows);
 
-        (Self::Dataset(property.0), property.1)
+        (Self::Dataset(name), value)
     }
 
     pub fn dataset_allows_public_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
-        let property = DatasetPropertyName::allows_public_read(allows);
+        let (name, value) = DatasetPropertyName::allows_public_read(allows);
 
-        (Self::Dataset(property.0), property.1)
+        (Self::Dataset(name), value)
     }
 
     pub fn property_group(&self) -> &'static str {
@@ -118,13 +121,13 @@ pub enum DatasetPropertyName {
 
 impl DatasetPropertyName {
     pub fn allows_anonymous_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
-        let value = if allows { "true" } else { "false" };
+        let value = boolean_property_value(allows);
 
         (DatasetPropertyName::AllowsAnonymousRead, value.into())
     }
 
     pub fn allows_public_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
-        let value = if allows { "true" } else { "false" };
+        let value = boolean_property_value(allows);
 
         (DatasetPropertyName::AllowsPublicRead, value.into())
     }
@@ -172,6 +175,16 @@ impl TryFrom<PropertyRowModel> for (PropertyName, PropertyValue<'static>) {
         let property_value = row_model.property_value.into();
 
         Ok((property_name, property_value))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn boolean_property_value(value: bool) -> &'static str {
+    if value {
+        PROPERTY_VALUE_BOOLEAN_TRUE
+    } else {
+        PROPERTY_VALUE_BOOLEAN_FALSE
     }
 }
 
