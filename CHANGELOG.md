@@ -9,9 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Changed -->
 <!--- - Fixed -->
 
-### Unreleased
+## Unreleased
 ### Changed
 - Get Data Panel: use SmTP for pull & push links 
+- GQL api method `setConfigCompaction` allows to set `metadataOnly` configuration for both root and derived datasets
+- GQL api `triggerFlow` allows to trigger `HARD_COMPACTION` flow in `metadataOnly` mode for both root and derived datasets
 
 ## [0.198.2] - 2024-08-30
 ### Added

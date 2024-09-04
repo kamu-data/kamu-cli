@@ -16,7 +16,6 @@ use kamu_flow_system::{
     FlowConfigurationService,
     FlowKeyDataset,
     IngestRule,
-    Schedule,
     ScheduleCronError,
     SetFlowConfigurationError,
     TransformRule,
@@ -27,7 +26,6 @@ use super::{
     ensure_expected_dataset_kind,
     ensure_flow_preconditions,
     ensure_scheduling_permission,
-    ensure_set_config_flow_supported,
     FlowIncompatibleDatasetKind,
     FlowPreconditionsNotMet,
 };
@@ -55,13 +53,18 @@ impl DatasetFlowConfigsMut {
         paused: bool,
         ingest: IngestConditionInput,
     ) -> Result<SetFlowConfigResult> {
-        if !ensure_set_config_flow_supported(dataset_flow_type, std::any::type_name::<Schedule>()) {
-            return Ok(SetFlowConfigResult::TypeIsNotSupported(
-                FlowTypeIsNotSupported,
-            ));
-        }
-        if let Some(e) =
-            ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
+        let flow_run_config: FlowRunConfiguration = ingest.clone().into();
+        if let Err(err) = flow_run_config.check_type_compatible(dataset_flow_type) {
+            return Ok(SetFlowConfigResult::TypeIsNotSupported(err));
+        };
+
+        if let Some(e) = ensure_expected_dataset_kind(
+            ctx,
+            &self.dataset_handle,
+            dataset_flow_type,
+            Some(&flow_run_config),
+        )
+        .await?
         {
             return Ok(SetFlowConfigResult::IncompatibleDatasetKind(e));
         }
@@ -104,14 +107,11 @@ impl DatasetFlowConfigsMut {
         paused: bool,
         transform: TransformConditionInput,
     ) -> Result<SetFlowTransformConfigResult> {
-        if !ensure_set_config_flow_supported(
-            dataset_flow_type,
-            std::any::type_name::<TransformRule>(),
-        ) {
-            return Ok(SetFlowTransformConfigResult::TypeIsNotSupported(
-                FlowTypeIsNotSupported,
-            ));
-        }
+        let flow_run_config: FlowRunConfiguration = transform.clone().into();
+        if let Err(err) = flow_run_config.check_type_compatible(dataset_flow_type) {
+            return Ok(SetFlowTransformConfigResult::TypeIsNotSupported(err));
+        };
+
         let transform_rule = match TransformRule::new_checked(
             transform.min_records_to_await,
             transform.max_batching_interval.into(),
@@ -126,8 +126,13 @@ impl DatasetFlowConfigsMut {
             }
         };
 
-        if let Some(e) =
-            ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
+        if let Some(e) = ensure_expected_dataset_kind(
+            ctx,
+            &self.dataset_handle,
+            dataset_flow_type,
+            Some(&flow_run_config),
+        )
+        .await?
         {
             return Ok(SetFlowTransformConfigResult::IncompatibleDatasetKind(e));
         }
@@ -166,14 +171,10 @@ impl DatasetFlowConfigsMut {
         dataset_flow_type: DatasetFlowType,
         compaction_args: CompactionConditionInput,
     ) -> Result<SetFlowCompactionConfigResult> {
-        if !ensure_set_config_flow_supported(
-            dataset_flow_type,
-            std::any::type_name::<CompactionRule>(),
-        ) {
-            return Ok(SetFlowCompactionConfigResult::TypeIsNotSupported(
-                FlowTypeIsNotSupported,
-            ));
-        }
+        let flow_run_config: FlowRunConfiguration = compaction_args.clone().into();
+        if let Err(err) = flow_run_config.check_type_compatible(dataset_flow_type) {
+            return Ok(SetFlowCompactionConfigResult::TypeIsNotSupported(err));
+        };
 
         let compaction_rule = match compaction_args {
             CompactionConditionInput::Full(compaction_input) => {
@@ -199,8 +200,13 @@ impl DatasetFlowConfigsMut {
             }
         };
 
-        if let Some(e) =
-            ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
+        if let Some(e) = ensure_expected_dataset_kind(
+            ctx,
+            &self.dataset_handle,
+            dataset_flow_type,
+            Some(&flow_run_config),
+        )
+        .await?
         {
             return Ok(SetFlowCompactionConfigResult::IncompatibleDatasetKind(e));
         }

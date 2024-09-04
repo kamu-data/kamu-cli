@@ -1395,6 +1395,60 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
     );
 }
 
+#[test_log::test(tokio::test)]
+async fn test_set_metadataonly_compaction_config_form_derivative() {
+    let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
+        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
+    })
+    .await;
+    harness.create_root_dataset().await;
+    let create_derived_result = harness.create_derived_dataset().await;
+
+    let mutation_code = FlowConfigHarness::set_config_compaction_metadata_only_mutation(
+        &create_derived_result.dataset_handle.id,
+        "HARD_COMPACTION",
+        false,
+    );
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "configs": {
+                            "setConfigCompaction": {
+                                "__typename": "SetFlowConfigSuccess",
+                                "message": "Success",
+                                "config": {
+                                    "__typename": "FlowConfiguration",
+                                    "paused": false,
+                                    "ingest": null,
+                                    "transform": null,
+                                    "compaction": {
+                                        "__typename": "CompactionMetadataOnly",
+                                        "recursive": false
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
@@ -1918,6 +1972,68 @@ impl FlowConfigHarness {
         .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<max_slice_records>", &max_slice_records.to_string())
         .replace("<max_slice_size>", &max_slice_size.to_string())
+        .replace("<recursive>", if recursive { "true" } else { "false" })
+    }
+
+    fn set_config_compaction_metadata_only_mutation(
+        id: &DatasetID,
+        dataset_flow_type: &str,
+        recursive: bool,
+    ) -> String {
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            configs {
+                                setConfigCompaction (
+                                    datasetFlowType: "<dataset_flow_type>",
+                                    compactionArgs: {
+                                        metadataOnly: {
+                                            recursive: <recursive>
+                                        }
+                                    }
+                                ) {
+                                    __typename,
+                                    message
+                                    ... on SetFlowConfigSuccess {
+                                        __typename,
+                                        message
+                                        ... on SetFlowConfigSuccess {
+                                            config {
+                                                __typename
+                                                paused
+                                                ingest {
+                                                    __typename
+                                                }
+                                                transform {
+                                                    __typename
+                                                }
+                                                compaction {
+                                                    __typename
+                                                    ... on CompactionFull {
+                                                        maxSliceSize
+                                                        maxSliceRecords
+                                                        recursive
+                                                    }
+                                                    ... on CompactionMetadataOnly {
+                                                        recursive
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
+        .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<recursive>", if recursive { "true" } else { "false" })
     }
 
