@@ -22,12 +22,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get the current feature tag
-        run: |
-          TAG=$(git describe --tags --exact-match 2>/dev/null)
-          echo "Feature tag: $TAG"
-          echo "KAMU_FEATURE_VERSION=$TAG" >> $GITHUB_ENV
-
       - name: Build base feature image
         run: |
           cd images/
