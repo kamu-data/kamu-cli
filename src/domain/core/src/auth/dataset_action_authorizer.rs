@@ -23,6 +23,7 @@ use crate::AccessError;
 pub trait DatasetActionAuthorizer: Sync + Send {
     async fn check_action_allowed(
         &self,
+        // TODO: Private Datasets: just odf::DatasetID?
         dataset_handle: &DatasetHandle,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError>;
@@ -39,7 +40,10 @@ pub trait DatasetActionAuthorizer: Sync + Send {
         }
     }
 
-    async fn get_allowed_actions(&self, dataset_handle: &DatasetHandle) -> HashSet<DatasetAction>;
+    async fn get_allowed_actions(
+        &self,
+        dataset_handle: &DatasetHandle,
+    ) -> Result<HashSet<DatasetAction>, InternalError>;
 
     async fn filter_datasets_allowing(
         &self,
@@ -85,6 +89,29 @@ impl std::fmt::Display for DatasetAction {
     }
 }
 
+#[cfg(feature = "oso")]
+impl oso::FromPolar for DatasetAction {
+    fn from_polar(polar_value: oso::PolarValue) -> oso::Result<Self> {
+        use oso::errors::{OsoError, TypeError};
+        use oso::PolarValue;
+
+        let PolarValue::String(raw_dataset_action) = polar_value else {
+            return Err(TypeError::expected("String").user());
+        };
+
+        Self::from_str(&raw_dataset_action).map_err(|e| OsoError::Custom {
+            message: e.to_string(),
+        })
+    }
+}
+
+#[cfg(feature = "oso")]
+impl oso::ToPolar for DatasetAction {
+    fn to_polar(self) -> oso::PolarValue {
+        self.to_string().to_polar()
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
@@ -93,7 +120,7 @@ pub enum DatasetActionUnauthorizedError {
     Access(AccessError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Debug, Error)]
@@ -134,8 +161,11 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
         Ok(())
     }
 
-    async fn get_allowed_actions(&self, _dataset_handle: &DatasetHandle) -> HashSet<DatasetAction> {
-        HashSet::from([DatasetAction::Read, DatasetAction::Write])
+    async fn get_allowed_actions(
+        &self,
+        _dataset_handle: &DatasetHandle,
+    ) -> Result<HashSet<DatasetAction>, InternalError> {
+        Ok(HashSet::from([DatasetAction::Read, DatasetAction::Write]))
     }
 
     async fn filter_datasets_allowing(

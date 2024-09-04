@@ -11,10 +11,9 @@ use std::assert_matches::assert_matches;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use dill::{Catalog, Component};
-use kamu::testing::MetadataFactory;
-use kamu::{CreateDatasetUseCaseImpl, DatasetRepositoryLocalFs, DatasetRepositoryWriter};
-use kamu_accounts::CurrentAccountSubject;
+use dill::Component;
+use kamu::{CreateDatasetUseCaseImpl, DatasetRepositoryWriter, MockDatasetRepositoryWriter};
+use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
 use kamu_adapter_auth_oso::{KamuAuthOso, OsoDatasetAuthorizer};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::{AccessError, CreateDatasetUseCase, DatasetRepository, TenancyConfig};
@@ -26,10 +25,10 @@ use time_source::SystemTimeSourceDefault;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_owner_can_read_and_write() {
-    let harness = DatasetAuthorizerHarness::new("john");
+async fn test_owner_can_read_and_write_private_dataset() {
+    let harness = DatasetAuthorizerHarness::new(logged("john"));
     let dataset_handle = harness
-        .create_dataset(&DatasetAlias::try_from("john/foo").unwrap())
+        .create_private_dataset(dataset_alias("john/foo"))
         .await;
 
     let read_result = harness
@@ -49,20 +48,20 @@ async fn test_owner_can_read_and_write() {
 
     assert_matches!(read_result, Ok(()));
     assert_matches!(write_result, Ok(()));
-
-    assert_eq!(
+    assert_matches!(
         allowed_actions,
-        HashSet::from([DatasetAction::Read, DatasetAction::Write])
+        Ok(actual_actions)
+            if actual_actions == HashSet::from([DatasetAction::Read, DatasetAction::Write])
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_guest_can_read_but_not_write() {
-    let harness = DatasetAuthorizerHarness::new("kate");
+async fn test_guest_can_read_but_not_write_public_dataset() {
+    let harness = DatasetAuthorizerHarness::new(anonymous());
     let dataset_handle = harness
-        .create_dataset(&DatasetAlias::try_from("john/foo").unwrap())
+        .create_public_dataset(dataset_alias("john/foo"))
         .await;
 
     let read_result = harness
@@ -87,65 +86,115 @@ async fn test_guest_can_read_but_not_write() {
             AccessError::Forbidden(_)
         ))
     );
-
-    assert_eq!(allowed_actions, HashSet::from([DatasetAction::Read]));
+    assert_matches!(
+        allowed_actions,
+        Ok(actual_actions)
+            if actual_actions == HashSet::from([DatasetAction::Read])
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(dead_code)]
 pub struct DatasetAuthorizerHarness {
-    tempdir: TempDir,
-    catalog: Catalog,
     dataset_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    outbox: Arc<dyn Outbox>,
 }
 
 impl DatasetAuthorizerHarness {
-    pub fn new(current_account_name: &str) -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
+    pub fn new(current_account_subject: CurrentAccountSubject) -> Self {
+        let catalog = {
+            let mut b = dill::CatalogBuilder::new();
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<SystemTimeSourceDefault>()
-            .add::<DummyOutboxImpl>()
-            .add_value(CurrentAccountSubject::logged(
-                AccountID::new_seeded_ed25519(current_account_name.as_bytes()),
-                AccountName::new_unchecked(current_account_name),
-                false,
-            ))
-            .add::<KamuAuthOso>()
-            .add::<OsoDatasetAuthorizer>()
-            .add_value(TenancyConfig::MultiTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<CreateDatasetUseCaseImpl>()
-            .build();
+            b.add::<SystemTimeSourceDefault>()
+                .add_value(TenancyConfig::MultiTenant)
+                .add_value(current_account_subject)
+                .add::<KamuAuthOso>()
+                .add::<OsoDatasetAuthorizer>()
+                .add::<kamu_auth_rebac_services::RebacServiceImpl>()
+                .add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>()
+                .add::<kamu_auth_rebac_services::MultiTenantRebacDatasetLifecycleMessageConsumer>()
+                .add_builder(
+                    OutboxImmediateImpl::builder()
+                        .with_consumer_filter(ConsumerFilter::AllConsumers),
+                )
+                .bind::<dyn Outbox, OutboxImmediateImpl>()
+                .add_value(MockDatasetRepositoryWriter::new())
+                .bind::<dyn DatasetRepositoryWriter, MockDatasetRepositoryWriter>()
+                .add::<CreateDatasetUseCaseImpl>();
 
-        let dataset_authorizer = catalog.get_one::<dyn DatasetActionAuthorizer>().unwrap();
+            register_message_dispatcher::<DatasetLifecycleMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+            );
+
+            b.build()
+        };
 
         Self {
-            tempdir,
-            catalog,
-            dataset_authorizer,
+            dataset_authorizer: catalog.get_one().unwrap(),
+            outbox: catalog.get_one().unwrap(),
         }
     }
 
-    pub async fn create_dataset(&self, alias: &DatasetAlias) -> DatasetHandle {
-        let create_dataset = self.catalog.get_one::<dyn CreateDatasetUseCase>().unwrap();
+    async fn create_public_dataset(&self, alias: odf::DatasetAlias) -> odf::DatasetHandle {
+        self.create_dataset(alias, DatasetVisibility::Public).await
+    }
 
-        create_dataset
-            .execute(
-                alias,
-                MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
-                    .build_typed(),
-                Default::default(),
+    async fn create_private_dataset(&self, alias: odf::DatasetAlias) -> odf::DatasetHandle {
+        self.create_dataset(alias, DatasetVisibility::Private).await
+    }
+
+    async fn create_dataset(
+        &self,
+        alias: odf::DatasetAlias,
+        visibility: DatasetVisibility,
+    ) -> odf::DatasetHandle {
+        let dataset_id = dataset_id(&alias);
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                DatasetLifecycleMessage::created(
+                    dataset_id.clone(),
+                    account_id(&alias),
+                    visibility,
+                    alias.dataset_name.clone(),
+                ),
             )
             .await
-            .unwrap()
-            .dataset_handle
+            .unwrap();
+
+        odf::DatasetHandle::new(dataset_id, alias)
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn logged(account_name: &str) -> CurrentAccountSubject {
+    CurrentAccountSubject::logged(
+        odf::AccountID::new_seeded_ed25519(account_name.as_bytes()),
+        odf::AccountName::new_unchecked(account_name),
+        false,
+    )
+}
+
+fn anonymous() -> CurrentAccountSubject {
+    CurrentAccountSubject::anonymous(AnonymousAccountReason::NoAuthenticationProvided)
+}
+
+fn dataset_alias(raw_alias: &str) -> odf::DatasetAlias {
+    odf::DatasetAlias::try_from(raw_alias).unwrap()
+}
+
+fn dataset_id(alias: &odf::DatasetAlias) -> odf::DatasetID {
+    odf::DatasetID::new_seeded_ed25519(alias.to_string().as_bytes())
+}
+
+fn account_id(alias: &odf::DatasetAlias) -> odf::AccountID {
+    odf::AccountID::new_seeded_ed25519(alias.account_name.as_ref().unwrap().as_bytes())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -19,7 +19,7 @@ use crate::DatasetEntry;
 #[cfg_attr(any(feature = "testing", test), mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetEntryRepository: Send + Sync {
-    async fn dataset_entries_count(&self) -> Result<usize, InternalError>;
+    async fn dataset_entries_count(&self) -> Result<usize, DatasetEntriesCountError>;
 
     async fn dataset_entries_count_by_owner_id(
         &self,
@@ -79,6 +79,16 @@ pub type DatasetEntryStream<'a> = std::pin::Pin<
 pub struct DatasetEntriesResolution {
     pub resolved_entries: Vec<DatasetEntry>,
     pub unresolved_entries: Vec<DatasetID>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DatasetEntriesCountError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

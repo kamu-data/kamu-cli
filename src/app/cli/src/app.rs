@@ -16,6 +16,7 @@ use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use database_common::DatabaseTransactionRunner;
 use dill::*;
+use init_on_startup::InitOnStartup;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::*;
@@ -23,7 +24,6 @@ use kamu_accounts::*;
 use kamu_accounts_services::PredefinedAccountsRegistrator;
 use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
-use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
 use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
@@ -136,9 +136,11 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             args.e2e_output_data_path.is_some(),
         );
 
-        if workspace_svc.is_in_workspace() {
-            base_catalog_builder.add::<DatasetEntryIndexer>();
-        }
+        base_catalog_builder.add_builder(
+            DatasetEntryIndexer::builder().with_is_in_workspace(workspace_svc.is_in_workspace()),
+        );
+        // The indexer has no other interfaces
+        base_catalog_builder.bind::<dyn InitOnStartup, DatasetEntryIndexer>();
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
@@ -498,12 +500,11 @@ pub fn configure_base_catalog(
     b.add::<odf_server::AccessTokenRegistryService>();
     b.add::<odf_server::CLIAccessTokenStore>();
 
-    b.add::<kamu_adapter_auth_oso::KamuAuthOso>();
-    b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
+    kamu_auth_rebac_services::register_dependencies(&mut b, multi_tenant_workspace);
+
+    kamu_adapter_auth_oso::register_dependencies(&mut b);
 
     b.add::<DatabaseTransactionRunner>();
-
-    b.add::<RebacServiceImpl>();
 
     if tenancy_config == TenancyConfig::MultiTenant {
         b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();

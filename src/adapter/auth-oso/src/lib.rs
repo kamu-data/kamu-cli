@@ -7,11 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub mod dataset_resource;
-pub mod user_actor;
+#![feature(lint_reasons)]
 
-pub mod kamu_auth_oso;
+mod dataset_resource;
+mod dependencies;
+mod jobs;
+mod kamu_auth_oso;
+mod messages;
+mod oso_dataset_authorizer;
+mod oso_resource_service_initializator;
+mod oso_resource_service_inmem;
+mod user_actor;
+
+pub use dataset_resource::*;
+pub use dependencies::*;
+pub use jobs::*;
 pub use kamu_auth_oso::*;
-
-pub mod oso_dataset_authorizer;
-pub use oso_dataset_authorizer::OsoDatasetAuthorizer;
+pub use messages::*;
+pub use oso_dataset_authorizer::*;
+pub use oso_resource_service_initializator::*;
+pub use oso_resource_service_inmem::*;
+pub use user_actor::*;

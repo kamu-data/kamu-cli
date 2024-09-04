@@ -38,7 +38,7 @@ impl State {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryDatasetEntryRepository {
-    state: Arc<Mutex<State>>,
+    state: Arc<RwLock<State>>,
 }
 
 #[component(pub)]
@@ -47,7 +47,7 @@ pub struct InMemoryDatasetEntryRepository {
 impl InMemoryDatasetEntryRepository {
     pub fn new() -> Self {
         Self {
-            state: Arc::new(Mutex::new(State::new())),
+            state: Arc::new(RwLock::new(State::new())),
         }
     }
 }
@@ -56,9 +56,12 @@ impl InMemoryDatasetEntryRepository {
 
 #[async_trait::async_trait]
 impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
-    async fn dataset_entries_count(&self) -> Result<usize, InternalError> {
-        let readable_state = self.state.lock().unwrap();
-        Ok(readable_state.rows.len())
+    async fn dataset_entries_count(&self) -> Result<usize, DatasetEntriesCountError> {
+        let readable_state = self.state.read().await;
+
+        let dataset_entries_count = readable_state.rows.len();
+
+        Ok(dataset_entries_count)
     }
 
     async fn dataset_entries_count_by_owner_id(
@@ -90,7 +93,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError> {
-        let readable_state = self.state.lock().unwrap();
+        let readable_state = self.state.read().await;
 
         let maybe_dataset_entry = readable_state.rows.get(dataset_id);
 
@@ -126,7 +129,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         owner_id: &AccountID,
         name: &DatasetName,
     ) -> Result<DatasetEntry, GetDatasetEntryByNameError> {
-        let readable_state = self.state.lock().unwrap();
+        let readable_state = self.state.read().await;
 
         let maybe_dataset_entry = readable_state
             .rows
@@ -170,7 +173,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         &self,
         dataset_entry: &DatasetEntry,
     ) -> Result<(), SaveDatasetEntryError> {
-        let mut writable_state = self.state.lock().unwrap();
+        let mut writable_state = self.state.write().await;
 
         for row in writable_state.rows.values() {
             if row.id == dataset_entry.id {
@@ -206,7 +209,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         dataset_id: &DatasetID,
         new_name: &DatasetName,
     ) -> Result<(), UpdateDatasetEntryNameError> {
-        let mut writable_state = self.state.lock().unwrap();
+        let mut writable_state = self.state.write().await;
 
         let maybe_dataset_entry = writable_state.rows.get(dataset_id);
 

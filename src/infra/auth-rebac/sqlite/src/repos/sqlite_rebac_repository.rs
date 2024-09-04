@@ -32,6 +32,24 @@ impl SqliteRebacRepository {
 
 #[async_trait::async_trait]
 impl RebacRepository for SqliteRebacRepository {
+    async fn properties_count(&self) -> Result<usize, PropertiesCountError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let properties_count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*)
+            FROM auth_rebac_properties
+            "#,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(usize::try_from(properties_count).unwrap())
+    }
+
     async fn set_entity_property(
         &self,
         entity: &Entity,

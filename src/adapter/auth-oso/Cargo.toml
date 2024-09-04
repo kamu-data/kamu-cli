@@ -1,6 +1,7 @@
 [package]
+# TODO: Private Datasets: add rebac to the name?
 name = "kamu-adapter-auth-oso"
-description = "Authorization adapter for Kamu domain based on OSO library"
+description = "Authorization adapter for Kamu domain based on OSO library & ReBAC properties"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -21,20 +22,28 @@ workspace = true
 doctest = false
 
 [dependencies]
+init-on-startup = { workspace = true }
 internal-error = { workspace = true }
+kamu-accounts = { workspace = true }
+kamu-auth-rebac = { workspace = true }
+kamu-auth-rebac-services = { workspace = true }
+kamu-core = { workspace = true, default-features = false, features = ["oso"] }
+kamu-datasets = { workspace = true }
+kamu-datasets-services = { workspace = true }
 messaging-outbox = { workspace = true }
 opendatafabric = { workspace = true }
-kamu-accounts = { workspace = true }
-kamu-core = { workspace = true }
 
 async-trait = "0.1"
 dill = "0.9"
 oso = "0.27"
 oso-derive = "0.27"
+tokio = { version = "1", default-features = false, features = ["macros"] }
 tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 kamu = { workspace = true, features = ["testing"] }
+kamu-auth-rebac-inmem = { workspace = true }
+kamu-auth-rebac-services = { workspace = true }
 time-source = { workspace = true }
 
 tempfile = "3"

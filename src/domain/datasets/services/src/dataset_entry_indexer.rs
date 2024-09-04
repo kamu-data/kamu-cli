@@ -35,6 +35,8 @@ pub struct DatasetEntryIndexer {
     time_source: Arc<dyn SystemTimeSource>,
     dataset_repo: Arc<dyn DatasetRepository>,
     account_repository: Arc<dyn AccountRepository>,
+    // TODO: Private Datasets: re-visit after rebasing
+    is_in_workspace: bool,
 }
 
 #[component(pub)]
@@ -53,12 +55,14 @@ impl DatasetEntryIndexer {
         time_source: Arc<dyn SystemTimeSource>,
         dataset_repo: Arc<dyn DatasetRepository>,
         account_repository: Arc<dyn AccountRepository>,
+        is_in_workspace: bool,
     ) -> Self {
         Self {
             dataset_entry_repo,
             time_source,
             dataset_repo,
             account_repository,
+            is_in_workspace,
         }
     }
 
@@ -93,7 +97,7 @@ impl DatasetEntryIndexer {
                 .get(&dataset_handle.alias.account_name)
                 .cloned()
             else {
-                tracing::debug!(dataset_handle=%dataset_handle, "Skipped indexing dataset due to unresolved owner");
+                tracing::warn!(dataset_handle=%dataset_handle, "Skipped indexing dataset due to unresolved owner");
                 continue;
             };
 
@@ -175,6 +179,12 @@ impl InitOnStartup for DatasetEntryIndexer {
         name = "DatasetEntryIndexer::run_initialization"
     )]
     async fn run_initialization(&self) -> Result<(), InternalError> {
+        if !self.is_in_workspace {
+            tracing::debug!("Skip initialization: not in a workspace");
+
+            return Ok(());
+        }
+
         if self.has_datasets_indexed().await? {
             tracing::debug!("Skip initialization: datasets already have indexed");
 

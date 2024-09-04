@@ -35,7 +35,7 @@ impl PostgresDatasetEntryRepository {
 
 #[async_trait::async_trait]
 impl DatasetEntryRepository for PostgresDatasetEntryRepository {
-    async fn dataset_entries_count(&self) -> Result<usize, InternalError> {
+    async fn dataset_entries_count(&self) -> Result<usize, DatasetEntriesCountError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;

@@ -482,6 +482,10 @@ type Dataset {
 	Various endpoints for interacting with data
 	"""
 	endpoints: DatasetEndpoints!
+	"""
+	Access to dataset properties
+	"""
+	properties: DatasetProperties!
 }
 
 scalar DatasetAlias
@@ -718,6 +722,10 @@ type DatasetMut {
 	Manually advances the watermark of a root dataset
 	"""
 	setWatermark(watermark: DateTime!): SetWatermarkResult!
+	"""
+	Set visibility for the dataset
+	"""
+	setVisibility(visibility: DatasetVisibilityInput!): SetDatasetPropertyResultSuccess!
 }
 
 scalar DatasetName
@@ -737,6 +745,11 @@ type DatasetPushStatus {
 
 type DatasetPushStatuses {
 	statuses: [DatasetPushStatus!]!
+}
+
+type DatasetProperties {
+	allowsAnonymousRead: Boolean!
+	allowsPublicRead: Boolean!
 }
 
 scalar DatasetRef
@@ -762,6 +775,11 @@ type DatasetState {
 enum DatasetVisibility {
 	PRIVATE
 	PUBLIC
+}
+
+input DatasetVisibilityInput @oneOf {
+	private: PrivateDatasetVisibilityInput
+	public: PublicDatasetVisibilityInput
 }
 
 type Datasets {
@@ -1515,9 +1533,17 @@ type PrepStepPipe {
 	command: [String!]!
 }
 
+input PrivateDatasetVisibilityInput {
+	dummy: String
+}
+
 input PropagationMode @oneOf {
 	custom: FlowConfigurationResetCustom
 	toSeed: FlowConfigurationResetToSeedDummy
+}
+
+input PublicDatasetVisibilityInput {
+	anonymousAvailable: Boolean!
 }
 
 type Query {
@@ -1725,6 +1751,11 @@ type SetAttachments {
 
 type SetDataSchema {
 	schema: DataSchema!
+}
+
+type SetDatasetPropertyResultSuccess {
+	dummy: String
+	message: String!
 }
 
 interface SetFlowCompactionConfigResult {

@@ -21,6 +21,8 @@ pub struct KamuAuthOso {
     pub oso: Arc<Oso>,
 }
 
+// TODO: Private Datasets: move from stateless component to stateful
+//                         (do not parse Polar every time)
 #[component(pub)]
 impl KamuAuthOso {
     pub fn new() -> Self {
@@ -35,11 +37,16 @@ impl KamuAuthOso {
     }
 
     fn load_oso() -> Result<Oso, OsoError> {
+        // TODO: Private Datasets: make a patch for OSO:
+        //       - remove extra allocations (check tracing logs)
+        //       - add removing/updating for cached instances
         let mut oso = Oso::new();
 
         oso.register_class(DatasetResource::get_polar_class())?;
         oso.register_class(UserActor::get_polar_class())?;
 
+        // TODO: Private Datasets: add Polar-related tests:
+        //       https://www.osohq.com/docs/modeling-in-polar/conceptual-overview/test#policy-tests
         oso.load_str(include_str!("schema.polar"))?;
 
         Ok(oso)

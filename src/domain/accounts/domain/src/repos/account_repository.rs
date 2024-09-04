@@ -21,6 +21,9 @@ use crate::Account;
 pub trait AccountRepository: Send + Sync {
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError>;
 
+    // TODO: Private Datasets: tests
+    async fn get_accounts(&self) -> Result<Vec<Account>, GetAccountsError>;
+
     async fn get_account_by_id(
         &self,
         account_id: &AccountID,
@@ -52,6 +55,8 @@ pub trait AccountRepository: Send + Sync {
     ) -> Result<Option<AccountID>, FindAccountIdByNameError>;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
@@ -90,6 +95,14 @@ impl Display for CreateAccountDuplicateField {
             },
         )
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetAccountsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

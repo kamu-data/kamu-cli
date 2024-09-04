@@ -670,7 +670,7 @@ impl KamuFlightSqlService {
 // FlightSqlService
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(unused_variables)]
+#[expect(unused_variables)]
 #[tonic::async_trait]
 impl FlightSqlService for KamuFlightSqlService {
     type FlightService = KamuFlightSqlService;

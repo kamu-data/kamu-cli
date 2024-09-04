@@ -15,6 +15,8 @@ use crate::prelude::*;
 use crate::queries::*;
 use crate::utils::ensure_dataset_env_vars_enabled;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone)]
 pub struct Dataset {
     owner: Account,
@@ -137,12 +139,13 @@ impl Dataset {
     /// Permissions of the current user
     async fn permissions(&self, ctx: &Context<'_>) -> Result<DatasetPermissions> {
         use kamu_core::auth;
+
         let dataset_action_authorizer =
             from_catalog::<dyn auth::DatasetActionAuthorizer>(ctx).unwrap();
 
         let allowed_actions = dataset_action_authorizer
             .get_allowed_actions(&self.dataset_handle)
-            .await;
+            .await?;
         let can_read = allowed_actions.contains(&auth::DatasetAction::Read);
         let can_write = allowed_actions.contains(&auth::DatasetAction::Write);
 
@@ -161,7 +164,21 @@ impl Dataset {
 
         DatasetEndpoints::new(&self.owner, self.dataset_handle.clone(), config)
     }
+
+    /// Access to dataset properties
+    async fn properties(&self, ctx: &Context<'_>) -> Result<DatasetProperties> {
+        let rebac_service = from_catalog::<dyn kamu_auth_rebac::RebacService>(ctx).unwrap();
+
+        let props = rebac_service
+            .get_dataset_properties(&self.dataset_handle.id)
+            .await
+            .int_err()?;
+
+        Ok(props.into())
+    }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DatasetPermissions {
@@ -171,3 +188,25 @@ pub struct DatasetPermissions {
     can_commit: bool,
     can_schedule: bool,
 }
+
+#[derive(SimpleObject, Debug, Default, Clone, PartialEq, Eq)]
+pub struct DatasetProperties {
+    allows_anonymous_read: bool,
+    allows_public_read: bool,
+}
+
+impl From<kamu_auth_rebac::DatasetProperties> for DatasetProperties {
+    fn from(
+        kamu_auth_rebac::DatasetProperties {
+            allows_anonymous_read,
+            allows_public_read,
+        }: kamu_auth_rebac::DatasetProperties,
+    ) -> Self {
+        Self {
+            allows_anonymous_read,
+            allows_public_read,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

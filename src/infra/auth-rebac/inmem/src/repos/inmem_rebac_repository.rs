@@ -22,6 +22,7 @@ use kamu_auth_rebac::{
     GetEntityPropertiesError,
     GetRelationsBetweenEntitiesError,
     InsertEntitiesRelationError,
+    PropertiesCountError,
     PropertyName,
     PropertyValue,
     RebacRepository,
@@ -77,6 +78,14 @@ impl InMemoryRebacRepository {
 
 #[async_trait::async_trait]
 impl RebacRepository for InMemoryRebacRepository {
+    async fn properties_count(&self) -> Result<usize, PropertiesCountError> {
+        let readable_state = self.state.read().await;
+
+        let count = readable_state.entities_properties_map.len();
+
+        Ok(count)
+    }
+
     async fn set_entity_property(
         &self,
         entity: &Entity,

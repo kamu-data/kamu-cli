@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
-use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::*;
@@ -16,18 +15,19 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::*;
 use kamu_core::AccessError;
-use opendatafabric::DatasetHandle;
+use opendatafabric as odf;
 use oso::Oso;
 
 use crate::dataset_resource::*;
 use crate::user_actor::*;
-use crate::KamuAuthOso;
+use crate::{KamuAuthOso, OsoResourceServiceInMem};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct OsoDatasetAuthorizer {
     oso: Arc<Oso>,
     current_account_subject: Arc<CurrentAccountSubject>,
+    oso_resource_service: Arc<OsoResourceServiceInMem>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,40 +35,39 @@ pub struct OsoDatasetAuthorizer {
 #[component(pub)]
 #[interface(dyn DatasetActionAuthorizer)]
 impl OsoDatasetAuthorizer {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     pub fn new(
         kamu_auth_oso: Arc<KamuAuthOso>,
         current_account_subject: Arc<CurrentAccountSubject>,
+        oso_resource_holder: Arc<OsoResourceServiceInMem>,
     ) -> Self {
         Self {
             oso: kamu_auth_oso.oso.clone(),
             current_account_subject,
+            oso_resource_service: oso_resource_holder,
         }
     }
 
-    fn actor(&self) -> UserActor {
-        match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => UserActor::new("", true, false),
-            CurrentAccountSubject::Logged(l) => {
-                UserActor::new(l.account_name.as_str(), false, l.is_admin)
-            }
-        }
-    }
+    async fn user_dataset_pair(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Result<(UserActor, DatasetResource), InternalError> {
+        let dataset_id = &dataset_handle.id;
+        let maybe_account_id = match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => None,
+            CurrentAccountSubject::Logged(logged_account) => Some(&logged_account.account_id),
+        };
+        let (maybe_user_actor, maybe_dataset_resource) = self
+            .oso_resource_service
+            .user_dataset_pair(dataset_id, maybe_account_id)
+            .await;
 
-    fn dataset_resource(&self, dataset_handle: &DatasetHandle) -> DatasetResource {
-        let dataset_alias = &dataset_handle.alias;
-        let creator = dataset_alias.account_name.as_ref().map_or_else(
-            || {
-                self.current_account_subject
-                    .account_name_or_default()
-                    .as_str()
-            },
-            |a| a.as_str(),
-        );
+        let user_actor = maybe_user_actor
+            .ok_or_else(|| format!("UserActor not found: {maybe_account_id:?}",).int_err())?;
+        let dataset_resource = maybe_dataset_resource
+            .ok_or_else(|| format!("DatasetResource not found: {dataset_id}").int_err())?;
 
-        // TODO: for now let's treat all datasets as public
-        // TODO: explicit read/write permissions
-        DatasetResource::new(creator, true)
+        Ok((user_actor, dataset_resource))
     }
 }
 
@@ -79,11 +78,10 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, ?action))]
     async fn check_action_allowed(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError> {
-        let actor = self.actor();
-        let dataset_resource = self.dataset_resource(dataset_handle);
+        let (actor, dataset_resource) = self.user_dataset_pair(dataset_handle).await?;
 
         match self
             .oso
@@ -108,23 +106,17 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         }
     }
 
+    // TODO: Private Datasets: more concrete error handling
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle))]
-    async fn get_allowed_actions(&self, dataset_handle: &DatasetHandle) -> HashSet<DatasetAction> {
-        let actor = self.actor();
-        let dataset_resource = self.dataset_resource(dataset_handle);
+    async fn get_allowed_actions(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Result<HashSet<DatasetAction>, InternalError> {
+        let (actor, dataset_resource) = self.user_dataset_pair(dataset_handle).await?;
 
-        let allowed_action_names: HashSet<String> = self
-            .oso
+        self.oso
             .get_allowed_actions(actor, dataset_resource)
-            .unwrap();
-
-        let mut allowed_actions = HashSet::new();
-        for action_name in allowed_action_names {
-            let action = DatasetAction::from_str(action_name.as_str()).unwrap();
-            allowed_actions.insert(action);
-        }
-
-        allowed_actions
+            .int_err()
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(dataset_handles=?dataset_handles, action=%action))]

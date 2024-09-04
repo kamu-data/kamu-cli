@@ -17,8 +17,6 @@ use crate::{
     DatasetPropertyName,
     EntityNotFoundError,
     EntityWithRelation,
-    GetEntityPropertiesError,
-    PropertyName,
     PropertyValue,
     SetEntityPropertyError,
     SubjectEntityRelationsError,
@@ -45,7 +43,7 @@ pub trait RebacService: Send + Sync {
     async fn get_account_properties(
         &self,
         account_id: &AccountID,
-    ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError>;
+    ) -> Result<AccountProperties, GetPropertiesError>;
 
     // Dataset
     async fn set_dataset_property(
@@ -69,7 +67,7 @@ pub trait RebacService: Send + Sync {
     async fn get_dataset_properties(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError>;
+    ) -> Result<DatasetProperties, GetPropertiesError>;
 
     // Relations
     async fn insert_account_dataset_relation(
@@ -93,6 +91,21 @@ pub trait RebacService: Send + Sync {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default)]
+pub struct AccountProperties {
+    pub is_admin: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default)]
+pub struct DatasetProperties {
+    pub allows_anonymous_read: bool,
+    pub allows_public_read: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -111,6 +124,14 @@ pub enum UnsetEntityPropertyError {
 pub enum DeletePropertiesError {
     #[error(transparent)]
     Internal(InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetPropertiesError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

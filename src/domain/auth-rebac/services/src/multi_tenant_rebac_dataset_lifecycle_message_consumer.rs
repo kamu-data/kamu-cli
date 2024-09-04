@@ -52,13 +52,25 @@ impl MultiTenantRebacDatasetLifecycleMessageConsumer {
         &self,
         message: &DatasetLifecycleMessageCreated,
     ) -> Result<(), InternalError> {
-        let allows = message.dataset_visibility.is_public();
-        let (name, value) = DatasetPropertyName::allows_public_read(allows);
+        {
+            let allows = message.dataset_visibility.is_public();
+            let (name, value) = DatasetPropertyName::allows_public_read(allows);
 
-        self.rebac_service
-            .set_dataset_property(&message.dataset_id, name, &value)
-            .await
-            .int_err()
+            self.rebac_service
+                .set_dataset_property(&message.dataset_id, name, &value)
+                .await
+                .int_err()?;
+        }
+        {
+            // TODO: Private Datasets: Read from a specific environment's config
+            let no = false;
+            let (name, value) = DatasetPropertyName::allows_anonymous_read(no);
+
+            self.rebac_service
+                .set_dataset_property(&message.dataset_id, name, &value)
+                .await
+                .int_err()
+        }
     }
 
     async fn handle_dataset_lifecycle_deleted_message(

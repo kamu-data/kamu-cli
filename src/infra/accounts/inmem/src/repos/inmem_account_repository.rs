@@ -105,6 +105,18 @@ impl AccountRepository for InMemoryAccountRepository {
         Ok(())
     }
 
+    async fn get_accounts(&self) -> Result<Vec<Account>, GetAccountsError> {
+        let readable_state = self.state.lock().unwrap();
+
+        let accounts = readable_state
+            .accounts_by_id
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+
+        Ok(accounts)
+    }
+
     async fn get_account_by_id(
         &self,
         account_id: &AccountID,
