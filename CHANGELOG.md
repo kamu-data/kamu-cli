@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Changed -->
 <!--- - Fixed -->
 
+## [0.199.1] - 2024-09-06
+### Fixed
+- Fixed crash when a derived dataset is manually forced to update while an existing flow 
+  for this dataset is already waiting for a batching condition
+
 ## [0.199.0] - 2024-09-06
 ### Added
 - Persistency has been enabled for Task and Flow domains. 
