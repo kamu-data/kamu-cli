@@ -10,6 +10,8 @@
 use std::sync::Arc;
 
 use console::style as s;
+use kamu::domain::{AddRepoError, RemoteRepositoryRegistry};
+use opendatafabric::RepoName;
 use url::Url;
 
 use crate::{odf_server, CLIError, Command, OutputConfig};
@@ -19,6 +21,7 @@ use crate::{odf_server, CLIError, Command, OutputConfig};
 pub struct LoginCommand {
     login_service: Arc<odf_server::LoginService>,
     access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+    remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     output_config: Arc<OutputConfig>,
     scope: odf_server::AccessTokenStoreScope,
     server: Option<Url>,
@@ -30,6 +33,7 @@ impl LoginCommand {
     pub fn new(
         login_service: Arc<odf_server::LoginService>,
         access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         output_config: Arc<OutputConfig>,
         scope: odf_server::AccessTokenStoreScope,
         server: Option<Url>,
@@ -39,6 +43,7 @@ impl LoginCommand {
         Self {
             login_service,
             access_token_registry_service,
+            remote_repo_reg,
             output_config,
             scope,
             server,
@@ -67,6 +72,19 @@ impl LoginCommand {
         Ok(())
     }
 
+    fn add_repository(&self, frontend_url: &Url, backend_url: &Url) -> Result<(), CLIError> {
+        let repo_name =
+            RepoName::try_from(frontend_url.host_str().unwrap()).map_err(CLIError::failure)?;
+        match self
+            .remote_repo_reg
+            .add_repository(&repo_name, backend_url.clone())
+        {
+            Ok(_) => Ok(()),
+            Err(_err @ AddRepoError::AlreadyExists(_)) => Ok(()),
+            Err(e) => Err(CLIError::failure(e)),
+        }
+    }
+
     async fn new_login(&self, odf_server_frontend_url: Url) -> Result<(), CLIError> {
         let login_callback_response = self
             .login_service
@@ -84,6 +102,11 @@ impl LoginCommand {
             Some(&odf_server_frontend_url),
             &login_callback_response.backend_url,
             login_callback_response.access_token,
+        )?;
+
+        self.add_repository(
+            &odf_server_frontend_url,
+            &login_callback_response.backend_url,
         )?;
 
         eprintln!(
@@ -174,7 +197,7 @@ impl Command for LoginCommand {
         if self.check {
             return if let Some(token_find_report) = self
                 .access_token_registry_service
-                .find_by_frontend_or_backend_url(self.scope, &odf_server_url)
+                .find_by_frontend_or_backend_url(&odf_server_url)
             {
                 match self.validate_login(token_find_report).await {
                     Ok(_) => {
@@ -212,7 +235,7 @@ impl Command for LoginCommand {
         // non-interactive login, only the interactive one with the browser
         if let Some(token_find_report) = self
             .access_token_registry_service
-            .find_by_frontend_url(self.scope, &odf_server_url)
+            .find_by_frontend_url(&odf_server_url)
         {
             match self.validate_login(token_find_report).await {
                 Ok(_) => {

@@ -209,6 +209,7 @@ pub fn get_command(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
                 if c.user {
                     odf_server::AccessTokenStoreScope::User
                 } else {
@@ -274,6 +275,7 @@ pub fn get_command(
             }
         }
         cli::Command::Push(c) => Box::new(PushCommand::new(
+            cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,

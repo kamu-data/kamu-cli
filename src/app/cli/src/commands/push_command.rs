@@ -14,10 +14,13 @@ use console::style as s;
 use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
+use kamu::UrlExt;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
+use url::Url;
 
 use super::{BatchError, CLIError, Command};
+use crate::odf_server;
 use crate::output::OutputConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,6 +31,8 @@ pub struct PushCommand {
     push_svc: Arc<dyn PushService>,
     dataset_repo: Arc<dyn DatasetRepository>,
     search_svc: Arc<dyn SearchService>,
+    remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
+    access_token_reg: Arc<odf_server::AccessTokenRegistryService>,
     refs: Vec<DatasetRefAnyPattern>,
     current_account_subject: Arc<CurrentAccountSubject>,
     all: bool,
@@ -44,6 +49,8 @@ impl PushCommand {
         push_svc: Arc<dyn PushService>,
         dataset_repo: Arc<dyn DatasetRepository>,
         search_svc: Arc<dyn SearchService>,
+        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
+        access_token_reg: Arc<odf_server::AccessTokenRegistryService>,
         refs: I,
         current_account_subject: Arc<CurrentAccountSubject>,
         all: bool,
@@ -61,6 +68,8 @@ impl PushCommand {
             push_svc,
             dataset_repo,
             search_svc,
+            remote_repo_reg,
+            access_token_reg,
             refs: refs.into_iter().collect(),
             current_account_subject,
             all,
@@ -157,11 +166,25 @@ impl PushCommand {
         let listener = Arc::new(progress.clone());
         self.do_push(Some(listener.clone())).await
     }
+
+    fn combine_remote_ref_url(&self, remote_repo_url: &Url) -> Result<Url, CLIError> {
+        let mut remote_repo_url = remote_repo_url.clone();
+        remote_repo_url
+            .into_odf_protoocol()
+            .map_err(CLIError::failure)?;
+        let current_account_name = match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => "",
+            CurrentAccountSubject::Logged(l) => l.account_name.as_str(),
+        };
+        // let remote_repo_path = format!()
+
+        Ok(remote_repo_url)
+    }
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for PushCommand {
-    async fn before_run(&self) -> Result<(), CLIError> {
+    async fn before_run(&mut self) -> Result<(), CLIError> {
         if self.refs.is_empty() && !self.all {
             return Err(CLIError::usage_error("Specify a dataset or pass --all"));
         }
@@ -170,6 +193,21 @@ impl Command for PushCommand {
             return Err(CLIError::usage_error(
                 "Cannot specify multiple datasets when using --to",
             ));
+        }
+
+        if self.to.is_none() {
+            let remote_repo_names: Vec<_> = self.remote_repo_reg.get_all_repositories().collect();
+            if let Some(remote_repo_name) = remote_repo_names.first() {
+                let remote_repo = self
+                    .remote_repo_reg
+                    .get_repository(remote_repo_name)
+                    .map_err(CLIError::failure)?;
+                let mut remote_repo_url = remote_repo.url;
+                remote_repo_url
+                    .into_odf_protoocol()
+                    .map_err(CLIError::failure)?;
+                self.to = Some(DatasetRefRemote::from(&remote_repo_url));
+            }
         }
 
         Ok(())

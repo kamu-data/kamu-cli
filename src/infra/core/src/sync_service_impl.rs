@@ -696,6 +696,7 @@ impl SyncRef {
 pub trait UrlExt {
     fn ensure_trailing_slash(&mut self);
     fn is_odf_protocol(&self) -> bool;
+    fn into_odf_protoocol(&mut self) -> Result<(), InternalError>;
 
     /// Converts from odf+http(s) scheme to plain http(s)
     fn odf_to_transport_protocol(&self) -> Result<Url, InternalError>;
@@ -705,6 +706,13 @@ impl UrlExt for Url {
     fn ensure_trailing_slash(&mut self) {
         if !self.path().ends_with('/') {
             self.set_path(&format!("{}/", self.path()));
+        }
+    }
+
+    fn into_odf_protoocol(&mut self) -> Result<(), InternalError> {
+        match self.set_scheme(&format!("odf+{}", self.scheme())) {
+            Ok(_) => Ok(()),
+            Err(_) => InternalError::bail("Failed to build odf link"),
         }
     }
 

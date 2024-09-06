@@ -209,7 +209,7 @@ impl AddCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for AddCommand {
-    async fn before_run(&self) -> Result<(), CLIError> {
+    async fn before_run(&mut self) -> Result<(), CLIError> {
         if self.stdin && !self.snapshot_refs.is_empty() {
             return Err(CLIError::usage_error(
                 "Cannot specify --stdin and positional arguments at the same time",
