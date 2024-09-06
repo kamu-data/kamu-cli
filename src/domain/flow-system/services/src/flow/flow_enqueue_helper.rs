@@ -368,11 +368,15 @@ impl FlowEnqueueHelper {
                     }
                     FlowTriggerContext::Scheduled(_) | FlowTriggerContext::Unconditional => {
                         // Evaluate throttling condition: is new time earlier than planned?
-                        let planned_time = self
-                            .find_planned_flow_activation_time(flow.flow_id)
-                            .expect("Flow expected to have activation time by now");
+                        let maybe_planned_time =
+                            self.find_planned_flow_activation_time(flow.flow_id);
 
-                        if throttling_boundary_time < planned_time {
+                        // In case of batching condition and manual trigger,
+                        // there is no planned time, but otherwise compare
+                        if maybe_planned_time.is_none()
+                            || maybe_planned_time
+                                .is_some_and(|planned_time| throttling_boundary_time < planned_time)
+                        {
                             // If so, enqueue the flow earlier
                             self.enqueue_flow(flow.flow_id, throttling_boundary_time);
 
