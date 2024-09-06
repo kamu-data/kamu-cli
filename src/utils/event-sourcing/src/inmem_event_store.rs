@@ -43,11 +43,7 @@ impl<Proj: Projection, State: EventStoreState<Proj>> EventStore<Proj>
         Ok(self.state.lock().unwrap().events_count())
     }
 
-    async fn get_events(
-        &self,
-        query: &Proj::Query,
-        opts: GetEventsOpts,
-    ) -> EventStream<Proj::Event> {
+    fn get_events(&self, query: &Proj::Query, opts: GetEventsOpts) -> EventStream<Proj::Event> {
         let query = query.clone();
 
         // TODO: This should be a buffered stream so we don't lock per event

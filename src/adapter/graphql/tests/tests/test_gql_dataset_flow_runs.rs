@@ -57,20 +57,17 @@ use kamu_flow_system::{
     Flow,
     FlowConfigurationUpdatedMessage,
     FlowEventStore,
+    FlowExecutorConfig,
+    FlowExecutorTestDriver,
     FlowID,
-    FlowServiceRunConfig,
-    FlowServiceTestDriver,
     FlowTrigger,
     FlowTriggerAutoPolling,
+    METADATA_TASK_FLOW_ID,
 };
 use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowEventStore};
-use kamu_flow_system_services::{
-    FlowConfigurationServiceImpl,
-    FlowServiceImpl,
-    MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
-};
-use kamu_task_system::{self as ts};
-use kamu_task_system_inmem::InMemoryTaskSystemEventStore;
+use kamu_flow_system_services::MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE;
+use kamu_task_system::{self as ts, TaskMetadata};
+use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
 use opendatafabric::{AccountID, DatasetID, DatasetKind, Multihash};
@@ -200,6 +197,7 @@ async fn test_trigger_ingest_root_dataset() {
         .duration_round(Duration::try_seconds(1).unwrap())
         .unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
+    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
     let response = schema
         .execute(
@@ -274,7 +272,9 @@ async fn test_trigger_ingest_root_dataset() {
     let running_time = Utc::now()
         .duration_round(Duration::try_seconds(1).unwrap())
         .unwrap();
-    harness.mimic_task_running(flow_task_id, running_time).await;
+    harness
+        .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
+        .await;
 
     let response = schema
         .execute(
@@ -349,6 +349,7 @@ async fn test_trigger_ingest_root_dataset() {
     harness
         .mimic_task_completed(
             flow_task_id,
+            flow_task_metadata,
             complete_time,
             ts::TaskOutcome::Success(ts::TaskResult::UpdateDatasetResult(
                 ts::TaskUpdateDatasetResult {
@@ -502,11 +503,14 @@ async fn test_trigger_reset_root_dataset_flow() {
         .duration_round(Duration::try_seconds(1).unwrap())
         .unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
+    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
     let running_time = Utc::now()
         .duration_round(Duration::try_seconds(1).unwrap())
         .unwrap();
-    harness.mimic_task_running(flow_task_id, running_time).await;
+    harness
+        .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
+        .await;
 
     let complete_time = Utc::now()
         .duration_round(Duration::try_seconds(1).unwrap())
@@ -514,6 +518,7 @@ async fn test_trigger_reset_root_dataset_flow() {
     harness
         .mimic_task_completed(
             flow_task_id,
+            flow_task_metadata,
             complete_time,
             ts::TaskOutcome::Success(ts::TaskResult::ResetDatasetResult(
                 ts::TaskResetDatasetResult {
@@ -822,11 +827,14 @@ async fn test_trigger_execute_transform_derived_dataset() {
         .duration_round(Duration::try_seconds(1).unwrap())
         .unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
+    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
     let running_time = Utc::now()
         .duration_round(Duration::try_seconds(1).unwrap())
         .unwrap();
-    harness.mimic_task_running(flow_task_id, running_time).await;
+    harness
+        .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
+        .await;
 
     let complete_time = Utc::now()
         .duration_round(Duration::try_seconds(1).unwrap())
@@ -834,6 +842,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
     harness
         .mimic_task_completed(
             flow_task_id,
+            flow_task_metadata,
             complete_time,
             ts::TaskOutcome::Success(ts::TaskResult::UpdateDatasetResult(
                 ts::TaskUpdateDatasetResult {
@@ -1042,6 +1051,7 @@ async fn test_trigger_compaction_root_dataset() {
         .duration_round(Duration::try_seconds(1).unwrap())
         .unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
+    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
     let response = schema
         .execute(
@@ -1116,7 +1126,9 @@ async fn test_trigger_compaction_root_dataset() {
     let running_time = Utc::now()
         .duration_round(Duration::try_seconds(1).unwrap())
         .unwrap();
-    harness.mimic_task_running(flow_task_id, running_time).await;
+    harness
+        .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
+        .await;
 
     let response = schema
         .execute(
@@ -1193,6 +1205,7 @@ async fn test_trigger_compaction_root_dataset() {
     harness
         .mimic_task_completed(
             flow_task_id,
+            flow_task_metadata,
             complete_time,
             ts::TaskOutcome::Success(ts::TaskResult::CompactionDatasetResult(
                 ts::TaskCompactionDatasetResult {
@@ -2006,9 +2019,12 @@ async fn test_cancel_ingest_root_dataset() {
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
-    harness.mimic_task_running(task_id, Utc::now()).await;
+    harness
+        .mimic_task_running(task_id, flow_task_metadata, Utc::now())
+        .await;
 
     let mutation_code =
         FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
@@ -2078,9 +2094,12 @@ async fn test_cancel_running_transform_derived_dataset() {
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
-    harness.mimic_task_running(task_id, Utc::now()).await;
+    harness
+        .mimic_task_running(task_id, flow_task_metadata, Utc::now())
+        .await;
 
     let mutation_code = FlowRunsHarness::cancel_scheduled_tasks_mutation(
         &create_derived_result.dataset_handle.id,
@@ -2149,9 +2168,12 @@ async fn test_cancel_hard_compaction_root_dataset() {
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
-    harness.mimic_task_running(task_id, Utc::now()).await;
+    harness
+        .mimic_task_running(task_id, flow_task_metadata, Utc::now())
+        .await;
 
     let mutation_code =
         FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
@@ -2395,9 +2417,12 @@ async fn test_cancel_already_aborted_flow() {
     let flow_id = res_json["datasets"]["byId"]["flows"]["runs"]["triggerFlow"]["flow"]["flowId"]
         .as_str()
         .unwrap();
+    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
-    harness.mimic_task_running(task_id, Utc::now()).await;
+    harness
+        .mimic_task_running(task_id, flow_task_metadata, Utc::now())
+        .await;
 
     let mutation_code =
         FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
@@ -2475,12 +2500,16 @@ async fn test_cancel_already_succeeded_flow() {
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let flow_task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
-    harness.mimic_task_running(flow_task_id, Utc::now()).await;
+    harness
+        .mimic_task_running(flow_task_id, flow_task_metadata.clone(), Utc::now())
+        .await;
     harness
         .mimic_task_completed(
             flow_task_id,
+            flow_task_metadata,
             Utc::now(),
             ts::TaskOutcome::Success(ts::TaskResult::Empty),
         )
@@ -2552,6 +2581,8 @@ async fn test_history_of_completed_flow() {
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
+
     harness
         .mimic_flow_secondary_trigger(
             flow_id,
@@ -2562,10 +2593,13 @@ async fn test_history_of_completed_flow() {
         .await;
 
     let flow_task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
-    harness.mimic_task_running(flow_task_id, Utc::now()).await;
+    harness
+        .mimic_task_running(flow_task_id, flow_task_metadata.clone(), Utc::now())
+        .await;
     harness
         .mimic_task_completed(
             flow_task_id,
+            flow_task_metadata,
             Utc::now(),
             ts::TaskOutcome::Success(ts::TaskResult::Empty),
         )
@@ -2716,10 +2750,14 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
         .duration_round(Duration::try_seconds(1).unwrap())
         .unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
+    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
+
     let running_time = Utc::now()
         .duration_round(Duration::try_seconds(1).unwrap())
         .unwrap();
-    harness.mimic_task_running(flow_task_id, running_time).await;
+    harness
+        .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
+        .await;
     let complete_time = Utc::now()
         .duration_round(Duration::try_seconds(1).unwrap())
         .unwrap();
@@ -2728,6 +2766,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
     harness
         .mimic_task_completed(
             flow_task_id,
+            flow_task_metadata,
             complete_time,
             ts::TaskOutcome::Success(ts::TaskResult::CompactionDatasetResult(
                 ts::TaskCompactionDatasetResult {
@@ -2864,16 +2903,21 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
         .duration_round(Duration::try_seconds(1).unwrap())
         .unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("1", schedule_time).await;
+    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]);
+
     let running_time = Utc::now()
         .duration_round(Duration::try_seconds(1).unwrap())
         .unwrap();
-    harness.mimic_task_running(flow_task_id, running_time).await;
+    harness
+        .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
+        .await;
     let complete_time = Utc::now()
         .duration_round(Duration::try_seconds(1).unwrap())
         .unwrap();
     harness
         .mimic_task_completed(
             flow_task_id,
+            flow_task_metadata,
             complete_time,
             ts::TaskOutcome::Failed(ts::TaskError::UpdateDatasetError(
                 ts::UpdateDatasetTaskError::RootDatasetCompacted(ts::RootDatasetCompactedError {
@@ -3181,16 +3225,14 @@ impl FlowRunsHarness {
             .add::<DependencyGraphServiceInMemory>()
             .add_value(dependency_graph_mock)
             .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
-            .add::<FlowConfigurationServiceImpl>()
             .add::<InMemoryFlowConfigurationEventStore>()
-            .add::<FlowServiceImpl>()
             .add::<InMemoryFlowEventStore>()
-            .add_value(FlowServiceRunConfig::new(
+            .add_value(FlowExecutorConfig::new(
                 Duration::try_seconds(1).unwrap(),
                 Duration::try_minutes(1).unwrap(),
             ))
             .add::<TaskSchedulerImpl>()
-            .add::<InMemoryTaskSystemEventStore>()
+            .add::<InMemoryTaskEventStore>()
             .add_value(transform_service_mock)
             .bind::<dyn TransformService, MockTransformService>()
             .add_value(polling_service_mock)
@@ -3203,6 +3245,7 @@ impl FlowRunsHarness {
             .add::<DatabaseTransactionRunner>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
+            kamu_flow_system_services::register_dependencies(&mut b);
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
@@ -3293,12 +3336,12 @@ impl FlowRunsHarness {
     ) -> ts::TaskID {
         let flow_service_test_driver = self
             .catalog_authorized
-            .get_one::<dyn FlowServiceTestDriver>()
+            .get_one::<dyn FlowExecutorTestDriver>()
             .unwrap();
 
         let flow_id = FlowID::new(flow_id.parse::<u64>().unwrap());
         flow_service_test_driver
-            .mimic_flow_scheduled(flow_id, schedule_time)
+            .mimic_flow_scheduled(&self.catalog_authorized, flow_id, schedule_time)
             .await
             .unwrap()
     }
@@ -3321,16 +3364,15 @@ impl FlowRunsHarness {
         flow.save(flow_event_store.as_ref()).await.unwrap();
     }
 
-    async fn mimic_task_running(&self, task_id: ts::TaskID, event_time: DateTime<Utc>) {
-        let flow_service_test_driver = self
-            .catalog_authorized
-            .get_one::<dyn FlowServiceTestDriver>()
-            .unwrap();
-        flow_service_test_driver.mimic_running_started();
-
+    async fn mimic_task_running(
+        &self,
+        task_id: ts::TaskID,
+        task_metadata: ts::TaskMetadata,
+        event_time: DateTime<Utc>,
+    ) {
         let task_event_store = self
             .catalog_anonymous
-            .get_one::<dyn ts::TaskSystemEventStore>()
+            .get_one::<dyn ts::TaskEventStore>()
             .unwrap();
 
         let mut task = ts::Task::load(task_id, task_event_store.as_ref())
@@ -3343,7 +3385,7 @@ impl FlowRunsHarness {
         outbox
             .post_message(
                 ts::MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
-                ts::TaskProgressMessage::running(event_time, task_id),
+                ts::TaskProgressMessage::running(event_time, task_id, task_metadata),
             )
             .await
             .unwrap();
@@ -3352,18 +3394,13 @@ impl FlowRunsHarness {
     async fn mimic_task_completed(
         &self,
         task_id: ts::TaskID,
+        task_metadata: ts::TaskMetadata,
         event_time: DateTime<Utc>,
         task_outcome: ts::TaskOutcome,
     ) {
-        let flow_service_test_driver = self
-            .catalog_authorized
-            .get_one::<dyn FlowServiceTestDriver>()
-            .unwrap();
-        flow_service_test_driver.mimic_running_started();
-
         let task_event_store = self
             .catalog_anonymous
-            .get_one::<dyn ts::TaskSystemEventStore>()
+            .get_one::<dyn ts::TaskEventStore>()
             .unwrap();
 
         let mut task = ts::Task::load(task_id, task_event_store.as_ref())
@@ -3376,7 +3413,7 @@ impl FlowRunsHarness {
         outbox
             .post_message(
                 ts::MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
-                ts::TaskProgressMessage::finished(event_time, task_id, task_outcome),
+                ts::TaskProgressMessage::finished(event_time, task_id, task_metadata, task_outcome),
             )
             .await
             .unwrap();

@@ -109,8 +109,6 @@ pub async fn test_push_many_messages_and_read_parts(catalog: &Catalog) {
 
     let messages: Vec<_> = outbox_message_repo
         .get_producer_messages("A", OutboxMessageID::new(0), 3)
-        .await
-        .unwrap()
         .try_collect()
         .await
         .unwrap();
@@ -122,8 +120,6 @@ pub async fn test_push_many_messages_and_read_parts(catalog: &Catalog) {
 
     let messages: Vec<_> = outbox_message_repo
         .get_producer_messages("A", OutboxMessageID::new(5), 4)
-        .await
-        .unwrap()
         .try_collect()
         .await
         .unwrap();
@@ -172,8 +168,6 @@ pub async fn test_try_reading_above_max(catalog: &Catalog) {
 
     let messages: Vec<_> = outbox_message_repo
         .get_producer_messages("A", OutboxMessageID::new(5), 3)
-        .await
-        .unwrap()
         .try_collect()
         .await
         .unwrap();
@@ -181,8 +175,6 @@ pub async fn test_try_reading_above_max(catalog: &Catalog) {
 
     let messages: Vec<_> = outbox_message_repo
         .get_producer_messages("A", OutboxMessageID::new(3), 6)
-        .await
-        .unwrap()
         .try_collect()
         .await
         .unwrap();

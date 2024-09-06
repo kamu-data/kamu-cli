@@ -29,7 +29,7 @@ impl From<&ts::TaskStatus> for TaskStatus {
         match v {
             ts::TaskStatus::Queued => Self::Queued,
             ts::TaskStatus::Running => Self::Running,
-            ts::TaskStatus::Finished(_) => Self::Finished,
+            ts::TaskStatus::Finished => Self::Finished,
         }
     }
 }

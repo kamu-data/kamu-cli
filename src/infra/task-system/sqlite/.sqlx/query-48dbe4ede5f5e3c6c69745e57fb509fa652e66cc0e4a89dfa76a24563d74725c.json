@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT task_id\n                    FROM tasks\n                    WHERE dataset_id = $1\n                    ORDER BY task_id DESC\n                    LIMIT $2 OFFSET $3\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "task_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "48dbe4ede5f5e3c6c69745e57fb509fa652e66cc0e4a89dfa76a24563d74725c"
+}

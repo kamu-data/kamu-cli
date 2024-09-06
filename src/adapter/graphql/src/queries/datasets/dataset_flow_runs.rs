@@ -9,6 +9,7 @@
 
 use std::collections::HashSet;
 
+use database_common::PaginationOpts;
 use futures::TryStreamExt;
 use kamu_accounts::AuthenticationService;
 use {kamu_flow_system as fs, opendatafabric as odf};
@@ -44,8 +45,12 @@ impl DatasetFlowRuns {
             });
         }
 
-        let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
-        let flow_state = flow_service.get_flow(flow_id.into()).await.int_err()?;
+        let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
+
+        let flow_state = flow_query_service
+            .get_flow(flow_id.into())
+            .await
+            .int_err()?;
 
         Ok(GetFlowResult::Success(GetFlowSuccess {
             flow: Flow::new(flow_state),
@@ -61,7 +66,7 @@ impl DatasetFlowRuns {
     ) -> Result<FlowConnection> {
         utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
-        let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
+        let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
@@ -89,11 +94,11 @@ impl DatasetFlowRuns {
 
         let filters = filters.unwrap_or_default();
 
-        let flows_state_listing = flow_service
+        let flows_state_listing = flow_query_service
             .list_all_flows_by_dataset(
                 &self.dataset_handle.id,
                 filters,
-                fs::FlowPaginationOpts {
+                PaginationOpts {
                     offset: page * per_page,
                     limit: per_page,
                 },
@@ -119,9 +124,9 @@ impl DatasetFlowRuns {
     async fn list_flow_initiators(&self, ctx: &Context<'_>) -> Result<AccountConnection> {
         utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
-        let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
+        let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
 
-        let flow_initiator_ids: Vec<_> = flow_service
+        let flow_initiator_ids: Vec<_> = flow_query_service
             .list_all_flow_initiators_by_dataset(&self.dataset_handle.id)
             .await
             .int_err()?

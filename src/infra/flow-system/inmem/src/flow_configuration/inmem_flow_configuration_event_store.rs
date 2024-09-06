@@ -62,12 +62,12 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query, ?opts))]
-    async fn get_events(
+    fn get_events(
         &self,
         query: &FlowKey,
         opts: GetEventsOpts,
     ) -> EventStream<FlowConfigurationEvent> {
-        self.inner.get_events(query, opts).await
+        self.inner.get_events(query, opts)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query, num_events = events.len()))]
@@ -95,7 +95,7 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
 #[async_trait::async_trait]
 impl FlowConfigurationEventStore for InMemoryFlowConfigurationEventStore {
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn list_all_dataset_ids(&self) -> FailableDatasetIDStream {
+    fn list_all_dataset_ids(&self) -> FailableDatasetIDStream {
         use futures::StreamExt;
 
         let dataset_ids = self.inner.as_state().lock().unwrap().dataset_ids.clone();

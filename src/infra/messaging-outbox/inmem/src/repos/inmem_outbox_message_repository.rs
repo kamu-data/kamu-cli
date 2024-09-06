@@ -81,12 +81,12 @@ impl OutboxMessageRepository for InMemoryOutboxMessageRepository {
         Ok(())
     }
 
-    async fn get_producer_messages(
+    fn get_producer_messages(
         &self,
         producer_name: &str,
         above_id: OutboxMessageID,
         batch_size: usize,
-    ) -> Result<OutboxMessageStream, InternalError> {
+    ) -> OutboxMessageStream {
         let messages = {
             let mut messages = Vec::new();
 
@@ -105,7 +105,7 @@ impl OutboxMessageRepository for InMemoryOutboxMessageRepository {
             messages
         };
 
-        Ok(Box::pin(tokio_stream::iter(messages)))
+        Box::pin(tokio_stream::iter(messages))
     }
 
     async fn get_latest_message_ids_by_producer(

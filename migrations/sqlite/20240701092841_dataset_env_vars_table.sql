@@ -1,3 +1,5 @@
+/* ------------------------------ */
+
 CREATE TABLE dataset_env_vars(
     id VARCHAR(36) NOT NULL PRIMARY KEY,
     key VARCHAR(200) NOT NULL,
@@ -7,6 +9,8 @@ CREATE TABLE dataset_env_vars(
     dataset_id VARCHAR(100) NOT NULL
 );
 
-CREATE UNIQUE INDEX idx_env_key_dataset ON dataset_env_vars(dataset_id, key);
+CREATE UNIQUE INDEX idx_dataset_env_vars_key_dataset ON dataset_env_vars(dataset_id, key);
 
-CREATE INDEX dataset_env_var_dataset_id_idx ON dataset_env_vars(dataset_id);
+CREATE INDEX idx_dataset_env_vars_dataset_id ON dataset_env_vars(dataset_id);
+
+/* ------------------------------ */

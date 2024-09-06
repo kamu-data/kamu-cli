@@ -15,7 +15,8 @@ use kamu_flow_system_inmem::*;
 
 database_transactional_test!(
     storage = inmem,
-    fixture = kamu_flow_system_repo_tests::test_event_store_empty,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_configuration_event_store::test_event_store_empty,
     harness = InMemoryFlowConfigurationEventStoreHarness
 );
 
@@ -23,7 +24,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = kamu_flow_system_repo_tests::test_event_store_get_streams,
+    fixture = kamu_flow_system_repo_tests::test_flow_configuration_event_store::test_event_store_get_streams,
     harness = InMemoryFlowConfigurationEventStoreHarness
 );
 
@@ -31,7 +32,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = kamu_flow_system_repo_tests::test_event_store_get_events_with_windowing,
+    fixture = kamu_flow_system_repo_tests::test_flow_configuration_event_store::test_event_store_get_events_with_windowing,
     harness = InMemoryFlowConfigurationEventStoreHarness
 );
 

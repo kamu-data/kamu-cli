@@ -203,7 +203,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
                 }
             }
 
-            let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().await.try_collect().await?;
+            let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().try_collect().await?;
 
             for dataset_id in dataset_ids {
                 for dataset_flow_type in DatasetFlowType::all() {

@@ -19,7 +19,6 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
-use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
 
@@ -146,7 +145,7 @@ async fn create_graph(
 // remote dataset
 async fn create_graph_remote(
     dataset_repo: Arc<dyn DatasetRepository>,
-    create_dataset_use_case: Arc<dyn CreateDatasetUseCase>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     reg: Arc<RemoteRepositoryRegistryImpl>,
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
     to_import: Vec<DatasetAlias>,
@@ -173,7 +172,7 @@ async fn create_graph_remote(
     let sync_service = SyncServiceImpl::new(
         reg.clone(),
         dataset_repo,
-        create_dataset_use_case,
+        dataset_repo_writer,
         Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         Arc::new(DatasetFactoryImpl::new(
             IpfsGateway::default(),
@@ -374,7 +373,7 @@ async fn test_pull_batching_complex_with_remote() {
     // D -----------/
     create_graph_remote(
         harness.dataset_repo.clone(),
-        harness.create_dataset_use_case.clone(),
+        harness.dataset_repo.clone(),
         harness.remote_repo_reg.clone(),
         vec![
             (n!("a"), names![]),
@@ -875,7 +874,6 @@ struct PullTestHarness {
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_svc: Arc<dyn PullService>,
-    create_dataset_use_case: Arc<dyn CreateDatasetUseCase>,
 }
 
 impl PullTestHarness {
@@ -919,8 +917,6 @@ impl PullTestHarness {
             .add_builder(TestSyncService::builder().with_calls(calls.clone()))
             .bind::<dyn SyncService, TestSyncService>()
             .add::<PullServiceImpl>()
-            .add::<CreateDatasetUseCaseImpl>()
-            .add::<DummyOutboxImpl>()
             .build();
 
         Self {
@@ -929,7 +925,6 @@ impl PullTestHarness {
             remote_repo_reg: catalog.get_one().unwrap(),
             remote_alias_reg: catalog.get_one().unwrap(),
             pull_svc: catalog.get_one().unwrap(),
-            create_dataset_use_case: catalog.get_one().unwrap(),
         }
     }
 

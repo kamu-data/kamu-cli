@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO task_ids(created_time) VALUES($1) RETURNING task_id as \"task_id: _\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "task_id: _",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "40fa470dd5959726f1df8747e2da944fcd5644bfbc3fca9504655d54eb1fa5f4"
+}

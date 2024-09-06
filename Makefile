@@ -155,6 +155,10 @@ test-fast:
 test-e2e:
 	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::e2e::)'
 
+.PHONY: test-database
+test-database:
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::database::)'
+
 ###############################################################################
 # Benchmarking
 ###############################################################################

@@ -92,7 +92,6 @@ struct InMemoryRebacRepositoryHarness {
 impl InMemoryRebacRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
-
         catalog_builder.add::<InMemoryRebacRepository>();
 
         Self {

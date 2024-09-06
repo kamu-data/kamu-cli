@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT COUNT(task_id) AS tasks_count FROM tasks\n                WHERE task_status == 'running'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "tasks_count",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "38a40ce900e6e3b5438013281855572b5806286e0d8dceeefce896e73cb2f5b2"
+}

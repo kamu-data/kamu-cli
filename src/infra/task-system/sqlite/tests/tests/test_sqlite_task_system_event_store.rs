@@ -55,6 +55,30 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_task_system_repo_tests::test_event_store_try_get_queued_single_task,
+    harness = SqliteTaskSystemEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_task_system_repo_tests::test_event_store_try_get_queued_multiple_tasks,
+    harness = SqliteTaskSystemEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_task_system_repo_tests::test_event_store_get_running_tasks,
+    harness = SqliteTaskSystemEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct SqliteTaskSystemEventStoreHarness {
     catalog: Catalog,
 }

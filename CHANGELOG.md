@@ -9,8 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Changed -->
 <!--- - Fixed -->
 
-## Unreleased
+## [0.199.0] - 2024-09-06
+### Added
+- Persistency has been enabled for Task and Flow domains. 
+  Both `TaskExecutor` and `FlowExecutor` now fully support transactional processing mode,
+  and save state in Postgres or Sqlite database.
+- Tasks now support attaching metadata properties. Storing task->flow association as this type of metadata.
+- Flows and Tasks now properly recover the unfinished requests after server restart
 ### Changed
+- Simplified database schema for flow configurations and minimized number of migrations 
+   (breaking change of the database schema)
+- Introduced `pre_run()` phase in flow executor, task executor & outbox processor to avoid startup races
+- Explicit in-memory task queue has been eliminated and replaced with event store queries
 - Get Data Panel: use SmTP for pull & push links 
 - GQL api method `setConfigCompaction` allows to set `metadataOnly` configuration for both root and derived datasets
 - GQL api `triggerFlow` allows to trigger `HARD_COMPACTION` flow in `metadataOnly` mode for both root and derived datasets

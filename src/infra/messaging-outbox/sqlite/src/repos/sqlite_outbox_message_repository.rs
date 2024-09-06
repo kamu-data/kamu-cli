@@ -55,17 +55,16 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
         Ok(())
     }
 
-    async fn get_producer_messages(
+    fn get_producer_messages(
         &self,
         producer_name: &str,
         above_id: OutboxMessageID,
         batch_size: usize,
-    ) -> Result<OutboxMessageStream, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
+    ) -> OutboxMessageStream {
         let producer_name = producer_name.to_string();
 
-        Ok(Box::pin(async_stream::stream! {
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
             let connection_mut = tr
                 .connection_mut()
                 .await?;
@@ -96,7 +95,7 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
             while let Some(message) = query_stream.try_next().await? {
                 yield Ok(message);
             }
-        }))
+        })
     }
 
     async fn get_latest_message_ids_by_producer(
@@ -109,7 +108,7 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
             r#"
                 SELECT
                     producer_name,
-                    IFNULL(MAX(message_id), 0) as max_message_id
+                    IFNULL(MAX(message_id), 0) AS max_message_id
                 FROM outbox_messages
                 GROUP BY producer_name
             "#,

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO flow_ids(created_time) VALUES($1) RETURNING flow_id as \"flow_id: _\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "flow_id: _",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0ee66478537b60b68540a836a6b5d3a3dd122472ef001096d2e0876ebbf9b2c4"
+}

@@ -22,6 +22,8 @@ doctest = false
 
 
 [dependencies]
+database-common = { workspace = true }
+internal-error = { workspace = true }
 opendatafabric = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-flow-system = { workspace = true }
@@ -45,7 +47,6 @@ serde_with = { version = "3", default-features = false }
 [dev-dependencies]
 database-common-macros = { workspace = true }
 kamu-flow-system-repo-tests = { workspace = true }
-kamu-task-system-inmem = { workspace = true }
 
 cron = { version = "0.12", default-features = false }
 tempfile = "3"

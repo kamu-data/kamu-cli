@@ -14,6 +14,6 @@
 // Re-exports
 pub use kamu_task_system as domain;
 
-mod sqlite_task_system_event_store;
+mod sqlite_task_event_store;
 
-pub use sqlite_task_system_event_store::*;
+pub use sqlite_task_event_store::*;

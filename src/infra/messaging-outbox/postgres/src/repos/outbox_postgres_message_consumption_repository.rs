@@ -31,12 +31,9 @@ impl PostgresOutboxMessageConsumptionRepository {
 
 #[async_trait::async_trait]
 impl OutboxMessageConsumptionRepository for PostgresOutboxMessageConsumptionRepository {
-    async fn list_consumption_boundaries(
-        &self,
-    ) -> Result<OutboxMessageConsumptionBoundariesStream, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        Ok(Box::pin(async_stream::stream! {
+    fn list_consumption_boundaries(&self) -> OutboxMessageConsumptionBoundariesStream {
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
             let connection_mut = tr
                 .connection_mut()
                 .await?;
@@ -56,7 +53,7 @@ impl OutboxMessageConsumptionRepository for PostgresOutboxMessageConsumptionRepo
             while let Some(consumption) = query_stream.try_next().await? {
                 yield Ok(consumption);
             }
-        }))
+        })
     }
 
     async fn find_consumption_boundary(

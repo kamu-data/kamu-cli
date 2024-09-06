@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::DatabasePaginationOpts;
+use database_common::PaginationOpts;
 use kamu_datasets::{DatasetEnvVarService, GetDatasetEnvVarError};
 use opendatafabric as odf;
 
@@ -23,7 +23,7 @@ pub struct DatasetEnvVars {
 
 #[Object]
 impl DatasetEnvVars {
-    const DEFAULT_PER_PAGE: i64 = 15;
+    const DEFAULT_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
     pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
@@ -54,8 +54,8 @@ impl DatasetEnvVars {
     async fn list_env_variables(
         &self,
         ctx: &Context<'_>,
-        page: Option<i64>,
-        per_page: Option<i64>,
+        page: Option<usize>,
+        per_page: Option<usize>,
     ) -> Result<ViewDatasetEnvVarConnection> {
         utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
@@ -66,7 +66,7 @@ impl DatasetEnvVars {
         let dataset_env_var_listing = dataset_env_var_service
             .get_all_dataset_env_vars_by_dataset_id(
                 &self.dataset_handle.id,
-                Some(DatabasePaginationOpts {
+                Some(PaginationOpts {
                     offset: (page * per_page),
                     limit: per_page,
                 }),
@@ -82,8 +82,8 @@ impl DatasetEnvVars {
 
         Ok(ViewDatasetEnvVarConnection::new(
             dataset_env_vars,
-            usize::try_from(page).unwrap(),
-            usize::try_from(per_page).unwrap(),
+            page,
+            per_page,
             dataset_env_var_listing.total_count,
         ))
     }

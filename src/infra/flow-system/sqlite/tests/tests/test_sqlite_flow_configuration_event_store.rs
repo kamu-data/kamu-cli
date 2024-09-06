@@ -10,14 +10,15 @@
 use database_common::SqliteTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_flow_system_sqlite::SqliteFlowSystemEventStore;
+use kamu_flow_system_sqlite::SqliteFlowConfigurationEventStore;
 use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_flow_system_repo_tests::test_event_store_empty,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_configuration_event_store::test_event_store_empty,
     harness = SqliteFlowConfigurationEventStoreHarness
 );
 
@@ -25,7 +26,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_flow_system_repo_tests::test_event_store_get_streams,
+    fixture = kamu_flow_system_repo_tests::test_flow_configuration_event_store::test_event_store_get_streams,
     harness = SqliteFlowConfigurationEventStoreHarness
 );
 
@@ -33,7 +34,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_flow_system_repo_tests::test_event_store_get_events_with_windowing,
+    fixture = kamu_flow_system_repo_tests::test_flow_configuration_event_store::test_event_store_get_events_with_windowing,
     harness = SqliteFlowConfigurationEventStoreHarness
 );
 
@@ -49,7 +50,7 @@ impl SqliteFlowConfigurationEventStoreHarness {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add_value(sqlite_pool);
         catalog_builder.add::<SqliteTransactionManager>();
-        catalog_builder.add::<SqliteFlowSystemEventStore>();
+        catalog_builder.add::<SqliteFlowConfigurationEventStore>();
 
         Self {
             catalog: catalog_builder.build(),

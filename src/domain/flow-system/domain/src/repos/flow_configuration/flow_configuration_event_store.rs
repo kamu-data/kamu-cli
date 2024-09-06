@@ -26,7 +26,7 @@ pub type FailableDatasetIDStream<'a> =
 pub trait FlowConfigurationEventStore: EventStore<FlowConfigurationState> {
     /// Returns all unique values of dataset IDs associated with update configs
     // TODO: re-consider performance impact
-    async fn list_all_dataset_ids(&self) -> FailableDatasetIDStream<'_>;
+    fn list_all_dataset_ids(&self) -> FailableDatasetIDStream<'_>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

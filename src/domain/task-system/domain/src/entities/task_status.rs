@@ -13,14 +13,15 @@ use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::Type)]
+#[sqlx(type_name = "task_status_type", rename_all = "snake_case")]
 pub enum TaskStatus {
     /// Task is waiting for capacity to be allocated to it
     Queued,
     /// Task is being executed
     Running,
     /// Task has reached a certain final outcome
-    Finished(TaskOutcome),
+    Finished,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

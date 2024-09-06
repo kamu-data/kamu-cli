@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    UPDATE flows\n                        SET flow_status = $2\n                        WHERE flow_id = $1\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        {
+          "Custom": {
+            "name": "flow_status_type",
+            "kind": {
+              "Enum": [
+                "waiting",
+                "running",
+                "finished"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0160db224abe1296b551d4cabfe77563124bab77494e435de9fa52f92cc71c10"
+}

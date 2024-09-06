@@ -34,10 +34,9 @@ use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOU
 use kamu_accounts_inmem::InMemoryAccessTokenRepository;
 use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
-use kamu_flow_system::FlowServiceRunConfig;
+use kamu_flow_system::FlowExecutorConfig;
 use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowEventStore};
-use kamu_flow_system_services::{FlowConfigurationServiceImpl, FlowServiceImpl};
-use kamu_task_system_inmem::InMemoryTaskSystemEventStore;
+use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use opendatafabric::{AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
@@ -678,16 +677,14 @@ impl FlowConfigHarness {
             .add::<DependencyGraphServiceInMemory>()
             .add_value(dependency_graph_mock)
             .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
-            .add::<FlowConfigurationServiceImpl>()
             .add::<InMemoryFlowConfigurationEventStore>()
-            .add::<FlowServiceImpl>()
             .add::<InMemoryFlowEventStore>()
-            .add_value(FlowServiceRunConfig::new(
+            .add_value(FlowExecutorConfig::new(
                 Duration::try_seconds(1).unwrap(),
                 Duration::try_minutes(1).unwrap(),
             ))
             .add::<TaskSchedulerImpl>()
-            .add::<InMemoryTaskSystemEventStore>()
+            .add::<InMemoryTaskEventStore>()
             .add_value(transform_service_mock)
             .bind::<dyn TransformService, MockTransformService>()
             .add_value(polling_service_mock)
@@ -697,6 +694,7 @@ impl FlowConfigHarness {
             .add::<DatabaseTransactionRunner>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
+            kamu_flow_system_services::register_dependencies(&mut b);
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,

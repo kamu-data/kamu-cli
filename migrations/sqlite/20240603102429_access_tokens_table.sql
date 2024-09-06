@@ -1,3 +1,5 @@
+/* ------------------------------ */
+
 CREATE TABLE access_tokens(
     id VARCHAR(36) NOT NULL PRIMARY KEY,
     token_name VARCHAR(100) NOT NULL,
@@ -8,4 +10,8 @@ CREATE TABLE access_tokens(
     account_id VARCHAR(100) NOT NULL REFERENCES accounts(id)
 );
 
-CREATE UNIQUE INDEX idx_account_token_name ON access_tokens(account_id, token_name);
+CREATE UNIQUE INDEX idx_access_tokens_account_token_name 
+    ON access_tokens(account_id, token_name) 
+    WHERE revoked_at IS NULL;
+
+/* ------------------------------ */

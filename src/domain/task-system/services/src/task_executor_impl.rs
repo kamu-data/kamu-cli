@@ -7,24 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
-use database_common::DatabaseTransactionRunner;
+use database_common::{DatabaseTransactionRunner, PaginationOpts};
 use dill::*;
-use kamu_core::{
-    CompactionOptions,
-    CompactionService,
-    DatasetRepository,
-    PollingIngestOptions,
-    PullError,
-    PullOptions,
-    PullService,
-    ResetError,
-    ResetService,
-    TransformError,
-};
-use kamu_datasets::{DatasetEnvVar, DatasetEnvVarService};
 use kamu_task_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
@@ -33,7 +19,7 @@ use time_source::SystemTimeSource;
 
 pub struct TaskExecutorImpl {
     catalog: Catalog,
-    task_sched: Arc<dyn TaskScheduler>,
+    task_logical_plan_runner: Arc<dyn TaskLogicalPlanRunner>,
     time_source: Arc<dyn SystemTimeSource>,
 }
 
@@ -45,64 +31,110 @@ pub struct TaskExecutorImpl {
 impl TaskExecutorImpl {
     pub fn new(
         catalog: Catalog,
-        task_sched: Arc<dyn TaskScheduler>,
+        task_logical_plan_runner: Arc<dyn TaskLogicalPlanRunner>,
         time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
             catalog,
-            task_sched,
+            task_logical_plan_runner,
             time_source,
         }
     }
 
-    async fn take_task(&self) -> Result<Task, InternalError> {
-        let task_id = self.task_sched.take().await.int_err()?;
+    async fn run_task_iteration(&self) -> Result<(), InternalError> {
+        let task = self.take_task().await?;
+        let task_outcome = self.run_task(&task).await?;
+        self.process_task_outcome(task, task_outcome).await?;
+        Ok(())
+    }
 
+    async fn recover_running_tasks(&self) -> Result<(), InternalError> {
+        // Recovering tasks means we are re-queing tasks that started running, but got
+        // aborted due to server shutdown or crash
         DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with2(
-                |event_store: Arc<dyn TaskSystemEventStore>, outbox: Arc<dyn Outbox>| async move {
-                    let task = Task::load(task_id, event_store.as_ref()).await.int_err()?;
+            .transactional(|target_catalog: Catalog| async move {
+                let task_event_store = target_catalog.get_one::<dyn TaskEventStore>().unwrap();
+
+                // Total number of running tasks
+                let total_running_tasks = task_event_store.get_count_running_tasks().await?;
+
+                // Processe them in pages
+                let mut processed_running_tasks = 0;
+                while processed_running_tasks < total_running_tasks {
+                    // Load another page
+                    use futures::TryStreamExt;
+                    let running_task_ids: Vec<_> = task_event_store
+                        .get_running_tasks(PaginationOpts {
+                            offset: processed_running_tasks,
+                            limit: 100,
+                        })
+                        .try_collect()
+                        .await?;
+
+                    for running_task_id in &running_task_ids {
+                        // TODO: batch loading of tasks
+                        let mut task = Task::load(*running_task_id, task_event_store.as_ref())
+                            .await
+                            .int_err()?;
+
+                        // Requeue
+                        task.requeue(self.time_source.now()).int_err()?;
+                        task.save(task_event_store.as_ref()).await.int_err()?;
+                    }
+
+                    processed_running_tasks += running_task_ids.len();
+                }
+
+                Ok(())
+            })
+            .await
+    }
+
+    async fn take_task(&self) -> Result<Task, InternalError> {
+        loop {
+            let maybe_task = DatabaseTransactionRunner::new(self.catalog.clone())
+                .transactional(|target_catalog: Catalog| async move {
+                    let task_scheduler = target_catalog.get_one::<dyn TaskScheduler>().unwrap();
+                    let maybe_task = task_scheduler.try_take().await.int_err()?;
+                    let Some(task) = maybe_task else {
+                        return Ok(None);
+                    };
 
                     tracing::info!(
-                        %task_id,
+                        task_id = %task.task_id,
                         logical_plan = ?task.logical_plan,
                         "Executing task",
                     );
 
+                    let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
                     outbox
                         .post_message(
                             MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
-                            TaskProgressMessage::running(self.time_source.now(), task_id),
+                            TaskProgressMessage::running(
+                                self.time_source.now(),
+                                task.task_id,
+                                task.metadata.clone(),
+                            ),
                         )
                         .await?;
 
-                    Ok(task)
-                },
-            )
-            .await
+                    Ok(Some(task))
+                })
+                .await?;
+
+            if let Some(task) = maybe_task {
+                return Ok(task);
+            }
+
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
     }
 
-    async fn execute_task(&self, task: &Task) -> Result<TaskOutcome, InternalError> {
-        let task_outcome = match &task.logical_plan {
-            LogicalPlan::UpdateDataset(upd) => self.update_dataset_logical_plan(upd).await?,
-            LogicalPlan::Probe(Probe {
-                busy_time,
-                end_with_outcome,
-                ..
-            }) => {
-                if let Some(busy_time) = busy_time {
-                    tokio::time::sleep(*busy_time).await;
-                }
-                end_with_outcome
-                    .clone()
-                    .unwrap_or(TaskOutcome::Success(TaskResult::Empty))
-            }
-            LogicalPlan::Reset(reset_args) => self.reset_dataset_logical_plan(reset_args).await?,
-            LogicalPlan::HardCompactionDataset(hard_compaction_args) => {
-                self.hard_compaction_logical_plan(hard_compaction_args)
-                    .await?
-            }
-        };
+    async fn run_task(&self, task: &Task) -> Result<TaskOutcome, InternalError> {
+        let task_outcome = self
+            .task_logical_plan_runner
+            .run_plan(&task.logical_plan)
+            .await?;
 
         tracing::info!(
             task_id = %task.task_id,
@@ -121,7 +153,7 @@ impl TaskExecutorImpl {
     ) -> Result<(), InternalError> {
         DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with2(
-                |event_store: Arc<dyn TaskSystemEventStore>, outbox: Arc<dyn Outbox>| async move {
+                |event_store: Arc<dyn TaskEventStore>, outbox: Arc<dyn Outbox>| async move {
                     // Refresh the task in case it was updated concurrently (e.g. late cancellation)
                     task.update(event_store.as_ref()).await.int_err()?;
                     task.finish(self.time_source.now(), task_outcome.clone())
@@ -134,6 +166,7 @@ impl TaskExecutorImpl {
                             TaskProgressMessage::finished(
                                 self.time_source.now(),
                                 task.task_id,
+                                task.metadata.clone(),
                                 task_outcome,
                             ),
                         )
@@ -144,138 +177,30 @@ impl TaskExecutorImpl {
 
         Ok(())
     }
-
-    async fn update_dataset_logical_plan(
-        &self,
-        update_dataset_args: &UpdateDataset,
-    ) -> Result<TaskOutcome, InternalError> {
-        let dataset_env_vars = DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(
-                |dataset_env_vars_svc: Arc<dyn DatasetEnvVarService>| async move {
-                    let dataset_env_vars = dataset_env_vars_svc
-                        .get_all_dataset_env_vars_by_dataset_id(
-                            &update_dataset_args.dataset_id,
-                            None,
-                        )
-                        .await
-                        .int_err()?;
-                    Ok(dataset_env_vars.list)
-                },
-            )
-            .await?;
-        let dataset_env_vars_hash_map = dataset_env_vars
-            .into_iter()
-            .map(|dataset_env_var| (dataset_env_var.key.clone(), dataset_env_var))
-            .collect::<HashMap<String, DatasetEnvVar>>();
-        let pull_options = PullOptions {
-            ingest_options: PollingIngestOptions {
-                dataset_env_vars: dataset_env_vars_hash_map,
-                fetch_uncacheable: update_dataset_args.fetch_uncacheable,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-
-        let pull_svc = self.catalog.get_one::<dyn PullService>().int_err()?;
-        let maybe_pull_result = pull_svc
-            .pull(
-                &update_dataset_args.dataset_id.as_any_ref(),
-                pull_options,
-                None,
-            )
-            .await;
-
-        match maybe_pull_result {
-            Ok(pull_result) => Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
-                TaskUpdateDatasetResult { pull_result },
-            ))),
-            Err(err) => match err {
-                PullError::TransformError(TransformError::InvalidInterval(_)) => {
-                    Ok(TaskOutcome::Failed(TaskError::UpdateDatasetError(
-                        UpdateDatasetTaskError::RootDatasetCompacted(RootDatasetCompactedError {
-                            dataset_id: update_dataset_args.dataset_id.clone(),
-                        }),
-                    )))
-                }
-                _ => Ok(TaskOutcome::Failed(TaskError::Empty)),
-            },
-        }
-    }
-
-    async fn reset_dataset_logical_plan(
-        &self,
-        reset_dataset_args: &ResetDataset,
-    ) -> Result<TaskOutcome, InternalError> {
-        let reset_svc = self.catalog.get_one::<dyn ResetService>().int_err()?;
-        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().int_err()?;
-        let dataset_handle = dataset_repo
-            .resolve_dataset_ref(&reset_dataset_args.dataset_id.as_local_ref())
-            .await
-            .int_err()?;
-
-        let reset_result_maybe = reset_svc
-            .reset_dataset(
-                &dataset_handle,
-                reset_dataset_args.new_head_hash.as_ref(),
-                reset_dataset_args.old_head_hash.as_ref(),
-            )
-            .await;
-        match reset_result_maybe {
-            Ok(new_head) => Ok(TaskOutcome::Success(TaskResult::ResetDatasetResult(
-                TaskResetDatasetResult { new_head },
-            ))),
-            Err(err) => match err {
-                ResetError::BlockNotFound(_) => Ok(TaskOutcome::Failed(
-                    TaskError::ResetDatasetError(ResetDatasetTaskError::ResetHeadNotFound),
-                )),
-                _ => Ok(TaskOutcome::Failed(TaskError::Empty)),
-            },
-        }
-    }
-
-    async fn hard_compaction_logical_plan(
-        &self,
-        hard_compaction_args: &HardCompactionDataset,
-    ) -> Result<TaskOutcome, InternalError> {
-        let compaction_svc = self.catalog.get_one::<dyn CompactionService>().int_err()?;
-        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().int_err()?;
-        let dataset_handle = dataset_repo
-            .resolve_dataset_ref(&hard_compaction_args.dataset_id.as_local_ref())
-            .await
-            .int_err()?;
-
-        let compaction_result = compaction_svc
-            .compact_dataset(
-                &dataset_handle,
-                CompactionOptions {
-                    max_slice_size: hard_compaction_args.max_slice_size,
-                    max_slice_records: hard_compaction_args.max_slice_records,
-                    keep_metadata_only: hard_compaction_args.keep_metadata_only,
-                },
-                None,
-            )
-            .await;
-
-        match compaction_result {
-            Ok(result) => Ok(TaskOutcome::Success(TaskResult::CompactionDatasetResult(
-                result.into(),
-            ))),
-            Err(_) => Ok(TaskOutcome::Failed(TaskError::Empty)),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl TaskExecutor for TaskExecutorImpl {
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn pre_run(&self) -> Result<(), InternalError> {
+        self.recover_running_tasks().await?;
+        Ok(())
+    }
+
     // TODO: Error and panic handling strategy
+    #[tracing::instrument(level = "info", skip_all)]
     async fn run(&self) -> Result<(), InternalError> {
         loop {
-            let task = self.take_task().await?;
-            let task_outcome = self.execute_task(&task).await?;
-            self.process_task_outcome(task, task_outcome).await?;
+            self.run_task_iteration().await?;
         }
+    }
+
+    /// Runs single task only, blocks until it is available (for tests only!)
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn run_single_task(&self) -> Result<(), InternalError> {
+        self.run_task_iteration().await
     }
 }
 

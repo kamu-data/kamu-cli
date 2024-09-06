@@ -11,7 +11,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use database_common::DatabasePaginationOpts;
+use database_common::PaginationOpts;
 use dill::*;
 use opendatafabric::DatasetID;
 use uuid::Uuid;
@@ -103,7 +103,7 @@ impl DatasetEnvVarRepository for InMemoryDatasetEnvVarRepository {
     async fn get_all_dataset_env_vars_by_dataset_id(
         &self,
         dataset_id: &DatasetID,
-        pagination: &DatabasePaginationOpts,
+        pagination: &PaginationOpts,
     ) -> Result<Vec<DatasetEnvVar>, GetDatasetEnvVarError> {
         let guard = self.state.lock().unwrap();
         if let Some(dataset_env_var_ids) = guard.dataset_env_var_ids_by_dataset_id.get(dataset_id) {
@@ -116,8 +116,8 @@ impl DatasetEnvVarRepository for InMemoryDatasetEnvVarRepository {
                         .unwrap()
                         .clone()
                 })
-                .skip(usize::try_from(pagination.offset).unwrap())
-                .take(usize::try_from(pagination.limit).unwrap())
+                .skip(pagination.offset)
+                .take(pagination.limit)
                 .collect();
             return Ok(dataset_env_vars);
         }

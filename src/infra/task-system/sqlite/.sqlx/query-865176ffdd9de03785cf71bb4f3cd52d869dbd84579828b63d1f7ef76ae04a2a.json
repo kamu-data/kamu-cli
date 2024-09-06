@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT COUNT(task_id) AS tasks_count FROM tasks\n              WHERE dataset_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "tasks_count",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "865176ffdd9de03785cf71bb4f3cd52d869dbd84579828b63d1f7ef76ae04a2a"
+}

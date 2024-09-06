@@ -18,11 +18,7 @@ use crate::{EventID, Projection};
 #[async_trait::async_trait]
 pub trait EventStore<Proj: Projection>: Send + Sync {
     /// Returns the event history of an aggregate in chronological order
-    async fn get_events(
-        &self,
-        query: &Proj::Query,
-        opts: GetEventsOpts,
-    ) -> EventStream<Proj::Event>;
+    fn get_events(&self, query: &Proj::Query, opts: GetEventsOpts) -> EventStream<Proj::Event>;
 
     /// Persists a series of events
     ///

@@ -63,6 +63,17 @@ impl FlowState {
         }
     }
 
+    // Extract wakeup time
+    pub fn wake_up_at(&self) -> Option<DateTime<Utc>> {
+        if self.status() == FlowStatus::Waiting {
+            if let Some(start_condition) = self.start_condition.as_ref() {
+                return start_condition.wake_up_at();
+            }
+        }
+
+        None
+    }
+
     pub fn try_result_as_ref(&self) -> Option<&FlowResult> {
         self.outcome
             .as_ref()

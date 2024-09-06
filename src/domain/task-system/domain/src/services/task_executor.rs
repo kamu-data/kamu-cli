@@ -9,8 +9,18 @@
 
 use crate::*;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 pub trait TaskExecutor: Sync + Send {
+    /// Runs initialization phase
+    async fn pre_run(&self) -> Result<(), InternalError>;
+
     /// Runs the executor main loop
     async fn run(&self) -> Result<(), InternalError>;
+
+    /// Runs single task only, blocks until it is available (for tests only!)
+    async fn run_single_task(&self) -> Result<(), InternalError>;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

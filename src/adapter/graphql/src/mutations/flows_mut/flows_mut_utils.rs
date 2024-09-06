@@ -37,9 +37,9 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
     flow_id: FlowID,
     dataset_handle: &odf::DatasetHandle,
 ) -> Result<Option<FlowInDatasetError>> {
-    let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
+    let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
 
-    match flow_service.get_flow(flow_id.into()).await {
+    match flow_query_service.get_flow(flow_id.into()).await {
         Ok(flow_state) => match flow_state.flow_key {
             fs::FlowKey::Dataset(fk_dataset) => {
                 if fk_dataset.dataset_id != dataset_handle.id {

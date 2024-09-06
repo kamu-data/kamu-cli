@@ -8,4 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod test_task_aggregate;
+
+mod test_task_executor_impl;
 mod test_task_scheduler_impl;

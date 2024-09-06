@@ -1,3 +1,5 @@
+/* ------------------------------ */
+
 CREATE TABLE auth_rebac_properties
 (
     entity_type    VARCHAR(25)  NOT NULL,
@@ -6,13 +8,13 @@ CREATE TABLE auth_rebac_properties
     property_value VARCHAR(50)  NOT NULL
 );
 
-CREATE INDEX idx_entity
+CREATE INDEX idx_auth_rebac_properties_entity
     ON auth_rebac_properties (entity_type, entity_id);
 
-CREATE UNIQUE INDEX idx_uniq_entity_property_name
+CREATE UNIQUE INDEX idx_auth_rebac_properties_entity_property_name
     ON auth_rebac_properties (entity_type, entity_id, property_name);
 
-------------------------------------------------------------------------------------------------------------------------
+/* ------------------------------ */
 
 CREATE TABLE auth_rebac_relations
 (
@@ -23,6 +25,9 @@ CREATE TABLE auth_rebac_relations
     object_entity_id    VARCHAR(100) NOT NULL
 );
 
-CREATE UNIQUE INDEX idx_uniq_row
-    ON auth_rebac_relations (subject_entity_type, subject_entity_id, relationship, object_entity_type,
-                             object_entity_id);
+CREATE UNIQUE INDEX idx_auth_rebac_relations_row
+    ON auth_rebac_relations (
+        subject_entity_type, subject_entity_id, relationship, object_entity_type, object_entity_id
+    );
+
+/* ------------------------------ */

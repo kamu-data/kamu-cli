@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(event_id) AS events_count\n                FROM flow_events\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "events_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "6790bcb0ad8f2be93e2383f53ed9b3a56df2f633ae487465fce85192730d30b9"
+}

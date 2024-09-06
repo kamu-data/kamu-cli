@@ -75,14 +75,17 @@ impl OutboxTransactionalProcessor {
         )
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
-    pub async fn run(&self) -> Result<(), InternalError> {
+    #[tracing::instrument(level = "info", skip_all)]
+    pub async fn pre_run(&self) -> Result<(), InternalError> {
         // Trace current routes
         self.debug_message_routes();
 
         // Make sure consumption records represent the routes
-        self.init_consumption_records().await?;
+        self.init_consumption_records().await
+    }
 
+    #[tracing::instrument(level = "info", skip_all)]
+    pub async fn run(&self) -> Result<(), InternalError> {
         // Main relay loop
         loop {
             self.run_relay_iteration().await?;
@@ -95,12 +98,6 @@ impl OutboxTransactionalProcessor {
     // To be used by tests only!
     #[tracing::instrument(level = "debug", skip_all)]
     pub async fn run_single_iteration_only(&self) -> Result<(), InternalError> {
-        // Trace current routes
-        self.debug_message_routes();
-
-        // Make sure consumption records represent the routes
-        self.init_consumption_records().await?;
-
         // Run single iteration instead of a loop
         self.run_relay_iteration().await?;
         Ok(())
@@ -121,7 +118,6 @@ impl OutboxTransactionalProcessor {
                     use futures::TryStreamExt;
                     let consumptions = outbox_consumption_repository
                         .list_consumption_boundaries()
-                        .await?
                         .try_collect::<Vec<_>>().await?;
 
                     // Build a set of producer-consumer pairs that already exist in the database
@@ -233,11 +229,10 @@ impl OutboxTransactionalProcessor {
             .transactional_with(
                 |outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>| async move {
                     let consumptions_stream = outbox_consumption_repository
-                        .list_consumption_boundaries()
-                        .await?;
+                        .list_consumption_boundaries();
 
-                        use futures::TryStreamExt;
-                        consumptions_stream.try_collect::<Vec<_>>().await
+                    use futures::TryStreamExt;
+                    consumptions_stream.try_collect::<Vec<_>>().await
                 },
             )
             .await
@@ -408,9 +403,11 @@ impl ProducerRelayJob {
         DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with(
                 |outbox_message_repository: Arc<dyn OutboxMessageRepository>| async move {
-                    let messages_stream = outbox_message_repository
-                        .get_producer_messages(&self.producer_name, above_id, batch_size)
-                        .await?;
+                    let messages_stream = outbox_message_repository.get_producer_messages(
+                        &self.producer_name,
+                        above_id,
+                        batch_size,
+                    );
 
                     use futures::TryStreamExt;
                     messages_stream.try_collect::<Vec<_>>().await

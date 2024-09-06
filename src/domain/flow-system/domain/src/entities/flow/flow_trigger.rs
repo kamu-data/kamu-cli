@@ -9,12 +9,13 @@
 
 use chrono::{DateTime, Utc};
 use opendatafabric::{AccountID, DatasetID};
+use serde::{Deserialize, Serialize};
 
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowTrigger {
     Manual(FlowTriggerManual),
     AutoPolling(FlowTriggerAutoPolling),
@@ -78,7 +79,7 @@ impl FlowTrigger {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowTriggerManual {
     pub trigger_time: DateTime<Utc>,
     pub initiator_account_id: AccountID,
@@ -92,14 +93,14 @@ pub type InitiatorIDStream<'a> = std::pin::Pin<
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowTriggerAutoPolling {
     pub trigger_time: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowTriggerPush {
     // TODO: source (HTTP, MQTT, CMD, ...)
     pub trigger_time: DateTime<Utc>,
@@ -108,7 +109,7 @@ pub struct FlowTriggerPush {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowTriggerInputDatasetFlow {
     pub trigger_time: DateTime<Utc>,
     pub dataset_id: DatasetID,

@@ -1,3 +1,5 @@
+/* ------------------------------ */
+
 CREATE TABLE accounts 
 (
     id VARCHAR(100) NOT NULL PRIMARY KEY,
@@ -14,8 +16,9 @@ CREATE TABLE accounts
 
 CREATE UNIQUE INDEX idx_accounts_name ON accounts(account_name);
 CREATE UNIQUE INDEX idx_accounts_email ON accounts(email);
-CREATE UNIQUE INDEX idx_provider_identity_key ON accounts(provider_identity_key);
+CREATE UNIQUE INDEX idx_accounts_provider_identity_key ON accounts(provider_identity_key);
 
+/* ------------------------------ */
 
 CREATE TABLE accounts_passwords(
     account_name VARCHAR(100) NOT NULL,
@@ -23,3 +26,5 @@ CREATE TABLE accounts_passwords(
 );
 
 CREATE UNIQUE INDEX idx_accounts_passwords_account_name ON accounts_passwords(account_name);
+
+/* ------------------------------ */

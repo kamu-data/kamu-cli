@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use database_common::DatabasePaginationOpts;
+use database_common::PaginationOpts;
 use internal_error::InternalError;
 use opendatafabric::AccountID;
 use thiserror::Error;
@@ -30,7 +30,7 @@ pub trait AccessTokenRepository: Send + Sync {
     async fn get_access_tokens_by_account_id(
         &self,
         account_id: &AccountID,
-        pagination: &DatabasePaginationOpts,
+        pagination: &PaginationOpts,
     ) -> Result<Vec<AccessToken>, GetAccessTokenError>;
 
     async fn get_access_tokens_count_by_account_id(
