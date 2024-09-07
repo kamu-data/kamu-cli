@@ -99,6 +99,10 @@ impl ApiError {
         Self::new(source, http::StatusCode::NOT_FOUND)
     }
 
+    pub fn not_implemented(source: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::new(source, http::StatusCode::NOT_IMPLEMENTED)
+    }
+
     pub fn not_found_without_body() -> Self {
         Self {
             source: "".into(),

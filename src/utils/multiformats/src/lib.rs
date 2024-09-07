@@ -14,6 +14,8 @@ mod errors;
 mod multibase;
 mod multicodec;
 mod multihash;
+mod private_key;
+mod signature;
 pub mod stack_string;
 
 pub use did_key::*;
@@ -21,5 +23,7 @@ pub use errors::*;
 pub use multibase::*;
 pub use multicodec::*;
 pub use multihash::*;
+pub use private_key::*;
+pub use signature::*;
 
 pub(crate) const MAX_VARINT_LEN: usize = 4;

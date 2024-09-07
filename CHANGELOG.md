@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Changed -->
 <!--- - Fixed -->
 
+## [Unreleased]
+### Added
+- REST API: The `/query` endpoint now supports request signing via brand new commitment scheme
+
 ## [0.199.1] - 2024-09-06
 ### Fixed
 - Fixed crash when a derived dataset is manually forced to update while an existing flow 

@@ -50,6 +50,10 @@ impl DidKey {
         Ok(Self { public_key: pk })
     }
 
+    pub fn new_ed25519(public_key: &ed25519::VerifyingKey) -> Self {
+        Self::new(Multicodec::Ed25519Pub, public_key.as_bytes()).unwrap()
+    }
+
     /// Creates DID from generated key pair using cryptographically secure RNG
     pub fn new_generated_ed25519() -> (ed25519::SigningKey, Self) {
         use rand::rngs::OsRng;
@@ -118,6 +122,14 @@ impl DidKey {
         let len = Multibase::decode(s, &mut buf[..]).map_err(|e| ParseError::new_from(s, e))?;
         Self::from_bytes(&buf[..len]).map_err(|e| ParseError::new_from(s, e))
     }
+
+    /// Verifies the message against the signature using DID as a public key
+    pub fn verify(&self, msg: &[u8], signature: &Signature) -> Result<(), ed25519::SignatureError> {
+        use ed25519::Verifier as _;
+
+        let public_key = ed25519::VerifyingKey::from_bytes(&self.public_key).unwrap();
+        public_key.verify(msg, signature)
+    }
 }
 
 impl Multiformat for DidKey {
@@ -138,6 +150,33 @@ impl std::fmt::Debug for DidKey {
 pub enum DidKeyError {
     #[error("Unsupported key type '{0}' key must be 'ed25519-pub")]
     UnsupportedKeyType(Multicodec),
+}
+
+impl serde::Serialize for DidKey {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let did = self.as_did_str().to_stack_string();
+        serializer.collect_str(&did)
+    }
+}
+
+struct DidKeyVisitor;
+
+impl<'de> serde::de::Visitor<'de> for DidKeyVisitor {
+    type Value = DidKey;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a canonical DID")
+    }
+
+    fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+        DidKey::from_did_str(v).map_err(serde::de::Error::custom)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for DidKey {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_str(DidKeyVisitor)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

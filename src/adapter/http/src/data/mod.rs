@@ -9,6 +9,7 @@
 
 mod ingest_handler;
 mod query_handler;
+pub mod query_types;
 mod router;
 mod tail_handler;
 

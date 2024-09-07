@@ -25,7 +25,7 @@ use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::DatasetRef;
 
-use super::query_handler::{DataFormat, SchemaFormat};
+use super::query_types::{DataFormat, SchemaFormat};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -52,14 +52,13 @@ pub async fn dataset_tail_handler(
         })?;
 
     let schema = if params.include_schema {
-        Some(super::query_handler::serialize_schema(df.schema(), params.schema_format).api_err()?)
+        Some(super::query_types::serialize_schema(df.schema(), params.schema_format).api_err()?)
     } else {
         None
     };
 
     let record_batches = df.collect().await.int_err().api_err()?;
-    let json =
-        super::query_handler::serialize_data(&record_batches, params.data_format).api_err()?;
+    let json = super::query_types::serialize_data(&record_batches, params.data_format).api_err()?;
     let data = serde_json::value::RawValue::from_string(json).unwrap();
 
     Ok(Json(TailResponseBody { data, schema }))

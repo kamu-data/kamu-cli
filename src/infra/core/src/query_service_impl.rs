@@ -91,93 +91,99 @@ impl QueryServiceImpl {
         &self,
         sql: &str,
         options: QueryOptions,
-    ) -> Result<QueryOptions, QueryError> {
+    ) -> Result<QueryState, QueryError> {
         use datafusion::sql::parser::Statement;
 
-        // If options already specify state - use it
-        if options.as_of_state.is_some() {
-            return Ok(options);
-        }
+        let name_resolution_enabled = options.input_datasets.is_empty();
 
-        // If options specify aliases - resolve state just for those datasets
-        if let Some(aliases) = &options.aliases {
-            let mut as_of_state = QueryState {
-                inputs: BTreeMap::new(),
-            };
-            for id in aliases.values() {
-                let dataset = self.dataset_repo.find_dataset_by_ref(&id.into()).await?;
+        if !name_resolution_enabled {
+            let mut input_datasets = BTreeMap::new();
 
-                // TODO: Do we leak any info by not checking read permissions here?
-                let hash = dataset
-                    .as_metadata_chain()
-                    .resolve_ref(&BlockRef::Head)
-                    .await
-                    .int_err()?;
+            for (id, opts) in options.input_datasets {
+                let block_hash = if let Some(block_hash) = opts.block_hash {
+                    block_hash
+                } else {
+                    // SECURITY: We expect that access permissions will be validated during
+                    // the query execution and that we're not leaking information here if the
+                    // user doesn't have access to this dataset.
+                    let dataset = self
+                        .dataset_repo
+                        .find_dataset_by_ref(&id.as_local_ref())
+                        .await?;
 
-                as_of_state.inputs.insert(id.clone(), hash);
+                    dataset
+                        .as_metadata_chain()
+                        .resolve_ref(&BlockRef::Head)
+                        .await
+                        .int_err()?
+                };
+
+                input_datasets.insert(
+                    id,
+                    QueryStateDataset {
+                        alias: opts.alias,
+                        block_hash,
+                    },
+                );
             }
-            return Ok(QueryOptions {
-                as_of_state: Some(as_of_state),
-                ..options
-            });
-        }
+            Ok(QueryState { input_datasets })
+        } else {
+            // In the name resolution mode we have to inspect SQL to
+            // understand which datasets the query is using and populate the block hashes
+            // and aliases for them
+            let mut table_refs = Vec::new();
 
-        // Since neither state nor aliases are present - we have to inspect SQL to
-        // understand which datasets the query is using and populate the state and
-        // aliases for them
-        let mut table_refs = Vec::new();
+            let statements = datafusion::sql::parser::DFParser::parse_sql(sql)
+                .map_err(|e| DataFusionError::SQL(e, None))?;
 
-        let statements = datafusion::sql::parser::DFParser::parse_sql(sql)
-            .map_err(|e| DataFusionError::SQL(e, None))?;
-
-        for stmt in statements {
-            match stmt {
-                Statement::Statement(stmt) => {
-                    table_refs.append(&mut extract_table_refs(&stmt)?);
+            for stmt in statements {
+                match stmt {
+                    Statement::Statement(stmt) => {
+                        table_refs.append(&mut extract_table_refs(&stmt)?);
+                    }
+                    Statement::CreateExternalTable(_)
+                    | Statement::CopyTo(_)
+                    | Statement::Explain(_) => {}
                 }
-                Statement::CreateExternalTable(_)
-                | Statement::CopyTo(_)
-                | Statement::Explain(_) => {}
             }
-        }
 
-        // Resolve table references into datasets.
-        // We simply ignore unresolvable, letting query to fail at the execution stage.
-        let mut aliases = BTreeMap::new();
-        let mut as_of_state = QueryState {
-            inputs: BTreeMap::new(),
-        };
-        for mut table in table_refs {
-            // Strip possible `kamu.kamu.` prefix
-            while table.0.len() > 1 && table.0[0].value == "kamu" {
-                table.0.remove(0);
-            }
-            if table.0.len() == 1 {
-                let alias = table.0.pop().unwrap().value;
-                let Ok(dataset_ref) = DatasetRef::try_from(&alias) else {
-                    tracing::warn!(alias, "Ignoring table with invalid alias");
-                    continue;
-                };
-                let Ok(hdl) = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await else {
-                    tracing::warn!(?dataset_ref, "Ignoring table with unresolvable alias");
-                    continue;
-                };
-                let dataset = self.dataset_repo.get_dataset_by_handle(&hdl);
-                let hash = dataset
-                    .as_metadata_chain()
-                    .resolve_ref(&BlockRef::Head)
-                    .await
-                    .int_err()?;
-                aliases.insert(alias, hdl.id.clone());
-                as_of_state.inputs.insert(hdl.id, hash);
-            }
-        }
+            // Resolve table references into datasets.
+            // We simply ignore unresolvable, letting query to fail at the execution stage.
+            let mut input_datasets = BTreeMap::new();
 
-        Ok(QueryOptions {
-            aliases: Some(aliases),
-            as_of_state: Some(as_of_state),
-            hints: options.hints,
-        })
+            for mut table in table_refs {
+                // Strip possible `kamu.kamu.` prefix
+                while table.0.len() > 1 && table.0[0].value == "kamu" {
+                    table.0.remove(0);
+                }
+                if table.0.len() == 1 {
+                    let alias = table.0.pop().unwrap().value;
+                    let Ok(dataset_ref) = DatasetRef::try_from(&alias) else {
+                        tracing::warn!(alias, "Ignoring table with invalid alias");
+                        continue;
+                    };
+                    let Ok(hdl) = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await else {
+                        tracing::warn!(?dataset_ref, "Ignoring table with unresolvable alias");
+                        continue;
+                    };
+
+                    // SECURITY: We expect that access permissions will be validated during
+                    // the query execution and that we're not leaking information here if the user
+                    // doesn't have access to this dataset.
+                    let dataset = self.dataset_repo.get_dataset_by_handle(&hdl);
+
+                    let block_hash = dataset
+                        .as_metadata_chain()
+                        .resolve_ref(&BlockRef::Head)
+                        .await
+                        .int_err()?;
+
+                    input_datasets.insert(hdl.id.clone(), QueryStateDataset { alias, block_hash });
+                }
+            }
+
+            Ok(QueryState { input_datasets })
+        }
     }
 
     async fn single_dataset(
@@ -194,17 +200,16 @@ impl QueryServiceImpl {
         let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
 
         let ctx = self.session_context(QueryOptions {
-            aliases: Some(BTreeMap::from([(
-                dataset_handle.alias.to_string(),
+            input_datasets: BTreeMap::from([(
                 dataset_handle.id.clone(),
-            )])),
-            as_of_state: None,
-            hints: Some(BTreeMap::from([(
-                dataset_handle.id,
-                DatasetQueryHints {
-                    last_records_to_consider,
+                QueryOptionsDataset {
+                    alias: dataset_handle.alias.to_string(),
+                    block_hash: None,
+                    hints: Some(DatasetQueryHints {
+                        last_records_to_consider,
+                    }),
                 },
-            )])),
+            )]),
         });
 
         let df = ctx
@@ -358,15 +363,34 @@ impl QueryService for QueryServiceImpl {
     ) -> Result<QueryResponse, QueryError> {
         tracing::info!(statement, "Executing SQL query");
 
-        let resolved_options = self.resolve_query_state(statement, options.clone()).await?;
+        let state = self.resolve_query_state(statement, options.clone()).await?;
 
         tracing::info!(
             original_options = ?options,
-            ?resolved_options,
-            "Resolved SQL query",
+            resolved_state = ?state,
+            "Resolved SQL query state",
         );
 
-        let state = resolved_options.as_of_state.clone().unwrap();
+        // Map resolved state back to options (including hints) for query planner
+        let options = QueryOptions {
+            input_datasets: state
+                .input_datasets
+                .iter()
+                .map(|(id, s)| {
+                    (
+                        id.clone(),
+                        QueryOptionsDataset {
+                            alias: s.alias.clone(),
+                            block_hash: Some(s.block_hash.clone()),
+                            hints: options
+                                .input_datasets
+                                .get(id)
+                                .and_then(|opt| opt.hints.clone()),
+                        },
+                    )
+                })
+                .collect(),
+        };
         let ctx = self.session_context(options);
         let df = ctx.sql(statement).await?;
 

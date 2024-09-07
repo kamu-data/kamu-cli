@@ -604,11 +604,13 @@ async fn test_sql_statement_by_alias() {
         .sql_statement(
             statement,
             QueryOptions {
-                aliases: Some(BTreeMap::from([(
-                    "foobar".to_string(),
+                input_datasets: BTreeMap::from([(
                     dataset.dataset_handle.id,
-                )])),
-                ..Default::default()
+                    QueryOptionsDataset {
+                        alias: "foobar".to_string(),
+                        ..Default::default()
+                    },
+                )]),
             },
         )
         .await
@@ -654,11 +656,13 @@ async fn test_sql_statement_alias_not_found() {
         .sql_statement(
             statement.as_str(),
             QueryOptions {
-                aliases: Some(BTreeMap::from([(
-                    dataset_alias.to_string(),
+                input_datasets: BTreeMap::from([(
                     DatasetID::new_seeded_ed25519(b"does-not-exist"),
-                )])),
-                ..Default::default()
+                    QueryOptionsDataset {
+                        alias: dataset_alias.to_string(),
+                        ..Default::default()
+                    },
+                )]),
             },
         )
         .await;
@@ -770,14 +774,17 @@ async fn test_sql_statement_with_state_simple() {
     .await;
 
     assert_eq!(
-        res.state.inputs,
+        res.state.input_datasets,
         BTreeMap::from([(
             foo_id.clone(),
-            foo_dataset
-                .as_metadata_chain()
-                .resolve_ref(&BlockRef::Head)
-                .await
-                .unwrap()
+            QueryStateDataset {
+                alias: "foo".to_string(),
+                block_hash: foo_dataset
+                    .as_metadata_chain()
+                    .resolve_ref(&BlockRef::Head)
+                    .await
+                    .unwrap()
+            }
         )])
     );
 
@@ -825,8 +832,21 @@ async fn test_sql_statement_with_state_simple() {
                 "#
             ),
             QueryOptions {
-                as_of_state: Some(res.state),
-                ..Default::default()
+                input_datasets: res
+                    .state
+                    .input_datasets
+                    .into_iter()
+                    .map(|(id, s)| {
+                        (
+                            id,
+                            QueryOptionsDataset {
+                                alias: s.alias,
+                                block_hash: Some(s.block_hash),
+                                ..Default::default()
+                            },
+                        )
+                    })
+                    .collect(),
             },
         )
         .await
@@ -1038,24 +1058,30 @@ async fn test_sql_statement_with_state_cte() {
     .await;
 
     assert_eq!(
-        res.state.inputs,
+        res.state.input_datasets,
         BTreeMap::from([
             (
                 foo_id.clone(),
-                foo_dataset
-                    .as_metadata_chain()
-                    .resolve_ref(&BlockRef::Head)
-                    .await
-                    .unwrap()
+                QueryStateDataset {
+                    alias: "foo".to_string(),
+                    block_hash: foo_dataset
+                        .as_metadata_chain()
+                        .resolve_ref(&BlockRef::Head)
+                        .await
+                        .unwrap()
+                }
             ),
             (
                 bar_id.clone(),
-                bar_dataset
-                    .as_metadata_chain()
-                    .resolve_ref(&BlockRef::Head)
-                    .await
-                    .unwrap()
-            )
+                QueryStateDataset {
+                    alias: "bar".to_string(),
+                    block_hash: bar_dataset
+                        .as_metadata_chain()
+                        .resolve_ref(&BlockRef::Head)
+                        .await
+                        .unwrap()
+                }
+            ),
         ])
     );
 
@@ -1178,8 +1204,21 @@ async fn test_sql_statement_with_state_cte() {
                 "#
             ),
             QueryOptions {
-                as_of_state: Some(res.state.clone()),
-                ..Default::default()
+                input_datasets: res
+                    .state
+                    .input_datasets
+                    .iter()
+                    .map(|(id, s)| {
+                        (
+                            id.clone(),
+                            QueryOptionsDataset {
+                                alias: s.alias.clone(),
+                                block_hash: Some(s.block_hash.clone()),
+                                ..Default::default()
+                            },
+                        )
+                    })
+                    .collect(),
             },
         )
         .await
@@ -1219,12 +1258,38 @@ async fn test_sql_statement_with_state_cte() {
             order by 1
             "#,
             QueryOptions {
-                aliases: Some(BTreeMap::from([
-                    ("fooz".to_string(), foo_id.clone()),
-                    ("barz".to_string(), bar_id.clone()),
-                ])),
-                as_of_state: Some(res.state),
-                ..Default::default()
+                input_datasets: BTreeMap::from([
+                    (
+                        foo_id.clone(),
+                        QueryOptionsDataset {
+                            alias: "fooz".to_string(),
+                            block_hash: Some(
+                                res.state
+                                    .input_datasets
+                                    .get(&foo_id)
+                                    .unwrap()
+                                    .block_hash
+                                    .clone(),
+                            ),
+                            ..Default::default()
+                        },
+                    ),
+                    (
+                        bar_id.clone(),
+                        QueryOptionsDataset {
+                            alias: "barz".to_string(),
+                            block_hash: Some(
+                                res.state
+                                    .input_datasets
+                                    .get(&bar_id)
+                                    .unwrap()
+                                    .block_hash
+                                    .clone(),
+                            ),
+                            ..Default::default()
+                        },
+                    ),
+                ]),
             },
         )
         .await

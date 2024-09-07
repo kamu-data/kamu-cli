@@ -27,6 +27,18 @@ pub trait DatasetActionAuthorizer: Sync + Send {
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError>;
 
+    async fn is_action_allowed(
+        &self,
+        dataset_handle: &DatasetHandle,
+        action: DatasetAction,
+    ) -> Result<bool, InternalError> {
+        match self.check_action_allowed(dataset_handle, action).await {
+            Ok(()) => Ok(true),
+            Err(DatasetActionUnauthorizedError::Access(_)) => Ok(false),
+            Err(DatasetActionUnauthorizedError::Internal(err)) => Err(err),
+        }
+    }
+
     async fn get_allowed_actions(&self, dataset_handle: &DatasetHandle) -> HashSet<DatasetAction>;
 }
 

@@ -574,6 +574,10 @@ pub fn register_config_in_catalog(
             .to_infra_cfg(),
     );
 
+    if let Some(identity_config) = config.identity.as_ref().unwrap().to_infra_cfg() {
+        catalog_builder.add_value(identity_config);
+    }
+
     let ipfs_conf = config.protocol.as_ref().unwrap().ipfs.as_ref().unwrap();
 
     catalog_builder.add_value(IpfsGateway {

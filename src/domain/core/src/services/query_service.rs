@@ -83,23 +83,30 @@ pub trait QueryService: Send + Sync {
 
 #[derive(Debug, Clone, Default)]
 pub struct QueryOptions {
-    /// Maps the table names used in a query to globally unique dataset
-    /// identifiers. If aliases are not provided - the table names will be
-    /// treated as dataset references and resolved as normally in the context of
-    /// the calling user. If at least one alias is specified - the name
-    /// resolution will be disabled, thus you should either provide all aliases
-    /// or none.
-    pub aliases: Option<BTreeMap<String, DatasetID>>,
-    /// Provides state information that should be used for query execution. This
-    /// is used to achieve full reproducibility of queries as no matter what
-    /// updates happen in the datasets - the query will only consider a specific
-    /// subset of the data ledger.
-    pub as_of_state: Option<QueryState>,
+    /// Options for datasets used as query inputs. If options for at least one
+    /// dataset are specified the name resolution will be disabled, so you
+    /// should either provide them for all datasets or none. If no options are
+    /// provided the table names in the query will be treated as dataset
+    /// references and resolved as normally in the context of the calling
+    /// user.
+    pub input_datasets: BTreeMap<DatasetID, QueryOptionsDataset>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct QueryOptionsDataset {
+    /// Associates a table name in a query with the globally unique dataset
+    /// identifier.
+    pub alias: String,
+    /// Last block hash of an input dataset that should be used for query
+    /// execution. This is used to achieve full reproducibility of queries
+    /// as no matter what updates happen in the datasets - the query will
+    /// only consider a specific subset of the data ledger.
+    pub block_hash: Option<Multihash>,
     /// Hints that can help the system to minimize metadata scanning. Be extra
     /// careful that your hints don't influence the actual result of the
     /// query, as they are not inlcuded in the [`QueryState`] and thus can
     /// ruin reproducibility if misused.
-    pub hints: Option<BTreeMap<DatasetID, DatasetQueryHints>>,
+    pub hints: Option<DatasetQueryHints>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -125,9 +132,17 @@ pub struct QueryResponse {
 
 #[derive(Debug, Clone)]
 pub struct QueryState {
-    /// Last block hases of input datasets that were considered during the query
-    /// planning
-    pub inputs: BTreeMap<DatasetID, Multihash>,
+    /// State of the input datasets used in the query
+    pub input_datasets: BTreeMap<DatasetID, QueryStateDataset>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QueryStateDataset {
+    /// Alias of the dataset used in the query
+    pub alias: String,
+    /// Last block hash that was considered during the
+    /// query planning
+    pub block_hash: Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -145,12 +160,12 @@ pub struct EngineDesc {
     pub latest_image: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
 pub enum QueryDialect {
-    SqlSpark,
-    SqlFlink,
     SqlDataFusion,
+    SqlFlink,
     SqlRisingWave,
+    SqlSpark,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

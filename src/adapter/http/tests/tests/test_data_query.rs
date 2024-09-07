@@ -15,6 +15,7 @@ use datafusion::arrow::datatypes::*;
 use datafusion::prelude::*;
 use kamu::domain::*;
 use kamu::*;
+use kamu_adapter_http::data::query_types::IdentityConfig;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::*;
 use serde_json::json;
@@ -38,8 +39,16 @@ impl Harness {
         // TODO: Need access to these from harness level
         let run_info_dir = tempfile::tempdir().unwrap();
 
+        let identity_config = IdentityConfig {
+            private_key: ed25519_dalek::SigningKey::from_bytes(
+                &[123; ed25519_dalek::SECRET_KEY_LENGTH],
+            )
+            .into(),
+        };
+
         let catalog = dill::CatalogBuilder::new()
             .add_value(RunInfoDir::new(run_info_dir.path()))
+            .add_value(identity_config)
             .add::<DataFormatRegistryImpl>()
             .add::<QueryServiceImpl>()
             .add::<PushIngestServiceImpl>()
@@ -269,6 +278,208 @@ async fn test_data_query_handler_full() {
                 }
             })
         );
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_query_handler_v2() {
+    let harness = Harness::new().await;
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+
+        let head = cl
+            .get(format!("{}/refs/head", harness.dataset_url))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+
+        let query = format!(
+            "select offset, city, population from \"{}\" order by offset desc",
+            harness.dataset_handle.alias
+        );
+
+        // 1: Output only
+        let res = cl
+            .post(&format!("{}query", harness.root_url))
+            .json(&json!({
+                "query": query,
+                "includeInput": false,
+                "includeSchema": false,
+                "sign": false,
+            }))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap(),
+            json!({
+                "output": {
+                    "data": [
+                        {"city": "B", "offset": 1, "population": 200},
+                        {"city": "A", "offset": 0, "population": 100},
+                    ],
+                    "dataFormat": "JsonAos",
+                }
+            })
+        );
+
+        // 2: Include inputs
+        let res = cl
+            .post(&format!("{}query", harness.root_url))
+            .json(&json!({
+                "query": query,
+                "sign": false,
+            }))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        let response = res.json::<serde_json::Value>().await.unwrap();
+        let ignore_schema = response["output"]["schema"].as_str().unwrap();
+
+        assert_eq!(
+            response,
+            json!({
+                "input": {
+                    "query": query,
+                    "queryDialect": "SqlDataFusion",
+                    "dataFormat": "JsonAos",
+                    "schemaFormat": "ArrowJson",
+                    "skip": 0,
+                    "limit": 100,
+                    "datasets": [{
+                        "alias": "kamu-server/population",
+                        "blockHash": head,
+                        "id": harness.dataset_handle.id.as_did_str().to_string(),
+                    }],
+                    "includeInput": true,
+                    "includeSchema": true,
+                    "sign": false,
+                },
+                "output": {
+                    "data": [
+                        {"city": "B", "offset": 1, "population": 200},
+                        {"city": "A", "offset": 0, "population": 100},
+                    ],
+                    "dataFormat": "JsonAos",
+                    "schema": ignore_schema,
+                    "schemaFormat": "ArrowJson",
+                }
+            })
+        );
+
+        // 3: Sign
+        let res = cl
+            .post(&format!("{}query", harness.root_url))
+            .json(&json!({
+                "query": query,
+                "sign": true,
+            }))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        let response = res.json::<serde_json::Value>().await.unwrap();
+        let ignore_schema = response["output"]["schema"].as_str().unwrap();
+
+        assert_eq!(
+            response,
+            json!({
+                "input": {
+                    "query": query,
+                    "queryDialect": "SqlDataFusion",
+                    "dataFormat": "JsonAos",
+                    "schemaFormat": "ArrowJson",
+                    "skip": 0,
+                    "limit": 100,
+                    "datasets": [{
+                        "alias": "kamu-server/population",
+                        "blockHash": head,
+                        "id": harness.dataset_handle.id.as_did_str().to_string(),
+                    }],
+                    "includeInput": true,
+                    "includeSchema": true,
+                    "sign": true,
+                },
+                "output": {
+                    "data": [
+                        {"city": "B", "offset": 1, "population": 200},
+                        {"city": "A", "offset": 0, "population": 100},
+                    ],
+                    "dataFormat": "JsonAos",
+                    "schema": ignore_schema,
+                    "schemaFormat": "ArrowJson",
+                },
+                "subQueries": [],
+                "commitment": {
+                    "inputHash": "f1620a8bfd82883faac205b9928276ef9d3fb7f0c2a777eab5ce34764f7dac61c45db",
+                    "outputHash": "f16205df27bb7e790bb1fc48132b6239a3829ec3a177bd7e253c76cf31b54e195f11c",
+                    "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
+                },
+                "proof": {
+                    "type": "Ed25519Signature2020",
+                    "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
+                    "proofValue": "u1XOIByD-4BgRVZLPHvS3Ewd1Mz-1PiHNbXijbEHRBAAh8sRQi4ZqLzpXusy0zJzigrfO1UJEjEJPl7h2ITfgCA",
+                }
+            })
+        );
+
+        // Verify the commitment
+        assert_eq!(
+            response["commitment"]["inputHash"].as_str().unwrap(),
+            Multihash::from_digest_sha3_256(
+                canonical_json::to_string(&response["input"])
+                    .unwrap()
+                    .as_bytes()
+            )
+            .to_string()
+        );
+        assert_eq!(
+            response["commitment"]["outputHash"].as_str().unwrap(),
+            Multihash::from_digest_sha3_256(
+                canonical_json::to_string(&response["output"])
+                    .unwrap()
+                    .as_bytes()
+            )
+            .to_string()
+        );
+        assert_eq!(
+            response["commitment"]["subQueriesHash"].as_str().unwrap(),
+            Multihash::from_digest_sha3_256(
+                canonical_json::to_string(&response["subQueries"])
+                    .unwrap()
+                    .as_bytes()
+            )
+            .to_string()
+        );
+
+        let signature =
+            Signature::from_multibase(response["proof"]["proofValue"].as_str().unwrap()).unwrap();
+
+        let did = DidKey::from_did_str(response["proof"]["verificationMethod"].as_str().unwrap())
+            .unwrap();
+
+        let commitment = canonical_json::to_string(&response["commitment"]).unwrap();
+
+        did.verify(commitment.as_bytes(), &signature).unwrap();
     };
 
     await_client_server_flow!(harness.server_harness.api_server_run(), client);

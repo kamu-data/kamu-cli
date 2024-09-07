@@ -2066,6 +2066,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "canonical_json"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f89083fd014d71c47a718d7f4ac050864dac8587668dbe90baf9e261064c5710"
+dependencies = [
+ "hex",
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "cargo-platform"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5159,12 +5172,14 @@ dependencies = [
  "axum-extra",
  "base64 0.22.1",
  "bytes",
+ "canonical_json",
  "chrono",
  "container-runtime",
  "database-common",
  "database-common-macros",
  "datafusion",
  "dill",
+ "ed25519-dalek",
  "flate2",
  "fs_extra",
  "futures",
@@ -6693,6 +6708,7 @@ dependencies = [
 name = "multiformats"
 version = "0.199.1"
 dependencies = [
+ "base64 0.22.1",
  "bs58",
  "digest 0.10.7",
  "ed25519-dalek",

@@ -14,6 +14,7 @@ use kamu::utils::docker_images;
 use kamu_accounts::*;
 use kamu_datasets::DatasetEnvVarsConfig;
 use merge::Merge;
+use opendatafabric::{self as odf, PrivateKey};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use url::Url;
@@ -24,54 +25,59 @@ use url::Url;
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct CLIConfig {
-    /// Engine configuration
-    #[merge(strategy = merge_recursive)]
-    pub engine: Option<EngineConfig>,
-
-    /// Source configuration
-    #[merge(strategy = merge_recursive)]
-    pub source: Option<SourceConfig>,
-
-    /// Network protocols configuration
-    #[merge(strategy = merge_recursive)]
-    pub protocol: Option<ProtocolConfig>,
-
-    /// Data access and visualization configuration
-    #[merge(strategy = merge_recursive)]
-    pub frontend: Option<FrontendConfig>,
-
-    /// Users configuration
-    #[merge(strategy = merge_recursive)]
-    pub users: Option<PredefinedAccountsConfig>,
-
     /// Database connection configuration
     pub database: Option<DatabaseConfig>,
-
-    /// Uploads configuration
-    #[merge(strategy = merge_recursive)]
-    pub uploads: Option<UploadsConfig>,
 
     /// Dataset environment variables configuration
     #[merge(strategy = merge_recursive)]
     pub dataset_env_vars: Option<DatasetEnvVarsConfig>,
 
+    /// Engine configuration
+    #[merge(strategy = merge_recursive)]
+    pub engine: Option<EngineConfig>,
+
+    /// Data access and visualization configuration
+    #[merge(strategy = merge_recursive)]
+    pub frontend: Option<FrontendConfig>,
+
+    /// UNSTABLE: Identity configuration
+    #[merge(strategy = merge_recursive)]
+    pub identity: Option<IdentityConfig>,
+
     /// Messaging outbox configuration
     #[merge(strategy = merge_recursive)]
     pub outbox: Option<OutboxConfig>,
+
+    /// Network protocols configuration
+    #[merge(strategy = merge_recursive)]
+    pub protocol: Option<ProtocolConfig>,
+
+    /// Source configuration
+    #[merge(strategy = merge_recursive)]
+    pub source: Option<SourceConfig>,
+
+    /// Users configuration
+    #[merge(strategy = merge_recursive)]
+    pub users: Option<PredefinedAccountsConfig>,
+
+    /// Uploads configuration
+    #[merge(strategy = merge_recursive)]
+    pub uploads: Option<UploadsConfig>,
 }
 
 impl CLIConfig {
     pub fn new() -> Self {
         Self {
-            engine: None,
-            source: None,
-            protocol: None,
-            frontend: None,
-            users: None,
             database: None,
-            uploads: None,
             dataset_env_vars: None,
+            engine: None,
+            frontend: None,
+            identity: None,
             outbox: None,
+            protocol: None,
+            source: None,
+            users: None,
+            uploads: None,
         }
     }
 
@@ -81,15 +87,16 @@ impl CLIConfig {
     // otherwise be omitted
     pub fn sample() -> Self {
         Self {
-            engine: Some(EngineConfig::sample()),
-            source: Some(SourceConfig::sample()),
-            protocol: Some(ProtocolConfig::sample()),
-            frontend: Some(FrontendConfig::sample()),
-            users: Some(PredefinedAccountsConfig::sample()),
             database: Some(DatabaseConfig::sample()),
-            uploads: Some(UploadsConfig::sample()),
             dataset_env_vars: Some(DatasetEnvVarsConfig::sample()),
+            engine: Some(EngineConfig::sample()),
+            frontend: Some(FrontendConfig::sample()),
+            identity: Some(IdentityConfig::sample()),
             outbox: Some(OutboxConfig::sample()),
+            protocol: Some(ProtocolConfig::sample()),
+            source: Some(SourceConfig::sample()),
+            users: Some(PredefinedAccountsConfig::sample()),
+            uploads: Some(UploadsConfig::sample()),
         }
     }
 }
@@ -97,15 +104,16 @@ impl CLIConfig {
 impl Default for CLIConfig {
     fn default() -> Self {
         Self {
-            engine: Some(EngineConfig::default()),
-            source: Some(SourceConfig::default()),
-            protocol: Some(ProtocolConfig::default()),
-            frontend: Some(FrontendConfig::default()),
-            users: Some(PredefinedAccountsConfig::default()),
             database: None,
-            uploads: Some(UploadsConfig::default()),
             dataset_env_vars: Some(DatasetEnvVarsConfig::default()),
+            engine: Some(EngineConfig::default()),
+            frontend: Some(FrontendConfig::default()),
+            identity: Some(IdentityConfig::default()),
             outbox: Some(OutboxConfig::default()),
+            protocol: Some(ProtocolConfig::default()),
+            source: Some(SourceConfig::default()),
+            users: Some(PredefinedAccountsConfig::default()),
+            uploads: Some(UploadsConfig::default()),
         }
     }
 }
@@ -669,6 +677,51 @@ pub struct AwsSecretDatabasePasswordPolicyConfig {
 #[serde(rename_all = "camelCase")]
 pub struct AwsIamTokenPasswordPolicyConfig {
     pub user_name: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Identity
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Default, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct IdentityConfig {
+    /// Private key used to sign API responses.
+    /// Currently only `ed25519` keys are supported.
+    ///
+    /// To generate use:
+    ///
+    ///     dd if=/dev/urandom bs=1 count=32 status=none |
+    ///         base64 -w0 |
+    ///         tr '+/' '-_' |
+    ///         tr -d '=' |
+    ///         (echo -n u && cat)
+    ///
+    /// The command above:
+    /// - reads 32 random bytes
+    /// - base64-encodes them
+    /// - converts default base64 encoding to base64url and removes padding
+    /// - prepends a multibase prefix
+    pub private_key: Option<odf::PrivateKey>,
+}
+
+impl IdentityConfig {
+    pub fn new() -> Self {
+        Self { private_key: None }
+    }
+
+    fn sample() -> Self {
+        Self {
+            private_key: Some(PrivateKey::from_bytes(&[0; 32])),
+        }
+    }
+
+    pub fn to_infra_cfg(&self) -> Option<kamu_adapter_http::data::query_types::IdentityConfig> {
+        self.private_key
+            .clone()
+            .map(|private_key| kamu_adapter_http::data::query_types::IdentityConfig { private_key })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
