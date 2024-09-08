@@ -8,5 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod api_error;
+pub mod comma_separated;
 
 pub use api_error::*;

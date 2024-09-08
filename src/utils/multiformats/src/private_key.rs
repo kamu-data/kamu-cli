@@ -16,7 +16,7 @@ pub struct PrivateKey(ed25519_dalek::SigningKey);
 // Don't leak secrets in debug logs
 impl std::fmt::Debug for PrivateKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("PrivateKey").field(&"...").finish()
+        f.write_str("PrivateKey(***)")
     }
 }
 

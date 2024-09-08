@@ -80,6 +80,42 @@ impl Harness {
             .await
             .unwrap();
 
+        for event in [
+            SetAttachments {
+                attachments: Attachments::Embedded(AttachmentsEmbedded {
+                    items: vec![AttachmentEmbedded {
+                        path: "README.md".to_string(),
+                        content: "Blah".to_string(),
+                    }],
+                }),
+            }
+            .into(),
+            SetInfo {
+                description: Some("Test dataset".to_string()),
+                keywords: Some(vec!["foo".to_string(), "bar".to_string()]),
+            }
+            .into(),
+            SetLicense {
+                short_name: "apache-2.0".to_string(),
+                name: "apache-2.0".to_string(),
+                spdx_id: None,
+                website_url: "https://www.apache.org/licenses/LICENSE-2.0".to_string(),
+            }
+            .into(),
+        ] {
+            create_result
+                .dataset
+                .commit_event(
+                    event,
+                    CommitOpts {
+                        system_time: Some(system_time),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+        }
+
         let ctx = SessionContext::new();
         let mut writer = DataWriterDataFusion::builder(create_result.dataset.clone(), ctx.clone())
             .with_metadata_state_scanned(None)
@@ -309,14 +345,13 @@ async fn test_data_query_handler_v2() {
             harness.dataset_handle.alias
         );
 
-        // 1: Output only
+        // 1: Defaults - output only
         let res = cl
             .post(&format!("{}query", harness.root_url))
             .json(&json!({
                 "query": query,
-                "includeInput": false,
-                "includeSchema": false,
-                "sign": false,
+                // TODO: Remove after V2 transition
+                "queryDialect": "SqlDataFusion",
             }))
             .send()
             .await
@@ -324,7 +359,7 @@ async fn test_data_query_handler_v2() {
             .error_for_status()
             .unwrap();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "output": {
@@ -337,12 +372,12 @@ async fn test_data_query_handler_v2() {
             })
         );
 
-        // 2: Include inputs
+        // 2: Input and schema
         let res = cl
             .post(&format!("{}query", harness.root_url))
             .json(&json!({
                 "query": query,
-                "sign": false,
+                "include": ["input", "schema"],
             }))
             .send()
             .await
@@ -353,10 +388,11 @@ async fn test_data_query_handler_v2() {
         let response = res.json::<serde_json::Value>().await.unwrap();
         let ignore_schema = response["output"]["schema"].as_str().unwrap();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             response,
             json!({
                 "input": {
+                    "include": ["Input", "Schema"],
                     "query": query,
                     "queryDialect": "SqlDataFusion",
                     "dataFormat": "JsonAos",
@@ -368,9 +404,6 @@ async fn test_data_query_handler_v2() {
                         "blockHash": head,
                         "id": harness.dataset_handle.id.as_did_str().to_string(),
                     }],
-                    "includeInput": true,
-                    "includeSchema": true,
-                    "sign": false,
                 },
                 "output": {
                     "data": [
@@ -384,12 +417,12 @@ async fn test_data_query_handler_v2() {
             })
         );
 
-        // 3: Sign
+        // 3: Full with proof
         let res = cl
             .post(&format!("{}query", harness.root_url))
             .json(&json!({
                 "query": query,
-                "sign": true,
+                "include": ["schema", "proof"],
             }))
             .send()
             .await
@@ -400,10 +433,12 @@ async fn test_data_query_handler_v2() {
         let response = res.json::<serde_json::Value>().await.unwrap();
         let ignore_schema = response["output"]["schema"].as_str().unwrap();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             response,
             json!({
                 "input": {
+                    // Note: Proof automatically adds Input
+                    "include": ["Input", "Proof", "Schema"],
                     "query": query,
                     "queryDialect": "SqlDataFusion",
                     "dataFormat": "JsonAos",
@@ -415,9 +450,6 @@ async fn test_data_query_handler_v2() {
                         "blockHash": head,
                         "id": harness.dataset_handle.id.as_did_str().to_string(),
                     }],
-                    "includeInput": true,
-                    "includeSchema": true,
-                    "sign": true,
                 },
                 "output": {
                     "data": [
@@ -430,14 +462,14 @@ async fn test_data_query_handler_v2() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620a8bfd82883faac205b9928276ef9d3fb7f0c2a777eab5ce34764f7dac61c45db",
+                    "inputHash": "f162001ff67ca8970bcb4f4f8b25e79b3c6db3fcd2ac0501d131e446591fd0475a2af",
                     "outputHash": "f16205df27bb7e790bb1fc48132b6239a3829ec3a177bd7e253c76cf31b54e195f11c",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "u1XOIByD-4BgRVZLPHvS3Ewd1Mz-1PiHNbXijbEHRBAAh8sRQi4ZqLzpXusy0zJzigrfO1UJEjEJPl7h2ITfgCA",
+                    "proofValue": "ueVlIWSbdPK3G7zjC_W0hhDXoqjY1vcvi9HWYPDt6cqVtIq3J2IhCpjF4AXyXbIh_9tKPH90S6qOquZNb1UxTAQ",
                 }
             })
         );
@@ -900,6 +932,109 @@ async fn test_data_query_handler_schema_formats() {
                 .as_str()
                 .unwrap(),
             r#"{"name": "arrow_schema", "type": "struct", "fields": [{"name": "offset", "repetition": "OPTIONAL", "type": "INT64"}, {"name": "city", "repetition": "REQUIRED", "type": "BYTE_ARRAY", "logicalType": "STRING"}, {"name": "population", "repetition": "REQUIRED", "type": "INT64", "logicalType": "INTEGER(64,false)"}]}"#
+        );
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_metadata_query_handler() {
+    let harness = Harness::new().await;
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+
+        let head = cl
+            .get(format!("{}/refs/head", harness.dataset_url))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+
+        // Default (seed only)
+        let url = format!("{}/metadata", harness.dataset_url);
+        let res = cl
+            .get(&url)
+            //.query(&[])
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        pretty_assertions::assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap(),
+            json!({
+                "output": {
+                    "seed": {
+                        "datasetId": harness.dataset_handle.id.to_string(),
+                        "datasetKind": "Root",
+                    }
+                }
+            })
+        );
+
+        // Full
+        let url = format!("{}/metadata", harness.dataset_url);
+        let res = cl
+            .get(&url)
+            .query(&[("include", "attachments,info,license,refs,schema,seed,vocab")])
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        let res = res.json::<serde_json::Value>().await.unwrap();
+        let ignore_schema = &res["output"]["schema"];
+        pretty_assertions::assert_eq!(
+            res,
+            json!({
+                "output": {
+                    "attachments": {
+                        "attachments": {
+                            "kind": "Embedded",
+                            "items": [{
+                                "path": "README.md",
+                                "content": "Blah",
+                            }],
+                        }
+                    },
+                    "info": {
+                        "description": "Test dataset",
+                        "keywords": ["foo", "bar"],
+                    },
+                    "license": {
+                        "name": "apache-2.0",
+                        "shortName": "apache-2.0",
+                        "websiteUrl": "https://www.apache.org/licenses/LICENSE-2.0",
+                    },
+                    "refs": [{
+                        "name": "head",
+                        "blockHash": head,
+                    }],
+                    "schema": ignore_schema,
+                    "schemaFormat": "ArrowJson",
+                    "seed": {
+                        "datasetId": harness.dataset_handle.id.to_string(),
+                        "datasetKind": "Root",
+                    },
+                    "vocab": {
+                        "eventTimeColumn": "event_time",
+                        "offsetColumn": "offset",
+                        "operationTypeColumn": "op",
+                        "systemTimeColumn": "system_time",
+                    }
+                }
+            })
         );
     };
 

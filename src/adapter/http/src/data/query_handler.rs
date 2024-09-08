@@ -46,6 +46,12 @@ async fn dataset_query_handler_post_v2(
     catalog: Catalog,
     mut body: RequestBodyV2,
 ) -> Result<Json<ResponseBody>, ApiError> {
+    // Automatically add `Input` if proof is requested, as proof depends on input
+    // for verifiability
+    if body.include.contains(&Include::Proof) {
+        body.include.insert(Include::Input);
+    }
+
     let identity = catalog.get_one::<IdentityConfig>().ok();
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
 
@@ -64,9 +70,9 @@ async fn dataset_query_handler_post_v2(
         .int_err()
         .api_err()?;
 
-    let (schema, schema_format) = if body.include_schema {
+    let (schema, schema_format) = if body.include.contains(&Include::Schema) {
         (
-            Some(serialize_schema(df.schema(), body.schema_format).api_err()?),
+            Some(serialize_schema(df.schema().as_arrow(), body.schema_format).api_err()?),
             Some(body.schema_format),
         )
     } else {
@@ -86,15 +92,17 @@ async fn dataset_query_handler_post_v2(
         schema_format,
     };
 
-    let sign = body.sign;
-    let input = if !body.include_input && !body.sign {
-        None
-    } else {
-        body.datasets = Some(RequestBodyV2::query_state_to_datasets(res.state));
-        Some(body)
-    };
+    let include_proof = body.include.contains(&Include::Proof);
 
-    let response = if !sign {
+    let input =
+        if !body.include.contains(&Include::Input) && !body.include.contains(&Include::Proof) {
+            None
+        } else {
+            body.datasets = Some(RequestBodyV2::query_state_to_datasets(res.state));
+            Some(body)
+        };
+
+    let response = if !include_proof {
         ResponseBody::V2(ResponseBodyV2 { input, output })
     } else if let Some(identity) = identity {
         use ed25519_dalek::Signer;
@@ -158,7 +166,7 @@ async fn dataset_query_handler_post_v1(
     let arrow_schema = df.schema().inner().clone();
 
     let schema = if body.include_schema {
-        Some(serialize_schema(df.schema(), body.schema_format).api_err()?)
+        Some(serialize_schema(df.schema().as_arrow(), body.schema_format).api_err()?)
     } else {
         None
     };

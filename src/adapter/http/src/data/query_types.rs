@@ -16,8 +16,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
+use http_common::comma_separated::CommaSeparatedSet;
 use internal_error::*;
 use kamu::domain;
 use opendatafabric::{self as odf, Multihash};
@@ -64,7 +65,10 @@ mod tests {
             .into(),
         };
 
-        assert_eq!(format!("{cfg:?}"), "IdentityConfig { private_key: ... }");
+        assert_eq!(
+            format!("{cfg:?}"),
+            "IdentityConfig { private_key: PrivateKey(***) }"
+        );
     }
 }
 
@@ -96,6 +100,10 @@ pub struct RequestBodyV2 {
     #[serde(default)]
     pub data_format: DataFormat,
 
+    /// What information to include
+    #[serde(default = "RequestBodyV2::default_include")]
+    pub include: BTreeSet<Include>,
+
     /// What representation to use for the schema
     #[serde(default)]
     pub schema_format: SchemaFormat,
@@ -105,15 +113,6 @@ pub struct RequestBodyV2 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub datasets: Option<Vec<DatasetState>>,
 
-    /// Whether to include schema info about the response
-    #[serde(default = "RequestBodyV2::default_include_schema")]
-    pub include_schema: bool,
-
-    /// Whether to include "input" section that can be used to reproduce the
-    /// query
-    #[serde(default = "RequestBodyV2::default_include_input")]
-    pub include_input: bool,
-
     /// Pagination: skips first N records
     #[serde(default)]
     pub skip: u64,
@@ -121,10 +120,6 @@ pub struct RequestBodyV2 {
     /// Pagination: limits number of records in response to N
     #[serde(default = "RequestBodyV2::default_limit")]
     pub limit: u64,
-
-    /// Whether to provide a cryptographic commitment with the response
-    #[serde(default = "RequestBodyV2::default_sign")]
-    pub sign: bool,
 }
 
 impl RequestBodyV2 {
@@ -136,16 +131,8 @@ impl RequestBodyV2 {
         100
     }
 
-    fn default_include_schema() -> bool {
-        true
-    }
-
-    fn default_include_input() -> bool {
-        true
-    }
-
-    fn default_sign() -> bool {
-        false
+    fn default_include() -> BTreeSet<Include> {
+        BTreeSet::new()
     }
 
     pub fn to_options(&self) -> domain::QueryOptions {
@@ -185,10 +172,45 @@ impl RequestBodyV2 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    strum::Display,
+    strum::EnumString,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[strum(serialize_all = "PascalCase")]
+#[strum(ascii_case_insensitive)]
+pub enum Include {
+    /// Include input block that can be used to fully reproduce the query
+    #[serde(alias = "input")]
+    Input,
+
+    /// Include cryptographic proof that lets you hold the node accountable for
+    /// the response
+    #[serde(alias = "proof")]
+    Proof,
+
+    /// Include schema of the data query resulted in
+    #[serde(alias = "schema")]
+    Schema,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RequestParams {
     pub query: String,
+
+    #[serde(default = "RequestBodyV2::default_query_dialect")]
+    pub query_dialect: domain::QueryDialect,
 
     #[serde(default)]
     pub skip: u64,
@@ -203,31 +225,50 @@ pub struct RequestParams {
     #[serde(default)]
     pub schema_format: SchemaFormat,
 
+    // TODO: Remove after V2 transition
     #[serde(alias = "schema")]
     #[serde(default = "RequestBodyV1::default_include_schema")]
     pub include_schema: bool,
 
+    // TODO: Remove after V2 transition
     #[serde(default = "RequestBodyV1::default_include_state")]
     pub include_state: bool,
 
+    // TODO: Remove after V2 transition
     #[serde(default = "RequestBodyV1::default_include_data_hash")]
     pub include_data_hash: bool,
+
+    /// What information to include in the response
+    pub include: Option<CommaSeparatedSet<Include>>,
 }
 
 impl From<RequestParams> for RequestBody {
     fn from(v: RequestParams) -> Self {
-        Self::V1(RequestBodyV1 {
-            query: v.query,
-            data_format: v.data_format,
-            schema_format: v.schema_format,
-            include_schema: v.include_schema,
-            include_state: v.include_state,
-            skip: v.skip,
-            limit: v.limit,
-            include_data_hash: v.include_data_hash,
-            aliases: None,
-            as_of_state: None,
-        })
+        if let Some(include) = v.include {
+            Self::V2(RequestBodyV2 {
+                query: v.query,
+                query_dialect: v.query_dialect,
+                data_format: v.data_format,
+                include: include.into(),
+                schema_format: v.schema_format,
+                datasets: None,
+                skip: v.skip,
+                limit: v.limit,
+            })
+        } else {
+            Self::V1(RequestBodyV1 {
+                query: v.query,
+                data_format: v.data_format,
+                schema_format: v.schema_format,
+                include_schema: v.include_schema,
+                include_state: v.include_state,
+                skip: v.skip,
+                limit: v.limit,
+                include_data_hash: v.include_data_hash,
+                aliases: None,
+                as_of_state: None,
+            })
+        }
     }
 }
 
@@ -418,24 +459,21 @@ pub enum SchemaFormat {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn serialize_schema(
-    schema: &datafusion::common::DFSchema,
+    schema: &datafusion::arrow::datatypes::Schema,
     format: SchemaFormat,
 ) -> Result<String, InternalError> {
     use kamu_data_utils::schema::{convert, format};
 
     let mut buf = Vec::new();
     match format {
-        SchemaFormat::ArrowJson => {
-            let arrow_schema = datafusion::arrow::datatypes::Schema::from(schema);
-            format::write_schema_arrow_json(&mut buf, &arrow_schema)
-        }
+        SchemaFormat::ArrowJson => format::write_schema_arrow_json(&mut buf, schema),
         SchemaFormat::Parquet => format::write_schema_parquet(
             &mut buf,
-            convert::dataframe_schema_to_parquet_schema(schema).as_ref(),
+            convert::arrow_schema_to_parquet_schema(schema).as_ref(),
         ),
         SchemaFormat::ParquetJson => format::write_schema_parquet_json(
             &mut buf,
-            convert::dataframe_schema_to_parquet_schema(schema).as_ref(),
+            convert::arrow_schema_to_parquet_schema(schema).as_ref(),
         ),
     }
     .int_err()?;

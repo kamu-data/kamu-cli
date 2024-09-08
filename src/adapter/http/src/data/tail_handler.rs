@@ -52,7 +52,10 @@ pub async fn dataset_tail_handler(
         })?;
 
     let schema = if params.include_schema {
-        Some(super::query_types::serialize_schema(df.schema(), params.schema_format).api_err()?)
+        Some(
+            super::query_types::serialize_schema(df.schema().as_arrow(), params.schema_format)
+                .api_err()?,
+        )
     } else {
         None
     };

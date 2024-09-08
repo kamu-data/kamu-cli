@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- REST API: The `/query` endpoint now supports request signing via brand new commitment scheme
+- REST API: The `/query` endpoint now supports response proofs via reproducibility and signing (#816)
+- REST API: New `/{dataset}/metadata` endpoint for retrieving schema, description, attachments etc. (#816)
 
 ## [0.199.1] - 2024-09-06
 ### Fixed

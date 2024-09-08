@@ -299,3 +299,13 @@ impl ApiErrorCategorizable for InsertError {
         }
     }
 }
+
+impl ApiErrorCategorizable for QueryError {
+    fn categorize(&self) -> ApiErrorCategory<'_> {
+        match &self {
+            Self::Access(e) => ApiErrorCategory::Access(e),
+            Self::Internal(e) => ApiErrorCategory::Internal(e),
+            _ => ApiErrorCategory::Other,
+        }
+    }
+}
