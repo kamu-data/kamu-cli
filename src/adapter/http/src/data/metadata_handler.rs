@@ -101,7 +101,7 @@ pub struct Output {
 
     pub refs: Option<Vec<Ref>>,
 
-    pub schema: Option<String>,
+    pub schema: Option<query_types::Schema>,
     pub schema_format: Option<query_types::SchemaFormat>,
 
     #[serde_as(as = "Option<odf::serde::yaml::SeedDef>")]
@@ -187,10 +187,12 @@ pub async fn dataset_metadata_handler(
         .map(|schema| schema.schema_as_arrow())
         .transpose()
         .int_err()?
-        .map(|schema| query_types::serialize_schema(&schema, params.schema_format))
-        .transpose()
-        .int_err()?
-        .map(|schema| (schema, params.schema_format))
+        .map(|schema| {
+            (
+                query_types::Schema::new(schema, params.schema_format),
+                params.schema_format,
+            )
+        })
         .unzip();
 
     let seed = seed_visitor.and_then(vis::SearchSingleTypedBlockVisitor::into_event);

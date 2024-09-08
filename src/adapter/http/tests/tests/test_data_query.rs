@@ -386,7 +386,7 @@ async fn test_data_query_handler_v2() {
             .unwrap();
 
         let response = res.json::<serde_json::Value>().await.unwrap();
-        let ignore_schema = response["output"]["schema"].as_str().unwrap();
+        let ignore_schema = &response["output"]["schema"];
 
         pretty_assertions::assert_eq!(
             response,
@@ -431,7 +431,7 @@ async fn test_data_query_handler_v2() {
             .unwrap();
 
         let response = res.json::<serde_json::Value>().await.unwrap();
-        let ignore_schema = response["output"]["schema"].as_str().unwrap();
+        let ignore_schema = &response["output"]["schema"];
 
         pretty_assertions::assert_eq!(
             response,
@@ -463,13 +463,13 @@ async fn test_data_query_handler_v2() {
                 "subQueries": [],
                 "commitment": {
                     "inputHash": "f162001ff67ca8970bcb4f4f8b25e79b3c6db3fcd2ac0501d131e446591fd0475a2af",
-                    "outputHash": "f16205df27bb7e790bb1fc48132b6239a3829ec3a177bd7e253c76cf31b54e195f11c",
+                    "outputHash": "f1620fa841fae69710c888fdf82d8fd63948469c0fd1e2a37c16e2067127e2eec1ea8",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "ueVlIWSbdPK3G7zjC_W0hhDXoqjY1vcvi9HWYPDt6cqVtIq3J2IhCpjF4AXyXbIh_9tKPH90S6qOquZNb1UxTAQ",
+                    "proofValue": "u-k8Rd9dB5ERqbTU9ymUvpySTQEh8HMPAqcEBrtZviNOBFoe-FXZtJUGcvwud39dxC659bkVz4iYHhDYUexmiCQ",
                 }
             })
         );
@@ -942,7 +942,7 @@ async fn test_data_query_handler_schema_formats() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_metadata_query_handler() {
+async fn test_metadata_handler_aspects() {
     let harness = Harness::new().await;
 
     let client = async move {
@@ -1033,6 +1033,181 @@ async fn test_metadata_query_handler() {
                         "operationTypeColumn": "op",
                         "systemTimeColumn": "system_time",
                     }
+                }
+            })
+        );
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_metadata_handler_schema_formats() {
+    let harness = Harness::new().await;
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+
+        let query_url = format!("{}/metadata", harness.dataset_url);
+        let res = cl
+            .get(&query_url)
+            .query(&[("include", "schema"), ("schemaFormat", "ArrowJson")])
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        pretty_assertions::assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap(),
+            json!({
+                "output": {
+                    "schemaFormat": "ArrowJson",
+                    "schema": {
+                        "fields": [
+                            {
+                                "data_type": "Int64",
+                                "dict_id": 0,
+                                "dict_is_ordered": false,
+                                "metadata": {},
+                                "name": "offset",
+                                "nullable": true
+                            },
+                            {
+                                "data_type": "Int32",
+                                "dict_id": 0,
+                                "dict_is_ordered": false,
+                                "metadata": {},
+                                "name": "op",
+                                "nullable": false
+                            },
+                            {
+                                "data_type": {
+                                    "Timestamp": [
+                                        "Millisecond",
+                                        "UTC"
+                                    ]
+                                },
+                                "dict_id": 0,
+                                "dict_is_ordered": false,
+                                "metadata": {},
+                                "name": "system_time",
+                                "nullable": false
+                            },
+                            {
+                                "data_type": {
+                                    "Timestamp": [
+                                        "Millisecond",
+                                        "UTC"
+                                    ]
+                                },
+                                "dict_id": 0,
+                                "dict_is_ordered": false,
+                                "metadata": {},
+                                "name": "event_time",
+                                "nullable": true
+                            },
+                            {
+                                "data_type": "Utf8",
+                                "dict_id": 0,
+                                "dict_is_ordered": false,
+                                "metadata": {},
+                                "name": "city",
+                                "nullable": false
+                            },
+                            {
+                                "data_type": "UInt64",
+                                "dict_id": 0,
+                                "dict_is_ordered": false,
+                                "metadata": {},
+                                "name": "population",
+                                "nullable": false
+                            }
+                        ],
+                        "metadata": {}
+                    },
+                }
+            })
+        );
+
+        let query_url = format!("{}/metadata", harness.dataset_url);
+        let res = cl
+            .get(&query_url)
+            .query(&[("include", "schema"), ("schemaFormat", "ParquetJson")])
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        pretty_assertions::assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap(),
+            json!({
+                "output": {
+                    "schemaFormat": "ParquetJson",
+                    "schema": {
+                        "name": "arrow_schema",
+                        "type": "struct",
+                        "fields": [
+                            {
+                                "name": "offset",
+                                "repetition": "OPTIONAL",
+                                "type": "INT64"
+                            },
+                            {
+                                "name": "op",
+                                "repetition": "REQUIRED",
+                                "type": "INT32"
+                            },
+                            {
+                                "logicalType": "TIMESTAMP(MILLIS,true)",
+                                "name": "system_time",
+                                "repetition": "REQUIRED",
+                                "type": "INT64"
+                            },
+                            {
+                                "logicalType": "TIMESTAMP(MILLIS,true)",
+                                "name": "event_time",
+                                "repetition": "OPTIONAL",
+                                "type": "INT64"
+                            },
+                            {
+                                "logicalType": "STRING",
+                                "name": "city",
+                                "repetition": "REQUIRED",
+                                "type": "BYTE_ARRAY"
+                            },
+                            {
+                                "logicalType": "INTEGER(64,false)",
+                                "name": "population",
+                                "repetition": "REQUIRED",
+                                "type": "INT64"
+                            }
+                        ],
+                    },
+                }
+            })
+        );
+
+        let query_url = format!("{}/metadata", harness.dataset_url);
+        let res = cl
+            .get(&query_url)
+            .query(&[("include", "schema"), ("schemaFormat", "Parquet")])
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        pretty_assertions::assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap(),
+            json!({
+                "output": {
+                    "schemaFormat": "Parquet",
+                    "schema": "message arrow_schema {\n  OPTIONAL INT64 offset;\n  REQUIRED INT32 op;\n  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));\n  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));\n  REQUIRED BYTE_ARRAY city (STRING);\n  REQUIRED INT64 population (INTEGER(64,false));\n}\n",
                 }
             })
         );

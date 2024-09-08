@@ -72,7 +72,7 @@ async fn dataset_query_handler_post_v2(
 
     let (schema, schema_format) = if body.include.contains(&Include::Schema) {
         (
-            Some(serialize_schema(df.schema().as_arrow(), body.schema_format).api_err()?),
+            Some(Schema::new(df.schema().inner().clone(), body.schema_format)),
             Some(body.schema_format),
         )
     } else {

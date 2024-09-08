@@ -334,7 +334,7 @@ pub struct Outputs {
 
     /// Schema of the resulting data
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub schema: Option<String>,
+    pub schema: Option<Schema>,
 
     /// What representation is used for the schema
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -458,6 +458,55 @@ pub enum SchemaFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
+pub struct Schema {
+    schema: datafusion::arrow::datatypes::SchemaRef,
+    format: SchemaFormat,
+}
+
+impl Schema {
+    pub fn new(schema: datafusion::arrow::datatypes::SchemaRef, format: SchemaFormat) -> Self {
+        Self { schema, format }
+    }
+}
+
+impl serde::Serialize for Schema {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use kamu_data_utils::schema::{convert, format};
+
+        match self.format {
+            SchemaFormat::ArrowJson => self.schema.serialize(serializer),
+            SchemaFormat::ParquetJson => {
+                let mut buf = Vec::new();
+
+                format::write_schema_parquet_json(
+                    &mut buf,
+                    convert::arrow_schema_to_parquet_schema(&self.schema).as_ref(),
+                )
+                .unwrap();
+
+                // TODO: PERF: Avoid re-serialization
+                let json: serde_json::Value = serde_json::from_slice(&buf).unwrap();
+                json.serialize(serializer)
+            }
+            SchemaFormat::Parquet => {
+                let mut buf = Vec::new();
+
+                format::write_schema_parquet(
+                    &mut buf,
+                    convert::arrow_schema_to_parquet_schema(&self.schema).as_ref(),
+                )
+                .unwrap();
+
+                serializer.collect_str(&std::str::from_utf8(&buf).unwrap())
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Remove after V2 transition
 pub(crate) fn serialize_schema(
     schema: &datafusion::arrow::datatypes::Schema,
     format: SchemaFormat,
