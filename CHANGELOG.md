@@ -9,10 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Changed -->
 <!--- - Fixed -->
 
-## [Unreleased]
+## [0.199.2] - 2024-09-09
 ### Added
 - REST API: The `/query` endpoint now supports response proofs via reproducibility and signing (#816)
 - REST API: New `/{dataset}/metadata` endpoint for retrieving schema, description, attachments etc. (#816)
+### Fixed
+- Fixed unguaranteed ordering of events when restoring event sourcing aggregates
 
 ## [0.199.1] - 2024-09-06
 ### Fixed
