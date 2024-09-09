@@ -59,10 +59,11 @@ impl SqliteFlowConfigurationEventStore {
                 EventModel,
                 r#"
                 SELECT event_id, event_payload as "event_payload: _"
-                    FROM flow_configuration_events
-                    WHERE system_flow_type = $1
-                        AND (cast($2 as INT8) IS NULL or event_id > $2)
-                        AND (cast($3 as INT8) IS NULL or event_id <= $3)
+                FROM flow_configuration_events
+                WHERE system_flow_type = $1
+                    AND (cast($2 as INT8) IS NULL or event_id > $2)
+                    AND (cast($3 as INT8) IS NULL or event_id <= $3)
+                ORDER BY event_id ASC
                 "#,
                 fk_system.flow_type,
                 maybe_from_id,
@@ -101,11 +102,12 @@ impl SqliteFlowConfigurationEventStore {
                 EventModel,
                 r#"
                 SELECT event_id, event_payload as "event_payload: _"
-                    FROM flow_configuration_events
-                    WHERE dataset_id = $1
-                        AND dataset_flow_type = $2
-                        AND (cast($3 as INT8) IS NULL or event_id > $3)
-                        AND (cast($4 as INT8) IS NULL or event_id <= $4)
+                FROM flow_configuration_events
+                WHERE dataset_id = $1
+                    AND dataset_flow_type = $2
+                    AND (cast($3 as INT8) IS NULL or event_id > $3)
+                    AND (cast($4 as INT8) IS NULL or event_id <= $4)
+                ORDER BY event_id ASC
                 "#,
                 dataset_id,
                 fk_dataset.flow_type,

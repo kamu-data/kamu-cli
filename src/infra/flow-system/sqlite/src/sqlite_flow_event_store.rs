@@ -194,6 +194,7 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
                 WHERE flow_id = $1
                     AND (cast($2 as INT8) IS NULL OR event_id > $2)
                     AND (cast($3 as INT8) IS NULL OR event_id <= $3)
+                ORDER BY event_id ASC
                 "#,
                 flow_id,
                 maybe_from_id,

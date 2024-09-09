@@ -48,6 +48,7 @@ impl PostgresFlowConfigurationEventStore {
                 WHERE system_flow_type = ($1::text)::system_flow_type
                     AND (cast($2 as INT8) IS NULL or event_id > $2)
                     AND (cast($3 as INT8) IS NULL or event_id <= $3)
+                ORDER BY event_id ASC
                 "#,
                 fk_system.flow_type as SystemFlowType,
                 maybe_from_id,
@@ -87,6 +88,7 @@ impl PostgresFlowConfigurationEventStore {
                     AND dataset_flow_type = ($2::text)::dataset_flow_type
                     AND (cast($3 as INT8) IS NULL or event_id > $3)
                     AND (cast($4 as INT8) IS NULL or event_id <= $4)
+                ORDER BY event_id ASC
                 "#,
                 fk_dataset.dataset_id.to_string(),
                 fk_dataset.flow_type as DatasetFlowType,
