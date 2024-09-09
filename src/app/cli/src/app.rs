@@ -24,8 +24,11 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
-use kamu_flow_system_inmem::domain::FlowConfigurationUpdatedMessage;
-use kamu_flow_system_services::MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE;
+use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
+use kamu_flow_system_services::{
+    MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+};
 use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
@@ -446,6 +449,7 @@ pub fn configure_base_catalog(
         &mut b,
         MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     );
+    register_message_dispatcher::<FlowProgressMessage>(&mut b, MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE);
 
     b
 }

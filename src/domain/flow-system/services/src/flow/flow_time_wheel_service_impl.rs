@@ -12,12 +12,25 @@ use std::collections::{BinaryHeap, HashMap};
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
-use dill::{component, interface, scope, Singleton};
+use dill::{component, interface, meta, scope, Catalog, Singleton};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system::{
     FlowID,
+    FlowProgressMessage,
     FlowTimeWheelService,
     TimeWheelCancelActivationError,
     TimeWheelFlowNotPlannedError,
+};
+use messaging_outbox::{
+    MessageConsumer,
+    MessageConsumerMeta,
+    MessageConsumerT,
+    MessageConsumptionDurability,
+};
+
+use crate::{
+    MESSAGE_CONSUMER_KAMU_FLOW_TIME_WHEEL_SERVICE,
+    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,11 +104,52 @@ impl FlowRecord {
 
 #[component(pub)]
 #[interface(dyn FlowTimeWheelService)]
+#[interface(dyn MessageConsumer)]
+#[interface(dyn MessageConsumerT<FlowProgressMessage>)]
+#[meta(MessageConsumerMeta {
+    consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_TIME_WHEEL_SERVICE,
+    feeding_producers: &[
+        MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE
+    ],
+    durability: MessageConsumptionDurability::Durable,
+})]
 #[scope(Singleton)]
 impl FlowTimeWheelServiceImpl {
     pub fn new() -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
+        }
+    }
+
+    fn activate_at(&self, activation_time: DateTime<Utc>, flow_id: FlowID) {
+        let mut guard = self.state.lock().unwrap();
+
+        match guard.flow_activation_times_by_id.get(&flow_id) {
+            Some(earlier_activation_time) => {
+                if activation_time < *earlier_activation_time {
+                    guard.unplan_flow(flow_id);
+                    guard.plan_flow(FlowRecord::new(activation_time, flow_id));
+                }
+            }
+            None => {
+                guard.plan_flow(FlowRecord::new(activation_time, flow_id));
+            }
+        }
+    }
+
+    fn cancel_flow_activation(
+        &self,
+        flow_id: FlowID,
+    ) -> Result<(), TimeWheelCancelActivationError> {
+        let mut guard = self.state.lock().unwrap();
+
+        if guard.flow_activation_times_by_id.contains_key(&flow_id) {
+            guard.unplan_flow(flow_id);
+            Ok(())
+        } else {
+            Err(TimeWheelCancelActivationError::FlowNotPlanned(
+                TimeWheelFlowNotPlannedError { flow_id },
+            ))
         }
     }
 }
@@ -135,40 +189,35 @@ impl FlowTimeWheelService for FlowTimeWheelServiceImpl {
         }
     }
 
-    fn activate_at(&self, activation_time: DateTime<Utc>, flow_id: FlowID) {
-        let mut guard = self.state.lock().unwrap();
-
-        match guard.flow_activation_times_by_id.get(&flow_id) {
-            Some(earlier_activation_time) => {
-                if activation_time < *earlier_activation_time {
-                    guard.unplan_flow(flow_id);
-                    guard.plan_flow(FlowRecord::new(activation_time, flow_id));
-                }
-            }
-            None => {
-                guard.plan_flow(FlowRecord::new(activation_time, flow_id));
-            }
-        }
-    }
-
     fn get_planned_flow_activation_time(&self, flow_id: FlowID) -> Option<DateTime<Utc>> {
         let guard = self.state.lock().unwrap();
         guard.flow_activation_times_by_id.get(&flow_id).copied()
     }
+}
 
-    fn cancel_flow_activation(
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl MessageConsumer for FlowTimeWheelServiceImpl {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl MessageConsumerT<FlowProgressMessage> for FlowTimeWheelServiceImpl {
+    async fn consume_message(
         &self,
-        flow_id: FlowID,
-    ) -> Result<(), TimeWheelCancelActivationError> {
-        let mut guard = self.state.lock().unwrap();
-
-        if guard.flow_activation_times_by_id.contains_key(&flow_id) {
-            guard.unplan_flow(flow_id);
-            Ok(())
-        } else {
-            Err(TimeWheelCancelActivationError::FlowNotPlanned(
-                TimeWheelFlowNotPlannedError { flow_id },
-            ))
+        _: &Catalog,
+        message: &FlowProgressMessage,
+    ) -> Result<(), InternalError> {
+        match message {
+            FlowProgressMessage::Enqueued(e) => {
+                self.activate_at(e.activate_at, e.flow_id);
+                Ok(())
+            }
+            FlowProgressMessage::Cancelled(e) => {
+                self.cancel_flow_activation(e.flow_id).int_err()?;
+                Ok(())
+            }
+            FlowProgressMessage::Running(_) | FlowProgressMessage::Finished(_) => Ok(()),
         }
     }
 }
@@ -260,7 +309,7 @@ mod tests {
         assert!(timewheel.nearest_activation_moment().is_none());
     }
 
-    fn schedule_flow(timewheel: &dyn FlowTimeWheelService, moment: DateTime<Utc>, flow_id: u64) {
+    fn schedule_flow(timewheel: &FlowTimeWheelServiceImpl, moment: DateTime<Utc>, flow_id: u64) {
         timewheel.activate_at(moment, FlowID::new(flow_id));
     }
 

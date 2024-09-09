@@ -19,12 +19,7 @@ pub trait FlowTimeWheelService: Send + Sync {
 
     fn take_nearest_planned_flows(&self) -> Vec<FlowID>;
 
-    fn activate_at(&self, activation_time: DateTime<Utc>, flow_id: FlowID);
-
     fn get_planned_flow_activation_time(&self, flow_id: FlowID) -> Option<DateTime<Utc>>;
-
-    fn cancel_flow_activation(&self, flow_id: FlowID)
-        -> Result<(), TimeWheelCancelActivationError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

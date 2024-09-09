@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::{FlowConfigurationRule, FlowKey};
+use crate::{FlowConfigurationRule, FlowID, FlowKey, FlowOutcome};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,8 +41,80 @@ impl Message for FlowExecutorUpdatedMessage {}
 pub enum FlowExecutorUpdateDetails {
     Loaded,
     ExecutedTimeslot,
-    FlowRunning,
-    FlowFinished,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum FlowProgressMessage {
+    Enqueued(FlowProgressMessageEnqueued),
+    Running(FlowProgressMessageRunning),
+    Finished(FlowProgressMessageFinished),
+    Cancelled(FlowProgressMessageCancelled),
+}
+
+impl Message for FlowProgressMessage {}
+
+impl FlowProgressMessage {
+    pub fn enqueued(
+        event_time: DateTime<Utc>,
+        flow_id: FlowID,
+        activate_at: DateTime<Utc>,
+    ) -> Self {
+        Self::Enqueued(FlowProgressMessageEnqueued {
+            event_time,
+            flow_id,
+            activate_at,
+        })
+    }
+
+    pub fn running(event_time: DateTime<Utc>, flow_id: FlowID) -> Self {
+        Self::Running(FlowProgressMessageRunning {
+            event_time,
+            flow_id,
+        })
+    }
+
+    pub fn finished(event_time: DateTime<Utc>, flow_id: FlowID, outcome: FlowOutcome) -> Self {
+        Self::Finished(FlowProgressMessageFinished {
+            event_time,
+            flow_id,
+            outcome,
+        })
+    }
+
+    pub fn cancelled(event_time: DateTime<Utc>, flow_id: FlowID) -> Self {
+        Self::Cancelled(FlowProgressMessageCancelled {
+            event_time,
+            flow_id,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FlowProgressMessageEnqueued {
+    pub event_time: DateTime<Utc>,
+    pub flow_id: FlowID,
+    pub activate_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FlowProgressMessageRunning {
+    pub event_time: DateTime<Utc>,
+    pub flow_id: FlowID,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FlowProgressMessageFinished {
+    pub event_time: DateTime<Utc>,
+    pub flow_id: FlowID,
+    pub outcome: FlowOutcome,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FlowProgressMessageCancelled {
+    pub event_time: DateTime<Utc>,
+    pub flow_id: FlowID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
