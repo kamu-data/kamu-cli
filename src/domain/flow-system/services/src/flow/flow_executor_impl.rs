@@ -402,13 +402,12 @@ impl FlowExecutor for FlowExecutorImpl {
     }
 
     /// Runs the update main loop
-    #[tracing::instrument(level = "info", skip_all)]
     async fn run(&self) -> Result<(), InternalError> {
         // Main scanning loop
-        let main_loop_span = tracing::debug_span!("FlowExecutor main loop");
-        let _ = main_loop_span.enter();
-
         loop {
+            let tick_span = tracing::trace_span!("FlowExecutor::tick");
+            let _ = tick_span.enter();
+
             let current_time = self.time_source.now();
 
             // Do we have a timeslot scheduled?
@@ -419,6 +418,9 @@ impl FlowExecutor for FlowExecutorImpl {
             if let Some(nearest_activation_time) = maybe_nearest_activation_time
                 && nearest_activation_time <= current_time
             {
+                let activation_span = tracing::info_span!("FlowExecutor::activation");
+                let _ = activation_span.enter();
+
                 DatabaseTransactionRunner::new(self.catalog.clone())
                     .transactional(|target_catalog: Catalog| async move {
                         // Run scheduling for current time slot. Should not throw any errors

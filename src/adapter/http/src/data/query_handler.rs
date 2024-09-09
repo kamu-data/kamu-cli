@@ -42,10 +42,13 @@ pub async fn dataset_query_handler_post(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tracing::instrument(level = "info", skip_all)]
 async fn dataset_query_handler_post_v2(
     catalog: Catalog,
     mut body: RequestBodyV2,
 ) -> Result<Json<ResponseBody>, ApiError> {
+    tracing::debug!(request = ?body, "Query");
+
     // Automatically add `Input` if proof is requested, as proof depends on input
     // for verifiability
     if body.include.contains(&Include::Proof) {
@@ -142,10 +145,13 @@ async fn dataset_query_handler_post_v2(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tracing::instrument(level = "info", skip_all)]
 async fn dataset_query_handler_post_v1(
     catalog: Catalog,
     body: RequestBodyV1,
 ) -> Result<Json<ResponseBody>, ApiError> {
+    tracing::debug!(request = ?body, "Query");
+
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
 
     let res = query_svc

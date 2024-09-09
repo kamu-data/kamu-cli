@@ -161,7 +161,7 @@ impl PushCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for PushCommand {
-    async fn before_run(&self) -> Result<(), CLIError> {
+    async fn validate_args(&self) -> Result<(), CLIError> {
         if self.refs.is_empty() && !self.all {
             return Err(CLIError::usage_error("Specify a dataset or pass --all"));
         }

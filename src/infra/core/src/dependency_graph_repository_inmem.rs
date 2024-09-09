@@ -35,7 +35,7 @@ impl DependencyGraphRepository for DependencyGraphRepositoryInMemory {
             let mut datasets_stream = self.dataset_repo.get_all_datasets();
 
             while let Some(Ok(dataset_handle)) = datasets_stream.next().await {
-                let dataset_span = tracing::debug_span!("Scanning dataset dependencies", dataset=%dataset_handle);
+                let dataset_span = tracing::debug_span!("Scanning dataset dependencies", dataset = %dataset_handle);
                 let _ = dataset_span.enter();
 
                 let summary = self

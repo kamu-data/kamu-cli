@@ -130,6 +130,7 @@ impl TaskExecutorImpl {
         }
     }
 
+    #[tracing::instrument(level = "info", skip_all, fields(task_id = %task.task_id))]
     async fn run_task(&self, task: &Task) -> Result<TaskOutcome, InternalError> {
         let task_outcome = self
             .task_logical_plan_runner
@@ -190,7 +191,6 @@ impl TaskExecutor for TaskExecutorImpl {
     }
 
     // TODO: Error and panic handling strategy
-    #[tracing::instrument(level = "info", skip_all)]
     async fn run(&self) -> Result<(), InternalError> {
         loop {
             self.run_task_iteration().await?;

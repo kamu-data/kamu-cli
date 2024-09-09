@@ -37,7 +37,7 @@ impl OutboxTransactionalImpl {
 
 #[async_trait::async_trait]
 impl Outbox for OutboxTransactionalImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(producer_name, content_json))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%producer_name, %content_json))]
     async fn post_message_as_json(
         &self,
         producer_name: &str,

@@ -14,6 +14,8 @@ use internal_error::InternalError;
 use kamu_core::*;
 use url::Url;
 
+use super::object_store_with_tracing::ObjectStoreWithTracing;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
@@ -35,7 +37,9 @@ impl ObjectStoreBuilder for ObjectStoreBuilderLocalFs {
 
     #[tracing::instrument(level = "info", skip_all)]
     fn build_object_store(&self) -> Result<Arc<dyn object_store::ObjectStore>, InternalError> {
-        Ok(Arc::new(object_store::local::LocalFileSystem::new()))
+        Ok(Arc::new(ObjectStoreWithTracing::new(
+            object_store::local::LocalFileSystem::new(),
+        )))
     }
 }
 

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -14,6 +15,7 @@ use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use database_common::DatabaseTransactionRunner;
 use dill::*;
+use internal_error::InternalError;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
@@ -27,7 +29,7 @@ use kamu_flow_system_services::MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE;
 use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
-use tracing::warn;
+use tracing::{warn, Instrument};
 
 use crate::accounts::AccountService;
 use crate::error::*;
@@ -53,8 +55,15 @@ use crate::{
 pub const BINARY_NAME: &str = "kamu";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-const DEFAULT_LOGGING_CONFIG: &str = "info";
-const VERBOSE_LOGGING_CONFIG: &str = "debug";
+const LOG_LEVELS: [&str; 5] = [
+    // Default
+    "info",
+    // First level of verbosity simply direct log to foreground
+    "info",
+    "debug,hyper=info,oso=info",
+    "debug",
+    "trace",
+];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -172,36 +181,40 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     initialize_components(&cli_catalog).await?;
 
-    let need_to_wrap_with_transaction = cli_commands::command_needs_transaction(&args);
-    let run_command = |catalog: Catalog| async move {
-        match cli_commands::get_command(&base_catalog, &catalog, args) {
-            Ok(mut command) => {
-                if command.needs_workspace() && !workspace_svc.is_in_workspace() {
-                    Err(CLIError::usage_error_from(NotInWorkspace))
-                } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
-                    Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-                } else if current_account.is_explicit() && !is_multi_tenant_workspace {
-                    Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
-                } else {
-                    command.before_run().await?;
-                    command.run().await
-                }
-            }
-            Err(e) => Err(e),
-        }
-    };
-    let is_database_used = maybe_db_connection_settings.is_some();
-    let command_result = if is_database_used && need_to_wrap_with_transaction {
-        let transaction_runner = DatabaseTransactionRunner::new(cli_catalog);
+    let is_transactional =
+        maybe_db_connection_settings.is_some() && cli_commands::command_needs_transaction(&args);
 
-        transaction_runner
-            .transactional(|transactional_catalog| async move {
-                run_command(transactional_catalog).await
-            })
-            .await
-    } else {
-        run_command(cli_catalog).await
-    };
+    let command_result: Result<(), CLIError> = maybe_transactional(
+        is_transactional,
+        cli_catalog,
+        |catalog: Catalog| async move {
+            let mut command = cli_commands::get_command(&base_catalog, &catalog, args)?;
+
+            if command.needs_workspace() && !workspace_svc.is_in_workspace() {
+                Err(CLIError::usage_error_from(NotInWorkspace))?;
+            }
+            if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
+                Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))?;
+            }
+            if current_account.is_explicit() && !is_multi_tenant_workspace {
+                Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))?;
+            }
+
+            command.validate_args().await?;
+
+            let command_name = command.name();
+
+            command
+                .run()
+                .instrument(tracing::info_span!(
+                    "Running command",
+                    %is_transactional,
+                    %command_name,
+                ))
+                .await
+        },
+    )
+    .await;
 
     match &command_result {
         Ok(()) => {
@@ -229,6 +242,29 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     }
 
     command_result
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn maybe_transactional<F, RF, RT, RE>(
+    transactional: bool,
+    cli_catalog: Catalog,
+    f: F,
+) -> Result<RT, RE>
+where
+    F: FnOnce(Catalog) -> RF,
+    RF: Future<Output = Result<RT, RE>>,
+    RE: From<InternalError>,
+{
+    if !transactional {
+        f(cli_catalog).await
+    } else {
+        let transaction_runner = DatabaseTransactionRunner::new(cli_catalog);
+
+        transaction_runner
+            .transactional(|transactional_catalog| async move { f(transactional_catalog).await })
+            .await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -718,10 +754,9 @@ fn configure_logging(
     // Use configuration from RUST_LOG env var if provided
     let env_filter = match EnvFilter::try_from_default_env() {
         Ok(filter) => filter,
-        Err(_) => match output_config.verbosity_level {
-            0 | 1 => EnvFilter::new(DEFAULT_LOGGING_CONFIG),
-            _ => EnvFilter::new(VERBOSE_LOGGING_CONFIG),
-        },
+        Err(_) => EnvFilter::new(
+            LOG_LEVELS[(output_config.verbosity_level as usize).clamp(0, LOG_LEVELS.len() - 1)],
+        ),
     };
 
     if output_config.verbosity_level > 0 {

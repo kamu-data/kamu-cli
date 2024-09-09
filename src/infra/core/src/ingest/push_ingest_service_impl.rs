@@ -449,7 +449,7 @@ impl PushIngestService for PushIngestServiceImpl {
         Ok(stream.try_collect().await.int_err()?)
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, %url, ?opts))]
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
     async fn ingest_from_url(
         &self,
         dataset_ref: &DatasetRef,
@@ -459,6 +459,8 @@ impl PushIngestService for PushIngestServiceImpl {
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError> {
         let listener = listener.unwrap_or_else(|| Arc::new(NullPushIngestListener));
+
+        tracing::info!(%url, ?opts, "Ingesting from url");
 
         self.do_ingest(
             dataset_ref,
@@ -470,7 +472,7 @@ impl PushIngestService for PushIngestServiceImpl {
         .await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, ?opts))]
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
     async fn ingest_from_file_stream(
         &self,
         dataset_ref: &DatasetRef,
@@ -480,6 +482,8 @@ impl PushIngestService for PushIngestServiceImpl {
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError> {
         let listener = listener.unwrap_or_else(|| Arc::new(NullPushIngestListener));
+
+        tracing::info!(?opts, "Ingesting from file stream");
 
         self.do_ingest(
             dataset_ref,

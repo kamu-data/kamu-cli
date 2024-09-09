@@ -310,9 +310,9 @@ impl QueryService for QueryServiceImpl {
 
     #[tracing::instrument(
         level = "info",
-        name = "query_service::tail",
+        name = "tail",
         skip_all,
-        fields(dataset_ref, num_records)
+        fields(%dataset_ref, %skip, %limit)
     )]
     async fn tail(
         &self,
@@ -361,15 +361,11 @@ impl QueryService for QueryServiceImpl {
         statement: &str,
         options: QueryOptions,
     ) -> Result<QueryResponse, QueryError> {
-        tracing::info!(statement, "Executing SQL query");
+        tracing::info!(statement, ?options, "Executing SQL query");
 
         let state = self.resolve_query_state(statement, options.clone()).await?;
 
-        tracing::info!(
-            original_options = ?options,
-            resolved_state = ?state,
-            "Resolved SQL query state",
-        );
+        tracing::info!(?state, "Resolved SQL query state");
 
         // Map resolved state back to options (including hints) for query planner
         let options = QueryOptions {
@@ -397,7 +393,7 @@ impl QueryService for QueryServiceImpl {
         Ok(QueryResponse { df, state })
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
     async fn get_schema(
         &self,
         dataset_ref: &DatasetRef,
@@ -405,7 +401,7 @@ impl QueryService for QueryServiceImpl {
         self.get_schema_impl(dataset_ref).await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
     async fn get_schema_parquet_file(
         &self,
         dataset_ref: &DatasetRef,
@@ -414,7 +410,7 @@ impl QueryService for QueryServiceImpl {
         self.get_schema_parquet_impl(&ctx, dataset_ref).await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
     async fn get_data(&self, dataset_ref: &DatasetRef) -> Result<DataFrame, QueryError> {
         // TODO: PERF: Limit push-down opportunity
         let (_dataset, df) = self.single_dataset(dataset_ref, None).await?;
@@ -449,7 +445,7 @@ impl QueryService for QueryServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[tracing::instrument(level = "debug", skip_all, fields(data_slice_store_path))]
+#[tracing::instrument(level = "debug", skip_all, fields(%data_slice_store_path))]
 async fn read_data_slice_metadata(
     object_store: Arc<dyn object_store::ObjectStore>,
     data_slice_store_path: &object_store::path::Path,

@@ -30,7 +30,7 @@ pub(crate) struct EngineContainer {
 impl EngineContainer {
     const ADAPTER_PORT: u16 = 2884;
 
-    #[tracing::instrument(level = "info", name = "init_engine", skip_all, fields(image))]
+    #[tracing::instrument(level = "info", name = "init_engine", skip_all, fields(%image))]
     pub async fn new(
         container_runtime: Arc<ContainerRuntime>,
         engine_config: ODFEngineConfig,

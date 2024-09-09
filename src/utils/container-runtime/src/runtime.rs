@@ -463,7 +463,7 @@ impl ContainerRuntime {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(host_port, duration))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%host_port, ?timeout))]
     pub async fn wait_for_socket(
         &self,
         host_port: u16,

@@ -43,6 +43,7 @@ impl NamedObjectRepositoryHttp {
 
 #[async_trait]
 impl NamedObjectRepository for NamedObjectRepositoryHttp {
+    #[tracing::instrument(level = "debug", skip_all, fields(%name))]
     async fn get(&self, name: &str) -> Result<Bytes, GetNamedError> {
         let url = self.base_url.join(name).int_err()?;
 

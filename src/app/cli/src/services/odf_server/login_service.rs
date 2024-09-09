@@ -40,13 +40,7 @@ impl LoginService {
         Self {}
     }
 
-    #[tracing::instrument(
-        level = "info",
-        skip_all,
-        fields(
-            body = %body,
-        )
-    )]
+    #[tracing::instrument(skip_all, fields(%body))]
     async fn post_handler(
         axum::extract::State(response_tx): axum::extract::State<
             tokio::sync::mpsc::Sender<FrontendLoginCallbackResponse>,

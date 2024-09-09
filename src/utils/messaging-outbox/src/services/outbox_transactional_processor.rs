@@ -84,7 +84,6 @@ impl OutboxTransactionalProcessor {
         self.init_consumption_records().await
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn run(&self) -> Result<(), InternalError> {
         // Main relay loop
         loop {
@@ -307,7 +306,7 @@ impl ProducerRelayJob {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(latest_produced_message_id))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%latest_produced_message_id))]
     async fn run_iteration(
         &self,
         latest_produced_message_id: OutboxMessageID,
@@ -394,7 +393,7 @@ impl ProducerRelayJob {
         earliest_seen_id
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(above_id, batch_size))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%above_id, %batch_size))]
     async fn load_messages_above(
         &self,
         above_id: OutboxMessageID,
@@ -416,7 +415,7 @@ impl ProducerRelayJob {
             .await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(consumer_name, ?message, is_first_consumption))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%consumer_name, ?message))]
     async fn invoke_consumer(
         &self,
         consumer_name: &str,

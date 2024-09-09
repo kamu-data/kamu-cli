@@ -17,6 +17,7 @@ use object_store::aws::{AmazonS3Builder, AwsCredential};
 use object_store::CredentialProvider;
 use url::Url;
 
+use crate::repos::object_store_with_tracing::ObjectStoreWithTracing;
 use crate::utils::s3_context::S3Context;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,16 +48,16 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
         Url::parse(format!("s3://{}/", self.s3_context.bucket).as_str()).unwrap()
     }
 
-    #[tracing::instrument(
-        level = "info", skip_all,
-        fields(
-            endpoint=self.s3_context.endpoint,
-            region=self.s3_context.region(),
-            bucket=self.s3_context.bucket,
-            allow_http=self.allow_http,
-        ),
-    )]
+    #[tracing::instrument(level = "info", skip_all)]
     fn build_object_store(&self) -> Result<Arc<dyn object_store::ObjectStore>, InternalError> {
+        tracing::info!(
+            endpoint = self.s3_context.endpoint,
+            region = self.s3_context.region(),
+            bucket = self.s3_context.bucket,
+            allow_http = self.allow_http,
+            "Building object store",
+        );
+
         let mut s3_builder = AmazonS3Builder::from_env()
             .with_credentials(Arc::new(AwsSdkCredentialProvider::new(
                 self.s3_context
@@ -85,7 +86,7 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
             })
             .int_err()?;
 
-        Ok(Arc::new(object_store))
+        Ok(Arc::new(ObjectStoreWithTracing::new(object_store)))
     }
 }
 

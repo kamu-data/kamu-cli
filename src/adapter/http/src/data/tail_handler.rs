@@ -33,11 +33,14 @@ use super::query_types::{DataFormat, SchemaFormat};
 // it should be properly re-designed in future to allow for different query
 // dialects, returning schema, error handling etc.
 #[transactional_handler]
+#[tracing::instrument(level = "info", skip_all, (%dataset_ref))]
 pub async fn dataset_tail_handler(
     Extension(catalog): Extension<Catalog>,
     Extension(dataset_ref): Extension<DatasetRef>,
     Query(params): Query<TailRequestParams>,
 ) -> Result<Json<TailResponseBody>, ApiError> {
+    tracing::debug!(request = ?params, "Tail");
+
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
 
     let df = query_svc

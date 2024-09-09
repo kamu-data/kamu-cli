@@ -37,6 +37,7 @@ impl NamedObjectRepositoryS3 {
 
 #[async_trait]
 impl NamedObjectRepository for NamedObjectRepositoryS3 {
+    #[tracing::instrument(level = "debug", skip_all, fields(%name))]
     async fn get(&self, name: &str) -> Result<Bytes, GetNamedError> {
         let key = self.get_key(name);
 
@@ -62,6 +63,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
         Ok(Bytes::from(data))
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%name))]
     async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetNamedError> {
         let key = self.get_key(name);
 
@@ -76,6 +78,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
         Ok(())
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%name))]
     async fn delete(&self, name: &str) -> Result<(), DeleteNamedError> {
         let key = self.get_key(name);
 

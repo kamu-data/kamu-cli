@@ -72,6 +72,7 @@ impl OsoDatasetAuthorizer {
 
 #[async_trait::async_trait]
 impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, ?action))]
     async fn check_action_allowed(
         &self,
         dataset_handle: &DatasetHandle,
@@ -103,6 +104,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle))]
     async fn get_allowed_actions(&self, dataset_handle: &DatasetHandle) -> HashSet<DatasetAction> {
         let actor = self.actor();
         let dataset_resource = self.dataset_resource(dataset_handle);

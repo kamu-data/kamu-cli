@@ -636,7 +636,7 @@ impl PollingIngestService for PollingIngestServiceImpl {
             .await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(?dataset_refs))]
+    #[tracing::instrument(level = "info", skip_all)]
     async fn ingest_multi(
         &self,
         dataset_refs: Vec<DatasetRef>,

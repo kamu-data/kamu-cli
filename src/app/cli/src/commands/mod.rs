@@ -114,12 +114,18 @@ pub use super::error::*;
 
 #[async_trait::async_trait(?Send)]
 pub trait Command {
+    /// Symbolic name of the command
+    fn name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
+    /// Whether the command requires an initialized workspace
     fn needs_workspace(&self) -> bool {
         true
     }
 
-    /// Method to override, which is convenient to use for various pre-checks
-    async fn before_run(&self) -> Result<(), CLIError> {
+    /// Will be called before running to perform various argument sanity checks
+    async fn validate_args(&self) -> Result<(), CLIError> {
         Ok(())
     }
 

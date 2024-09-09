@@ -164,7 +164,10 @@ impl TaskLogicalPlanRunnerImpl {
 
 #[async_trait::async_trait]
 impl TaskLogicalPlanRunner for TaskLogicalPlanRunnerImpl {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn run_plan(&self, logical_plan: &LogicalPlan) -> Result<TaskOutcome, InternalError> {
+        tracing::debug!(?logical_plan, "Running task plan");
+
         let task_outcome = match logical_plan {
             LogicalPlan::UpdateDataset(upd) => self.run_update(upd).await?,
             LogicalPlan::Probe(probe) => self.run_probe(probe).await?,

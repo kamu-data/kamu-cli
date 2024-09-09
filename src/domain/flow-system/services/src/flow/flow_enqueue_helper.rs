@@ -121,7 +121,7 @@ impl FlowEnqueueHelper {
         Ok(())
     }
 
-    #[tracing::instrument(level = "trace", skip_all, fields(?flow.flow_key, %flow.flow_id, ))]
+    #[tracing::instrument(level = "trace", skip_all, fields(?flow.flow_key, %flow.flow_id))]
     pub(crate) async fn enqueue_dependent_flows(
         &self,
         input_success_time: DateTime<Utc>,

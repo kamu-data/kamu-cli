@@ -46,11 +46,13 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         ObjectRepositoryProtocol::Memory
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let blocks_by_hash = self.blocks_by_hash.lock().unwrap();
         Ok(blocks_by_hash.contains_key(hash))
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
     async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
         let blocks_by_hash = self.blocks_by_hash.lock().unwrap();
         let res = blocks_by_hash.get(hash);
@@ -62,6 +64,7 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         let blocks_by_hash = self.blocks_by_hash.lock().unwrap();
         let res = blocks_by_hash.get(hash);
@@ -97,6 +100,7 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         Err(GetExternalUrlError::NotSupported)
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn insert_bytes<'a>(
         &'a self,
         data: &'a [u8],
@@ -139,6 +143,7 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         panic!("insert_file_move not allowed for in-memory repository");
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {
         let mut blocks_by_hash = self.blocks_by_hash.lock().unwrap();
         blocks_by_hash.remove(hash);

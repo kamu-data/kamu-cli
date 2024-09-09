@@ -29,10 +29,9 @@ kamu-core = { workspace = true }
 
 async-trait = "0.1"
 dill = "0.9"
-
-# Authorization
 oso = "0.27"
 oso-derive = "0.27"
+tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 kamu = { workspace = true }
@@ -41,5 +40,4 @@ time-source = { workspace = true }
 tempfile = "3"
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = [] }
-tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
