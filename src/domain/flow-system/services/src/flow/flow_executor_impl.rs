@@ -35,6 +35,7 @@ use crate::{
     MESSAGE_CONSUMER_KAMU_FLOW_EXECUTOR,
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
+    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -124,10 +125,8 @@ impl FlowExecutorImpl {
     ) -> Result<(), InternalError> {
         // Extract necessary dependencies
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-        let flow_timewheel_service = target_catalog
-            .get_one::<dyn FlowTimeWheelService>()
-            .unwrap();
         let enqueue_helper = target_catalog.get_one::<FlowEnqueueHelper>().unwrap();
+        let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
 
         // How many waiting flows do we have?
         let waiting_filters = AllFlowFilters {
@@ -170,7 +169,16 @@ impl FlowExecutorImpl {
                         if activation_time < start_time {
                             activation_time = start_time;
                         }
-                        flow_timewheel_service.activate_at(activation_time, *waiting_flow_id);
+                        outbox
+                            .post_message(
+                                MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                                FlowProgressMessage::enqueued(
+                                    start_time,
+                                    *waiting_flow_id,
+                                    activation_time,
+                                ),
+                            )
+                            .await?;
                     }
                     // and we also need to re-evaluate the batching condition
                     else if let FlowStartCondition::Batching(b) = start_condition {
@@ -463,11 +471,16 @@ impl FlowExecutorTestDriver for FlowExecutorImpl {
         flow_id: FlowID,
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
-        self.flow_time_wheel_service
-            .cancel_flow_activation(flow_id)
-            .int_err()?;
-
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
+        let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
+
+        outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                FlowProgressMessage::cancelled(self.time_source.now(), flow_id),
+            )
+            .await?;
+
         let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
             .await
             .int_err()?;
@@ -511,11 +524,8 @@ impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
                     let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
                     outbox
                         .post_message(
-                            MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
-                            FlowExecutorUpdatedMessage {
-                                update_time: message.event_time,
-                                update_details: FlowExecutorUpdateDetails::FlowRunning,
-                            },
+                            MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                            FlowProgressMessage::running(message.event_time, flow_id),
                         )
                         .await?;
                 }
@@ -568,11 +578,15 @@ impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
                     let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
                     outbox
                         .post_message(
-                            MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
-                            FlowExecutorUpdatedMessage {
-                                update_time: message.event_time,
-                                update_details: FlowExecutorUpdateDetails::FlowFinished,
-                            },
+                            MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                            FlowProgressMessage::finished(
+                                message.event_time,
+                                flow_id,
+                                flow.outcome
+                                    .as_ref()
+                                    .expect("Outcome must be attached by now")
+                                    .clone(),
+                            ),
                         )
                         .await?;
 
@@ -598,15 +612,19 @@ impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
         if message.paused {
             let maybe_pending_flow_id = {
                 let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
+                let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
 
                 let maybe_pending_flow_id = flow_event_store
                     .try_get_pending_flow(&message.flow_key)
                     .await?;
 
                 if let Some(flow_id) = &maybe_pending_flow_id {
-                    self.flow_time_wheel_service
-                        .cancel_flow_activation(*flow_id)
-                        .int_err()?;
+                    outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                            FlowProgressMessage::cancelled(self.time_source.now(), *flow_id),
+                        )
+                        .await?;
                 }
                 maybe_pending_flow_id
             };
@@ -659,23 +677,30 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowExecutorImpl {
                             .await?
                         {
                             flow_ids_2_abort.push(flow_id);
-                            self.flow_time_wheel_service
-                                .cancel_flow_activation(flow_id)
-                                .int_err()?;
                         }
                     }
                     flow_ids_2_abort
                 };
 
                 let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
+                let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
 
                 // Abort matched flows
                 for flow_id in flow_ids_2_abort {
+                    let now = self.time_source.now();
+
                     let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
                         .await
                         .int_err()?;
-                    flow.abort(self.time_source.now()).int_err()?;
+                    flow.abort(now).int_err()?;
                     flow.save(flow_event_store.as_ref()).await.int_err()?;
+
+                    outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                            FlowProgressMessage::cancelled(now, flow_id),
+                        )
+                        .await?;
                 }
 
                 // Not deleting task->update association, it should be safe.

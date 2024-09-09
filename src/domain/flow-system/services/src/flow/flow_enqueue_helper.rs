@@ -14,10 +14,11 @@ use dill::component;
 use internal_error::InternalError;
 use kamu_core::{DatasetChangesService, DatasetOwnershipService, DependencyGraphService};
 use kamu_flow_system::*;
+use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
 use super::{DownstreamDependencyFlowPlan, FlowTriggerContext};
-use crate::DownstreamDependencyTriggerType;
+use crate::{DownstreamDependencyTriggerType, MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,6 +26,7 @@ pub(crate) struct FlowEnqueueHelper {
     flow_timewheel_service: Arc<dyn FlowTimeWheelService>,
     flow_event_store: Arc<dyn FlowEventStore>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
+    outbox: Arc<dyn Outbox>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
@@ -38,6 +40,7 @@ impl FlowEnqueueHelper {
         flow_timewheel_service: Arc<dyn FlowTimeWheelService>,
         flow_event_store: Arc<dyn FlowEventStore>,
         flow_configuration_service: Arc<dyn FlowConfigurationService>,
+        outbox: Arc<dyn Outbox>,
         dataset_changes_service: Arc<dyn DatasetChangesService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
@@ -48,6 +51,7 @@ impl FlowEnqueueHelper {
             flow_timewheel_service,
             flow_event_store,
             flow_configuration_service,
+            outbox,
             dataset_changes_service,
             dependency_graph_service,
             dataset_ownership_service,
@@ -378,7 +382,8 @@ impl FlowEnqueueHelper {
                                 .is_some_and(|planned_time| throttling_boundary_time < planned_time)
                         {
                             // If so, enqueue the flow earlier
-                            self.enqueue_flow(flow.flow_id, throttling_boundary_time);
+                            self.enqueue_flow(flow.flow_id, throttling_boundary_time)
+                                .await?;
 
                             // Indicate throttling, if applied
                             if throttling_boundary_time > trigger_time {
@@ -437,7 +442,8 @@ impl FlowEnqueueHelper {
                         // Apply throttling boundary
                         let next_activation_time =
                             std::cmp::max(throttling_boundary_time, naive_next_activation_time);
-                        self.enqueue_flow(flow.flow_id, next_activation_time);
+                        self.enqueue_flow(flow.flow_id, next_activation_time)
+                            .await?;
 
                         // Set throttling activity as start condition
                         if throttling_boundary_time > naive_next_activation_time {
@@ -461,7 +467,8 @@ impl FlowEnqueueHelper {
                         // Apply throttling boundary
                         let next_activation_time =
                             std::cmp::max(throttling_boundary_time, trigger_time);
-                        self.enqueue_flow(flow.flow_id, next_activation_time);
+                        self.enqueue_flow(flow.flow_id, next_activation_time)
+                            .await?;
 
                         // Set throttling activity as start condition
                         if throttling_boundary_time > trigger_time {
@@ -580,7 +587,8 @@ impl FlowEnqueueHelper {
                 None => true,
             };
             if should_activate {
-                self.enqueue_flow(flow.flow_id, corrected_finish_time);
+                self.enqueue_flow(flow.flow_id, corrected_finish_time)
+                    .await?;
             }
 
             // If batching is over, it's start condition is no longer valid.
@@ -659,10 +667,18 @@ impl FlowEnqueueHelper {
         }
     }
 
-    #[tracing::instrument(level = "trace", skip_all, fields(%flow_id, %activation_time))]
-    fn enqueue_flow(&self, flow_id: FlowID, activation_time: DateTime<Utc>) {
-        self.flow_timewheel_service
-            .activate_at(activation_time, flow_id);
+    #[tracing::instrument(level = "trace", skip_all, fields(%flow_id, %activate_at))]
+    async fn enqueue_flow(
+        &self,
+        flow_id: FlowID,
+        activate_at: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                FlowProgressMessage::enqueued(self.time_source.now(), flow_id, activate_at),
+            )
+            .await
     }
 }
 

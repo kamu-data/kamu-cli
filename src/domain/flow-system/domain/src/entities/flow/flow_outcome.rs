@@ -15,7 +15,7 @@ use ts::TaskError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowOutcome {
     /// Flow succeeded
     Success(FlowResult),
@@ -55,14 +55,14 @@ impl FlowResult {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowError {
     Failed,
     RootDatasetCompacted(FlowRootDatasetCompactedError),
     ResetHeadNotFound,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowRootDatasetCompactedError {
     pub dataset_id: DatasetID,
 }

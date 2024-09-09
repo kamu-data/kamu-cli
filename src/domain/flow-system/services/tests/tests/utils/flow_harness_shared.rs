@@ -176,6 +176,10 @@ impl FlowHarness {
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
             );
+            register_message_dispatcher::<FlowProgressMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+            );
 
             b.build()
         };

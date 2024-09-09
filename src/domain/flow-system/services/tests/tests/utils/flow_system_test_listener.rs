@@ -15,7 +15,10 @@ use database_common::PaginationOpts;
 use dill::*;
 use internal_error::InternalError;
 use kamu_flow_system::*;
-use kamu_flow_system_services::MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR;
+use kamu_flow_system_services::{
+    MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
+    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+};
 use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
@@ -45,9 +48,10 @@ struct FlowSystemTestListenerState {
 #[scope(Singleton)]
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<FlowExecutorUpdatedMessage>)]
+#[interface(dyn MessageConsumerT<FlowProgressMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: "FlowSystemTestListener",
-    feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR],
+    feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR, MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE],
     durability: MessageConsumptionDurability::BestEffort,
 })]
 impl FlowSystemTestListener {
@@ -243,6 +247,22 @@ impl MessageConsumerT<FlowExecutorUpdatedMessage> for FlowSystemTestListener {
         message: &FlowExecutorUpdatedMessage,
     ) -> Result<(), InternalError> {
         self.make_a_snapshot(message.update_time).await;
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl MessageConsumerT<FlowProgressMessage> for FlowSystemTestListener {
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: &FlowProgressMessage,
+    ) -> Result<(), InternalError> {
+        match message {
+            FlowProgressMessage::Running(e) => self.make_a_snapshot(e.event_time).await,
+            FlowProgressMessage::Finished(e) => self.make_a_snapshot(e.event_time).await,
+            FlowProgressMessage::Enqueued(_) | FlowProgressMessage::Cancelled(_) => {}
+        }
         Ok(())
     }
 }

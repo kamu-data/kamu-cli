@@ -44,6 +44,7 @@ impl DatabaseTransactionRunner {
         Self { catalog }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn transactional<H, HFut, HFutResultT, HFutResultE>(
         &self,
         callback: H,
@@ -64,6 +65,9 @@ impl DatabaseTransactionRunner {
 
         // A catalog with a transaction must live for a limited time
         let result = {
+            let transaction_body_span = tracing::info_span!("Transaction Body");
+            let _ = transaction_body_span.enter();
+
             // Create a chained catalog for transaction-aware components,
             // but keep a local copy of a transaction pointer
             let catalog_with_transaction = CatalogBuilder::new_chained(&self.catalog)
@@ -77,14 +81,21 @@ impl DatabaseTransactionRunner {
         match result {
             // In case everything succeeded, commit the transaction
             Ok(res) => {
+                let transaction_commit_span = tracing::info_span!("Transaction COMMIT");
+                let _ = transaction_commit_span.enter();
+
                 db_transaction_manager
                     .commit_transaction(transaction_ref)
                     .await?;
+
                 Ok(res)
             }
 
             // Otherwise, do an explicit rollback
             Err(e) => {
+                let transaction_rollback_span = tracing::error_span!("Transaction ROLLBACK");
+                let _ = transaction_rollback_span.enter();
+
                 db_transaction_manager
                     .rollback_transaction(transaction_ref)
                     .await?;

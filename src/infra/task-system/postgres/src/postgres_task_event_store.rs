@@ -136,6 +136,7 @@ impl EventStore<TaskState> for PostgresTaskEventStore {
                     WHERE task_id = $1
                          AND (cast($2 as INT8) IS NULL or event_id > $2)
                          AND (cast($3 as INT8) IS NULL or event_id <= $3)
+                    ORDER BY event_id ASC
                 "#,
                 task_id,
                 maybe_from_id,
