@@ -44,9 +44,10 @@ impl DatabaseTransactionRunner {
         Self { catalog }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", skip_all, fields(transaction_label))]
     pub async fn transactional<H, HFut, HFutResultT, HFutResultE>(
         &self,
+        #[allow(unused_variables)] transaction_label: &str,
         callback: H,
     ) -> Result<HFutResultT, HFutResultE>
     where
@@ -103,6 +104,7 @@ impl DatabaseTransactionRunner {
 
     pub async fn transactional_with<Iface, H, HFut, HFutResultT, HFutResultE>(
         &self,
+        transaction_label: &str,
         callback: H,
     ) -> Result<HFutResultT, HFutResultE>
     where
@@ -111,7 +113,7 @@ impl DatabaseTransactionRunner {
         HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
         HFutResultE: From<InternalError>,
     {
-        self.transactional(|transactional_catalog| async move {
+        self.transactional(transaction_label, |transactional_catalog| async move {
             let catalog_item = transactional_catalog.get_one().int_err()?;
 
             callback(catalog_item).await
@@ -121,6 +123,7 @@ impl DatabaseTransactionRunner {
 
     pub async fn transactional_with2<Iface1, Iface2, H, HFut, HFutResultT, HFutResultE>(
         &self,
+        transaction_label: &str,
         callback: H,
     ) -> Result<HFutResultT, HFutResultE>
     where
@@ -130,7 +133,7 @@ impl DatabaseTransactionRunner {
         HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
         HFutResultE: From<InternalError>,
     {
-        self.transactional(|transactional_catalog| async move {
+        self.transactional(transaction_label, |transactional_catalog| async move {
             let catalog_item1 = transactional_catalog.get_one().int_err()?;
             let catalog_item2 = transactional_catalog.get_one().int_err()?;
 

@@ -56,6 +56,7 @@ impl TaskLogicalPlanRunnerImpl {
     async fn run_update(&self, args: &UpdateDataset) -> Result<TaskOutcome, InternalError> {
         let dataset_env_vars = DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with(
+                "TaskLogicalPlanRunner::run_update",
                 |dataset_env_vars_svc: Arc<dyn DatasetEnvVarService>| async move {
                     let dataset_env_vars = dataset_env_vars_svc
                         .get_all_dataset_env_vars_by_dataset_id(&args.dataset_id, None)

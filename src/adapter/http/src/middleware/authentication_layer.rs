@@ -62,6 +62,7 @@ impl<Svc> AuthenticationMiddleware<Svc> {
         if let Some(access_token) = maybe_access_token {
             let account_res = DatabaseTransactionRunner::new(base_catalog.clone())
                 .transactional_with(
+                    "AuthenticationMiddleware::current_account_subject",
                     |authentication_service: Arc<dyn AuthenticationService>| async move {
                         authentication_service
                             .account_by_token(access_token.token)

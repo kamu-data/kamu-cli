@@ -185,15 +185,18 @@ impl FlowHarness {
         };
 
         DatabaseTransactionRunner::new(catalog.clone())
-            .transactional(|transactional_catalog| async move {
-                let registrator = transactional_catalog
-                    .get_one::<PredefinedAccountsRegistrator>()
-                    .unwrap();
+            .transactional(
+                "test::PredefinedAccountsRegistrator",
+                |transactional_catalog| async move {
+                    let registrator = transactional_catalog
+                        .get_one::<PredefinedAccountsRegistrator>()
+                        .unwrap();
 
-                registrator
-                    .ensure_predefined_accounts_are_registered()
-                    .await
-            })
+                    registrator
+                        .ensure_predefined_accounts_are_registered()
+                        .await
+                },
+            )
             .await
             .unwrap();
 

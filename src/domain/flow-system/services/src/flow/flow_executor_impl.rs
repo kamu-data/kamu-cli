@@ -382,30 +382,36 @@ impl FlowExecutor for FlowExecutorImpl {
 
         // Initial scheduling
         DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional(|target_catalog: Catalog| async move {
-                // Recover already scheduled flows after server restart
-                self.recover_time_wheel(&target_catalog, start_time).await?;
+            .transactional(
+                "FlowExecutorImpl::pre_run",
+                |target_catalog: Catalog| async move {
+                    // Recover already scheduled flows after server restart
+                    self.recover_time_wheel(&target_catalog, start_time).await?;
 
-                // Restore auto polling flows:
-                //   - read active configurations
-                //   - automatically trigger flows, if they are not waiting already
-                self.restore_auto_polling_flows_from_configurations(&target_catalog, start_time)
-                    .await?;
-
-                // Publish progress event
-                let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-                outbox
-                    .post_message(
-                        MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
-                        FlowExecutorUpdatedMessage {
-                            update_time: start_time,
-                            update_details: FlowExecutorUpdateDetails::Loaded,
-                        },
+                    // Restore auto polling flows:
+                    //   - read active configurations
+                    //   - automatically trigger flows, if they are not waiting already
+                    self.restore_auto_polling_flows_from_configurations(
+                        &target_catalog,
+                        start_time,
                     )
                     .await?;
 
-                Ok(())
-            })
+                    // Publish progress event
+                    let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
+                    outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
+                            FlowExecutorUpdatedMessage {
+                                update_time: start_time,
+                                update_details: FlowExecutorUpdateDetails::Loaded,
+                            },
+                        )
+                        .await?;
+
+                    Ok(())
+                },
+            )
             .await
     }
 
@@ -430,25 +436,28 @@ impl FlowExecutor for FlowExecutorImpl {
                 let _ = activation_span.enter();
 
                 DatabaseTransactionRunner::new(self.catalog.clone())
-                    .transactional(|target_catalog: Catalog| async move {
-                        // Run scheduling for current time slot. Should not throw any errors
-                        self.run_current_timeslot(&target_catalog, nearest_activation_time)
-                            .await?;
+                    .transactional(
+                        "FlowExecutor::activation",
+                        |target_catalog: Catalog| async move {
+                            // Run scheduling for current time slot. Should not throw any errors
+                            self.run_current_timeslot(&target_catalog, nearest_activation_time)
+                                .await?;
 
-                        // Publish progress event
-                        let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-                        outbox
-                            .post_message(
-                                MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
-                                FlowExecutorUpdatedMessage {
-                                    update_time: nearest_activation_time,
-                                    update_details: FlowExecutorUpdateDetails::ExecutedTimeslot,
-                                },
-                            )
-                            .await?;
+                            // Publish progress event
+                            let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
+                            outbox
+                                .post_message(
+                                    MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
+                                    FlowExecutorUpdatedMessage {
+                                        update_time: nearest_activation_time,
+                                        update_details: FlowExecutorUpdateDetails::ExecutedTimeslot,
+                                    },
+                                )
+                                .await?;
 
-                        Ok(())
-                    })
+                            Ok(())
+                        },
+                    )
                     .await?;
             }
 

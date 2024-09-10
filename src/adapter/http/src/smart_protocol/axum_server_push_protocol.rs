@@ -201,6 +201,7 @@ impl AxumServerPushProtocolInstance {
                 };
                 let create_result = DatabaseTransactionRunner::new(self.catalog.clone())
                     .transactional_with(
+                        "AxumServerPushProtocolInstance::create_dataset",
                         |create_dataset_use_case: Arc<dyn CreateDatasetUseCase>| async move {
                             create_dataset_use_case
                                 .execute(dataset_alias, seed_block, create_options)
@@ -441,6 +442,7 @@ impl AxumServerPushProtocolInstance {
         let dataset = self.dataset.clone().unwrap();
         DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with(
+                "AxumServerPushProtocolInstance::try_handle_push_complete",
                 |append_dataset_metadata_batch: Arc<dyn AppendDatasetMetadataBatchUseCase>| async move {
                     append_dataset_metadata_batch
                         .execute(dataset.as_ref(), new_blocks, force_update_if_diverged)

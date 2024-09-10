@@ -708,13 +708,16 @@ impl FlowConfigHarness {
         let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
 
         DatabaseTransactionRunner::new(catalog_authorized.clone())
-            .transactional(|transactional_catalog| async move {
-                let initializer = transactional_catalog
-                    .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
-                    .unwrap();
+            .transactional(
+                "test::DatasetOwnershipServiceInMemoryStateInitializer",
+                |transactional_catalog| async move {
+                    let initializer = transactional_catalog
+                        .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
+                        .unwrap();
 
-                initializer.eager_initialization().await
-            })
+                    initializer.eager_initialization().await
+                },
+            )
             .await
             .unwrap();
 

@@ -112,6 +112,7 @@ impl OutboxTransactionalProcessor {
     async fn init_consumption_records(&self) -> Result<(), InternalError> {
         DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with(
+                "OutboxTransactionalProcessor::init_consumption_records",
                 |outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>| async move {
                     // Load existing consumption records
                     use futures::TryStreamExt;
@@ -205,6 +206,7 @@ impl OutboxTransactionalProcessor {
         // Extract latest (producer, max message id) relation
         let latest_message_ids_by_producer = DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with(
+                "OutboxTransactionalProcessor::select_latest_message_ids_by_producers",
                 |outbox_message_repository: Arc<dyn OutboxMessageRepository>| async move {
                     outbox_message_repository
                         .get_latest_message_ids_by_producer()
@@ -226,6 +228,7 @@ impl OutboxTransactionalProcessor {
         // Extract consumption boundaries for all routes
         let all_boundaries = DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with(
+                "OutboxTransactionalProcessor::select_latest_consumption_boundaries_by_producers",
                 |outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>| async move {
                     let consumptions_stream = outbox_consumption_repository
                         .list_consumption_boundaries();
@@ -401,6 +404,7 @@ impl ProducerRelayJob {
     ) -> Result<Vec<OutboxMessage>, InternalError> {
         DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with(
+                "OutboxTransactionalProcessor::load_messages_above",
                 |outbox_message_repository: Arc<dyn OutboxMessageRepository>| async move {
                     let messages_stream = outbox_message_repository.get_producer_messages(
                         &self.producer_name,
@@ -422,39 +426,42 @@ impl ProducerRelayJob {
         message: &OutboxMessage,
     ) -> Result<(), InternalError> {
         DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional(|transaction_catalog| async move {
-                let dispatcher = self
-                    .relay_routes_static_info
-                    .message_dispatchers_by_producers
-                    .get(&message.producer_name)
-                    .expect("No dispatcher for producer");
+            .transactional(
+                "OutboxTransactionalProcessor::invoke_consumer",
+                |transaction_catalog| async move {
+                    let dispatcher = self
+                        .relay_routes_static_info
+                        .message_dispatchers_by_producers
+                        .get(&message.producer_name)
+                        .expect("No dispatcher for producer");
 
-                let content_json = message.content_json.to_string();
+                    let content_json = message.content_json.to_string();
 
-                dispatcher
-                    .dispatch_message(
-                        &transaction_catalog,
-                        ConsumerFilter::SelectedConsumer(consumer_name),
-                        &content_json,
-                    )
-                    .await?;
+                    dispatcher
+                        .dispatch_message(
+                            &transaction_catalog,
+                            ConsumerFilter::SelectedConsumer(consumer_name),
+                            &content_json,
+                        )
+                        .await?;
 
-                // Shift consumption record regardless of whether the consumer was interested in
-                // the message
-                let consumption_repository = transaction_catalog
-                    .get_one::<dyn OutboxMessageConsumptionRepository>()
-                    .unwrap();
-                consumption_repository
-                    .update_consumption_boundary(OutboxMessageConsumptionBoundary {
-                        consumer_name: consumer_name.to_string(),
-                        producer_name: message.producer_name.to_string(),
-                        last_consumed_message_id: message.message_id,
-                    })
-                    .await
-                    .int_err()?;
+                    // Shift consumption record regardless of whether the consumer was interested in
+                    // the message
+                    let consumption_repository = transaction_catalog
+                        .get_one::<dyn OutboxMessageConsumptionRepository>()
+                        .unwrap();
+                    consumption_repository
+                        .update_consumption_boundary(OutboxMessageConsumptionBoundary {
+                            consumer_name: consumer_name.to_string(),
+                            producer_name: message.producer_name.to_string(),
+                            last_consumed_message_id: message.message_id,
+                        })
+                        .await
+                        .int_err()?;
 
-                Ok(())
-            })
+                    Ok(())
+                },
+            )
             .await
     }
 }

@@ -50,19 +50,22 @@ impl ManualFlowTriggerDriver {
         self.time_source.sleep(self.args.run_since_start).await;
 
         DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional(|transactional_catalog| async move {
-                let flow_query_service = transactional_catalog
-                    .get_one::<dyn FlowQueryService>()
-                    .unwrap();
-                flow_query_service
-                    .trigger_manual_flow(
-                        start_time + self.args.run_since_start,
-                        self.args.flow_key,
-                        self.args.initiator_id.unwrap_or(DEFAULT_ACCOUNT_ID.clone()),
-                        None,
-                    )
-                    .await
-            })
+            .transactional(
+                "ManualFlowTriggerDriver::trigger_manual_flow",
+                |transactional_catalog| async move {
+                    let flow_query_service = transactional_catalog
+                        .get_one::<dyn FlowQueryService>()
+                        .unwrap();
+                    flow_query_service
+                        .trigger_manual_flow(
+                            start_time + self.args.run_since_start,
+                            self.args.flow_key,
+                            self.args.initiator_id.unwrap_or(DEFAULT_ACCOUNT_ID.clone()),
+                            None,
+                        )
+                        .await
+                },
+            )
             .await
             .unwrap();
     }

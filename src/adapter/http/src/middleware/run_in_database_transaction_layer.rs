@@ -72,13 +72,16 @@ where
             let transaction_runner = DatabaseTransactionRunner::new(base_catalog);
 
             transaction_runner
-                .transactional(|updated_catalog| async move {
-                    request.extensions_mut().insert(updated_catalog);
+                .transactional(
+                    "RunInDatabaseTransactionMiddleware",
+                    |updated_catalog| async move {
+                        request.extensions_mut().insert(updated_catalog);
 
-                    let inner_result = inner.call(request).await;
+                        let inner_result = inner.call(request).await;
 
-                    Ok(inner_result)
-                })
+                        Ok(inner_result)
+                    },
+                )
                 .await
                 .unwrap_or_else(|e: InternalError| Ok(e.api_err().into_response()))
         })

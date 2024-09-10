@@ -39,11 +39,9 @@ pub fn transactional_handler(_attr: TokenStream, item: TokenStream) -> TokenStre
 
     let has_catalog_argument = input.sig.inputs.iter().any(is_catalog_argument);
 
+    let function_name = &input.sig.ident;
     if !has_catalog_argument {
-        let function_name = &input.sig.ident;
-
         const CATALOG_ARGUMENT: &str = "Extension(catalog): Extension<Catalog>";
-
         panic!("{function_name}(): the expected argument \"{CATALOG_ARGUMENT}\" was not found!");
     }
 
@@ -54,7 +52,7 @@ pub fn transactional_handler(_attr: TokenStream, item: TokenStream) -> TokenStre
     let updated_function = quote! {
         #function_visibility #function_signature {
             ::database_common::DatabaseTransactionRunner::new(catalog)
-                .transactional(|catalog: ::dill::Catalog| async move {
+                .transactional(stringify!(#function_name), |catalog: ::dill::Catalog| async move {
                     #function_body
                 })
                 .await
@@ -272,6 +270,7 @@ pub fn transactional_method(attr: TokenStream, item: TokenStream) -> TokenStream
     let input = parse_macro_input!(item as ItemFn);
 
     let method_signature = &input.sig;
+    let method_name = &method_signature.ident;
     let method_body = &input.block;
     let method_visibility = &input.vis;
 
@@ -283,7 +282,7 @@ pub fn transactional_method(attr: TokenStream, item: TokenStream) -> TokenStream
     let updated_method = quote! {
         #method_visibility #method_signature {
             ::database_common::DatabaseTransactionRunner::new(self.catalog.clone())
-                .transactional_with(|#catalog_item_name: #catalog_item_type| async move {
+                .transactional_with(stringify!(#method_name), |#catalog_item_name: #catalog_item_type| async move {
                     #method_body
                 })
                 .await
@@ -332,7 +331,7 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
                 let harness = #harness ::new(pg_pool);
 
                 database_common::DatabaseTransactionRunner::new(harness.catalog)
-                    .transactional(|catalog| async move {
+                    .transactional(stringify!(#test_function_name), |catalog| async move {
                         #fixture (&catalog).await;
 
                         Ok::<_, internal_error::InternalError>(())
@@ -348,7 +347,7 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
                 let harness = #harness ::new(mysql_pool);
 
                 database_common::DatabaseTransactionRunner::new(harness.catalog)
-                    .transactional(|catalog| async move {
+                    .transactional(stringify!(#test_function_name), |catalog| async move {
                         #fixture (&catalog).await;
 
                         Ok::<_, internal_error::InternalError>(())
@@ -364,7 +363,7 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
                 let harness = #harness ::new(sqlite_pool);
 
                 database_common::DatabaseTransactionRunner::new(harness.catalog)
-                    .transactional(|catalog| async move {
+                    .transactional(stringify!(#test_function_name), |catalog| async move {
                         #fixture (&catalog).await;
 
                         Ok::<_, internal_error::InternalError>(())
