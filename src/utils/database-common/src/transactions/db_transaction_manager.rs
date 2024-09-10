@@ -54,6 +54,8 @@ impl DatabaseTransactionRunner {
         HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
         HFutResultE: From<InternalError>,
     {
+        use tracing::Instrument;
+
         // Extract transaction manager, specific for the database
         let db_transaction_manager = self
             .catalog
@@ -65,27 +67,24 @@ impl DatabaseTransactionRunner {
 
         // A catalog with a transaction must live for a limited time
         let result = {
-            let transaction_body_span = tracing::info_span!("Transaction Body");
-            let _ = transaction_body_span.enter();
-
             // Create a chained catalog for transaction-aware components,
             // but keep a local copy of a transaction pointer
             let catalog_with_transaction = CatalogBuilder::new_chained(&self.catalog)
                 .add_value(transaction_ref.clone())
                 .build();
 
-            callback(catalog_with_transaction).await
+            callback(catalog_with_transaction)
+                .instrument(tracing::info_span!("Transaction Body"))
+                .await
         };
 
         // Commit or rollback transaction depending on the result
         match result {
             // In case everything succeeded, commit the transaction
             Ok(res) => {
-                let transaction_commit_span = tracing::info_span!("Transaction COMMIT");
-                let _ = transaction_commit_span.enter();
-
                 db_transaction_manager
                     .commit_transaction(transaction_ref)
+                    .instrument(tracing::info_span!("Transaction COMMIT"))
                     .await?;
 
                 Ok(res)
@@ -93,11 +92,9 @@ impl DatabaseTransactionRunner {
 
             // Otherwise, do an explicit rollback
             Err(e) => {
-                let transaction_rollback_span = tracing::error_span!("Transaction ROLLBACK");
-                let _ = transaction_rollback_span.enter();
-
                 db_transaction_manager
                     .rollback_transaction(transaction_ref)
+                    .instrument(tracing::error_span!("Transaction ROLLBACK"))
                     .await?;
                 Err(e)
             }
