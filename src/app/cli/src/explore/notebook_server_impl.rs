@@ -155,7 +155,7 @@ impl NotebookServerImpl {
 
         let docker_host = self.container_runtime.get_runtime_host_addr();
         let jupyter_port = jupyter
-            .wait_for_host_socket(jupyter_port_in_container, Duration::from_secs(10))
+            .wait_for_host_socket(jupyter_port_in_container, Duration::from_secs(30))
             .await
             .int_err()?;
 
