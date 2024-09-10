@@ -394,7 +394,13 @@ impl TransformServiceImpl {
                 .try_collect()
                 .await
                 .map_err(|chain_err| match chain_err {
-                    IterBlocksError::InvalidInterval(err) => TransformError::InvalidInterval(err),
+                    IterBlocksError::InvalidInterval(err) => {
+                        TransformError::InvalidInputInterval(InvalidInputIntervalError {
+                            head: err.head,
+                            tail: err.tail,
+                            input_dataset_id: dataset_handle.id.clone(),
+                        })
+                    }
                     _ => TransformError::Internal(chain_err.int_err()),
                 })?
         } else {
@@ -704,7 +710,7 @@ impl TransformServiceImpl {
                 listener.success(&TransformResult::UpToDate);
                 Ok(TransformResult::UpToDate)
             }
-            Err(err @ TransformError::InvalidInterval(_))
+            Err(err @ TransformError::InvalidInputInterval(_))
                 if options.reset_derivatives_on_diverged_input =>
             {
                 tracing::warn!(

@@ -728,7 +728,9 @@ async fn test_transform_with_compaction_retry() {
 
     assert_matches!(
         transform_result,
-        Err(TransformError::InvalidInterval(InvalidIntervalError { .. }))
+        Err(TransformError::InvalidInputInterval(
+            InvalidInputIntervalError { .. }
+        ))
     );
 
     let transform_result = harness

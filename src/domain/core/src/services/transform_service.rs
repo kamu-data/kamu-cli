@@ -149,10 +149,10 @@ pub enum TransformError {
         AccessError,
     ),
     #[error(transparent)]
-    InvalidInterval(
+    InvalidInputInterval(
         #[from]
         #[backtrace]
-        InvalidIntervalError,
+        InvalidInputIntervalError,
     ),
     #[error(transparent)]
     Internal(
@@ -174,6 +174,16 @@ pub struct TransformNotDefinedError {}
 #[error("Dataset {dataset_handle} has not defined a schema yet")]
 pub struct InputSchemaNotDefinedError {
     pub dataset_handle: DatasetHandle,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("Invalid block interval [{head}, {tail}) in input dataset '{input_dataset_id}'")]
+pub struct InvalidInputIntervalError {
+    pub input_dataset_id: DatasetID,
+    pub head: Multihash,
+    pub tail: Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

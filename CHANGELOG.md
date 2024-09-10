@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Changed -->
 <!--- - Fixed -->
 
+## [Unreleased]
+### Fixed
+- Associating correct input dataset that was hard compacted with the error during transformation of derived dataset
+
 ## [0.199.2] - 2024-09-09
 ### Added
 - REST API: The `/query` endpoint now supports response proofs via reproducibility and signing (#816)

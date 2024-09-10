@@ -88,10 +88,10 @@ impl TaskLogicalPlanRunnerImpl {
                 TaskUpdateDatasetResult { pull_result },
             ))),
             Err(err) => match err {
-                PullError::TransformError(TransformError::InvalidInterval(_)) => {
+                PullError::TransformError(TransformError::InvalidInputInterval(e)) => {
                     Ok(TaskOutcome::Failed(TaskError::UpdateDatasetError(
-                        UpdateDatasetTaskError::RootDatasetCompacted(RootDatasetCompactedError {
-                            dataset_id: args.dataset_id.clone(),
+                        UpdateDatasetTaskError::InputDatasetCompacted(InputDatasetCompactedError {
+                            dataset_id: e.input_dataset_id,
                         }),
                     )))
                 }
