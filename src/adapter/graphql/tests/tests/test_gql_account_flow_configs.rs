@@ -823,12 +823,12 @@ impl FlowConfigHarness {
                                           }
                                           ...on FlowFailedError {
                                               reason {
-                                                  ...on FlowFailedMessage {
+                                                  ...on FlowFailureReasonGeneral {
                                                       message
                                                   }
-                                                  ...on FlowDatasetCompactedFailedError {
+                                                  ...on FlowFailureReasonInputDatasetCompacted {
                                                       message
-                                                      rootDataset {
+                                                      inputDataset {
                                                           id
                                                       }
                                                   }
@@ -927,12 +927,12 @@ impl FlowConfigHarness {
                                               }
                                               ...on FlowFailedError {
                                                   reason {
-                                                      ...on FlowFailedMessage {
+                                                    ...on FlowFailureReasonGeneral {
+                                                        message
+                                                    }
+                                                    ...on FlowFailureReasonInputDatasetCompacted {
                                                           message
-                                                      }
-                                                      ...on FlowDatasetCompactedFailedError {
-                                                          message
-                                                          rootDataset {
+                                                          inputDataset {
                                                               id
                                                           }
                                                       }

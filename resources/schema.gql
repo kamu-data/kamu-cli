@@ -995,11 +995,6 @@ type FlowConnection {
 	edges: [FlowEdge!]!
 }
 
-type FlowDatasetCompactedFailedError {
-	rootDataset: Dataset!
-	message: String!
-}
-
 union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionDatasetReset | FlowDescriptionSystemGC
 
 type FlowDescriptionDatasetExecuteTransform {
@@ -1106,14 +1101,19 @@ type FlowEventTriggerAdded implements FlowEvent {
 }
 
 type FlowFailedError {
-	reason: FlowFailedReason!
+	reason: FlowFailureReason!
 }
 
-type FlowFailedMessage {
+union FlowFailureReason = FlowFailureReasonGeneral | FlowFailureReasonInputDatasetCompacted
+
+type FlowFailureReasonGeneral {
 	message: String!
 }
 
-union FlowFailedReason = FlowFailedMessage | FlowDatasetCompactedFailedError
+type FlowFailureReasonInputDatasetCompacted {
+	inputDataset: Dataset!
+	message: String!
+}
 
 scalar FlowID
 

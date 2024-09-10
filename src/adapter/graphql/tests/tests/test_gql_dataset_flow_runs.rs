@@ -2703,11 +2703,11 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
     })
     .await;
 
-    let create_result = harness.create_root_dataset().await;
+    let create_root_result = harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
 
     let mutation_code = FlowRunsHarness::trigger_flow_with_compaction_config_mutation(
-        &create_result.dataset_handle.id,
+        &create_root_result.dataset_handle.id,
         "HARD_COMPACTION",
         10000,
         1_000_000,
@@ -2781,7 +2781,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
         )
         .await;
 
-    let request_code = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id);
+    let request_code = FlowRunsHarness::list_flows_query(&create_root_result.dataset_handle.id);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -2803,7 +2803,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                         "flowId": "0",
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetHardCompaction",
-                                            "datasetId": create_result.dataset_handle.id.to_string(),
+                                            "datasetId": create_root_result.dataset_handle.id.to_string(),
                                             "compactionResult": {
                                                 "originalBlocksCount": 5,
                                                 "resultingBlocksCount": 4,
@@ -2920,8 +2920,8 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
             flow_task_metadata,
             complete_time,
             ts::TaskOutcome::Failed(ts::TaskError::UpdateDatasetError(
-                ts::UpdateDatasetTaskError::RootDatasetCompacted(ts::RootDatasetCompactedError {
-                    dataset_id: create_result.dataset_handle.id.clone(),
+                ts::UpdateDatasetTaskError::InputDatasetCompacted(ts::InputDatasetCompactedError {
+                    dataset_id: create_root_result.dataset_handle.id.clone(),
                 }),
             )),
         )
@@ -2955,9 +2955,9 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                         "status": "FINISHED",
                                         "outcome": {
                                             "reason": {
-                                                "message": "Root dataset was compacted",
-                                                "rootDataset": {
-                                                    "id": create_result.dataset_handle.id.to_string()
+                                                "message": "Input dataset was compacted",
+                                                "inputDataset": {
+                                                    "id": create_root_result.dataset_handle.id.to_string()
                                                 }
                                             }
                                         },
@@ -3509,12 +3509,12 @@ impl FlowRunsHarness {
                                             }
                                             ...on FlowFailedError {
                                                 reason {
-                                                    ...on FlowFailedMessage {
+                                                    ...on FlowFailureReasonGeneral {
                                                         message
                                                     }
-                                                    ...on FlowDatasetCompactedFailedError {
+                                                    ...on FlowFailureReasonInputDatasetCompacted {
                                                         message
-                                                        rootDataset {
+                                                        inputDataset {
                                                             id
                                                         }
                                                     }
@@ -3720,12 +3720,12 @@ impl FlowRunsHarness {
                                                 }
                                                 ...on FlowFailedError {
                                                     reason {
-                                                        ...on FlowFailedMessage {
+                                                        ...on FlowFailureReasonGeneral {
                                                             message
                                                         }
-                                                        ...on FlowDatasetCompactedFailedError {
+                                                        ...on FlowFailureReasonInputDatasetCompacted {
                                                             message
-                                                            rootDataset {
+                                                            inputDataset {
                                                                 id
                                                             }
                                                         }
@@ -3790,12 +3790,12 @@ impl FlowRunsHarness {
                                                 }
                                                 ...on FlowFailedError {
                                                     reason {
-                                                        ...on FlowFailedMessage {
+                                                        ...on FlowFailureReasonGeneral {
                                                             message
                                                         }
-                                                        ...on FlowDatasetCompactedFailedError {
+                                                        ...on FlowFailureReasonInputDatasetCompacted {
                                                             message
-                                                            rootDataset {
+                                                            inputDataset {
                                                                 id
                                                             }
                                                         }
@@ -3861,12 +3861,12 @@ impl FlowRunsHarness {
                                                 }
                                                 ...on FlowFailedError {
                                                     reason {
-                                                        ...on FlowFailedMessage {
+                                                        ...on FlowFailureReasonGeneral {
                                                             message
                                                         }
-                                                        ...on FlowDatasetCompactedFailedError {
+                                                        ...on FlowFailureReasonInputDatasetCompacted {
                                                             message
-                                                            rootDataset {
+                                                            inputDataset {
                                                                 id
                                                             }
                                                         }
@@ -3917,12 +3917,12 @@ impl FlowRunsHarness {
                                                 }
                                                 ...on FlowFailedError {
                                                     reason {
-                                                        ...on FlowFailedMessage {
+                                                        ...on FlowFailureReasonGeneral {
                                                             message
                                                         }
-                                                        ...on FlowDatasetCompactedFailedError {
+                                                        ...on FlowFailureReasonInputDatasetCompacted {
                                                             message
-                                                            rootDataset {
+                                                            inputDataset {
                                                                 id
                                                             }
                                                         }

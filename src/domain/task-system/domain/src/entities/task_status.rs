@@ -88,11 +88,11 @@ pub enum TaskError {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UpdateDatasetTaskError {
-    RootDatasetCompacted(RootDatasetCompactedError),
+    InputDatasetCompacted(InputDatasetCompactedError),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RootDatasetCompactedError {
+pub struct InputDatasetCompactedError {
     pub dataset_id: DatasetID,
 }
 

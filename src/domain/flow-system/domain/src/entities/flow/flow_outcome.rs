@@ -58,12 +58,12 @@ impl FlowResult {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowError {
     Failed,
-    RootDatasetCompacted(FlowRootDatasetCompactedError),
+    InputDatasetCompacted(FlowInputDatasetCompactedError),
     ResetHeadNotFound,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FlowRootDatasetCompactedError {
+pub struct FlowInputDatasetCompactedError {
     pub dataset_id: DatasetID,
 }
 
@@ -72,8 +72,8 @@ impl From<&TaskError> for FlowError {
         match value {
             TaskError::Empty => Self::Failed,
             TaskError::UpdateDatasetError(update_dataset_error) => match update_dataset_error {
-                UpdateDatasetTaskError::RootDatasetCompacted(err) => {
-                    Self::RootDatasetCompacted(FlowRootDatasetCompactedError {
+                UpdateDatasetTaskError::InputDatasetCompacted(err) => {
+                    Self::InputDatasetCompacted(FlowInputDatasetCompactedError {
                         dataset_id: err.dataset_id.clone(),
                     })
                 }
