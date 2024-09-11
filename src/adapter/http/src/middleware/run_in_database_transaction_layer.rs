@@ -59,6 +59,8 @@ where
     }
 
     fn call(&mut self, mut request: http::Request<Body>) -> Self::Future {
+        use tracing::Instrument;
+
         // Inspired by https://github.com/maxcountryman/axum-login/blob/5239b38b2698a3db3f92075b6ad430aea79c215a/axum-login/src/auth.rs
         // TODO: PERF: Is cloning a performance concern?
         let mut inner = self.inner.clone();
@@ -72,16 +74,14 @@ where
             let transaction_runner = DatabaseTransactionRunner::new(base_catalog);
 
             transaction_runner
-                .transactional(
-                    "RunInDatabaseTransactionMiddleware",
-                    |updated_catalog| async move {
-                        request.extensions_mut().insert(updated_catalog);
+                .transactional(|updated_catalog| async move {
+                    request.extensions_mut().insert(updated_catalog);
 
-                        let inner_result = inner.call(request).await;
+                    let inner_result = inner.call(request).await;
 
-                        Ok(inner_result)
-                    },
-                )
+                    Ok(inner_result)
+                })
+                .instrument(tracing::debug_span!("RunInDatabaseTransactionMiddleware"))
                 .await
                 .unwrap_or_else(|e: InternalError| Ok(e.api_err().into_response()))
         })

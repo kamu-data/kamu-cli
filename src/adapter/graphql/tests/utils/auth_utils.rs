@@ -46,18 +46,15 @@ pub async fn authentication_catalogs(
         .build();
 
     DatabaseTransactionRunner::new(catalog_authorized.clone())
-        .transactional(
-            "authentication_catalogs",
-            |transactional_catalog| async move {
-                let registrator = transactional_catalog
-                    .get_one::<PredefinedAccountsRegistrator>()
-                    .unwrap();
+        .transactional(|transactional_catalog| async move {
+            let registrator = transactional_catalog
+                .get_one::<PredefinedAccountsRegistrator>()
+                .unwrap();
 
-                registrator
-                    .ensure_predefined_accounts_are_registered()
-                    .await
-            },
-        )
+            registrator
+                .ensure_predefined_accounts_are_registered()
+                .await
+        })
         .await
         .unwrap();
 

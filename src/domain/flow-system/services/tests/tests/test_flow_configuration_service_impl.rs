@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
-use database_common_macros::transactional_method;
+use database_common_macros::transactional_method1;
 use dill::*;
 use futures::TryStreamExt;
 use kamu::testing::MetadataFactory;
@@ -507,7 +507,7 @@ impl FlowConfigurationHarness {
         res
     }
 
-    #[transactional_method(flow_configuration_service: Arc<dyn FlowConfigurationService>)]
+    #[transactional_method1(flow_configuration_service: Arc<dyn FlowConfigurationService>, return_value="unwrapAndColon")]
     async fn set_system_flow_schedule(&self, system_flow_type: SystemFlowType, schedule: Schedule) {
         flow_configuration_service
             .set_configuration(

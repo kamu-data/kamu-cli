@@ -9,8 +9,8 @@
 
 use std::sync::Arc;
 
-use chrono::Duration;
-use database_common::DatabaseTransactionRunner;
+use chrono::{DateTime, Duration, Utc};
+use database_common_macros::transactional_method1;
 use dill::Catalog;
 use kamu_accounts::DEFAULT_ACCOUNT_ID;
 use kamu_flow_system::{FlowKey, FlowQueryService};
@@ -49,25 +49,22 @@ impl ManualFlowTriggerDriver {
 
         self.time_source.sleep(self.args.run_since_start).await;
 
-        DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional(
-                "ManualFlowTriggerDriver::trigger_manual_flow",
-                |transactional_catalog| async move {
-                    let flow_query_service = transactional_catalog
-                        .get_one::<dyn FlowQueryService>()
-                        .unwrap();
-                    flow_query_service
-                        .trigger_manual_flow(
-                            start_time + self.args.run_since_start,
-                            self.args.flow_key,
-                            self.args.initiator_id.unwrap_or(DEFAULT_ACCOUNT_ID.clone()),
-                            None,
-                        )
-                        .await
-                },
+        self.send_trigger_manual_flow(start_time).await;
+    }
+
+    #[transactional_method1(flow_query_service: Arc<dyn FlowQueryService>, return_value="unwrapAndColon")]
+    async fn send_trigger_manual_flow(&self, start_time: DateTime<Utc>) {
+        flow_query_service
+            .trigger_manual_flow(
+                start_time + self.args.run_since_start,
+                self.args.flow_key.clone(),
+                self.args
+                    .initiator_id
+                    .clone()
+                    .unwrap_or(DEFAULT_ACCOUNT_ID.clone()),
+                None,
             )
             .await
-            .unwrap();
     }
 }
 

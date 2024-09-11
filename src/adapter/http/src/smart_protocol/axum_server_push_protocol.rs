@@ -27,6 +27,7 @@ use kamu_core::{
     RefCollisionError,
 };
 use opendatafabric::{AsTypedBlock, DatasetRef};
+use tracing::Instrument;
 use url::Url;
 
 use super::errors::*;
@@ -201,13 +202,15 @@ impl AxumServerPushProtocolInstance {
                 };
                 let create_result = DatabaseTransactionRunner::new(self.catalog.clone())
                     .transactional_with(
-                        "AxumServerPushProtocolInstance::create_dataset",
                         |create_dataset_use_case: Arc<dyn CreateDatasetUseCase>| async move {
                             create_dataset_use_case
                                 .execute(dataset_alias, seed_block, create_options)
                                 .await
                         },
                     )
+                    .instrument(tracing::debug_span!(
+                        "AxumServerPushProtocolInstance::create_dataset",
+                    ))
                     .await;
                 match create_result {
                     Ok(create_result) => self.dataset = Some(create_result.dataset),
@@ -442,13 +445,13 @@ impl AxumServerPushProtocolInstance {
         let dataset = self.dataset.clone().unwrap();
         DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with(
-                "AxumServerPushProtocolInstance::try_handle_push_complete",
                 |append_dataset_metadata_batch: Arc<dyn AppendDatasetMetadataBatchUseCase>| async move {
                     append_dataset_metadata_batch
                         .execute(dataset.as_ref(), new_blocks, force_update_if_diverged)
                         .await
                 },
             )
+            .instrument(tracing::debug_span!("AxumServerPushProtocolInstance::try_handle_push_complete"))
             .await
             .protocol_int_err(PushPhase::CompleteRequest)?;
 

@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use database_common::DatabaseTransactionRunner;
+use database_common_macros::transactional_method1;
 use dill::*;
 use internal_error::InternalError;
 use kamu_core::{
@@ -54,22 +54,12 @@ impl TaskLogicalPlanRunnerImpl {
     }
 
     async fn run_update(&self, args: &UpdateDataset) -> Result<TaskOutcome, InternalError> {
-        let dataset_env_vars = DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(
-                "TaskLogicalPlanRunner::run_update",
-                |dataset_env_vars_svc: Arc<dyn DatasetEnvVarService>| async move {
-                    let dataset_env_vars = dataset_env_vars_svc
-                        .get_all_dataset_env_vars_by_dataset_id(&args.dataset_id, None)
-                        .await
-                        .int_err()?;
-                    Ok(dataset_env_vars.list)
-                },
-            )
-            .await?;
+        let dataset_env_vars = self.query_dataset_env_vars(args).await?;
         let dataset_env_vars_hash_map = dataset_env_vars
             .into_iter()
             .map(|dataset_env_var| (dataset_env_var.key.clone(), dataset_env_var))
             .collect::<HashMap<String, DatasetEnvVar>>();
+
         let pull_options = PullOptions {
             ingest_options: PollingIngestOptions {
                 dataset_env_vars: dataset_env_vars_hash_map,
@@ -99,6 +89,18 @@ impl TaskLogicalPlanRunnerImpl {
                 _ => Ok(TaskOutcome::Failed(TaskError::Empty)),
             },
         }
+    }
+
+    #[transactional_method1(dataset_env_vars_svc: Arc<dyn DatasetEnvVarService>)]
+    async fn query_dataset_env_vars(
+        &self,
+        args: &UpdateDataset,
+    ) -> Result<Vec<DatasetEnvVar>, InternalError> {
+        dataset_env_vars_svc
+            .get_all_dataset_env_vars_by_dataset_id(&args.dataset_id, None)
+            .await
+            .map(|listing| listing.list)
+            .int_err()
     }
 
     async fn run_reset(&self, args: &ResetDataset) -> Result<TaskOutcome, InternalError> {

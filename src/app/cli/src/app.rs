@@ -189,7 +189,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     let command_result: Result<(), CLIError> = maybe_transactional(
         is_transactional,
-        "app::run_command",
         cli_catalog,
         |catalog: Catalog| async move {
             let mut command = cli_commands::get_command(&base_catalog, &catalog, args)?;
@@ -218,6 +217,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                 .await
         },
     )
+    .instrument(tracing::debug_span!("app::run_command"))
     .await;
 
     match &command_result {
@@ -252,7 +252,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
 async fn maybe_transactional<F, RF, RT, RE>(
     transactional: bool,
-    transaction_label: &str,
     cli_catalog: Catalog,
     f: F,
 ) -> Result<RT, RE>
@@ -267,9 +266,7 @@ where
         let transaction_runner = DatabaseTransactionRunner::new(cli_catalog);
 
         transaction_runner
-            .transactional(transaction_label, |transactional_catalog| async move {
-                f(transactional_catalog).await
-            })
+            .transactional(|transactional_catalog| async move { f(transactional_catalog).await })
             .await
     }
 }
@@ -480,28 +477,26 @@ pub fn configure_cli_catalog(
 async fn initialize_components(cli_catalog: &Catalog) -> Result<(), CLIError> {
     // TODO: Generalize on-startup initialization into a trait
     DatabaseTransactionRunner::new(cli_catalog.clone())
-        .transactional(
-            "app::initialize_components",
-            |transactional_catalog| async move {
-                let registrator = transactional_catalog
-                    .get_one::<PredefinedAccountsRegistrator>()
-                    .map_err(CLIError::critical)?;
+        .transactional(|transactional_catalog| async move {
+            let registrator = transactional_catalog
+                .get_one::<PredefinedAccountsRegistrator>()
+                .map_err(CLIError::critical)?;
 
-                registrator
-                    .ensure_predefined_accounts_are_registered()
-                    .await
-                    .map_err(CLIError::critical)?;
+            registrator
+                .ensure_predefined_accounts_are_registered()
+                .await
+                .map_err(CLIError::critical)?;
 
-                let initializer = transactional_catalog
-                    .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
-                    .map_err(CLIError::critical)?;
+            let initializer = transactional_catalog
+                .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
+                .map_err(CLIError::critical)?;
 
-                initializer
-                    .eager_initialization()
-                    .await
-                    .map_err(CLIError::critical)
-            },
-        )
+            initializer
+                .eager_initialization()
+                .await
+                .map_err(CLIError::critical)
+        })
+        .instrument(tracing::debug_span!("app::initialize_components"))
         .await?;
 
     Ok(())

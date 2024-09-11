@@ -18,6 +18,7 @@ use internal_error::ResultIntoInternal;
 use kamu_accounts::*;
 use kamu_accounts_services::PasswordLoginCredentials;
 use kamu_adapter_oauth::*;
+use tracing::Instrument;
 
 use super::{CLIError, Command};
 use crate::OutputConfig;
@@ -106,21 +107,21 @@ impl APIServerRunCommand {
         };
 
         let login_response = DatabaseTransactionRunner::new(self.base_catalog.clone())
-            .transactional_with(
-                "APIServerRunCommand::get_access_token",
-                |auth_svc: Arc<dyn AuthenticationService>| async move {
-                    auth_svc
-                        .login(
-                            PROVIDER_PASSWORD,
-                            serde_json::to_string::<PasswordLoginCredentials>(&login_credentials)
-                                .int_err()
-                                .map_err(CLIError::critical)?,
-                        )
-                        .await
-                        .int_err()
-                        .map_err(CLIError::critical)
-                },
-            )
+            .transactional_with(|auth_svc: Arc<dyn AuthenticationService>| async move {
+                auth_svc
+                    .login(
+                        PROVIDER_PASSWORD,
+                        serde_json::to_string::<PasswordLoginCredentials>(&login_credentials)
+                            .int_err()
+                            .map_err(CLIError::critical)?,
+                    )
+                    .await
+                    .int_err()
+                    .map_err(CLIError::critical)
+            })
+            .instrument(tracing::debug_span!(
+                "APIServerRunCommand::get_access_token"
+            ))
             .await?;
 
         Ok(login_response.access_token)

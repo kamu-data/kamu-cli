@@ -28,6 +28,7 @@ use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+use tracing::Instrument;
 use url::Url;
 
 use crate::smart_protocol::errors::*;
@@ -679,7 +680,6 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             let dst_dataset = dst.clone();
             DatabaseTransactionRunner::new(self.catalog.clone())
                 .transactional_with(
-                    "SmartTransferProtocolClient::append_dataset_metadata_batch",
                     |append_dataset_metadata_batch: Arc<
                         dyn AppendDatasetMetadataBatchUseCase,
                     >| async move {
@@ -692,6 +692,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                             .await
                     },
                 )
+                .instrument(tracing::debug_span!("SmartTransferProtocolClient::append_dataset_metadata_batch",))
                 .await
                 .int_err()?;
 
