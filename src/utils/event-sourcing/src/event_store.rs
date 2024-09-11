@@ -28,6 +28,7 @@ pub trait EventStore<Proj: Projection>: Send + Sync {
     async fn save_events(
         &self,
         query: &Proj::Query,
+        prev_stored_event_id: Option<EventID>,
         events: Vec<Proj::Event>,
     ) -> Result<EventID, SaveEventsError>;
 
@@ -66,7 +67,21 @@ pub enum SaveEventsError {
     #[error("No events for saves")]
     NothingToSave,
 
-    // TODO: Concurrency control
+    #[error(transparent)]
+    ConcurrentModification(ConcurrentModificationError),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
+
+impl SaveEventsError {
+    pub fn concurrent_modification() -> Self {
+        Self::ConcurrentModification(ConcurrentModificationError {})
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+#[error("Concurrent modification")]
+pub struct ConcurrentModificationError {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

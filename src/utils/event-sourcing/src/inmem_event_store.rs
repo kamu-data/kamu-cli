@@ -79,9 +79,11 @@ impl<Proj: Projection, State: EventStoreState<Proj>> EventStore<Proj>
     async fn save_events(
         &self,
         _: &Proj::Query,
+        _: Option<EventID>,
         events: Vec<Proj::Event>,
     ) -> Result<EventID, SaveEventsError> {
         let mut g = self.state.lock().unwrap();
+
         for event in events {
             g.add_event(event);
         }

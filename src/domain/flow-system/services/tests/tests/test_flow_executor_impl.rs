@@ -180,6 +180,7 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
         .flow_configuration_event_store
         .save_events(
             &foo_flow_key,
+            None,
             vec![FlowConfigurationEventCreated {
                 event_time: start_time,
                 flow_key: foo_flow_key.clone(),
@@ -203,6 +204,7 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
         .flow_event_store
         .save_events(
             &flow_id,
+            None,
             vec![
                 FlowEventInitiated {
                     event_time: start_time,

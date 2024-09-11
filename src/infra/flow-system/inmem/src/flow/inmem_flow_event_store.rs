@@ -279,6 +279,7 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
     async fn save_events(
         &self,
         query: &FlowID,
+        prev_stored_event_id: Option<EventID>,
         events: Vec<FlowEvent>,
     ) -> Result<EventID, SaveEventsError> {
         {
@@ -289,7 +290,9 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
             }
         }
 
-        self.inner.save_events(query, events).await
+        self.inner
+            .save_events(query, prev_stored_event_id, events)
+            .await
     }
 }
 

@@ -74,6 +74,7 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
     async fn save_events(
         &self,
         query: &FlowKey,
+        prev_stored_event_id: Option<EventID>,
         events: Vec<FlowConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
         if events.is_empty() {
@@ -86,7 +87,9 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
             g.dataset_ids.push(flow_key.dataset_id.clone());
         }
 
-        self.inner.save_events(query, events).await
+        self.inner
+            .save_events(query, prev_stored_event_id, events)
+            .await
     }
 }
 
