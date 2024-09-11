@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Changed -->
 <!--- - Fixed -->
 
+## [Unreleased]
+### Changed
+- Improved telemetry data collected around transactional code
+
 ## [0.199.3] - 2024-09-11
 ### Fixed
 - Associating correct input dataset that was hard compacted with the error during transformation of derived dataset
