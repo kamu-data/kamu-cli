@@ -178,63 +178,9 @@ fn is_catalog_type(type_path: &TypePath) -> bool {
 // Transactional methods
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-enum ReturnValueAction {
-    Unwrap,
-    UnwrapAndColon,
-    ReturnAsIs,
-}
-
-fn parse_return_value_action(input: ParseStream) -> syn::Result<ReturnValueAction> {
-    input.parse::<Token![,]>()?;
-
-    let return_value_parameter_name: Ident = input.parse()?;
-
-    assert_eq!(
-        return_value_parameter_name, "return_value",
-        r#"Unexpected parameter: only "return_value" is available"#
-    );
-
-    input.parse::<Token![=]>()?;
-
-    let return_value: LitStr = input.parse()?;
-
-    let result = match return_value.value().as_str() {
-        "unwrap" => ReturnValueAction::Unwrap,
-        "unwrapAndColon" => ReturnValueAction::UnwrapAndColon,
-        "asIs" => ReturnValueAction::ReturnAsIs,
-        s => panic!(
-            "Unexpected \"return_value\" = \"{s}\"! Only \"unwrap\", \"unwrapAndColon\" and \
-             \"asIs\" are available"
-        ),
-    };
-
-    Ok(result)
-}
-
-struct CatalogNoItems {
-    return_value_action: ReturnValueAction,
-}
-
-impl Parse for CatalogNoItems {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let return_value_action = {
-            if !input.peek(Token![,]) {
-                ReturnValueAction::ReturnAsIs
-            } else {
-                parse_return_value_action(input)?
-            }
-        };
-
-        Ok(Self {
-            return_value_action,
-        })
-    }
-}
-
 struct CatalogItem1 {
     item_name: Ident,
     item_type: Type,
-    return_value_action: ReturnValueAction,
 }
 
 impl Parse for CatalogItem1 {
@@ -245,18 +191,9 @@ impl Parse for CatalogItem1 {
 
         let item_type: Type = input.parse()?;
 
-        let return_value_action = {
-            if !input.peek(Token![,]) {
-                ReturnValueAction::ReturnAsIs
-            } else {
-                parse_return_value_action(input)?
-            }
-        };
-
         Ok(Self {
             item_name,
             item_type,
-            return_value_action,
         })
     }
 }
@@ -266,7 +203,6 @@ struct CatalogItem2 {
     item1_type: Type,
     item2_name: Ident,
     item2_type: Type,
-    return_value_action: ReturnValueAction,
 }
 
 impl Parse for CatalogItem2 {
@@ -285,20 +221,11 @@ impl Parse for CatalogItem2 {
 
         let item2_type: Type = input.parse()?;
 
-        let return_value_action = {
-            if !input.peek(Token![,]) {
-                ReturnValueAction::ReturnAsIs
-            } else {
-                parse_return_value_action(input)?
-            }
-        };
-
         Ok(Self {
             item1_name,
             item1_type,
             item2_name,
             item2_type,
-            return_value_action,
         })
     }
 }
@@ -313,22 +240,8 @@ impl Parse for CatalogItem2 {
 /// async fn set_system_flow_schedule(&self) {
 ///     // `transaction_catalog` is available inside the method body
 /// }
-///
-/// // Behavior change when dealing with the result
-/// // Available values
-/// // - "unwrap"
-/// // - "unwrapAndColon"
-/// // - "asIs" (default)
-/// #[transactional_method(return_value = "asIs")]
-/// async fn set_system_flow_schedule(&self) -> Result<(), InternalError>{
-///     // `transaction_catalog` is available inside the method body
-///     something().await
-/// }
 /// ```
-pub fn transactional_method(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let CatalogNoItems {
-        return_value_action,
-    } = parse_macro_input!(attr as CatalogNoItems);
+pub fn transactional_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemFn);
 
     let method_signature = &input.sig;
@@ -336,11 +249,6 @@ pub fn transactional_method(attr: TokenStream, item: TokenStream) -> TokenStream
     let method_body = &input.block;
     let method_visibility = &input.vis;
 
-    let return_value_action = match return_value_action {
-        ReturnValueAction::Unwrap => quote! { .unwrap() },
-        ReturnValueAction::UnwrapAndColon => quote! { .unwrap(); },
-        ReturnValueAction::ReturnAsIs => quote! {},
-    };
     let updated_method = quote! {
         #method_visibility #method_signature {
             use tracing::Instrument;
@@ -350,7 +258,6 @@ pub fn transactional_method(attr: TokenStream, item: TokenStream) -> TokenStream
                 })
                 .instrument(tracing::debug_span!(stringify!(#method_name)))
                 .await
-                #return_value_action
         }
     };
 
@@ -368,23 +275,11 @@ pub fn transactional_method(attr: TokenStream, item: TokenStream) -> TokenStream
 /// async fn set_system_flow_schedule(&self) {
 ///     // `service` is available inside the method body
 /// }
-///
-/// // Behavior change when dealing with the result
-/// // Available values
-/// // - "unwrap"
-/// // - "unwrapAndColon"
-/// // - "asIs" (default)
-/// #[transactional_method1(service: Arc<dyn Service>, return_value = "asIs")]
-/// async fn set_system_flow_schedule(&self) -> Result<(), InternalError>{
-///     // `service` is available inside the method body
-///     service.something().await
-/// }
 /// ```
 pub fn transactional_method1(attr: TokenStream, item: TokenStream) -> TokenStream {
     let CatalogItem1 {
         item_name: catalog_item_name,
         item_type: catalog_item_type,
-        return_value_action,
     } = parse_macro_input!(attr as CatalogItem1);
     let input = parse_macro_input!(item as ItemFn);
 
@@ -393,11 +288,6 @@ pub fn transactional_method1(attr: TokenStream, item: TokenStream) -> TokenStrea
     let method_body = &input.block;
     let method_visibility = &input.vis;
 
-    let return_value_action = match return_value_action {
-        ReturnValueAction::Unwrap => quote! { .unwrap() },
-        ReturnValueAction::UnwrapAndColon => quote! { .unwrap(); },
-        ReturnValueAction::ReturnAsIs => quote! {},
-    };
     let updated_method = quote! {
         #method_visibility #method_signature {
             use tracing::Instrument;
@@ -407,7 +297,6 @@ pub fn transactional_method1(attr: TokenStream, item: TokenStream) -> TokenStrea
                 })
                 .instrument(tracing::debug_span!(stringify!(#method_name)))
                 .await
-                #return_value_action
         }
     };
 
@@ -425,17 +314,6 @@ pub fn transactional_method1(attr: TokenStream, item: TokenStream) -> TokenStrea
 /// async fn set_system_flow_schedule(&self) {
 ///     // `service1` and `service2` are available inside the method body
 /// }
-///
-/// // Behavior change when dealing with the result
-/// // Available values
-/// // - "unwrap"
-/// // - "unwrapAndColon"
-/// // - "asIs" (default)
-/// #[transactional_method2(service1: Arc<dyn Service1>, service2: Arc<dyn Service2>, return_value = "asIs")]
-/// async fn set_system_flow_schedule(&self) -> Result<(), InternalError>{
-///     // `service1` and `service2` are available inside the method body
-///     service1.something().await
-/// }
 /// ```
 pub fn transactional_method2(attr: TokenStream, item: TokenStream) -> TokenStream {
     let CatalogItem2 {
@@ -443,7 +321,6 @@ pub fn transactional_method2(attr: TokenStream, item: TokenStream) -> TokenStrea
         item1_type: catalog_item1_type,
         item2_name: catalog_item2_name,
         item2_type: catalog_item2_type,
-        return_value_action,
     } = parse_macro_input!(attr as CatalogItem2);
     let input = parse_macro_input!(item as ItemFn);
 
@@ -452,11 +329,6 @@ pub fn transactional_method2(attr: TokenStream, item: TokenStream) -> TokenStrea
     let method_body = &input.block;
     let method_visibility = &input.vis;
 
-    let return_value_action = match return_value_action {
-        ReturnValueAction::Unwrap => quote! { .unwrap() },
-        ReturnValueAction::UnwrapAndColon => quote! { .unwrap(); },
-        ReturnValueAction::ReturnAsIs => quote! {},
-    };
     let updated_method = quote! {
         #method_visibility #method_signature {
             use tracing::Instrument;
@@ -466,7 +338,6 @@ pub fn transactional_method2(attr: TokenStream, item: TokenStream) -> TokenStrea
                 })
                 .instrument(tracing::debug_span!(stringify!(#method_name)))
                 .await
-                #return_value_action
         }
     };
 

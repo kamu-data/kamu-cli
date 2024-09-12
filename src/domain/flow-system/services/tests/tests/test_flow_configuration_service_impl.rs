@@ -38,7 +38,8 @@ async fn test_visibility() {
     let gc_schedule: Schedule = Duration::try_minutes(30).unwrap().into();
     harness
         .set_system_flow_schedule(SystemFlowType::GC, gc_schedule.clone())
-        .await;
+        .await
+        .unwrap();
 
     let foo_id = harness.create_root_dataset("foo").await;
     let bar_id = harness.create_root_dataset("bar").await;
@@ -278,7 +279,8 @@ async fn test_pause_resume_individual_system_flows() {
     let gc_schedule: Schedule = Duration::try_minutes(30).unwrap().into();
     harness
         .set_system_flow_schedule(SystemFlowType::GC, gc_schedule.clone())
-        .await;
+        .await
+        .unwrap();
 
     // It should be visible in the list of enabled configs, and create 1 event
     let configs = harness.list_enabled_configurations().await;
@@ -507,8 +509,12 @@ impl FlowConfigurationHarness {
         res
     }
 
-    #[transactional_method1(flow_configuration_service: Arc<dyn FlowConfigurationService>, return_value="unwrapAndColon")]
-    async fn set_system_flow_schedule(&self, system_flow_type: SystemFlowType, schedule: Schedule) {
+    #[transactional_method1(flow_configuration_service: Arc<dyn FlowConfigurationService>)]
+    async fn set_system_flow_schedule(
+        &self,
+        system_flow_type: SystemFlowType,
+        schedule: Schedule,
+    ) -> Result<(), SetFlowConfigurationError> {
         flow_configuration_service
             .set_configuration(
                 Utc::now(),
@@ -516,7 +522,8 @@ impl FlowConfigurationHarness {
                 false,
                 FlowConfigurationRule::Schedule(schedule),
             )
-            .await
+            .await?;
+        Ok(())
     }
 
     async fn set_dataset_flow_schedule(
