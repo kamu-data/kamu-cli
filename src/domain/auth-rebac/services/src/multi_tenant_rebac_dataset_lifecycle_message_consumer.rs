@@ -83,7 +83,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for MultiTenantRebacDatasetLifecy
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        label = "MultiTenantRebacDatasetLifecycleMessageConsumer[DatasetLifecycleMessage]"
+        name = "MultiTenantRebacDatasetLifecycleMessageConsumer[DatasetLifecycleMessage]"
     )]
     async fn consume_message(
         &self,

@@ -206,7 +206,7 @@ impl MessageConsumerT<FlowProgressMessage> for FlowTimeWheelServiceImpl {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        label = "FlowTimeWheelServiceImpl[FlowProgressMessage]"
+        name = "FlowTimeWheelServiceImpl[FlowProgressMessage]"
     )]
     async fn consume_message(
         &self,

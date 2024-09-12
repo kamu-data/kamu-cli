@@ -266,7 +266,7 @@ impl QueryServiceImpl {
             .await
             .int_err()
             .map_err(|e| {
-                tracing::error!(error = ?e, "Resolving last data slice failed");
+                tracing::error!(error = ?e, error_msg = %e, "Resolving last data slice failed");
                 e
             })?
             .into_event()
@@ -456,6 +456,7 @@ async fn read_data_slice_metadata(
         .map_err(|e| {
             tracing::error!(
                 error = ?e,
+                error_msg = %e,
                 "QueryService::read_data_slice_metadata: object store head failed",
             );
             e
@@ -471,6 +472,7 @@ async fn read_data_slice_metadata(
         .map_err(|e| {
             tracing::error!(
                 error = ?e,
+                error_msg = %e,
                 "QueryService::read_data_slice_metadata: Parquet reader get metadata failed"
             );
             e

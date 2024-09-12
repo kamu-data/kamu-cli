@@ -13,7 +13,6 @@ use std::sync::Arc;
 use database_common_macros::{transactional_method, transactional_method1};
 use dill::{component, scope, Catalog, Singleton};
 use internal_error::{InternalError, ResultIntoInternal};
-use thiserror::Error;
 
 use crate::*;
 
@@ -347,13 +346,9 @@ impl ProducerRelayJob {
                     }
                 }
 
-                #[derive(Error, Debug)]
-                #[error("Outbox message consumption error")]
                 struct OutboxMessageConsumptionError {
-                    #[source]
                     source: InternalError,
                     consumer_name: String,
-                    message_id: OutboxMessageID,
                 }
 
                 // Consume message concurrently
@@ -364,7 +359,6 @@ impl ProducerRelayJob {
                             .await
                             .map_err(|e| OutboxMessageConsumptionError {
                                 consumer_name: consumer_name.to_owned(),
-                                message_id: message.message_id,
                                 source: e,
                             })
                     })
@@ -379,8 +373,11 @@ impl ProducerRelayJob {
                     .map(|e| e.err().unwrap())
                     .for_each(|e: OutboxMessageConsumptionError| {
                         tracing::error!(
-                            error=?e, message=?message,
-                            "Consuming outbox message FAILED"
+                            error = ?e.source,
+                            error_msg = %e.source,
+                            consumer_name = %e.consumer_name,
+                            message = ?message,
+                            "Consuming outbox message failed"
                         );
                         failing_consumer_names.insert(e.consumer_name);
                     });

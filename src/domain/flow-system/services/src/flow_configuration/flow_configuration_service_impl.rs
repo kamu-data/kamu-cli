@@ -352,7 +352,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowConfigurationServiceImpl 
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        label = "FlowConfigurationServiceImpl[DatasetLifecycleMessage]"
+        name = "FlowConfigurationServiceImpl[DatasetLifecycleMessage]"
     )]
     async fn consume_message(
         &self,

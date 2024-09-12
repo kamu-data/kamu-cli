@@ -132,7 +132,7 @@ impl PushIngestServiceImpl {
                 Ok(res)
             }
             Err(err) => {
-                tracing::error!(error = ?err, "Ingest iteration failed");
+                tracing::error!(error = ?err, error_msg = %err, "Ingest iteration failed");
                 listener.error(&err);
                 Err(err)
             }

@@ -81,7 +81,7 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
         let object_store = s3_builder
             .build()
             .map_err(|e| {
-                tracing::error!(error = ?e, "Failed to build S3 object store");
+                tracing::error!(error = ?e, error_msg = %e, "Failed to build S3 object store");
                 e
             })
             .int_err()?;

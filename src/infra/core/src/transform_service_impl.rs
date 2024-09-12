@@ -74,7 +74,7 @@ impl TransformServiceImpl {
                 Ok(res)
             }
             Err(err) => {
-                tracing::error!(error = ?err, "Transform failed");
+                tracing::error!(error = ?err, error_msg = %err, "Transform failed");
                 listener.error(&err);
                 Err(err)
             }

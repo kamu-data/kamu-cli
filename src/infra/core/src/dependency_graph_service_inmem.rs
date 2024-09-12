@@ -386,7 +386,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceInMemor
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        label = "DependencyGraphServiceInMemory[DatasetLifecycleMessage]"
+        name = "DependencyGraphServiceInMemory[DatasetLifecycleMessage]"
     )]
     async fn consume_message(
         &self,

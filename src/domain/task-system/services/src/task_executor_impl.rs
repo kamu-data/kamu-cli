@@ -139,7 +139,12 @@ impl TaskExecutorImpl {
             Ok(outcome) => outcome,
             Err(e) => {
                 // No useful task result, but at least the error logged
-                tracing::error!(task=?task, error=?e, "Task run FAILED");
+                tracing::error!(
+                    task=?task,
+                    error=?e,
+                    error_msg=%e,
+                    "Task run failed"
+                );
                 TaskOutcome::Failed(TaskError::Empty)
             }
         };

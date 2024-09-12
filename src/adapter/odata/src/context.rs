@@ -180,7 +180,7 @@ impl CollectionContext for ODataCollectionContext {
             .try_first()
             .await
             .map_err(|e| {
-                tracing::error!(error = ?e, "Resolving last data slice failed");
+                tracing::error!(error = ?e, error_msg = %e, "Resolving last data slice failed");
                 e
             })
             .int_err()

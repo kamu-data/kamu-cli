@@ -276,7 +276,11 @@ impl FlowExecutorImpl {
             .filter(Result::is_err)
             .map(|e| e.err().unwrap())
             .for_each(|e: InternalError| {
-                tracing::error!(error=?e, "Scheduling flow failed");
+                tracing::error!(
+                    error=?e,
+                    error_msg=%e,
+                    "Scheduling flow failed"
+                );
             });
 
         // Publish progress event
@@ -500,7 +504,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        label = "FlowExecutorImpl[TaskProgressMessage]"
+        name = "FlowExecutorImpl[TaskProgressMessage]"
     )]
     async fn consume_message(
         &self,
@@ -608,7 +612,7 @@ impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        label = "FlowExecutorImpl[FlowConfigurationUpdatedMessage]"
+        name = "FlowExecutorImpl[FlowConfigurationUpdatedMessage]"
     )]
     async fn consume_message(
         &self,
@@ -663,7 +667,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowExecutorImpl {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        label = "FlowExecutorImpl[DatasetLifecycleMessage]"
+        name = "FlowExecutorImpl[DatasetLifecycleMessage]"
     )]
     async fn consume_message(
         &self,

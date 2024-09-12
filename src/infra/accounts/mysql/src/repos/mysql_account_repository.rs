@@ -74,7 +74,11 @@ impl AccountRepository for MySqlAccountRepository {
                     } else if mysql_error_message.contains("for key 'idx_accounts_provider_identity_key'") {
                         CreateAccountDuplicateField::ProviderIdentityKey
                     } else {
-                        tracing::error!("Unexpected MySQL error message: {}", mysql_error_message);
+                        tracing::error!(
+                            error=?e, 
+                            error_msg = mysql_error_message, 
+                            "Unexpected MySQL error"
+                        );
                         CreateAccountDuplicateField::Id
                     };
 

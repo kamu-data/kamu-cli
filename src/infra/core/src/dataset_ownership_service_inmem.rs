@@ -154,7 +154,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetOwnershipServiceInMemo
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        label = "DatasetOwnershipServiceInMemory[DatasetLifecycleMessage]"
+        name = "DatasetOwnershipServiceInMemory[DatasetLifecycleMessage]"
     )]
     async fn consume_message(
         &self,

@@ -60,8 +60,11 @@ impl Outbox for OutboxImmediateImpl {
                 .await;
             if let Err(e) = dispatch_result {
                 tracing::error!(
-                    error=?e, producer_name, content_json=?content_json,
-                    "Immediate outbox message dispatching FAILED"
+                    error = ?e,
+                    error_msg = %e,
+                    producer_name,
+                    content_json=?content_json,
+                    "Immediate outbox message dispatching faioed"
                 );
             }
         }
