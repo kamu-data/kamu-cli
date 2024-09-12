@@ -511,7 +511,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
         target_catalog: &Catalog,
         message: &TaskProgressMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(message=?message, "Received task progress message");
+        tracing::debug!(received_message=?message, "Received task progress message");
 
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
 
@@ -619,7 +619,7 @@ impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
         target_catalog: &Catalog,
         message: &FlowConfigurationUpdatedMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(message=?message, "Received flow configuration message");
+        tracing::debug!(received_message=?message, "Received flow configuration message");
 
         if message.paused {
             let maybe_pending_flow_id = {
@@ -674,7 +674,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowExecutorImpl {
         target_catalog: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(message=?message, "Received dataset lifecycle message");
+        tracing::debug!(received_message=?message, "Received dataset lifecycle message");
 
         match message {
             DatasetLifecycleMessage::Deleted(message) => {

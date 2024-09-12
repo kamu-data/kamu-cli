@@ -213,7 +213,7 @@ impl MessageConsumerT<FlowProgressMessage> for FlowTimeWheelServiceImpl {
         _: &Catalog,
         message: &FlowProgressMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(message=?message, "Received flow progress message");
+        tracing::debug!(received_message=?message, "Received flow progress message");
 
         match message {
             FlowProgressMessage::Enqueued(e) => {

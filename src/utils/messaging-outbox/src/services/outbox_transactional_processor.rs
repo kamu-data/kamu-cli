@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use database_common_macros::{transactional_method, transactional_method1};
 use dill::{component, scope, Catalog, Singleton};
@@ -159,6 +159,11 @@ impl OutboxTransactionalProcessor {
         // Prepare iteration for each producer
         let mut producer_tasks = Vec::new();
         for producer_relay_job in &self.producer_relay_jobs {
+            // Skip this relay if no more working consumers left
+            if producer_relay_job.all_consumers_failing() {
+                continue;
+            }
+
             // Extract latest message ID by producer
             let Some(latest_produced_message_id) =
                 latest_message_ids_by_producer.get(&producer_relay_job.producer_name)
@@ -273,6 +278,7 @@ struct ProducerRelayJob {
     relay_routes_static_info: Arc<RoutesStaticInfo>,
     producer_name: String,
     consumer_names: Vec<String>,
+    failed_consumer_names: Mutex<HashSet<String>>,
 }
 
 impl ProducerRelayJob {
@@ -289,15 +295,28 @@ impl ProducerRelayJob {
             relay_routes_static_info,
             producer_name,
             consumer_names,
+            failed_consumer_names: Mutex::new(HashSet::new()),
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%latest_produced_message_id))]
+    fn all_consumers_failing(&self) -> bool {
+        let g_failed_consumer_names = self.failed_consumer_names.lock().unwrap();
+        assert!(g_failed_consumer_names.len() <= self.consumer_names.len());
+        g_failed_consumer_names.len() == self.consumer_names.len()
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(%latest_produced_message_id, producer_name=%self.producer_name))]
     async fn run_iteration(
         &self,
         latest_produced_message_id: OutboxMessageID,
         consumption_boundaries: HashMap<String, OutboxMessageID>,
     ) -> Result<(), InternalError> {
+        // Clone names of failing consumers before this iteration.
+        let mut failing_consumer_names = {
+            let g_failed_consumer_names = self.failed_consumer_names.lock().unwrap();
+            g_failed_consumer_names.clone()
+        };
+
         // Decide on the earliest message that was processed by all of the consumers
         let maybe_processed_boundary_id =
             self.determine_processed_boundary_id(&consumption_boundaries);
@@ -319,9 +338,6 @@ impl ProducerRelayJob {
                     usize::try_from(self.config.batch_size).unwrap(),
                 )
                 .await?;
-
-            // Collecting failing consumers as we go
-            let mut failing_consumer_names: HashSet<String> = HashSet::new();
 
             // Feed consumers if they are behind this message
             // We must respect the sequential order of messages,
@@ -364,8 +380,8 @@ impl ProducerRelayJob {
                     })
                     .collect();
 
-                // Report errors and disable failing consumers temporarily, as they cannot
-                // advance to the next messages without success of processing the current one
+                // Report errors and disable failing consumers, as they cannot advance to the
+                // next messages without success of processing the current one
                 futures::future::join_all(consumption_futures)
                     .await
                     .into_iter()
@@ -376,8 +392,8 @@ impl ProducerRelayJob {
                             error = ?e.source,
                             error_msg = %e.source,
                             consumer_name = %e.consumer_name,
-                            message = ?message,
-                            "Consuming outbox message failed"
+                            outbox_message = ?message,
+                            "Consuming outbox message failed - pausing further message processing for consumer until restart."
                         );
                         failing_consumer_names.insert(e.consumer_name);
                     });
@@ -394,6 +410,10 @@ impl ProducerRelayJob {
                 }
             }
         }
+
+        // Update list of failing consumer names for this job
+        let mut g_failed_consumer_names = self.failed_consumer_names.lock().unwrap();
+        *g_failed_consumer_names = failing_consumer_names;
 
         Ok(())
     }
@@ -446,7 +466,7 @@ impl ProducerRelayJob {
         consumer_name: &str,
         message: &OutboxMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(consumer_name=%consumer_name, message=?message, "Invoking consumer");
+        tracing::debug!(consumer_name=%consumer_name, received_message=?message, "Invoking consumer");
 
         let dispatcher = self
             .relay_routes_static_info

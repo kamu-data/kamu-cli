@@ -75,8 +75,8 @@ impl AccountRepository for MySqlAccountRepository {
                         CreateAccountDuplicateField::ProviderIdentityKey
                     } else {
                         tracing::error!(
-                            error=?e, 
-                            error_msg = mysql_error_message, 
+                            error=?e,
+                            error_msg = mysql_error_message,
                             "Unexpected MySQL error"
                         );
                         CreateAccountDuplicateField::Id

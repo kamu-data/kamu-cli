@@ -359,7 +359,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowConfigurationServiceImpl 
         _: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(message=?message, "Received dataset lifecycle message");
+        tracing::debug!(received_message=?message, "Received dataset lifecycle message");
 
         match message {
             DatasetLifecycleMessage::Deleted(message) => {

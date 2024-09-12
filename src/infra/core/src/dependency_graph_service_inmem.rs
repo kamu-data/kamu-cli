@@ -393,7 +393,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceInMemor
         _: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(message=?message, "Received dataset lifecycle message");
+        tracing::debug!(received_message=?message, "Received dataset lifecycle message");
 
         let mut state = self.state.write().await;
 
