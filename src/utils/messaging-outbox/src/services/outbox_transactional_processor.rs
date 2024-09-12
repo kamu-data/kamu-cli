@@ -88,8 +88,6 @@ impl OutboxTransactionalProcessor {
         // Main relay loop
         loop {
             self.run_relay_iteration().await?;
-
-            tracing::debug!("Awaiting next iteration");
             tokio::time::sleep(self.config.awaiting_step.to_std().unwrap()).await;
         }
     }
@@ -305,7 +303,7 @@ impl ProducerRelayJob {
             self.determine_processed_boundary_id(&consumption_boundaries);
 
         tracing::debug!(
-            "Processed boundary for producer '{}' is {:?}",
+            "Selected boundary message for producer '{}' is {:?}",
             self.producer_name,
             maybe_processed_boundary_id
         );
@@ -339,6 +337,7 @@ impl ProducerRelayJob {
                 }
 
                 // Consume concurrently
+                // TODO: error recovery
                 use futures::{StreamExt, TryStreamExt};
                 futures::stream::iter(consumer_tasks)
                     .map(Ok)
@@ -424,6 +423,13 @@ impl ProducerRelayJob {
 
         // Shift consumption record regardless of whether the consumer was interested in
         // the message
+        tracing::debug!(
+            consumer_name=%consumer_name,
+            producer_name=%message.producer_name,
+            last_consumed_message_id=%message.message_id,
+            "Shifting consumption record"
+        );
+
         let consumption_repository = transaction_catalog
             .get_one::<dyn OutboxMessageConsumptionRepository>()
             .unwrap();

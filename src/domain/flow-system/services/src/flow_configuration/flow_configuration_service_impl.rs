@@ -155,7 +155,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
     }
 
     /// Set or modify dataset update schedule
-    #[tracing::instrument(level = "info", skip_all, fields(?flow_key, %paused, ?rule))]
+    #[tracing::instrument(level = "info", skip_all, fields(?flow_key, %paused))]
     async fn set_configuration(
         &self,
         request_time: DateTime<Utc>,
@@ -163,6 +163,8 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         paused: bool,
         rule: FlowConfigurationRule,
     ) -> Result<FlowConfigurationState, SetFlowConfigurationError> {
+        tracing::info!(flow_key=?flow_key, paused=%paused, rule=?rule, "Setting flow configuration");
+
         let maybe_flow_configuration =
             FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await?;
 
@@ -347,12 +349,18 @@ impl MessageConsumer for FlowConfigurationServiceImpl {}
 
 #[async_trait::async_trait]
 impl MessageConsumerT<DatasetLifecycleMessage> for FlowConfigurationServiceImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        label = "FlowConfigurationServiceImpl[DatasetLifecycleMessage]"
+    )]
     async fn consume_message(
         &self,
         _: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
+        tracing::debug!(message=?message, "Received dataset lifecycle message");
+
         match message {
             DatasetLifecycleMessage::Deleted(message) => {
                 for flow_type in DatasetFlowType::all() {

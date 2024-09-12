@@ -383,12 +383,18 @@ impl MessageConsumer for DependencyGraphServiceInMemory {}
 
 #[async_trait::async_trait]
 impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceInMemory {
-    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        label = "DependencyGraphServiceInMemory[DatasetLifecycleMessage]"
+    )]
     async fn consume_message(
         &self,
         _: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
+        tracing::debug!(message=?message, "Received dataset lifecycle message");
+
         let mut state = self.state.write().await;
 
         match message {

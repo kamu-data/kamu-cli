@@ -497,12 +497,18 @@ impl MessageConsumer for FlowExecutorImpl {}
 
 #[async_trait::async_trait]
 impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        label = "FlowExecutorImpl[TaskProgressMessage]"
+    )]
     async fn consume_message(
         &self,
         target_catalog: &Catalog,
         message: &TaskProgressMessage,
     ) -> Result<(), InternalError> {
+        tracing::debug!(message=?message, "Received task progress message");
+
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
 
         match message {
@@ -599,12 +605,18 @@ impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
 
 #[async_trait::async_trait]
 impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        label = "FlowExecutorImpl[FlowConfigurationUpdatedMessage]"
+    )]
     async fn consume_message(
         &self,
         target_catalog: &Catalog,
         message: &FlowConfigurationUpdatedMessage,
     ) -> Result<(), InternalError> {
+        tracing::debug!(message=?message, "Received flow configuration message");
+
         if message.paused {
             let maybe_pending_flow_id = {
                 let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
@@ -648,12 +660,18 @@ impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
 
 #[async_trait::async_trait]
 impl MessageConsumerT<DatasetLifecycleMessage> for FlowExecutorImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        label = "FlowExecutorImpl[DatasetLifecycleMessage]"
+    )]
     async fn consume_message(
         &self,
         target_catalog: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
+        tracing::debug!(message=?message, "Received dataset lifecycle message");
+
         match message {
             DatasetLifecycleMessage::Deleted(message) => {
                 let flow_ids_2_abort = {

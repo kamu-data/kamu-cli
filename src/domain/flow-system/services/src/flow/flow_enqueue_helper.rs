@@ -60,13 +60,14 @@ impl FlowEnqueueHelper {
         }
     }
 
-    #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?rule))]
     pub(crate) async fn activate_flow_configuration(
         &self,
         start_time: DateTime<Utc>,
         flow_key: FlowKey,
         rule: FlowConfigurationRule,
     ) -> Result<(), InternalError> {
+        tracing::trace!(flow_key=?flow_key, rule=?rule, "Activating flow configuration");
+
         match &flow_key {
             FlowKey::Dataset(_) => {
                 match &rule {
@@ -105,7 +106,6 @@ impl FlowEnqueueHelper {
         Ok(())
     }
 
-    #[tracing::instrument(level = "trace", skip_all, fields(?flow_key))]
     pub(crate) async fn try_enqueue_scheduled_auto_polling_flow_if_enabled(
         &self,
         start_time: DateTime<Utc>,
@@ -284,13 +284,14 @@ impl FlowEnqueueHelper {
         }
     }
 
-    #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?schedule))]
     pub(crate) async fn enqueue_scheduled_auto_polling_flow(
         &self,
         start_time: DateTime<Utc>,
         flow_key: &FlowKey,
         schedule: &Schedule,
     ) -> Result<FlowState, InternalError> {
+        tracing::trace!(flow_key=?flow_key, schedule=?schedule, "Enqueuing scheduled flow");
+
         self.trigger_flow_common(
             flow_key,
             FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
@@ -302,7 +303,6 @@ impl FlowEnqueueHelper {
         .await
     }
 
-    #[tracing::instrument(level = "trace", skip_all, fields(?flow_key))]
     pub(crate) async fn enqueue_auto_polling_flow_unconditionally(
         &self,
         start_time: DateTime<Utc>,
@@ -633,7 +633,6 @@ impl FlowEnqueueHelper {
             .get_planned_flow_activation_time(flow_id)
     }
 
-    #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?trigger))]
     async fn make_new_flow(
         &self,
         flow_event_store: &dyn FlowEventStore,
@@ -641,6 +640,8 @@ impl FlowEnqueueHelper {
         trigger: FlowTrigger,
         config_snapshot: Option<FlowConfigurationSnapshot>,
     ) -> Result<Flow, InternalError> {
+        tracing::trace!(flow_key=?flow_key, trigger=?trigger, "Creating new flow");
+
         let flow = Flow::new(
             self.time_source.now(),
             flow_event_store.new_flow_id().await?,
@@ -667,7 +668,6 @@ impl FlowEnqueueHelper {
         }
     }
 
-    #[tracing::instrument(level = "trace", skip_all, fields(%flow_id, %activate_at))]
     async fn enqueue_flow(
         &self,
         flow_id: FlowID,

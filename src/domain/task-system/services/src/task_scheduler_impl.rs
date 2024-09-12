@@ -40,12 +40,13 @@ impl TaskSchedulerImpl {
 
 #[async_trait::async_trait]
 impl TaskScheduler for TaskSchedulerImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(?logical_plan))]
     async fn create_task(
         &self,
         logical_plan: LogicalPlan,
         metadata: Option<TaskMetadata>,
     ) -> Result<TaskState, CreateTaskError> {
+        tracing::info!(logical_plan=?logical_plan, "Creating task");
+
         let mut task = Task::new(
             self.time_source.now(),
             self.task_event_store.new_task_id().await?,

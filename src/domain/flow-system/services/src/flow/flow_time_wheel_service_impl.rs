@@ -203,11 +203,18 @@ impl MessageConsumer for FlowTimeWheelServiceImpl {}
 
 #[async_trait::async_trait]
 impl MessageConsumerT<FlowProgressMessage> for FlowTimeWheelServiceImpl {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        label = "FlowTimeWheelServiceImpl[FlowProgressMessage]"
+    )]
     async fn consume_message(
         &self,
         _: &Catalog,
         message: &FlowProgressMessage,
     ) -> Result<(), InternalError> {
+        tracing::debug!(message=?message, "Received flow progress message");
+
         match message {
             FlowProgressMessage::Enqueued(e) => {
                 self.activate_at(e.activate_at, e.flow_id);

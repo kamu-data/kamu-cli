@@ -151,12 +151,18 @@ impl MessageConsumer for DatasetOwnershipServiceInMemory {}
 
 #[async_trait::async_trait]
 impl MessageConsumerT<DatasetLifecycleMessage> for DatasetOwnershipServiceInMemory {
-    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        label = "DatasetOwnershipServiceInMemory[DatasetLifecycleMessage]"
+    )]
     async fn consume_message(
         &self,
         _: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
+        tracing::debug!(message=?message, "Received dataset lifecycle message");
+
         match message {
             DatasetLifecycleMessage::Created(message) => {
                 let mut guard = self.state.write().await;

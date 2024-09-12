@@ -52,7 +52,6 @@ impl MessageConsumer for FlowConfigTestListener {}
 
 #[async_trait::async_trait]
 impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowConfigTestListener {
-    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
     async fn consume_message(
         &self,
         _: &Catalog,
