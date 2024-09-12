@@ -49,7 +49,7 @@ impl Outbox for OutboxImmediateImpl {
         producer_name: &str,
         content_json: &serde_json::Value,
     ) -> Result<(), InternalError> {
-        tracing::debug!(content_json=%content_json, "Dispatching outbox message immediately");
+        tracing::debug!(content_json = %content_json, "Dispatching outbox message immediately");
 
         let maybe_dispatcher = self.message_dispatchers_by_producers.get(producer_name);
         if let Some(dispatcher) = maybe_dispatcher {
@@ -63,7 +63,7 @@ impl Outbox for OutboxImmediateImpl {
                     error = ?e,
                     error_msg = %e,
                     producer_name,
-                    content_json=?content_json,
+                    ?content_json,
                     "Immediate outbox message dispatching faioed"
                 );
             }

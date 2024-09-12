@@ -16,8 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Revised associating span objects with large JSON structures such as messages
    - Suppressed several noisy, but not very useful events
 - Improved Outbox stability when message consumers fail
-- Similarly, Task Executor keeps executing next tasks 
-    in case running a task results in an internal error
+- Similarly, Task Executor keeps executing next tasks in case running a task results in an internal error
 
 ## [0.199.3] - 2024-09-11
 ### Fixed

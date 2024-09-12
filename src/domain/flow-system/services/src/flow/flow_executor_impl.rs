@@ -277,8 +277,8 @@ impl FlowExecutorImpl {
             .map(|e| e.err().unwrap())
             .for_each(|e: InternalError| {
                 tracing::error!(
-                    error=?e,
-                    error_msg=%e,
+                    error = ?e,
+                    error_msg = %e,
                     "Scheduling flow failed"
                 );
             });

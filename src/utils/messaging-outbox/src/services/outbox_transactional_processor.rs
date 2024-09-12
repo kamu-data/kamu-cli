@@ -385,8 +385,7 @@ impl ProducerRelayJob {
                 futures::future::join_all(consumption_futures)
                     .await
                     .into_iter()
-                    .filter(Result::is_err)
-                    .map(|e| e.err().unwrap())
+                    .filter_map(Result::err)
                     .for_each(|e: OutboxMessageConsumptionError| {
                         tracing::error!(
                             error = ?e.source,
