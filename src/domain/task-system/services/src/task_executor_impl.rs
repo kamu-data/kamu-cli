@@ -128,10 +128,21 @@ impl TaskExecutorImpl {
 
     #[tracing::instrument(level = "info", skip_all, fields(task_id = %task.task_id))]
     async fn run_task(&self, task: &Task) -> Result<TaskOutcome, InternalError> {
-        let task_outcome = self
+        // Run task via logical plan
+        let task_run_result = self
             .task_logical_plan_runner
             .run_plan(&task.logical_plan)
-            .await?;
+            .await;
+
+        // Deal with errors: we should not interrupt the main loop if task fails
+        let task_outcome = match task_run_result {
+            Ok(outcome) => outcome,
+            Err(e) => {
+                // No useful task result, but at least the error logged
+                tracing::error!(task=?task, error=?e, "Task run FAILED");
+                TaskOutcome::Failed(TaskError::Empty)
+            }
+        };
 
         tracing::info!(
             task_id = %task.task_id,
