@@ -60,13 +60,13 @@ impl SqliteTaskSystemEventStore {
         &self,
         tr: &mut database_common::TransactionGuard<'_, Sqlite>,
         events: &[TaskEvent],
-        prev_stored_event_id: Option<EventID>,
+        maybe_prev_stored_event_id: Option<EventID>,
         last_event_id: EventID,
     ) -> Result<(), SaveEventsError> {
         let connection_mut = tr.connection_mut().await?;
 
         let last_event_id: i64 = last_event_id.into();
-        let prev_stored_event_id: Option<i64> = prev_stored_event_id.map(Into::into);
+        let maybe_prev_stored_event_id: Option<i64> = maybe_prev_stored_event_id.map(Into::into);
 
         let last_event = events.last().expect("Non empty event list expected");
 
@@ -87,7 +87,7 @@ impl SqliteTaskSystemEventStore {
                 event_task_id,
                 latest_status,
                 last_event_id,
-                prev_stored_event_id,
+                maybe_prev_stored_event_id,
             )
             .fetch_all(connection_mut)
             .await
@@ -196,7 +196,7 @@ impl EventStore<TaskState> for SqliteTaskSystemEventStore {
     async fn save_events(
         &self,
         task_id: &TaskID,
-        prev_stored_event_id: Option<EventID>,
+        maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<TaskEvent>,
     ) -> Result<EventID, SaveEventsError> {
         // If there is nothing to save, exit quickly
@@ -209,9 +209,12 @@ impl EventStore<TaskState> for SqliteTaskSystemEventStore {
         // For the newly created task, make sure it's registered before events
         let first_event = events.first().expect("Non empty event list expected");
         if let TaskEvent::TaskCreated(e) = first_event {
-            // When creating a task, there is no way something was already stored
-            assert!(prev_stored_event_id.is_none());
             assert_eq!(task_id, &e.task_id);
+
+            // When creating a task, there is no way something was already stored
+            if maybe_prev_stored_event_id.is_some() {
+                return Err(SaveEventsError::concurrent_modification());
+            }
 
             // Make registration
             self.register_task(&mut tr, *task_id, &e.logical_plan)
@@ -223,7 +226,7 @@ impl EventStore<TaskState> for SqliteTaskSystemEventStore {
         let last_event_id = self.save_events_impl(&mut tr, &events).await?;
 
         // Update denormalized task record: latest status and stored event
-        self.update_task_from_events(&mut tr, &events, prev_stored_event_id, last_event_id)
+        self.update_task_from_events(&mut tr, &events, maybe_prev_stored_event_id, last_event_id)
             .await?;
 
         Ok(last_event_id)

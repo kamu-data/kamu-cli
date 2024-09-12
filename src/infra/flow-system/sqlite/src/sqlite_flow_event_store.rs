@@ -111,12 +111,12 @@ impl SqliteFlowEventStore {
         tr: &mut database_common::TransactionGuard<'_, Sqlite>,
         flow_id: FlowID,
         events: &[FlowEvent],
-        prev_stored_event_id: Option<EventID>,
+        maybe_prev_stored_event_id: Option<EventID>,
         last_event_id: EventID,
     ) -> Result<(), SaveEventsError> {
         let flow_id: i64 = flow_id.try_into().unwrap();
         let last_event_id: i64 = last_event_id.into();
-        let prev_stored_event_id: Option<i64> = prev_stored_event_id.map(Into::into);
+        let maybe_prev_stored_event_id: Option<i64> = maybe_prev_stored_event_id.map(Into::into);
 
         // Determine if we have a status change between these events
         let mut maybe_latest_status = None;
@@ -159,7 +159,7 @@ impl SqliteFlowEventStore {
             flow_id,
             latest_status,
             last_event_id,
-            prev_stored_event_id,
+            maybe_prev_stored_event_id,
         )
         .fetch_all(connection_mut)
         .await
@@ -265,7 +265,7 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
     async fn save_events(
         &self,
         flow_id: &FlowID,
-        prev_stored_event_id: Option<EventID>,
+        maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<FlowEvent>,
     ) -> Result<EventID, SaveEventsError> {
         // If there is nothing to save, exit quickly
@@ -278,9 +278,12 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
         // For the newly created flow, make sure it's registered before events
         let first_event = events.first().expect("Non empty event list expected");
         if let FlowEvent::Initiated(e) = first_event {
-            // When creating a flow, there is no way something was already stored
-            assert!(prev_stored_event_id.is_none());
             assert_eq!(flow_id, &e.flow_id);
+
+            // When creating a flow, there is no way something was already stored
+            if maybe_prev_stored_event_id.is_some() {
+                return Err(SaveEventsError::concurrent_modification());
+            }
 
             // Make registration
             self.register_flow(&mut tr, e)
@@ -296,7 +299,7 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
             &mut tr,
             *flow_id,
             &events,
-            prev_stored_event_id,
+            maybe_prev_stored_event_id,
             last_event_id,
         )
         .await?;

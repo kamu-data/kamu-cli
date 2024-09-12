@@ -1717,6 +1717,96 @@ pub async fn test_pending_flow_system_flow_crud(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    let flow_id = event_store.new_flow_id().await.unwrap();
+    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
+    let flow_key = FlowKey::dataset(dataset_id.clone(), DatasetFlowType::Ingest);
+
+    // Nothing stored yet, but prev stored event id sent => CM
+    let res = event_store
+        .save_events(
+            &flow_id,
+            Some(EventID::new(15)),
+            vec![FlowEventInitiated {
+                event_time: Utc::now(),
+                flow_key: flow_key.clone(),
+                flow_id,
+                trigger: FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                    trigger_time: Utc::now(),
+                }),
+                config_snapshot: None,
+            }
+            .into()],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // Nothing stored yet, no storage expectation => OK
+    let res = event_store
+        .save_events(
+            &flow_id,
+            None,
+            vec![FlowEventInitiated {
+                event_time: Utc::now(),
+                flow_key,
+                flow_id,
+                trigger: FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                    trigger_time: Utc::now(),
+                }),
+                config_snapshot: None,
+            }
+            .into()],
+        )
+        .await;
+    assert_matches!(res, Ok(_));
+
+    // Something stored, but no expectation => CM
+    let res = event_store
+        .save_events(
+            &flow_id,
+            None,
+            vec![FlowEventAborted {
+                event_time: Utc::now(),
+                flow_id,
+            }
+            .into()],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // Something stored, but expectation is wrong => CM
+    let res = event_store
+        .save_events(
+            &flow_id,
+            Some(EventID::new(15)),
+            vec![FlowEventAborted {
+                event_time: Utc::now(),
+                flow_id,
+            }
+            .into()],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // Something stored, and expectation is correct
+    let res = event_store
+        .save_events(
+            &flow_id,
+            Some(EventID::new(1)),
+            vec![FlowEventAborted {
+                event_time: Utc::now(),
+                flow_id,
+            }
+            .into()],
+        )
+        .await;
+    assert_matches!(res, Ok(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct DatasetTestCase {
     dataset_id: DatasetID,
     ingest_flow_ids: TestFlowIDs,

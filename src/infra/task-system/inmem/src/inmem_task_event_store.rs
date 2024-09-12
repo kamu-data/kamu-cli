@@ -102,7 +102,7 @@ impl EventStore<TaskState> for InMemoryTaskEventStore {
     async fn save_events(
         &self,
         task_id: &TaskID,
-        prev_stored_event_id: Option<EventID>,
+        maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<TaskEvent>,
     ) -> Result<EventID, SaveEventsError> {
         if events.is_empty() {
@@ -118,7 +118,7 @@ impl EventStore<TaskState> for InMemoryTaskEventStore {
         }
 
         self.inner
-            .save_events(task_id, prev_stored_event_id, events)
+            .save_events(task_id, maybe_prev_stored_event_id, events)
             .await
     }
 }

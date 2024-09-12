@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
+
 use chrono::Utc;
 use database_common::PaginationOpts;
 use dill::Catalog;
@@ -926,6 +928,88 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
         .await
         .unwrap();
     assert!(running_task_ids.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn TaskEventStore>().unwrap();
+
+    let task_id = event_store.new_task_id().await.unwrap();
+
+    // Nothing stored yet, but prev stored event id sent => CM
+    let res = event_store
+        .save_events(
+            &task_id,
+            Some(EventID::new(15)),
+            vec![TaskEventCreated {
+                event_time: Utc::now(),
+                task_id,
+                logical_plan: Probe::default().into(),
+                metadata: None,
+            }
+            .into()],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // Nothing stored yet, no storage expectation => OK
+    let res = event_store
+        .save_events(
+            &task_id,
+            None,
+            vec![TaskEventCreated {
+                event_time: Utc::now(),
+                task_id,
+                logical_plan: Probe::default().into(),
+                metadata: None,
+            }
+            .into()],
+        )
+        .await;
+    assert_matches!(res, Ok(_));
+
+    // Something stored, but no expectation => CM
+    let res = event_store
+        .save_events(
+            &task_id,
+            None,
+            vec![TaskEventRunning {
+                event_time: Utc::now(),
+                task_id,
+            }
+            .into()],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // Something stored, but expectation is wrong => CM
+    let res = event_store
+        .save_events(
+            &task_id,
+            Some(EventID::new(15)),
+            vec![TaskEventRunning {
+                event_time: Utc::now(),
+                task_id,
+            }
+            .into()],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // Something stored, and expectation is correct
+    let res = event_store
+        .save_events(
+            &task_id,
+            Some(EventID::new(1)),
+            vec![TaskEventRunning {
+                event_time: Utc::now(),
+                task_id,
+            }
+            .into()],
+        )
+        .await;
+    assert_matches!(res, Ok(_));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

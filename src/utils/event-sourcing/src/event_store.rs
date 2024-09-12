@@ -28,7 +28,7 @@ pub trait EventStore<Proj: Projection>: Send + Sync {
     async fn save_events(
         &self,
         query: &Proj::Query,
-        prev_stored_event_id: Option<EventID>,
+        maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<Proj::Event>,
     ) -> Result<EventID, SaveEventsError>;
 
