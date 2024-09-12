@@ -13,6 +13,7 @@ use std::sync::Arc;
 use database_common_macros::{transactional_method, transactional_method1};
 use dill::{component, scope, Catalog, Singleton};
 use internal_error::{InternalError, ResultIntoInternal};
+use thiserror::Error;
 
 use crate::*;
 
@@ -320,6 +321,9 @@ impl ProducerRelayJob {
                 )
                 .await?;
 
+            // Collecting failing consumers as we go
+            let mut failing_consumer_names: HashSet<String> = HashSet::new();
+
             // Feed consumers if they are behind this message
             // We must respect the sequential order of messages,
             // but individual consumers may process each message concurrently
@@ -327,28 +331,70 @@ impl ProducerRelayJob {
                 // Prepare consumer invocation tasks
                 let mut consumer_tasks = Vec::new();
                 for consumer_name in &self.consumer_names {
+                    // Skip consumers, which are failing
+                    if failing_consumer_names.contains(consumer_name) {
+                        continue;
+                    }
+
+                    // Skip consumers, which are already beyond this message ID
                     let boundary_id = consumption_boundaries
                         .get(consumer_name)
                         .copied()
                         .unwrap_or_else(|| OutboxMessageID::new(0));
                     if boundary_id < message.message_id {
+                        // Non-failing consumer which hasn't seen this message is a task to execute
                         consumer_tasks.push((consumer_name.as_str(), &message));
                     }
                 }
 
-                // Consume concurrently
-                // TODO: error recovery
-                use futures::{StreamExt, TryStreamExt};
-                futures::stream::iter(consumer_tasks)
-                    .map(Ok)
-                    .try_for_each_concurrent(
-                        /* limit */ None,
-                        |(consumer_name, message)| async move {
-                            self.invoke_consumer(consumer_name, message).await?;
-                            Ok(())
-                        },
-                    )
-                    .await?;
+                #[derive(Error, Debug)]
+                #[error("Outbox message consumption error")]
+                struct OutboxMessageConsumptionError {
+                    #[source]
+                    source: InternalError,
+                    consumer_name: String,
+                    message_id: OutboxMessageID,
+                }
+
+                // Consume message concurrently
+                let consumption_futures: Vec<_> = consumer_tasks
+                    .into_iter()
+                    .map(|(consumer_name, message)| async move {
+                        self.invoke_consumer(consumer_name, message)
+                            .await
+                            .map_err(|e| OutboxMessageConsumptionError {
+                                consumer_name: consumer_name.to_owned(),
+                                message_id: message.message_id,
+                                source: e,
+                            })
+                    })
+                    .collect();
+
+                // Report errors and disable failing consumers temporarily, as they cannot
+                // advance to the next messages without success of processing the current one
+                futures::future::join_all(consumption_futures)
+                    .await
+                    .into_iter()
+                    .filter(Result::is_err)
+                    .map(|e| e.err().unwrap())
+                    .for_each(|e: OutboxMessageConsumptionError| {
+                        tracing::error!(
+                            error=?e, message=?message,
+                            "Consuming outbox message FAILED"
+                        );
+                        failing_consumer_names.insert(e.consumer_name);
+                    });
+
+                // If all consumers are failing, time to interrupt this iteration
+                assert!(failing_consumer_names.len() <= self.consumer_names.len());
+                if failing_consumer_names.len() == self.consumer_names.len() {
+                    tracing::error!(
+                        producer_name = self.producer_name,
+                        message_id = ?message.message_id,
+                        "Outbox consumption iteration interrupted, all consumers are failing"
+                    );
+                    break;
+                }
             }
         }
 

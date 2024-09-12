@@ -49,15 +49,21 @@ impl Outbox for OutboxImmediateImpl {
         producer_name: &str,
         content_json: &serde_json::Value,
     ) -> Result<(), InternalError> {
-        tracing::debug!(content_json=%content_json, "Posting outbox message immediately");
+        tracing::debug!(content_json=%content_json, "Dispatching outbox message immediately");
 
         let maybe_dispatcher = self.message_dispatchers_by_producers.get(producer_name);
         if let Some(dispatcher) = maybe_dispatcher {
             let content_json = content_json.to_string();
 
-            dispatcher
+            let dispatch_result = dispatcher
                 .dispatch_message(&self.catalog, self.consumer_filter, &content_json)
-                .await?;
+                .await;
+            if let Err(e) = dispatch_result {
+                tracing::error!(
+                    error=?e, producer_name, content_json=?content_json,
+                    "Immediate outbox message dispatching FAILED"
+                );
+            }
         }
 
         Ok(())

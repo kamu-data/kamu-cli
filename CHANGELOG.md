@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Improved data collected around transactional code
    - Revised associating span objects with large JSON structures such as messages
    - Suppressed several noisy, but not very useful events
+- Improved Outbox stability when message consumers fail   
 
 ## [0.199.3] - 2024-09-11
 ### Fixed
