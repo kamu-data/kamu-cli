@@ -9,7 +9,8 @@
 
 use std::sync::Arc;
 
-use database_common::{DatabaseTransactionRunner, PaginationOpts};
+use database_common::PaginationOpts;
+use database_common_macros::{transactional_method1, transactional_method2};
 use dill::*;
 use kamu_task_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
@@ -48,79 +49,47 @@ impl TaskExecutorImpl {
         Ok(())
     }
 
+    #[transactional_method1(task_event_store: Arc<dyn TaskEventStore>)]
     async fn recover_running_tasks(&self) -> Result<(), InternalError> {
         // Recovering tasks means we are re-queing tasks that started running, but got
         // aborted due to server shutdown or crash
-        DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional(|target_catalog: Catalog| async move {
-                let task_event_store = target_catalog.get_one::<dyn TaskEventStore>().unwrap();
 
-                // Total number of running tasks
-                let total_running_tasks = task_event_store.get_count_running_tasks().await?;
+        // Total number of running tasks
+        let total_running_tasks = task_event_store.get_count_running_tasks().await?;
 
-                // Processe them in pages
-                let mut processed_running_tasks = 0;
-                while processed_running_tasks < total_running_tasks {
-                    // Load another page
-                    use futures::TryStreamExt;
-                    let running_task_ids: Vec<_> = task_event_store
-                        .get_running_tasks(PaginationOpts {
-                            offset: processed_running_tasks,
-                            limit: 100,
-                        })
-                        .try_collect()
-                        .await?;
+        // Processe them in pages
+        let mut processed_running_tasks = 0;
+        while processed_running_tasks < total_running_tasks {
+            // Load another page
+            use futures::TryStreamExt;
+            let running_task_ids: Vec<_> = task_event_store
+                .get_running_tasks(PaginationOpts {
+                    offset: processed_running_tasks,
+                    limit: 100,
+                })
+                .try_collect()
+                .await?;
 
-                    for running_task_id in &running_task_ids {
-                        // TODO: batch loading of tasks
-                        let mut task = Task::load(*running_task_id, task_event_store.as_ref())
-                            .await
-                            .int_err()?;
+            for running_task_id in &running_task_ids {
+                // TODO: batch loading of tasks
+                let mut task = Task::load(*running_task_id, task_event_store.as_ref())
+                    .await
+                    .int_err()?;
 
-                        // Requeue
-                        task.requeue(self.time_source.now()).int_err()?;
-                        task.save(task_event_store.as_ref()).await.int_err()?;
-                    }
+                // Requeue
+                task.requeue(self.time_source.now()).int_err()?;
+                task.save(task_event_store.as_ref()).await.int_err()?;
+            }
 
-                    processed_running_tasks += running_task_ids.len();
-                }
+            processed_running_tasks += running_task_ids.len();
+        }
 
-                Ok(())
-            })
-            .await
+        Ok(())
     }
 
     async fn take_task(&self) -> Result<Task, InternalError> {
         loop {
-            let maybe_task = DatabaseTransactionRunner::new(self.catalog.clone())
-                .transactional(|target_catalog: Catalog| async move {
-                    let task_scheduler = target_catalog.get_one::<dyn TaskScheduler>().unwrap();
-                    let maybe_task = task_scheduler.try_take().await.int_err()?;
-                    let Some(task) = maybe_task else {
-                        return Ok(None);
-                    };
-
-                    tracing::info!(
-                        task_id = %task.task_id,
-                        logical_plan = ?task.logical_plan,
-                        "Executing task",
-                    );
-
-                    let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-                    outbox
-                        .post_message(
-                            MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
-                            TaskProgressMessage::running(
-                                self.time_source.now(),
-                                task.task_id,
-                                task.metadata.clone(),
-                            ),
-                        )
-                        .await?;
-
-                    Ok(Some(task))
-                })
-                .await?;
+            let maybe_task = self.take_task_non_blocking().await?;
 
             if let Some(task) = maybe_task {
                 return Ok(task);
@@ -128,6 +97,33 @@ impl TaskExecutorImpl {
 
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
+    }
+
+    #[transactional_method2(task_scheduler: Arc<dyn TaskScheduler>, outbox: Arc<dyn Outbox>)]
+    async fn take_task_non_blocking(&self) -> Result<Option<Task>, InternalError> {
+        let maybe_task = task_scheduler.try_take().await.int_err()?;
+        let Some(task) = maybe_task else {
+            return Ok(None);
+        };
+
+        tracing::info!(
+            task_id = %task.task_id,
+            logical_plan = ?task.logical_plan,
+            "Executing task",
+        );
+
+        outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                TaskProgressMessage::running(
+                    self.time_source.now(),
+                    task.task_id,
+                    task.metadata.clone(),
+                ),
+            )
+            .await?;
+
+        Ok(Some(task))
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(task_id = %task.task_id))]
@@ -147,32 +143,27 @@ impl TaskExecutorImpl {
         Ok(task_outcome)
     }
 
+    #[transactional_method2(event_store: Arc<dyn TaskEventStore>, outbox: Arc<dyn Outbox>)]
     async fn process_task_outcome(
         &self,
         mut task: Task,
         task_outcome: TaskOutcome,
     ) -> Result<(), InternalError> {
-        DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with2(
-                |event_store: Arc<dyn TaskEventStore>, outbox: Arc<dyn Outbox>| async move {
-                    // Refresh the task in case it was updated concurrently (e.g. late cancellation)
-                    task.update(event_store.as_ref()).await.int_err()?;
-                    task.finish(self.time_source.now(), task_outcome.clone())
-                        .int_err()?;
-                    task.save(event_store.as_ref()).await.int_err()?;
+        // Refresh the task in case it was updated concurrently (e.g. late cancellation)
+        task.update(event_store.as_ref()).await.int_err()?;
+        task.finish(self.time_source.now(), task_outcome.clone())
+            .int_err()?;
+        task.save(event_store.as_ref()).await.int_err()?;
 
-                    outbox
-                        .post_message(
-                            MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
-                            TaskProgressMessage::finished(
-                                self.time_source.now(),
-                                task.task_id,
-                                task.metadata.clone(),
-                                task_outcome,
-                            ),
-                        )
-                        .await
-                },
+        outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                TaskProgressMessage::finished(
+                    self.time_source.now(),
+                    task.task_id,
+                    task.metadata.clone(),
+                    task_outcome,
+                ),
             )
             .await?;
 

@@ -217,6 +217,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                 .await
         },
     )
+    .instrument(tracing::debug_span!("app::run_command"))
     .await;
 
     match &command_result {
@@ -495,6 +496,7 @@ async fn initialize_components(cli_catalog: &Catalog) -> Result<(), CLIError> {
                 .await
                 .map_err(CLIError::critical)
         })
+        .instrument(tracing::debug_span!("app::initialize_components"))
         .await?;
 
     Ok(())

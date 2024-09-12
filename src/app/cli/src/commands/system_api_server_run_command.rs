@@ -18,6 +18,7 @@ use internal_error::ResultIntoInternal;
 use kamu_accounts::*;
 use kamu_accounts_services::PasswordLoginCredentials;
 use kamu_adapter_oauth::*;
+use tracing::Instrument;
 
 use super::{CLIError, Command};
 use crate::OutputConfig;
@@ -118,6 +119,9 @@ impl APIServerRunCommand {
                     .int_err()
                     .map_err(CLIError::critical)
             })
+            .instrument(tracing::debug_span!(
+                "APIServerRunCommand::get_access_token"
+            ))
             .await?;
 
         Ok(login_response.access_token)

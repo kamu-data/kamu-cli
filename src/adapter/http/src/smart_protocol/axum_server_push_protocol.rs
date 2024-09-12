@@ -27,6 +27,7 @@ use kamu_core::{
     RefCollisionError,
 };
 use opendatafabric::{AsTypedBlock, DatasetRef};
+use tracing::Instrument;
 use url::Url;
 
 use super::errors::*;
@@ -207,6 +208,9 @@ impl AxumServerPushProtocolInstance {
                                 .await
                         },
                     )
+                    .instrument(tracing::debug_span!(
+                        "AxumServerPushProtocolInstance::create_dataset",
+                    ))
                     .await;
                 match create_result {
                     Ok(create_result) => self.dataset = Some(create_result.dataset),
@@ -447,6 +451,7 @@ impl AxumServerPushProtocolInstance {
                         .await
                 },
             )
+            .instrument(tracing::debug_span!("AxumServerPushProtocolInstance::try_handle_push_complete"))
             .await
             .protocol_int_err(PushPhase::CompleteRequest)?;
 

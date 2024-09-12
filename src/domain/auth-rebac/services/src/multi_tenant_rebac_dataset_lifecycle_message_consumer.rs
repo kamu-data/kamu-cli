@@ -80,12 +80,18 @@ impl MessageConsumer for MultiTenantRebacDatasetLifecycleMessageConsumer {}
 
 #[async_trait::async_trait]
 impl MessageConsumerT<DatasetLifecycleMessage> for MultiTenantRebacDatasetLifecycleMessageConsumer {
-    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        label = "MultiTenantRebacDatasetLifecycleMessageConsumer[DatasetLifecycleMessage]"
+    )]
     async fn consume_message(
         &self,
         _: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
+        tracing::debug!(message=?message, "Received dataset lifecycle message");
+
         match message {
             DatasetLifecycleMessage::Created(message) => {
                 self.handle_dataset_lifecycle_created_message(message).await

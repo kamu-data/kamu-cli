@@ -12,7 +12,8 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common::{DatabaseTransactionRunner, PaginationOpts};
+use database_common::PaginationOpts;
+use database_common_macros::transactional_method;
 use dill::*;
 use futures::TryStreamExt;
 use internal_error::InternalError;
@@ -81,38 +82,32 @@ impl FlowExecutorImpl {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn run_current_timeslot(
+    #[transactional_method]
+    async fn recover_initial_flows_state(
         &self,
-        target_catalog: &Catalog,
-        timeslot_time: DateTime<Utc>,
+        start_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
-        let planned_flow_ids: Vec<_> = self.flow_time_wheel_service.take_nearest_planned_flows();
+        // Recover already scheduled flows after server restart
+        self.recover_time_wheel(&transaction_catalog, start_time)
+            .await?;
 
-        let mut planned_task_futures = Vec::new();
-        for planned_flow_id in planned_flow_ids {
-            let target_catalog = target_catalog.clone();
-            let flow_event_store: Arc<dyn FlowEventStore> =
-                target_catalog.get_one::<dyn FlowEventStore>().unwrap();
+        // Restore auto polling flows:
+        //   - read active configurations
+        //   - automatically trigger flows, if they are not waiting already
+        self.restore_auto_polling_flows_from_configurations(&transaction_catalog, start_time)
+            .await?;
 
-            planned_task_futures.push(async move {
-                let mut flow = Flow::load(planned_flow_id, flow_event_store.as_ref())
-                    .await
-                    .int_err()?;
-                self.schedule_flow_task(target_catalog, &mut flow, timeslot_time)
-                    .await?;
-                Ok(())
-            });
-        }
-
-        let results = futures::future::join_all(planned_task_futures).await;
-        results
-            .into_iter()
-            .filter(Result::is_err)
-            .map(|e| e.err().unwrap())
-            .for_each(|e: InternalError| {
-                tracing::error!(error=?e, "Scheduling flow failed");
-            });
+        // Publish progress event
+        let outbox = transaction_catalog.get_one::<dyn Outbox>().unwrap();
+        outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
+                FlowExecutorUpdatedMessage {
+                    update_time: start_time,
+                    update_details: FlowExecutorUpdateDetails::Loaded,
+                },
+            )
+            .await?;
 
         Ok(())
     }
@@ -253,6 +248,52 @@ impl FlowExecutorImpl {
         Ok(())
     }
 
+    #[transactional_method]
+    async fn run_flows_current_timeslot(
+        &self,
+        timeslot_time: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
+        let planned_flow_ids: Vec<_> = self.flow_time_wheel_service.take_nearest_planned_flows();
+
+        let mut planned_task_futures = Vec::new();
+        for planned_flow_id in planned_flow_ids {
+            let transaction_catalog = transaction_catalog.clone();
+            let flow_event_store = transaction_catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+            planned_task_futures.push(async move {
+                let mut flow = Flow::load(planned_flow_id, flow_event_store.as_ref())
+                    .await
+                    .int_err()?;
+                self.schedule_flow_task(transaction_catalog, &mut flow, timeslot_time)
+                    .await?;
+                Ok(())
+            });
+        }
+
+        let results = futures::future::join_all(planned_task_futures).await;
+        results
+            .into_iter()
+            .filter(Result::is_err)
+            .map(|e| e.err().unwrap())
+            .for_each(|e: InternalError| {
+                tracing::error!(error=?e, "Scheduling flow failed");
+            });
+
+        // Publish progress event
+        let outbox = transaction_catalog.get_one::<dyn Outbox>().unwrap();
+        outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
+                FlowExecutorUpdatedMessage {
+                    update_time: timeslot_time,
+                    update_details: FlowExecutorUpdateDetails::ExecutedTimeslot,
+                },
+            )
+            .await?;
+
+        Ok(())
+    }
+
     #[tracing::instrument(level = "trace", skip_all, fields(flow_id = %flow.flow_id))]
     async fn schedule_flow_task(
         &self,
@@ -379,34 +420,7 @@ impl FlowExecutor for FlowExecutorImpl {
     #[tracing::instrument(level = "info", skip_all)]
     async fn pre_run(&self, planned_start_time: DateTime<Utc>) -> Result<(), InternalError> {
         let start_time = self.executor_config.round_time(planned_start_time)?;
-
-        // Initial scheduling
-        DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional(|target_catalog: Catalog| async move {
-                // Recover already scheduled flows after server restart
-                self.recover_time_wheel(&target_catalog, start_time).await?;
-
-                // Restore auto polling flows:
-                //   - read active configurations
-                //   - automatically trigger flows, if they are not waiting already
-                self.restore_auto_polling_flows_from_configurations(&target_catalog, start_time)
-                    .await?;
-
-                // Publish progress event
-                let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-                outbox
-                    .post_message(
-                        MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
-                        FlowExecutorUpdatedMessage {
-                            update_time: start_time,
-                            update_details: FlowExecutorUpdateDetails::Loaded,
-                        },
-                    )
-                    .await?;
-
-                Ok(())
-            })
-            .await
+        self.recover_initial_flows_state(start_time).await
     }
 
     /// Runs the update main loop
@@ -429,26 +443,8 @@ impl FlowExecutor for FlowExecutorImpl {
                 let activation_span = tracing::info_span!("FlowExecutor::activation");
                 let _ = activation_span.enter();
 
-                DatabaseTransactionRunner::new(self.catalog.clone())
-                    .transactional(|target_catalog: Catalog| async move {
-                        // Run scheduling for current time slot. Should not throw any errors
-                        self.run_current_timeslot(&target_catalog, nearest_activation_time)
-                            .await?;
-
-                        // Publish progress event
-                        let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-                        outbox
-                            .post_message(
-                                MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
-                                FlowExecutorUpdatedMessage {
-                                    update_time: nearest_activation_time,
-                                    update_details: FlowExecutorUpdateDetails::ExecutedTimeslot,
-                                },
-                            )
-                            .await?;
-
-                        Ok(())
-                    })
+                // Run scheduling for current time slot. Should not throw any errors
+                self.run_flows_current_timeslot(nearest_activation_time)
                     .await?;
             }
 
@@ -501,12 +497,18 @@ impl MessageConsumer for FlowExecutorImpl {}
 
 #[async_trait::async_trait]
 impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        label = "FlowExecutorImpl[TaskProgressMessage]"
+    )]
     async fn consume_message(
         &self,
         target_catalog: &Catalog,
         message: &TaskProgressMessage,
     ) -> Result<(), InternalError> {
+        tracing::debug!(message=?message, "Received task progress message");
+
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
 
         match message {
@@ -603,12 +605,18 @@ impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
 
 #[async_trait::async_trait]
 impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        label = "FlowExecutorImpl[FlowConfigurationUpdatedMessage]"
+    )]
     async fn consume_message(
         &self,
         target_catalog: &Catalog,
         message: &FlowConfigurationUpdatedMessage,
     ) -> Result<(), InternalError> {
+        tracing::debug!(message=?message, "Received flow configuration message");
+
         if message.paused {
             let maybe_pending_flow_id = {
                 let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
@@ -652,12 +660,18 @@ impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
 
 #[async_trait::async_trait]
 impl MessageConsumerT<DatasetLifecycleMessage> for FlowExecutorImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        label = "FlowExecutorImpl[DatasetLifecycleMessage]"
+    )]
     async fn consume_message(
         &self,
         target_catalog: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
+        tracing::debug!(message=?message, "Received dataset lifecycle message");
+
         match message {
             DatasetLifecycleMessage::Deleted(message) => {
                 let flow_ids_2_abort = {
