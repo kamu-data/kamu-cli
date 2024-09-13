@@ -310,20 +310,12 @@ impl FlowQueryService for FlowQueryServiceImpl {
         &self,
         flow_id: FlowID,
     ) -> Result<FlowState, CancelScheduledTasksError> {
-        let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
-
-        // Cancel tasks for flows in Waiting/Running state.
-        // Ignore in Finished state
-        match flow.status() {
-            FlowStatus::Waiting | FlowStatus::Running => {
-                // Abort current flow and it's scheduled tasks
-                let abort_helper = self.catalog.get_one::<FlowAbortHelper>().unwrap();
-                abort_helper.abort_loaded_flow(&mut flow).await?;
-            }
-            FlowStatus::Finished => { /* Skip, idempotence */ }
-        }
-
-        Ok(flow.into())
+        // Abort current flow and it's scheduled tasks
+        let abort_helper = self.catalog.get_one::<FlowAbortHelper>().unwrap();
+        abort_helper
+            .abort_flow(flow_id)
+            .await
+            .map_err(CancelScheduledTasksError::Internal)
     }
 }
 

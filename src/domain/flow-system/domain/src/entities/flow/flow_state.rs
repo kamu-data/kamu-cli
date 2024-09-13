@@ -79,6 +79,10 @@ impl FlowState {
             .as_ref()
             .and_then(|outcome| outcome.try_result_as_ref())
     }
+
+    pub fn can_schedule(&self) -> bool {
+        matches!(self.status(), FlowStatus::Waiting)
+    }
 }
 
 impl Projection for FlowState {

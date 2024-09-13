@@ -11,9 +11,12 @@ use std::sync::Arc;
 
 use dill::component;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_flow_system::{Flow, FlowEventStore, FlowID};
+use kamu_flow_system::{Flow, FlowEventStore, FlowID, FlowProgressMessage, FlowState, FlowStatus};
 use kamu_task_system::TaskScheduler;
+use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
+
+use crate::MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,6 +24,7 @@ pub(crate) struct FlowAbortHelper {
     flow_event_store: Arc<dyn FlowEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -31,34 +35,52 @@ impl FlowAbortHelper {
         flow_event_store: Arc<dyn FlowEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
         task_scheduler: Arc<dyn TaskScheduler>,
+        outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             flow_event_store,
             time_source,
             task_scheduler,
+            outbox,
         }
     }
 
-    pub(crate) async fn abort_flow(&self, flow_id: FlowID) -> Result<(), InternalError> {
+    pub(crate) async fn abort_flow(&self, flow_id: FlowID) -> Result<FlowState, InternalError> {
         // Mark flow as aborted
         let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
             .await
             .int_err()?;
 
-        self.abort_loaded_flow(&mut flow).await
-    }
+        match flow.status() {
+            FlowStatus::Waiting | FlowStatus::Running => {
+                // Abort flow itself
+                flow.abort(self.time_source.now()).int_err()?;
+                flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
-    pub(crate) async fn abort_loaded_flow(&self, flow: &mut Flow) -> Result<(), InternalError> {
-        // Abort flow itself
-        flow.abort(self.time_source.now()).int_err()?;
-        flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+                // Cancel associated tasks
+                for task_id in &flow.task_ids {
+                    self.task_scheduler.cancel_task(*task_id).await.int_err()?;
+                }
 
-        // Cancel associated tasks
-        for task_id in &flow.task_ids {
-            self.task_scheduler.cancel_task(*task_id).await.int_err()?;
+                // Notify the flow has been aborted
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                        FlowProgressMessage::cancelled(self.time_source.now(), flow.flow_id),
+                    )
+                    .await?;
+            }
+            FlowStatus::Finished => {
+                /* Skip, idempotence */
+                tracing::info!(
+                    flow_id=%flow.flow_id,
+                    flow_status=%flow.status(),
+                    "Flow abortion skipped as no longer relevant"
+                );
+            }
         }
 
-        Ok(())
+        Ok(flow.into())
     }
 }
 
