@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Changed -->
 <!--- - Fixed -->
 
-## [Unreleased]
+## [0.200.0] - 2024-09-13
 ### Added
 - Added first integration of Prometheus metrics starting with Outbox
 - Added `--metrics` CLI flag that will dump metrics into a file after command execution
