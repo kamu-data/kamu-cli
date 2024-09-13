@@ -45,6 +45,7 @@ database-common = { workspace = true }
 database-common-macros = { workspace = true }
 http-common = { workspace = true }
 internal-error = { workspace = true }
+observability = { workspace = true, features = ["prometheus"] }
 time-source = { workspace = true }
 
 kamu = { workspace = true }
@@ -139,7 +140,8 @@ serde = { version = "1", features = ["derive"] }
 serde_with = "3"
 serde_yaml = "0.9"
 
-# Tracing / logging / telemetry
+# Tracing / logging / telemetry / metrics
+prometheus = { version = "0.13", default-features = false }
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-perfetto = { workspace = true }

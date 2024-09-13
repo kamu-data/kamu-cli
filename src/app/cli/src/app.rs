@@ -177,6 +177,9 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         (guards, final_base_catalog, cli_catalog, output_config)
     };
 
+    // Register metrics
+    let metrics_registry = observability::metrics::register_all(&cli_catalog);
+
     // Evict cache
     if workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()? {
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
@@ -239,6 +242,14 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     // Flush all logging sinks
     drop(guards);
+
+    if let Some(metrics_file) = &output_config.metrics_file {
+        if let Ok(mut file) = std::fs::File::create(metrics_file) {
+            use prometheus::Encoder as _;
+            let _ = prometheus::TextEncoder::new().encode(&metrics_registry.gather(), &mut file);
+            eprintln!("Saving metrics to {}", metrics_file.display());
+        }
+    }
 
     if let Some(trace_file) = &output_config.trace_file {
         // Run a web server and open the trace in the browser if the environment allows
@@ -316,6 +327,8 @@ pub fn configure_base_catalog(
     b.add_value(RunInfoDir::new(&workspace_layout.run_info_dir));
     b.add_value(CacheDir::new(&workspace_layout.cache_dir));
     b.add_value(RemoteReposDir::new(&workspace_layout.repos_dir));
+
+    b.add_value(prometheus::Registry::new());
 
     b.add::<ContainerRuntime>();
 
@@ -440,6 +453,7 @@ pub fn configure_base_catalog(
     b.add::<messaging_outbox::OutboxDispatchingImpl>();
     b.bind::<dyn Outbox, OutboxDispatchingImpl>();
     b.add::<messaging_outbox::OutboxTransactionalProcessor>();
+    b.add::<messaging_outbox::OutboxTransactionalProcessorMetrics>();
 
     register_message_dispatcher::<DatasetLifecycleMessage>(
         &mut b,
@@ -839,6 +853,18 @@ fn configure_output_format(args: &cli::Cli, workspace_svc: &WorkspaceService) ->
         None
     };
 
+    let metrics_file = if args.metrics && workspace_svc.is_in_workspace() {
+        Some(
+            workspace_svc
+                .layout()
+                .unwrap()
+                .run_info_dir
+                .join("kamu.metrics.txt"),
+        )
+    } else {
+        None
+    };
+
     let format = args.tabular_output_format().unwrap_or(if is_tty {
         OutputFormat::Table
     } else {
@@ -851,6 +877,7 @@ fn configure_output_format(args: &cli::Cli, workspace_svc: &WorkspaceService) ->
         is_tty,
         format,
         trace_file,
+        metrics_file,
     }
 }
 

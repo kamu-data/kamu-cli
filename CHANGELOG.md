@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Fixed -->
 
 ## [Unreleased]
+### Added
+- Added first integration of Prometheus metrics starting with Outbox
+- Added `--metrics` CLI flag that will dump metrics into a file after command execution
 ### Changed
 - Telemetry improvements:
    - Improved data collected around transactional code

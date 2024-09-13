@@ -24,6 +24,9 @@ pub struct OutputConfig {
     pub format: OutputFormat,
     /// Points to the output trace file if Perfetto tracing was enabled
     pub trace_file: Option<PathBuf>,
+    /// Points to the output metrics file if Prometheus metrics dump was
+    /// requested
+    pub metrics_file: Option<PathBuf>,
 }
 
 impl Default for OutputConfig {
@@ -34,6 +37,7 @@ impl Default for OutputConfig {
             is_tty: false,
             format: OutputFormat::Table,
             trace_file: None,
+            metrics_file: None,
         }
     }
 }

@@ -11,34 +11,12 @@ skip-tree = []
 wildcards = "deny"
 
 # We specify features explicitly to avoid bloat
-workspace-default-features = "deny"
-features = [
-    { name = "opendatafabric", allow = [
-        "default",
-        "sqlx",
-        "sqlx-mysql",
-        "sqlx-postgres",
-        "sqlx-sqlite",
-    ] },
-    { name = "kamu", allow = [
-        "default",
-        "ingest-evm",
-        "ingest-ftp",
-        "ingest-mqtt",
-        "query-extensions-json",
-    ] },
-    { name = "kamu-accounts", allow = [
-        "default",
-        "sqlx",
-    ] },
-    { name = "kamu-datasets", allow = [
-        "default",
-        "sqlx",
-    ] },
-    { name = "kamu-cli", allow = [
-        "default",
-    ] },
-]
+# TODO: https://github.com/EmbarkStudios/cargo-deny/issues/699
+# external-default-features = "deny"
+
+# TODO: https://github.com/EmbarkStudios/cargo-deny/issues/700
+# workspace-default-features = "deny"
+
 
 deny = [
     ### Crates we shouldn't use ####

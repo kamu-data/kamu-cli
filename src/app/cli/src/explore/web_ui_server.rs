@@ -12,8 +12,11 @@ use std::sync::Arc;
 
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
+use axum::Extension;
 use database_common::DatabaseTransactionRunner;
+use database_common_macros::transactional_handler;
 use dill::{Catalog, CatalogBuilder};
+use http_common::ApiError;
 use internal_error::InternalError;
 use kamu::domain::{Protocols, ServerUrlConfig};
 use kamu_accounts::{
@@ -184,21 +187,27 @@ impl WebUIServer {
                 ),
             )
             .fallback(app_handler)
+            .layer(kamu_adapter_http::AuthenticationLayer::new())
             .layer(
-                tower::ServiceBuilder::new()
-                    .layer(tower_http::trace::TraceLayer::new_for_http())
-                    .layer(
-                        tower_http::cors::CorsLayer::new()
-                            .allow_origin(tower_http::cors::Any)
-                            .allow_methods(vec![http::Method::GET, http::Method::POST])
-                            .allow_headers(tower_http::cors::Any),
-                    )
-                    .layer(axum::extract::Extension(web_ui_catalog))
-                    .layer(axum::extract::Extension(gql_schema))
-                    .layer(axum::extract::Extension(web_ui_config))
-                    .layer(kamu_adapter_http::RunInDatabaseTransactionLayer::new())
-                    .layer(kamu_adapter_http::AuthenticationLayer::new()),
-            );
+                tower_http::cors::CorsLayer::new()
+                    .allow_origin(tower_http::cors::Any)
+                    .allow_methods(vec![http::Method::GET, http::Method::POST])
+                    .allow_headers(tower_http::cors::Any),
+            )
+            .layer(observability::axum::http_layer())
+            // Note: Healthcheck and metrics routes are placed before the tracing layer (layers
+            // execute bottom-up) to avoid spam in logs
+            .route(
+                "/system/health",
+                axum::routing::get(observability::health::health_handler),
+            )
+            .route(
+                "/system/metrics",
+                axum::routing::get(observability::metrics::metrics_handler),
+            )
+            .layer(axum::extract::Extension(web_ui_catalog))
+            .layer(axum::extract::Extension(gql_schema))
+            .layer(axum::extract::Extension(web_ui_config));
 
         let server = axum::Server::builder(bound_addr).serve(app.into_make_service());
 
@@ -270,13 +279,16 @@ async fn runtime_config_handler(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[transactional_handler]
 async fn graphql_handler(
-    schema: axum::extract::Extension<kamu_adapter_graphql::Schema>,
-    catalog: axum::extract::Extension<Catalog>,
+    Extension(schema): Extension<kamu_adapter_graphql::Schema>,
+    Extension(catalog): Extension<Catalog>,
     req: async_graphql_axum::GraphQLRequest,
-) -> async_graphql_axum::GraphQLResponse {
-    let graphql_request = req.into_inner().data(catalog.0);
-    schema.execute(graphql_request).await.into()
+) -> Result<async_graphql_axum::GraphQLResponse, ApiError> {
+    let graphql_request = req.into_inner().data(catalog);
+    let graphql_response = schema.execute(graphql_request).await.into();
+
+    Ok(graphql_response)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

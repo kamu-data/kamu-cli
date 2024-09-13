@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use database_common_macros::{transactional_method, transactional_method1};
 use dill::{component, scope, Catalog, Singleton};
 use internal_error::{InternalError, ResultIntoInternal};
+use observability::metrics::MetricsProvider;
 
 use crate::*;
 
@@ -23,6 +24,7 @@ pub struct OutboxTransactionalProcessor {
     config: Arc<OutboxConfig>,
     routes_static_info: Arc<RoutesStaticInfo>,
     producer_relay_jobs: Vec<ProducerRelayJob>,
+    metrics: Arc<OutboxTransactionalProcessorMetrics>,
 }
 
 #[component(pub)]
@@ -32,11 +34,14 @@ impl OutboxTransactionalProcessor {
         catalog: Catalog,
         config: Arc<OutboxConfig>,
         message_dispatchers_by_producers: Vec<Arc<dyn MessageDispatcher>>,
+        metrics: Arc<OutboxTransactionalProcessorMetrics>,
     ) -> Self {
         let routes_static_info = Arc::new(Self::make_static_routes_info(
             &catalog,
             message_dispatchers_by_producers,
         ));
+
+        metrics.init(&routes_static_info.consumers_by_producers);
 
         let mut producer_relay_jobs = Vec::new();
         for (producer_name, consumer_names) in &routes_static_info.consumers_by_producers {
@@ -46,6 +51,7 @@ impl OutboxTransactionalProcessor {
                 routes_static_info.clone(),
                 producer_name.clone(),
                 consumer_names.clone(),
+                metrics.clone(),
             ));
         }
 
@@ -54,6 +60,7 @@ impl OutboxTransactionalProcessor {
             config,
             routes_static_info,
             producer_relay_jobs,
+            metrics,
         }
     }
 
@@ -141,8 +148,10 @@ impl OutboxTransactionalProcessor {
         Ok(())
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
     async fn run_relay_iteration(&self) -> Result<(), InternalError> {
+        let span = observability::tracing::root_span!("outbox_iteration");
+        let _ = span.enter();
+
         // producer A - message 17
         // producer B - message 19
         let latest_message_ids_by_producer = self.select_latest_message_ids_by_producers().await?;
@@ -159,11 +168,6 @@ impl OutboxTransactionalProcessor {
         // Prepare iteration for each producer
         let mut producer_tasks = Vec::new();
         for producer_relay_job in &self.producer_relay_jobs {
-            // Skip this relay if no more working consumers left
-            if producer_relay_job.all_consumers_failing() {
-                continue;
-            }
-
             // Extract latest message ID by producer
             let Some(latest_produced_message_id) =
                 latest_message_ids_by_producer.get(&producer_relay_job.producer_name)
@@ -177,6 +181,21 @@ impl OutboxTransactionalProcessor {
             else {
                 continue;
             };
+
+            // Report queue length metrics
+            for (consumer, last_consumed_message_id) in &consumption_boundaries {
+                let queue_length =
+                    latest_produced_message_id.into_inner() - last_consumed_message_id.into_inner();
+                self.metrics
+                    .messages_pending_total
+                    .with_label_values(&[&producer_relay_job.producer_name, consumer])
+                    .set(queue_length);
+            }
+
+            // Skip this relay if no more working consumers left
+            if producer_relay_job.all_consumers_failing() {
+                continue;
+            }
 
             producer_tasks.push((
                 producer_relay_job,
@@ -279,6 +298,7 @@ struct ProducerRelayJob {
     producer_name: String,
     consumer_names: Vec<String>,
     failed_consumer_names: Mutex<HashSet<String>>,
+    metrics: Arc<OutboxTransactionalProcessorMetrics>,
 }
 
 impl ProducerRelayJob {
@@ -288,6 +308,7 @@ impl ProducerRelayJob {
         relay_routes_static_info: Arc<RoutesStaticInfo>,
         producer_name: String,
         consumer_names: Vec<String>,
+        metrics: Arc<OutboxTransactionalProcessorMetrics>,
     ) -> Self {
         Self {
             catalog,
@@ -295,6 +316,7 @@ impl ProducerRelayJob {
             relay_routes_static_info,
             producer_name,
             consumer_names,
+            metrics,
             failed_consumer_names: Mutex::new(HashSet::new()),
         }
     }
@@ -392,8 +414,15 @@ impl ProducerRelayJob {
                             error_msg = %e.source,
                             consumer_name = %e.consumer_name,
                             outbox_message = ?message,
-                            "Consuming outbox message failed - pausing further message processing for consumer until restart."
+                            "Consuming outbox message failed \
+                             - pausing further message processing for consumer until restart."
                         );
+
+                        self.metrics
+                            .failed_consumers_total
+                            .with_label_values(&[&self.producer_name, &e.consumer_name])
+                            .set(1);
+
                         failing_consumer_names.insert(e.consumer_name);
                     });
 
@@ -486,11 +515,17 @@ impl ProducerRelayJob {
         // Shift consumption record regardless of whether the consumer was interested in
         // the message
         tracing::debug!(
-            consumer_name=%consumer_name,
-            producer_name=%message.producer_name,
-            last_consumed_message_id=%message.message_id,
+            consumer_name = %consumer_name,
+            producer_name = %message.producer_name,
+            last_consumed_message_id = %message.message_id,
             "Shifting consumption record"
         );
+
+        // Report consumption metric
+        self.metrics
+            .messages_processed_total
+            .with_label_values(&[&self.producer_name, consumer_name])
+            .inc();
 
         let consumption_repository = transaction_catalog
             .get_one::<dyn OutboxMessageConsumptionRepository>()
@@ -504,6 +539,82 @@ impl ProducerRelayJob {
             .await
             .int_err()?;
 
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+
+pub struct OutboxTransactionalProcessorMetrics {
+    pub messages_processed_total: prometheus::IntCounterVec,
+    pub messages_pending_total: prometheus::IntGaugeVec,
+    pub failed_consumers_total: prometheus::IntGaugeVec,
+}
+
+#[dill::component(pub)]
+#[dill::interface(dyn MetricsProvider)]
+#[dill::scope(dill::Singleton)]
+impl OutboxTransactionalProcessorMetrics {
+    pub fn new() -> Self {
+        use prometheus::*;
+
+        Self {
+            messages_processed_total: IntCounterVec::new(
+                Opts::new(
+                    "outbox_messages_processed_total",
+                    "Number of messages processed by an individual producer-consumer pair",
+                ),
+                &["producer", "consumer"],
+            )
+            .unwrap(),
+            messages_pending_total: IntGaugeVec::new(
+                Opts::new(
+                    "outbox_messages_pending_total",
+                    "Number of messages that are awaiting processing in an individual \
+                     producer-consumer pair",
+                ),
+                &["producer", "consumer"],
+            )
+            .unwrap(),
+            failed_consumers_total: IntGaugeVec::new(
+                Opts::new(
+                    "outbox_failed_consumers_total",
+                    "Number of consumers that are in the failed state and have stopped consuming \
+                     messages",
+                ),
+                &["producer", "consumer"],
+            )
+            .unwrap(),
+        }
+    }
+
+    /// Initializes labeled metrics so they show up in the output early
+    fn init(&self, producer_consumers: &HashMap<String, Vec<String>>) {
+        for (producer, consumers) in producer_consumers {
+            for consumer in consumers {
+                self.messages_processed_total
+                    .with_label_values(&[producer, consumer])
+                    .reset();
+
+                self.messages_pending_total
+                    .with_label_values(&[producer, consumer])
+                    .set(0);
+
+                self.failed_consumers_total
+                    .with_label_values(&[producer, consumer])
+                    .set(0);
+            }
+        }
+    }
+}
+
+impl MetricsProvider for OutboxTransactionalProcessorMetrics {
+    fn register(&self, reg: &prometheus::Registry) -> prometheus::Result<()> {
+        reg.register(Box::new(self.messages_processed_total.clone()))?;
+        reg.register(Box::new(self.messages_pending_total.clone()))?;
+        reg.register(Box::new(self.failed_consumers_total.clone()))?;
         Ok(())
     }
 }

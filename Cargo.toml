@@ -14,6 +14,7 @@ members = [
     "src/utils/kamu-cli-puppet",
     "src/utils/messaging-outbox",
     "src/utils/multiformats",
+    "src/utils/observability",
     "src/utils/random-names",
     "src/utils/repo-tools",
     "src/utils/time-source",
@@ -104,6 +105,7 @@ kamu-data-utils = { version = "0.199.3", path = "src/utils/data-utils", default-
 kamu-datafusion-cli = { version = "0.199.3", path = "src/utils/datafusion-cli", default-features = false }
 messaging-outbox = { version = "0.199.3", path = "src/utils/messaging-outbox", default-features = false }
 multiformats = { version = "0.199.3", path = "src/utils/multiformats", default-features = false }
+observability = { version = "0.199.3", path = "src/utils/observability", default-features = false }
 random-names = { version = "0.199.3", path = "src/utils/random-names", default-features = false }
 time-source = { version = "0.199.3", path = "src/utils/time-source", default-features = false }
 tracing-perfetto = { version = "0.199.3", path = "src/utils/tracing-perfetto", default-features = false }

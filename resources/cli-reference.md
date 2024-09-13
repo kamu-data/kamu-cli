@@ -43,6 +43,7 @@ To regenerate this schema from existing code, use the following command:
 * `--no-color` — Disable color output in the terminal
 * `-q`, `--quiet` — Suppress all non-essential output
 * `--trace` — Record and visualize the command execution as perfetto.dev trace
+* `--metrics` — Dump all metrics at the end of command execution
 
 To get help for individual commands use:
     kamu <command> -h

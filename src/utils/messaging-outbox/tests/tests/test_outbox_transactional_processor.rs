@@ -90,6 +90,13 @@ async fn test_deliver_messages_of_one_type() {
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
         ])
         .await;
+
+    harness.check_metrics_messages_processed_total(&[
+        (TEST_PRODUCER_A, "TestMessageConsumerA", 2),
+        (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+        (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
+        (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
+    ]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -146,6 +153,13 @@ async fn test_deliver_messages_of_two_types() {
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
         ])
         .await;
+
+    harness.check_metrics_messages_processed_total(&[
+        (TEST_PRODUCER_A, "TestMessageConsumerA", 1),
+        (TEST_PRODUCER_B, "TestMessageConsumerB", 1),
+        (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
+        (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
+    ]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -207,6 +221,13 @@ async fn test_deliver_messages_multiple_consumers() {
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 2),
         ])
         .await;
+
+    harness.check_metrics_messages_processed_total(&[
+        (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+        (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+        (TEST_PRODUCER_C, "TestMessageConsumerC1", 2),
+        (TEST_PRODUCER_C, "TestMessageConsumerC2", 2),
+    ]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -292,6 +313,13 @@ async fn test_deliver_messages_with_partial_consumption() {
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 5),
         ])
         .await;
+
+    harness.check_metrics_messages_processed_total(&[
+        (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+        (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+        (TEST_PRODUCER_C, "TestMessageConsumerC1", 5 - 2),
+        (TEST_PRODUCER_C, "TestMessageConsumerC2", 5 - 4),
+    ]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -301,12 +329,14 @@ struct TransactionalOutboxProcessorHarness {
     outbox_processor: Arc<OutboxTransactionalProcessor>,
     outbox: Arc<dyn Outbox>,
     outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>,
+    metrics: Arc<OutboxTransactionalProcessorMetrics>,
 }
 
 impl TransactionalOutboxProcessorHarness {
     fn new() -> Self {
         let mut b = CatalogBuilder::new();
         b.add::<OutboxTransactionalProcessor>();
+        b.add::<OutboxTransactionalProcessorMetrics>();
         b.add_value(OutboxConfig::default());
         b.add::<InMemoryOutboxMessageRepository>();
         b.add::<InMemoryOutboxMessageConsumptionRepository>();
@@ -332,12 +362,14 @@ impl TransactionalOutboxProcessorHarness {
         let outbox_consumption_repository = catalog
             .get_one::<dyn OutboxMessageConsumptionRepository>()
             .unwrap();
+        let metrics = catalog.get_one().unwrap();
 
         Self {
             catalog,
             outbox_processor,
             outbox,
             outbox_consumption_repository,
+            metrics,
         }
     }
 
@@ -385,6 +417,21 @@ impl TransactionalOutboxProcessorHarness {
 
         boundaries.sort();
         boundaries
+    }
+
+    fn check_metrics_messages_processed_total(&self, expected: &[(&str, &str, u64)]) {
+        for (producer, consumer, expected_value) in expected {
+            let actual_value = self
+                .metrics
+                .messages_processed_total
+                .get_metric_with_label_values(&[producer, consumer])
+                .unwrap()
+                .get();
+            assert_eq!(
+                *expected_value, actual_value,
+                "messages_processed_total{{producer={producer},consumer={consumer}}}"
+            );
+        }
     }
 }
 

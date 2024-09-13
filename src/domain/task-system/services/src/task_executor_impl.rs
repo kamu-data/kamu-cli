@@ -126,8 +126,13 @@ impl TaskExecutorImpl {
         Ok(Some(task))
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(task_id = %task.task_id))]
     async fn run_task(&self, task: &Task) -> Result<TaskOutcome, InternalError> {
+        let span = observability::tracing::root_span!(
+            "run_task",
+            task_id = %task.task_id,
+        );
+        let _ = span.enter();
+
         // Run task via logical plan
         let task_run_result = self
             .task_logical_plan_runner

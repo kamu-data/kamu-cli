@@ -44,7 +44,7 @@ impl DatabaseTransactionRunner {
         Self { catalog }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "debug", skip_all)]
     pub async fn transactional<H, HFut, HFutResultT, HFutResultE>(
         &self,
         callback: H,
@@ -74,7 +74,7 @@ impl DatabaseTransactionRunner {
                 .build();
 
             callback(catalog_with_transaction)
-                .instrument(tracing::info_span!("Transaction Body"))
+                .instrument(tracing::debug_span!("Transaction Body"))
                 .await
         };
 
@@ -82,9 +82,10 @@ impl DatabaseTransactionRunner {
         match result {
             // In case everything succeeded, commit the transaction
             Ok(res) => {
+                tracing::debug!("Transaction COMMIT");
+
                 db_transaction_manager
                     .commit_transaction(transaction_ref)
-                    .instrument(tracing::info_span!("Transaction COMMIT"))
                     .await?;
 
                 Ok(res)
@@ -92,10 +93,12 @@ impl DatabaseTransactionRunner {
 
             // Otherwise, do an explicit rollback
             Err(e) => {
+                tracing::warn!("Transaction ROLLBACK");
+
                 db_transaction_manager
                     .rollback_transaction(transaction_ref)
-                    .instrument(tracing::error_span!("Transaction ROLLBACK"))
                     .await?;
+
                 Err(e)
             }
         }

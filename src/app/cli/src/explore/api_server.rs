@@ -142,19 +142,26 @@ impl APIServer {
                     multi_tenant_workspace,
                 ),
             )
+            .layer(kamu_adapter_http::AuthenticationLayer::new())
             .layer(
-                tower::ServiceBuilder::new()
-                    .layer(tower_http::trace::TraceLayer::new_for_http())
-                    .layer(
-                        tower_http::cors::CorsLayer::new()
-                            .allow_origin(tower_http::cors::Any)
-                            .allow_methods(vec![http::Method::GET, http::Method::POST])
-                            .allow_headers(tower_http::cors::Any),
-                    )
-                    .layer(Extension(api_server_catalog))
-                    .layer(Extension(gql_schema))
-                    .layer(kamu_adapter_http::AuthenticationLayer::new()),
-            );
+                tower_http::cors::CorsLayer::new()
+                    .allow_origin(tower_http::cors::Any)
+                    .allow_methods(vec![http::Method::GET, http::Method::POST])
+                    .allow_headers(tower_http::cors::Any),
+            )
+            .layer(observability::axum::http_layer())
+            // Note: Healthcheck and metrics routes are placed before the tracing layer (layers
+            // execute bottom-up) to avoid spam in logs
+            .route(
+                "/system/health",
+                axum::routing::get(observability::health::health_handler),
+            )
+            .route(
+                "/system/metrics",
+                axum::routing::get(observability::metrics::metrics_handler),
+            )
+            .layer(axum::extract::Extension(gql_schema))
+            .layer(axum::extract::Extension(api_server_catalog));
 
         let is_e2e_testing = e2e_output_data_path.is_some();
         let maybe_shutdown_notify = if is_e2e_testing {
