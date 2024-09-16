@@ -10,7 +10,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
-use database_common_macros::{transactional_method, transactional_method1};
+use database_common_macros::{transactional_method, transactional_method1, transactional_method2};
 use dill::{component, scope, Catalog, Singleton};
 use internal_error::{InternalError, ResultIntoInternal};
 use observability::metrics::MetricsProvider;
@@ -152,32 +152,24 @@ impl OutboxTransactionalProcessor {
         let span = observability::tracing::root_span!("outbox_iteration");
         let _ = span.enter();
 
-        // producer A - message 17
-        // producer B - message 19
-        let latest_message_ids_by_producer = self.select_latest_message_ids_by_producers().await?;
-
-        // producer A ->
-        //   consumer X -> message 15
-        //   consumer Y -> message 14
-        // producer B ->
-        //   consumer X -> message 12
-        let mut consumption_boundaries_by_producer = self
-            .select_latest_consumption_boundaries_by_producers()
-            .await?;
+        // Read current state of producers and consumptions
+        let mut current_consumption_state = self.read_current_consumption_state().await?;
 
         // Prepare iteration for each producer
         let mut producer_tasks = Vec::new();
         for producer_relay_job in &self.producer_relay_jobs {
             // Extract latest message ID by producer
-            let Some(latest_produced_message_id) =
-                latest_message_ids_by_producer.get(&producer_relay_job.producer_name)
+            let Some(latest_produced_message_id) = current_consumption_state
+                .latest_message_ids_by_producer
+                .get(&producer_relay_job.producer_name)
             else {
                 continue;
             };
 
             // Take consumption boundaries for this producer
-            let Some(consumption_boundaries) =
-                consumption_boundaries_by_producer.remove(&producer_relay_job.producer_name)
+            let Some(consumption_boundaries) = current_consumption_state
+                .consumption_boundaries_by_producer
+                .remove(&producer_relay_job.producer_name)
             else {
                 continue;
             };
@@ -219,9 +211,37 @@ impl OutboxTransactionalProcessor {
         Ok(())
     }
 
-    #[transactional_method1(outbox_message_repository: Arc<dyn OutboxMessageRepository>)]
+    #[transactional_method2(
+        outbox_message_repository: Arc<dyn OutboxMessageRepository>,
+        outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>
+    )]
+    async fn read_current_consumption_state(
+        &self,
+    ) -> Result<CurrentConsumptionState, InternalError> {
+        // producer A - message 17
+        // producer B - message 19
+        let latest_message_ids_by_producer = self
+            .select_latest_message_ids_by_producers(outbox_message_repository)
+            .await?;
+
+        // producer A ->
+        //   consumer X -> message 15
+        //   consumer Y -> message 14
+        // producer B ->
+        //   consumer X -> message 12
+        let consumption_boundaries_by_producer = self
+            .select_latest_consumption_boundaries_by_producers(outbox_consumption_repository)
+            .await?;
+
+        Ok(CurrentConsumptionState {
+            latest_message_ids_by_producer,
+            consumption_boundaries_by_producer,
+        })
+    }
+
     async fn select_latest_message_ids_by_producers(
         &self,
+        outbox_message_repository: Arc<dyn OutboxMessageRepository>,
     ) -> Result<HashMap<String, OutboxMessageID>, InternalError> {
         // Extract latest (producer, max message id) relation
         let latest_message_ids_by_producer = outbox_message_repository
@@ -234,9 +254,9 @@ impl OutboxTransactionalProcessor {
             .collect::<HashMap<_, _>>())
     }
 
-    #[transactional_method1(outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>)]
     async fn select_latest_consumption_boundaries_by_producers(
         &self,
+        outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>,
     ) -> Result<HashMap<String, HashMap<String, OutboxMessageID>>, InternalError> {
         // Extract consumption boundaries for all routes
         let all_boundaries = async move {
@@ -287,6 +307,13 @@ impl RoutesStaticInfo {
             consumers_by_producers,
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct CurrentConsumptionState {
+    latest_message_ids_by_producer: HashMap<String, OutboxMessageID>,
+    consumption_boundaries_by_producer: HashMap<String, HashMap<String, OutboxMessageID>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
