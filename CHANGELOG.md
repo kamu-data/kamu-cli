@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - split outbox into planner and consumption jobs components
     - planner analyzes current state and loads bunch of unprocessed messages within a 1 transaction only
     - consumption jobs invoke consumers and detect their failures
+- Detecting concurrent modifications in flow and task event stores
+- Improved and cleaned handling of flow abortions at different stages of processing
 
 ## [0.200.0] - 2024-09-13
 ### Added
