@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - REST API: New `/verify` endpoint allows verification of query commitment as per [documentation](https://docs.kamu.dev/node/commitments/#dispute-resolution) (#831)
+### Changed
+- Outbox main loop was revised to minimize the number of transactions:
+    - split outbox into planner and consumption jobs components
+    - planner analyzes current state and loads bunch of unprocessed messages within a 1 transaction only
+    - consumption jobs invoke consumers and detect their failures
 
 ## [0.200.0] - 2024-09-13
 ### Added
