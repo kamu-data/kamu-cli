@@ -81,20 +81,37 @@ impl OutboxMessageRepository for InMemoryOutboxMessageRepository {
         Ok(())
     }
 
-    fn get_producer_messages(
+    fn get_messages(
         &self,
-        producer_name: &str,
-        above_id: OutboxMessageID,
+        above_boundaries_by_producer: Vec<(String, OutboxMessageID)>,
         batch_size: usize,
     ) -> OutboxMessageStream {
+        let minimal_above_id = above_boundaries_by_producer
+            .iter()
+            .map(|(_, boundary_id)| boundary_id)
+            .min()
+            .copied()
+            .unwrap_or_else(|| OutboxMessageID::new(0));
+
         let messages = {
             let mut messages = Vec::new();
 
             let guard = self.state.lock().unwrap();
 
-            let mut cursor = guard.messages.lower_bound(Bound::Excluded(&above_id));
+            let mut cursor = guard
+                .messages
+                .lower_bound(Bound::Excluded(&minimal_above_id));
+
             while let Some((_, message)) = cursor.next() {
-                if message.producer_name == producer_name {
+                let matches_filter =
+                    above_boundaries_by_producer
+                        .iter()
+                        .any(|(producer_name, above_id)| {
+                            message.producer_name == *producer_name
+                                && message.message_id > *above_id
+                        });
+
+                if matches_filter || above_boundaries_by_producer.is_empty() {
                     messages.push(Ok(message.clone()));
                     if messages.len() >= batch_size {
                         break;

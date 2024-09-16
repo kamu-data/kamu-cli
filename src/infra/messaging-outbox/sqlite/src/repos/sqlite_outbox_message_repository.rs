@@ -11,6 +11,7 @@ use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use sqlx::sqlite::SqliteRow;
 
 use crate::domain::*;
 
@@ -55,13 +56,27 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
         Ok(())
     }
 
-    fn get_producer_messages(
+    fn get_messages(
         &self,
-        producer_name: &str,
-        above_id: OutboxMessageID,
+        above_boundaries_by_producer: Vec<(String, OutboxMessageID)>,
         batch_size: usize,
     ) -> OutboxMessageStream {
-        let producer_name = producer_name.to_string();
+        let producer_filters = if above_boundaries_by_producer.is_empty() {
+            "true".to_string()
+        } else {
+            above_boundaries_by_producer
+                .iter()
+                .enumerate()
+                .map(|(i, _)| {
+                    format!(
+                        "producer_name = ${} AND message_id > ${}",
+                        i * 2 + 2, // $2, $4, $6, ...
+                        i * 2 + 3, // $3, $5, $7, ...
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(" OR ")
+        };
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -69,26 +84,37 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
                 .connection_mut()
                 .await?;
 
-            let above_id = above_id.into_inner();
-            let batch_size = i64::try_from(batch_size).unwrap();
-
-            let mut query_stream = sqlx::query_as!(
-                OutboxMessage,
+            let query_str = format!(
                 r#"
-                    SELECT
-                        message_id,
-                        producer_name,
-                        content_json as "content_json: _",
-                        occurred_on as "occurred_on: _"
-                    FROM outbox_messages
-                    WHERE producer_name = $1 and message_id > $2
-                    ORDER BY message_id
-                    LIMIT $3
+                SELECT
+                    message_id,
+                    producer_name,
+                    content_json,
+                    occurred_on
+                FROM outbox_messages
+                WHERE {producer_filters}
+                ORDER BY message_id
+                LIMIT $1
                 "#,
-                producer_name,
-                above_id,
-                batch_size,
-            )
+            );
+
+            let mut query = sqlx::query(&query_str)
+                .bind(i64::try_from(batch_size).unwrap());
+
+            for (producer_name, above_id) in above_boundaries_by_producer {
+                query = query.bind(producer_name).bind(above_id.into_inner());
+            }
+
+
+            use sqlx::Row;
+            let mut query_stream = query.try_map(|event_row: SqliteRow| {
+                Ok(OutboxMessage {
+                    message_id: OutboxMessageID::new(event_row.get(0)),
+                    producer_name: event_row.get(1),
+                    content_json: event_row.get(2),
+                    occurred_on: event_row.get(3),
+                })
+            })
             .fetch(connection_mut)
             .map_err(ErrorIntoInternal::int_err);
 

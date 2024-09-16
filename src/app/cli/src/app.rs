@@ -452,8 +452,8 @@ pub fn configure_base_catalog(
     b.add::<messaging_outbox::OutboxTransactionalImpl>();
     b.add::<messaging_outbox::OutboxDispatchingImpl>();
     b.bind::<dyn Outbox, OutboxDispatchingImpl>();
-    b.add::<messaging_outbox::OutboxTransactionalProcessor>();
-    b.add::<messaging_outbox::OutboxTransactionalProcessorMetrics>();
+    b.add::<messaging_outbox::OutboxExecutor>();
+    b.add::<messaging_outbox::OutboxExecutorMetrics>();
 
     register_message_dispatcher::<DatasetLifecycleMessage>(
         &mut b,

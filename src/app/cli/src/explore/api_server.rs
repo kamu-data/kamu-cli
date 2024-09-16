@@ -24,7 +24,7 @@ use kamu::domain::{Protocols, ServerUrlConfig};
 use kamu_adapter_http::e2e::e2e_router;
 use kamu_flow_system_inmem::domain::FlowExecutor;
 use kamu_task_system_inmem::domain::TaskExecutor;
-use messaging_outbox::OutboxTransactionalProcessor;
+use messaging_outbox::OutboxExecutor;
 use time_source::SystemTimeSource;
 use tokio::sync::Notify;
 use url::Url;
@@ -38,7 +38,7 @@ pub struct APIServer {
     >,
     task_executor: Arc<dyn TaskExecutor>,
     flow_executor: Arc<dyn FlowExecutor>,
-    outbox_processor: Arc<OutboxTransactionalProcessor>,
+    outbox_processor: Arc<OutboxExecutor>,
     time_source: Arc<dyn SystemTimeSource>,
     maybe_shutdown_notify: Option<Arc<Notify>>,
 }
