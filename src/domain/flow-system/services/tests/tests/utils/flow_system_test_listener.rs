@@ -261,7 +261,8 @@ impl MessageConsumerT<FlowProgressMessage> for FlowSystemTestListener {
         match message {
             FlowProgressMessage::Running(e) => self.make_a_snapshot(e.event_time).await,
             FlowProgressMessage::Finished(e) => self.make_a_snapshot(e.event_time).await,
-            FlowProgressMessage::Enqueued(_) | FlowProgressMessage::Cancelled(_) => {}
+            FlowProgressMessage::Cancelled(e) => self.make_a_snapshot(e.event_time).await,
+            FlowProgressMessage::Enqueued(_) => {}
         }
         Ok(())
     }

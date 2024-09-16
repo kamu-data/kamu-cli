@@ -21,6 +21,7 @@ use super::{
     FlowHarness,
     FlowHarnessOverrides,
     FlowSystemTestListener,
+    ManualFlowAbortArgs,
     ManualFlowTriggerArgs,
     TaskDriverArgs,
     SCHEDULING_ALIGNMENT_MS,
@@ -2360,9 +2361,6 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 harness.advance_time(Duration::try_milliseconds(50).unwrap()).await;
                 harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), foo_id.clone(), DatasetFlowType::Ingest).await;
                 harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), bar_id.clone(), DatasetFlowType::Ingest).await;
-                test_flow_listener
-                    .make_a_snapshot(start_time + Duration::try_milliseconds(50).unwrap())
-                    .await;
 
                 // 80ms: Wake up after initially planned "foo" scheduling but before planned "bar" scheduling:
                 //  - "foo":
@@ -2437,19 +2435,17 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
 
             #6: +50ms:
               "bar" Ingest:
-                Flow ID = 3 Finished Aborted
+                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=110ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #7: +80ms:
+            #7: +50ms:
               "bar" Ingest:
-                Flow ID = 5 Waiting AutoPolling Schedule(wakeup=100ms)
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Waiting AutoPolling
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
@@ -2459,11 +2455,21 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
+                Flow ID = 4 Waiting AutoPolling
+                Flow ID = 2 Finished Aborted
+                Flow ID = 0 Finished Success
+
+            #9: +80ms:
+              "bar" Ingest:
+                Flow ID = 5 Waiting AutoPolling Schedule(wakeup=100ms)
+                Flow ID = 3 Finished Aborted
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
                 Flow ID = 4 Waiting AutoPolling Executor(task=2, since=80ms)
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #9: +100ms:
+            #10: +100ms:
               "bar" Ingest:
                 Flow ID = 5 Waiting AutoPolling Executor(task=3, since=100ms)
                 Flow ID = 3 Finished Aborted
@@ -2588,9 +2594,6 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
               harness.advance_time(Duration::try_milliseconds(50).unwrap()).await;
               harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), foo_id.clone(), DatasetFlowType::Ingest).await;
               harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), bar_id.clone(), DatasetFlowType::Ingest).await;
-              test_flow_listener
-                  .make_a_snapshot(start_time + Duration::try_milliseconds(50).unwrap())
-                  .await;
 
               // 100ms: Wake up after initially planned "bar" scheduling but before planned "foo" scheduling:
               //  - "foo":
@@ -2664,13 +2667,21 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
 
             #6: +50ms:
               "bar" Ingest:
+                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=90ms)
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Finished Aborted
+                Flow ID = 0 Finished Success
+
+            #7: +50ms:
+              "bar" Ingest:
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #7: +100ms:
+            #8: +100ms:
               "bar" Ingest:
                 Flow ID = 5 Waiting AutoPolling
                 Flow ID = 3 Finished Aborted
@@ -2680,7 +2691,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #8: +100ms:
+            #9: +100ms:
               "bar" Ingest:
                 Flow ID = 5 Waiting AutoPolling Executor(task=2, since=100ms)
                 Flow ID = 3 Finished Aborted
@@ -2690,7 +2701,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #9: +120ms:
+            #10: +120ms:
               "bar" Ingest:
                 Flow ID = 5 Waiting AutoPolling Executor(task=2, since=100ms)
                 Flow ID = 3 Finished Aborted
@@ -2811,16 +2822,10 @@ async fn test_dataset_deleted() {
                 // 50ms: deleting "foo" in QUEUED state
                 harness.advance_time(Duration::try_milliseconds(50).unwrap()).await;
                 harness.delete_dataset(&foo_id).await;
-                test_flow_listener
-                    .make_a_snapshot(start_time + Duration::try_milliseconds(50).unwrap())
-                    .await;
 
                 // 120ms: deleting "bar" in SCHEDULED state
                 harness.advance_time(Duration::try_milliseconds(70).unwrap()).await;
                 harness.delete_dataset(&bar_id).await;
-                test_flow_listener
-                    .make_a_snapshot(start_time + Duration::try_milliseconds(120).unwrap())
-                    .await;
 
                 // 140ms: finish
                 harness.advance_time(Duration::try_milliseconds(20).unwrap()).await;
@@ -5617,6 +5622,8 @@ async fn test_list_all_flow_initiators() {
     assert_eq!(bar_dataset_initiators_list, [bar_account_id.clone()]);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_list_all_datasets_with_flow() {
     let foo_account_name = AccountName::new_unchecked("foo");
@@ -5808,6 +5815,441 @@ async fn test_list_all_datasets_with_flow() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_abort_flow_before_scheduling_tasks() {
+    let harness = FlowHarness::new().await;
+
+    // Create a "foo" root dataset, and configure ingestion schedule every 100ns
+    let foo_create_result = harness
+        .create_root_dataset(DatasetAlias {
+            dataset_name: DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
+    harness
+        .set_dataset_flow_ingest(
+            harness.now_datetime(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(100).unwrap().into(),
+            },
+        )
+        .await;
+    harness.eager_initialization().await;
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .unwrap();
+
+    // Run scheduler concurrently with manual aborts script
+    harness.flow_service.pre_run(start_time).await.unwrap();
+    tokio::select! {
+        // Run API service
+        res = harness.flow_service.run() => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+            // Task 0: start running at 10ms, finish at 20ms
+            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::try_milliseconds(10).unwrap(),
+                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false
+                }),
+            });
+            let foo_task0_handle = foo_task0_driver.run();
+
+            // Manual abort for "foo" at 80ms
+            let abort0_driver = harness.manual_flow_abort_driver(ManualFlowAbortArgs {
+                flow_id: FlowID::new(1),
+                abort_since_start: Duration::try_milliseconds(80).unwrap(),
+            });
+            let abort0_handle = abort0_driver.run();
+
+            let sim_handle = harness.advance_time(Duration::try_milliseconds(150).unwrap());
+            tokio::join!(foo_task0_handle, abort0_handle, sim_handle)
+        } => Ok(())
+    }
+    .unwrap();
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling
+
+            #1: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+
+            #2: +10ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #3: +20ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=120ms)
+                Flow ID = 0 Finished Success
+
+            #4: +80ms:
+              "foo" Ingest:
+                Flow ID = 1 Finished Aborted
+                Flow ID = 0 Finished Success
+
+          "#
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
+    let harness = FlowHarness::new().await;
+
+    // Create a "foo" root dataset, and configure ingestion schedule every 50ms
+    let foo_create_result = harness
+        .create_root_dataset(DatasetAlias {
+            dataset_name: DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
+    harness
+        .set_dataset_flow_ingest(
+            harness.now_datetime(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+            },
+        )
+        .await;
+    harness.eager_initialization().await;
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    harness.flow_service.pre_run(start_time).await.unwrap();
+    tokio::select! {
+        // Run API service
+        res = harness.flow_service.run() => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+            // Task 0: start running at 10ms, finish at 20ms
+            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::try_milliseconds(10).unwrap(),
+                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false
+                }),
+            });
+            let foo_task0_handle = foo_task0_driver.run();
+
+            // Manual abort for "foo" at 90ms
+            let abort0_driver = harness.manual_flow_abort_driver(ManualFlowAbortArgs {
+                flow_id: FlowID::new(1),
+                abort_since_start: Duration::try_milliseconds(90).unwrap(),
+            });
+            let abort0_handle = abort0_driver.run();
+
+            let sim_handle = harness.advance_time(Duration::try_milliseconds(150).unwrap());
+            tokio::join!(foo_task0_handle, abort0_handle, sim_handle)
+        } => Ok(())
+    }
+    .unwrap();
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling
+
+            #1: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+
+            #2: +10ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #3: +20ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=70ms)
+                Flow ID = 0 Finished Success
+
+            #4: +70ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=70ms)
+                Flow ID = 0 Finished Success
+
+            #5: +90ms:
+              "foo" Ingest:
+                Flow ID = 1 Finished Aborted
+                Flow ID = 0 Finished Success
+
+          "#
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_abort_flow_after_task_running_has_started() {
+    let harness = FlowHarness::new().await;
+
+    // Create a "foo" root dataset, and configure ingestion schedule every 50ms
+    let foo_create_result = harness
+        .create_root_dataset(DatasetAlias {
+            dataset_name: DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
+    harness
+        .set_dataset_flow_ingest(
+            harness.now_datetime(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+            },
+        )
+        .await;
+    harness.eager_initialization().await;
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    harness.flow_service.pre_run(start_time).await.unwrap();
+    tokio::select! {
+        // Run API service
+        res = harness.flow_service.run() => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+            // Task 0: start running at 10ms, finish at 110ms
+            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::try_milliseconds(10).unwrap(),
+                finish_in_with: Some((Duration::try_milliseconds(100).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false
+                }),
+            });
+            let foo_task0_handle = foo_task0_driver.run();
+
+            // Manual abort for "foo" at 50ms, which is within task run period
+            let abort0_driver = harness.manual_flow_abort_driver(ManualFlowAbortArgs {
+                flow_id: FlowID::new(0),
+                abort_since_start: Duration::try_milliseconds(50).unwrap(),
+            });
+            let abort0_handle = abort0_driver.run();
+
+            let sim_handle = harness.advance_time(Duration::try_milliseconds(150).unwrap());
+            tokio::join!(foo_task0_handle, abort0_handle, sim_handle)
+        } => Ok(())
+    }
+    .unwrap();
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling
+
+            #1: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+
+            #2: +10ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #3: +50ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Aborted
+
+          "#
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_abort_flow_after_task_finishes() {
+    let harness = FlowHarness::new().await;
+
+    // Create a "foo" root dataset, and configure ingestion schedule every 50ms
+    let foo_create_result = harness
+        .create_root_dataset(DatasetAlias {
+            dataset_name: DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
+    harness
+        .set_dataset_flow_ingest(
+            harness.now_datetime(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+            },
+        )
+        .await;
+    harness.eager_initialization().await;
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    harness.flow_service.pre_run(start_time).await.unwrap();
+    tokio::select! {
+        // Run API service
+        res = harness.flow_service.run() => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+            // Task 0: start running at 10ms, finish at 30ms
+            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::try_milliseconds(10).unwrap(),
+                finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false
+                }),
+            });
+            let foo_task0_handle = foo_task0_driver.run();
+
+            // Task 1: start running at 90ms, finish at 110ms
+            let foo_task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::try_milliseconds(90).unwrap(),
+                finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false
+                }),
+            });
+            let foo_task1_handle = foo_task1_driver.run();
+
+            // Manual abort for "foo" at 50ms, which is after flow 0 has finished, and before flow 1 has started
+            let abort0_driver = harness.manual_flow_abort_driver(ManualFlowAbortArgs {
+                flow_id: FlowID::new(0),
+                abort_since_start: Duration::try_milliseconds(50).unwrap(),
+            });
+            let abort0_handle = abort0_driver.run();
+
+            let sim_handle = harness.advance_time(Duration::try_milliseconds(150).unwrap());
+            tokio::join!(foo_task0_handle, foo_task1_handle, abort0_handle, sim_handle)
+        } => Ok(())
+    }
+    .unwrap();
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling
+
+            #1: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+
+            #2: +10ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #3: +30ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=80ms)
+                Flow ID = 0 Finished Success
+
+            #4: +80ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=80ms)
+                Flow ID = 0 Finished Success
+
+            #5: +90ms:
+              "foo" Ingest:
+                Flow ID = 1 Running(task=1)
+                Flow ID = 0 Finished Success
+
+            #6: +110ms:
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+          "#
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO next:
 //  - derived more than 1 level
-//  - cancelling queued/scheduled flow (at flow level, not at task level)
