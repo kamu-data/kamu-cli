@@ -6571,6 +6571,7 @@ dependencies = [
  "dill",
  "futures",
  "internal-error",
+ "itertools 0.13.0",
  "kamu-messaging-outbox-inmem",
  "mockall",
  "observability",

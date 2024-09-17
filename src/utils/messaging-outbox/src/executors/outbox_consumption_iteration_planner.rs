@@ -111,7 +111,7 @@ impl OutboxConsumptionIterationPlanner {
         &self,
     ) -> Result<HashMap<String, HashMap<String, OutboxMessageID>>, InternalError> {
         // Extract consumption boundaries for all routes
-        let all_boundaries = async move {
+        let mut all_boundaries = async move {
             let consumptions_stream = self
                 .outbox_message_consumption_repository
                 .list_consumption_boundaries();
@@ -122,20 +122,21 @@ impl OutboxConsumptionIterationPlanner {
         .await?;
 
         // Organize by producer->consumer hierarchically
-        let mut boundaries_by_producer = HashMap::new();
-        for boundary in all_boundaries {
-            boundaries_by_producer
-                .entry(boundary.producer_name)
-                .and_modify(|by_consumer: &mut HashMap<String, OutboxMessageID>| {
-                    by_consumer.insert(
-                        boundary.consumer_name.clone(),
-                        boundary.last_consumed_message_id,
-                    );
-                })
-                .or_insert_with(|| {
-                    HashMap::from([(boundary.consumer_name, boundary.last_consumed_message_id)])
-                });
-        }
+        use itertools::Itertools;
+        all_boundaries.sort();
+        let boundaries_by_producer = all_boundaries
+            .into_iter()
+            .chunk_by(|b| b.producer_name.clone())
+            .into_iter()
+            .map(|(producer_name, producer_boundaries)| {
+                (
+                    producer_name.to_string(),
+                    producer_boundaries
+                        .map(|b| (b.consumer_name.to_string(), b.last_consumed_message_id))
+                        .collect(),
+                )
+            })
+            .collect();
 
         Ok(boundaries_by_producer)
     }
@@ -242,27 +243,23 @@ impl OutboxConsumptionIterationPlanner {
 
         // Load batch of unprocessed messages, which satisfy filters
         use futures::TryStreamExt;
-        let unprocessed_messages = self
+        let mut unprocessed_messages = self
             .outbox_message_repository
             .get_messages(boundaries_by_producer, self.messages_batch_size)
             .try_collect::<Vec<_>>()
             .await?;
 
         // Group messages by producers
-        let mut unprocessed_messages_by_producer: HashMap<String, Vec<OutboxMessage>> =
-            HashMap::new();
-        for unprocessed_message in unprocessed_messages {
-            if let Some(entry) =
-                unprocessed_messages_by_producer.get_mut(&unprocessed_message.producer_name)
-            {
-                entry.push(unprocessed_message);
-            } else {
-                unprocessed_messages_by_producer.insert(
-                    unprocessed_message.producer_name.clone(),
-                    vec![unprocessed_message],
-                );
-            }
-        }
+        use itertools::Itertools;
+        unprocessed_messages.sort_by(|m1, m2| m1.producer_name.cmp(&m2.producer_name));
+        let unprocessed_messages_by_producer: HashMap<_, _> = unprocessed_messages
+            .into_iter()
+            .chunk_by(|m| m.producer_name.clone())
+            .into_iter()
+            .map(|(producer_name, producer_messages)| {
+                (producer_name.clone(), producer_messages.collect())
+            })
+            .collect();
 
         Ok(unprocessed_messages_by_producer)
     }
