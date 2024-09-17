@@ -576,6 +576,16 @@ impl FlowEnqueueHelper {
                 batching_deadline
             };
 
+            // If batching is over, it's start condition is no longer valid.
+            // However, set throttling condition, if it applies
+            if (satisfied || is_compacted) && throttling_boundary_time > batching_finish_time {
+                self.indicate_throttling_activity(
+                    flow,
+                    throttling_boundary_time,
+                    batching_finish_time,
+                )?;
+            }
+
             // Throttling boundary correction
             let corrected_finish_time =
                 std::cmp::max(batching_finish_time, throttling_boundary_time);
@@ -586,16 +596,6 @@ impl FlowEnqueueHelper {
             };
             if should_activate {
                 self.enqueue_flow(flow, corrected_finish_time).await?;
-            }
-
-            // If batching is over, it's start condition is no longer valid.
-            // However, set throttling condition, if it applies
-            if (satisfied || is_compacted) && throttling_boundary_time > batching_finish_time {
-                self.indicate_throttling_activity(
-                    flow,
-                    throttling_boundary_time,
-                    batching_finish_time,
-                )?;
             }
         }
 
