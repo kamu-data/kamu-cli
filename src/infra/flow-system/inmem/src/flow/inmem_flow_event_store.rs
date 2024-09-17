@@ -8,15 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_flow_system::{BorrowedFlowKeyDataset, *};
 use opendatafabric::{AccountID, DatasetID};
-
-use super::FlowTimeWheel;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,7 +35,8 @@ struct State {
     flow_key_by_flow_id: HashMap<FlowID, FlowKey>,
     dataset_flow_last_run_stats: HashMap<FlowKeyDataset, FlowRunStats>,
     system_flow_last_run_stats: HashMap<SystemFlowType, FlowRunStats>,
-    flow_time_wheel: FlowTimeWheel,
+    flows_by_enqueued_time: BTreeMap<DateTime<Utc>, BTreeSet<FlowID>>,
+    enqueued_time_by_flow_id: HashMap<FlowID, DateTime<Utc>>,
 }
 
 impl State {
@@ -218,10 +217,6 @@ impl InMemoryFlowEventStore {
             }
 
             state.all_flows.push(event.flow_id());
-        } else if let FlowEvent::Enqueued(e) = &event {
-            state
-                .flow_time_wheel
-                .activate_at(e.activation_time, e.flow_id);
         }
         /* Existing flow must have been indexed, update status */
         else if let Some(new_status) = event.new_status() {
@@ -264,8 +259,47 @@ impl InMemoryFlowEventStore {
                         })
                         .or_insert(new_run_stats),
                 };
-            } else if let FlowEvent::Aborted(e) = &event {
-                state.flow_time_wheel.cancel_flow_activation(e.flow_id);
+            }
+        }
+
+        // Manage enqueued time changes- insertions
+        if let FlowEvent::Enqueued(e) = &event {
+            // Remove any possible previous enqueuing
+            Self::remove_flow_enqueueing_record(state, e.flow_id);
+            // make new record
+            Self::insert_flow_enqueueing_record(state, e.flow_id, e.enqueued_for);
+        }
+        // and removals
+        else if let FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) = &event {
+            let flow_id = event.flow_id();
+            Self::remove_flow_enqueueing_record(state, flow_id);
+        }
+    }
+
+    fn insert_flow_enqueueing_record(
+        state: &mut State,
+        flow_id: FlowID,
+        enqueued_for: DateTime<Utc>,
+    ) {
+        // Update direct lookup
+        state
+            .flows_by_enqueued_time
+            .entry(enqueued_for)
+            .and_modify(|flow_ids| {
+                flow_ids.insert(flow_id);
+            })
+            .or_insert_with(|| BTreeSet::from([flow_id]));
+
+        // Update reverse lookup
+        state.enqueued_time_by_flow_id.insert(flow_id, enqueued_for);
+    }
+
+    fn remove_flow_enqueueing_record(state: &mut State, flow_id: FlowID) {
+        if let Some(enqueued_for) = state.enqueued_time_by_flow_id.remove(&flow_id) {
+            let flow_ids = state.flows_by_enqueued_time.get_mut(&enqueued_for).unwrap();
+            flow_ids.remove(&flow_id);
+            if flow_ids.is_empty() {
+                state.flows_by_enqueued_time.remove(&enqueued_for);
             }
         }
     }
@@ -403,7 +437,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
     async fn nearest_enqueued_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        Ok(g.flow_time_wheel.nearest_activation_moment())
+        Ok(g.flows_by_enqueued_time.keys().next().copied())
     }
 
     /// Returns flows enqueued for the given activation time
@@ -412,15 +446,12 @@ impl FlowEventStore for InMemoryFlowEventStore {
         enqueued_for: DateTime<Utc>,
     ) -> Result<Vec<FlowID>, InternalError> {
         let state = self.inner.as_state();
-        let mut g = state.lock().unwrap();
+        let g = state.lock().unwrap();
 
-        // Note: we do not support random access, only the nearest enqueued moment
-        assert_eq!(
-            Some(enqueued_for),
-            g.flow_time_wheel.nearest_activation_moment()
-        );
-
-        Ok(g.flow_time_wheel.take_nearest_planned_flows())
+        Ok(g.flows_by_enqueued_time
+            .get(&enqueued_for)
+            .map(|flow_ids| flow_ids.iter().copied().collect())
+            .unwrap_or_default())
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters, ?pagination))]

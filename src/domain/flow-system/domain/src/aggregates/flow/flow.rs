@@ -84,12 +84,12 @@ impl Flow {
     pub fn enqueue(
         &mut self,
         now: DateTime<Utc>,
-        activation_time: DateTime<Utc>,
+        enqueued_for: DateTime<Utc>,
     ) -> Result<(), ProjectionError<FlowState>> {
         let event = FlowEventEnqueued {
             event_time: now,
             flow_id: self.flow_id,
-            activation_time,
+            enqueued_for,
         };
         self.apply(event)?;
         Ok(())

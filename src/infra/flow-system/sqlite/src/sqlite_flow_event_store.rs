@@ -126,7 +126,7 @@ impl SqliteFlowEventStore {
                 maybe_latest_status = Some(new_status);
             }
             if let FlowEvent::Enqueued(e) = event {
-                maybe_enqueued_for = Some(e.activation_time);
+                maybe_enqueued_for = Some(e.enqueued_for);
             } else if let FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) = event {
                 maybe_enqueued_for = None;
             }

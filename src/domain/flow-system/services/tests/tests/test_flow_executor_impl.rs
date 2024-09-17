@@ -229,7 +229,7 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
                 FlowEventEnqueued {
                     event_time: Utc::now(),
                     flow_id,
-                    activation_time: start_time + Duration::try_milliseconds(100).unwrap(),
+                    enqueued_for: start_time + Duration::try_milliseconds(100).unwrap(),
                 }
                 .into(),
             ],

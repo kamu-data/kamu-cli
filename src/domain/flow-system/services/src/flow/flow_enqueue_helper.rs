@@ -591,7 +591,7 @@ impl FlowEnqueueHelper {
                 std::cmp::max(batching_finish_time, throttling_boundary_time);
 
             let should_activate = match flow.timing.enqueued_for {
-                Some(activation_time) => activation_time > corrected_finish_time,
+                Some(enqueued_for) => enqueued_for > corrected_finish_time,
                 None => true,
             };
             if should_activate {

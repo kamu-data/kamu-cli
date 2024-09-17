@@ -67,7 +67,7 @@ impl FlowEvent {
             fs::FlowEvent::Enqueued(e) => Self::Enqueued(FlowEventEnqueued::new(
                 event_id,
                 e.event_time,
-                e.activation_time,
+                e.enqueued_for,
             )),
             fs::FlowEvent::TaskScheduled(e) => Self::TaskChanged(FlowEventTaskChanged::new(
                 event_id,
@@ -168,21 +168,17 @@ impl FlowEventTriggerAdded {
 pub struct FlowEventEnqueued {
     event_id: EventID,
     event_time: DateTime<Utc>,
-    activation_time: DateTime<Utc>,
+    enqueued_for: DateTime<Utc>,
 }
 
 #[ComplexObject]
 impl FlowEventEnqueued {
     #[graphql(skip)]
-    fn new(
-        event_id: evs::EventID,
-        event_time: DateTime<Utc>,
-        activation_time: DateTime<Utc>,
-    ) -> Self {
+    fn new(event_id: evs::EventID, event_time: DateTime<Utc>, enqueued_for: DateTime<Utc>) -> Self {
         Self {
             event_id: event_id.into(),
             event_time,
-            activation_time,
+            enqueued_for,
         }
     }
 }

@@ -135,15 +135,13 @@ impl Projection for FlowState {
                             Ok(FlowState { triggers, ..s })
                         }
                     }
-                    E::Enqueued(FlowEventEnqueued {
-                        activation_time, ..
-                    }) => {
+                    E::Enqueued(FlowEventEnqueued { enqueued_for, .. }) => {
                         if s.outcome.is_some() || s.timing.awaiting_executor_since.is_some() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(FlowState {
                                 timing: FlowTimingRecords {
-                                    enqueued_for: Some(activation_time),
+                                    enqueued_for: Some(enqueued_for),
                                     ..s.timing
                                 },
                                 ..s

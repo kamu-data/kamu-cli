@@ -87,7 +87,7 @@ pub struct FlowEventTriggerAdded {
 pub struct FlowEventEnqueued {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
-    pub activation_time: DateTime<Utc>,
+    pub enqueued_for: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
