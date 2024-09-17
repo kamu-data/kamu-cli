@@ -48,7 +48,7 @@ async fn test_deliver_messages_of_one_type() {
         body: "bar".to_string(),
     };
 
-    let harness = TransactionalOutboxProcessorHarness::new();
+    let harness = OutboxExecutorHarness::new();
     harness.outbox_processor.pre_run().await.unwrap();
 
     harness
@@ -73,7 +73,7 @@ async fn test_deliver_messages_of_one_type() {
         ])
         .await;
 
-    // Run relay iteration
+    // Run iteration
     harness
         .outbox_processor
         .run_single_iteration_only()
@@ -110,7 +110,7 @@ async fn test_deliver_messages_of_two_types() {
         body: "bar".to_string(),
     };
 
-    let harness = TransactionalOutboxProcessorHarness::new();
+    let harness = OutboxExecutorHarness::new();
     harness.outbox_processor.pre_run().await.unwrap();
 
     harness
@@ -135,7 +135,7 @@ async fn test_deliver_messages_of_two_types() {
         ])
         .await;
 
-    // Run relay iteration
+    // Run iteration
     harness
         .outbox_processor
         .run_single_iteration_only()
@@ -173,7 +173,7 @@ async fn test_deliver_messages_multiple_consumers() {
         body: "bar".to_string(),
     };
 
-    let harness = TransactionalOutboxProcessorHarness::new();
+    let harness = OutboxExecutorHarness::new();
     harness.outbox_processor.pre_run().await.unwrap();
 
     harness
@@ -198,7 +198,7 @@ async fn test_deliver_messages_multiple_consumers() {
         ])
         .await;
 
-    // Run relay iteration
+    // Run iteration
     harness
         .outbox_processor
         .run_single_iteration_only()
@@ -234,7 +234,7 @@ async fn test_deliver_messages_multiple_consumers() {
 
 #[test_log::test(tokio::test)]
 async fn test_deliver_messages_with_partial_consumption() {
-    let harness = TransactionalOutboxProcessorHarness::new();
+    let harness = OutboxExecutorHarness::new();
     harness.outbox_processor.pre_run().await.unwrap();
 
     let message_texts = ["foo", "bar", "baz", "super", "duper"];
@@ -282,7 +282,7 @@ async fn test_deliver_messages_with_partial_consumption() {
         ])
         .await;
 
-    // Run relay iteration
+    // Run iteration
     harness
         .outbox_processor
         .run_single_iteration_only()
@@ -324,19 +324,19 @@ async fn test_deliver_messages_with_partial_consumption() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct TransactionalOutboxProcessorHarness {
+struct OutboxExecutorHarness {
     catalog: Catalog,
-    outbox_processor: Arc<OutboxTransactionalProcessor>,
+    outbox_processor: Arc<OutboxExecutor>,
     outbox: Arc<dyn Outbox>,
     outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>,
-    metrics: Arc<OutboxTransactionalProcessorMetrics>,
+    metrics: Arc<OutboxExecutorMetrics>,
 }
 
-impl TransactionalOutboxProcessorHarness {
+impl OutboxExecutorHarness {
     fn new() -> Self {
         let mut b = CatalogBuilder::new();
-        b.add::<OutboxTransactionalProcessor>();
-        b.add::<OutboxTransactionalProcessorMetrics>();
+        b.add::<OutboxExecutor>();
+        b.add::<OutboxExecutorMetrics>();
         b.add_value(OutboxConfig::default());
         b.add::<InMemoryOutboxMessageRepository>();
         b.add::<InMemoryOutboxMessageConsumptionRepository>();
@@ -357,7 +357,7 @@ impl TransactionalOutboxProcessorHarness {
 
         let catalog = b.build();
 
-        let outbox_processor = catalog.get_one::<OutboxTransactionalProcessor>().unwrap();
+        let outbox_processor = catalog.get_one::<OutboxExecutor>().unwrap();
         let outbox = catalog.get_one::<dyn Outbox>().unwrap();
         let outbox_consumption_repository = catalog
             .get_one::<dyn OutboxMessageConsumptionRepository>()

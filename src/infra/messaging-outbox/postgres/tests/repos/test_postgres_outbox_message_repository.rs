@@ -41,6 +41,15 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture =
+        kamu_messaging_outbox_repo_tests::test_reading_messages_above_max_with_multiple_producers,
+    harness = PostgresOutboxMessageRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = kamu_messaging_outbox_repo_tests::test_try_reading_above_max,
     harness = PostgresOutboxMessageRepositoryHarness
 );
