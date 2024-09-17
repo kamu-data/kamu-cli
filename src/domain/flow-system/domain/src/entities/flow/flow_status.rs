@@ -9,7 +9,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, strum::Display)]
 #[sqlx(type_name = "flow_status_type", rename_all = "snake_case")]
 pub enum FlowStatus {
     Waiting,

@@ -155,6 +155,7 @@ impl EventStore<FlowConfigurationState> for SqliteFlowConfigurationEventStore {
     async fn save_events(
         &self,
         flow_key: &FlowKey,
+        _prev_stored_event_id: Option<EventID>, // TODO: detecting concurrent modifications
         events: Vec<FlowConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
         if events.is_empty() {

@@ -42,6 +42,8 @@ use tokio::task::yield_now;
 
 use super::{
     FlowSystemTestListener,
+    ManualFlowAbortArgs,
+    ManualFlowAbortDriver,
     ManualFlowTriggerArgs,
     ManualFlowTriggerDriver,
     TaskDriver,
@@ -429,6 +431,10 @@ impl FlowHarness {
         args: ManualFlowTriggerArgs,
     ) -> ManualFlowTriggerDriver {
         ManualFlowTriggerDriver::new(self.catalog.clone(), self.catalog.get_one().unwrap(), args)
+    }
+
+    pub fn manual_flow_abort_driver(&self, args: ManualFlowAbortArgs) -> ManualFlowAbortDriver {
+        ManualFlowAbortDriver::new(self.catalog.clone(), self.catalog.get_one().unwrap(), args)
     }
 
     pub fn now_datetime(&self) -> DateTime<Utc> {

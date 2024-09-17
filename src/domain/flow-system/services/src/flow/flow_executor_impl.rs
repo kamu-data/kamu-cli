@@ -264,8 +264,18 @@ impl FlowExecutorImpl {
                 let mut flow = Flow::load(planned_flow_id, flow_event_store.as_ref())
                     .await
                     .int_err()?;
-                self.schedule_flow_task(transaction_catalog, &mut flow, timeslot_time)
-                    .await?;
+
+                if flow.can_schedule() {
+                    self.schedule_flow_task(transaction_catalog, &mut flow, timeslot_time)
+                        .await?;
+                } else {
+                    tracing::warn!(
+                        flow_id = %planned_flow_id,
+                        flow_status = %flow.status(),
+                        "Skipped flow scheduling as no longer relevant"
+                    );
+                }
+
                 Ok(())
             });
         }
@@ -472,14 +482,6 @@ impl FlowExecutorTestDriver for FlowExecutorImpl {
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-        let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-
-        outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                FlowProgressMessage::cancelled(self.time_source.now(), flow_id),
-            )
-            .await?;
 
         let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
             .await
@@ -511,7 +513,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
         target_catalog: &Catalog,
         message: &TaskProgressMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(received_message=?message, "Received task progress message");
+        tracing::debug!(received_message = ?message, "Received task progress message");
 
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
 
@@ -523,17 +525,26 @@ impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
                     let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
                         .await
                         .int_err()?;
-                    flow.on_task_running(message.event_time, message.task_id)
-                        .int_err()?;
-                    flow.save(flow_event_store.as_ref()).await.int_err()?;
+                    if flow.status() != FlowStatus::Finished {
+                        flow.on_task_running(message.event_time, message.task_id)
+                            .int_err()?;
+                        flow.save(flow_event_store.as_ref()).await.int_err()?;
 
-                    let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-                    outbox
-                        .post_message(
-                            MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                            FlowProgressMessage::running(message.event_time, flow_id),
-                        )
-                        .await?;
+                        let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
+                        outbox
+                            .post_message(
+                                MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                                FlowProgressMessage::running(message.event_time, flow_id),
+                            )
+                            .await?;
+                    } else {
+                        tracing::info!(
+                            flow_id = %flow.flow_id,
+                            flow_status = %flow.status(),
+                            task_id = %message.task_id,
+                            "Flow ignores notification about running task as no longer relevant"
+                        );
+                    }
                 }
             }
             TaskProgressMessage::Finished(message) => {
@@ -543,60 +554,69 @@ impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
                     let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
                         .await
                         .int_err()?;
-                    flow.on_task_finished(
-                        message.event_time,
-                        message.task_id,
-                        message.outcome.clone(),
-                    )
-                    .int_err()?;
-                    flow.save(flow_event_store.as_ref()).await.int_err()?;
+                    if flow.status() != FlowStatus::Finished {
+                        flow.on_task_finished(
+                            message.event_time,
+                            message.task_id,
+                            message.outcome.clone(),
+                        )
+                        .int_err()?;
+                        flow.save(flow_event_store.as_ref()).await.int_err()?;
 
-                    let enqueue_helper = target_catalog.get_one::<FlowEnqueueHelper>().unwrap();
+                        let enqueue_helper = target_catalog.get_one::<FlowEnqueueHelper>().unwrap();
 
-                    let finish_time = self.executor_config.round_time(message.event_time)?;
+                        let finish_time = self.executor_config.round_time(message.event_time)?;
 
-                    // In case of success:
-                    //  - execute followup method
-                    if let Some(flow_result) = flow.try_result_as_ref()
-                        && !flow_result.is_empty()
-                    {
-                        match flow.flow_key.get_type().success_followup_method() {
-                            FlowSuccessFollowupMethod::Ignore => {}
-                            FlowSuccessFollowupMethod::TriggerDependent => {
-                                enqueue_helper
-                                    .enqueue_dependent_flows(finish_time, &flow, flow_result)
-                                    .await?;
+                        // In case of success:
+                        //  - execute followup method
+                        if let Some(flow_result) = flow.try_result_as_ref()
+                            && !flow_result.is_empty()
+                        {
+                            match flow.flow_key.get_type().success_followup_method() {
+                                FlowSuccessFollowupMethod::Ignore => {}
+                                FlowSuccessFollowupMethod::TriggerDependent => {
+                                    enqueue_helper
+                                        .enqueue_dependent_flows(finish_time, &flow, flow_result)
+                                        .await?;
+                                }
                             }
                         }
-                    }
 
-                    // In case of success:
-                    //  - enqueue next auto-polling flow cycle
-                    if message.outcome.is_success() {
-                        enqueue_helper
-                            .try_enqueue_scheduled_auto_polling_flow_if_enabled(
-                                finish_time,
-                                &flow.flow_key,
+                        // In case of success:
+                        //  - enqueue next auto-polling flow cycle
+                        if message.outcome.is_success() {
+                            enqueue_helper
+                                .try_enqueue_scheduled_auto_polling_flow_if_enabled(
+                                    finish_time,
+                                    &flow.flow_key,
+                                )
+                                .await?;
+                        }
+
+                        let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
+                        outbox
+                            .post_message(
+                                MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                                FlowProgressMessage::finished(
+                                    message.event_time,
+                                    flow_id,
+                                    flow.outcome
+                                        .as_ref()
+                                        .expect("Outcome must be attached by now")
+                                        .clone(),
+                                ),
                             )
                             .await?;
+
+                        // TODO: retry logic in case of failed outcome
+                    } else {
+                        tracing::info!(
+                            flow_id = %flow.flow_id,
+                            flow_status = %flow.status(),
+                            task_id = %message.task_id,
+                            "Flow ignores notification about finished task as no longer relevant"
+                        );
                     }
-
-                    let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-                    outbox
-                        .post_message(
-                            MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                            FlowProgressMessage::finished(
-                                message.event_time,
-                                flow_id,
-                                flow.outcome
-                                    .as_ref()
-                                    .expect("Outcome must be attached by now")
-                                    .clone(),
-                            ),
-                        )
-                        .await?;
-
-                    // TODO: retry logic in case of failed outcome
                 }
             }
         }
@@ -619,26 +639,14 @@ impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
         target_catalog: &Catalog,
         message: &FlowConfigurationUpdatedMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(received_message=?message, "Received flow configuration message");
+        tracing::debug!(received_message = ?message, "Received flow configuration message");
 
         if message.paused {
             let maybe_pending_flow_id = {
                 let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-                let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-
-                let maybe_pending_flow_id = flow_event_store
+                flow_event_store
                     .try_get_pending_flow(&message.flow_key)
-                    .await?;
-
-                if let Some(flow_id) = &maybe_pending_flow_id {
-                    outbox
-                        .post_message(
-                            MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                            FlowProgressMessage::cancelled(self.time_source.now(), *flow_id),
-                        )
-                        .await?;
-                }
-                maybe_pending_flow_id
+                    .await?
             };
 
             if let Some(flow_id) = maybe_pending_flow_id {
@@ -674,7 +682,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowExecutorImpl {
         target_catalog: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(received_message=?message, "Received dataset lifecycle message");
+        tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
 
         match message {
             DatasetLifecycleMessage::Deleted(message) => {
@@ -700,36 +708,11 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowExecutorImpl {
                     flow_ids_2_abort
                 };
 
-                let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-                let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-
                 // Abort matched flows
                 for flow_id in flow_ids_2_abort {
-                    let now = self.time_source.now();
-
-                    let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
-                        .await
-                        .int_err()?;
-                    flow.abort(now).int_err()?;
-                    flow.save(flow_event_store.as_ref()).await.int_err()?;
-
-                    outbox
-                        .post_message(
-                            MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                            FlowProgressMessage::cancelled(now, flow_id),
-                        )
-                        .await?;
+                    let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();
+                    abort_helper.abort_flow(flow_id).await?;
                 }
-
-                // Not deleting task->update association, it should be safe.
-                // Most of the time the outcome of the task will be "Cancelled".
-                // Even if task squeezes to succeed in between cancellations,
-                // it's safe:
-                //   - we will record a successful update, no consequence
-                //   - no further updates will be attempted (schedule
-                //     deactivated above)
-                //   - no dependent tasks will be launched (dependency graph
-                //     erases neighbors)
             }
 
             DatasetLifecycleMessage::Created(_)

@@ -64,7 +64,7 @@ impl ProducerConsumptionJob {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(
-        producer_name=%self.producer_name
+        producer_name = %self.producer_name
     ))]
     pub(crate) async fn run_consumption_task(
         &self,
@@ -167,7 +167,11 @@ impl ProducerConsumptionJob {
         consumer_name: &str,
         message: &OutboxMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(consumer_name=%consumer_name, received_message=?message, "Invoking consumer");
+        tracing::debug!(
+            consumer_name = %consumer_name,
+            received_message = ?message,
+            "Invoking consumer"
+        );
 
         let dispatcher = self
             .routes_static_info

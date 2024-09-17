@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE flows\n                SET flow_status = $2, last_event_id = $3\n                WHERE flow_id = $1 AND (\n                    last_event_id IS NULL AND CAST($4 as INT8) IS NULL OR\n                    last_event_id IS NOT NULL AND CAST($4 as INT8) IS NOT NULL AND last_event_id = $4\n                )\n                RETURNING flow_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "flow_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c7b1895e06e6920f7868b251c0e92e604e9881d2c02cce177a7e03945c334018"
+}

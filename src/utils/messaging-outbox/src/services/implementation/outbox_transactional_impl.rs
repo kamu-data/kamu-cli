@@ -43,7 +43,7 @@ impl Outbox for OutboxTransactionalImpl {
         producer_name: &str,
         content_json: &serde_json::Value,
     ) -> Result<(), InternalError> {
-        tracing::debug!(content_json=%content_json, "Saving outbox message into database");
+        tracing::debug!(content_json = %content_json, "Saving outbox message into database");
 
         let new_outbox_message = NewOutboxMessage {
             content_json: content_json.clone(),

@@ -7,84 +7,97 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::SqliteTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_task_system_inmem::InMemoryTaskEventStore;
+use kamu_task_system_sqlite::SqliteTaskSystemEventStore;
+use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_task_system_repo_tests::test_event_store_empty,
-    harness = InMemoryTaskSystemEventStoreHarness
+    harness = SqliteTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_task_system_repo_tests::test_event_store_get_streams,
-    harness = InMemoryTaskSystemEventStoreHarness
+    harness = SqliteTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_task_system_repo_tests::test_event_store_get_events_with_windowing,
-    harness = InMemoryTaskSystemEventStoreHarness
+    harness = SqliteTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_task_system_repo_tests::test_event_store_get_events_by_tasks,
-    harness = InMemoryTaskSystemEventStoreHarness
+    harness = SqliteTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_task_system_repo_tests::test_event_store_get_dataset_tasks,
-    harness = InMemoryTaskSystemEventStoreHarness
+    harness = SqliteTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_task_system_repo_tests::test_event_store_try_get_queued_single_task,
-    harness = InMemoryTaskSystemEventStoreHarness
+    harness = SqliteTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_task_system_repo_tests::test_event_store_try_get_queued_multiple_tasks,
-    harness = InMemoryTaskSystemEventStoreHarness
+    harness = SqliteTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_task_system_repo_tests::test_event_store_get_running_tasks,
-    harness = InMemoryTaskSystemEventStoreHarness
+    harness = SqliteTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct InMemoryTaskSystemEventStoreHarness {
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_task_system_repo_tests::test_event_store_concurrent_modification,
+    harness = SqliteTaskSystemEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct SqliteTaskSystemEventStoreHarness {
     catalog: Catalog,
 }
 
-impl InMemoryTaskSystemEventStoreHarness {
-    pub fn new() -> Self {
+impl SqliteTaskSystemEventStoreHarness {
+    pub fn new(sqlite_pool: SqlitePool) -> Self {
+        // Initialize catalog with predefined SQLite pool
         let mut catalog_builder = CatalogBuilder::new();
-        catalog_builder.add::<InMemoryTaskEventStore>();
+        catalog_builder.add_value(sqlite_pool);
+        catalog_builder.add::<SqliteTransactionManager>();
+        catalog_builder.add::<SqliteTaskSystemEventStore>();
 
         Self {
             catalog: catalog_builder.build(),

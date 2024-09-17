@@ -66,7 +66,7 @@ impl FlowEnqueueHelper {
         flow_key: FlowKey,
         rule: FlowConfigurationRule,
     ) -> Result<(), InternalError> {
-        tracing::trace!(flow_key=?flow_key, rule=?rule, "Activating flow configuration");
+        tracing::trace!(flow_key = ?flow_key, rule = ?rule, "Activating flow configuration");
 
         match &flow_key {
             FlowKey::Dataset(_) => {
@@ -290,7 +290,7 @@ impl FlowEnqueueHelper {
         flow_key: &FlowKey,
         schedule: &Schedule,
     ) -> Result<FlowState, InternalError> {
-        tracing::trace!(flow_key=?flow_key, schedule=?schedule, "Enqueuing scheduled flow");
+        tracing::trace!(flow_key = ?flow_key, schedule = ?schedule, "Enqueuing scheduled flow");
 
         self.trigger_flow_common(
             flow_key,
@@ -640,7 +640,7 @@ impl FlowEnqueueHelper {
         trigger: FlowTrigger,
         config_snapshot: Option<FlowConfigurationSnapshot>,
     ) -> Result<Flow, InternalError> {
-        tracing::trace!(flow_key=?flow_key, trigger=?trigger, "Creating new flow");
+        tracing::trace!(flow_key = ?flow_key, trigger = ?trigger, "Creating new flow");
 
         let flow = Flow::new(
             self.time_source.now(),

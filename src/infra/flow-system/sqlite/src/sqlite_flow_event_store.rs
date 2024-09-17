@@ -52,75 +52,123 @@ impl SqliteFlowEventStore {
             .join(", ")
     }
 
-    async fn save_flow_updates_from_events(
+    async fn register_flow(
         &self,
         tr: &mut database_common::TransactionGuard<'_, Sqlite>,
-        events: &[FlowEvent],
-    ) -> Result<(), SaveEventsError> {
-        for event in events {
-            let event_flow_id: i64 = (event.flow_id()).try_into().unwrap();
+        e: &FlowEventInitiated,
+    ) -> Result<(), InternalError> {
+        let connection_mut = tr.connection_mut().await?;
 
-            if let FlowEvent::Initiated(e) = &event {
-                let connection_mut = tr.connection_mut().await?;
-                let initiator = e
-                    .trigger
-                    .initiator_account_id()
-                    .map_or_else(|| SYSTEM_INITIATOR.to_string(), ToString::to_string);
+        let initiator = e
+            .trigger
+            .initiator_account_id()
+            .map_or_else(|| SYSTEM_INITIATOR.to_string(), ToString::to_string);
 
-                match &e.flow_key {
-                    FlowKey::Dataset(fk_dataset) => {
-                        let dataset_id = fk_dataset.dataset_id.to_string();
-                        let dataset_flow_type = fk_dataset.flow_type;
+        let flow_id: i64 = e.flow_id.try_into().unwrap();
 
-                        sqlx::query!(
-                            r#"
-                            INSERT INTO flows (flow_id, dataset_id, dataset_flow_type, initiator, flow_status)
-                                VALUES ($1, $2, $3, $4, $5)
-                            "#,
-                            event_flow_id,
-                            dataset_id,
-                            dataset_flow_type,
-                            initiator,
-                            FlowStatus::Waiting,
-                        )
-                        .execute(connection_mut)
-                        .await
-                        .map_err(|e| SaveEventsError::Internal(e.int_err()))?;
-                    }
-                    FlowKey::System(fk_system) => {
-                        let system_flow_type = fk_system.flow_type;
-                        sqlx::query!(
-                            r#"
-                            INSERT INTO flows (flow_id, system_flow_type, initiator, flow_status)
-                                VALUES ($1, $2, $3, $4)
-                            "#,
-                            event_flow_id,
-                            system_flow_type,
-                            initiator,
-                            FlowStatus::Waiting as FlowStatus,
-                        )
-                        .execute(connection_mut)
-                        .await
-                        .map_err(|e| SaveEventsError::Internal(e.int_err()))?;
-                    }
-                }
+        match &e.flow_key {
+            FlowKey::Dataset(fk_dataset) => {
+                let dataset_id = fk_dataset.dataset_id.to_string();
+                let dataset_flow_type = fk_dataset.flow_type;
+
+                sqlx::query!(
+                r#"
+                INSERT INTO flows (flow_id, dataset_id, dataset_flow_type, initiator, flow_status, last_event_id)
+                    VALUES ($1, $2, $3, $4, 'waiting', NULL)
+                "#,
+                flow_id,
+                dataset_id,
+                dataset_flow_type,
+                initiator,
+            )
+                .execute(connection_mut)
+                .await
+                .map_err(ErrorIntoInternal::int_err)?;
             }
-            /* Existing flow must have been indexed, update status */
-            else if let Some(new_status) = event.new_status() {
-                let connection_mut = tr.connection_mut().await?;
+            FlowKey::System(fk_system) => {
+                let system_flow_type = fk_system.flow_type;
+
                 sqlx::query!(
                     r#"
-                    UPDATE flows
-                        SET flow_status = $2
-                        WHERE flow_id = $1
-                    "#,
-                    event_flow_id,
-                    new_status,
+                INSERT INTO flows (flow_id, system_flow_type, initiator, flow_status, last_event_id)
+                    VALUES ($1, $2, $3, 'waiting', NULL)
+                "#,
+                    flow_id,
+                    system_flow_type,
+                    initiator,
                 )
                 .execute(connection_mut)
                 .await
-                .map_err(|e| SaveEventsError::Internal(e.int_err()))?;
+                .map_err(ErrorIntoInternal::int_err)?;
             }
+        }
+
+        Ok(())
+    }
+
+    async fn update_flow_from_events(
+        &self,
+        tr: &mut database_common::TransactionGuard<'_, Sqlite>,
+        flow_id: FlowID,
+        events: &[FlowEvent],
+        maybe_prev_stored_event_id: Option<EventID>,
+        last_event_id: EventID,
+    ) -> Result<(), SaveEventsError> {
+        let flow_id: i64 = flow_id.try_into().unwrap();
+        let last_event_id: i64 = last_event_id.into();
+        let maybe_prev_stored_event_id: Option<i64> = maybe_prev_stored_event_id.map(Into::into);
+
+        // Determine if we have a status change between these events
+        let mut maybe_latest_status = None;
+        for event in events {
+            if let Some(new_status) = event.new_status() {
+                maybe_latest_status = Some(new_status);
+            }
+        }
+
+        // We either have determined the lateststatus, or should read the previous
+        let latest_status = if let Some(latest_status) = maybe_latest_status {
+            latest_status
+        } else {
+            // Find out current flow status recorded
+            let connection_mut = tr.connection_mut().await?;
+            sqlx::query!(
+                r#"
+                SELECT flow_status as "flow_status: FlowStatus" FROM flows
+                WHERE flow_id = $1
+                "#,
+                flow_id
+            )
+            .fetch_one(connection_mut)
+            .await
+            .map_err(|e| SaveEventsError::Internal(e.int_err()))?
+            .flow_status
+        };
+
+        let connection_mut = tr.connection_mut().await?;
+        let rows = sqlx::query!(
+            r#"
+            UPDATE flows
+                SET flow_status = $2, last_event_id = $3
+                WHERE flow_id = $1 AND (
+                    last_event_id IS NULL AND CAST($4 as INT8) IS NULL OR
+                    last_event_id IS NOT NULL AND CAST($4 as INT8) IS NOT NULL AND last_event_id = $4
+                )
+                RETURNING flow_id
+            "#,
+            flow_id,
+            latest_status,
+            last_event_id,
+            maybe_prev_stored_event_id,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .map_err(|e| SaveEventsError::Internal(e.int_err()))?;
+
+        // If a previously stored event id does not match the expected,
+        // this means we've just detected a concurrent modification (version conflict)
+        if rows.len() != 1 {
+            return Err(SaveEventsError::concurrent_modification());
         }
 
         Ok(())
@@ -216,17 +264,45 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
 
     async fn save_events(
         &self,
-        _flow_id: &FlowID,
+        flow_id: &FlowID,
+        maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<FlowEvent>,
     ) -> Result<EventID, SaveEventsError> {
+        // If there is nothing to save, exit quickly
         if events.is_empty() {
             return Err(SaveEventsError::NothingToSave);
         }
 
         let mut tr = self.transaction.lock().await;
 
-        self.save_flow_updates_from_events(&mut tr, &events).await?;
+        // For the newly created flow, make sure it's registered before events
+        let first_event = events.first().expect("Non empty event list expected");
+        if let FlowEvent::Initiated(e) = first_event {
+            assert_eq!(flow_id, &e.flow_id);
+
+            // When creating a flow, there is no way something was already stored
+            if maybe_prev_stored_event_id.is_some() {
+                return Err(SaveEventsError::concurrent_modification());
+            }
+
+            // Make registration
+            self.register_flow(&mut tr, e)
+                .await
+                .map_err(SaveEventsError::Internal)?;
+        }
+
+        // Save events one by one
         let last_event_id = self.save_events_impl(&mut tr, &events).await?;
+
+        // Update denormalized flow record: latest status and stored event
+        self.update_flow_from_events(
+            &mut tr,
+            *flow_id,
+            &events,
+            maybe_prev_stored_event_id,
+            last_event_id,
+        )
+        .await?;
 
         Ok(last_event_id)
     }

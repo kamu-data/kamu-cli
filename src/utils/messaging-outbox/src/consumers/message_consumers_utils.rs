@@ -30,7 +30,7 @@ pub async fn consume_deserialized_message<'a, TMessage: Message + 'static>(
     consumer_filter: ConsumerFilter<'a>,
     content_json: &str,
 ) -> Result<(), InternalError> {
-    tracing::debug!(content_json=%content_json, "Consuming outbox message");
+    tracing::debug!(content_json = %content_json, "Consuming outbox message");
 
     let message = serde_json::from_str::<TMessage>(content_json).int_err()?;
 

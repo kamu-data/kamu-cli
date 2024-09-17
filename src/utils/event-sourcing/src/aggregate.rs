@@ -33,7 +33,7 @@ where
     query: Proj::Query,
     state: Option<Proj>, // Safe to unwrap everywhere - will only be None if Proj::apply() panics
     pending_events: DropEmptyVec<Proj::Event>,
-    last_stored_event: Option<EventID>,
+    last_stored_event_id: Option<EventID>,
     _store: PhantomData<Store>,
 }
 
@@ -51,7 +51,7 @@ where
             query,
             state: Some(Proj::apply(None, genesis_event.clone())?),
             pending_events: vec![genesis_event].into(),
-            last_stored_event: None,
+            last_stored_event_id: None,
             _store: PhantomData,
         })
     }
@@ -66,7 +66,7 @@ where
             query,
             state: Some(Proj::apply(None, event)?),
             pending_events: DropEmptyVec::new(),
-            last_stored_event: Some(event_id),
+            last_stored_event_id: Some(event_id),
             _store: PhantomData,
         })
     }
@@ -77,7 +77,7 @@ where
             query,
             state: Some(state),
             pending_events: DropEmptyVec::new(),
-            last_stored_event: Some(event_id),
+            last_stored_event_id: Some(event_id),
             _store: PhantomData,
         }
     }
@@ -89,8 +89,8 @@ where
 
     /// Returns the last event ID in an event store to which this aggregate was
     /// synchronized
-    pub fn last_stored_event(&self) -> Option<&EventID> {
-        self.last_stored_event.as_ref()
+    pub fn last_stored_event_id(&self) -> Option<&EventID> {
+        self.last_stored_event_id.as_ref()
     }
 
     /// Initializes an aggregate from event history
@@ -158,7 +158,7 @@ where
 
         tracing::debug!(
             num_events,
-            last_stored_event = %agg.last_stored_event.unwrap(),
+            last_stored_event_id = %agg.last_stored_event_id.unwrap(),
             "Loaded aggregate",
         );
 
@@ -193,12 +193,12 @@ where
 
         assert!(!self.has_updates());
 
-        let prev_stored_event = self.last_stored_event;
+        let prev_stored_event_id = self.last_stored_event_id;
 
         let mut event_stream = event_store.get_events(
             &self.query,
             GetEventsOpts {
-                from: prev_stored_event,
+                from: prev_stored_event_id,
                 to: opts.as_of_event,
             },
         );
@@ -213,8 +213,8 @@ where
 
         tracing::debug!(
             num_events,
-            prev_stored_event = %prev_stored_event.unwrap(),
-            last_stored_event = %self.last_stored_event.unwrap(),
+            prev_stored_event_id = %prev_stored_event_id.unwrap(),
+            last_stored_event_id = %self.last_stored_event_id.unwrap(),
             "Updated aggregate",
         );
 
@@ -240,15 +240,17 @@ where
 
         if !events.is_empty() {
             let num_events = events.len();
-            let prev_stored_event = self.last_stored_event;
+            let prev_stored_event_id = self.last_stored_event_id;
 
-            let last_stored_event = event_store.save_events(&self.query, events).await?;
-            self.last_stored_event = Some(last_stored_event);
+            let last_stored_event_id = event_store
+                .save_events(&self.query, prev_stored_event_id, events)
+                .await?;
+            self.last_stored_event_id = Some(last_stored_event_id);
 
             tracing::debug!(
                 num_events,
-                ?prev_stored_event,
-                %last_stored_event,
+                ?prev_stored_event_id,
+                %last_stored_event_id,
                 "Saved aggregate",
             );
         }
@@ -278,11 +280,11 @@ where
         event_id: EventID,
         event: Proj::Event,
     ) -> Result<(), ProjectionError<Proj>> {
-        if let Some(last_stored_event) = self.last_stored_event {
+        if let Some(last_stored_event_id) = self.last_stored_event_id {
             assert!(
-                last_stored_event < event_id,
+                last_stored_event_id < event_id,
                 "Attempting to mutate with event {event_id} while state is already synced to \
-                 {last_stored_event}",
+                 {last_stored_event_id}",
             );
         }
 
@@ -298,7 +300,7 @@ where
             }
         }?;
 
-        self.last_stored_event = Some(event_id);
+        self.last_stored_event_id = Some(event_id);
         Ok(())
     }
 
@@ -323,7 +325,7 @@ where
             .field("query", &self.query)
             .field("state", self.state.as_ref().unwrap())
             .field("pending_events", &self.pending_events)
-            .field("last_stored_event", &self.last_stored_event)
+            .field("last_stored_event_id", &self.last_stored_event_id)
             .finish()
     }
 }
@@ -411,7 +413,9 @@ impl<Proj: Projection, Err: Into<ProjectionError<Proj>>> From<Err> for UpdateErr
 
 #[derive(thiserror::Error, Debug)]
 pub enum SaveError {
-    // TODO: Concurrency
+    #[error(transparent)]
+    ConcurrentModification(ConcurrentModificationError),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
@@ -420,6 +424,7 @@ impl From<SaveEventsError> for SaveError {
     fn from(value: SaveEventsError) -> Self {
         match value {
             e @ SaveEventsError::NothingToSave => SaveError::Internal(e.int_err()),
+            SaveEventsError::ConcurrentModification(err) => Self::ConcurrentModification(err),
             SaveEventsError::Internal(err) => Self::Internal(err),
         }
     }

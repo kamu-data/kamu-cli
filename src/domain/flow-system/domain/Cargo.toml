@@ -38,6 +38,7 @@ cron = { version = "0.12", default-features = false }
 dill = { version = "0.9" }
 lazy_static = { version = "1" }
 sqlx = { version = "0.8", default-features = false, features = ["macros"] }
+strum = { version = "0.26", features = ["derive"] }
 thiserror = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }

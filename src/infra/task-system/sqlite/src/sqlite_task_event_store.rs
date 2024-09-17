@@ -29,48 +29,76 @@ impl SqliteTaskSystemEventStore {
             transaction: transaction.into(),
         }
     }
-    async fn save_task_updates_from_events(
+
+    async fn register_task(
+        &self,
+        tr: &mut database_common::TransactionGuard<'_, Sqlite>,
+        task_id: TaskID,
+        logical_plan: &LogicalPlan,
+    ) -> Result<(), InternalError> {
+        let connection_mut = tr.connection_mut().await?;
+
+        let task_id: i64 = task_id.try_into().unwrap();
+        let maybe_dataset_id = logical_plan.dataset_id().map(ToString::to_string);
+
+        sqlx::query!(
+            r#"
+            INSERT INTO tasks (task_id, dataset_id, task_status, last_event_id)
+                VALUES ($1, $2, 'queued', NULL)
+            "#,
+            task_id,
+            maybe_dataset_id,
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(())
+    }
+
+    async fn update_task_from_events(
         &self,
         tr: &mut database_common::TransactionGuard<'_, Sqlite>,
         events: &[TaskEvent],
+        maybe_prev_stored_event_id: Option<EventID>,
+        last_event_id: EventID,
     ) -> Result<(), SaveEventsError> {
-        for event in events {
-            let connection_mut = tr.connection_mut().await?;
+        let connection_mut = tr.connection_mut().await?;
 
-            let event_task_id: i64 = (event.task_id()).try_into().unwrap();
+        let last_event_id: i64 = last_event_id.into();
+        let maybe_prev_stored_event_id: Option<i64> = maybe_prev_stored_event_id.map(Into::into);
 
-            if let TaskEvent::TaskCreated(e) = &event {
-                let maybe_dataset_id = e.logical_plan.dataset_id().map(ToString::to_string);
-                sqlx::query!(
-                    r#"
-                    INSERT INTO tasks (task_id, dataset_id, task_status)
-                        VALUES ($1, $2, $3)
-                    "#,
-                    event_task_id,
-                    maybe_dataset_id,
-                    TaskStatus::Queued,
-                )
-                .execute(connection_mut)
-                .await
-                .map_err(|e| SaveEventsError::Internal(e.int_err()))?;
-            }
-            /* Existing task, update status */
-            else {
-                let new_status = event.new_status();
+        let last_event = events.last().expect("Non empty event list expected");
 
-                sqlx::query!(
-                    r#"
-                    UPDATE tasks
-                        SET task_status = $2
-                        WHERE task_id = $1
-                    "#,
-                    event_task_id,
-                    new_status,
-                )
-                .execute(connection_mut)
-                .await
-                .map_err(|e| SaveEventsError::Internal(e.int_err()))?;
-            }
+        let event_task_id: i64 = (last_event.task_id()).try_into().unwrap();
+        let latest_status = last_event.new_status();
+
+        let affected_rows_count =
+            sqlx::query!(
+                r#"
+                UPDATE tasks
+                    SET task_status = $2, last_event_id = $3
+                    WHERE task_id = $1 AND (
+                        last_event_id IS NULL AND CAST($4 as INT8) IS NULL OR
+                        last_event_id IS NOT NULL AND CAST($4 as INT8) IS NOT NULL AND last_event_id = $4
+                    )
+                    RETURNING task_id
+                "#,
+                event_task_id,
+                latest_status,
+                last_event_id,
+                maybe_prev_stored_event_id,
+            )
+            .fetch_all(connection_mut)
+            .await
+            .map_err(|e| SaveEventsError::Internal(e.int_err()))?
+            .len()
+        ;
+
+        // If a previously stored event id does not match the expected,
+        // this means we've just detected a concurrent modification (version conflict)
+        if affected_rows_count != 1 {
+            return Err(SaveEventsError::concurrent_modification());
         }
 
         Ok(())
@@ -167,17 +195,39 @@ impl EventStore<TaskState> for SqliteTaskSystemEventStore {
 
     async fn save_events(
         &self,
-        _task_id: &TaskID,
+        task_id: &TaskID,
+        maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<TaskEvent>,
     ) -> Result<EventID, SaveEventsError> {
+        // If there is nothing to save, exit quickly
         if events.is_empty() {
             return Err(SaveEventsError::NothingToSave);
         }
 
         let mut tr = self.transaction.lock().await;
 
-        self.save_task_updates_from_events(&mut tr, &events).await?;
+        // For the newly created task, make sure it's registered before events
+        let first_event = events.first().expect("Non empty event list expected");
+        if let TaskEvent::TaskCreated(e) = first_event {
+            assert_eq!(task_id, &e.task_id);
+
+            // When creating a task, there is no way something was already stored
+            if maybe_prev_stored_event_id.is_some() {
+                return Err(SaveEventsError::concurrent_modification());
+            }
+
+            // Make registration
+            self.register_task(&mut tr, *task_id, &e.logical_plan)
+                .await
+                .map_err(SaveEventsError::Internal)?;
+        }
+
+        // Save events one by one
         let last_event_id = self.save_events_impl(&mut tr, &events).await?;
+
+        // Update denormalized task record: latest status and stored event
+        self.update_task_from_events(&mut tr, &events, maybe_prev_stored_event_id, last_event_id)
+            .await?;
 
         Ok(last_event_id)
     }

@@ -45,7 +45,7 @@ impl TaskScheduler for TaskSchedulerImpl {
         logical_plan: LogicalPlan,
         metadata: Option<TaskMetadata>,
     ) -> Result<TaskState, CreateTaskError> {
-        tracing::info!(logical_plan=?logical_plan, "Creating task");
+        tracing::info!(logical_plan = ?logical_plan, "Creating task");
 
         let mut task = Task::new(
             self.time_source.now(),

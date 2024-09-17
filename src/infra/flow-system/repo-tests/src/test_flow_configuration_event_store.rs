@@ -75,6 +75,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     event_store
         .save_events(
             &flow_key_1,
+            None,
             vec![event_1_1.clone().into(), event_1_2.clone().into()],
         )
         .await
@@ -97,7 +98,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     };
 
     event_store
-        .save_events(&flow_key_2, vec![event_2.clone().into()])
+        .save_events(&flow_key_2, None, vec![event_2.clone().into()])
         .await
         .unwrap();
 
@@ -116,7 +117,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     };
 
     event_store
-        .save_events(&flow_key_3, vec![event_3.clone().into()])
+        .save_events(&flow_key_3, None, vec![event_3.clone().into()])
         .await
         .unwrap();
 
@@ -206,6 +207,7 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     let latest_event_id = event_store
         .save_events(
             &flow_key,
+            None,
             vec![
                 event_1.clone().into(),
                 event_2.clone().into(),

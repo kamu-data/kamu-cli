@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
+
 use chrono::Utc;
 use database_common::PaginationOpts;
 use dill::Catalog;
@@ -84,13 +86,15 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     event_store
         .save_events(
-            &task_id_1, // Cheating a bit,
-            vec![
-                event_1.clone().into(),
-                event_2.clone().into(),
-                event_3.clone().into(),
-            ],
+            &task_id_1,
+            None,
+            vec![event_1.clone().into(), event_3.clone().into()],
         )
+        .await
+        .unwrap();
+
+    event_store
+        .save_events(&task_id_2, None, vec![event_2.clone().into()])
         .await
         .unwrap();
 
@@ -155,6 +159,7 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     let latest_event_id = event_store
         .save_events(
             &task_id,
+            None,
             vec![
                 event_1.clone().into(),
                 event_2.clone().into(),
@@ -274,6 +279,7 @@ pub async fn test_event_store_get_events_by_tasks(catalog: &Catalog) {
     event_store
         .save_events(
             &task_id_1,
+            None,
             vec![
                 event_1_1.clone().into(),
                 event_1_2.clone().into(),
@@ -289,6 +295,7 @@ pub async fn test_event_store_get_events_by_tasks(catalog: &Catalog) {
     event_store
         .save_events(
             &task_id_2,
+            None,
             vec![
                 event_2_1.clone().into(),
                 event_2_2.clone().into(),
@@ -384,7 +391,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     };
 
     event_store
-        .save_events(&task_id_1_1, vec![event_1_1.clone().into()])
+        .save_events(&task_id_1_1, None, vec![event_1_1.clone().into()])
         .await
         .unwrap();
 
@@ -392,7 +399,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     assert_eq!(1, num_events);
 
     event_store
-        .save_events(&task_id_1_2, vec![event_1_2.clone().into()])
+        .save_events(&task_id_1_2, None, vec![event_1_2.clone().into()])
         .await
         .unwrap();
 
@@ -400,7 +407,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     assert_eq!(2, num_events);
 
     event_store
-        .save_events(&task_id_2_1, vec![event_2_1.clone().into()])
+        .save_events(&task_id_2_1, None, vec![event_2_1.clone().into()])
         .await
         .unwrap();
 
@@ -408,7 +415,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     assert_eq!(3, num_events);
 
     event_store
-        .save_events(&task_id_2_2, vec![event_2_2.clone().into()])
+        .save_events(&task_id_2_2, None, vec![event_2_2.clone().into()])
         .await
         .unwrap();
 
@@ -509,9 +516,10 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
 
     // Schedule a task
     let task_id_1 = event_store.new_task_id().await.unwrap();
-    event_store
+    let last_event_id = event_store
         .save_events(
             &task_id_1,
+            None,
             vec![TaskEventCreated {
                 event_time: Utc::now(),
                 task_id: task_id_1,
@@ -528,9 +536,10 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
     assert_eq!(maybe_task_id, Some(task_id_1));
 
     // Mark the task as running
-    event_store
+    let last_event_id = event_store
         .save_events(
             &task_id_1,
+            Some(last_event_id),
             vec![TaskEventRunning {
                 event_time: Utc::now(),
                 task_id: task_id_1,
@@ -545,9 +554,10 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
     assert!(maybe_task_id.is_none());
 
     // Requeue the task (server restarted)
-    event_store
+    let last_event_id = event_store
         .save_events(
             &task_id_1,
+            Some(last_event_id),
             vec![TaskEventRequeued {
                 event_time: Utc::now(),
                 task_id: task_id_1,
@@ -565,6 +575,7 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
     event_store
         .save_events(
             &task_id_1,
+            Some(last_event_id),
             vec![
                 TaskEventRunning {
                     event_time: Utc::now(),
@@ -593,12 +604,14 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn TaskEventStore>().unwrap();
 
     // Schedule a few tasks
-    let mut task_ids: Vec<_> = Vec::new();
+    let mut task_ids = Vec::new();
+    let mut last_event_ids = Vec::new();
     for _ in 0..3 {
         let task_id = event_store.new_task_id().await.unwrap();
-        event_store
+        let last_event_id = event_store
             .save_events(
                 &task_id,
+                None,
                 vec![TaskEventCreated {
                     event_time: Utc::now(),
                     task_id,
@@ -611,6 +624,7 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
             .unwrap();
 
         task_ids.push(task_id);
+        last_event_ids.push(last_event_id);
     }
 
     // We should see the earliest registered task
@@ -618,9 +632,10 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
     assert_eq!(maybe_task_id, Some(task_ids[0]));
 
     // Mark task 0 as running
-    event_store
+    last_event_ids[0] = event_store
         .save_events(
             &task_ids[0],
+            Some(last_event_ids[0]),
             vec![TaskEventRunning {
                 event_time: Utc::now(),
                 task_id: task_ids[0],
@@ -635,9 +650,10 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
     assert_eq!(maybe_task_id, Some(task_ids[1]));
 
     // Mark task 1 as running, then finished
-    event_store
+    last_event_ids[1] = event_store
         .save_events(
             &task_ids[1],
+            Some(last_event_ids[1]),
             vec![
                 TaskEventRunning {
                     event_time: Utc::now(),
@@ -660,9 +676,10 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
     assert_eq!(maybe_task_id, Some(task_ids[2]));
 
     // Task 0 got requeued
-    event_store
+    last_event_ids[0] = event_store
         .save_events(
             &task_ids[0],
+            Some(last_event_ids[0]),
             vec![TaskEventRequeued {
                 event_time: Utc::now(),
                 task_id: task_ids[0],
@@ -677,9 +694,10 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
     assert_eq!(maybe_task_id, Some(task_ids[0]));
 
     // Mark task 0 as running, then finished
-    event_store
+    last_event_ids[0] = event_store
         .save_events(
             &task_ids[0],
+            Some(last_event_ids[0]),
             vec![
                 TaskEventRunning {
                     event_time: Utc::now(),
@@ -702,9 +720,10 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
     assert_eq!(maybe_task_id, Some(task_ids[2]));
 
     // Mark task 2 as running
-    event_store
+    last_event_ids[2] = event_store
         .save_events(
             &task_ids[2],
+            Some(last_event_ids[2]),
             vec![TaskEventRunning {
                 event_time: Utc::now(),
                 task_id: task_ids[2],
@@ -740,12 +759,14 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
     assert!(running_task_ids.is_empty());
 
     // Schedule a few tasks
-    let mut task_ids: Vec<_> = Vec::new();
+    let mut task_ids = Vec::new();
+    let mut last_event_ids = Vec::new();
     for _ in 0..3 {
         let task_id = event_store.new_task_id().await.unwrap();
-        event_store
+        let last_event_id = event_store
             .save_events(
                 &task_id,
+                None,
                 vec![TaskEventCreated {
                     event_time: Utc::now(),
                     task_id,
@@ -758,6 +779,7 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
             .unwrap();
 
         task_ids.push(task_id);
+        last_event_ids.push(last_event_id);
     }
 
     // Still no running tasks
@@ -776,9 +798,10 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
     assert!(running_task_ids.is_empty());
 
     // Mark 2 of 3 tasks as running
-    event_store
+    last_event_ids[0] = event_store
         .save_events(
             &task_ids[0],
+            Some(last_event_ids[0]),
             vec![TaskEventRunning {
                 event_time: Utc::now(),
                 task_id: task_ids[0],
@@ -787,9 +810,10 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
         )
         .await
         .unwrap();
-    event_store
+    last_event_ids[1] = event_store
         .save_events(
             &task_ids[1],
+            Some(last_event_ids[1]),
             vec![TaskEventRunning {
                 event_time: Utc::now(),
                 task_id: task_ids[1],
@@ -847,9 +871,10 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
     assert_eq!(running_task_ids, vec![]);
 
     // Finish 2nd task only
-    event_store
+    last_event_ids[1] = event_store
         .save_events(
             &task_ids[1],
+            Some(last_event_ids[1]),
             vec![TaskEventFinished {
                 event_time: Utc::now(),
                 task_id: task_ids[1],
@@ -876,9 +901,10 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
     assert_eq!(running_task_ids, vec![task_ids[0]]);
 
     // Requeue 1st task
-    event_store
+    last_event_ids[0] = event_store
         .save_events(
             &task_ids[0],
+            Some(last_event_ids[0]),
             vec![TaskEventRequeued {
                 event_time: Utc::now(),
                 task_id: task_ids[0],
@@ -902,6 +928,88 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
         .await
         .unwrap();
     assert!(running_task_ids.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn TaskEventStore>().unwrap();
+
+    let task_id = event_store.new_task_id().await.unwrap();
+
+    // Nothing stored yet, but prev stored event id sent => CM
+    let res = event_store
+        .save_events(
+            &task_id,
+            Some(EventID::new(15)),
+            vec![TaskEventCreated {
+                event_time: Utc::now(),
+                task_id,
+                logical_plan: Probe::default().into(),
+                metadata: None,
+            }
+            .into()],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // Nothing stored yet, no storage expectation => OK
+    let res = event_store
+        .save_events(
+            &task_id,
+            None,
+            vec![TaskEventCreated {
+                event_time: Utc::now(),
+                task_id,
+                logical_plan: Probe::default().into(),
+                metadata: None,
+            }
+            .into()],
+        )
+        .await;
+    assert_matches!(res, Ok(_));
+
+    // Something stored, but no expectation => CM
+    let res = event_store
+        .save_events(
+            &task_id,
+            None,
+            vec![TaskEventRunning {
+                event_time: Utc::now(),
+                task_id,
+            }
+            .into()],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // Something stored, but expectation is wrong => CM
+    let res = event_store
+        .save_events(
+            &task_id,
+            Some(EventID::new(15)),
+            vec![TaskEventRunning {
+                event_time: Utc::now(),
+                task_id,
+            }
+            .into()],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // Something stored, and expectation is correct
+    let res = event_store
+        .save_events(
+            &task_id,
+            Some(EventID::new(1)),
+            vec![TaskEventRunning {
+                event_time: Utc::now(),
+                task_id,
+            }
+            .into()],
+        )
+        .await;
+    assert_matches!(res, Ok(_));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

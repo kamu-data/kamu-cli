@@ -7,89 +7,96 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::SqliteTransactionManager;
+use database_common::PostgresTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_task_system_sqlite::SqliteTaskSystemEventStore;
-use sqlx::SqlitePool;
+use kamu_task_system_postgres::PostgresTaskEventStore;
+use sqlx::PgPool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = postgres,
     fixture = kamu_task_system_repo_tests::test_event_store_empty,
-    harness = SqliteTaskSystemEventStoreHarness
+    harness = PostgresTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = postgres,
     fixture = kamu_task_system_repo_tests::test_event_store_get_streams,
-    harness = SqliteTaskSystemEventStoreHarness
+    harness = PostgresTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = postgres,
     fixture = kamu_task_system_repo_tests::test_event_store_get_events_with_windowing,
-    harness = SqliteTaskSystemEventStoreHarness
+    harness = PostgresTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = postgres,
     fixture = kamu_task_system_repo_tests::test_event_store_get_events_by_tasks,
-    harness = SqliteTaskSystemEventStoreHarness
+    harness = PostgresTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = postgres,
     fixture = kamu_task_system_repo_tests::test_event_store_get_dataset_tasks,
-    harness = SqliteTaskSystemEventStoreHarness
+    harness = PostgresTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = postgres,
     fixture = kamu_task_system_repo_tests::test_event_store_try_get_queued_single_task,
-    harness = SqliteTaskSystemEventStoreHarness
+    harness = PostgresTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = postgres,
     fixture = kamu_task_system_repo_tests::test_event_store_try_get_queued_multiple_tasks,
-    harness = SqliteTaskSystemEventStoreHarness
+    harness = PostgresTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = postgres,
     fixture = kamu_task_system_repo_tests::test_event_store_get_running_tasks,
-    harness = SqliteTaskSystemEventStoreHarness
+    harness = PostgresTaskSystemEventStoreHarness
+);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_task_system_repo_tests::test_event_store_concurrent_modification,
+    harness = PostgresTaskSystemEventStoreHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct SqliteTaskSystemEventStoreHarness {
+struct PostgresTaskSystemEventStoreHarness {
     catalog: Catalog,
 }
 
-impl SqliteTaskSystemEventStoreHarness {
-    pub fn new(sqlite_pool: SqlitePool) -> Self {
-        // Initialize catalog with predefined SQLite pool
+impl PostgresTaskSystemEventStoreHarness {
+    pub fn new(pg_pool: PgPool) -> Self {
+        // Initialize catalog with predefined Postgres pool
         let mut catalog_builder = CatalogBuilder::new();
-        catalog_builder.add_value(sqlite_pool);
-        catalog_builder.add::<SqliteTransactionManager>();
-        catalog_builder.add::<SqliteTaskSystemEventStore>();
+        catalog_builder.add_value(pg_pool);
+        catalog_builder.add::<PostgresTransactionManager>();
+        catalog_builder.add::<PostgresTaskEventStore>();
 
         Self {
             catalog: catalog_builder.build(),
