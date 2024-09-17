@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use super::{Multibase, MultibaseError};
+use crate::stack_string::StackString;
 
 /// Multibase-encoded signature
 #[derive(Debug, Clone)]
@@ -28,6 +29,18 @@ impl Signature {
             })?;
         }
         Ok(Self::from_bytes(&buf))
+    }
+
+    pub fn to_multibase_str(&self) -> StackString<{ ed25519_dalek::SIGNATURE_LENGTH * 2 }> {
+        Multibase::encode(&self.0.to_bytes(), Multibase::Base64Url)
+    }
+}
+
+// Have to implement this as Deref exposes `to_string` from the wrapped type
+// that produces incorrect value
+impl std::fmt::Display for Signature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_multibase_str())
     }
 }
 
@@ -53,11 +66,7 @@ impl std::ops::Deref for Signature {
 
 impl serde::Serialize for Signature {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let multibase = Multibase::encode::<{ ed25519_dalek::SIGNATURE_LENGTH * 2 }>(
-            &self.0.to_bytes(),
-            Multibase::Base64Url,
-        );
-        serializer.collect_str(&multibase)
+        serializer.collect_str(&self.to_multibase_str())
     }
 }
 

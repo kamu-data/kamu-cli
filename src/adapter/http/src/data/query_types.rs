@@ -19,8 +19,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use http_common::comma_separated::CommaSeparatedSet;
+use http_common::{ApiError, IntoApiError};
 use internal_error::*;
 use kamu::domain;
+use kamu_core::{DataFusionError, QueryError};
 use opendatafabric::{self as odf, Multihash};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -86,7 +88,7 @@ pub enum RequestBody {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Sanity limits
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RequestBodyV2 {
     /// Query string
@@ -105,8 +107,8 @@ pub struct RequestBodyV2 {
     pub include: BTreeSet<Include>,
 
     /// What representation to use for the schema
-    #[serde(default)]
-    pub schema_format: SchemaFormat,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schema_format: Option<SchemaFormat>,
 
     /// Optional information used to affix an alias to the specific
     /// [`odf::DatasetID`] and reproduce the query at a specific state in time
@@ -222,8 +224,7 @@ pub struct RequestParams {
     #[serde(default)]
     pub data_format: DataFormat,
 
-    #[serde(default)]
-    pub schema_format: SchemaFormat,
+    pub schema_format: Option<SchemaFormat>,
 
     // TODO: Remove after V2 transition
     #[serde(alias = "schema")]
@@ -259,7 +260,7 @@ impl From<RequestParams> for RequestBody {
             Self::V1(RequestBodyV1 {
                 query: v.query,
                 data_format: v.data_format,
-                schema_format: v.schema_format,
+                schema_format: v.schema_format.unwrap_or_default(),
                 include_schema: v.include_schema,
                 include_state: v.include_state,
                 skip: v.skip,
@@ -310,7 +311,7 @@ pub struct ResponseBodyV2Signed {
 
     /// Information about processing performed by other nodes as part of this
     /// operation
-    pub sub_queries: Vec<ResponseBodyV2Signed>,
+    pub sub_queries: Vec<SubQuery>,
 
     /// Succinct commitment
     pub commitment: Commitment,
@@ -321,6 +322,26 @@ pub struct ResponseBodyV2Signed {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Fragments
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Mirrors the structure of [`ResponseBodyV2Signed`] without the `outputs`
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SubQuery {
+    /// Inputs that can be used to fully reproduce the query
+    pub input: RequestBodyV2,
+
+    /// Information about processing performed by other nodes as part of this
+    /// operation
+    pub sub_queries: Vec<SubQuery>,
+
+    /// Succinct commitment
+    pub commitment: Commitment,
+
+    /// Signature block
+    pub proof: Proof,
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, serde::Serialize)]
@@ -341,8 +362,8 @@ pub struct Outputs {
     pub schema_format: Option<SchemaFormat>,
 }
 
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Commitment {
     /// Hash of the "input" object in the [multihash](https://multiformats.io/multihash/) format
     pub input_hash: Multihash,
@@ -354,8 +375,8 @@ pub struct Commitment {
     pub sub_queries_hash: Multihash,
 }
 
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Proof {
     /// Type of the proof provided
     pub r#type: ProofType,
@@ -401,13 +422,16 @@ pub enum DataFormat {
     #[default]
     #[serde(alias = "jsonaos")]
     #[serde(alias = "json-aos")]
-    JsonAos,
+    #[serde(alias = "JsonAos")]
+    JsonAoS,
     #[serde(alias = "jsonsoa")]
     #[serde(alias = "json-soa")]
-    JsonSoa,
+    #[serde(alias = "JsonSoa")]
+    JsonSoA,
     #[serde(alias = "jsonaoa")]
     #[serde(alias = "json-aoa")]
-    JsonAoa,
+    #[serde(alias = "JsonAoa")]
+    JsonAoA,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -422,11 +446,11 @@ pub(crate) fn serialize_data(
 
     {
         let mut writer: Box<dyn RecordsWriter> = match format {
-            DataFormat::JsonAos => Box::new(JsonArrayOfStructsWriter::new(&mut buf)),
-            DataFormat::JsonSoa => {
+            DataFormat::JsonAoS => Box::new(JsonArrayOfStructsWriter::new(&mut buf)),
+            DataFormat::JsonSoA => {
                 Box::new(JsonStructOfArraysWriter::new(&mut buf, MAX_SOA_BUFFER_SIZE))
             }
-            DataFormat::JsonAoa => Box::new(JsonArrayOfArraysWriter::new(&mut buf)),
+            DataFormat::JsonAoA => Box::new(JsonArrayOfArraysWriter::new(&mut buf)),
         };
 
         for batch in record_batches {
@@ -528,6 +552,41 @@ pub(crate) fn serialize_schema(
     .int_err()?;
 
     Ok(String::from_utf8(buf).unwrap())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn map_query_error(err: QueryError) -> ApiError {
+    match err {
+        QueryError::DatasetNotFound(_)
+        | QueryError::DatasetBlockNotFound(_)
+        | QueryError::DatasetSchemaNotAvailable(_) => ApiError::not_found(err),
+        QueryError::DataFusionError(DataFusionError {
+            source: datafusion::error::DataFusionError::SQL(err, _),
+            ..
+        }) => ApiError::bad_request(err),
+        QueryError::DataFusionError(DataFusionError {
+            source: err @ datafusion::error::DataFusionError::Plan(_),
+            ..
+        }) => ApiError::bad_request(err),
+        QueryError::DataFusionError(_) => err.int_err().api_err(),
+        QueryError::Access(err) => err.api_err(),
+        QueryError::Internal(err) => err.api_err(),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn to_canonical_json<T: serde::Serialize>(val: &T) -> Vec<u8> {
+    // TODO: PERF: Avoid double-serialization
+    // Because `canonical_json` needs `serde_json::Value` to be able to sort keys
+    // before serializing into a buffer we end up paying double for allocations.
+    // A better approach would be to use a macro to enforce alphabetic order of
+    // struct fields to avoid the need of sorting and then use a canonical formatter
+    // to write directly to a buffer.
+    let json = serde_json::to_value(val).unwrap();
+    let str = canonical_json::to_string(&json).unwrap();
+    str.into_bytes()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

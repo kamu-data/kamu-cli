@@ -64,7 +64,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 #[error("api error {status_code:?}")]
 pub struct ApiError {
-    status_code: http::StatusCode,
+    pub status_code: http::StatusCode,
     source: Box<dyn std::error::Error + Send + Sync + 'static>,
 }
 

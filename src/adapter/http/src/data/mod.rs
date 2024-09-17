@@ -13,5 +13,6 @@ mod query_handler;
 pub mod query_types;
 mod router;
 mod tail_handler;
+mod verify_handler;
 
 pub use router::*;

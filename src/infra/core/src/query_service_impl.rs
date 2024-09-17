@@ -100,17 +100,28 @@ impl QueryServiceImpl {
             let mut input_datasets = BTreeMap::new();
 
             for (id, opts) in options.input_datasets {
+                // SECURITY: We expect that access permissions will be validated during
+                // the query execution and that we're not leaking information here if the
+                // user doesn't have access to this dataset.
+                let dataset = self
+                    .dataset_repo
+                    .find_dataset_by_ref(&id.as_local_ref())
+                    .await?;
+
                 let block_hash = if let Some(block_hash) = opts.block_hash {
+                    // Validate that block the user is asking for exists
+                    // SECURITY: Are we leaking information here by doing this check before auth?
+                    if !dataset
+                        .as_metadata_chain()
+                        .contains_block(&block_hash)
+                        .await
+                        .int_err()?
+                    {
+                        return Err(DatasetBlockNotFoundError::new(id, block_hash).into());
+                    }
+
                     block_hash
                 } else {
-                    // SECURITY: We expect that access permissions will be validated during
-                    // the query execution and that we're not leaking information here if the
-                    // user doesn't have access to this dataset.
-                    let dataset = self
-                        .dataset_repo
-                        .find_dataset_by_ref(&id.as_local_ref())
-                        .await?;
-
                     dataset
                         .as_metadata_chain()
                         .resolve_ref(&BlockRef::Head)

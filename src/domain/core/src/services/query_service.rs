@@ -197,6 +197,12 @@ pub enum QueryError {
         DatasetNotFoundError,
     ),
     #[error(transparent)]
+    DatasetBlockNotFound(
+        #[from]
+        #[backtrace]
+        DatasetBlockNotFoundError,
+    ),
+    #[error(transparent)]
     DatasetSchemaNotAvailable(
         #[from]
         #[backtrace]
@@ -220,6 +226,26 @@ pub enum QueryError {
         #[backtrace]
         InternalError,
     ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// This error returned only when the caller provides an explicit block hash to
+/// query via [`QueryOptionsDataset`]
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("Dataset {dataset_id} does not have a block {block_hash}")]
+pub struct DatasetBlockNotFoundError {
+    pub dataset_id: DatasetID,
+    pub block_hash: Multihash,
+}
+
+impl DatasetBlockNotFoundError {
+    pub fn new(dataset_id: DatasetID, block_hash: Multihash) -> Self {
+        Self {
+            dataset_id,
+            block_hash,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -19,11 +19,16 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn root_router() -> axum::Router {
-    axum::Router::new().route(
-        "/query",
-        axum::routing::get(super::query_handler::dataset_query_handler)
-            .post(super::query_handler::dataset_query_handler_post),
-    )
+    axum::Router::new()
+        .route(
+            "/query",
+            axum::routing::get(super::query_handler::query_handler)
+                .post(super::query_handler::query_handler_post),
+        )
+        .route(
+            "/verify",
+            axum::routing::post(super::verify_handler::verify_handler),
+        )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

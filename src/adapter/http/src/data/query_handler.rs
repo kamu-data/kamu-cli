@@ -30,20 +30,20 @@ use super::query_types::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[transactional_handler]
-pub async fn dataset_query_handler_post(
+pub async fn query_handler_post(
     Extension(catalog): Extension<Catalog>,
     Json(body): Json<RequestBody>,
 ) -> Result<Json<ResponseBody>, ApiError> {
     match body {
-        RequestBody::V1(body) => dataset_query_handler_post_v1(catalog, body).await,
-        RequestBody::V2(body) => dataset_query_handler_post_v2(catalog, body).await,
+        RequestBody::V1(body) => query_handler_post_v1(catalog, body).await,
+        RequestBody::V2(body) => query_handler_post_v2(catalog, body).await,
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tracing::instrument(level = "info", skip_all)]
-async fn dataset_query_handler_post_v2(
+pub(crate) async fn query_handler_post_v2(
     catalog: Catalog,
     mut body: RequestBodyV2,
 ) -> Result<Json<ResponseBody>, ApiError> {
@@ -53,6 +53,10 @@ async fn dataset_query_handler_post_v2(
     // for verifiability
     if body.include.contains(&Include::Proof) {
         body.include.insert(Include::Input);
+    }
+    // Automatically add `Schema` if user specified schema format
+    if body.schema_format.is_some() {
+        body.include.insert(Include::Schema);
     }
 
     let identity = catalog.get_one::<IdentityConfig>().ok();
@@ -74,9 +78,10 @@ async fn dataset_query_handler_post_v2(
         .api_err()?;
 
     let (schema, schema_format) = if body.include.contains(&Include::Schema) {
+        let schema_format = body.schema_format.unwrap_or_default();
         (
-            Some(Schema::new(df.schema().inner().clone(), body.schema_format)),
-            Some(body.schema_format),
+            Some(Schema::new(df.schema().inner().clone(), schema_format)),
+            Some(schema_format),
         )
     } else {
         (None, None)
@@ -102,6 +107,7 @@ async fn dataset_query_handler_post_v2(
             None
         } else {
             body.datasets = Some(RequestBodyV2::query_state_to_datasets(res.state));
+            body.schema_format = schema_format;
             Some(body)
         };
 
@@ -146,7 +152,7 @@ async fn dataset_query_handler_post_v2(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tracing::instrument(level = "info", skip_all)]
-async fn dataset_query_handler_post_v1(
+async fn query_handler_post_v1(
     catalog: Catalog,
     body: RequestBodyV1,
 ) -> Result<Json<ResponseBody>, ApiError> {
@@ -206,42 +212,11 @@ async fn dataset_query_handler_post_v1(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn dataset_query_handler(
+pub async fn query_handler(
     catalog: Extension<Catalog>,
     Query(params): Query<RequestParams>,
 ) -> Result<Json<ResponseBody>, ApiError> {
-    dataset_query_handler_post(catalog, Json(params.into())).await
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn to_canonical_json<T: serde::Serialize>(val: &T) -> Vec<u8> {
-    // TODO: PERF: Avoid double-serialization
-    // Because `canonical_json` needs `serde_json::Value` to be able to sort keys
-    // before serializing into a buffer we end up paying double for allocations.
-    // A better approach would be to use a macro to enforce alphabetic order of
-    // struct fields to avoid the need of sorting and then use a canonical formatter
-    // to write directly to a buffer.
-    let json = serde_json::to_value(val).unwrap();
-    let str = canonical_json::to_string(&json).unwrap();
-    str.into_bytes()
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn map_query_error(error: QueryError) -> ApiError {
-    match error {
-        QueryError::DatasetNotFound(err) => ApiError::not_found(err),
-        QueryError::DataFusionError(DataFusionError {
-            source: datafusion::error::DataFusionError::SQL(err, _),
-            ..
-        }) => ApiError::bad_request(err),
-        QueryError::DataFusionError(DataFusionError {
-            source: err @ datafusion::error::DataFusionError::Plan(_),
-            ..
-        }) => ApiError::bad_request(err),
-        _ => error.int_err().api_err(),
-    }
+    query_handler_post(catalog, Json(params.into())).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
