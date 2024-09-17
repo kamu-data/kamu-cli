@@ -163,7 +163,12 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         paused: bool,
         rule: FlowConfigurationRule,
     ) -> Result<FlowConfigurationState, SetFlowConfigurationError> {
-        tracing::info!(flow_key=?flow_key, paused=%paused, rule=?rule, "Setting flow configuration");
+        tracing::info!(
+            flow_key = ?flow_key,
+            paused = %paused,
+            rule = ?rule,
+            "Setting flow configuration"
+        );
 
         let maybe_flow_configuration =
             FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await?;
@@ -359,7 +364,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowConfigurationServiceImpl 
         _: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(received_message=?message, "Received dataset lifecycle message");
+        tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
 
         match message {
             DatasetLifecycleMessage::Deleted(message) => {

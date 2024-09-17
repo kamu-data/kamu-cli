@@ -5802,6 +5802,7 @@ dependencies = [
  "serde",
  "serde_with",
  "sqlx",
+ "strum 0.26.3",
  "thiserror",
  "tokio-stream",
  "tracing",

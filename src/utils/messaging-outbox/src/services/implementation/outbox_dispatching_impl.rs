@@ -83,7 +83,7 @@ impl Outbox for OutboxDispatchingImpl {
         producer_name: &str,
         content_json: &serde_json::Value,
     ) -> Result<(), InternalError> {
-        tracing::debug!(content_json=%content_json, "Dispatching outbox message");
+        tracing::debug!(content_json = %content_json, "Dispatching outbox message");
 
         if self.durable_producers.contains(producer_name) {
             self.transactional_outbox

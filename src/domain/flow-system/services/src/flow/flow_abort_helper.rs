@@ -73,8 +73,8 @@ impl FlowAbortHelper {
             FlowStatus::Finished => {
                 /* Skip, idempotence */
                 tracing::info!(
-                    flow_id=%flow.flow_id,
-                    flow_status=%flow.status(),
+                    flow_id = %flow.flow_id,
+                    flow_status = %flow.status(),
                     "Flow abortion skipped as no longer relevant"
                 );
             }

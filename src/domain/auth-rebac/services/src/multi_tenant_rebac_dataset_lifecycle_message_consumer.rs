@@ -90,7 +90,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for MultiTenantRebacDatasetLifecy
         _: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(received_message=?message, "Received dataset lifecycle message");
+        tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
 
         match message {
             DatasetLifecycleMessage::Created(message) => {
