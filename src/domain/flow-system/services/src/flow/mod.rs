@@ -11,10 +11,8 @@ mod flow_abort_helper;
 mod flow_enqueue_helper;
 mod flow_executor_impl;
 mod flow_query_service_impl;
-mod flow_time_wheel_service_impl;
 
 pub(crate) use flow_abort_helper::*;
 pub(crate) use flow_enqueue_helper::*;
 pub use flow_executor_impl::*;
 pub use flow_query_service_impl::*;
-pub use flow_time_wheel_service_impl::*;

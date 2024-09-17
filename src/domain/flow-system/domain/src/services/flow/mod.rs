@@ -9,8 +9,6 @@
 
 mod flow_query_service;
 mod flow_service_test_driver;
-mod flow_time_wheel_service;
 
 pub use flow_query_service::*;
 pub use flow_service_test_driver::*;
-pub use flow_time_wheel_service::*;

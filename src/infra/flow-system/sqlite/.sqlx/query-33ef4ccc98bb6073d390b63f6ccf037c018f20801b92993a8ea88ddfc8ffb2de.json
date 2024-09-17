@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT f.enqueued_for as \"activation_time: _\"\n                FROM flows f\n                WHERE\n                    f.enqueued_for IS NOT NULL AND\n                    f.flow_status = 'waiting'\n                ORDER BY f.enqueued_for ASC\n                LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "activation_time: _",
+        "ordinal": 0,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "33ef4ccc98bb6073d390b63f6ccf037c018f20801b92993a8ea88ddfc8ffb2de"
+}

@@ -17,7 +17,6 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<FlowConfigurationServiceImpl>();
     catalog_builder.add::<FlowExecutorImpl>();
     catalog_builder.add::<FlowQueryServiceImpl>();
-    catalog_builder.add::<FlowTimeWheelServiceImpl>();
 
     catalog_builder.add::<FlowAbortHelper>();
     catalog_builder.add::<FlowEnqueueHelper>();
