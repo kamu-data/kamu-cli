@@ -37,6 +37,8 @@ pub struct FlowState {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct FlowTimingRecords {
+    /// Flow enqueued and will be scheduled at time
+    pub enqueued_for: Option<DateTime<Utc>>,
     /// Task scheduled and waiting for execution since time
     pub awaiting_executor_since: Option<DateTime<Utc>>,
     /// Started running at time
@@ -61,17 +63,6 @@ impl FlowState {
         } else {
             FlowStatus::Waiting
         }
-    }
-
-    // Extract wakeup time
-    pub fn wake_up_at(&self) -> Option<DateTime<Utc>> {
-        if self.status() == FlowStatus::Waiting {
-            if let Some(start_condition) = self.start_condition.as_ref() {
-                return start_condition.wake_up_at();
-            }
-        }
-
-        None
     }
 
     pub fn try_result_as_ref(&self) -> Option<&FlowResult> {
@@ -106,6 +97,7 @@ impl Projection for FlowState {
                     triggers: vec![trigger],
                     start_condition: None,
                     timing: FlowTimingRecords {
+                        enqueued_for: None,
                         awaiting_executor_since: None,
                         running_since: None,
                         finished_at: None,
@@ -125,7 +117,7 @@ impl Projection for FlowState {
                         start_condition,
                         ..
                     }) => {
-                        if s.outcome.is_some() || s.timing.running_since.is_some() {
+                        if s.outcome.is_some() || s.timing.awaiting_executor_since.is_some() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(FlowState {
@@ -141,6 +133,21 @@ impl Projection for FlowState {
                             let mut triggers = s.triggers;
                             triggers.push(trigger.clone());
                             Ok(FlowState { triggers, ..s })
+                        }
+                    }
+                    E::Enqueued(FlowEventEnqueued {
+                        activation_time, ..
+                    }) => {
+                        if s.outcome.is_some() || s.timing.awaiting_executor_since.is_some() {
+                            Err(ProjectionError::new(Some(s), event))
+                        } else {
+                            Ok(FlowState {
+                                timing: FlowTimingRecords {
+                                    enqueued_for: Some(activation_time),
+                                    ..s.timing
+                                },
+                                ..s
+                            })
                         }
                     }
                     E::TaskScheduled(FlowEventTaskScheduled {

@@ -23,7 +23,6 @@ use crate::{DownstreamDependencyTriggerType, MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct FlowEnqueueHelper {
-    flow_timewheel_service: Arc<dyn FlowTimeWheelService>,
     flow_event_store: Arc<dyn FlowEventStore>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     outbox: Arc<dyn Outbox>,
@@ -37,7 +36,6 @@ pub(crate) struct FlowEnqueueHelper {
 #[component(pub)]
 impl FlowEnqueueHelper {
     pub(crate) fn new(
-        flow_timewheel_service: Arc<dyn FlowTimeWheelService>,
         flow_event_store: Arc<dyn FlowEventStore>,
         flow_configuration_service: Arc<dyn FlowConfigurationService>,
         outbox: Arc<dyn Outbox>,
@@ -48,7 +46,6 @@ impl FlowEnqueueHelper {
         executor_config: Arc<FlowExecutorConfig>,
     ) -> Self {
         Self {
-            flow_timewheel_service,
             flow_event_store,
             flow_configuration_service,
             outbox,
@@ -372,19 +369,14 @@ impl FlowEnqueueHelper {
                     }
                     FlowTriggerContext::Scheduled(_) | FlowTriggerContext::Unconditional => {
                         // Evaluate throttling condition: is new time earlier than planned?
-                        let maybe_planned_time =
-                            self.find_planned_flow_activation_time(flow.flow_id);
-
                         // In case of batching condition and manual trigger,
                         // there is no planned time, but otherwise compare
-                        if maybe_planned_time.is_none()
-                            || maybe_planned_time
+                        if flow.timing.enqueued_for.is_none()
+                            || flow
+                                .timing
+                                .enqueued_for
                                 .is_some_and(|planned_time| throttling_boundary_time < planned_time)
                         {
-                            // If so, enqueue the flow earlier
-                            self.enqueue_flow(flow.flow_id, throttling_boundary_time)
-                                .await?;
-
                             // Indicate throttling, if applied
                             if throttling_boundary_time > trigger_time {
                                 self.indicate_throttling_activity(
@@ -393,6 +385,10 @@ impl FlowEnqueueHelper {
                                     trigger_time,
                                 )?;
                             }
+
+                            // Enqueue the flow earlier than previously planned
+                            self.enqueue_flow(&mut flow, throttling_boundary_time)
+                                .await?;
                         }
                     }
                 }
@@ -442,8 +438,6 @@ impl FlowEnqueueHelper {
                         // Apply throttling boundary
                         let next_activation_time =
                             std::cmp::max(throttling_boundary_time, naive_next_activation_time);
-                        self.enqueue_flow(flow.flow_id, next_activation_time)
-                            .await?;
 
                         // Set throttling activity as start condition
                         if throttling_boundary_time > naive_next_activation_time {
@@ -462,13 +456,14 @@ impl FlowEnqueueHelper {
                             )
                             .int_err()?;
                         }
+
+                        // Enqueue flow for the decided moment
+                        self.enqueue_flow(&mut flow, next_activation_time).await?;
                     }
                     FlowTriggerContext::Unconditional => {
                         // Apply throttling boundary
                         let next_activation_time =
                             std::cmp::max(throttling_boundary_time, trigger_time);
-                        self.enqueue_flow(flow.flow_id, next_activation_time)
-                            .await?;
 
                         // Set throttling activity as start condition
                         if throttling_boundary_time > trigger_time {
@@ -478,6 +473,9 @@ impl FlowEnqueueHelper {
                                 trigger_time,
                             )?;
                         }
+
+                        // Enqueue flow for the decided moment
+                        self.enqueue_flow(&mut flow, next_activation_time).await?;
                     }
                 }
 
@@ -582,13 +580,12 @@ impl FlowEnqueueHelper {
             let corrected_finish_time =
                 std::cmp::max(batching_finish_time, throttling_boundary_time);
 
-            let should_activate = match self.find_planned_flow_activation_time(flow.flow_id) {
+            let should_activate = match flow.timing.enqueued_for {
                 Some(activation_time) => activation_time > corrected_finish_time,
                 None => true,
             };
             if should_activate {
-                self.enqueue_flow(flow.flow_id, corrected_finish_time)
-                    .await?;
+                self.enqueue_flow(flow, corrected_finish_time).await?;
             }
 
             // If batching is over, it's start condition is no longer valid.
@@ -625,12 +622,6 @@ impl FlowEnqueueHelper {
 
     async fn find_pending_flow(&self, flow_key: &FlowKey) -> Result<Option<FlowID>, InternalError> {
         self.flow_event_store.try_get_pending_flow(flow_key).await
-    }
-
-    #[inline]
-    fn find_planned_flow_activation_time(&self, flow_id: FlowID) -> Option<DateTime<Utc>> {
-        self.flow_timewheel_service
-            .get_planned_flow_activation_time(flow_id)
     }
 
     async fn make_new_flow(
@@ -670,13 +661,16 @@ impl FlowEnqueueHelper {
 
     async fn enqueue_flow(
         &self,
-        flow_id: FlowID,
+        flow: &mut Flow,
         activate_at: DateTime<Utc>,
     ) -> Result<(), InternalError> {
+        flow.enqueue(self.time_source.now(), activate_at)
+            .int_err()?;
+
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                FlowProgressMessage::enqueued(self.time_source.now(), flow_id, activate_at),
+                FlowProgressMessage::enqueued(self.time_source.now(), flow.flow_id, activate_at),
             )
             .await
     }

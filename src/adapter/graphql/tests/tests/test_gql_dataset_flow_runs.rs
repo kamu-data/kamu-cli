@@ -2634,22 +2634,26 @@ async fn test_history_of_completed_flow() {
                                             }
                                         },
                                         {
-                                            "__typename": "FlowEventTriggerAdded",
+                                            "__typename": "FlowEventEnqueued",
                                             "eventId": "2",
+                                        },
+                                        {
+                                            "__typename": "FlowEventTriggerAdded",
+                                            "eventId": "3",
                                             "trigger": {
                                                 "__typename": "FlowTriggerAutoPolling"
                                             }
                                         },
                                         {
                                             "__typename": "FlowEventStartConditionUpdated",
-                                            "eventId": "3",
+                                            "eventId": "4",
                                             "startCondition": {
                                                 "__typename" : "FlowStartConditionExecutor"
                                             }
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
-                                            "eventId": "4",
+                                            "eventId": "5",
                                             "taskId": "0",
                                             "taskStatus": "QUEUED",
                                             "task": {
@@ -2658,7 +2662,7 @@ async fn test_history_of_completed_flow() {
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
-                                            "eventId": "5",
+                                            "eventId": "6",
                                             "taskId": "0",
                                             "taskStatus": "RUNNING",
                                             "task": {
@@ -2667,7 +2671,7 @@ async fn test_history_of_completed_flow() {
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
-                                            "eventId": "6",
+                                            "eventId": "7",
                                             "taskId": "0",
                                             "taskStatus": "FINISHED",
                                             "task": {

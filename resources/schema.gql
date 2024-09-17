@@ -1074,6 +1074,12 @@ type FlowEventAborted implements FlowEvent {
 	eventTime: DateTime!
 }
 
+type FlowEventEnqueued implements FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+	activationTime: DateTime!
+}
+
 type FlowEventInitiated implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!

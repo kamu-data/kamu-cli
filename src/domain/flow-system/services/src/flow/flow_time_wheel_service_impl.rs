@@ -188,11 +188,6 @@ impl FlowTimeWheelService for FlowTimeWheelServiceImpl {
             res
         }
     }
-
-    fn get_planned_flow_activation_time(&self, flow_id: FlowID) -> Option<DateTime<Utc>> {
-        let guard = self.state.lock().unwrap();
-        guard.flow_activation_times_by_id.get(&flow_id).copied()
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

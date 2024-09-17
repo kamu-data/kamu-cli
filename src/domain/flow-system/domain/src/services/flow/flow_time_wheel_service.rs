@@ -18,8 +18,6 @@ pub trait FlowTimeWheelService: Send + Sync {
     fn nearest_activation_moment(&self) -> Option<DateTime<Utc>>;
 
     fn take_nearest_planned_flows(&self) -> Vec<FlowID>;
-
-    fn get_planned_flow_activation_time(&self, flow_id: FlowID) -> Option<DateTime<Utc>>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
