@@ -80,16 +80,16 @@ impl Flow {
         }
     }
 
-    /// Indicate flow in enqueued for activation at particular time
-    pub fn enqueue(
+    /// Indicate flow is scheduled for activation at particular time
+    pub fn schedule_for_activation(
         &mut self,
         now: DateTime<Utc>,
-        enqueued_for: DateTime<Utc>,
+        scheduled_for_activation_at: DateTime<Utc>,
     ) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventEnqueued {
+        let event = FlowEventScheduledForActivation {
             event_time: now,
             flow_id: self.flow_id,
-            enqueued_for,
+            scheduled_for_activation_at,
         };
         self.apply(event)?;
         Ok(())

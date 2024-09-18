@@ -32,7 +32,7 @@ use time_source::SystemTimeSource;
 
 use crate::{
     FlowAbortHelper,
-    FlowEnqueueHelper,
+    FlowSchedulingHelper,
     MESSAGE_CONSUMER_KAMU_FLOW_EXECUTOR,
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
@@ -117,7 +117,7 @@ impl FlowExecutorImpl {
     ) -> Result<(), InternalError> {
         // Extract necessary dependencies
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-        let enqueue_helper = target_catalog.get_one::<FlowEnqueueHelper>().unwrap();
+        let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
 
         // How many waiting flows do we have?
         let waiting_filters = AllFlowFilters {
@@ -153,7 +153,7 @@ impl FlowExecutorImpl {
 
                 // We need to re-evaluate batching conditions only
                 if let Some(FlowStartCondition::Batching(b)) = &flow.start_condition {
-                    enqueue_helper
+                    scheduling_helper
                         .trigger_flow_common(
                             &flow.flow_key,
                             FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
@@ -194,7 +194,7 @@ impl FlowExecutorImpl {
             .into_iter()
             .partition(|config| matches!(config.rule, FlowConfigurationRule::Schedule(_)));
 
-        let enqueue_helper = target_catalog.get_one::<FlowEnqueueHelper>().unwrap();
+        let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
 
         // Activate all configs, ensuring schedule configs precedes non-schedule configs
         // (this i.e. forces all root datasets to be updated earlier than the derived)
@@ -210,7 +210,7 @@ impl FlowExecutorImpl {
                 .try_get_pending_flow(&enabled_config.flow_key)
                 .await?;
             if maybe_pending_flow_id.is_none() {
-                enqueue_helper
+                scheduling_helper
                     .activate_flow_configuration(
                         start_time,
                         enabled_config.flow_key,
@@ -227,18 +227,19 @@ impl FlowExecutorImpl {
     async fn run_flows_current_timeslot(&self) -> Result<(), InternalError> {
         // Do we have a timeslot scheduled?
         let flow_event_store = transaction_catalog.get_one::<dyn FlowEventStore>().unwrap();
-        let maybe_nearest_enqueued_moment = flow_event_store.nearest_enqueued_moment().await?;
+        let maybe_nearest_flow_activation_moment =
+            flow_event_store.nearest_flow_activation_moment().await?;
 
         // Is it time to execute it yet?
         let current_time = self.time_source.now();
-        if let Some(nearest_enqueued_moment) = maybe_nearest_enqueued_moment
-            && nearest_enqueued_moment <= current_time
+        if let Some(nearest_flow_activation_moment) = maybe_nearest_flow_activation_moment
+            && nearest_flow_activation_moment <= current_time
         {
             let activation_span = tracing::info_span!("FlowExecutor::activation");
             let _ = activation_span.enter();
 
             let planned_flow_ids: Vec<_> = flow_event_store
-                .get_enqueued_flows(nearest_enqueued_moment)
+                .get_flows_scheduled_for_activation_at(nearest_flow_activation_moment)
                 .await?;
 
             let mut planned_task_futures = Vec::new();
@@ -255,7 +256,7 @@ impl FlowExecutorImpl {
                         self.schedule_flow_task(
                             transaction_catalog,
                             &mut flow,
-                            nearest_enqueued_moment,
+                            nearest_flow_activation_moment,
                         )
                         .await?;
                     } else {
@@ -289,7 +290,7 @@ impl FlowExecutorImpl {
                 .post_message(
                     MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
                     FlowExecutorUpdatedMessage {
-                        update_time: nearest_enqueued_moment,
+                        update_time: nearest_flow_activation_moment,
                         update_details: FlowExecutorUpdateDetails::ExecutedTimeslot,
                     },
                 )
@@ -539,7 +540,8 @@ impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
                         .int_err()?;
                         flow.save(flow_event_store.as_ref()).await.int_err()?;
 
-                        let enqueue_helper = target_catalog.get_one::<FlowEnqueueHelper>().unwrap();
+                        let scheduling_helper =
+                            target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
 
                         let finish_time = self.executor_config.round_time(message.event_time)?;
 
@@ -551,18 +553,18 @@ impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
                             match flow.flow_key.get_type().success_followup_method() {
                                 FlowSuccessFollowupMethod::Ignore => {}
                                 FlowSuccessFollowupMethod::TriggerDependent => {
-                                    enqueue_helper
-                                        .enqueue_dependent_flows(finish_time, &flow, flow_result)
+                                    scheduling_helper
+                                        .schedule_dependent_flows(finish_time, &flow, flow_result)
                                         .await?;
                                 }
                             }
                         }
 
                         // In case of success:
-                        //  - enqueue next auto-polling flow cycle
+                        //  - schedule next auto-polling flow cycle
                         if message.outcome.is_success() {
-                            enqueue_helper
-                                .try_enqueue_scheduled_auto_polling_flow_if_enabled(
+                            scheduling_helper
+                                .try_schedule_auto_polling_flow_if_enabled(
                                     finish_time,
                                     &flow.flow_key,
                                 )
@@ -630,8 +632,8 @@ impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
                 abort_helper.abort_flow(flow_id).await?;
             }
         } else {
-            let enqueue_helper = target_catalog.get_one::<FlowEnqueueHelper>().unwrap();
-            enqueue_helper
+            let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
+            scheduling_helper
                 .activate_flow_configuration(
                     self.executor_config.round_time(message.event_time)?,
                     message.flow_key.clone(),

@@ -37,8 +37,8 @@ pub struct FlowState {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct FlowTimingRecords {
-    /// Flow enqueued and will be scheduled at time
-    pub enqueued_for: Option<DateTime<Utc>>,
+    /// Flow scheduled and will be activated at time
+    pub scheduled_for_activation_at: Option<DateTime<Utc>>,
     /// Task scheduled and waiting for execution since time
     pub awaiting_executor_since: Option<DateTime<Utc>>,
     /// Started running at time
@@ -97,7 +97,7 @@ impl Projection for FlowState {
                     triggers: vec![trigger],
                     start_condition: None,
                     timing: FlowTimingRecords {
-                        enqueued_for: None,
+                        scheduled_for_activation_at: None,
                         awaiting_executor_since: None,
                         running_since: None,
                         finished_at: None,
@@ -135,13 +135,16 @@ impl Projection for FlowState {
                             Ok(FlowState { triggers, ..s })
                         }
                     }
-                    E::Enqueued(FlowEventEnqueued { enqueued_for, .. }) => {
+                    E::ScheduledForActivation(FlowEventScheduledForActivation {
+                        scheduled_for_activation_at,
+                        ..
+                    }) => {
                         if s.outcome.is_some() || s.timing.awaiting_executor_since.is_some() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(FlowState {
                                 timing: FlowTimingRecords {
-                                    enqueued_for: Some(enqueued_for),
+                                    scheduled_for_activation_at: Some(scheduled_for_activation_at),
                                     ..s.timing
                                 },
                                 ..s

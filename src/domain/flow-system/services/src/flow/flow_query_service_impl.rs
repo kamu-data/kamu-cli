@@ -20,7 +20,7 @@ use kamu_flow_system::*;
 use opendatafabric::{AccountID, DatasetID};
 
 use super::FlowTriggerContext;
-use crate::{FlowAbortHelper, FlowEnqueueHelper};
+use crate::{FlowAbortHelper, FlowSchedulingHelper};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -285,8 +285,8 @@ impl FlowQueryService for FlowQueryServiceImpl {
     ) -> Result<FlowState, RequestFlowError> {
         let activation_time = self.executor_config.round_time(trigger_time)?;
 
-        let enqueue_helper = self.catalog.get_one::<FlowEnqueueHelper>().unwrap();
-        enqueue_helper
+        let scheduling_helper = self.catalog.get_one::<FlowSchedulingHelper>().unwrap();
+        scheduling_helper
             .trigger_flow_common(
                 &flow_key,
                 FlowTrigger::Manual(FlowTriggerManual {

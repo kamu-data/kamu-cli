@@ -99,8 +99,8 @@ async fn test_read_initial_config_and_queue_without_waiting() {
 
                 // Main simulation boundary - 120ms total
                 //  - "foo" should immediately schedule "task 0", since "foo" has never run yet
-                //  - "task 0" will take action and complete, this will enqueue the next flow
-                //    run for "foo" after full scheduling period
+                //  - "task 0" will take action and complete, this will schedule the next flow
+                //    run for "foo" after full period
                 //  - when that period is over, "task 1" should be scheduled
                 //  - "task 1" will take action and complete, enqueuing another flow
                 let sim_handle = harness.advance_time(Duration::try_milliseconds(120).unwrap());
@@ -226,10 +226,11 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
                     last_trigger_index: 0,
                 }
                 .into(),
-                FlowEventEnqueued {
+                FlowEventScheduledForActivation {
                     event_time: Utc::now(),
                     flow_id,
-                    enqueued_for: start_time + Duration::try_milliseconds(100).unwrap(),
+                    scheduled_for_activation_at: start_time
+                        + Duration::try_milliseconds(100).unwrap(),
                 }
                 .into(),
             ],
@@ -535,7 +536,7 @@ async fn test_manual_trigger() {
                     // "foo":
                     //  - flow 0 => task 0 gets scheduled immediately at 0ms
                     //  - flow 0 => task 0 starts at 10ms and finishes running at 20ms
-                    //  - next flow => enqueued at 20ms to trigger in 1 period of 90ms - at 110ms
+                    //  - next flow => scheduled at 20ms to trigger in 1 period of 90ms - at 110ms
                     // "bar": silent
 
                     // Moment 40ms - manual foo trigger happens here:
@@ -548,7 +549,7 @@ async fn test_manual_trigger() {
                     //  - flow 2 immediately scheduled
                     //  - task 2 gets scheduled at 80ms
                     //  - task 2 starts at 100ms and finishes at 110ms (ensure gap to fight against task execution order)
-                    //  - no next flow enqueued
+                    //  - no next flow scheduled
 
                     // Stop at 180ms: "foo" flow 3 gets scheduled at 160ms
                     harness.advance_time(Duration::try_milliseconds(180).unwrap()).await;
@@ -753,7 +754,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     // "foo":
                     //  - flow 0 => task 0 gets scheduled immediately at 0ms
                     //  - flow 0 => task 0 starts at 10ms and finishes running at 20ms
-                    //  - next flow => enqueued at 20ms to trigger in 1 period of 90ms - at 110ms
+                    //  - next flow => scheduled at 20ms to trigger in 1 period of 90ms - at 110ms
                     // "bar": silent
 
                     // Moment 40ms - manual foo trigger happens here:
@@ -766,7 +767,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     //  - flow 2 immediately scheduled
                     //  - task 2 gets scheduled at 80ms
                     //  - task 2 starts at 100ms and finishes at 110ms (ensure gap to fight against task execution order)
-                    //  - no next flow enqueued
+                    //  - no next flow scheduled
 
                     // Stop at 180ms: "foo" flow 3 gets scheduled at 110ms
                     harness.advance_time(Duration::try_milliseconds(180).unwrap()).await;
@@ -2605,7 +2606,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
               //  - "foo":
               //    - resumed with period 100ms
               //    - last success at 20ms
-              //    - enqueued for 120ms (still wait a little bit since last success)
+              //    - scheduled for 120ms (still wait a little bit since last success)
               //  - "bar":
               //    - resumed with period 60ms
               //    - last success at 30ms
@@ -2819,11 +2820,11 @@ async fn test_dataset_deleted() {
                 //  "foo":
                 //   - flow 0 scheduled at 0ms
                 //   - task 0 starts at 10ms, finishes at 20ms
-                //   - flow 2 enqueued for 20ms + period = 70ms
+                //   - flow 2 scheduled for 20ms + period = 70ms
                 //  "bar":
                 //   - flow 1 scheduled at 0ms
                 //   - task 1 starts at 20ms, finishes at 30ms
-                //   - flow 3 enqueued for 30ms + period = 100ms
+                //   - flow 3 scheduled for 30ms + period = 100ms
 
                 // 50ms: deleting "foo" in QUEUED state
                 harness.advance_time(Duration::try_milliseconds(50).unwrap()).await;
@@ -3030,15 +3031,15 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 //  "foo":
                 //   - flow 0 scheduled at 0ms
                 //   - task 0 starts at 10ms, finishes at 20ms
-                //   - next flow 3 enqueued for 20ms + period = 60ms
+                //   - next flow 3 scheduled for 20ms + period = 60ms
                 //  "bar":
                 //   - flow 1 scheduled at 0ms
                 //   - task 1 starts at 20ms, finishes at 30ms with failure
-                //   - next flow not enqueued
+                //   - next flow not scheduled
                 //  "baz":
                 //   - flow 2 scheduled at 0ms
                 //   - task 2 starts at 30ms, finishes at 40ms with cancellation
-                //   - next flow not enqueued
+                //   - next flow not scheduled
 
                 // 80ms: the succeeded dataset schedule another update
                 harness.advance_time(Duration::try_milliseconds(80).unwrap()).await;
@@ -3750,27 +3751,27 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           //     - baz not queued as pending already, trigger recorded
           //  - baz:
           //     - task 2 starts at 30ms, finishes at 50ms, flow 2 completes at 50ms
-          //     - no continuation enqueued
+          //     - no continuation scheduled
 
           // Stage 1: foo runs next flow
           //  - foo:
           //     - flow 3 scheduled at 120ms
           //     - task 3 starts at 130ms, finishes at 140ms, flow 3 completes at 140ms
-          //     - baz flow 5 enqueued as derived for 150ms: max(140ms initiated, last attempt 50ms + throttling 100ms)
-          //     - foo flow 6 enqueued for 240ms: 140ms initiated + max(period 50ms, throttling 100ms)
+          //     - baz flow 5 scheduled as derived for 150ms: max(140ms initiated, last attempt 50ms + throttling 100ms)
+          //     - foo flow 6 scheduled for 240ms: 140ms initiated + max(period 50ms, throttling 100ms)
 
           // Stage 2: baz executes triggered by foo
           //  - baz:
           //     - flow 5 scheduled at 150ms
           //     - task 4 starts at 160ms, finishes at 170ms, flow 5 completes at 170ms
-          //     - no continuation enqueued
+          //     - no continuation scheduled
 
           // Stage 3: bar runs next flow
           // - bar
           //   - flow 4 schedules at 180ms
           //   - task 5 starts at 190ms, finishes at 200ms, flow 4 completes at 200ms
-          //   - baz flow 7 enqueued as derived for 270ms: max(200ms initiated, last attempt 170ms + hrottling 100ms)
-          //   - bar flow 8 enqueued for 350ms: 200ms initiated + max (period 150ms, throttling 100ms)
+          //   - baz flow 7 scheduled as derived for 270ms: max(200ms initiated, last attempt 170ms + hrottling 100ms)
+          //   - bar flow 8 scheduled for 350ms: 200ms initiated + max (period 150ms, throttling 100ms)
 
           harness.advance_time(Duration::try_milliseconds(400).unwrap()).await;
         };

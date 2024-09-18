@@ -35,8 +35,8 @@ struct State {
     flow_key_by_flow_id: HashMap<FlowID, FlowKey>,
     dataset_flow_last_run_stats: HashMap<FlowKeyDataset, FlowRunStats>,
     system_flow_last_run_stats: HashMap<SystemFlowType, FlowRunStats>,
-    flows_by_enqueued_time: BTreeMap<DateTime<Utc>, BTreeSet<FlowID>>,
-    enqueued_time_by_flow_id: HashMap<FlowID, DateTime<Utc>>,
+    flows_by_scheduled_for_activation_time: BTreeMap<DateTime<Utc>, BTreeSet<FlowID>>,
+    scheduled_for_activation_time_by_flow_id: HashMap<FlowID, DateTime<Utc>>,
 }
 
 impl State {
@@ -262,44 +262,54 @@ impl InMemoryFlowEventStore {
             }
         }
 
-        // Manage enqueued time changes- insertions
-        if let FlowEvent::Enqueued(e) = &event {
+        // Manage scheduled time changes- insertions
+        if let FlowEvent::ScheduledForActivation(e) = &event {
             // Remove any possible previous enqueuing
-            Self::remove_flow_enqueueing_record(state, e.flow_id);
+            Self::remove_flow_scheduling_record(state, e.flow_id);
             // make new record
-            Self::insert_flow_enqueueing_record(state, e.flow_id, e.enqueued_for);
+            Self::insert_flow_scheduling_record(state, e.flow_id, e.scheduled_for_activation_at);
         }
         // and removals
         else if let FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) = &event {
             let flow_id = event.flow_id();
-            Self::remove_flow_enqueueing_record(state, flow_id);
+            Self::remove_flow_scheduling_record(state, flow_id);
         }
     }
 
-    fn insert_flow_enqueueing_record(
+    fn insert_flow_scheduling_record(
         state: &mut State,
         flow_id: FlowID,
-        enqueued_for: DateTime<Utc>,
+        scheduled_for_activation_at: DateTime<Utc>,
     ) {
         // Update direct lookup
         state
-            .flows_by_enqueued_time
-            .entry(enqueued_for)
+            .flows_by_scheduled_for_activation_time
+            .entry(scheduled_for_activation_at)
             .and_modify(|flow_ids| {
                 flow_ids.insert(flow_id);
             })
             .or_insert_with(|| BTreeSet::from([flow_id]));
 
         // Update reverse lookup
-        state.enqueued_time_by_flow_id.insert(flow_id, enqueued_for);
+        state
+            .scheduled_for_activation_time_by_flow_id
+            .insert(flow_id, scheduled_for_activation_at);
     }
 
-    fn remove_flow_enqueueing_record(state: &mut State, flow_id: FlowID) {
-        if let Some(enqueued_for) = state.enqueued_time_by_flow_id.remove(&flow_id) {
-            let flow_ids = state.flows_by_enqueued_time.get_mut(&enqueued_for).unwrap();
+    fn remove_flow_scheduling_record(state: &mut State, flow_id: FlowID) {
+        if let Some(scheduled_for_activation_at) = state
+            .scheduled_for_activation_time_by_flow_id
+            .remove(&flow_id)
+        {
+            let flow_ids = state
+                .flows_by_scheduled_for_activation_time
+                .get_mut(&scheduled_for_activation_at)
+                .unwrap();
             flow_ids.remove(&flow_id);
             if flow_ids.is_empty() {
-                state.flows_by_enqueued_time.remove(&enqueued_for);
+                state
+                    .flows_by_scheduled_for_activation_time
+                    .remove(&scheduled_for_activation_at);
             }
         }
     }
@@ -433,23 +443,26 @@ impl FlowEventStore for InMemoryFlowEventStore {
             .unwrap_or_default())
     }
 
-    /// Returns nearest flow activation time from all enqueued flows
-    async fn nearest_enqueued_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
+    /// Returns nearest time when one or more flows are scheduled for activation
+    async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        Ok(g.flows_by_enqueued_time.keys().next().copied())
+        Ok(g.flows_by_scheduled_for_activation_time
+            .keys()
+            .next()
+            .copied())
     }
 
-    /// Returns flows enqueued for the given activation time
-    async fn get_enqueued_flows(
+    /// Returns flows scheduled for activation at the given time
+    async fn get_flows_scheduled_for_activation_at(
         &self,
-        enqueued_for: DateTime<Utc>,
+        scheduled_for_activation_at: DateTime<Utc>,
     ) -> Result<Vec<FlowID>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
 
-        Ok(g.flows_by_enqueued_time
-            .get(&enqueued_for)
+        Ok(g.flows_by_scheduled_for_activation_time
+            .get(&scheduled_for_activation_at)
             .map(|flow_ids| flow_ids.iter().copied().collect())
             .unwrap_or_default())
     }

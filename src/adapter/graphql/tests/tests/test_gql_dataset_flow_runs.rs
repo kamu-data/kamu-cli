@@ -2634,7 +2634,7 @@ async fn test_history_of_completed_flow() {
                                             }
                                         },
                                         {
-                                            "__typename": "FlowEventEnqueued",
+                                            "__typename": "FlowEventScheduledForActivation",
                                             "eventId": "2",
                                         },
                                         {

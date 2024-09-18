@@ -24,8 +24,8 @@ pub enum FlowEvent {
     StartConditionUpdated(FlowEventStartConditionUpdated),
     /// Secondary trigger added
     TriggerAdded(FlowEventTriggerAdded),
-    /// Enqueued for particular time
-    Enqueued(FlowEventEnqueued),
+    /// Scheduled for activation at a particular time
+    ScheduledForActivation(FlowEventScheduledForActivation),
     /// Scheduled/Rescheduled a task
     TaskScheduled(FlowEventTaskScheduled),
     /// Task running
@@ -42,7 +42,7 @@ impl FlowEvent {
             FlowEvent::Initiated(_) => "FlowEventInitiated",
             FlowEvent::StartConditionUpdated(_) => "FlowEventStartConditionUpdated",
             FlowEvent::TriggerAdded(_) => "FlowEventTriggerAdded",
-            FlowEvent::Enqueued(_) => "FlowEventEnqueued",
+            FlowEvent::ScheduledForActivation(_) => "FlowEventScheduledForActivation",
             FlowEvent::TaskScheduled(_) => "FlowEventTaskScheduled",
             FlowEvent::TaskRunning(_) => "FlowEventTaskRunning",
             FlowEvent::TaskFinished(_) => "FlowEventTaskFinished",
@@ -84,10 +84,10 @@ pub struct FlowEventTriggerAdded {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FlowEventEnqueued {
+pub struct FlowEventScheduledForActivation {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
-    pub enqueued_for: DateTime<Utc>,
+    pub scheduled_for_activation_at: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -134,7 +134,7 @@ impl FlowEvent {
             FlowEvent::Initiated(e) => e.flow_id,
             FlowEvent::StartConditionUpdated(e) => e.flow_id,
             FlowEvent::TriggerAdded(e) => e.flow_id,
-            FlowEvent::Enqueued(e) => e.flow_id,
+            FlowEvent::ScheduledForActivation(e) => e.flow_id,
             FlowEvent::TaskScheduled(e) => e.flow_id,
             FlowEvent::TaskRunning(e) => e.flow_id,
             FlowEvent::TaskFinished(e) => e.flow_id,
@@ -147,7 +147,7 @@ impl FlowEvent {
             FlowEvent::Initiated(e) => e.event_time,
             FlowEvent::StartConditionUpdated(e) => e.event_time,
             FlowEvent::TriggerAdded(e) => e.event_time,
-            FlowEvent::Enqueued(e) => e.event_time,
+            FlowEvent::ScheduledForActivation(e) => e.event_time,
             FlowEvent::TaskScheduled(e) => e.event_time,
             FlowEvent::TaskRunning(e) => e.event_time,
             FlowEvent::TaskFinished(e) => e.event_time,
@@ -160,7 +160,7 @@ impl FlowEvent {
             FlowEvent::Initiated(_) => Some(FlowStatus::Waiting),
             FlowEvent::StartConditionUpdated(_)
             | FlowEvent::TriggerAdded(_)
-            | FlowEvent::Enqueued(_)
+            | FlowEvent::ScheduledForActivation(_)
             | FlowEvent::TaskScheduled(_) => None,
             FlowEvent::TaskRunning(_) => Some(FlowStatus::Running),
             FlowEvent::TaskFinished(_) | FlowEvent::Aborted(_) => Some(FlowStatus::Finished),
@@ -175,7 +175,9 @@ impl_enum_variant!(FlowEvent::StartConditionUpdated(
     FlowEventStartConditionUpdated
 ));
 impl_enum_variant!(FlowEvent::TriggerAdded(FlowEventTriggerAdded));
-impl_enum_variant!(FlowEvent::Enqueued(FlowEventEnqueued));
+impl_enum_variant!(FlowEvent::ScheduledForActivation(
+    FlowEventScheduledForActivation
+));
 impl_enum_variant!(FlowEvent::TaskScheduled(FlowEventTaskScheduled));
 impl_enum_variant!(FlowEvent::TaskRunning(FlowEventTaskRunning));
 impl_enum_variant!(FlowEvent::TaskFinished(FlowEventTaskFinished));

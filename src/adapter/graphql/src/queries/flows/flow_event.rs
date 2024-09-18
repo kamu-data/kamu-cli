@@ -27,8 +27,8 @@ pub enum FlowEvent {
     Initiated(FlowEventInitiated),
     /// Start condition defined
     StartConditionUpdated(FlowEventStartConditionUpdated),
-    /// Flow enqueued
-    Enqueued(FlowEventEnqueued),
+    /// Flow scheduled for activation
+    ScheduledForActivation(FlowEventScheduledForActivation),
     /// Secondary trigger added
     TriggerAdded(FlowEventTriggerAdded),
     /// Associated task has changed status
@@ -64,11 +64,13 @@ impl FlowEvent {
             fs::FlowEvent::TriggerAdded(e) => {
                 Self::TriggerAdded(FlowEventTriggerAdded::build(event_id, e, ctx).await?)
             }
-            fs::FlowEvent::Enqueued(e) => Self::Enqueued(FlowEventEnqueued::new(
-                event_id,
-                e.event_time,
-                e.enqueued_for,
-            )),
+            fs::FlowEvent::ScheduledForActivation(e) => {
+                Self::ScheduledForActivation(FlowEventScheduledForActivation::new(
+                    event_id,
+                    e.event_time,
+                    e.scheduled_for_activation_at,
+                ))
+            }
             fs::FlowEvent::TaskScheduled(e) => Self::TaskChanged(FlowEventTaskChanged::new(
                 event_id,
                 e.event_time,
@@ -165,20 +167,24 @@ impl FlowEventTriggerAdded {
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct FlowEventEnqueued {
+pub struct FlowEventScheduledForActivation {
     event_id: EventID,
     event_time: DateTime<Utc>,
-    enqueued_for: DateTime<Utc>,
+    scheduled_for_activation_at: DateTime<Utc>,
 }
 
 #[ComplexObject]
-impl FlowEventEnqueued {
+impl FlowEventScheduledForActivation {
     #[graphql(skip)]
-    fn new(event_id: evs::EventID, event_time: DateTime<Utc>, enqueued_for: DateTime<Utc>) -> Self {
+    fn new(
+        event_id: evs::EventID,
+        event_time: DateTime<Utc>,
+        scheduled_for_activation_at: DateTime<Utc>,
+    ) -> Self {
         Self {
             event_id: event_id.into(),
             event_time,
-            enqueued_for,
+            scheduled_for_activation_at,
         }
     }
 }

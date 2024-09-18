@@ -22,7 +22,7 @@ use crate::{DownstreamDependencyTriggerType, MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct FlowEnqueueHelper {
+pub(crate) struct FlowSchedulingHelper {
     flow_event_store: Arc<dyn FlowEventStore>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     outbox: Arc<dyn Outbox>,
@@ -34,7 +34,7 @@ pub(crate) struct FlowEnqueueHelper {
 }
 
 #[component(pub)]
-impl FlowEnqueueHelper {
+impl FlowSchedulingHelper {
     pub(crate) fn new(
         flow_event_store: Arc<dyn FlowEventStore>,
         flow_configuration_service: Arc<dyn FlowConfigurationService>,
@@ -69,11 +69,11 @@ impl FlowEnqueueHelper {
             FlowKey::Dataset(_) => {
                 match &rule {
                     FlowConfigurationRule::TransformRule(_) => {
-                        self.enqueue_auto_polling_flow_unconditionally(start_time, &flow_key)
+                        self.schedule_auto_polling_flow_unconditionally(start_time, &flow_key)
                             .await?;
                     }
                     FlowConfigurationRule::IngestRule(ingest_rule) => {
-                        self.enqueue_scheduled_auto_polling_flow(
+                        self.schedule_auto_polling_flow(
                             start_time,
                             &flow_key,
                             &ingest_rule.schedule_condition,
@@ -90,7 +90,7 @@ impl FlowEnqueueHelper {
             }
             FlowKey::System(_) => {
                 if let FlowConfigurationRule::Schedule(schedule) = &rule {
-                    self.enqueue_scheduled_auto_polling_flow(start_time, &flow_key, schedule)
+                    self.schedule_auto_polling_flow(start_time, &flow_key, schedule)
                         .await?;
                 } else {
                     unimplemented!(
@@ -103,7 +103,7 @@ impl FlowEnqueueHelper {
         Ok(())
     }
 
-    pub(crate) async fn try_enqueue_scheduled_auto_polling_flow_if_enabled(
+    pub(crate) async fn try_schedule_auto_polling_flow_if_enabled(
         &self,
         start_time: DateTime<Utc>,
         flow_key: &FlowKey,
@@ -115,7 +115,7 @@ impl FlowEnqueueHelper {
             .int_err()?;
 
         if let Some(active_schedule) = maybe_active_schedule {
-            self.enqueue_scheduled_auto_polling_flow(start_time, flow_key, &active_schedule)
+            self.schedule_auto_polling_flow(start_time, flow_key, &active_schedule)
                 .await?;
         }
 
@@ -123,7 +123,7 @@ impl FlowEnqueueHelper {
     }
 
     #[tracing::instrument(level = "trace", skip_all, fields(?flow.flow_key, %flow.flow_id))]
-    pub(crate) async fn enqueue_dependent_flows(
+    pub(crate) async fn schedule_dependent_flows(
         &self,
         input_success_time: DateTime<Utc>,
         flow: &Flow,
@@ -281,7 +281,7 @@ impl FlowEnqueueHelper {
         }
     }
 
-    pub(crate) async fn enqueue_scheduled_auto_polling_flow(
+    pub(crate) async fn schedule_auto_polling_flow(
         &self,
         start_time: DateTime<Utc>,
         flow_key: &FlowKey,
@@ -300,7 +300,7 @@ impl FlowEnqueueHelper {
         .await
     }
 
-    pub(crate) async fn enqueue_auto_polling_flow_unconditionally(
+    pub(crate) async fn schedule_auto_polling_flow_unconditionally(
         &self,
         start_time: DateTime<Utc>,
         flow_key: &FlowKey,
@@ -371,10 +371,10 @@ impl FlowEnqueueHelper {
                         // Evaluate throttling condition: is new time earlier than planned?
                         // In case of batching condition and manual trigger,
                         // there is no planned time, but otherwise compare
-                        if flow.timing.enqueued_for.is_none()
+                        if flow.timing.scheduled_for_activation_at.is_none()
                             || flow
                                 .timing
-                                .enqueued_for
+                                .scheduled_for_activation_at
                                 .is_some_and(|planned_time| throttling_boundary_time < planned_time)
                         {
                             // Indicate throttling, if applied
@@ -386,8 +386,8 @@ impl FlowEnqueueHelper {
                                 )?;
                             }
 
-                            // Enqueue the flow earlier than previously planned
-                            self.enqueue_flow(&mut flow, throttling_boundary_time)
+                            // Schedule the flow earlier than previously planned
+                            self.schedule_flow_for_activation(&mut flow, throttling_boundary_time)
                                 .await?;
                         }
                     }
@@ -397,7 +397,7 @@ impl FlowEnqueueHelper {
                 Ok(flow.into())
             }
 
-            // Otherwise, initiate a new flow, and enqueue it in the time wheel
+            // Otherwise, initiate a new flow and schedule it for activation
             None => {
                 // Initiate new flow
                 let config_snapshot_maybe = if config_snapshot_maybe.is_some() {
@@ -457,8 +457,9 @@ impl FlowEnqueueHelper {
                             .int_err()?;
                         }
 
-                        // Enqueue flow for the decided moment
-                        self.enqueue_flow(&mut flow, next_activation_time).await?;
+                        // Schedule flow for the decided moment
+                        self.schedule_flow_for_activation(&mut flow, next_activation_time)
+                            .await?;
                     }
                     FlowTriggerContext::Unconditional => {
                         // Apply throttling boundary
@@ -474,8 +475,9 @@ impl FlowEnqueueHelper {
                             )?;
                         }
 
-                        // Enqueue flow for the decided moment
-                        self.enqueue_flow(&mut flow, next_activation_time).await?;
+                        // Schedule flow for the decided moment
+                        self.schedule_flow_for_activation(&mut flow, next_activation_time)
+                            .await?;
                     }
                 }
 
@@ -590,12 +592,15 @@ impl FlowEnqueueHelper {
             let corrected_finish_time =
                 std::cmp::max(batching_finish_time, throttling_boundary_time);
 
-            let should_activate = match flow.timing.enqueued_for {
-                Some(enqueued_for) => enqueued_for > corrected_finish_time,
+            let should_activate = match flow.timing.scheduled_for_activation_at {
+                Some(scheduled_for_activation_at) => {
+                    scheduled_for_activation_at > corrected_finish_time
+                }
                 None => true,
             };
             if should_activate {
-                self.enqueue_flow(flow, corrected_finish_time).await?;
+                self.schedule_flow_for_activation(flow, corrected_finish_time)
+                    .await?;
             }
         }
 
@@ -659,18 +664,18 @@ impl FlowEnqueueHelper {
         }
     }
 
-    async fn enqueue_flow(
+    async fn schedule_flow_for_activation(
         &self,
         flow: &mut Flow,
         activate_at: DateTime<Utc>,
     ) -> Result<(), InternalError> {
-        flow.enqueue(self.time_source.now(), activate_at)
+        flow.schedule_for_activation(self.time_source.now(), activate_at)
             .int_err()?;
 
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                FlowProgressMessage::enqueued(self.time_source.now(), flow.flow_id, activate_at),
+                FlowProgressMessage::scheduled(self.time_source.now(), flow.flow_id, activate_at),
             )
             .await
     }

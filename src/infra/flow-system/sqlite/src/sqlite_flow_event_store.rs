@@ -120,15 +120,15 @@ impl SqliteFlowEventStore {
 
         // Determine if we have a status change between these events
         let mut maybe_latest_status = None;
-        let mut maybe_enqueued_for = None;
+        let mut maybe_scheduled_for_activation_at = None;
         for event in events {
             if let Some(new_status) = event.new_status() {
                 maybe_latest_status = Some(new_status);
             }
-            if let FlowEvent::Enqueued(e) = event {
-                maybe_enqueued_for = Some(e.enqueued_for);
+            if let FlowEvent::ScheduledForActivation(e) = event {
+                maybe_scheduled_for_activation_at = Some(e.scheduled_for_activation_at);
             } else if let FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) = event {
-                maybe_enqueued_for = None;
+                maybe_scheduled_for_activation_at = None;
             }
         }
 
@@ -155,7 +155,7 @@ impl SqliteFlowEventStore {
         let rows = sqlx::query!(
             r#"
             UPDATE flows
-                SET flow_status = $2, last_event_id = $3, enqueued_for = $4
+                SET flow_status = $2, last_event_id = $3, scheduled_for_activation_at = $4
                 WHERE flow_id = $1 AND (
                     last_event_id IS NULL AND CAST($5 as INT8) IS NULL OR
                     last_event_id IS NOT NULL AND CAST($5 as INT8) IS NOT NULL AND last_event_id = $5
@@ -165,7 +165,7 @@ impl SqliteFlowEventStore {
             flow_id,
             latest_status,
             last_event_id,
-            maybe_enqueued_for,
+            maybe_scheduled_for_activation_at,
             maybe_prev_stored_event_id,
         )
         .fetch_all(connection_mut)
@@ -549,8 +549,8 @@ impl FlowEventStore for SqliteFlowEventStore {
         })
     }
 
-    /// Returns nearest flow activation time from all enqueued flows
-    async fn nearest_enqueued_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
+    /// Returns nearest time when one or more flows are scheduled for activation
+    async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
         let mut tr = self.transaction.lock().await;
 
         #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
@@ -563,12 +563,12 @@ impl FlowEventStore for SqliteFlowEventStore {
         let maybe_activation_time = sqlx::query_as!(
             ActivationRow,
             r#"
-            SELECT f.enqueued_for as "activation_time: _"
+            SELECT f.scheduled_for_activation_at as "activation_time: _"
                 FROM flows f
                 WHERE
-                    f.enqueued_for IS NOT NULL AND
+                    f.scheduled_for_activation_at IS NOT NULL AND
                     f.flow_status = 'waiting'
-                ORDER BY f.enqueued_for ASC
+                ORDER BY f.scheduled_for_activation_at ASC
                 LIMIT 1
             "#,
         )
@@ -584,10 +584,10 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(maybe_activation_time)
     }
 
-    /// Returns flows enqueued for the given activation time
-    async fn get_enqueued_flows(
+    /// Returns flows scheduled for activation at the given time
+    async fn get_flows_scheduled_for_activation_at(
         &self,
-        enqueued_for: DateTime<Utc>,
+        scheduled_for_activation_at: DateTime<Utc>,
     ) -> Result<Vec<FlowID>, InternalError> {
         let mut tr = self.transaction.lock().await;
 
@@ -597,11 +597,11 @@ impl FlowEventStore for SqliteFlowEventStore {
             SELECT f.flow_id as flow_id
                 FROM flows f
                 WHERE
-                    f.enqueued_for = $1 AND
+                    f.scheduled_for_activation_at = $1 AND
                     f.flow_status = 'waiting'
                 ORDER BY f.flow_id ASC
             "#,
-            enqueued_for,
+            scheduled_for_activation_at,
         )
         .map(|row| FlowID::try_from(row.flow_id).unwrap())
         .fetch_all(connection_mut)
