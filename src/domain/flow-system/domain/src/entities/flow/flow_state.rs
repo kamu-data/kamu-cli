@@ -156,7 +156,7 @@ impl Projection for FlowState {
                         task_id,
                         ..
                     }) => {
-                        if s.outcome.is_some() {
+                        if s.outcome.is_some() || s.timing.scheduled_for_activation_at.is_none() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             let mut task_ids = s.task_ids;

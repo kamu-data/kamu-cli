@@ -70,12 +70,7 @@ impl UploadService for UploadServiceS3 {
         let file_key = self.make_file_key(account_id, &upload_id, &file_name);
 
         let presigned_conf = PresigningConfig::builder()
-            .expires_in(
-                chrono::Duration::try_seconds(3600)
-                    .unwrap()
-                    .to_std()
-                    .unwrap(),
-            )
+            .expires_in(chrono::Duration::seconds(3600).to_std().unwrap())
             .build()
             .expect("Invalid presigning config");
 

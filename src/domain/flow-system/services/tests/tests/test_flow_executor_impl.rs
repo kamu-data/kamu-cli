@@ -49,7 +49,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(60).unwrap().into(),
+                schedule_condition: Duration::milliseconds(60).into(),
             },
         )
         .await;
@@ -58,7 +58,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -74,8 +74,8 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     task_id: TaskID::new(0),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::try_milliseconds(10).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    run_since_start: Duration::milliseconds(10),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
@@ -88,8 +88,8 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     task_id: TaskID::new(1),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::try_milliseconds(90).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    run_since_start: Duration::milliseconds(90),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
@@ -103,7 +103,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                 //    run for "foo" after full period
                 //  - when that period is over, "task 1" should be scheduled
                 //  - "task 1" will take action and complete, enqueuing another flow
-                let sim_handle = harness.advance_time(Duration::try_milliseconds(120).unwrap());
+                let sim_handle = harness.advance_time(Duration::milliseconds(120));
                 tokio::join!(foo_task0_handle, foo_task1_handle, sim_handle)
             } => Ok(())
     }
@@ -173,7 +173,7 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Configure ingestion schedule every 60ms, but use event store directly
@@ -188,7 +188,7 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
                 paused: false,
                 rule: FlowConfigurationRule::IngestRule(IngestRule {
                     fetch_uncacheable: false,
-                    schedule_condition: Duration::try_milliseconds(60).unwrap().into(),
+                    schedule_condition: Duration::milliseconds(60).into(),
                 }),
             }
             .into()],
@@ -221,7 +221,7 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
                     event_time: Utc::now(),
                     flow_id,
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
-                        wake_up_at: start_time + Duration::try_milliseconds(100).unwrap(),
+                        wake_up_at: start_time + Duration::milliseconds(100),
                     }),
                     last_trigger_index: 0,
                 }
@@ -229,8 +229,7 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
                 FlowEventScheduledForActivation {
                     event_time: Utc::now(),
                     flow_id,
-                    scheduled_for_activation_at: start_time
-                        + Duration::try_milliseconds(100).unwrap(),
+                    scheduled_for_activation_at: start_time + Duration::milliseconds(100),
                 }
                 .into(),
             ],
@@ -251,8 +250,8 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
                     task_id: TaskID::new(0),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::try_milliseconds(110).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    run_since_start: Duration::milliseconds(110),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
@@ -261,7 +260,7 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
                 let foo_task0_handle = foo_task0_driver.run();
 
                 // Main simulation boundary - 130ms total
-                let sim_handle = harness.advance_time(Duration::try_milliseconds(130).unwrap());
+                let sim_handle = harness.advance_time(Duration::milliseconds(130));
                 tokio::join!(foo_task0_handle, sim_handle)
             } => Ok(())
     }
@@ -302,8 +301,8 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
 async fn test_cron_config() {
     // Note: this test runs with 1s step, CRON does not apply to milliseconds
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        awaiting_step: Some(Duration::try_seconds(1).unwrap()),
-        mandatory_throttling_period: Some(Duration::try_seconds(1).unwrap()),
+        awaiting_step: Some(Duration::seconds(1)),
+        mandatory_throttling_period: Some(Duration::seconds(1)),
         ..Default::default()
     })
     .await;
@@ -322,7 +321,7 @@ async fn test_cron_config() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_seconds(1).unwrap())
+        .duration_round(Duration::seconds(1))
         .unwrap();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -341,8 +340,8 @@ async fn test_cron_config() {
                     task_id: TaskID::new(0),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::try_seconds(6).unwrap(),
-                    finish_in_with: Some((Duration::try_seconds(1).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    run_since_start: Duration::seconds(6),
+                    finish_in_with: Some((Duration::seconds(1), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
@@ -353,7 +352,7 @@ async fn test_cron_config() {
                 // Main simulation script
                 let main_handle = async {
                     // Wait 2 s
-                    harness.advance_time_custom_alignment(Duration::try_seconds(1).unwrap(), Duration::try_seconds(2).unwrap()).await;
+                    harness.advance_time_custom_alignment(Duration::seconds(1), Duration::seconds(2)).await;
 
                     // Enable CRON config (we are skipping moment 0s)
                     harness
@@ -371,11 +370,11 @@ async fn test_cron_config() {
                             )
                             .await;
                     test_flow_listener
-                        .make_a_snapshot(start_time + Duration::try_seconds(1).unwrap())
+                        .make_a_snapshot(start_time + Duration::seconds(1))
                         .await;
 
                     // Main simulation boundary - 12s total: at 10s 2nd scheduling happens;
-                    harness.advance_time_custom_alignment(Duration::try_seconds(1).unwrap(), Duration::try_seconds(11).unwrap()).await;
+                    harness.advance_time_custom_alignment(Duration::seconds(1), Duration::seconds(11)).await;
                 };
 
                 tokio::join!(foo_task0_handle, main_handle)
@@ -446,7 +445,7 @@ async fn test_manual_trigger() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(90).unwrap().into(),
+                schedule_condition: Duration::milliseconds(90).into(),
             },
         )
         .await;
@@ -462,7 +461,7 @@ async fn test_manual_trigger() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -478,8 +477,8 @@ async fn test_manual_trigger() {
                     task_id: TaskID::new(0),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::try_milliseconds(10).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    run_since_start: Duration::milliseconds(10),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
@@ -492,8 +491,8 @@ async fn test_manual_trigger() {
                     task_id: TaskID::new(1),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::try_milliseconds(60).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    run_since_start: Duration::milliseconds(60),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
@@ -506,8 +505,8 @@ async fn test_manual_trigger() {
                     task_id: TaskID::new(2),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
                     dataset_id: Some(bar_id.clone()),
-                    run_since_start: Duration::try_milliseconds(100).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    run_since_start: Duration::milliseconds(100),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                       dataset_id: bar_id.clone(),
                       fetch_uncacheable: false
@@ -518,7 +517,7 @@ async fn test_manual_trigger() {
                 // Manual trigger for "foo" at 40ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: foo_flow_key,
-                    run_since_start: Duration::try_milliseconds(40).unwrap(),
+                    run_since_start: Duration::milliseconds(40),
                     initiator_id: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
@@ -526,7 +525,7 @@ async fn test_manual_trigger() {
                 // Manual trigger for "bar" at 80ms
                 let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: bar_flow_key,
-                    run_since_start: Duration::try_milliseconds(80).unwrap(),
+                    run_since_start: Duration::milliseconds(80),
                     initiator_id: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
@@ -552,7 +551,7 @@ async fn test_manual_trigger() {
                     //  - no next flow scheduled
 
                     // Stop at 180ms: "foo" flow 3 gets scheduled at 160ms
-                    harness.advance_time(Duration::try_milliseconds(180).unwrap()).await;
+                    harness.advance_time(Duration::milliseconds(180)).await;
                 };
 
                 tokio::join!(task0_handle, task1_handle, task2_handle, trigger0_handle, trigger1_handle, main_handle)
@@ -664,7 +663,7 @@ async fn test_ingest_trigger_with_ingest_config() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: true,
-                schedule_condition: Duration::try_milliseconds(90).unwrap().into(),
+                schedule_condition: Duration::milliseconds(90).into(),
             },
         )
         .await;
@@ -680,7 +679,7 @@ async fn test_ingest_trigger_with_ingest_config() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -696,8 +695,8 @@ async fn test_ingest_trigger_with_ingest_config() {
                     task_id: TaskID::new(0),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::try_milliseconds(10).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    run_since_start: Duration::milliseconds(10),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: true
@@ -710,8 +709,8 @@ async fn test_ingest_trigger_with_ingest_config() {
                     task_id: TaskID::new(1),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::try_milliseconds(60).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    run_since_start: Duration::milliseconds(60),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: true
@@ -724,8 +723,8 @@ async fn test_ingest_trigger_with_ingest_config() {
                     task_id: TaskID::new(2),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
                     dataset_id: Some(bar_id.clone()),
-                    run_since_start: Duration::try_milliseconds(100).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    run_since_start: Duration::milliseconds(100),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                       dataset_id: bar_id.clone(),
                       fetch_uncacheable: false
@@ -736,7 +735,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                 // Manual trigger for "foo" at 40ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: foo_flow_key,
-                    run_since_start: Duration::try_milliseconds(40).unwrap(),
+                    run_since_start: Duration::milliseconds(40),
                     initiator_id: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
@@ -744,7 +743,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                 // Manual trigger for "bar" at 80ms
                 let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: bar_flow_key,
-                    run_since_start: Duration::try_milliseconds(80).unwrap(),
+                    run_since_start: Duration::milliseconds(80),
                     initiator_id: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
@@ -770,7 +769,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     //  - no next flow scheduled
 
                     // Stop at 180ms: "foo" flow 3 gets scheduled at 110ms
-                    harness.advance_time(Duration::try_milliseconds(180).unwrap()).await;
+                    harness.advance_time(Duration::milliseconds(180)).await;
                 };
 
                 tokio::join!(task0_handle, task1_handle, task2_handle, trigger0_handle, trigger1_handle, main_handle)
@@ -888,7 +887,7 @@ async fn test_manual_trigger_compaction() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -904,8 +903,8 @@ async fn test_manual_trigger_compaction() {
                     task_id: TaskID::new(0),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::try_milliseconds(10).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    run_since_start: Duration::milliseconds(10),
+                    finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                       dataset_id: foo_id.clone(),
                       max_slice_size: None,
@@ -919,8 +918,8 @@ async fn test_manual_trigger_compaction() {
                   task_id: TaskID::new(1),
                   task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                   dataset_id: Some(bar_id.clone()),
-                  run_since_start: Duration::try_milliseconds(60).unwrap(),
-                  finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                  run_since_start: Duration::milliseconds(60),
+                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                   expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
@@ -933,7 +932,7 @@ async fn test_manual_trigger_compaction() {
                 // Manual trigger for "foo" at 10ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: foo_flow_key,
-                    run_since_start: Duration::try_milliseconds(10).unwrap(),
+                    run_since_start: Duration::milliseconds(10),
                     initiator_id: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
@@ -941,7 +940,7 @@ async fn test_manual_trigger_compaction() {
                 // Manual trigger for "bar" at 50ms
                 let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: bar_flow_key,
-                    run_since_start: Duration::try_milliseconds(50).unwrap(),
+                    run_since_start: Duration::milliseconds(50),
                     initiator_id: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
@@ -955,7 +954,7 @@ async fn test_manual_trigger_compaction() {
                     //  - flow 1 trigger and finishes
                     //  - task 1 starts at 60ms, finishes at 70ms (leave some gap to fight with random order)
 
-                    harness.advance_time(Duration::try_milliseconds(100).unwrap()).await;
+                    harness.advance_time(Duration::milliseconds(100)).await;
                 };
 
                 tokio::join!(task0_handle, task1_handle, trigger0_handle, trigger1_handle, main_handle)
@@ -1056,7 +1055,7 @@ async fn test_manual_trigger_reset() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -1072,8 +1071,8 @@ async fn test_manual_trigger_reset() {
                     task_id: TaskID::new(0),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(create_dataset_result.dataset_handle.id.clone()),
-                    run_since_start: Duration::try_milliseconds(20).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(90).unwrap(), TaskOutcome::Success(TaskResult::ResetDatasetResult(TaskResetDatasetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") })))),
+                    run_since_start: Duration::milliseconds(20),
+                    finish_in_with: Some((Duration::milliseconds(90), TaskOutcome::Success(TaskResult::ResetDatasetResult(TaskResetDatasetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") })))),
                     expected_logical_plan: LogicalPlan::Reset(ResetDataset {
                       dataset_id: create_dataset_result.dataset_handle.id.clone(),
                       // By deafult should reset to seed block
@@ -1087,7 +1086,7 @@ async fn test_manual_trigger_reset() {
                 // Manual trigger for "foo" at 10ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: foo_flow_key,
-                    run_since_start: Duration::try_milliseconds(10).unwrap(),
+                    run_since_start: Duration::milliseconds(10),
                     initiator_id: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
@@ -1096,7 +1095,7 @@ async fn test_manual_trigger_reset() {
                 let main_handle = async {
                     // Moment 20ms - manual foo trigger happens here:
                     //  - flow 0 gets trigger and finishes at 110ms
-                    harness.advance_time(Duration::try_milliseconds(250).unwrap()).await;
+                    harness.advance_time(Duration::milliseconds(250)).await;
                 };
 
                 tokio::join!(task0_handle, trigger0_handle, main_handle)
@@ -1198,7 +1197,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -1211,7 +1210,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
       _ = async {
           let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
               flow_key: foo_flow_key,
-              run_since_start: Duration::try_milliseconds(10).unwrap(),
+              run_since_start: Duration::milliseconds(10),
               initiator_id: None,
           });
           let trigger0_handle = trigger0_driver.run();
@@ -1221,8 +1220,8 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               task_id: TaskID::new(0),
               task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
               dataset_id: Some(create_foo_result.dataset_handle.id.clone()),
-              run_since_start: Duration::try_milliseconds(20).unwrap(),
-              finish_in_with: Some((Duration::try_milliseconds(70).unwrap(), TaskOutcome::Success(TaskResult::ResetDatasetResult(TaskResetDatasetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") })))),
+              run_since_start: Duration::milliseconds(20),
+              finish_in_with: Some((Duration::milliseconds(70), TaskOutcome::Success(TaskResult::ResetDatasetResult(TaskResetDatasetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") })))),
               expected_logical_plan: LogicalPlan::Reset(ResetDataset {
                 dataset_id: create_foo_result.dataset_handle.id.clone(),
                 new_head_hash: Some(dataset_blocks[1].0.clone()),
@@ -1237,10 +1236,10 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               task_id: TaskID::new(1),
               task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
               dataset_id: Some(foo_baz_id.clone()),
-              run_since_start: Duration::try_milliseconds(110).unwrap(),
+              run_since_start: Duration::milliseconds(110),
               finish_in_with: Some(
                 (
-                  Duration::try_milliseconds(70).unwrap(),
+                  Duration::milliseconds(70),
                   TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                     compaction_result: CompactionResult::Success {
                       old_head: Multihash::from_digest_sha3_256(b"old-slice-2"),
@@ -1265,10 +1264,10 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               task_id: TaskID::new(2),
               task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
               dataset_id: Some(foo_bar_id.clone()),
-              run_since_start: Duration::try_milliseconds(200).unwrap(),
+              run_since_start: Duration::milliseconds(200),
               finish_in_with: Some(
                 (
-                  Duration::try_milliseconds(40).unwrap(),
+                  Duration::milliseconds(40),
                   TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                     compaction_result: CompactionResult::Success {
                       old_head: Multihash::from_digest_sha3_256(b"old-slice-3"),
@@ -1290,7 +1289,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
 
           // Main simulation script
           let main_handle = async {
-              harness.advance_time(Duration::try_milliseconds(300).unwrap()).await;
+              harness.advance_time(Duration::milliseconds(300)).await;
           };
 
           // tokio::join!(trigger0_handle, task0_handle, main_handle)
@@ -1403,7 +1402,7 @@ async fn test_manual_trigger_compaction_with_config() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -1419,8 +1418,8 @@ async fn test_manual_trigger_compaction_with_config() {
                     task_id: TaskID::new(0),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::try_milliseconds(30).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    run_since_start: Duration::milliseconds(30),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                       dataset_id: foo_id.clone(),
                       max_slice_size: Some(max_slice_size),
@@ -1432,7 +1431,7 @@ async fn test_manual_trigger_compaction_with_config() {
 
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: foo_flow_key,
-                    run_since_start: Duration::try_milliseconds(20).unwrap(),
+                    run_since_start: Duration::milliseconds(20),
                     initiator_id: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
@@ -1441,7 +1440,7 @@ async fn test_manual_trigger_compaction_with_config() {
                 let main_handle = async {
                     // Moment 30ms - manual foo trigger happens here:
                     //  - flow 0 trigger and finishes at 40ms
-                    harness.advance_time(Duration::try_milliseconds(80).unwrap()).await;
+                    harness.advance_time(Duration::milliseconds(80)).await;
                 };
 
                 tokio::join!(task0_handle, trigger0_handle, main_handle)
@@ -1531,7 +1530,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -1544,7 +1543,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
       _ = async {
           let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
               flow_key: foo_flow_key,
-              run_since_start: Duration::try_milliseconds(10).unwrap(),
+              run_since_start: Duration::milliseconds(10),
               initiator_id: None,
           });
           let trigger0_handle = trigger0_driver.run();
@@ -1554,10 +1553,10 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
               task_id: TaskID::new(0),
               task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
               dataset_id: Some(foo_id.clone()),
-              run_since_start: Duration::try_milliseconds(20).unwrap(),
+              run_since_start: Duration::milliseconds(20),
               finish_in_with: Some(
                 (
-                  Duration::try_milliseconds(70).unwrap(),
+                  Duration::milliseconds(70),
                   TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                     compaction_result: CompactionResult::Success {
                       old_head: Multihash::from_digest_sha3_256(b"old-slice"),
@@ -1582,10 +1581,10 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
               task_id: TaskID::new(1),
               task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
               dataset_id: Some(foo_baz_id.clone()),
-              run_since_start: Duration::try_milliseconds(110).unwrap(),
+              run_since_start: Duration::milliseconds(110),
               finish_in_with: Some(
                 (
-                  Duration::try_milliseconds(70).unwrap(),
+                  Duration::milliseconds(70),
                   TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                     compaction_result: CompactionResult::Success {
                       old_head: Multihash::from_digest_sha3_256(b"old-slice-2"),
@@ -1610,10 +1609,10 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
               task_id: TaskID::new(2),
               task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
               dataset_id: Some(foo_bar_id.clone()),
-              run_since_start: Duration::try_milliseconds(200).unwrap(),
+              run_since_start: Duration::milliseconds(200),
               finish_in_with: Some(
                 (
-                  Duration::try_milliseconds(40).unwrap(),
+                  Duration::milliseconds(40),
                   TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                     compaction_result: CompactionResult::Success {
                       old_head: Multihash::from_digest_sha3_256(b"old-slice-3"),
@@ -1635,7 +1634,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
 
           // Main simulation script
           let main_handle = async {
-              harness.advance_time(Duration::try_milliseconds(300).unwrap()).await;
+              harness.advance_time(Duration::milliseconds(300)).await;
           };
 
           tokio::join!(trigger0_handle, task0_handle, task1_handle, task2_handle, main_handle)
@@ -1766,7 +1765,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -1779,7 +1778,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
         _ = async {
             let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                 flow_key: foo_flow_key,
-                run_since_start: Duration::try_milliseconds(10).unwrap(),
+                run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
             });
             let trigger0_handle = trigger0_driver.run();
@@ -1789,10 +1788,10 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::try_milliseconds(20).unwrap(),
+                run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some(
                   (
-                    Duration::try_milliseconds(70).unwrap(),
+                    Duration::milliseconds(70),
                     TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                       compaction_result: CompactionResult::Success {
                         old_head: Multihash::from_digest_sha3_256(b"old-slice"),
@@ -1817,10 +1816,10 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                 task_id: TaskID::new(1),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(foo_bar_id.clone()),
-                run_since_start: Duration::try_milliseconds(110).unwrap(),
+                run_since_start: Duration::milliseconds(110),
                 finish_in_with: Some(
                   (
-                    Duration::try_milliseconds(70).unwrap(),
+                    Duration::milliseconds(70),
                     TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                       compaction_result: CompactionResult::Success {
                         old_head: Multihash::from_digest_sha3_256(b"old-slice-2"),
@@ -1845,10 +1844,10 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                 task_id: TaskID::new(2),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
                 dataset_id: Some(foo_bar_baz_id.clone()),
-                run_since_start: Duration::try_milliseconds(200).unwrap(),
+                run_since_start: Duration::milliseconds(200),
                 finish_in_with: Some(
                   (
-                    Duration::try_milliseconds(40).unwrap(),
+                    Duration::milliseconds(40),
                     TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                       compaction_result: CompactionResult::Success {
                         old_head: Multihash::from_digest_sha3_256(b"old-slice-3"),
@@ -1870,7 +1869,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
 
             // Main simulation script
             let main_handle = async {
-                harness.advance_time(Duration::try_milliseconds(300).unwrap()).await;
+                harness.advance_time(Duration::milliseconds(300)).await;
             };
 
             tokio::join!(trigger0_handle, task0_handle, task1_handle, task2_handle, main_handle)
@@ -2003,7 +2002,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -2016,7 +2015,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
         _ = async {
             let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                 flow_key: foo_flow_key,
-                run_since_start: Duration::try_milliseconds(10).unwrap(),
+                run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
             });
             let trigger0_handle = trigger0_driver.run();
@@ -2026,10 +2025,10 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::try_milliseconds(20).unwrap(),
+                run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some(
                   (
-                    Duration::try_milliseconds(70).unwrap(),
+                    Duration::milliseconds(70),
                     TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                       compaction_result: CompactionResult::Success {
                         old_head: Multihash::from_digest_sha3_256(b"old-slice"),
@@ -2051,7 +2050,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
 
             // Main simulation script
             let main_handle = async {
-                harness.advance_time(Duration::try_milliseconds(150).unwrap()).await;
+                harness.advance_time(Duration::milliseconds(150)).await;
             };
 
             tokio::join!(trigger0_handle, task0_handle, main_handle)
@@ -2145,7 +2144,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -2161,8 +2160,8 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::try_milliseconds(10).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(70).unwrap(), TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((Duration::milliseconds(70), TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                   compaction_result: CompactionResult::Success {
                     old_head: Multihash::from_digest_sha3_256(b"old-slice"),
                     new_head: Multihash::from_digest_sha3_256(b"new-slice"),
@@ -2180,7 +2179,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
 
             let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                 flow_key: foo_flow_key,
-                run_since_start: Duration::try_milliseconds(10).unwrap(),
+                run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
             });
             let trigger0_handle = trigger0_driver.run();
@@ -2190,9 +2189,9 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                 task_id: TaskID::new(1),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(foo_bar_id.clone()),
-                run_since_start: Duration::try_milliseconds(110).unwrap(),
+                run_since_start: Duration::milliseconds(110),
                 // Send some PullResult with records to bypass batching condition
-                finish_in_with: Some((Duration::try_milliseconds(70).unwrap(), TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                finish_in_with: Some((Duration::milliseconds(70), TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                   compaction_result: CompactionResult::Success {
                     old_head: Multihash::from_digest_sha3_256(b"old-slice"),
                     new_head: Multihash::from_digest_sha3_256(b"new-slice"),
@@ -2211,7 +2210,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
 
             // Main simulation script
             let main_handle = async {
-                harness.advance_time(Duration::try_milliseconds(400).unwrap()).await;
+                harness.advance_time(Duration::milliseconds(400)).await;
             };
 
             tokio::join!(task0_handle, trigger0_handle, task1_handle, main_handle)
@@ -2291,7 +2290,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+                schedule_condition: Duration::milliseconds(50).into(),
             },
         )
         .await;
@@ -2302,7 +2301,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(80).unwrap().into(),
+                schedule_condition: Duration::milliseconds(80).into(),
             },
         )
         .await;
@@ -2315,7 +2314,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -2331,8 +2330,8 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::try_milliseconds(10).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                   dataset_id: foo_id.clone(),
                   fetch_uncacheable: false
@@ -2345,8 +2344,8 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 task_id: TaskID::new(1),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
-                run_since_start: Duration::try_milliseconds(20).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                run_since_start: Duration::milliseconds(20),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                   dataset_id: bar_id.clone(),
                   fetch_uncacheable: false
@@ -2365,9 +2364,9 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 //  - next flow 3 queued for 70ms (20+50)
 
                 // 50ms: Pause both flow configs in between completion 2 first tasks and queuing
-                harness.advance_time(Duration::try_milliseconds(50).unwrap()).await;
-                harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), foo_id.clone(), DatasetFlowType::Ingest).await;
-                harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), bar_id.clone(), DatasetFlowType::Ingest).await;
+                harness.advance_time(Duration::milliseconds(50)).await;
+                harness.pause_dataset_flow(start_time + Duration::milliseconds(50), foo_id.clone(), DatasetFlowType::Ingest).await;
+                harness.pause_dataset_flow(start_time + Duration::milliseconds(50), bar_id.clone(), DatasetFlowType::Ingest).await;
 
                 // 80ms: Wake up after initially planned "foo" scheduling but before planned "bar" scheduling:
                 //  - "foo":
@@ -2376,18 +2375,18 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 //  - "bar":
                 //    - gets a config update for period of 70ms
                 //    - get queued for 100ms (last success at 30ms + period of 70ms)
-                harness.advance_time(Duration::try_milliseconds(30).unwrap()).await;
-                harness.resume_dataset_flow(start_time + Duration::try_milliseconds(80).unwrap(), foo_id.clone(), DatasetFlowType::Ingest).await;
-                harness.set_dataset_flow_ingest(start_time + Duration::try_milliseconds(80).unwrap(), bar_id.clone(), DatasetFlowType::Ingest, IngestRule {
+                harness.advance_time(Duration::milliseconds(30)).await;
+                harness.resume_dataset_flow(start_time + Duration::milliseconds(80), foo_id.clone(), DatasetFlowType::Ingest).await;
+                harness.set_dataset_flow_ingest(start_time + Duration::milliseconds(80), bar_id.clone(), DatasetFlowType::Ingest, IngestRule {
                   fetch_uncacheable: false,
-                  schedule_condition: Duration::try_milliseconds(70).unwrap().into(),
+                  schedule_condition: Duration::milliseconds(70).into(),
               }).await;
                 test_flow_listener
-                    .make_a_snapshot(start_time + Duration::try_milliseconds(80).unwrap())
+                    .make_a_snapshot(start_time + Duration::milliseconds(80))
                     .await;
 
                 // 120ms: finish
-                harness.advance_time(Duration::try_milliseconds(40).unwrap()).await;
+                harness.advance_time(Duration::milliseconds(40)).await;
             };
 
             tokio::join!(task0_handle, task1_handle, main_handle)
@@ -2520,7 +2519,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(100).unwrap().into(),
+                schedule_condition: Duration::milliseconds(100).into(),
             },
         )
         .await;
@@ -2532,7 +2531,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(60).unwrap().into(),
+                schedule_condition: Duration::milliseconds(60).into(),
             },
         )
         .await;
@@ -2548,7 +2547,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -2564,8 +2563,8 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::try_milliseconds(10).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                   dataset_id: foo_id.clone(),
                   fetch_uncacheable: false
@@ -2578,8 +2577,8 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 task_id: TaskID::new(1),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
-                run_since_start: Duration::try_milliseconds(20).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                run_since_start: Duration::milliseconds(20),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                   dataset_id: bar_id.clone(),
                   fetch_uncacheable: false
@@ -2598,9 +2597,9 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
               //  - next flow 3 queued for 90ms (30ms initiated + 60ms period)
 
               // 50ms: Pause flow config before next flow runs
-              harness.advance_time(Duration::try_milliseconds(50).unwrap()).await;
-              harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), foo_id.clone(), DatasetFlowType::Ingest).await;
-              harness.pause_dataset_flow(start_time + Duration::try_milliseconds(50).unwrap(), bar_id.clone(), DatasetFlowType::Ingest).await;
+              harness.advance_time(Duration::milliseconds(50)).await;
+              harness.pause_dataset_flow(start_time + Duration::milliseconds(50), foo_id.clone(), DatasetFlowType::Ingest).await;
+              harness.pause_dataset_flow(start_time + Duration::milliseconds(50), bar_id.clone(), DatasetFlowType::Ingest).await;
 
               // 100ms: Wake up after initially planned "bar" scheduling but before planned "foo" scheduling:
               //  - "foo":
@@ -2611,15 +2610,15 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
               //    - resumed with period 60ms
               //    - last success at 30ms
               //    - gets scheduled immediately (waited longer than 30ms last success + 60ms period)
-              harness.advance_time(Duration::try_milliseconds(50).unwrap()).await;
-              harness.resume_dataset_flow(start_time + Duration::try_milliseconds(100).unwrap(), foo_id.clone(), DatasetFlowType::Ingest).await;
-              harness.resume_dataset_flow(start_time + Duration::try_milliseconds(100).unwrap(), bar_id.clone(), DatasetFlowType::Ingest).await;
+              harness.advance_time(Duration::milliseconds(50)).await;
+              harness.resume_dataset_flow(start_time + Duration::milliseconds(100), foo_id.clone(), DatasetFlowType::Ingest).await;
+              harness.resume_dataset_flow(start_time + Duration::milliseconds(100), bar_id.clone(), DatasetFlowType::Ingest).await;
               test_flow_listener
-                  .make_a_snapshot(start_time + Duration::try_milliseconds(100).unwrap())
+                  .make_a_snapshot(start_time + Duration::milliseconds(100))
                   .await;
 
               // 150ms: finish
-              harness.advance_time(Duration::try_milliseconds(50).unwrap()).await;
+              harness.advance_time(Duration::milliseconds(50)).await;
           };
 
           tokio::join!(task0_handle, task1_handle, main_handle)
@@ -2752,7 +2751,7 @@ async fn test_dataset_deleted() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+                schedule_condition: Duration::milliseconds(50).into(),
             },
         )
         .await;
@@ -2763,7 +2762,7 @@ async fn test_dataset_deleted() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(70).unwrap().into(),
+                schedule_condition: Duration::milliseconds(70).into(),
             },
         )
         .await;
@@ -2776,7 +2775,7 @@ async fn test_dataset_deleted() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -2792,8 +2791,8 @@ async fn test_dataset_deleted() {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::try_milliseconds(10).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                   dataset_id: foo_id.clone(),
                   fetch_uncacheable: false
@@ -2806,8 +2805,8 @@ async fn test_dataset_deleted() {
                 task_id: TaskID::new(1),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
-                run_since_start: Duration::try_milliseconds(20).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                run_since_start: Duration::milliseconds(20),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                   dataset_id: bar_id.clone(),
                   fetch_uncacheable: false
@@ -2827,15 +2826,15 @@ async fn test_dataset_deleted() {
                 //   - flow 3 scheduled for 30ms + period = 100ms
 
                 // 50ms: deleting "foo" in QUEUED state
-                harness.advance_time(Duration::try_milliseconds(50).unwrap()).await;
+                harness.advance_time(Duration::milliseconds(50)).await;
                 harness.delete_dataset(&foo_id).await;
 
                 // 120ms: deleting "bar" in SCHEDULED state
-                harness.advance_time(Duration::try_milliseconds(70).unwrap()).await;
+                harness.advance_time(Duration::milliseconds(70)).await;
                 harness.delete_dataset(&bar_id).await;
 
                 // 140ms: finish
-                harness.advance_time(Duration::try_milliseconds(20).unwrap()).await;
+                harness.advance_time(Duration::milliseconds(20)).await;
             };
 
             tokio::join!(task0_handle, task1_handle, main_handle)
@@ -2954,7 +2953,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 DatasetFlowType::Ingest,
                 IngestRule {
                     fetch_uncacheable: false,
-                    schedule_condition: Duration::try_milliseconds(40).unwrap().into(),
+                    schedule_condition: Duration::milliseconds(40).into(),
                 },
             )
             .await;
@@ -2972,7 +2971,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -2988,8 +2987,8 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::try_milliseconds(10).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                   dataset_id: foo_id.clone(),
                   fetch_uncacheable: false
@@ -3002,8 +3001,8 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 task_id: TaskID::new(1),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
-                run_since_start: Duration::try_milliseconds(20).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Failed(TaskError::Empty))),
+                run_since_start: Duration::milliseconds(20),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                   dataset_id: bar_id.clone(),
                   fetch_uncacheable: false
@@ -3016,8 +3015,8 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 task_id: TaskID::new(2),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
                 dataset_id: Some(baz_id.clone()),
-                run_since_start: Duration::try_milliseconds(30).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Cancelled)),
+                run_since_start: Duration::milliseconds(30),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Cancelled)),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                   dataset_id: baz_id.clone(),
                   fetch_uncacheable: false
@@ -3042,7 +3041,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 //   - next flow not scheduled
 
                 // 80ms: the succeeded dataset schedule another update
-                harness.advance_time(Duration::try_milliseconds(80).unwrap()).await;
+                harness.advance_time(Duration::milliseconds(80)).await;
             };
 
             tokio::join!(task0_handle, task1_handle, task2_handle, main_handle)
@@ -3179,7 +3178,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(80).unwrap().into(),
+                schedule_condition: Duration::milliseconds(80).into(),
             },
         )
         .await;
@@ -3189,7 +3188,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            TransformRule::new_checked(1, Duration::try_seconds(1).unwrap()).unwrap(),
+            TransformRule::new_checked(1, Duration::seconds(1)).unwrap(),
         )
         .await;
 
@@ -3204,7 +3203,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -3220,8 +3219,8 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::try_milliseconds(10).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                   dataset_id: foo_id.clone(),
                   fetch_uncacheable: false
@@ -3234,9 +3233,9 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 task_id: TaskID::new(1),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
-                run_since_start: Duration::try_milliseconds(20).unwrap(),
+                run_since_start: Duration::milliseconds(20),
                 // Send some PullResult with records to bypass batching condition
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                   pull_result: PullResult::Updated {
                     old_head: Some(Multihash::from_digest_sha3_256(b"old-slice")),
                     new_head: Multihash::from_digest_sha3_256(b"new-slice"),
@@ -3254,9 +3253,9 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 task_id: TaskID::new(2),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::try_milliseconds(110).unwrap(),
+                run_since_start: Duration::milliseconds(110),
                 // Send some PullResult with records to bypass batching condition
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                   pull_result: PullResult::Updated {
                     old_head: Some(Multihash::from_digest_sha3_256(b"new-slice")),
                     new_head: Multihash::from_digest_sha3_256(b"newest-slice"),
@@ -3274,8 +3273,8 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 task_id: TaskID::new(3),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
                 dataset_id: Some(bar_id.clone()),
-                run_since_start: Duration::try_milliseconds(130).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                run_since_start: Duration::milliseconds(130),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                   dataset_id: bar_id.clone(),
                   fetch_uncacheable: false
@@ -3286,7 +3285,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
 
             // Main simulation script
             let main_handle = async {
-                harness.advance_time(Duration::try_milliseconds(220).unwrap()).await;
+                harness.advance_time(Duration::milliseconds(220)).await;
             };
 
             tokio::join!(task0_handle, task1_handle, task2_handle, task3_handle, main_handle)
@@ -3407,10 +3406,8 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
 #[test_log::test(tokio::test)]
 async fn test_throttling_manual_triggers() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        awaiting_step: Some(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap()),
-        mandatory_throttling_period: Some(
-            Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS * 10).unwrap(),
-        ),
+        awaiting_step: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS)),
+        mandatory_throttling_period: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10)),
         ..Default::default()
     })
     .await;
@@ -3435,7 +3432,7 @@ async fn test_throttling_manual_triggers() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -3449,7 +3446,7 @@ async fn test_throttling_manual_triggers() {
         // Manual trigger for "foo" at 20ms
         let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
             flow_key: foo_flow_key.clone(),
-            run_since_start: Duration::try_milliseconds(20).unwrap(),
+            run_since_start: Duration::milliseconds(20),
             initiator_id: None,
         });
         let trigger0_handle = trigger0_driver.run();
@@ -3457,7 +3454,7 @@ async fn test_throttling_manual_triggers() {
         // Manual trigger for "foo" at 30ms
         let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
             flow_key: foo_flow_key.clone(),
-            run_since_start: Duration::try_milliseconds(30).unwrap(),
+            run_since_start: Duration::milliseconds(30),
             initiator_id: None,
         });
         let trigger1_handle = trigger1_driver.run();
@@ -3465,7 +3462,7 @@ async fn test_throttling_manual_triggers() {
         // Manual trigger for "foo" at 70ms
         let trigger2_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
           flow_key: foo_flow_key,
-          run_since_start: Duration::try_milliseconds(70).unwrap(),
+          run_since_start: Duration::milliseconds(70),
           initiator_id: None,
         });
         let trigger2_handle = trigger2_driver.run();
@@ -3475,8 +3472,8 @@ async fn test_throttling_manual_triggers() {
             task_id: TaskID::new(0),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
             dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::try_milliseconds(40).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+            run_since_start: Duration::milliseconds(40),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
@@ -3486,11 +3483,11 @@ async fn test_throttling_manual_triggers() {
 
         // Main simulation script
         let main_handle = async {
-          harness.advance_time(Duration::try_milliseconds(100).unwrap()).await;
+          harness.advance_time(Duration::milliseconds(100)).await;
           test_flow_listener
-              .make_a_snapshot(start_time + Duration::try_milliseconds(100).unwrap())
+              .make_a_snapshot(start_time + Duration::milliseconds(100))
               .await;
-          harness.advance_time(Duration::try_milliseconds(70).unwrap()).await;
+          harness.advance_time(Duration::milliseconds(70)).await;
         };
 
         tokio::join!(trigger0_handle, trigger1_handle, trigger2_handle, task0_handle, main_handle)
@@ -3536,9 +3533,9 @@ async fn test_throttling_manual_triggers() {
 #[test_log::test(tokio::test)]
 async fn test_throttling_derived_dataset_with_2_parents() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        awaiting_step: Some(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap()), // 10ms,
+        awaiting_step: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS)), // 10ms,
         mandatory_throttling_period: Some(
-            Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS * 10).unwrap(),
+            Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10),
         ), /* 100ms */
         mock_dataset_changes: Some(MockDatasetChangesService::with_increment_since(
             DatasetIntervalIncrement {
@@ -3584,7 +3581,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+                schedule_condition: Duration::milliseconds(50).into(),
             },
         )
         .await;
@@ -3596,7 +3593,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(150).unwrap().into(),
+                schedule_condition: Duration::milliseconds(150).into(),
             },
         )
         .await;
@@ -3606,7 +3603,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             harness.now_datetime(),
             baz_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            TransformRule::new_checked(1, Duration::try_hours(24).unwrap()).unwrap(),
+            TransformRule::new_checked(1, Duration::hours(24)).unwrap(),
         )
         .await;
 
@@ -3622,7 +3619,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -3638,8 +3635,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             task_id: TaskID::new(0),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
             dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::try_milliseconds(10).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            run_since_start: Duration::milliseconds(10),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
@@ -3657,8 +3654,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             task_id: TaskID::new(1),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
             dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::try_milliseconds(20).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            run_since_start: Duration::milliseconds(20),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"fbar-new-slice"),
@@ -3676,8 +3673,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             task_id: TaskID::new(2),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
             dataset_id: Some(baz_id.clone()),
-            run_since_start: Duration::try_milliseconds(30).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+            run_since_start: Duration::milliseconds(30),
+            finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
               dataset_id: baz_id.clone(),
               fetch_uncacheable: false
@@ -3690,8 +3687,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             task_id: TaskID::new(3),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
             dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::try_milliseconds(130).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            run_since_start: Duration::milliseconds(130),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
                     old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
                     new_head: Multihash::from_digest_sha3_256(b"foo-newest-slice"),
@@ -3709,8 +3706,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             task_id: TaskID::new(4),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "5")]),
             dataset_id: Some(baz_id.clone()),
-            run_since_start: Duration::try_milliseconds(160).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+            run_since_start: Duration::milliseconds(160),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
             expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
               dataset_id: baz_id.clone(),
               fetch_uncacheable: false
@@ -3723,8 +3720,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             task_id: TaskID::new(5),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "4")]),
             dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::try_milliseconds(190).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            run_since_start: Duration::milliseconds(190),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"bar-newest-slice"),
@@ -3773,7 +3770,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           //   - baz flow 7 scheduled as derived for 270ms: max(200ms initiated, last attempt 170ms + hrottling 100ms)
           //   - bar flow 8 scheduled for 350ms: 200ms initiated + max (period 150ms, throttling 100ms)
 
-          harness.advance_time(Duration::try_milliseconds(400).unwrap()).await;
+          harness.advance_time(Duration::milliseconds(400)).await;
         };
 
         tokio::join!(task0_handle, task1_handle, task2_handle, task3_handle, task4_handle, task5_handle, main_handle)
@@ -4071,7 +4068,7 @@ async fn test_batching_condition_records_reached() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+                schedule_condition: Duration::milliseconds(50).into(),
             },
         )
         .await;
@@ -4081,7 +4078,7 @@ async fn test_batching_condition_records_reached() {
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            TransformRule::new_checked(10, Duration::try_milliseconds(120).unwrap()).unwrap(),
+            TransformRule::new_checked(10, Duration::milliseconds(120)).unwrap(),
         )
         .await;
 
@@ -4096,7 +4093,7 @@ async fn test_batching_condition_records_reached() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -4112,8 +4109,8 @@ async fn test_batching_condition_records_reached() {
             task_id: TaskID::new(0),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
             dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::try_milliseconds(10).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            run_since_start: Duration::milliseconds(10),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
@@ -4131,8 +4128,8 @@ async fn test_batching_condition_records_reached() {
             task_id: TaskID::new(1),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
             dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::try_milliseconds(20).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            run_since_start: Duration::milliseconds(20),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
@@ -4150,8 +4147,8 @@ async fn test_batching_condition_records_reached() {
             task_id: TaskID::new(2),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
             dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::try_milliseconds(80).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            run_since_start: Duration::milliseconds(80),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
@@ -4169,8 +4166,8 @@ async fn test_batching_condition_records_reached() {
             task_id: TaskID::new(3),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "4")]),
             dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::try_milliseconds(150).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            run_since_start: Duration::milliseconds(150),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice-2")),
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
@@ -4188,8 +4185,8 @@ async fn test_batching_condition_records_reached() {
             task_id: TaskID::new(4),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
             dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::try_milliseconds(170).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            run_since_start: Duration::milliseconds(170),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
@@ -4204,7 +4201,7 @@ async fn test_batching_condition_records_reached() {
 
         // Main simulation script
         let main_handle = async {
-          harness.advance_time(Duration::try_milliseconds(400).unwrap()).await;
+          harness.advance_time(Duration::milliseconds(400)).await;
         };
 
         tokio::join!(task0_handle, task1_handle, task2_handle, task3_handle, task4_handle, main_handle)
@@ -4401,7 +4398,7 @@ async fn test_batching_condition_timeout() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+                schedule_condition: Duration::milliseconds(50).into(),
             },
         )
         .await;
@@ -4411,7 +4408,7 @@ async fn test_batching_condition_timeout() {
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            TransformRule::new_checked(10, Duration::try_milliseconds(150).unwrap()).unwrap(),
+            TransformRule::new_checked(10, Duration::milliseconds(150)).unwrap(),
         )
         .await;
 
@@ -4426,7 +4423,7 @@ async fn test_batching_condition_timeout() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -4442,8 +4439,8 @@ async fn test_batching_condition_timeout() {
             task_id: TaskID::new(0),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
             dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::try_milliseconds(10).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            run_since_start: Duration::milliseconds(10),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
@@ -4461,8 +4458,8 @@ async fn test_batching_condition_timeout() {
             task_id: TaskID::new(1),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
             dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::try_milliseconds(20).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            run_since_start: Duration::milliseconds(20),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
@@ -4480,8 +4477,8 @@ async fn test_batching_condition_timeout() {
             task_id: TaskID::new(2),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
             dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::try_milliseconds(80).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            run_since_start: Duration::milliseconds(80),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
@@ -4501,8 +4498,8 @@ async fn test_batching_condition_timeout() {
             task_id: TaskID::new(4),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
             dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::try_milliseconds(250).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            run_since_start: Duration::milliseconds(250),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
@@ -4517,7 +4514,7 @@ async fn test_batching_condition_timeout() {
 
         // Main simulation script
         let main_handle = async {
-          harness.advance_time(Duration::try_milliseconds(400).unwrap()).await;
+          harness.advance_time(Duration::milliseconds(400)).await;
         };
 
         tokio::join!(task0_handle, task1_handle, task2_handle, task4_handle, main_handle)
@@ -4682,7 +4679,7 @@ async fn test_batching_condition_watermark() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(40).unwrap().into(),
+                schedule_condition: Duration::milliseconds(40).into(),
             },
         )
         .await;
@@ -4692,7 +4689,7 @@ async fn test_batching_condition_watermark() {
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            TransformRule::new_checked(10, Duration::try_milliseconds(200).unwrap()).unwrap(),
+            TransformRule::new_checked(10, Duration::milliseconds(200)).unwrap(),
         )
         .await;
 
@@ -4707,7 +4704,7 @@ async fn test_batching_condition_watermark() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -4723,8 +4720,8 @@ async fn test_batching_condition_watermark() {
             task_id: TaskID::new(0),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
             dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::try_milliseconds(10).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            run_since_start: Duration::milliseconds(10),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
@@ -4742,8 +4739,8 @@ async fn test_batching_condition_watermark() {
             task_id: TaskID::new(1),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
             dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::try_milliseconds(20).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            run_since_start: Duration::milliseconds(20),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
@@ -4761,8 +4758,8 @@ async fn test_batching_condition_watermark() {
             task_id: TaskID::new(2),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
             dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::try_milliseconds(70).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            run_since_start: Duration::milliseconds(70),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
@@ -4782,8 +4779,8 @@ async fn test_batching_condition_watermark() {
             task_id: TaskID::new(4),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
             dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::try_milliseconds(290).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            run_since_start: Duration::milliseconds(290),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
@@ -4798,7 +4795,7 @@ async fn test_batching_condition_watermark() {
 
         // Main simulation script
         let main_handle = async {
-          harness.advance_time(Duration::try_milliseconds(400).unwrap()).await;
+          harness.advance_time(Duration::milliseconds(400)).await;
         };
 
         tokio::join!(task0_handle, task1_handle, task2_handle, task4_handle, main_handle)
@@ -5020,7 +5017,7 @@ async fn test_batching_condition_with_2_inputs() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(80).unwrap().into(),
+                schedule_condition: Duration::milliseconds(80).into(),
             },
         )
         .await;
@@ -5032,7 +5029,7 @@ async fn test_batching_condition_with_2_inputs() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(120).unwrap().into(),
+                schedule_condition: Duration::milliseconds(120).into(),
             },
         )
         .await;
@@ -5042,7 +5039,7 @@ async fn test_batching_condition_with_2_inputs() {
             harness.now_datetime(),
             baz_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            TransformRule::new_checked(15, Duration::try_milliseconds(200).unwrap()).unwrap(),
+            TransformRule::new_checked(15, Duration::milliseconds(200)).unwrap(),
         )
         .await;
 
@@ -5058,7 +5055,7 @@ async fn test_batching_condition_with_2_inputs() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -5074,8 +5071,8 @@ async fn test_batching_condition_with_2_inputs() {
             task_id: TaskID::new(0),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
             dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::try_milliseconds(10).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            run_since_start: Duration::milliseconds(10),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
@@ -5093,8 +5090,8 @@ async fn test_batching_condition_with_2_inputs() {
             task_id: TaskID::new(1),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
             dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::try_milliseconds(20).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            run_since_start: Duration::milliseconds(20),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
@@ -5112,8 +5109,8 @@ async fn test_batching_condition_with_2_inputs() {
             task_id: TaskID::new(2),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
             dataset_id: Some(baz_id.clone()),
-            run_since_start: Duration::try_milliseconds(30).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            run_since_start: Duration::milliseconds(30),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"baz-old-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"baz-new-slice"),
@@ -5131,8 +5128,8 @@ async fn test_batching_condition_with_2_inputs() {
             task_id: TaskID::new(3),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
             dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::try_milliseconds(110).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            run_since_start: Duration::milliseconds(110),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
@@ -5150,8 +5147,8 @@ async fn test_batching_condition_with_2_inputs() {
             task_id: TaskID::new(4),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "4")]),
             dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::try_milliseconds(160).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            run_since_start: Duration::milliseconds(160),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
@@ -5169,8 +5166,8 @@ async fn test_batching_condition_with_2_inputs() {
             task_id: TaskID::new(5),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "6")]),
             dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::try_milliseconds(210).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            run_since_start: Duration::milliseconds(210),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
@@ -5188,8 +5185,8 @@ async fn test_batching_condition_with_2_inputs() {
             task_id: TaskID::new(6),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "5")]),
             dataset_id: Some(baz_id.clone()),
-            run_since_start: Duration::try_milliseconds(230).unwrap(),
-            finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            run_since_start: Duration::milliseconds(230),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
                 old_head: Some(Multihash::from_digest_sha3_256(b"baz-new-slice")),
                 new_head: Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
@@ -5204,7 +5201,7 @@ async fn test_batching_condition_with_2_inputs() {
 
         // Main simulation script
         let main_handle = async {
-          harness.advance_time(Duration::try_milliseconds(400).unwrap()).await;
+          harness.advance_time(Duration::milliseconds(400)).await;
         };
 
         tokio::join!(task0_handle, task1_handle, task2_handle, task3_handle, task4_handle, task5_handle, task6_handle, main_handle)
@@ -5529,7 +5526,7 @@ async fn test_list_all_flow_initiators() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -5545,8 +5542,8 @@ async fn test_list_all_flow_initiators() {
                     task_id: TaskID::new(0),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::try_milliseconds(10).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    run_since_start: Duration::milliseconds(10),
+                    finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                       dataset_id: foo_id.clone(),
                       max_slice_size: None,
@@ -5560,8 +5557,8 @@ async fn test_list_all_flow_initiators() {
                   task_id: TaskID::new(1),
                   task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                   dataset_id: Some(bar_id.clone()),
-                  run_since_start: Duration::try_milliseconds(60).unwrap(),
-                  finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                  run_since_start: Duration::milliseconds(60),
+                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                   expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
@@ -5574,7 +5571,7 @@ async fn test_list_all_flow_initiators() {
                 // Manual trigger for "foo" at 10ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: foo_flow_key,
-                    run_since_start: Duration::try_milliseconds(10).unwrap(),
+                    run_since_start: Duration::milliseconds(10),
                     initiator_id: Some(foo_account_id.clone()),
                 });
                 let trigger0_handle = trigger0_driver.run();
@@ -5582,7 +5579,7 @@ async fn test_list_all_flow_initiators() {
                 // Manual trigger for "bar" at 50ms
                 let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: bar_flow_key,
-                    run_since_start: Duration::try_milliseconds(50).unwrap(),
+                    run_since_start: Duration::milliseconds(50),
                     initiator_id: Some(bar_account_id.clone()),
                 });
                 let trigger1_handle = trigger1_driver.run();
@@ -5596,7 +5593,7 @@ async fn test_list_all_flow_initiators() {
                     //  - flow 1 trigger and finishes
                     //  - task 1 starts at 60ms, finishes at 70ms (leave some gap to fight with random order)
 
-                    harness.advance_time(Duration::try_milliseconds(100).unwrap()).await;
+                    harness.advance_time(Duration::milliseconds(100)).await;
                 };
 
                 tokio::join!(task0_handle, task1_handle, trigger0_handle, trigger1_handle, main_handle)
@@ -5696,7 +5693,7 @@ async fn test_list_all_datasets_with_flow() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -5712,8 +5709,8 @@ async fn test_list_all_datasets_with_flow() {
                     task_id: TaskID::new(0),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::try_milliseconds(10).unwrap(),
-                    finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                    run_since_start: Duration::milliseconds(10),
+                    finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                       dataset_id: foo_id.clone(),
                       max_slice_size: None,
@@ -5727,8 +5724,8 @@ async fn test_list_all_datasets_with_flow() {
                   task_id: TaskID::new(1),
                   task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                   dataset_id: Some(bar_id.clone()),
-                  run_since_start: Duration::try_milliseconds(60).unwrap(),
-                  finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                  run_since_start: Duration::milliseconds(60),
+                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                   expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
@@ -5741,7 +5738,7 @@ async fn test_list_all_datasets_with_flow() {
                 // Manual trigger for "foo" at 10ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: foo_flow_key,
-                    run_since_start: Duration::try_milliseconds(10).unwrap(),
+                    run_since_start: Duration::milliseconds(10),
                     initiator_id: Some(foo_account_id.clone()),
                 });
                 let trigger0_handle = trigger0_driver.run();
@@ -5749,7 +5746,7 @@ async fn test_list_all_datasets_with_flow() {
                 // Manual trigger for "bar" at 50ms
                 let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
                     flow_key: bar_flow_key,
-                    run_since_start: Duration::try_milliseconds(50).unwrap(),
+                    run_since_start: Duration::milliseconds(50),
                     initiator_id: Some(bar_account_id.clone()),
                 });
                 let trigger1_handle = trigger1_driver.run();
@@ -5763,7 +5760,7 @@ async fn test_list_all_datasets_with_flow() {
                     //  - flow 1 trigger and finishes
                     //  - task 1 starts at 60ms, finishes at 70ms (leave some gap to fight with random order)
 
-                    harness.advance_time(Duration::try_milliseconds(100).unwrap()).await;
+                    harness.advance_time(Duration::milliseconds(100)).await;
                 };
 
                 tokio::join!(task0_handle, task1_handle, trigger0_handle, trigger1_handle, main_handle)
@@ -5842,7 +5839,7 @@ async fn test_abort_flow_before_scheduling_tasks() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(100).unwrap().into(),
+                schedule_condition: Duration::milliseconds(100).into(),
             },
         )
         .await;
@@ -5851,7 +5848,7 @@ async fn test_abort_flow_before_scheduling_tasks() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual aborts script
@@ -5867,8 +5864,8 @@ async fn test_abort_flow_before_scheduling_tasks() {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::try_milliseconds(10).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -5879,11 +5876,11 @@ async fn test_abort_flow_before_scheduling_tasks() {
             // Manual abort for "foo" at 80ms
             let abort0_driver = harness.manual_flow_abort_driver(ManualFlowAbortArgs {
                 flow_id: FlowID::new(1),
-                abort_since_start: Duration::try_milliseconds(80).unwrap(),
+                abort_since_start: Duration::milliseconds(80),
             });
             let abort0_handle = abort0_driver.run();
 
-            let sim_handle = harness.advance_time(Duration::try_milliseconds(150).unwrap());
+            let sim_handle = harness.advance_time(Duration::milliseconds(150));
             tokio::join!(foo_task0_handle, abort0_handle, sim_handle)
         } => Ok(())
     }
@@ -5945,7 +5942,7 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+                schedule_condition: Duration::milliseconds(50).into(),
             },
         )
         .await;
@@ -5954,7 +5951,7 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -5970,8 +5967,8 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::try_milliseconds(10).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(10).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -5982,11 +5979,11 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
             // Manual abort for "foo" at 90ms
             let abort0_driver = harness.manual_flow_abort_driver(ManualFlowAbortArgs {
                 flow_id: FlowID::new(1),
-                abort_since_start: Duration::try_milliseconds(90).unwrap(),
+                abort_since_start: Duration::milliseconds(90),
             });
             let abort0_handle = abort0_driver.run();
 
-            let sim_handle = harness.advance_time(Duration::try_milliseconds(150).unwrap());
+            let sim_handle = harness.advance_time(Duration::milliseconds(150));
             tokio::join!(foo_task0_handle, abort0_handle, sim_handle)
         } => Ok(())
     }
@@ -6053,7 +6050,7 @@ async fn test_abort_flow_after_task_running_has_started() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+                schedule_condition: Duration::milliseconds(50).into(),
             },
         )
         .await;
@@ -6062,7 +6059,7 @@ async fn test_abort_flow_after_task_running_has_started() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -6078,8 +6075,8 @@ async fn test_abort_flow_after_task_running_has_started() {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::try_milliseconds(10).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(100).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((Duration::milliseconds(100), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -6090,11 +6087,11 @@ async fn test_abort_flow_after_task_running_has_started() {
             // Manual abort for "foo" at 50ms, which is within task run period
             let abort0_driver = harness.manual_flow_abort_driver(ManualFlowAbortArgs {
                 flow_id: FlowID::new(0),
-                abort_since_start: Duration::try_milliseconds(50).unwrap(),
+                abort_since_start: Duration::milliseconds(50),
             });
             let abort0_handle = abort0_driver.run();
 
-            let sim_handle = harness.advance_time(Duration::try_milliseconds(150).unwrap());
+            let sim_handle = harness.advance_time(Duration::milliseconds(150));
             tokio::join!(foo_task0_handle, abort0_handle, sim_handle)
         } => Ok(())
     }
@@ -6150,7 +6147,7 @@ async fn test_abort_flow_after_task_finishes() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::try_milliseconds(50).unwrap().into(),
+                schedule_condition: Duration::milliseconds(50).into(),
             },
         )
         .await;
@@ -6159,7 +6156,7 @@ async fn test_abort_flow_after_task_finishes() {
     // Remember start time
     let start_time = harness
         .now_datetime()
-        .duration_round(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap())
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
@@ -6175,8 +6172,8 @@ async fn test_abort_flow_after_task_finishes() {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::try_milliseconds(10).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -6189,8 +6186,8 @@ async fn test_abort_flow_after_task_finishes() {
                 task_id: TaskID::new(1),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::try_milliseconds(90).unwrap(),
-                finish_in_with: Some((Duration::try_milliseconds(20).unwrap(), TaskOutcome::Success(TaskResult::Empty))),
+                run_since_start: Duration::milliseconds(90),
+                finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -6201,11 +6198,11 @@ async fn test_abort_flow_after_task_finishes() {
             // Manual abort for "foo" at 50ms, which is after flow 0 has finished, and before flow 1 has started
             let abort0_driver = harness.manual_flow_abort_driver(ManualFlowAbortArgs {
                 flow_id: FlowID::new(0),
-                abort_since_start: Duration::try_milliseconds(50).unwrap(),
+                abort_since_start: Duration::milliseconds(50),
             });
             let abort0_handle = abort0_driver.run();
 
-            let sim_handle = harness.advance_time(Duration::try_milliseconds(150).unwrap());
+            let sim_handle = harness.advance_time(Duration::milliseconds(150));
             tokio::join!(foo_task0_handle, foo_task1_handle, abort0_handle, sim_handle)
         } => Ok(())
     }

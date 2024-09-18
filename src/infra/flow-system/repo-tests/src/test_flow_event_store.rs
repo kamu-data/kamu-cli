@@ -2100,7 +2100,7 @@ impl<'a> DatasetFlowGenerator<'a> {
         let flow_id: u64 = flow.flow_id.into();
 
         flow.on_task_finished(
-            flow.timing.running_since.unwrap() + Duration::try_minutes(10).unwrap(),
+            flow.timing.running_since.unwrap() + Duration::minutes(10),
             TaskID::new(flow_id * 2 + 1),
             outcome,
         )
@@ -2169,7 +2169,7 @@ impl SystemFlowGenerator {
         let flow_id: u64 = flow.flow_id.into();
 
         flow.on_task_finished(
-            flow.timing.running_since.unwrap() + Duration::try_minutes(10).unwrap(),
+            flow.timing.running_since.unwrap() + Duration::minutes(10),
             TaskID::new(flow_id * 2 + 1),
             outcome,
         )
@@ -2185,10 +2185,16 @@ fn drive_flow_to_status(flow: &mut Flow, expected_status: FlowStatus) {
     let start_moment = Utc::now();
 
     flow.set_relevant_start_condition(
-        start_moment + Duration::try_seconds(1).unwrap(),
+        start_moment + Duration::seconds(1),
         FlowStartCondition::Schedule(FlowStartConditionSchedule {
-            wake_up_at: start_moment + Duration::try_minutes(1).unwrap(),
+            wake_up_at: start_moment + Duration::minutes(1),
         }),
+    )
+    .unwrap();
+
+    flow.schedule_for_activation(
+        start_moment + Duration::seconds(1),
+        start_moment + Duration::minutes(1),
     )
     .unwrap();
 
@@ -2197,14 +2203,14 @@ fn drive_flow_to_status(flow: &mut Flow, expected_status: FlowStatus) {
         let flow_id: u64 = flow.flow_id.into();
         let task_id = TaskID::new(flow_id * 2 + 1);
 
-        flow.on_task_scheduled(start_moment + Duration::try_minutes(5).unwrap(), task_id)
+        flow.on_task_scheduled(start_moment + Duration::minutes(5), task_id)
             .unwrap();
-        flow.on_task_running(start_moment + Duration::try_minutes(7).unwrap(), task_id)
+        flow.on_task_running(start_moment + Duration::minutes(7), task_id)
             .unwrap();
 
         if expected_status == FlowStatus::Finished {
             flow.on_task_finished(
-                start_moment + Duration::try_minutes(10).unwrap(),
+                start_moment + Duration::minutes(10),
                 task_id,
                 TaskOutcome::Success(TaskResult::Empty),
             )

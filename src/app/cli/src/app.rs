@@ -408,8 +408,8 @@ pub fn configure_base_catalog(
     kamu_task_system_services::register_dependencies(&mut b);
 
     b.add_value(kamu_flow_system_inmem::domain::FlowExecutorConfig::new(
-        chrono::Duration::try_seconds(1).unwrap(),
-        chrono::Duration::try_minutes(1).unwrap(),
+        chrono::Duration::seconds(1),
+        chrono::Duration::minutes(1),
     ));
     kamu_flow_system_services::register_dependencies(&mut b);
 

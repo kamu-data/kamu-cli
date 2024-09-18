@@ -680,8 +680,8 @@ impl FlowConfigHarness {
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowEventStore>()
             .add_value(FlowExecutorConfig::new(
-                Duration::try_seconds(1).unwrap(),
-                Duration::try_minutes(1).unwrap(),
+                Duration::seconds(1),
+                Duration::minutes(1),
             ))
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
