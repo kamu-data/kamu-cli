@@ -32,8 +32,8 @@ opendatafabric = { workspace = true }
 
 axum = { version = "0.6", features = ["headers"] }
 chrono = { version = "0.4", default-features = false }
-datafusion = { version = "41", default-features = false }
-datafusion-odata = { version = "41", default-features = false }
+datafusion = { version = "42", default-features = false }
+datafusion-odata = { version = "42", default-features = false }
 dill = { version = "0.9" }
 futures = { version = "0.3", default-features = false }
 http = "0.2"
@@ -49,6 +49,7 @@ time-source = { workspace = true }
 hyper = { version = "0.14", default-features = false }
 indoc = { version = "2" }
 kamu = { workspace = true }
+pretty_assertions = { version = "1" }
 reqwest = { version = "0.11", default-features = false }
 tempfile = { version = "3" }
 test-group = { version = "1" }

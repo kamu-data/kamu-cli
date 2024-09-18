@@ -100,7 +100,7 @@ struct SessionFactoryImpl {
 impl SessionFactory for SessionFactoryImpl {
     async fn authenticate(&self, username: &str, password: &str) -> Result<Token, Status> {
         if username == "kamu" && password == "kamu" {
-            Ok(String::new())
+            Ok(Token::new())
         } else {
             Err(Status::unauthenticated("Invalid credentials!"))
         }

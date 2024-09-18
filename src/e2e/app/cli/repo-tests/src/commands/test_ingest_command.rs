@@ -72,7 +72,7 @@ pub async fn test_push_ingest_from_file_ledger(mut kamu: KamuCliPuppet) {
         indoc!(
             r#"
             message arrow_schema {
-              OPTIONAL INT64 offset;
+              REQUIRED INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -154,7 +154,7 @@ pub async fn test_push_ingest_from_file_snapshot_with_event_time(mut kamu: KamuC
         indoc!(
             r#"
             message arrow_schema {
-              OPTIONAL INT64 offset;
+              REQUIRED INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));

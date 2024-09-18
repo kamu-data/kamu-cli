@@ -121,7 +121,7 @@ async fn test_ingest_polling_snapshot() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -294,7 +294,7 @@ async fn test_ingest_polling_ledger() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
@@ -566,7 +566,7 @@ async fn test_ingest_polling_event_time_as_date() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT32 date (DATE);
@@ -721,7 +721,7 @@ async fn test_ingest_polling_bad_column_names_preserve() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT32 Date (UTC) (DATE);
@@ -814,7 +814,7 @@ async fn test_ingest_polling_bad_column_names_rename() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -906,7 +906,7 @@ async fn test_ingest_polling_preprocess_with_spark() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -998,7 +998,7 @@ async fn test_ingest_polling_preprocess_with_flink() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));

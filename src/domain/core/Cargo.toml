@@ -45,10 +45,10 @@ tracing = { version = "0.1", default-features = false }
 url = { version = "2", default-features = false, features = ["serde"] }
 
 # TODO: Avoid this dependency or depend on sub-crates
-datafusion = { version = "41", default-features = false, features = [
+datafusion = { version = "42", default-features = false, features = [
     "parquet",
 ] }
-object_store = { version = "0.10", default-features = false }
+object_store = { version = "0.11", default-features = false }
 
 # TODO: Make serde optional
 serde = { version = "1", default-features = false, features = ["derive"] }

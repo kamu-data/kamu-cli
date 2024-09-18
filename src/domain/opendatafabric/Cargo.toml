@@ -68,7 +68,7 @@ prost = "0.12"
 tonic = "0.11"
 
 # Optional
-arrow = { optional = true, version = "52", default-features = false, features = [
+arrow = { optional = true, version = "53", default-features = false, features = [
     "ipc",
 ] }
 sqlx = { optional = true, version = "0.8", default-features = false }

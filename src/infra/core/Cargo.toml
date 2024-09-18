@@ -68,9 +68,9 @@ secrecy = "0.8"
 zip = "0.6"
 
 # Data
-datafusion = { version = "41", default-features = false }
+datafusion = { version = "42", default-features = false }
 digest = "0.10"
-object_store = { version = "0.10", features = ["aws"] }
+object_store = { version = "0.11", features = ["aws"] }
 parking_lot = { version = "0.12" }
 sha3 = "0.10"
 
@@ -125,7 +125,7 @@ tower-http = { version = "0.4", features = ["fs", "trace"] }
 axum = "0.6"
 
 # Optional dependencies
-alloy = { optional = true, version = "0.2", default-features = false, features = [
+alloy = { optional = true, version = "0.3", default-features = false, features = [
     "std",
     "provider-http",
     "provider-ws",
@@ -138,9 +138,9 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { optional = true, version = "41" }
-datafusion-functions-json = { optional = true, version = "0.41" }
-rumqttc = { optional = true, version = "0.23" }
+datafusion-ethers = { optional = true, version = "42" }
+datafusion-functions-json = { optional = true, version = "0.42" }
+rumqttc = { optional = true, version = "0.24" }
 
 
 [target.'cfg(unix)'.dependencies]
@@ -154,7 +154,7 @@ kamu-accounts-services = { workspace = true }
 kamu-datasets-services = { workspace = true }
 
 criterion = { version = "0.5", features = ["async_tokio"] }
-datafusion = { version = "41", default-features = false, features = [
+datafusion = { version = "42", default-features = false, features = [
     "parquet",
 ] }
 filetime = "0.2"

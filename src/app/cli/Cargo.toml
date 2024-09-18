@@ -29,13 +29,14 @@ doctest = false
 
 
 [features]
-default = ["kamu/ingest-evm", "kamu/ingest-mqtt", "kamu/query-extensions-json"]
+default = ["flight-sql", "ingest-evm", "ingest-mqtt", "query-extensions-json"]
 
-web-ui = ["rust-embed"]
+flight-sql = ["dep:kamu-adapter-flight-sql"]
 ingest-evm = ["kamu/ingest-evm"]
 ingest-ftp = ["kamu/ingest-ftp"]
 ingest-mqtt = ["kamu/ingest-mqtt"]
 query-extensions-json = ["kamu/query-extensions-json"]
+web-ui = ["rust-embed"]
 
 
 [dependencies]
@@ -52,7 +53,7 @@ kamu = { workspace = true }
 kamu-data-utils = { workspace = true }
 
 kamu-adapter-auth-oso = { workspace = true }
-kamu-adapter-flight-sql = { workspace = true }
+kamu-adapter-flight-sql = { optional = true, workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true }
 kamu-adapter-oauth = { workspace = true }
@@ -108,7 +109,7 @@ read_input = "0.8"                                                # Basic user i
 webbrowser = "0.8"                                                # For opening URLs in default system browser
 
 # APIs
-arrow-flight = { version = "52", features = ["flight-sql-experimental"] }
+arrow-flight = { version = "53", features = ["flight-sql-experimental"] }
 async-graphql = { version = "6", features = [
     "chrono",
     "url",
@@ -121,7 +122,7 @@ http = "0.2"
 hyper = "0.14"
 reqwest = { version = "0.11", default-features = false, features = [] }
 serde_json = "1"
-tonic = { version = "0.11", default-features = false }
+tonic = { version = "0.12", default-features = false }
 tower = "0.4"
 tower-http = { version = "0.4", features = ["trace", "cors"] }
 
@@ -158,7 +159,7 @@ tracing-bunyan-formatter = "0.3"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1" # Conditional compilation
-datafusion = { version = "41", default-features = false, features = [
+datafusion = { version = "42", default-features = false, features = [
     "crypto_expressions",
     "encoding_expressions",
     "parquet",

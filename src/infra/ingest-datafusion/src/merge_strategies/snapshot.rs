@@ -9,7 +9,7 @@
 
 use datafusion::common::DFSchema;
 use datafusion::error::DataFusionError;
-use datafusion::logical_expr::{LogicalPlanBuilder, Operator};
+use datafusion::logical_expr::{LogicalPlanBuilder, Operator, SortExpr};
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
 use internal_error::*;
@@ -89,25 +89,19 @@ impl MergeStrategySnapshot {
         let rank_col = "__rank";
 
         let state = ledger
-            .window(vec![Expr::WindowFunction(
-                datafusion::logical_expr::expr::WindowFunction {
-                    fun: datafusion::logical_expr::WindowFunctionDefinition::BuiltInWindowFunction(
-                        datafusion::logical_expr::BuiltInWindowFunction::RowNumber,
-                    ),
-                    args: Vec::new(),
-                    partition_by: self
-                        .primary_key
+            .window(vec![datafusion::functions_window::row_number::row_number()
+                .partition_by(
+                    self.primary_key
                         .iter()
                         .map(|name| col(Column::from_name(name)))
                         .collect(),
-                    order_by: vec![
-                        col(Column::from_name(&self.vocab.offset_column)).sort(false, false)
-                    ],
-                    window_frame: datafusion::logical_expr::WindowFrame::new(Some(false)),
-                    null_treatment: None,
-                },
-            )
-            .alias(rank_col)])
+                )
+                .order_by(vec![
+                    col(Column::from_name(&self.vocab.offset_column)).sort(false, false)
+                ])
+                .build()
+                .int_err()?
+                .alias(rank_col)])
             .int_err()?
             .filter(
                 col(Column::from_name(rank_col)).eq(lit(1)).and(or(
@@ -382,7 +376,7 @@ impl MergeStrategy for MergeStrategySnapshot {
         Ok(res)
     }
 
-    fn sort_order(&self) -> Vec<Expr> {
+    fn sort_order(&self) -> Vec<SortExpr> {
         // Main goal here is to establish correct order of -C / +C corrections, so we
         // sort records by primary key and then by operation type
         self.primary_key
