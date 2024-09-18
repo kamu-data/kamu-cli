@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use chrono::{Duration, Utc};
+use chrono::{Duration, SubsecRound, Utc};
 use database_common::PaginationOpts;
 use dill::Catalog;
 use futures::TryStreamExt;
@@ -1803,6 +1803,382 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
         )
         .await;
     assert_matches!(res, Ok(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_flow_activation_visibility_at_different_stages_through_success_path(
+    catalog: &Catalog,
+) {
+    let event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    let flow_id = event_store.new_flow_id().await.unwrap();
+    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
+    let flow_key = FlowKey::dataset(dataset_id, DatasetFlowType::Ingest);
+
+    let start_moment = Utc::now().trunc_subsecs(6);
+    let activation_moment = start_moment + Duration::minutes(1);
+
+    let last_event_id = event_store
+        .save_events(
+            &flow_id,
+            None,
+            vec![FlowEventInitiated {
+                event_time: start_moment,
+                flow_key,
+                flow_id,
+                trigger: FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                    trigger_time: start_moment,
+                }),
+                config_snapshot: None,
+            }
+            .into()],
+        )
+        .await
+        .unwrap();
+
+    let maybe_nearest_activation_time = event_store.nearest_flow_activation_moment().await.unwrap();
+    assert!(maybe_nearest_activation_time.is_none());
+
+    let last_event_id = event_store
+        .save_events(
+            &flow_id,
+            Some(last_event_id),
+            vec![FlowEventStartConditionUpdated {
+                flow_id,
+                event_time: Utc::now(),
+                start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                    wake_up_at: activation_moment,
+                }),
+                last_trigger_index: 0,
+            }
+            .into()],
+        )
+        .await
+        .unwrap();
+
+    let maybe_nearest_activation_time = event_store.nearest_flow_activation_moment().await.unwrap();
+    assert!(maybe_nearest_activation_time.is_none());
+    assert_eq!(
+        event_store
+            .get_flows_scheduled_for_activation_at(activation_moment)
+            .await
+            .unwrap(),
+        vec![]
+    );
+
+    let last_event_id = event_store
+        .save_events(
+            &flow_id,
+            Some(last_event_id),
+            vec![FlowEventScheduledForActivation {
+                flow_id,
+                event_time: Utc::now(),
+                scheduled_for_activation_at: activation_moment,
+            }
+            .into()],
+        )
+        .await
+        .unwrap();
+
+    let maybe_nearest_activation_time = event_store.nearest_flow_activation_moment().await.unwrap();
+    assert_eq!(maybe_nearest_activation_time, Some(activation_moment));
+    assert_eq!(
+        event_store
+            .get_flows_scheduled_for_activation_at(activation_moment)
+            .await
+            .unwrap(),
+        vec![flow_id]
+    );
+
+    let last_event_id = event_store
+        .save_events(
+            &flow_id,
+            Some(last_event_id),
+            vec![FlowEventTaskScheduled {
+                flow_id,
+                event_time: activation_moment + Duration::milliseconds(100),
+                task_id: TaskID::new(1),
+            }
+            .into()],
+        )
+        .await
+        .unwrap();
+
+    let maybe_nearest_activation_time = event_store.nearest_flow_activation_moment().await.unwrap();
+    assert!(maybe_nearest_activation_time.is_none());
+    assert_eq!(
+        event_store
+            .get_flows_scheduled_for_activation_at(activation_moment)
+            .await
+            .unwrap(),
+        vec![]
+    );
+
+    let last_event_id = event_store
+        .save_events(
+            &flow_id,
+            Some(last_event_id),
+            vec![FlowEventTaskRunning {
+                flow_id,
+                event_time: activation_moment + Duration::milliseconds(500),
+                task_id: TaskID::new(1),
+            }
+            .into()],
+        )
+        .await
+        .unwrap();
+
+    let maybe_nearest_activation_time = event_store.nearest_flow_activation_moment().await.unwrap();
+    assert!(maybe_nearest_activation_time.is_none());
+    assert_eq!(
+        event_store
+            .get_flows_scheduled_for_activation_at(activation_moment)
+            .await
+            .unwrap(),
+        vec![]
+    );
+
+    event_store
+        .save_events(
+            &flow_id,
+            Some(last_event_id),
+            vec![FlowEventTaskFinished {
+                flow_id,
+                event_time: activation_moment + Duration::milliseconds(1500),
+                task_id: TaskID::new(1),
+                task_outcome: TaskOutcome::Success(TaskResult::Empty),
+            }
+            .into()],
+        )
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_flow_activation_visibility_when_aborted_before_activation(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    let flow_id = event_store.new_flow_id().await.unwrap();
+    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
+    let flow_key = FlowKey::dataset(dataset_id, DatasetFlowType::Ingest);
+
+    let start_moment = Utc::now().trunc_subsecs(6);
+    let activation_moment = start_moment + Duration::minutes(1);
+    let abortion_moment = start_moment + Duration::seconds(30);
+
+    let last_event_id = event_store
+        .save_events(
+            &flow_id,
+            None,
+            vec![
+                FlowEventInitiated {
+                    event_time: start_moment,
+                    flow_key,
+                    flow_id,
+                    trigger: FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                        trigger_time: start_moment,
+                    }),
+                    config_snapshot: None,
+                }
+                .into(),
+                FlowEventStartConditionUpdated {
+                    flow_id,
+                    event_time: Utc::now(),
+                    start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                        wake_up_at: activation_moment,
+                    }),
+                    last_trigger_index: 0,
+                }
+                .into(),
+                FlowEventScheduledForActivation {
+                    flow_id,
+                    event_time: Utc::now(),
+                    scheduled_for_activation_at: activation_moment,
+                }
+                .into(),
+            ],
+        )
+        .await
+        .unwrap();
+
+    let maybe_nearest_activation_time = event_store.nearest_flow_activation_moment().await.unwrap();
+    assert_eq!(maybe_nearest_activation_time, Some(activation_moment));
+    assert_eq!(
+        event_store
+            .get_flows_scheduled_for_activation_at(activation_moment)
+            .await
+            .unwrap(),
+        vec![flow_id]
+    );
+
+    event_store
+        .save_events(
+            &flow_id,
+            Some(last_event_id),
+            vec![FlowEventAborted {
+                event_time: abortion_moment,
+                flow_id,
+            }
+            .into()],
+        )
+        .await
+        .unwrap();
+
+    let maybe_nearest_activation_time = event_store.nearest_flow_activation_moment().await.unwrap();
+    assert!(maybe_nearest_activation_time.is_none());
+    assert_eq!(
+        event_store
+            .get_flows_scheduled_for_activation_at(activation_moment)
+            .await
+            .unwrap(),
+        vec![]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    let dataset_id_foo = DatasetID::new_seeded_ed25519(b"foo");
+    let dataset_id_bar = DatasetID::new_seeded_ed25519(b"bar");
+    let dataset_id_baz = DatasetID::new_seeded_ed25519(b"baz");
+
+    let flow_id_foo = event_store.new_flow_id().await.unwrap();
+    let flow_id_bar = event_store.new_flow_id().await.unwrap();
+    let flow_id_baz = event_store.new_flow_id().await.unwrap();
+
+    let flow_key_foo = FlowKey::dataset(dataset_id_foo, DatasetFlowType::Ingest);
+    let flow_key_bar = FlowKey::dataset(dataset_id_bar, DatasetFlowType::Ingest);
+    let flow_key_baz = FlowKey::dataset(dataset_id_baz, DatasetFlowType::Ingest);
+
+    let start_moment = Utc::now().trunc_subsecs(6);
+    let activation_moment_1 = start_moment + Duration::minutes(1);
+    let activation_moment_2 = start_moment + Duration::minutes(2);
+
+    event_store
+        .save_events(
+            &flow_id_foo,
+            None,
+            vec![
+                FlowEventInitiated {
+                    event_time: start_moment,
+                    flow_key: flow_key_foo,
+                    flow_id: flow_id_foo,
+                    trigger: FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                        trigger_time: start_moment,
+                    }),
+                    config_snapshot: None,
+                }
+                .into(),
+                FlowEventStartConditionUpdated {
+                    flow_id: flow_id_foo,
+                    event_time: Utc::now(),
+                    start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                        wake_up_at: activation_moment_1,
+                    }),
+                    last_trigger_index: 0,
+                }
+                .into(),
+                FlowEventScheduledForActivation {
+                    flow_id: flow_id_foo,
+                    event_time: Utc::now(),
+                    scheduled_for_activation_at: activation_moment_1,
+                }
+                .into(),
+            ],
+        )
+        .await
+        .unwrap();
+
+    event_store
+        .save_events(
+            &flow_id_bar,
+            None,
+            vec![
+                FlowEventInitiated {
+                    event_time: start_moment,
+                    flow_key: flow_key_bar,
+                    flow_id: flow_id_bar,
+                    trigger: FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                        trigger_time: start_moment,
+                    }),
+                    config_snapshot: None,
+                }
+                .into(),
+                FlowEventStartConditionUpdated {
+                    flow_id: flow_id_bar,
+                    event_time: Utc::now(),
+                    start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                        wake_up_at: activation_moment_1,
+                    }),
+                    last_trigger_index: 0,
+                }
+                .into(),
+                FlowEventScheduledForActivation {
+                    flow_id: flow_id_bar,
+                    event_time: Utc::now(),
+                    scheduled_for_activation_at: activation_moment_1,
+                }
+                .into(),
+            ],
+        )
+        .await
+        .unwrap();
+
+    event_store
+        .save_events(
+            &flow_id_baz,
+            None,
+            vec![
+                FlowEventInitiated {
+                    event_time: start_moment,
+                    flow_key: flow_key_baz,
+                    flow_id: flow_id_baz,
+                    trigger: FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                        trigger_time: start_moment,
+                    }),
+                    config_snapshot: None,
+                }
+                .into(),
+                FlowEventStartConditionUpdated {
+                    flow_id: flow_id_baz,
+                    event_time: Utc::now(),
+                    start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                        wake_up_at: activation_moment_2,
+                    }),
+                    last_trigger_index: 0,
+                }
+                .into(),
+                FlowEventScheduledForActivation {
+                    flow_id: flow_id_baz,
+                    event_time: Utc::now(),
+                    scheduled_for_activation_at: activation_moment_2,
+                }
+                .into(),
+            ],
+        )
+        .await
+        .unwrap();
+
+    let maybe_nearest_activation_time = event_store.nearest_flow_activation_moment().await.unwrap();
+    assert_eq!(maybe_nearest_activation_time, Some(activation_moment_1));
+    assert_eq!(
+        event_store
+            .get_flows_scheduled_for_activation_at(activation_moment_1)
+            .await
+            .unwrap(),
+        vec![flow_id_foo, flow_id_bar]
+    );
+    assert_eq!(
+        event_store
+            .get_flows_scheduled_for_activation_at(activation_moment_2)
+            .await
+            .unwrap(),
+        vec![flow_id_baz]
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
