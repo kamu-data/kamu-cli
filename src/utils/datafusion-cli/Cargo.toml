@@ -30,12 +30,15 @@ edition = { workspace = true }
 publish = { workspace = true }
 
 [dependencies]
-arrow = { version = "52" }
-async-trait = "0.1"
-aws-config = "0.57"
-aws-credential-types = "0.57"
+arrow = { version = "53" }
+async-trait = "0.1.73"
+aws-config = "1.5.5"
+aws-sdk-sso = "1"
+aws-sdk-ssooidc = "1"
+aws-sdk-sts = "1"
+aws-credential-types = "1.2.0"
 clap = { version = "4", features = ["derive"] }
-datafusion = { version = "41", features = [
+datafusion = { version = "42", features = [
     "crypto_expressions",
     "datetime_expressions",
     "encoding_expressions",
@@ -44,14 +47,14 @@ datafusion = { version = "41", features = [
     "unicode_expressions",
     "compression",
 ] }
-datafusion-common = { version = "41", default-features = false }
-dirs = "5"
+dirs = "5.0.1"
+env_logger = "0.11"
 futures = "0.3"
-object_store = { version = "0.10.1", features = ["aws", "gcp", "http"] }
+object_store = { version = "0.11", features = ["aws", "gcp", "http"] }
 parking_lot = { version = "0.12" }
-parquet = { version = "52", default-features = false }
-regex = "1"
-rustyline = "11"
+parquet = { version = "53", default-features = false }
+regex = "1.8"
+rustyline = "14.0"
 tokio = { version = "1", features = [
     "macros",
     "rt",
@@ -60,4 +63,4 @@ tokio = { version = "1", features = [
     "parking_lot",
     "signal",
 ] }
-url = { version = "2" }
+url = "2"

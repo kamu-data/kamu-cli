@@ -56,7 +56,7 @@ async fn test_service_handler() {
         );
 
         let body = res.text().await.unwrap();
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             body,
             indoc!(
                 r#"
@@ -101,7 +101,7 @@ async fn test_metadata_handler() {
         );
 
         let body = res.text().await.unwrap();
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             body,
             indoc!(
                 r#"
@@ -110,8 +110,8 @@ async fn test_metadata_handler() {
                 <edmx:DataServices xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" m:DataServiceVersion="3.0" m:MaxDataServiceVersion="3.0">
                 <Schema Namespace="default" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
                 <EntityType Name="foo.bar">
-                <Key><PropertyRef Name="foo.bar"/></Key>
-                <Property Name="offset" Type="Edm.Int64" Nullable="true"/>
+                <Key><PropertyRef Name="offset"/></Key>
+                <Property Name="offset" Type="Edm.Int64" Nullable="false"/>
                 <Property Name="op" Type="Edm.Int32" Nullable="false"/>
                 <Property Name="system_time" Type="Edm.DateTime" Nullable="false"/>
                 <Property Name="date" Type="Edm.DateTime" Nullable="true"/>
@@ -154,7 +154,7 @@ async fn test_collection_handler() {
         );
 
         let body = res.text().await.unwrap();
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             body,
             indoc!(
                 r#"
@@ -253,7 +253,7 @@ async fn test_collection_handler_by_id() {
         );
 
         let body = res.text().await.unwrap();
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             body,
             indoc!(
                 r#"

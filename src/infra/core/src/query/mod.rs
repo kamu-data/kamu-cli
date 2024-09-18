@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -512,7 +513,7 @@ impl TableProvider for KamuTable {
         None
     }
 
-    fn get_logical_plan(&self) -> Option<&LogicalPlan> {
+    fn get_logical_plan(&self) -> Option<Cow<LogicalPlan>> {
         None
     }
 

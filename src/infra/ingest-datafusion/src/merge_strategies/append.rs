@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use datafusion::logical_expr::SortExpr;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_data_utils::data::dataframe_ext::DataFrameExt;
@@ -43,7 +44,7 @@ impl MergeStrategy for MergeStrategyAppend {
         Ok(df)
     }
 
-    fn sort_order(&self) -> Vec<Expr> {
+    fn sort_order(&self) -> Vec<SortExpr> {
         vec![col(Column::from_name(&self.vocab.event_time_column)).sort(true, true)]
     }
 }

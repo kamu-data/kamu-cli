@@ -108,6 +108,7 @@ impl Reader for ReaderCsv {
         let options = CsvReadOptions {
             schema: self.schema.as_deref(),
             delimiter,
+            terminator: None,
             comment: None,
             has_header: self.conf.header.unwrap_or(false),
             schema_infer_max_records: if self.conf.infer_schema.unwrap_or(false) {

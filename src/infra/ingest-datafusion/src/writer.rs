@@ -263,8 +263,6 @@ impl DataWriterDataFusion {
         fallback_event_time: DateTime<Utc>,
         start_offset: u64,
     ) -> Result<DataFrame, InternalError> {
-        use datafusion::logical_expr as expr;
-        use datafusion::logical_expr::expr::WindowFunction;
         use datafusion::scalar::ScalarValue;
 
         // Collect column names for later
@@ -332,16 +330,10 @@ impl DataWriterDataFusion {
             .int_err()?
             .with_column(
                 &self.meta.vocab.offset_column,
-                Expr::WindowFunction(WindowFunction {
-                    fun: expr::WindowFunctionDefinition::BuiltInWindowFunction(
-                        expr::BuiltInWindowFunction::RowNumber,
-                    ),
-                    args: vec![],
-                    partition_by: vec![],
-                    order_by: self.merge_strategy.sort_order(),
-                    window_frame: expr::WindowFrame::new(Some(false)),
-                    null_treatment: None,
-                }),
+                datafusion::functions_window::row_number::row_number()
+                    .order_by(self.merge_strategy.sort_order())
+                    .build()
+                    .int_err()?,
             )
             .int_err()?;
 

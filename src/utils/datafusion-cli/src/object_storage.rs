@@ -20,6 +20,7 @@ use std::fmt::{Debug, Display};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use aws_config::BehaviorVersion;
 use aws_credential_types::provider::ProvideCredentials;
 use datafusion::common::config::{
     ConfigEntry,
@@ -63,7 +64,7 @@ pub async fn get_s3_object_store_builder(
             builder = builder.with_token(session_token);
         }
     } else {
-        let config = aws_config::from_env().load().await;
+        let config = aws_config::defaults(BehaviorVersion::latest()).load().await;
         if let Some(region) = config.region() {
             builder = builder.with_region(region.to_string());
         }

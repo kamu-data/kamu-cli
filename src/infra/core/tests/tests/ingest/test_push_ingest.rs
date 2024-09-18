@@ -92,7 +92,7 @@ async fn test_ingest_push_url_stream() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
@@ -240,7 +240,7 @@ async fn test_ingest_push_media_type_override() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
@@ -293,7 +293,7 @@ async fn test_ingest_push_media_type_override() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
@@ -348,7 +348,7 @@ async fn test_ingest_push_media_type_override() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
@@ -528,7 +528,7 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_string() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -608,7 +608,7 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_unixtime() 
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -688,7 +688,7 @@ async fn test_ingest_inference_automatic_renaming_of_conflicting_columns() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -783,7 +783,7 @@ async fn test_ingest_sql_case_sensitivity() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));

@@ -273,8 +273,7 @@ impl FetchService {
         Ok(FetchResult::Updated(FetchResultUpdated {
             source_state: Some(PollingSourceState::ETag(format!(
                 "{}@{:x}",
-                last_seen_block.header.number.unwrap(),
-                last_seen_block.header.hash.unwrap(),
+                last_seen_block.header.number, last_seen_block.header.hash,
             ))),
             source_event_time: None,
             has_more,

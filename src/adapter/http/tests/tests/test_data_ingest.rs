@@ -73,7 +73,7 @@ async fn test_data_push_ingest_handler() {
                 indoc!(
                     r#"
                     message arrow_schema {
-                      OPTIONAL INT64 offset;
+                      REQUIRED INT64 offset;
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -184,7 +184,7 @@ async fn test_data_push_ingest_handler() {
                 indoc!(
                     r#"
                     message arrow_schema {
-                      OPTIONAL INT64 offset;
+                      REQUIRED INT64 offset;
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -245,7 +245,7 @@ async fn test_data_push_ingest_handler() {
                 indoc!(
                     r#"
                     message arrow_schema {
-                      OPTIONAL INT64 offset;
+                      REQUIRED INT64 offset;
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -329,7 +329,7 @@ async fn test_data_push_ingest_upload_token_no_initial_source() {
                 indoc!(
                     r#"
                     message arrow_schema {
-                      OPTIONAL INT64 offset;
+                      REQUIRED INT64 offset;
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -416,7 +416,7 @@ async fn test_data_push_ingest_upload_token_with_initial_source() {
                 indoc!(
                     r#"
                     message arrow_schema {
-                      OPTIONAL INT64 offset;
+                      REQUIRED INT64 offset;
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -495,7 +495,7 @@ async fn test_data_push_ingest_upload_content_type_not_specified() {
                 indoc!(
                     r#"
                     message arrow_schema {
-                      OPTIONAL INT64 offset;
+                      REQUIRED INT64 offset;
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
