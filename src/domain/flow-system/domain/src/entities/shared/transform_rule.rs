@@ -32,12 +32,12 @@ impl TransformRule {
             return Err(TransformRuleValidationError::MinRecordsToAwaitNotPositive);
         }
 
-        let lower_interval_bound = Duration::try_seconds(0).unwrap();
+        let lower_interval_bound = Duration::seconds(0);
         if lower_interval_bound >= max_batching_interval {
             return Err(TransformRuleValidationError::MinIntervalNotPositive);
         }
 
-        let upper_interval_bound = Duration::try_hours(Self::MAX_BATCHING_INTERVAL_HOURS).unwrap();
+        let upper_interval_bound = Duration::hours(Self::MAX_BATCHING_INTERVAL_HOURS);
         if max_batching_interval > upper_interval_bound {
             return Err(TransformRuleValidationError::MaxIntervalAboveLimit);
         }
@@ -88,24 +88,18 @@ mod tests {
 
     #[test]
     fn test_good_transform_rule() {
+        assert_matches!(TransformRule::new_checked(1, TimeDelta::minutes(15)), Ok(_));
         assert_matches!(
-            TransformRule::new_checked(1, TimeDelta::try_minutes(15).unwrap()),
+            TransformRule::new_checked(1_000_000, TimeDelta::hours(3)),
             Ok(_)
         );
-        assert_matches!(
-            TransformRule::new_checked(1_000_000, TimeDelta::try_hours(3).unwrap()),
-            Ok(_)
-        );
-        assert_matches!(
-            TransformRule::new_checked(1, TimeDelta::try_hours(24).unwrap()),
-            Ok(_)
-        );
+        assert_matches!(TransformRule::new_checked(1, TimeDelta::hours(24)), Ok(_));
     }
 
     #[test]
     fn test_non_positive_min_records() {
         assert_matches!(
-            TransformRule::new_checked(0, TimeDelta::try_minutes(15).unwrap()),
+            TransformRule::new_checked(0, TimeDelta::minutes(15)),
             Err(TransformRuleValidationError::MinRecordsToAwaitNotPositive)
         );
     }
@@ -113,11 +107,11 @@ mod tests {
     #[test]
     fn test_non_positive_max_interval() {
         assert_matches!(
-            TransformRule::new_checked(1, TimeDelta::try_minutes(0).unwrap()),
+            TransformRule::new_checked(1, TimeDelta::minutes(0)),
             Err(TransformRuleValidationError::MinIntervalNotPositive)
         );
         assert_matches!(
-            TransformRule::new_checked(1, TimeDelta::try_minutes(-1).unwrap()),
+            TransformRule::new_checked(1, TimeDelta::minutes(-1)),
             Err(TransformRuleValidationError::MinIntervalNotPositive)
         );
     }

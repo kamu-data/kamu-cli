@@ -47,7 +47,7 @@ pub enum FlowExecutorUpdateDetails {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FlowProgressMessage {
-    Enqueued(FlowProgressMessageEnqueued),
+    Scheduled(FlowProgressMessageScheduled),
     Running(FlowProgressMessageRunning),
     Finished(FlowProgressMessageFinished),
     Cancelled(FlowProgressMessageCancelled),
@@ -56,15 +56,15 @@ pub enum FlowProgressMessage {
 impl Message for FlowProgressMessage {}
 
 impl FlowProgressMessage {
-    pub fn enqueued(
+    pub fn scheduled(
         event_time: DateTime<Utc>,
         flow_id: FlowID,
-        activate_at: DateTime<Utc>,
+        scheduled_for_activation_at: DateTime<Utc>,
     ) -> Self {
-        Self::Enqueued(FlowProgressMessageEnqueued {
+        Self::Scheduled(FlowProgressMessageScheduled {
             event_time,
             flow_id,
-            activate_at,
+            scheduled_for_activation_at,
         })
     }
 
@@ -92,10 +92,10 @@ impl FlowProgressMessage {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FlowProgressMessageEnqueued {
+pub struct FlowProgressMessageScheduled {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
-    pub activate_at: DateTime<Utc>,
+    pub scheduled_for_activation_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

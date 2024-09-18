@@ -94,11 +94,14 @@ impl FlowHarness {
 
         let awaiting_step = overrides
             .awaiting_step
-            .unwrap_or(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap());
+            .unwrap_or(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS));
 
-        let mandatory_throttling_period = overrides.mandatory_throttling_period.unwrap_or(
-            Duration::try_milliseconds(SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS).unwrap(),
-        );
+        let mandatory_throttling_period =
+            overrides
+                .mandatory_throttling_period
+                .unwrap_or(Duration::milliseconds(
+                    SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS,
+                ));
 
         let mock_dataset_changes = overrides.mock_dataset_changes.unwrap_or_default();
 
@@ -443,7 +446,7 @@ impl FlowHarness {
 
     pub async fn advance_time(&self, time_quantum: Duration) {
         self.advance_time_custom_alignment(
-            Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap(),
+            Duration::milliseconds(SCHEDULING_ALIGNMENT_MS),
             time_quantum,
         )
         .await;

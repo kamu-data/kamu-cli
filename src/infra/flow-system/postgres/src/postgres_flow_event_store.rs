@@ -9,6 +9,7 @@
 
 use std::collections::HashSet;
 
+use chrono::{DateTime, Utc};
 use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
@@ -105,13 +106,19 @@ impl PostgresFlowEventStore {
 
         // Determine if we have a status change between these events
         let mut maybe_latest_status = None;
+        let mut maybe_scheduled_for_activation_at = None;
         for event in events {
             if let Some(new_status) = event.new_status() {
                 maybe_latest_status = Some(new_status);
             }
+            if let FlowEvent::ScheduledForActivation(e) = event {
+                maybe_scheduled_for_activation_at = Some(e.scheduled_for_activation_at);
+            } else if let FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) = event {
+                maybe_scheduled_for_activation_at = None;
+            }
         }
 
-        // We either have determined the lateststatus, or should read the previous
+        // We either have determined the latest status, or should read the previous
         let latest_status = if let Some(latest_status) = maybe_latest_status {
             latest_status
         } else {
@@ -134,16 +141,17 @@ impl PostgresFlowEventStore {
         let rows = sqlx::query!(
             r#"
             UPDATE flows
-                SET flow_status = $2, last_event_id = $3
+                SET flow_status = $2, last_event_id = $3, scheduled_for_activation_at = $4
                 WHERE flow_id = $1 AND (
-                    last_event_id IS NULL AND CAST($4 as BIGINT) IS NULL OR
-                    last_event_id IS NOT NULL AND CAST($4 as BIGINT) IS NOT NULL AND last_event_id = $4
+                    last_event_id IS NULL AND CAST($5 as BIGINT) IS NULL OR
+                    last_event_id IS NOT NULL AND CAST($5 as BIGINT) IS NOT NULL AND last_event_id = $5
                 )
                 RETURNING flow_id
             "#,
             flow_id,
             latest_status as FlowStatus,
             last_event_id,
+            maybe_scheduled_for_activation_at,
             maybe_prev_stored_event_id,
         )
         .fetch_all(connection_mut)
@@ -486,6 +494,61 @@ impl FlowEventStore for PostgresFlowEventStore {
             last_attempt_time: maybe_attempt_result,
             last_success_time: maybe_success_result,
         })
+    }
+
+    /// Returns nearest time when one or more flows are scheduled for activation
+    async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+        let maybe_activation_time = sqlx::query!(
+            r#"
+            SELECT f.scheduled_for_activation_at as activation_time
+                FROM flows f
+                WHERE
+                    f.scheduled_for_activation_at IS NOT NULL AND
+                    f.flow_status = 'waiting'::flow_status_type
+                ORDER BY f.scheduled_for_activation_at ASC
+                LIMIT 1
+            "#,
+        )
+        .map(|result| {
+            result
+                .activation_time
+                .expect("NULL values filtered by query")
+        })
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(maybe_activation_time)
+    }
+
+    /// Returns flows scheduled for activation at the given time
+    async fn get_flows_scheduled_for_activation_at(
+        &self,
+        scheduled_for_activation_at: DateTime<Utc>,
+    ) -> Result<Vec<FlowID>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+        let flow_ids = sqlx::query!(
+            r#"
+            SELECT f.flow_id as flow_id
+                FROM flows f
+                WHERE
+                    f.scheduled_for_activation_at = $1 AND
+                    f.flow_status = 'waiting'::flow_status_type
+                ORDER BY f.flow_id ASC
+            "#,
+            scheduled_for_activation_at,
+        )
+        .map(|row| FlowID::try_from(row.flow_id).unwrap())
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(flow_ids)
     }
 
     fn get_all_flow_ids_by_dataset(

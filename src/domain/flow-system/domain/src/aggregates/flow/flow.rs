@@ -80,6 +80,21 @@ impl Flow {
         }
     }
 
+    /// Indicate flow is scheduled for activation at particular time
+    pub fn schedule_for_activation(
+        &mut self,
+        now: DateTime<Utc>,
+        scheduled_for_activation_at: DateTime<Utc>,
+    ) -> Result<(), ProjectionError<FlowState>> {
+        let event = FlowEventScheduledForActivation {
+            event_time: now,
+            flow_id: self.flow_id,
+            scheduled_for_activation_at,
+        };
+        self.apply(event)?;
+        Ok(())
+    }
+
     /// Attaches a scheduled task
     pub fn on_task_scheduled(
         &mut self,

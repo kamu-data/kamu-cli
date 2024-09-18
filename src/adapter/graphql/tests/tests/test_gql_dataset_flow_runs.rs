@@ -193,9 +193,7 @@ async fn test_trigger_ingest_root_dataset() {
         })
     );
 
-    let schedule_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
     let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
@@ -269,9 +267,7 @@ async fn test_trigger_ingest_root_dataset() {
         })
     );
 
-    let running_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
         .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
         .await;
@@ -343,9 +339,7 @@ async fn test_trigger_ingest_root_dataset() {
         })
     );
 
-    let complete_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
         .mimic_task_completed(
             flow_task_id,
@@ -499,22 +493,16 @@ async fn test_trigger_reset_root_dataset_flow() {
         })
     );
 
-    let schedule_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
     let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
-    let running_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
         .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
         .await;
 
-    let complete_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
         .mimic_task_completed(
             flow_task_id,
@@ -823,22 +811,16 @@ async fn test_trigger_execute_transform_derived_dataset() {
         })
     );
 
-    let schedule_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
     let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
-    let running_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
         .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
         .await;
 
-    let complete_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
         .mimic_task_completed(
             flow_task_id,
@@ -1047,9 +1029,7 @@ async fn test_trigger_compaction_root_dataset() {
         })
     );
 
-    let schedule_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
     let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
@@ -1123,9 +1103,7 @@ async fn test_trigger_compaction_root_dataset() {
         })
     );
 
-    let running_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
         .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
         .await;
@@ -1197,9 +1175,7 @@ async fn test_trigger_compaction_root_dataset() {
         })
     );
 
-    let complete_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
 
     let new_head = Multihash::from_digest_sha3_256(b"new-slice");
     harness
@@ -2634,22 +2610,26 @@ async fn test_history_of_completed_flow() {
                                             }
                                         },
                                         {
-                                            "__typename": "FlowEventTriggerAdded",
+                                            "__typename": "FlowEventScheduledForActivation",
                                             "eventId": "2",
+                                        },
+                                        {
+                                            "__typename": "FlowEventTriggerAdded",
+                                            "eventId": "3",
                                             "trigger": {
                                                 "__typename": "FlowTriggerAutoPolling"
                                             }
                                         },
                                         {
                                             "__typename": "FlowEventStartConditionUpdated",
-                                            "eventId": "3",
+                                            "eventId": "4",
                                             "startCondition": {
                                                 "__typename" : "FlowStartConditionExecutor"
                                             }
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
-                                            "eventId": "4",
+                                            "eventId": "5",
                                             "taskId": "0",
                                             "taskStatus": "QUEUED",
                                             "task": {
@@ -2658,7 +2638,7 @@ async fn test_history_of_completed_flow() {
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
-                                            "eventId": "5",
+                                            "eventId": "6",
                                             "taskId": "0",
                                             "taskStatus": "RUNNING",
                                             "task": {
@@ -2667,7 +2647,7 @@ async fn test_history_of_completed_flow() {
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
-                                            "eventId": "6",
+                                            "eventId": "7",
                                             "taskId": "0",
                                             "taskStatus": "FINISHED",
                                             "task": {
@@ -2746,21 +2726,15 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
             }
         })
     );
-    let schedule_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
     let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
-    let running_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
         .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
         .await;
-    let complete_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
 
     let new_head = Multihash::from_digest_sha3_256(b"new-slice");
     harness
@@ -2899,21 +2873,15 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
         })
     );
 
-    let schedule_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("1", schedule_time).await;
     let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]);
 
-    let running_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
         .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
         .await;
-    let complete_time = Utc::now()
-        .duration_round(Duration::try_seconds(1).unwrap())
-        .unwrap();
+    let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
         .mimic_task_completed(
             flow_task_id,
@@ -3228,8 +3196,8 @@ impl FlowRunsHarness {
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowEventStore>()
             .add_value(FlowExecutorConfig::new(
-                Duration::try_seconds(1).unwrap(),
-                Duration::try_minutes(1).unwrap(),
+                Duration::seconds(1),
+                Duration::minutes(1),
             ))
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()

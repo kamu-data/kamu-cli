@@ -27,6 +27,8 @@ pub enum FlowEvent {
     Initiated(FlowEventInitiated),
     /// Start condition defined
     StartConditionUpdated(FlowEventStartConditionUpdated),
+    /// Flow scheduled for activation
+    ScheduledForActivation(FlowEventScheduledForActivation),
     /// Secondary trigger added
     TriggerAdded(FlowEventTriggerAdded),
     /// Associated task has changed status
@@ -61,6 +63,13 @@ impl FlowEvent {
             }
             fs::FlowEvent::TriggerAdded(e) => {
                 Self::TriggerAdded(FlowEventTriggerAdded::build(event_id, e, ctx).await?)
+            }
+            fs::FlowEvent::ScheduledForActivation(e) => {
+                Self::ScheduledForActivation(FlowEventScheduledForActivation::new(
+                    event_id,
+                    e.event_time,
+                    e.scheduled_for_activation_at,
+                ))
             }
             fs::FlowEvent::TaskScheduled(e) => Self::TaskChanged(FlowEventTaskChanged::new(
                 event_id,
@@ -151,6 +160,32 @@ impl FlowEventTriggerAdded {
             event_time: event.event_time,
             trigger: FlowTrigger::build(event.trigger, ctx).await?,
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct FlowEventScheduledForActivation {
+    event_id: EventID,
+    event_time: DateTime<Utc>,
+    scheduled_for_activation_at: DateTime<Utc>,
+}
+
+#[ComplexObject]
+impl FlowEventScheduledForActivation {
+    #[graphql(skip)]
+    fn new(
+        event_id: evs::EventID,
+        event_time: DateTime<Utc>,
+        scheduled_for_activation_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            event_id: event_id.into(),
+            event_time,
+            scheduled_for_activation_at,
+        }
     }
 }
 

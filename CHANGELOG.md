@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Changed -->
 <!--- - Fixed -->
 
-## [Unreleased]
+## [0.201.0] - 2024-09-18
 ### Added
 - REST API: New `/verify` endpoint allows verification of query commitment as per [documentation](https://docs.kamu.dev/node/commitments/#dispute-resolution) (#831)
 ### Changed
@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - consumption jobs invoke consumers and detect their failures
 - Detecting concurrent modifications in flow and task event stores
 - Improved and cleaned handling of flow abortions at different stages of processing
+- Revised implementation of flow scheduling to avoid in-memory time wheel:
+    - recording `FlowEventScheduledForActivation` event (previously, placement moment into the time wheel)
+    - replaced binary heap based time wheel operations with event store queries
+    - Postgres/SQlite event stores additionally track activation time for the waiting flows
+    - in-memory event store keeps prepared map-based lookup structures for activation time
 
 ## [0.200.0] - 2024-09-13
 ### Added

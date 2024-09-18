@@ -42,6 +42,15 @@ pub trait FlowEventStore: EventStore<FlowState> {
         flow_type: SystemFlowType,
     ) -> Result<FlowRunStats, InternalError>;
 
+    /// Returns nearest time when one or more flows are scheduled for activation
+    async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError>;
+
+    /// Returns flows scheduled for activation at the given time
+    async fn get_flows_scheduled_for_activation_at(
+        &self,
+        scheduled_for_activation_at: DateTime<Utc>,
+    ) -> Result<Vec<FlowID>, InternalError>;
+
     /// Returns IDs of the flows associated with the specified
     /// dataset in reverse chronological order based on creation time.
     /// Applies filters/pagination, if specified

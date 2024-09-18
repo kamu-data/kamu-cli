@@ -1080,6 +1080,12 @@ type FlowEventInitiated implements FlowEvent {
 	trigger: FlowTrigger!
 }
 
+type FlowEventScheduledForActivation implements FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+	scheduledForActivationAt: DateTime!
+}
+
 type FlowEventStartConditionUpdated implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
