@@ -17,7 +17,7 @@ use object_store::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A simple wrapper on top of [`ObjectStore`] to add tracing
-pub(crate) struct ObjectStoreWithTracing<S>(S);
+pub struct ObjectStoreWithTracing<S>(S);
 
 impl<S> ObjectStoreWithTracing<S> {
     pub fn new(inner: S) -> Self {

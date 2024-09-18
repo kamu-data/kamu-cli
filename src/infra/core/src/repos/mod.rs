@@ -57,4 +57,5 @@ pub use object_repository_s3::*;
 pub use object_store_builder_local_fs::*;
 pub use object_store_builder_s3::*;
 pub use object_store_registry_impl::*;
+pub use object_store_with_tracing::*;
 pub use reference_repository_impl::*;

@@ -19,6 +19,27 @@ pub trait OdfServerAccessTokenResolver: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: This should be removed from domain crate and placed into testing utils
+#[component(pub)]
+#[interface(dyn OdfServerAccessTokenResolver)]
+pub struct OdfServerAccessTokenResolverNull {}
+
+impl OdfServerAccessTokenResolverNull {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait::async_trait]
+impl OdfServerAccessTokenResolver for OdfServerAccessTokenResolverNull {
+    fn resolve_odf_dataset_access_token(&self, _: &Url) -> Option<String> {
+        None
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: This should be removed from domain crate and placed into testing utils
 #[component(pub)]
 #[interface(dyn OdfServerAccessTokenResolver)]
 pub struct DummyOdfServerAccessTokenResolver {}

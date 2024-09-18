@@ -11,6 +11,7 @@ mod engine;
 mod ingest;
 mod repos;
 mod test_compact_service_impl;
+mod test_datafusion_ipfs;
 mod test_dataset_changes_service_impl;
 mod test_dataset_ownership_service_inmem;
 mod test_datasets_filtering;
