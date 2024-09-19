@@ -75,6 +75,7 @@ impl DatasetRepositoryS3 {
         let endpoint = s3_context.endpoint;
         let bucket = s3_context.bucket;
         let key_prefix = s3_context.key_prefix;
+        let sdk_config = s3_context.sdk_config;
 
         // TODO: Consider switching DatasetImpl to dynamic dispatch to simplify
         // configurability
@@ -88,6 +89,7 @@ impl DatasetRepositoryS3 {
                                 endpoint.clone(),
                                 bucket.clone(),
                                 format!("{key_prefix}blocks/"),
+                                sdk_config.clone(),
                             )),
                             metadata_cache_local_fs_path.clone(),
                         ),
@@ -97,6 +99,7 @@ impl DatasetRepositoryS3 {
                         endpoint.clone(),
                         bucket.clone(),
                         format!("{key_prefix}refs/"),
+                        sdk_config.clone(),
                     ))),
                 ),
                 ObjectRepositoryS3Sha3::new(S3Context::new(
@@ -104,18 +107,21 @@ impl DatasetRepositoryS3 {
                     endpoint.clone(),
                     bucket.clone(),
                     format!("{key_prefix}data/"),
+                    sdk_config.clone(),
                 )),
                 ObjectRepositoryS3Sha3::new(S3Context::new(
                     client.clone(),
                     endpoint.clone(),
                     bucket.clone(),
                     format!("{key_prefix}checkpoints/"),
+                    sdk_config.clone(),
                 )),
                 NamedObjectRepositoryS3::new(S3Context::new(
-                    client.clone(),
-                    endpoint.clone(),
-                    bucket.clone(),
+                    client,
+                    endpoint,
+                    bucket,
                     format!("{key_prefix}info/"),
+                    sdk_config,
                 )),
             ))
         } else {
@@ -127,6 +133,7 @@ impl DatasetRepositoryS3 {
                             endpoint.clone(),
                             bucket.clone(),
                             format!("{key_prefix}blocks/"),
+                            sdk_config.clone(),
                         )),
                     )),
                     ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(S3Context::new(
@@ -134,6 +141,7 @@ impl DatasetRepositoryS3 {
                         endpoint.clone(),
                         bucket.clone(),
                         format!("{key_prefix}refs/"),
+                        sdk_config.clone(),
                     ))),
                 ),
                 ObjectRepositoryS3Sha3::new(S3Context::new(
@@ -141,18 +149,21 @@ impl DatasetRepositoryS3 {
                     endpoint.clone(),
                     bucket.clone(),
                     format!("{key_prefix}data/"),
+                    sdk_config.clone(),
                 )),
                 ObjectRepositoryS3Sha3::new(S3Context::new(
                     client.clone(),
                     endpoint.clone(),
                     bucket.clone(),
                     format!("{key_prefix}checkpoints/"),
+                    sdk_config.clone(),
                 )),
                 NamedObjectRepositoryS3::new(S3Context::new(
-                    client.clone(),
-                    endpoint.clone(),
-                    bucket.clone(),
+                    client,
+                    endpoint,
+                    bucket,
                     format!("{key_prefix}info/"),
+                    sdk_config,
                 )),
             ))
         }

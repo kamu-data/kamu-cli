@@ -122,6 +122,7 @@ impl DatasetFactoryImpl {
         let endpoint = s3_context.endpoint;
         let bucket = s3_context.bucket;
         let key_prefix = s3_context.key_prefix;
+        let sdk_config = s3_context.sdk_config;
 
         Ok(DatasetImpl::new(
             MetadataChainImpl::new(
@@ -131,6 +132,7 @@ impl DatasetFactoryImpl {
                         endpoint.clone(),
                         bucket.clone(),
                         format!("{key_prefix}blocks/"),
+                        sdk_config.clone(),
                     )),
                 )),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(S3Context::new(
@@ -138,6 +140,7 @@ impl DatasetFactoryImpl {
                     endpoint.clone(),
                     bucket.clone(),
                     format!("{key_prefix}refs/"),
+                    sdk_config.clone(),
                 ))),
             ),
             ObjectRepositoryS3Sha3::new(S3Context::new(
@@ -145,18 +148,21 @@ impl DatasetFactoryImpl {
                 endpoint.clone(),
                 bucket.clone(),
                 format!("{key_prefix}data/"),
+                sdk_config.clone(),
             )),
             ObjectRepositoryS3Sha3::new(S3Context::new(
                 client.clone(),
                 endpoint.clone(),
                 bucket.clone(),
                 format!("{key_prefix}checkpoints/"),
+                sdk_config.clone(),
             )),
             NamedObjectRepositoryS3::new(S3Context::new(
-                client.clone(),
-                endpoint.clone(),
-                bucket.clone(),
+                client,
+                endpoint,
+                bucket,
                 format!("{key_prefix}info/"),
+                sdk_config,
             )),
         ))
     }

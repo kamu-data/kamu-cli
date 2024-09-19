@@ -12,8 +12,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use aws_config::BehaviorVersion;
-use aws_credential_types::Credentials;
+use aws_config::{BehaviorVersion, SdkConfig};
 use aws_sdk_s3::error::{BoxError, SdkError};
 use aws_sdk_s3::operation::delete_object::{DeleteObjectError, DeleteObjectOutput};
 use aws_sdk_s3::operation::get_object::{GetObjectError, GetObjectOutput};
@@ -39,6 +38,7 @@ pub struct S3Context {
     pub endpoint: Option<String>,
     pub bucket: String,
     pub key_prefix: String,
+    pub sdk_config: SdkConfig,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,7 +46,13 @@ pub struct S3Context {
 impl S3Context {
     const MAX_LISTED_OBJECTS: i32 = 1000;
 
-    pub fn new<S1, S2, S3>(client: Client, endpoint: Option<S1>, bucket: S2, key_prefix: S3) -> Self
+    pub fn new<S1, S2, S3>(
+        client: Client,
+        endpoint: Option<S1>,
+        bucket: S2,
+        key_prefix: S3,
+        sdk_config: SdkConfig,
+    ) -> Self
     where
         S1: Into<String>,
         S2: Into<String>,
@@ -57,6 +63,7 @@ impl S3Context {
             endpoint: endpoint.map(Into::into),
             bucket: bucket.into(),
             key_prefix: key_prefix.into(),
+            sdk_config,
         }
     }
 
@@ -72,6 +79,7 @@ impl S3Context {
             endpoint: self.endpoint.clone(),
             bucket: self.bucket.clone(),
             key_prefix,
+            sdk_config: self.sdk_config.clone(),
         }
     }
 
@@ -97,7 +105,7 @@ impl S3Context {
         // TODO: PERF: Client construction is expensive and should only be done once
         let client = Client::from_conf(s3_config);
 
-        Self::new(client, endpoint, bucket, key_prefix)
+        Self::new(client, endpoint, bucket, key_prefix, sdk_config)
     }
 
     pub async fn from_url(url: &Url) -> Self {
@@ -156,12 +164,6 @@ impl S3Context {
             }
         };
         Url::parse(context_url_str.as_str()).unwrap()
-    }
-
-    pub async fn credentials(&self) -> Credentials {
-        use aws_credential_types::provider::ProvideCredentials;
-        let credentials_cache = self.client.config().credentials_provider().unwrap();
-        credentials_cache.provide_credentials().await.unwrap()
     }
 
     pub fn region(&self) -> Option<&str> {

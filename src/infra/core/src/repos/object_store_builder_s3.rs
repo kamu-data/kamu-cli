@@ -61,8 +61,7 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
         let mut s3_builder = AmazonS3Builder::from_env()
             .with_credentials(Arc::new(AwsSdkCredentialProvider::new(
                 self.s3_context
-                    .client
-                    .config()
+                    .sdk_config
                     .credentials_provider()
                     .unwrap()
                     .clone(),
