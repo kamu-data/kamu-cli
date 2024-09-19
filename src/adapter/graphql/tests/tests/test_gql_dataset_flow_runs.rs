@@ -2932,7 +2932,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                         "timing": {
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
-                                            "finishedAt": null,
+                                            "finishedAt": complete_time.to_rfc3339(),
                                         },
                                         "tasks": [
                                             {
