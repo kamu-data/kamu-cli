@@ -31,12 +31,12 @@ publish = { workspace = true }
 
 [dependencies]
 arrow = { version = "53" }
-async-trait = "0.1.73"
-aws-config = "1.5.5"
+async-trait = "0.1"
+aws-config = "1"
 aws-sdk-sso = "1"
 aws-sdk-ssooidc = "1"
 aws-sdk-sts = "1"
-aws-credential-types = "1.2.0"
+aws-credential-types = "1"
 clap = { version = "4", features = ["derive"] }
 datafusion = { version = "42", features = [
     "crypto_expressions",
@@ -53,7 +53,7 @@ futures = "0.3"
 object_store = { version = "0.11", features = ["aws", "gcp", "http"] }
 parking_lot = { version = "0.12" }
 parquet = { version = "53", default-features = false }
-regex = "1.8"
+regex = "1"
 rustyline = "14.0"
 tokio = { version = "1", features = [
     "macros",
