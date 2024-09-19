@@ -11,10 +11,10 @@ use std::collections::VecDeque;
 use std::io::Read;
 use std::str::FromStr;
 
-use axum::headers::Header as AxumHeader;
 use bytes::Bytes;
 use flate2::Compression;
 use futures::TryStreamExt;
+use headers::Header as _;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu::deserialize_metadata_block;
 use kamu_core::*;
@@ -713,7 +713,7 @@ pub async fn dataset_export_object_file(
     let response = client
         .put(upload_to.url.clone())
         .headers(header_map)
-        .body(hyper::Body::wrap_stream(reader_stream))
+        .body(reqwest::Body::wrap_stream(reader_stream))
         .send()
         .await
         .map_err(|e| SyncError::Internal(e.int_err()))?;

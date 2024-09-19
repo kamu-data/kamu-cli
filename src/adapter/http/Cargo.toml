@@ -37,7 +37,7 @@ time-source = { workspace = true }
 aws-sdk-s3 = { version = "1" }
 
 axum = { version = "0.7", features = ["ws", "multipart"] }
-axum-extra = { version = "0.9", features = ["async-read-body"] }
+axum-extra = { version = "0.9", features = ["async-read-body", "typed-header"] }
 async-trait = "0.1"
 base64 = { version = "0.22", default-features = false }
 bytes = "1"
@@ -52,8 +52,9 @@ ed25519-dalek = { version = "2", default-features = false, features = [
 ] }
 flate2 = "1" # GZip decoder
 futures = "0.3"
+headers = { version = "0.4", default-features = false }
 http = "1"
-hyper = "1"
+hyper = { version = "1", default-features = false, features = [] }
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls",
     "multipart",
@@ -76,7 +77,10 @@ tokio-util = { version = "0.7", default-features = false, features = [
     "compat",
     "io",
 ] }
-tokio-tungstenite = { version = "0.24", features = ["rustls-tls-native-roots"] }
+tokio-tungstenite = { version = "0.24", features = [
+    "rustls-tls-native-roots",
+    "url",
+] }
 tower = "0.5"
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }

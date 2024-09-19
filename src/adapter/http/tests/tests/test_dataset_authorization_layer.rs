@@ -201,10 +201,8 @@ const UNSAFE_METHODS: [http::Method; 4] = [
 
 #[allow(dead_code)]
 struct ServerHarness {
-    server: axum::Server<
-        hyper::server::conn::AddrIncoming,
-        axum::routing::IntoMakeService<axum::Router>,
-    >,
+    server: axum::serve::Serve<axum::routing::IntoMakeService<axum::Router>, axum::Router>,
+    local_addr: SocketAddr,
     _temp_dir: tempfile::TempDir,
 }
 
@@ -292,11 +290,14 @@ impl ServerHarness {
             );
 
         let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        let local_addr = listener.local_addr().unwrap();
 
-        let server = axum::Server::bind(&addr).serve(app.into_make_service());
+        let server = axum::serve(listener, app.into_make_service());
 
         Self {
             server,
+            local_addr,
             _temp_dir: temp_dir,
         }
     }
@@ -353,7 +354,7 @@ impl ServerHarness {
     }
 
     pub fn test_url(&self, path: &str) -> Url {
-        Url::from_str(format!("http://{}/{}", self.server.local_addr(), path).as_str()).unwrap()
+        Url::from_str(format!("http://{}/{}", self.local_addr, path).as_str()).unwrap()
     }
 
     #[allow(clippy::unused_async)]

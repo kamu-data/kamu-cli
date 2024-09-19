@@ -82,7 +82,7 @@ impl Command for UICommand {
             self.address,
             self.port,
         )
-        .await;
+        .await?;
 
         let web_server_url = format!("http://{}", web_server.local_addr());
         tracing::info!("HTTP server is listening on: {}", web_server_url);

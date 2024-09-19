@@ -219,8 +219,8 @@ impl S3Context {
         use aws_smithy_types::body::SdkBody;
         use aws_smithy_types::byte_stream::ByteStream;
 
-        let body = hyper::Body::wrap_stream(stream);
-        let stream = ByteStream::new(SdkBody::from_body_0_4(body));
+        let body = todo!(); //hyper::Body::wrap_stream(stream);
+        let stream = todo!(); //ByteStream::new(SdkBody::from_body_0_4(body));
         let size = i64::try_from(size).unwrap();
 
         self.client
@@ -273,7 +273,7 @@ impl S3Context {
 
         // TODO: Support iteration
         assert!(
-            !list_objects_resp.is_truncated,
+            !list_objects_resp.is_truncated.unwrap_or_default(),
             "Cannot handle truncated response"
         );
 
@@ -301,7 +301,7 @@ impl S3Context {
                     .collect::<Result<Vec<_>, _>>()
                     .int_err()?;
 
-                has_next_page = list_response.is_truncated;
+                has_next_page = list_response.is_truncated.unwrap_or_default();
                 self.client
                     .delete_objects()
                     .bucket(&self.bucket)
@@ -346,7 +346,7 @@ impl S3Context {
             // same bucket. Consider optimistic locking (comparing old head with
             // expected before final commit).
 
-            has_next_page = list_response.is_truncated();
+            has_next_page = list_response.is_truncated.unwrap_or_default();
             if let Some(contents) = list_response.contents {
                 for obj in &contents {
                     let copy_source =

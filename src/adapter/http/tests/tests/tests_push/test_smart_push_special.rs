@@ -36,7 +36,8 @@ async fn test_smart_push_new_dataset_unauthenticated() {
             multi_tenant: true,
             authorized_writes: true,
             base_catalog: None,
-        }),
+        })
+        .await,
     )
     .await;
 
@@ -81,7 +82,8 @@ async fn test_smart_push_new_dataset_wrong_user() {
             multi_tenant: true,
             authorized_writes: true,
             base_catalog: None,
-        }),
+        })
+        .await,
     )
     .await;
 
@@ -131,7 +133,8 @@ async fn test_smart_push_existing_dataset_unauthenticated() {
             multi_tenant: true,
             authorized_writes: false,
             base_catalog: None,
-        }),
+        })
+        .await,
     )
     .await;
 
@@ -174,7 +177,8 @@ async fn test_smart_push_existing_dataset_unauthorized() {
             multi_tenant: true,
             authorized_writes: false,
             base_catalog: None,
-        }),
+        })
+        .await,
     )
     .await;
 
@@ -217,7 +221,8 @@ async fn test_smart_push_existing_ref_collision() {
             multi_tenant: true,
             authorized_writes: true,
             base_catalog: None,
-        }),
+        })
+        .await,
     )
     .await;
 
@@ -258,7 +263,8 @@ async fn test_smart_push_incompatible_version_err() {
             multi_tenant: true,
             authorized_writes: true,
             base_catalog: None,
-        }),
+        })
+        .await,
     )
     .await;
 

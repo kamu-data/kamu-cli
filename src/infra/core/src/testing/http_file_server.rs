@@ -10,26 +10,25 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::Path;
 
-use hyper::server::conn::AddrIncoming;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct HttpFileServer {
-    server: axum::Server<AddrIncoming, axum::routing::IntoMakeService<axum::Router>>,
+    server: axum::serve::Serve<axum::routing::IntoMakeService<axum::Router>, axum::Router>,
+    local_addr: SocketAddr,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl HttpFileServer {
-    pub fn new<P>(path: P) -> Self
+    pub async fn new<P>(path: P) -> Self
     where
         P: AsRef<Path>,
     {
         let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
-
-        let bound_addr = AddrIncoming::bind(&addr).unwrap_or_else(|e| {
-            panic!("error binding to {addr}: {e}");
-        });
+        let listener = tokio::net::TcpListener::bind(&addr)
+            .await
+            .expect("Error binding TCP listener");
+        let local_addr = listener.local_addr().unwrap();
 
         let app = axum::Router::new()
             .route(
@@ -40,16 +39,16 @@ impl HttpFileServer {
                 tower::ServiceBuilder::new().layer(tower_http::trace::TraceLayer::new_for_http()),
             );
 
-        let server = axum::Server::builder(bound_addr).serve(app.into_make_service());
+        let server = axum::serve(listener, app.into_make_service());
 
-        Self { server }
+        Self { server, local_addr }
     }
 
     pub fn local_addr(&self) -> SocketAddr {
-        self.server.local_addr()
+        self.local_addr
     }
 
-    pub async fn run(self) -> Result<(), hyper::Error> {
+    pub async fn run(self) -> Result<(), std::io::Error> {
         self.server.await
     }
 }

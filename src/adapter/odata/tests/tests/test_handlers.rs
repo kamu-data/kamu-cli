@@ -40,7 +40,7 @@ macro_rules! await_client_server_flow {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_service_handler() {
-    let harness = TestHarness::new();
+    let harness = TestHarness::new().await;
 
     harness.create_simple_dataset().await;
 
@@ -85,7 +85,7 @@ async fn test_service_handler() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_metadata_handler() {
-    let harness = TestHarness::new();
+    let harness = TestHarness::new().await;
 
     harness.create_simple_dataset().await;
 
@@ -138,7 +138,7 @@ async fn test_metadata_handler() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_collection_handler() {
-    let harness = TestHarness::new();
+    let harness = TestHarness::new().await;
 
     harness.create_simple_dataset().await;
 
@@ -234,7 +234,7 @@ async fn test_collection_handler() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_collection_handler_by_id() {
-    let harness = TestHarness::new();
+    let harness = TestHarness::new().await;
 
     harness.create_simple_dataset().await;
 
@@ -291,7 +291,7 @@ async fn test_collection_handler_by_id() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_collection_handler_by_id_not_found() {
-    let harness = TestHarness::new();
+    let harness = TestHarness::new().await;
 
     harness.create_simple_dataset().await;
 
@@ -319,11 +319,11 @@ struct TestHarness {
 }
 
 impl TestHarness {
-    fn new() -> Self {
-        Self::new_with_authorizer(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new())
+    async fn new() -> Self {
+        Self::new_with_authorizer(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new()).await
     }
 
-    fn new_with_authorizer<TDatasetAuthorizer: auth::DatasetActionAuthorizer + 'static>(
+    async fn new_with_authorizer<TDatasetAuthorizer: auth::DatasetActionAuthorizer + 'static>(
         dataset_action_authorizer: TDatasetAuthorizer,
     ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
@@ -370,7 +370,7 @@ impl TestHarness {
 
         let push_ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
 
-        let api_server = TestAPIServer::new(catalog.clone(), None, None, false);
+        let api_server = TestAPIServer::new(catalog.clone(), None, None, false).await;
 
         Self {
             temp_dir,

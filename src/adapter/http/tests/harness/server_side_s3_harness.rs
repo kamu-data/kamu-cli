@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::net::{SocketAddr, TcpListener};
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -79,10 +79,10 @@ impl ServerSideS3Harness {
 
         let time_source = SystemTimeSourceStub::new();
 
-        let (base_catalog, bind_socket) = {
+        let (base_catalog, listener) = {
             let addr = SocketAddr::from(([127, 0, 0, 1], 0));
-            let bind_socket = TcpListener::bind(addr).unwrap();
-            let base_url_rest = format!("http://{}", bind_socket.local_addr().unwrap());
+            let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+            let base_url_rest = format!("http://{}", listener.local_addr().unwrap());
 
             let mut b = dill::CatalogBuilder::new();
 
@@ -113,12 +113,12 @@ impl ServerSideS3Harness {
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
-            (b.build(), bind_socket)
+            (b.build(), listener)
         };
 
         let api_server = TestAPIServer::new(
             create_web_user_catalog(&base_catalog, &options),
-            bind_socket,
+            listener,
             options.multi_tenant,
         );
 

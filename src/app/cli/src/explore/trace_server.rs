@@ -12,7 +12,6 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use axum::response::IntoResponse;
-use hyper::server::conn::AddrIncoming;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,14 +34,9 @@ impl TraceServer {
         url::Url::parse("https://ui.perfetto.dev/#!/?url=http%3A%2F%2F127.0.0.1%3A9001%2F").unwrap()
     }
 
-    pub fn serve(
-        &self,
-        trace_path: impl Into<PathBuf>,
-    ) -> impl std::future::Future<Output = Result<(), hyper::Error>> {
+    pub async fn serve(&self, trace_path: impl Into<PathBuf>) -> Result<(), std::io::Error> {
         let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), Self::HTTP_PORT));
-        let bound_addr = AddrIncoming::bind(&addr).unwrap_or_else(|e| {
-            panic!("error binding to {addr}: {e}");
-        });
+        let listener = tokio::net::TcpListener::bind(addr).await?;
 
         let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel::<()>();
 
@@ -59,16 +53,16 @@ impl TraceServer {
             )
             .with_state(StateInner::new(trace_path, shutdown_sender));
 
-        axum::Server::builder(bound_addr)
-            .serve(app.into_make_service())
+        axum::serve(listener, app.into_make_service())
             .with_graceful_shutdown(async {
                 shutdown_receiver.await.ok();
             })
+            .await
     }
 
     pub async fn maybe_serve_in_browser(
         trace_path: impl Into<PathBuf>,
-    ) -> Result<(), hyper::Error> {
+    ) -> Result<(), std::io::Error> {
         let trace_path = trace_path.into();
         let trace_server = Self::new();
         let srv = trace_server.serve(&trace_path);
@@ -125,7 +119,7 @@ async fn download_trace(
         }
     };
 
-    Ok(axum::body::StreamBody::new(
+    Ok(axum::body::Body::from_stream(
         tokio_util::io::ReaderStream::new(file),
     ))
 }

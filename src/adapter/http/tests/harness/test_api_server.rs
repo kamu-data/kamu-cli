@@ -7,21 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::net::{SocketAddr, TcpListener};
+use std::net::SocketAddr;
 
 use dill::Catalog;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct TestAPIServer {
-    server: axum::Server<
-        hyper::server::conn::AddrIncoming,
-        axum::routing::IntoMakeService<axum::Router>,
-    >,
+    server: axum::serve::Serve<axum::routing::IntoMakeService<axum::Router>, axum::Router>,
+    local_addr: SocketAddr,
 }
 
 impl TestAPIServer {
-    pub fn new(catalog: Catalog, bind_socket: TcpListener, multi_tenant: bool) -> Self {
+    pub fn new(catalog: Catalog, listener: tokio::net::TcpListener, multi_tenant: bool) -> Self {
         let app = axum::Router::new()
             .route(
                 "/platform/login",
@@ -65,18 +63,18 @@ impl TestAPIServer {
                     .layer(kamu_adapter_http::AuthenticationLayer::new()),
             );
 
-        let server = axum::Server::from_tcp(bind_socket)
-            .unwrap()
-            .serve(app.into_make_service());
+        let local_addr = listener.local_addr().unwrap();
 
-        Self { server }
+        let server = axum::serve(listener, app.into_make_service());
+
+        Self { server, local_addr }
     }
 
     pub fn local_addr(&self) -> SocketAddr {
-        self.server.local_addr()
+        self.local_addr.clone()
     }
 
-    pub async fn run(self) -> Result<(), hyper::Error> {
+    pub async fn run(self) -> Result<(), std::io::Error> {
         self.server.await
     }
 }

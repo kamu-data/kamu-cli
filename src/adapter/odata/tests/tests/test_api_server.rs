@@ -14,14 +14,12 @@ use dill::Catalog;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct TestAPIServer {
-    server: axum::Server<
-        hyper::server::conn::AddrIncoming,
-        axum::routing::IntoMakeService<axum::Router>,
-    >,
+    server: axum::serve::Serve<axum::routing::IntoMakeService<axum::Router>, axum::Router>,
+    local_addr: SocketAddr,
 }
 
 impl TestAPIServer {
-    pub fn new(
+    pub async fn new(
         catalog: Catalog,
         address: Option<IpAddr>,
         port: Option<u16>,
@@ -49,16 +47,18 @@ impl TestAPIServer {
             port.unwrap_or(0),
         ));
 
-        let server = axum::Server::bind(&addr).serve(app.into_make_service());
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        let local_addr = listener.local_addr().unwrap();
+        let server = axum::serve(listener, app.into_make_service());
 
-        Self { server }
+        Self { server, local_addr }
     }
 
-    pub fn local_addr(&self) -> SocketAddr {
-        self.server.local_addr()
+    pub fn local_addr(&self) -> &SocketAddr {
+        &self.local_addr
     }
 
-    pub async fn run(self) -> Result<(), hyper::Error> {
+    pub async fn run(self) -> Result<(), std::io::Error> {
         self.server.await
     }
 }

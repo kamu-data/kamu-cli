@@ -31,7 +31,7 @@ use crate::harness::*;
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_push_ingest_handler() {
-    let harness = DataIngestHarness::new();
+    let harness = DataIngestHarness::new().await;
 
     let create_result = harness.create_population_dataset(true).await;
 
@@ -275,7 +275,7 @@ async fn test_data_push_ingest_handler() {
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_push_ingest_upload_token_no_initial_source() {
-    let harness = DataIngestHarness::new();
+    let harness = DataIngestHarness::new().await;
 
     let create_result = harness.create_population_dataset(false).await;
 
@@ -360,7 +360,7 @@ async fn test_data_push_ingest_upload_token_no_initial_source() {
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_push_ingest_upload_token_with_initial_source() {
-    let harness = DataIngestHarness::new();
+    let harness = DataIngestHarness::new().await;
 
     let create_result = harness.create_population_dataset(true).await;
 
@@ -447,7 +447,7 @@ async fn test_data_push_ingest_upload_token_with_initial_source() {
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_push_ingest_upload_content_type_not_specified() {
-    let harness = DataIngestHarness::new();
+    let harness = DataIngestHarness::new().await;
 
     let create_result = harness.create_population_dataset(false).await;
 
@@ -526,7 +526,7 @@ async fn test_data_push_ingest_upload_content_type_not_specified() {
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_push_ingest_upload_token_actual_file_different_size() {
-    let harness = DataIngestHarness::new();
+    let harness = DataIngestHarness::new().await;
 
     let create_result = harness.create_population_dataset(false).await;
 
@@ -592,7 +592,7 @@ struct DataIngestHarness {
 }
 
 impl DataIngestHarness {
-    fn new() -> Self {
+    async fn new() -> Self {
         let catalog = dill::CatalogBuilder::new()
             .add::<DataFormatRegistryImpl>()
             .add::<PushIngestServiceImpl>()
@@ -605,7 +605,8 @@ impl DataIngestHarness {
             multi_tenant: true,
             authorized_writes: true,
             base_catalog: Some(catalog),
-        });
+        })
+        .await;
 
         let system_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
         server_harness.system_time_source().set(system_time);

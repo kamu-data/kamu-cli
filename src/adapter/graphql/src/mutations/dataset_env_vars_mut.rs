@@ -15,7 +15,7 @@ use kamu_datasets::{
     SaveDatasetEnvVarError,
 };
 use opendatafabric as odf;
-use secrecy::Secret;
+use secrecy::SecretString;
 
 use crate::prelude::*;
 use crate::queries::ViewDatasetEnvVar;
@@ -46,7 +46,7 @@ impl DatasetEnvVarsMut {
         let dataset_env_var_service = from_catalog::<dyn DatasetEnvVarService>(ctx).unwrap();
 
         let dataset_env_var_value = if is_secret {
-            DatasetEnvVarValue::Secret(Secret::new(value))
+            DatasetEnvVarValue::Secret(SecretString::from(value))
         } else {
             DatasetEnvVarValue::Regular(value)
         };
@@ -120,7 +120,7 @@ impl DatasetEnvVarsMut {
 
         let dataset_env_var_service = from_catalog::<dyn DatasetEnvVarService>(ctx).unwrap();
         let dataset_env_var_value = if is_secret {
-            DatasetEnvVarValue::Secret(Secret::new(new_value))
+            DatasetEnvVarValue::Secret(SecretString::from(new_value))
         } else {
             DatasetEnvVarValue::Regular(new_value)
         };

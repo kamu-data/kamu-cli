@@ -118,7 +118,12 @@ impl UploadService for UploadServiceS3 {
             .head_object(file_key)
             .await
             .map_err(ErrorIntoInternal::int_err)?;
-        Ok(usize::try_from(res.content_length).unwrap())
+
+        let content_length = res
+            .content_length
+            .ok_or_else(|| "S3 did not return content length".int_err())?;
+
+        Ok(usize::try_from(content_length).unwrap())
     }
 
     async fn upload_reference_into_stream(

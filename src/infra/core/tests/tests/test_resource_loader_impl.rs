@@ -68,7 +68,7 @@ async fn test_load_from_http_url() {
     let path = tempdir.path().join("test.yaml");
     let expected = create_test_snapshot(&path);
 
-    let http_server = HttpFileServer::new(tempdir.path());
+    let http_server = HttpFileServer::new(tempdir.path()).await;
     let url = url::Url::parse(&format!("http://{}/test.yaml", http_server.local_addr())).unwrap();
 
     let _server_hdl = tokio::spawn(http_server.run());
@@ -88,7 +88,7 @@ async fn test_load_from_http_url() {
 async fn test_load_from_http_url_404() {
     let tempdir = tempfile::tempdir().unwrap();
 
-    let http_server = HttpFileServer::new(tempdir.path());
+    let http_server = HttpFileServer::new(tempdir.path()).await;
     let url = url::Url::parse(&format!("http://{}/test.yaml", http_server.local_addr())).unwrap();
 
     let _server_hdl = tokio::spawn(http_server.run());

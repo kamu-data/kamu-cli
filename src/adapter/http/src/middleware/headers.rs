@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use axum::headers::authorization::Bearer;
-use axum::headers::{Authorization, Error, Header};
-use axum::TypedHeader;
+use axum_extra::typed_header::TypedHeader;
+use headers::authorization::{Authorization, Bearer};
+use headers::{Error, Header};
 use http::{HeaderName, HeaderValue};
 
 pub type BearerHeader = TypedHeader<Authorization<Bearer>>;

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::net::{SocketAddr, TcpListener};
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -66,7 +66,7 @@ pub(crate) struct ServerSideLocalFsHarness {
 }
 
 impl ServerSideLocalFsHarness {
-    pub fn new(options: ServerSideHarnessOptions) -> Self {
+    pub async fn new(options: ServerSideHarnessOptions) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
         let datasets_dir = tempdir.path().join("datasets");
@@ -79,15 +79,15 @@ impl ServerSideLocalFsHarness {
         std::fs::create_dir(&cache_dir).unwrap();
 
         let time_source = SystemTimeSourceStub::new();
-        let (base_catalog, bind_socket) = {
+        let (base_catalog, listener) = {
             let mut b = match &options.base_catalog {
                 None => dill::CatalogBuilder::new(),
                 Some(c) => dill::CatalogBuilder::new_chained(c),
             };
 
             let addr = SocketAddr::from(([127, 0, 0, 1], 0));
-            let bind_socket = TcpListener::bind(addr).unwrap();
-            let base_url_rest = format!("http://{}", bind_socket.local_addr().unwrap());
+            let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+            let base_url_rest = format!("http://{}", listener.local_addr().unwrap());
 
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add_value(CacheDir::new(cache_dir))
@@ -115,12 +115,12 @@ impl ServerSideLocalFsHarness {
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
-            (b.build(), bind_socket)
+            (b.build(), listener)
         };
 
         let api_server = TestAPIServer::new(
             create_web_user_catalog(&base_catalog, &options),
-            bind_socket,
+            listener,
             options.multi_tenant,
         );
 

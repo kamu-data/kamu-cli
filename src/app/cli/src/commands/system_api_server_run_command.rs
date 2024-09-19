@@ -143,7 +143,8 @@ impl Command for APIServerRunCommand {
             self.port,
             self.external_address,
             self.e2e_output_data_path.as_ref(),
-        );
+        )
+        .await?;
 
         tracing::info!(
             "API server is listening on: http://{}",

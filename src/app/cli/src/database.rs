@@ -12,7 +12,7 @@ use std::path::Path;
 use database_common::*;
 use dill::{Catalog, CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
-use secrecy::Secret;
+use secrecy::SecretString;
 
 use crate::config::{DatabaseConfig, DatabaseCredentialSourceConfig, RemoteDatabaseConfig};
 
@@ -207,8 +207,12 @@ fn init_database_password_provider(b: &mut CatalogBuilder, raw_db_config: &Datab
             DatabaseCredentialSourceConfig::RawPassword(raw_password_config) => {
                 b.add_builder(
                     DatabaseFixedPasswordProvider::builder()
-                        .with_db_user_name(Secret::new(raw_password_config.user_name.clone()))
-                        .with_fixed_password(Secret::new(raw_password_config.raw_password.clone())),
+                        .with_db_user_name(SecretString::from(
+                            raw_password_config.user_name.clone(),
+                        ))
+                        .with_fixed_password(SecretString::from(
+                            raw_password_config.raw_password.clone(),
+                        )),
                 );
                 b.bind::<dyn DatabasePasswordProvider, DatabaseFixedPasswordProvider>();
             }
@@ -222,7 +226,7 @@ fn init_database_password_provider(b: &mut CatalogBuilder, raw_db_config: &Datab
             DatabaseCredentialSourceConfig::AwsIamToken(aws_iam_config) => {
                 b.add_builder(
                     DatabaseAwsIamTokenProvider::builder()
-                        .with_db_user_name(Secret::new(aws_iam_config.user_name.clone())),
+                        .with_db_user_name(SecretString::from(aws_iam_config.user_name.clone())),
                 );
                 b.bind::<dyn DatabasePasswordProvider, DatabaseAwsIamTokenProvider>();
             }

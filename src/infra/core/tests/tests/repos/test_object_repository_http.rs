@@ -25,7 +25,7 @@ async fn test_protocol() {
 #[test_log::test(tokio::test)]
 async fn test_read_only() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let http_server = HttpFileServer::new(tmp_repo_dir.path());
+    let http_server = HttpFileServer::new(tmp_repo_dir.path()).await;
     let base_url = url::Url::parse(&format!("http://{}/", http_server.local_addr())).unwrap();
     let _srv_handle = tokio::spawn(http_server.run());
     let repo = ObjectRepositoryHttp::new(reqwest::Client::new(), base_url, Default::default());
@@ -39,7 +39,7 @@ async fn test_read_only() {
 #[test_log::test(tokio::test)]
 async fn test_bytes() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let http_server = HttpFileServer::new(tmp_repo_dir.path());
+    let http_server = HttpFileServer::new(tmp_repo_dir.path()).await;
     let base_url = url::Url::parse(&format!("http://{}/", http_server.local_addr())).unwrap();
     let _srv_handle = tokio::spawn(http_server.run());
     let repo = ObjectRepositoryHttp::new(reqwest::Client::new(), base_url, Default::default());
@@ -75,7 +75,7 @@ async fn test_bytes() {
 #[test_log::test(tokio::test)]
 async fn test_stream() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let http_server = HttpFileServer::new(tmp_repo_dir.path());
+    let http_server = HttpFileServer::new(tmp_repo_dir.path()).await;
     let base_url = url::Url::parse(&format!("http://{}/", http_server.local_addr())).unwrap();
     let _srv_handle = tokio::spawn(http_server.run());
     let repo = ObjectRepositoryHttp::new(reqwest::Client::new(), base_url, Default::default());

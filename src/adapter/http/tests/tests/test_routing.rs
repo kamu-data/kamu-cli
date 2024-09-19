@@ -7,14 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::future::IntoFuture;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use ::serde::Deserialize;
 use axum::extract::{FromRequestParts, Path};
-use axum::routing::IntoMakeService;
-use axum::Router;
 use dill::Component;
-use hyper::server::conn::AddrIncoming;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -80,11 +78,14 @@ async fn setup_repo() -> RepoFixture {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn setup_server<IdExt, Extractor>(
+async fn setup_server<IdExt, Extractor>(
     catalog: dill::Catalog,
     path: &str,
     identity_extractor: IdExt,
-) -> axum::Server<AddrIncoming, IntoMakeService<Router>>
+) -> (
+    impl std::future::Future<Output = Result<(), std::io::Error>>,
+    SocketAddr,
+)
 where
     IdExt: Fn(Extractor) -> DatasetRef,
     IdExt: Clone + Send + 'static,
@@ -111,8 +112,10 @@ where
         );
 
     let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
-
-    axum::Server::bind(&addr).serve(app.into_make_service())
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let local_addr = listener.local_addr().unwrap();
+    let server = axum::serve(listener, app.into_make_service());
+    (server.into_future(), local_addr)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -143,11 +146,13 @@ async fn test_routing_root() {
     let repo = setup_repo().await;
 
     let dataset_ref = repo.created_dataset.dataset_handle.as_local_ref();
-    let server = setup_server(repo.catalog, "/", move |_: axum::extract::OriginalUri| {
-        dataset_ref.clone()
-    });
+    let (server, local_addr) =
+        setup_server(repo.catalog, "/", move |_: axum::extract::OriginalUri| {
+            dataset_ref.clone()
+        })
+        .await;
 
-    let dataset_url = url::Url::parse(&format!("http://{}/", server.local_addr(),)).unwrap();
+    let dataset_url = url::Url::parse(&format!("http://{}/", local_addr)).unwrap();
 
     let client = setup_client(dataset_url, repo.created_dataset.head);
 
@@ -165,15 +170,16 @@ struct DatasetByID {
 async fn test_routing_dataset_id() {
     let repo = setup_repo().await;
 
-    let server = setup_server(
+    let (server, local_addr) = setup_server(
         repo.catalog,
         "/:dataset_id",
         |Path(p): Path<DatasetByID>| p.dataset_id.as_local_ref(),
-    );
+    )
+    .await;
 
     let dataset_url = url::Url::parse(&format!(
         "http://{}/{}/",
-        server.local_addr(),
+        local_addr,
         repo.created_dataset.dataset_handle.id.as_did_str()
     ))
     .unwrap();
@@ -194,16 +200,16 @@ struct DatasetByName {
 async fn test_routing_dataset_name() {
     let repo = setup_repo().await;
 
-    let server = setup_server(
+    let (server, local_addr) = setup_server(
         repo.catalog,
         "/:dataset_name",
         |Path(p): Path<DatasetByName>| DatasetAlias::new(None, p.dataset_name).into_local_ref(),
-    );
+    )
+    .await;
 
     let dataset_url = url::Url::parse(&format!(
         "http://{}/{}/",
-        server.local_addr(),
-        repo.created_dataset.dataset_handle.alias
+        local_addr, repo.created_dataset.dataset_handle.alias
     ))
     .unwrap();
 
@@ -216,15 +222,16 @@ async fn test_routing_dataset_name() {
 async fn test_routing_dataset_name_case_insensetive() {
     let repo = setup_repo().await;
 
-    let server = setup_server(
+    let (server, local_addr) = setup_server(
         repo.catalog,
         "/:dataset_name",
         |Path(p): Path<DatasetByName>| DatasetAlias::new(None, p.dataset_name).into_local_ref(),
-    );
+    )
+    .await;
 
     let dataset_url = url::Url::parse(&format!(
         "http://{}/{}/",
-        server.local_addr(),
+        local_addr,
         repo.created_dataset
             .dataset_handle
             .alias
@@ -251,21 +258,21 @@ struct DatasetByAccountAndName {
 async fn test_routing_dataset_account_and_name() {
     let repo = setup_repo().await;
 
-    let server = setup_server(
+    let (server, local_addr) = setup_server(
         repo.catalog,
         "/:account_name/:dataset_name",
         |Path(p): Path<DatasetByAccountAndName>| {
             // TODO: Ignoring account name until DatasetRepository supports multi-tenancy
             DatasetAlias::new(None, p.dataset_name).into_local_ref()
         },
-    );
+    )
+    .await;
 
-    println!("{}", server.local_addr());
+    println!("{}", local_addr);
 
     let dataset_url = url::Url::parse(&format!(
         "http://{}/kamu/{}/",
-        server.local_addr(),
-        repo.created_dataset.dataset_handle.alias
+        local_addr, repo.created_dataset.dataset_handle.alias
     ))
     .unwrap();
 
@@ -280,13 +287,14 @@ async fn test_routing_dataset_account_and_name() {
 async fn test_routing_err_invalid_identity_format() {
     let repo = setup_repo().await;
 
-    let server = setup_server(
+    let (server, local_addr) = setup_server(
         repo.catalog,
         "/:dataset_id",
         |Path(p): Path<DatasetByID>| p.dataset_id.into_local_ref(),
-    );
+    )
+    .await;
 
-    let dataset_url = format!("http://{}/this-is-no-a-did/refs/head", server.local_addr());
+    let dataset_url = format!("http://{}/this-is-no-a-did/refs/head", local_addr);
 
     let client = async move {
         let res = reqwest::get(dataset_url).await.unwrap();
@@ -302,13 +310,14 @@ async fn test_routing_err_invalid_identity_format() {
 async fn test_routing_err_dataset_not_found() {
     let repo = setup_repo().await;
 
-    let server = setup_server(
+    let (server, local_addr) = setup_server(
         repo.catalog,
         "/:dataset_name",
         |Path(p): Path<DatasetByName>| DatasetAlias::new(None, p.dataset_name).as_local_ref(),
-    );
+    )
+    .await;
 
-    let dataset_url = format!("http://{}/non.existing.dataset/", server.local_addr());
+    let dataset_url = format!("http://{}/non.existing.dataset/", local_addr);
 
     let client = async move {
         let res = reqwest::get(dataset_url).await.unwrap();

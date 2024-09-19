@@ -26,7 +26,7 @@ use crate::harness::await_client_server_flow;
 
 #[test_log::test(tokio::test)]
 async fn test_anonymous_api_access() {
-    let server_harness = ServerHarness::new(MockAuthenticationService::new(), None);
+    let server_harness = ServerHarness::new(MockAuthenticationService::new(), None).await;
     let test_url = server_harness.test_url();
 
     let api_server_handle = server_harness.api_server_run();
@@ -53,7 +53,8 @@ async fn test_non_anonymous_api_valid_access() {
             kamu_accounts::Account::dummy(),
         ),
         None,
-    );
+    )
+    .await;
     let test_url = server_harness.test_url();
 
     let api_server_handle = server_harness.api_server_run();
@@ -76,7 +77,7 @@ async fn test_non_anonymous_api_valid_access() {
 
 #[test_log::test(tokio::test)]
 async fn test_non_anonymous_api_access_expired_token() {
-    let server_harness = ServerHarness::new(MockAuthenticationService::expired_token(), None);
+    let server_harness = ServerHarness::new(MockAuthenticationService::expired_token(), None).await;
     let test_url = server_harness.test_url();
 
     let api_server_handle = server_harness.api_server_run();
@@ -102,7 +103,7 @@ async fn test_non_anonymous_api_access_expired_token() {
 
 #[test_log::test(tokio::test)]
 async fn test_non_anonymous_api_access_invalid_token() {
-    let server_harness = ServerHarness::new(MockAuthenticationService::invalid_token(), None);
+    let server_harness = ServerHarness::new(MockAuthenticationService::invalid_token(), None).await;
     let test_url = server_harness.test_url();
 
     let api_server_handle = server_harness.api_server_run();
@@ -132,14 +133,12 @@ const TEST_ENDPOINT: &str = "/foo";
 
 #[allow(dead_code)]
 struct ServerHarness {
-    server: axum::Server<
-        hyper::server::conn::AddrIncoming,
-        axum::routing::IntoMakeService<axum::Router>,
-    >,
+    server: axum::serve::Serve<axum::routing::IntoMakeService<axum::Router>, axum::Router>,
+    local_addr: SocketAddr,
 }
 
 impl ServerHarness {
-    pub fn new(
+    pub async fn new(
         authentication_service: MockAuthenticationService,
         initial_current_account_subject: Option<CurrentAccountSubject>,
     ) -> Self {
@@ -176,10 +175,12 @@ impl ServerHarness {
             );
 
         let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        let local_addr = listener.local_addr().unwrap();
 
-        let server = axum::Server::bind(&addr).serve(app.into_make_service());
+        let server = axum::serve(listener, app.into_make_service());
 
-        Self { server }
+        Self { server, local_addr }
     }
 
     pub async fn api_server_run(self) -> Result<(), InternalError> {
@@ -187,8 +188,7 @@ impl ServerHarness {
     }
 
     pub fn test_url(&self) -> Url {
-        Url::from_str(format!("http://{}{}", self.server.local_addr(), TEST_ENDPOINT).as_str())
-            .unwrap()
+        Url::from_str(format!("http://{}{}", self.local_addr, TEST_ENDPOINT).as_str()).unwrap()
     }
 
     #[allow(clippy::unused_async)]

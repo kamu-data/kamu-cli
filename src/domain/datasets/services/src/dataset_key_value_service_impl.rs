@@ -20,12 +20,12 @@ use kamu_datasets::{
     DatasetKeyValueService,
     FindDatasetEnvVarError,
 };
-use secrecy::{ExposeSecret, Secret};
+use secrecy::{ExposeSecret, SecretString};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetKeyValueServiceImpl {
-    dataset_env_var_encryption_key: Secret<String>,
+    dataset_env_var_encryption_key: SecretString,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,7 +36,7 @@ impl DatasetKeyValueServiceImpl {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(dataset_env_var_config: Arc<DatasetEnvVarsConfig>) -> Self {
         Self {
-            dataset_env_var_encryption_key: Secret::new(
+            dataset_env_var_encryption_key: SecretString::from(
                 dataset_env_var_config
                     .encryption_key
                     .as_ref()
@@ -60,7 +60,9 @@ impl DatasetKeyValueService for DatasetKeyValueServiceImpl {
                 .get_exposed_decrypted_value(self.dataset_env_var_encryption_key.expose_secret())
                 .map_err(|err| FindDatasetEnvVarError::Internal(err.int_err()))?;
             return if existing_dataset_env_var.secret_nonce.is_some() {
-                Ok(DatasetEnvVarValue::Secret(Secret::new(exposed_value)))
+                Ok(DatasetEnvVarValue::Secret(SecretString::from(
+                    exposed_value,
+                )))
             } else {
                 return Ok(DatasetEnvVarValue::Regular(exposed_value));
             };
