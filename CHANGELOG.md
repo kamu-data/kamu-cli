@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Changed -->
 <!--- - Fixed -->
 
+## [Unreleased]
+### Fixed
+- Failed flows should still propagate `finishedAt` time
+
 ## [0.201.0] - 2024-09-18
 ### Added
 - REST API: New `/verify` endpoint allows verification of query commitment as per [documentation](https://docs.kamu.dev/node/commitments/#dispute-resolution) (#831)

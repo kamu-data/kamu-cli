@@ -207,26 +207,25 @@ impl Projection for FlowState {
                             // Ignore for idempotence motivation
                             Ok(s)
                         } else {
+                            let timing = FlowTimingRecords {
+                                finished_at: Some(event_time),
+                                ..s.timing
+                            };
                             match task_outcome {
                                 ts::TaskOutcome::Success(task_result) => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Success(task_result.clone().into())),
-                                    timing: FlowTimingRecords {
-                                        finished_at: Some(event_time),
-                                        ..s.timing
-                                    },
+                                    timing,
                                     ..s
                                 }),
                                 ts::TaskOutcome::Cancelled => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Aborted),
-                                    timing: FlowTimingRecords {
-                                        finished_at: Some(event_time),
-                                        ..s.timing
-                                    },
+                                    timing,
                                     ..s
                                 }),
                                 // TODO: support retries
                                 ts::TaskOutcome::Failed(task_error) => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Failed(task_error.into())),
+                                    timing,
                                     ..s
                                 }),
                             }
