@@ -285,12 +285,8 @@ where
 
         tracing::debug!(?key, size, "Inserting object stream");
 
-        use tokio_util::io::ReaderStream;
-
-        let stream = ReaderStream::new(src);
-
         self.s3_context
-            .put_object_stream(key, stream, size)
+            .put_object_stream(key, src, size)
             .await
             // TODO: Detect credentials error
             .map_err(|e| e.into_service_error().int_err())?;

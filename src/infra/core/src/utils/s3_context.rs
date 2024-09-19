@@ -8,19 +8,27 @@
 // by the Apache License, Version 2.0.
 
 use std::convert::TryFrom;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
 
 use aws_config::BehaviorVersion;
 use aws_credential_types::Credentials;
-use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::error::{BoxError, SdkError};
 use aws_sdk_s3::operation::delete_object::{DeleteObjectError, DeleteObjectOutput};
 use aws_sdk_s3::operation::get_object::{GetObjectError, GetObjectOutput};
 use aws_sdk_s3::operation::head_object::{HeadObjectError, HeadObjectOutput};
 use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
+use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{CommonPrefix, Delete, ObjectIdentifier};
 use aws_sdk_s3::Client;
+use bytes::Bytes;
+use futures::Stream;
+use http_body_util::StreamBody;
+use hyper::body::Frame;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::AsyncReadObj;
-use tokio_util::io::ReaderStream;
+use tokio::io::ReadBuf;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -213,21 +221,17 @@ impl S3Context {
     pub async fn put_object_stream(
         &self,
         key: String,
-        stream: ReaderStream<Box<AsyncReadObj>>,
+        reader: Box<AsyncReadObj>,
         size: u64,
     ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
-        use aws_smithy_types::body::SdkBody;
-        use aws_smithy_types::byte_stream::ByteStream;
-
-        let body = todo!(); //hyper::Body::wrap_stream(stream);
-        let stream = todo!(); //ByteStream::new(SdkBody::from_body_0_4(body));
+        let byte_stream = reader_to_bytestream(reader);
         let size = i64::try_from(size).unwrap();
 
         self.client
             .put_object()
             .bucket(&self.bucket)
             .key(key)
-            .body(stream)
+            .body(byte_stream)
             .content_length(size)
             .send()
             .await
@@ -392,6 +396,62 @@ impl S3Context {
 
         Ok(())
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct AsyncReadStream<R: tokio::io::AsyncRead + Unpin + Send + 'static> {
+    reader: Arc<tokio::sync::Mutex<R>>,
+    buf: Vec<u8>,
+}
+
+impl<R: tokio::io::AsyncRead + Unpin + Send + 'static> AsyncReadStream<R> {
+    fn new(reader: R) -> Self {
+        Self {
+            reader: Arc::new(tokio::sync::Mutex::new(reader)),
+            buf: vec![0; 8192],
+        }
+    }
+}
+
+impl<R: tokio::io::AsyncRead + Unpin + Send + 'static> Stream for AsyncReadStream<R> {
+    type Item = Result<Frame<Bytes>, BoxError>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+
+        // Pinning the mutex lock and using a future to get the lock asynchronously
+        let mut reader_future = Box::pin(this.reader.lock());
+
+        // Polling the future to get the lock
+        use futures::Future;
+        let mut reader = futures::ready!(reader_future.as_mut().poll(cx));
+
+        // Reset the buffer before each read
+        this.buf.clear();
+        this.buf.resize(8192, 0); // Resize to match the buffer size (8KB in this case)
+
+        // Create a ReadBuf from the internal buffer
+        let mut read_buf = ReadBuf::new(&mut this.buf);
+
+        // Perform a non-blocking async read
+        match futures::ready!(Pin::new(&mut *reader).poll_read(cx, &mut read_buf)) {
+            Ok(()) if read_buf.filled().is_empty() => Poll::Ready(None), // No more data to read
+            Ok(()) => {
+                // Produce a frame with the exact number of bytes read
+                let filled_data = Bytes::copy_from_slice(read_buf.filled());
+                let frame = Frame::data(filled_data);
+                Poll::Ready(Some(Ok(frame)))
+            }
+            Err(e) => Poll::Ready(Some(Err(BoxError::from(e)))),
+        }
+    }
+}
+
+fn reader_to_bytestream<R: tokio::io::AsyncRead + Unpin + Send + 'static>(reader: R) -> ByteStream {
+    let stream = AsyncReadStream::new(reader);
+    let byte_stream = StreamBody::new(stream);
+    ByteStream::from_body_1_x(byte_stream)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
