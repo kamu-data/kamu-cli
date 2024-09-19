@@ -21,7 +21,7 @@ use kamu_core::*;
 use opendatafabric::{Multicodec, Multihash};
 use url::Url;
 
-use crate::utils::s3_context::{AsyncReadObj, S3Context};
+use crate::utils::s3_context::S3Context;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -9,6 +9,7 @@
 
 use std::convert::TryFrom;
 
+use aws_config::BehaviorVersion;
 use aws_credential_types::Credentials;
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::delete_object::{DeleteObjectError, DeleteObjectOutput};
@@ -18,7 +19,7 @@ use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
 use aws_sdk_s3::types::{CommonPrefix, Delete, ObjectIdentifier};
 use aws_sdk_s3::Client;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use tokio::io::AsyncRead;
+use kamu_core::AsyncReadObj;
 use tokio_util::io::ReaderStream;
 use url::Url;
 
@@ -31,10 +32,6 @@ pub struct S3Context {
     pub bucket: String,
     pub key_prefix: String,
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -76,7 +73,10 @@ impl S3Context {
         // not set even if using custom endpoint
         let region_provider = aws_config::meta::region::RegionProviderChain::default_provider()
             .or_else("unspecified");
-        let sdk_config = aws_config::from_env().region(region_provider).load().await;
+        let sdk_config = aws_config::defaults(BehaviorVersion::latest())
+            .region(region_provider)
+            .load()
+            .await;
         let s3_config = if let Some(endpoint) = endpoint.clone() {
             aws_sdk_s3::config::Builder::from(&sdk_config)
                 .endpoint_url(endpoint)

@@ -15,14 +15,12 @@ use bytes::Bytes;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use opendatafabric::{Multicodec, Multihash};
-use tokio::io::{AsyncRead, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use url::Url;
 
 use super::dataset_repository_helpers as helpers;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 
 pub type ObjectRepositoryLocalFSSha3 =
     ObjectRepositoryLocalFS<sha3::Sha3_256, { Multicodec::Sha3_256 as u32 }>;

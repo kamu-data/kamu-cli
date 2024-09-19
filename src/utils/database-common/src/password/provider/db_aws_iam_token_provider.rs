@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use aws_config::meta::region::RegionProviderChain;
+use aws_config::BehaviorVersion;
 use aws_credential_types::provider::ProvideCredentials;
 use chrono::Utc;
 use dill::*;
@@ -63,7 +64,10 @@ impl DatabaseAwsIamTokenProvider {
 impl DatabasePasswordProvider for DatabaseAwsIamTokenProvider {
     async fn provide_credentials(&self) -> Result<Option<DatabaseCredentials>, InternalError> {
         let region_provider = RegionProviderChain::default_provider().or_else("unspefified");
-        let config = aws_config::from_env().region(region_provider).load().await;
+        let config = aws_config::defaults(BehaviorVersion::latest())
+            .region(region_provider)
+            .load()
+            .await;
 
         let creds = config
             .credentials_provider()
