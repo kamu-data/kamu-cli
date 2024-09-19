@@ -71,7 +71,7 @@ impl TestAPIServer {
     }
 
     pub fn local_addr(&self) -> SocketAddr {
-        self.local_addr.clone()
+        self.local_addr
     }
 
     pub async fn run(self) -> Result<(), std::io::Error> {

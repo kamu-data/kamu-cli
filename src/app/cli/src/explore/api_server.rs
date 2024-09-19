@@ -71,7 +71,7 @@ impl APIServer {
         let local_addr = listener.local_addr().unwrap();
 
         let base_url_rest = {
-            let mut base_addr_rest = local_addr.clone();
+            let mut base_addr_rest = local_addr;
 
             if let Some(external_address) = external_address {
                 base_addr_rest.set_ip(external_address);

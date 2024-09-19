@@ -152,7 +152,7 @@ async fn test_routing_root() {
         })
         .await;
 
-    let dataset_url = url::Url::parse(&format!("http://{}/", local_addr)).unwrap();
+    let dataset_url = url::Url::parse(&format!("http://{local_addr}/")).unwrap();
 
     let client = setup_client(dataset_url, repo.created_dataset.head);
 
@@ -268,7 +268,7 @@ async fn test_routing_dataset_account_and_name() {
     )
     .await;
 
-    println!("{}", local_addr);
+    println!("{local_addr}");
 
     let dataset_url = url::Url::parse(&format!(
         "http://{}/kamu/{}/",
@@ -294,7 +294,7 @@ async fn test_routing_err_invalid_identity_format() {
     )
     .await;
 
-    let dataset_url = format!("http://{}/this-is-no-a-did/refs/head", local_addr);
+    let dataset_url = format!("http://{local_addr}/this-is-no-a-did/refs/head");
 
     let client = async move {
         let res = reqwest::get(dataset_url).await.unwrap();
@@ -317,7 +317,7 @@ async fn test_routing_err_dataset_not_found() {
     )
     .await;
 
-    let dataset_url = format!("http://{}/non.existing.dataset/", local_addr);
+    let dataset_url = format!("http://{local_addr}/non.existing.dataset/");
 
     let client = async move {
         let res = reqwest::get(dataset_url).await.unwrap();
