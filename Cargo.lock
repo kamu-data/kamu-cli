@@ -6022,6 +6022,7 @@ dependencies = [
  "kamu-task-system-services",
  "messaging-outbox",
  "mockall",
+ "observability",
  "opendatafabric",
  "pretty_assertions",
  "serde",

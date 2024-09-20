@@ -30,6 +30,7 @@ kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-task-system = { workspace = true }
+observability = { workspace = true, default-features = false }
 opendatafabric = { workspace = true }
 time-source = { workspace = true }
 

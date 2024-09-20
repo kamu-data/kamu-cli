@@ -13,6 +13,7 @@ use std::sync::Arc;
 use database_common_macros::{transactional_method1, transactional_method2};
 use dill::{component, scope, Catalog, Singleton};
 use internal_error::{InternalError, ResultIntoInternal};
+use tracing::Instrument as _;
 
 use crate::*;
 
@@ -92,7 +93,10 @@ impl OutboxExecutor {
     pub async fn run(&self) -> Result<(), InternalError> {
         // Main consumption loop
         loop {
-            self.run_consumption_iteration().await?;
+            self.run_consumption_iteration()
+                .instrument(tracing::debug_span!("OutboxExecutor::tick"))
+                .await?;
+
             tokio::time::sleep(self.config.awaiting_step.to_std().unwrap()).await;
         }
     }
@@ -147,9 +151,6 @@ impl OutboxExecutor {
     }
 
     async fn run_consumption_iteration(&self) -> Result<(), InternalError> {
-        let span = observability::tracing::root_span!("outbox_iteration");
-        let _ = span.enter();
-
         // Read current state of producers and consumptions
         // Prepare consumption tasks for each progressed producer
         let mut consumption_tasks_by_producer = self.prepare_consumption_iteration().await?;

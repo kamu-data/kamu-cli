@@ -229,7 +229,7 @@ impl OutboxConsumptionIterationPlanner {
     async fn load_unprocessed_messages_by_producer(
         &self,
         unconsumed_state_by_producer: &HashMap<String, UnconsumedProducerState>,
-    ) -> Result<HashMap<String, Vec<OutboxMessage>>, InternalError> {
+    ) -> Result<HashMap<String, Vec<Arc<OutboxMessage>>>, InternalError> {
         // Prepare filter to load messages with boundary by each producer
         let boundaries_by_producer: Vec<_> = unconsumed_state_by_producer
             .iter()
@@ -246,6 +246,7 @@ impl OutboxConsumptionIterationPlanner {
         let mut unprocessed_messages = self
             .outbox_message_repository
             .get_messages(boundaries_by_producer, self.messages_batch_size)
+            .map_ok(Arc::new)
             .try_collect::<Vec<_>>()
             .await?;
 
@@ -266,7 +267,7 @@ impl OutboxConsumptionIterationPlanner {
 
     fn compose_producer_consumption_tasks(
         &self,
-        unprocessed_messages_by_producer: HashMap<String, Vec<OutboxMessage>>,
+        unprocessed_messages_by_producer: HashMap<String, Vec<Arc<OutboxMessage>>>,
         mut unconsumed_state_by_producers: HashMap<String, UnconsumedProducerState>,
     ) -> HashMap<String, ProducerConsumptionTask> {
         let mut consumption_tasks_by_producers = HashMap::new();

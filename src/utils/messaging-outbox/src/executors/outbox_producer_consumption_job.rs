@@ -13,10 +13,12 @@ use std::sync::{Arc, Mutex};
 use database_common_macros::transactional_method;
 use dill::Catalog;
 use internal_error::{InternalError, ResultIntoInternal};
+use tracing::Instrument;
 
 use super::{OutboxExecutorMetrics, OutboxRoutesStaticInfo, ProducerConsumptionTask};
 use crate::{
     ConsumerFilter,
+    MessageDispatcher,
     OutboxMessage,
     OutboxMessageConsumptionBoundary,
     OutboxMessageConsumptionRepository,
@@ -100,47 +102,48 @@ impl ProducerConsumptionJob {
                 }
             }
 
-            struct OutboxMessageConsumptionError {
-                source: InternalError,
-                consumer_name: String,
-            }
-
-            // Consume message concurrently
-            let consumption_futures: Vec<_> = consumer_tasks
+            // Create individual transaction objects
+            let transactions: Vec<ConsumeMessageTransaction> = consumer_tasks
                 .into_iter()
-                .map(|(consumer_name, message)| async move {
-                    self.invoke_consumer(consumer_name, message)
-                        .await
-                        .map_err(|e| OutboxMessageConsumptionError {
-                            consumer_name: consumer_name.to_owned(),
-                            source: e,
-                        })
+                .map(|(consumer_name, message)| ConsumeMessageTransaction {
+                    catalog: self.catalog.clone(),
+                    consumer_name: consumer_name.to_string(),
+                    message: Arc::clone(message),
+                    dispatcher: Arc::clone(
+                        self.routes_static_info
+                            .message_dispatchers_by_producers
+                            .get(&message.producer_name)
+                            .expect("No dispatcher for producer"),
+                    ),
                 })
                 .collect();
 
+            // Spawn message consumption transactions as concurrent tokio tasks
+            let mut join_set = tokio::task::JoinSet::new();
+            for tx in transactions {
+                join_set.spawn(tx.invoke());
+            }
+
             // Report errors and disable failing consumers, as they cannot advance to the
             // next messages without success of processing the current one
-            futures::future::join_all(consumption_futures)
-                .await
-                .into_iter()
-                .filter_map(Result::err)
-                .for_each(|e: OutboxMessageConsumptionError| {
-                    tracing::error!(
-                        error = ?e.source,
-                        error_msg = %e.source,
-                        consumer_name = %e.consumer_name,
-                        outbox_message = ?message,
-                        "Consuming outbox message failed \
-                            - pausing further message processing for consumer until restart."
-                    );
+            while let Some(res) = join_set.join_next().await {
+                match res.int_err()? {
+                    Ok(tx) => {
+                        self.metrics
+                            .messages_processed_total
+                            .with_label_values(&[&tx.message.producer_name, &tx.consumer_name])
+                            .inc();
+                    }
+                    Err(err) => {
+                        self.metrics
+                            .failed_consumers_total
+                            .with_label_values(&[&self.producer_name, &err.tx.consumer_name])
+                            .set(1);
 
-                    self.metrics
-                        .failed_consumers_total
-                        .with_label_values(&[&self.producer_name, &e.consumer_name])
-                        .set(1);
-
-                    failing_consumer_names.insert(e.consumer_name);
-                });
+                        failing_consumer_names.insert(err.tx.consumer_name);
+                    }
+                }
+            }
 
             // If all consumers are failing, time to interrupt this iteration
             assert!(failing_consumer_names.len() <= self.consumer_names.len());
@@ -160,31 +163,63 @@ impl ProducerConsumptionJob {
 
         Ok(())
     }
+}
 
-    #[transactional_method]
-    async fn invoke_consumer(
-        &self,
-        consumer_name: &str,
-        message: &OutboxMessage,
-    ) -> Result<(), InternalError> {
-        tracing::debug!(
-            consumer_name = %consumer_name,
-            received_message = ?message,
-            "Invoking consumer"
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A wrapper that represents a  consumption of a single message and advancement
+/// of the last consumed record under one DB transaction
+struct ConsumeMessageTransaction {
+    catalog: dill::Catalog,
+    consumer_name: String,
+    message: Arc<OutboxMessage>,
+    dispatcher: Arc<dyn MessageDispatcher>,
+}
+
+impl ConsumeMessageTransaction {
+    /// This is a root-level transaction and is expected to run in a dedicated
+    /// tokio task
+    async fn invoke(self) -> Result<Self, ConsumeMessageError> {
+        let span = observability::tracing::root_span!(
+            "Outbox::consume_message",
+            producer = %self.message.producer_name,
+            consumer = %self.consumer_name,
+            message_id = %self.message.message_id,
         );
 
-        let dispatcher = self
-            .routes_static_info
-            .message_dispatchers_by_producers
-            .get(&message.producer_name)
-            .expect("No dispatcher for producer");
+        match self.invoke_transactional().instrument(span).await {
+            Ok(()) => Ok(self),
+            Err(err) => {
+                tracing::error!(
+                    error = ?err,
+                    error_msg = %err,
+                    consumer_name = %self.consumer_name,
+                    outbox_message = ?self.message,
+                    "Consuming outbox message failed - pausing further \
+                     message processing for consumer until restart."
+                );
 
-        let content_json = message.content_json.to_string();
+                Err(ConsumeMessageError {
+                    tx: self,
+                    source: err,
+                })
+            }
+        }
+    }
 
-        dispatcher
+    #[transactional_method]
+    async fn invoke_transactional(&self) -> Result<(), InternalError> {
+        tracing::debug!(
+            outbox_message = ?self.message,
+            "Consuming message"
+        );
+
+        let content_json = self.message.content_json.to_string();
+
+        self.dispatcher
             .dispatch_message(
                 &transaction_catalog,
-                ConsumerFilter::SelectedConsumer(consumer_name),
+                ConsumerFilter::SelectedConsumer(&self.consumer_name),
                 &content_json,
             )
             .await?;
@@ -192,32 +227,45 @@ impl ProducerConsumptionJob {
         // Shift consumption record regardless of whether the consumer was interested in
         // the message
         tracing::debug!(
-            consumer_name = %consumer_name,
-            producer_name = %message.producer_name,
-            last_consumed_message_id = %message.message_id,
+            consumer_name = %self.consumer_name,
+            producer_name = %self.message.producer_name,
+            last_consumed_message_id = %self.message.message_id,
             "Shifting consumption record"
         );
-
-        // Report consumption metric
-        self.metrics
-            .messages_processed_total
-            .with_label_values(&[&self.producer_name, consumer_name])
-            .inc();
 
         let consumption_repository = transaction_catalog
             .get_one::<dyn OutboxMessageConsumptionRepository>()
             .unwrap();
+
         consumption_repository
             .update_consumption_boundary(OutboxMessageConsumptionBoundary {
-                consumer_name: consumer_name.to_string(),
-                producer_name: message.producer_name.to_string(),
-                last_consumed_message_id: message.message_id,
+                consumer_name: self.consumer_name.clone(),
+                producer_name: self.message.producer_name.clone(),
+                last_consumed_message_id: self.message.message_id,
             })
             .await
             .int_err()?;
 
         Ok(())
     }
+}
+
+impl std::fmt::Debug for ConsumeMessageTransaction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConsumeMessageTransaction")
+            .field("consumer_name", &self.consumer_name)
+            .field("message", &self.message)
+            .finish_non_exhaustive()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+#[error("Consuming outbox message failed")]
+struct ConsumeMessageError {
+    pub tx: ConsumeMessageTransaction,
+    pub source: InternalError,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

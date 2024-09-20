@@ -15,6 +15,7 @@ use dill::*;
 use kamu_task_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
+use tracing::Instrument as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,8 +45,17 @@ impl TaskExecutorImpl {
 
     async fn run_task_iteration(&self) -> Result<(), InternalError> {
         let task = self.take_task().await?;
-        let task_outcome = self.run_task(&task).await?;
+
+        let task_outcome = self
+            .run_task(&task)
+            .instrument(observability::tracing::root_span!(
+                "TaskExecutor::run_task",
+                task_id = %task.task_id,
+            ))
+            .await?;
+
         self.process_task_outcome(task, task_outcome).await?;
+
         Ok(())
     }
 
@@ -106,11 +116,7 @@ impl TaskExecutorImpl {
             return Ok(None);
         };
 
-        tracing::info!(
-            task_id = %task.task_id,
-            logical_plan = ?task.logical_plan,
-            "Executing task",
-        );
+        tracing::debug!(task_id = %task.task_id, "Received next task from scheduler");
 
         outbox
             .post_message(
@@ -127,11 +133,11 @@ impl TaskExecutorImpl {
     }
 
     async fn run_task(&self, task: &Task) -> Result<TaskOutcome, InternalError> {
-        let span = observability::tracing::root_span!(
-            "run_task",
+        tracing::debug!(
             task_id = %task.task_id,
+            logical_plan = ?task.logical_plan,
+            "Running task",
         );
-        let _ = span.enter();
 
         // Run task via logical plan
         let task_run_result = self

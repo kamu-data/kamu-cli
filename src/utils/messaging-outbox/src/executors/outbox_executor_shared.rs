@@ -48,7 +48,7 @@ pub(crate) struct UnconsumedProducerState {
 
 pub(crate) struct ProducerConsumptionTask {
     /// Messages to consume
-    pub(crate) unconsumed_messages: Vec<OutboxMessage>,
+    pub(crate) unconsumed_messages: Vec<Arc<OutboxMessage>>,
 
     /// Last processed message IDs by each consumer
     pub(crate) consumption_boundaries_by_consumer: HashMap<String, OutboxMessageID>,
