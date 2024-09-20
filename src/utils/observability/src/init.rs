@@ -143,6 +143,7 @@ fn init_otel_tracer(cfg: &Config) -> opentelemetry_sdk::trace::Tracer {
         .with_endpoint(cfg.otlp_endpoint.as_ref().unwrap())
         .with_timeout(Duration::from_secs(5));
 
+    use opentelemetry::trace::TracerProvider;
     opentelemetry_otlp::new_pipeline()
         .tracing()
         .with_exporter(otel_exporter)
@@ -157,7 +158,9 @@ fn init_otel_tracer(cfg: &Config) -> opentelemetry_sdk::trace::Tracer {
                 .with_sampler(opentelemetry_sdk::trace::Sampler::AlwaysOn),
         )
         .install_batch(opentelemetry_sdk::runtime::Tokio)
-        .expect("Creating tracer")
+        .expect("Creating tracer provider")
+        .tracer_builder(cfg.service_name.clone())
+        .build()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
