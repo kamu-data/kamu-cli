@@ -60,13 +60,11 @@ fn error_response(status: http::status::StatusCode) -> axum::response::Response 
 // Misc
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn body_into_async_read(
-    body_stream: axum::extract::BodyStream,
-) -> impl tokio::io::AsyncRead {
+pub(crate) fn body_into_async_read(body: axum::body::Body) -> impl tokio::io::AsyncRead {
     use futures::TryStreamExt;
     use tokio_util::compat::FuturesAsyncReadCompatExt;
 
-    body_stream
+    body.into_data_stream()
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
         .into_async_read()
         .compat()

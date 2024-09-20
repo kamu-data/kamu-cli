@@ -22,7 +22,7 @@ use kamu_datasets::{
     SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
 };
 use opendatafabric::DatasetID;
-use secrecy::Secret;
+use secrecy::SecretString;
 use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,7 +65,7 @@ pub async fn test_insert_and_get_dataset_env_var(catalog: &Catalog) {
     let dataset_env_var_key = "foo";
     let dataset_env_var_key_string = "foo_value".to_string();
     let dataset_env_var_value =
-        DatasetEnvVarValue::Secret(Secret::new(dataset_env_var_key_string.clone()));
+        DatasetEnvVarValue::Secret(SecretString::from(dataset_env_var_key_string.clone()));
     let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
 
     let new_dataset_env_var = DatasetEnvVar::new(
@@ -113,8 +113,9 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
     let dataset_env_var_repo = catalog.get_one::<dyn DatasetEnvVarRepository>().unwrap();
     let secret_dataset_env_var_key = "foo";
     let secret_dataset_env_var_key_string = "foo_value".to_string();
-    let secret_dataset_env_var_value =
-        DatasetEnvVarValue::Secret(Secret::new(secret_dataset_env_var_key_string.clone()));
+    let secret_dataset_env_var_value = DatasetEnvVarValue::Secret(SecretString::from(
+        secret_dataset_env_var_key_string.clone(),
+    ));
     let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
 
     let new_secret_dataset_env_var = DatasetEnvVar::new(

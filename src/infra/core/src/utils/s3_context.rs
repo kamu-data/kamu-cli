@@ -8,8 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use std::convert::TryFrom;
+use std::sync::Arc;
 
-use aws_credential_types::Credentials;
+use aws_config::{BehaviorVersion, SdkConfig};
+use aws_sdk_s3::config::SharedCredentialsProvider;
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::delete_object::{DeleteObjectError, DeleteObjectOutput};
 use aws_sdk_s3::operation::get_object::{GetObjectError, GetObjectOutput};
@@ -17,57 +19,80 @@ use aws_sdk_s3::operation::head_object::{HeadObjectError, HeadObjectOutput};
 use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
 use aws_sdk_s3::types::{CommonPrefix, Delete, ObjectIdentifier};
 use aws_sdk_s3::Client;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use tokio::io::AsyncRead;
-use tokio_util::io::ReaderStream;
+use internal_error::{InternalError, ResultIntoInternal, *};
+use kamu_core::AsyncReadObj;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone)]
 pub struct S3Context {
-    pub client: Client,
-    pub endpoint: Option<String>,
-    pub bucket: String,
-    pub key_prefix: String,
+    client: Client,
+    endpoint: Option<Arc<str>>,
+    bucket: Arc<str>,
+    key_prefix: Arc<str>,
+    sdk_config: Arc<SdkConfig>,
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl S3Context {
     const MAX_LISTED_OBJECTS: i32 = 1000;
 
-    pub fn new<S1, S2, S3>(client: Client, endpoint: Option<S1>, bucket: S2, key_prefix: S3) -> Self
-    where
-        S1: Into<String>,
-        S2: Into<String>,
-        S3: Into<String>,
-    {
+    #[inline]
+    pub fn client(&self) -> &Client {
+        &self.client
+    }
+
+    #[inline]
+    pub fn endpoint(&self) -> Option<&str> {
+        self.endpoint.as_deref()
+    }
+
+    #[inline]
+    pub fn bucket(&self) -> &str {
+        &self.bucket
+    }
+
+    #[inline]
+    pub fn key_prefix(&self) -> &str {
+        &self.key_prefix
+    }
+
+    pub fn new(
+        client: Client,
+        endpoint: Option<impl AsRef<str>>,
+        bucket: impl AsRef<str>,
+        key_prefix: impl AsRef<str>,
+        sdk_config: Arc<SdkConfig>,
+    ) -> Self {
         Self {
             client,
-            endpoint: endpoint.map(Into::into),
-            bucket: bucket.into(),
-            key_prefix: key_prefix.into(),
+            endpoint: endpoint.map(|s| s.as_ref().into()),
+            bucket: bucket.as_ref().into(),
+            key_prefix: key_prefix.as_ref().into(),
+            sdk_config,
         }
     }
 
     /// Creates a context for a sub-key while reusing the S3 client and its
     /// credential cache
     pub fn sub_context(&self, sub_key: &str) -> Self {
+        self.clone().into_sub_context(sub_key)
+    }
+
+    /// Moves context under a sub-key
+    pub fn into_sub_context(mut self, sub_key: &str) -> Self {
         let mut key_prefix = self.get_key(sub_key);
         if !key_prefix.ends_with('/') {
             key_prefix.push('/');
         }
-        Self {
-            client: self.client.clone(),
-            endpoint: self.endpoint.clone(),
-            bucket: self.bucket.clone(),
-            key_prefix,
-        }
+        self.key_prefix = key_prefix.into();
+        self
+    }
+
+    pub fn credentials_provider(&self) -> Option<SharedCredentialsProvider> {
+        self.sdk_config.credentials_provider()
     }
 
     #[tracing::instrument(level = "info", name = "init_s3_context")]
@@ -76,7 +101,12 @@ impl S3Context {
         // not set even if using custom endpoint
         let region_provider = aws_config::meta::region::RegionProviderChain::default_provider()
             .or_else("unspecified");
-        let sdk_config = aws_config::from_env().region(region_provider).load().await;
+
+        let sdk_config = aws_config::defaults(BehaviorVersion::latest())
+            .region(region_provider)
+            .load()
+            .await;
+
         let s3_config = if let Some(endpoint) = endpoint.clone() {
             aws_sdk_s3::config::Builder::from(&sdk_config)
                 .endpoint_url(endpoint)
@@ -89,7 +119,7 @@ impl S3Context {
         // TODO: PERF: Client construction is expensive and should only be done once
         let client = Client::from_conf(s3_config);
 
-        Self::new(client, endpoint, bucket, key_prefix)
+        Self::new(client, endpoint, bucket, key_prefix, Arc::new(sdk_config))
     }
 
     pub async fn from_url(url: &Url) -> Self {
@@ -150,12 +180,6 @@ impl S3Context {
         Url::parse(context_url_str.as_str()).unwrap()
     }
 
-    pub async fn credentials(&self) -> Credentials {
-        use aws_credential_types::provider::ProvideCredentials;
-        let credentials_cache = self.client.config().credentials_provider().unwrap();
-        credentials_cache.provide_credentials().await.unwrap()
-    }
-
     pub fn region(&self) -> Option<&str> {
         self.client.config().region().map(AsRef::as_ref)
     }
@@ -174,7 +198,7 @@ impl S3Context {
     ) -> Result<HeadObjectOutput, SdkError<HeadObjectError>> {
         self.client
             .head_object()
-            .bucket(&self.bucket)
+            .bucket(self.bucket.as_ref())
             .key(key)
             .send()
             .await
@@ -186,7 +210,7 @@ impl S3Context {
     ) -> Result<GetObjectOutput, SdkError<GetObjectError>> {
         self.client
             .get_object()
-            .bucket(&self.bucket)
+            .bucket(self.bucket.as_ref())
             .key(key)
             .send()
             .await
@@ -201,7 +225,7 @@ impl S3Context {
 
         self.client
             .put_object()
-            .bucket(&self.bucket)
+            .bucket(self.bucket.as_ref())
             .key(key)
             // TODO: PERF: Avoid copying data into a buffer
             .body(Vec::from(data).into())
@@ -213,22 +237,23 @@ impl S3Context {
     pub async fn put_object_stream(
         &self,
         key: String,
-        stream: ReaderStream<Box<AsyncReadObj>>,
+        reader: Box<AsyncReadObj>,
         size: u64,
     ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
         use aws_smithy_types::body::SdkBody;
         use aws_smithy_types::byte_stream::ByteStream;
 
-        let body = hyper::Body::wrap_stream(stream);
-        let stream = ByteStream::new(SdkBody::from_body_0_4(body));
-        let size = i64::try_from(size).unwrap();
+        // FIXME: https://github.com/awslabs/aws-sdk-rust/issues/1030
+        let stream = tokio_util::io::ReaderStream::new(reader);
+        let body = reqwest::Body::wrap_stream(stream);
+        let byte_stream = ByteStream::new(SdkBody::from_body_1_x(body));
 
         self.client
             .put_object()
-            .bucket(&self.bucket)
+            .bucket(self.bucket.as_ref())
             .key(key)
-            .body(stream)
-            .content_length(size)
+            .body(byte_stream)
+            .content_length(i64::try_from(size).unwrap())
             .send()
             .await
     }
@@ -239,7 +264,7 @@ impl S3Context {
     ) -> Result<DeleteObjectOutput, SdkError<DeleteObjectError>> {
         self.client
             .delete_object()
-            .bucket(&self.bucket)
+            .bucket(self.bucket.as_ref())
             .key(key)
             .send()
             .await
@@ -249,7 +274,7 @@ impl S3Context {
         let listing = self
             .client
             .list_objects_v2()
-            .bucket(&self.bucket)
+            .bucket(self.bucket.as_ref())
             .prefix(self.get_key(key_prefix))
             .max_keys(1)
             .send()
@@ -265,7 +290,7 @@ impl S3Context {
         let list_objects_resp = self
             .client
             .list_objects_v2()
-            .bucket(&self.bucket)
+            .bucket(self.bucket.as_ref())
             .delimiter("/")
             .send()
             .await
@@ -273,7 +298,7 @@ impl S3Context {
 
         // TODO: Support iteration
         assert!(
-            !list_objects_resp.is_truncated,
+            !list_objects_resp.is_truncated.unwrap_or_default(),
             "Cannot handle truncated response"
         );
 
@@ -287,7 +312,7 @@ impl S3Context {
             let list_response = self
                 .client
                 .list_objects_v2()
-                .bucket(&self.bucket)
+                .bucket(self.bucket.as_ref())
                 .prefix(&key_prefix)
                 .max_keys(Self::MAX_LISTED_OBJECTS)
                 .send()
@@ -301,10 +326,10 @@ impl S3Context {
                     .collect::<Result<Vec<_>, _>>()
                     .int_err()?;
 
-                has_next_page = list_response.is_truncated;
+                has_next_page = list_response.is_truncated.unwrap_or_default();
                 self.client
                     .delete_objects()
-                    .bucket(&self.bucket)
+                    .bucket(self.bucket.as_ref())
                     .delete(
                         Delete::builder()
                             .set_objects(Some(object_identifiers))
@@ -334,7 +359,7 @@ impl S3Context {
             let list_response = self
                 .client
                 .list_objects_v2()
-                .bucket(&self.bucket)
+                .bucket(self.bucket.as_ref())
                 .prefix(&old_key_prefix)
                 .max_keys(Self::MAX_LISTED_OBJECTS)
                 .send()
@@ -346,7 +371,7 @@ impl S3Context {
             // same bucket. Consider optimistic locking (comparing old head with
             // expected before final commit).
 
-            has_next_page = list_response.is_truncated();
+            has_next_page = list_response.is_truncated.unwrap_or_default();
             if let Some(contents) = list_response.contents {
                 for obj in &contents {
                     let copy_source =
@@ -358,7 +383,7 @@ impl S3Context {
                         .replace(old_key_prefix.as_str(), new_key_prefix.as_str());
                     self.client
                         .copy_object()
-                        .bucket(&self.bucket)
+                        .bucket(self.bucket.as_ref())
                         .copy_source(copy_source)
                         .key(new_key)
                         .send()
@@ -374,7 +399,7 @@ impl S3Context {
 
                 self.client
                     .delete_objects()
-                    .bucket(&self.bucket)
+                    .bucket(self.bucket.as_ref())
                     .delete(
                         Delete::builder()
                             .set_objects(Some(object_identifiers))

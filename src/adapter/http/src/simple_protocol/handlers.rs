@@ -19,7 +19,8 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::TypedHeader;
+use axum::response::IntoResponse;
+use axum_extra::typed_header::TypedHeader;
 use http_common::*;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
@@ -97,7 +98,7 @@ pub async fn dataset_blocks_handler(
 pub async fn dataset_data_get_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
-) -> Result<axum::response::Response, ApiError> {
+) -> Result<impl IntoResponse, ApiError> {
     dataset_get_object_common(dataset.as_data_repo(), &hash_param.physical_hash).await
 }
 
@@ -106,7 +107,7 @@ pub async fn dataset_data_get_handler(
 pub async fn dataset_checkpoints_get_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
-) -> Result<axum::response::Response, ApiError> {
+) -> Result<impl IntoResponse, ApiError> {
     dataset_get_object_common(dataset.as_checkpoint_repo(), &hash_param.physical_hash).await
 }
 
@@ -115,19 +116,16 @@ pub async fn dataset_checkpoints_get_handler(
 async fn dataset_get_object_common(
     object_repository: &dyn ObjectRepository,
     physical_hash: &Multihash,
-) -> Result<axum::response::Response, ApiError> {
+) -> Result<impl IntoResponse, ApiError> {
     let stream = match object_repository.get_stream(physical_hash).await {
         Ok(stream) => Ok(stream),
         Err(e @ GetError::NotFound(_)) => Err(ApiError::not_found(e)),
         Err(e) => Err(e.api_err()),
     }?;
 
-    axum::response::Response::builder()
-        .body(axum::body::boxed(axum_extra::body::AsyncReadBody::new(
-            stream,
-        )))
-        .int_err()
-        .api_err()
+    Ok(axum::body::Body::from_stream(
+        tokio_util::io::ReaderStream::new(stream),
+    ))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -135,14 +133,14 @@ async fn dataset_get_object_common(
 pub async fn dataset_data_put_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
-    axum::TypedHeader(content_length): axum::TypedHeader<axum::headers::ContentLength>,
-    body_stream: axum::extract::BodyStream,
+    TypedHeader(content_length): TypedHeader<headers::ContentLength>,
+    body: axum::body::Body,
 ) -> Result<(), ApiError> {
     dataset_put_object_common(
         dataset.as_data_repo(),
         hash_param.physical_hash,
         content_length.0,
-        body_stream,
+        body,
     )
     .await
 }
@@ -152,14 +150,14 @@ pub async fn dataset_data_put_handler(
 pub async fn dataset_checkpoints_put_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
-    axum::TypedHeader(content_length): axum::TypedHeader<axum::headers::ContentLength>,
-    body_stream: axum::extract::BodyStream,
+    TypedHeader(content_length): TypedHeader<headers::ContentLength>,
+    body: axum::body::Body,
 ) -> Result<(), ApiError> {
     dataset_put_object_common(
         dataset.as_checkpoint_repo(),
         hash_param.physical_hash,
         content_length.0,
-        body_stream,
+        body,
     )
     .await
 }
@@ -170,9 +168,9 @@ async fn dataset_put_object_common(
     object_repository: &dyn ObjectRepository,
     physical_hash: Multihash,
     content_length: u64,
-    body_stream: axum::extract::BodyStream,
+    body: axum::body::Body,
 ) -> Result<(), ApiError> {
-    let src = Box::new(crate::axum_utils::body_into_async_read(body_stream));
+    let src = Box::new(crate::axum_utils::body_into_async_read(body));
 
     object_repository
         .insert_stream(

@@ -8,10 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use aws_config::meta::region::RegionProviderChain;
+use aws_config::BehaviorVersion;
 use aws_sdk_secretsmanager::Client;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use secrecy::Secret;
+use secrecy::SecretString;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -37,7 +38,10 @@ impl DatabaseAwsSecretPasswordProvider {
 impl DatabasePasswordProvider for DatabaseAwsSecretPasswordProvider {
     async fn provide_credentials(&self) -> Result<Option<DatabaseCredentials>, InternalError> {
         let region_provider = RegionProviderChain::default_provider().or_else("unspecified");
-        let config = aws_config::from_env().region(region_provider).load().await;
+        let config = aws_config::defaults(BehaviorVersion::latest())
+            .region(region_provider)
+            .load()
+            .await;
         let client = Client::new(&config);
 
         let response = client
@@ -52,8 +56,8 @@ impl DatabasePasswordProvider for DatabaseAwsSecretPasswordProvider {
                 let secret_value =
                     serde_json::from_str::<AwsRdsSecretValue>(secret_string).int_err()?;
                 Ok(Some(DatabaseCredentials {
-                    user_name: Secret::new(secret_value.username.clone()),
-                    password: Secret::new(secret_value.password.clone()),
+                    user_name: SecretString::from(secret_value.username.clone()),
+                    password: SecretString::from(secret_value.password.clone()),
                 }))
             }
             None => Err(AwsSecretNotFoundError {

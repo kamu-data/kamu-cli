@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::future::IntoFuture;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
@@ -27,8 +28,10 @@ use crate::odf_server;
 pub const DEFAULT_ODF_FRONTEND_URL: &str = "https://platform.demo.kamu.dev";
 pub const DEFAULT_ODF_BACKEND_URL: &str = "https://api.demo.kamu.dev";
 
-type WebServer =
-    axum::Server<hyper::server::conn::AddrIncoming, axum::routing::IntoMakeService<axum::Router>>;
+struct WebServer {
+    server: axum::serve::Serve<axum::routing::IntoMakeService<axum::Router>, axum::Router>,
+    local_addr: SocketAddr,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,21 +67,19 @@ impl LoginService {
         }
     }
 
-    fn initialize_cli_web_server(
+    async fn initialize_cli_web_server(
         &self,
         server_frontend_url: &Url,
         response_tx: tokio::sync::mpsc::Sender<FrontendLoginCallbackResponse>,
-    ) -> WebServer {
+    ) -> Result<WebServer, InternalError> {
         let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
-
-        let bound_addr = hyper::server::conn::AddrIncoming::bind(&addr).unwrap_or_else(|e| {
-            panic!("error binding to {addr}: {e}");
-        });
+        let listener = tokio::net::TcpListener::bind(addr).await.int_err()?;
+        let local_addr = listener.local_addr().unwrap();
 
         let redirect_url = format!(
             "{}?callbackUrl=http://{}/",
             server_frontend_url.join("/v/login").unwrap(),
-            bound_addr.local_addr()
+            local_addr
         );
 
         let app = axum::Router::new()
@@ -101,14 +102,17 @@ impl LoginService {
             )
             .with_state(response_tx);
 
-        axum::Server::builder(bound_addr).serve(app.into_make_service())
+        let server = axum::serve(listener, app.into_make_service());
+
+        Ok(WebServer { server, local_addr })
     }
 
     async fn obtain_callback_response(
-        mut cli_web_server: WebServer,
+        cli_web_server: WebServer,
         mut response_rx: tokio::sync::mpsc::Receiver<FrontendLoginCallbackResponse>,
     ) -> Result<Option<FrontendLoginCallbackResponse>, InternalError> {
         let ctrlc_rx = ctrlc_channel().int_err()?;
+        let cli_web_server = cli_web_server.server.into_future();
 
         tokio::select! {
             maybe_login_response = response_rx.recv() => {
@@ -119,7 +123,7 @@ impl LoginService {
                 tracing::info!("Shutting down web server, as Ctrl+C pressed");
                 Ok(None)
             }
-            _ = &mut cli_web_server => {
+            _ = cli_web_server => {
                 tracing::info!("Shutting down web server, as it died first");
                 Ok(None)
             }
@@ -134,9 +138,11 @@ impl LoginService {
         let (response_tx, response_rx) =
             tokio::sync::mpsc::channel::<FrontendLoginCallbackResponse>(1);
 
-        let cli_web_server = self.initialize_cli_web_server(odf_server_frontend_url, response_tx);
+        let cli_web_server = self
+            .initialize_cli_web_server(odf_server_frontend_url, response_tx)
+            .await?;
 
-        let cli_web_server_url = format!("http://{}", cli_web_server.local_addr());
+        let cli_web_server_url = format!("http://{}", cli_web_server.local_addr);
         web_server_started_callback(&cli_web_server_url);
         let _ = webbrowser::open(&cli_web_server_url);
 

@@ -10,7 +10,8 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use axum::headers::Header;
+use axum_extra::TypedHeader;
+use headers::Header;
 use kamu::domain::Dataset;
 use kamu::testing::{MetadataFactory, TEST_BUCKET_NAME};
 use kamu_accounts::DUMMY_ACCESS_TOKEN;
@@ -37,7 +38,8 @@ async fn test_object_url_local_fs() {
         multi_tenant: false,
         authorized_writes: true,
         base_catalog: None,
-    });
+    })
+    .await;
 
     let test_case = create_test_case(&server_harness).await;
 
@@ -495,11 +497,9 @@ async fn create_test_case(server_harness: &dyn ServerSideHarness) -> TestCase {
     )
     .await;
 
-    let bearer_header = axum::TypedHeader(
-        axum::headers::Authorization::<axum::headers::authorization::Bearer>::bearer(
-            DUMMY_ACCESS_TOKEN,
-        )
-        .unwrap(),
+    let bearer_header = TypedHeader(
+        headers::Authorization::<headers::authorization::Bearer>::bearer(DUMMY_ACCESS_TOKEN)
+            .unwrap(),
     );
 
     let dataset_url = server_harness.dataset_url(&create_result.dataset_handle.alias);

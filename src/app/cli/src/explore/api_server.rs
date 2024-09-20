@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::fs;
-use std::future::Future;
+use std::future::{Future, IntoFuture};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -32,10 +32,8 @@ use url::Url;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct APIServer {
-    server: axum::Server<
-        hyper::server::conn::AddrIncoming,
-        axum::routing::IntoMakeService<axum::Router>,
-    >,
+    server: axum::serve::Serve<axum::routing::IntoMakeService<axum::Router>, axum::Router>,
+    local_addr: SocketAddr,
     task_executor: Arc<dyn TaskExecutor>,
     flow_executor: Arc<dyn FlowExecutor>,
     outbox_processor: Arc<OutboxExecutor>,
@@ -44,7 +42,7 @@ pub struct APIServer {
 }
 
 impl APIServer {
-    pub fn new(
+    pub async fn new(
         base_catalog: &Catalog,
         cli_catalog: &Catalog,
         multi_tenant_workspace: bool,
@@ -52,7 +50,7 @@ impl APIServer {
         port: Option<u16>,
         external_address: Option<IpAddr>,
         e2e_output_data_path: Option<&PathBuf>,
-    ) -> Self {
+    ) -> Result<Self, InternalError> {
         // Background task executor must run with server privileges to execute tasks on
         // behalf of the system, as they are automatically scheduled
         let task_executor = cli_catalog.get_one().unwrap();
@@ -69,12 +67,11 @@ impl APIServer {
             address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
             port.unwrap_or(0),
         ));
-        let bound_addr = hyper::server::conn::AddrIncoming::bind(&addr).unwrap_or_else(|e| {
-            panic!("error binding to {addr}: {e}");
-        });
+        let listener = tokio::net::TcpListener::bind(addr).await.int_err()?;
+        let local_addr = listener.local_addr().unwrap();
 
         let base_url_rest = {
-            let mut base_addr_rest = bound_addr.local_addr();
+            let mut base_addr_rest = local_addr;
 
             if let Some(external_address) = external_address {
                 base_addr_rest.set_ip(external_address);
@@ -174,20 +171,21 @@ impl APIServer {
             None
         };
 
-        let server = axum::Server::builder(bound_addr).serve(app.into_make_service());
+        let server = axum::serve(listener, app.into_make_service());
 
-        Self {
+        Ok(Self {
             server,
+            local_addr,
             task_executor,
             flow_executor,
             outbox_processor,
             time_source,
             maybe_shutdown_notify,
-        }
+        })
     }
 
-    pub fn local_addr(&self) -> SocketAddr {
-        self.server.local_addr()
+    pub fn local_addr(&self) -> &SocketAddr {
+        &self.local_addr
     }
 
     pub async fn pre_run(&self) -> Result<(), InternalError> {
@@ -201,14 +199,15 @@ impl APIServer {
         let server_run_fut: Pin<Box<dyn Future<Output = _>>> =
             if let Some(shutdown_notify) = self.maybe_shutdown_notify {
                 Box::pin(async move {
-                    let server_with_graceful_shutdown = self.server.with_graceful_shutdown(async {
-                        shutdown_notify.notified().await;
-                    });
+                    let server_with_graceful_shutdown =
+                        self.server.with_graceful_shutdown(async move {
+                            shutdown_notify.notified().await;
+                        });
 
                     server_with_graceful_shutdown.await
                 })
             } else {
-                Box::pin(self.server)
+                Box::pin(self.server.into_future())
             };
 
         tokio::select! {

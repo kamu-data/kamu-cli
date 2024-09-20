@@ -54,7 +54,7 @@ serde_yaml = "0.9"
 
 # Ingest
 flate2 = "1" # GZip decoder
-reqwest = { version = "0.11", default-features = false, features = [
+reqwest = { version = "0.12", default-features = false, features = [
     "json",
     "rustls-tls",
     "stream",
@@ -64,24 +64,24 @@ reqwest = { version = "0.11", default-features = false, features = [
     "json",
 ] }
 ringbuf = "0.3"
-secrecy = "0.8"
-zip = "0.6"
+secrecy = "0.10"
+zip = "2"
 
 # Data
-datafusion = { version = "41", default-features = false }
+datafusion = { version = "42", default-features = false }
 digest = "0.10"
-object_store = { version = "0.10", features = ["aws"] }
+object_store = { version = "0.11", features = ["aws"] }
 parking_lot = { version = "0.12" }
 sha3 = "0.10"
 
 # Repositories
-aws-config = { version = "0.57" }
-aws-sdk-s3 = { version = "0.35" }
-aws-smithy-http = { version = "0.57", features = ["rt-tokio"] }
-aws-smithy-types = { version = "0.57" }
-aws-credential-types = { version = "0.57" }
+aws-config = { version = "1" }
+aws-sdk-s3 = { version = "1" }
+aws-smithy-http = { version = "0.60", features = ["rt-tokio"] }
+aws-smithy-types = { version = "1" }
+aws-credential-types = { version = "1" }
 trust-dns-resolver = "0.23"                                     # TODO: Needed for DNSLink resolution with IPFS
-http = "0.2"
+http = "1"
 
 # Utils
 async-recursion = "1"
@@ -94,13 +94,13 @@ dashmap = { version = "6", default-features = false }
 dill = "0.9"
 futures = "0.3"
 glob = "0.3" # Used for glob fetch
-hyper = "0.14"
+hyper = "1"
 itertools = "0.13"
 libc = "0.2" # Signal names
 like = { version = "0.3", default-features = false }
-mockall = "0.11"
+mockall = "0.13"
 pin-project = "1"
-petgraph = { version = "0.6.4", default-features = false }
+petgraph = { version = "0.6", default-features = false }
 rand = "0.8"
 regex = "1"
 tempfile = "3"
@@ -120,12 +120,12 @@ url = { version = "2", features = ["serde"] }
 walkdir = "2"
 
 # Http file server
-tower = "0.4"
-tower-http = { version = "0.4", features = ["fs", "trace"] }
-axum = "0.6"
+tower = "0.5"
+tower-http = { version = "0.5", features = ["fs", "trace"] }
+axum = "0.7"
 
 # Optional dependencies
-alloy = { optional = true, version = "0.2", default-features = false, features = [
+alloy = { optional = true, version = "0.3", default-features = false, features = [
     "std",
     "provider-http",
     "provider-ws",
@@ -138,9 +138,9 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { optional = true, version = "41" }
-datafusion-functions-json = { optional = true, version = "0.41" }
-rumqttc = { optional = true, version = "0.23" }
+datafusion-ethers = { optional = true, version = "42" }
+datafusion-functions-json = { optional = true, version = "0.42" }
+rumqttc = { optional = true, version = "0.24" }
 
 
 [target.'cfg(unix)'.dependencies]
@@ -154,7 +154,7 @@ kamu-accounts-services = { workspace = true }
 kamu-datasets-services = { workspace = true }
 
 criterion = { version = "0.5", features = ["async_tokio"] }
-datafusion = { version = "41", default-features = false, features = [
+datafusion = { version = "42", default-features = false, features = [
     "parquet",
 ] }
 filetime = "0.2"

@@ -25,7 +25,7 @@ use kamu_datasets::{
     SaveDatasetEnvVarError,
 };
 use opendatafabric::DatasetID;
-use secrecy::{ExposeSecret, Secret};
+use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
 use uuid::Uuid;
 
@@ -34,7 +34,7 @@ use uuid::Uuid;
 pub struct DatasetEnvVarServiceImpl {
     dataset_env_var_repository: Arc<dyn DatasetEnvVarRepository>,
     time_source: Arc<dyn SystemTimeSource>,
-    dataset_env_var_encryption_key: Secret<String>,
+    dataset_env_var_encryption_key: SecretString,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +51,7 @@ impl DatasetEnvVarServiceImpl {
         Self {
             dataset_env_var_repository,
             time_source,
-            dataset_env_var_encryption_key: Secret::new(
+            dataset_env_var_encryption_key: SecretString::from(
                 dataset_env_var_config
                     .encryption_key
                     .as_ref()

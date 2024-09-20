@@ -33,11 +33,13 @@ deny = [
     { name = "clap", deny-multiple-versions = true },
     { name = "datafusion", deny-multiple-versions = true },
     { name = "dill", deny-multiple-versions = true },
+    # TODO: waiting for aws-sdk to upgrade
+    # https://github.com/awslabs/aws-sdk-rust/issues/977
     # { name = "hyper", deny-multiple-versions = true },
     { name = "object_store", deny-multiple-versions = true },
     { name = "parquet", deny-multiple-versions = true },
     { name = "prost", deny-multiple-versions = true },
-    # { name = "reqwest", deny-multiple-versions = true },
+    { name = "reqwest", deny-multiple-versions = true },
     # { name = "rustls", deny-multiple-versions = true },
     { name = "sqlx", deny-multiple-versions = true },
     { name = "tokio", deny-multiple-versions = true },

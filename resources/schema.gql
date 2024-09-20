@@ -5,8 +5,6 @@
 # make codegen-graphql-schema
 # ```
 
-directive @oneOf on INPUT_OBJECT
-
 type AccessTokenConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -1964,6 +1962,10 @@ type WebSocketProtocolDesc {
 	url: String!
 }
 
+directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+directive @oneOf on INPUT_OBJECT
+directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+directive @specifiedBy(url: String!) on SCALAR
 schema {
 	query: Query
 	mutation: Mutation

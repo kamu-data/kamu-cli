@@ -118,46 +118,18 @@ impl DatasetFactoryImpl {
     }
 
     pub fn get_s3_from_context(s3_context: S3Context) -> Result<impl Dataset, InternalError> {
-        let client = s3_context.client;
-        let endpoint = s3_context.endpoint;
-        let bucket = s3_context.bucket;
-        let key_prefix = s3_context.key_prefix;
-
         Ok(DatasetImpl::new(
             MetadataChainImpl::new(
                 MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
-                    ObjectRepositoryS3Sha3::new(S3Context::new(
-                        client.clone(),
-                        endpoint.clone(),
-                        bucket.clone(),
-                        format!("{key_prefix}blocks/"),
-                    )),
+                    ObjectRepositoryS3Sha3::new(s3_context.sub_context("blocks/")),
                 )),
-                ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(S3Context::new(
-                    client.clone(),
-                    endpoint.clone(),
-                    bucket.clone(),
-                    format!("{key_prefix}refs/"),
-                ))),
+                ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(
+                    s3_context.sub_context("refs/"),
+                )),
             ),
-            ObjectRepositoryS3Sha3::new(S3Context::new(
-                client.clone(),
-                endpoint.clone(),
-                bucket.clone(),
-                format!("{key_prefix}data/"),
-            )),
-            ObjectRepositoryS3Sha3::new(S3Context::new(
-                client.clone(),
-                endpoint.clone(),
-                bucket.clone(),
-                format!("{key_prefix}checkpoints/"),
-            )),
-            NamedObjectRepositoryS3::new(S3Context::new(
-                client.clone(),
-                endpoint.clone(),
-                bucket.clone(),
-                format!("{key_prefix}info/"),
-            )),
+            ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/")),
+            ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
+            NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
         ))
     }
 

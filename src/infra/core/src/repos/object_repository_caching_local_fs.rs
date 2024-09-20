@@ -19,8 +19,6 @@ use opendatafabric::Multihash;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use url::Url;
 
-use crate::utils::s3_context::AsyncReadObj;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A read-through and (partially) a write-through caching layer for

@@ -10,10 +10,10 @@
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 
-use axum::headers::Header;
 use database_common::DatabaseTransactionRunner;
 use dill::*;
 use futures::SinkExt;
+use headers::Header;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu::utils::smart_transfer_protocol::{
     DatasetFactoryFn,

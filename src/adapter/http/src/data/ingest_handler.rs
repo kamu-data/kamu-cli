@@ -59,7 +59,7 @@ pub async fn dataset_ingest_handler(
     Extension(dataset_ref): Extension<DatasetRef>,
     Query(params): Query<IngestQueryParams>,
     headers: HeaderMap,
-    body_stream: axum::extract::BodyStream,
+    body: axum::body::Body,
 ) -> Result<(), ApiError> {
     let is_ingest_from_upload = params.upload_token.is_some();
 
@@ -90,7 +90,7 @@ pub async fn dataset_ingest_handler(
             .get(http::header::CONTENT_TYPE)
             .map(|h| MediaType(h.to_str().unwrap().to_string()));
 
-        let data = Box::new(crate::axum_utils::body_into_async_read(body_stream));
+        let data = Box::new(crate::axum_utils::body_into_async_read(body));
 
         IngestTaskArguments {
             data_stream: data,

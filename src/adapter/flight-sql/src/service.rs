@@ -138,6 +138,7 @@ impl KamuFlightSqlService {
             .map_err(|e| Status::internal(format!("Error: {e}")))
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn get_catalogs(
         &self,
         ctx: &SessionContext,

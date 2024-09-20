@@ -63,7 +63,7 @@ async fn test_basics_s3() {
 #[tokio::test]
 async fn test_basics_http() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let http_server = HttpFileServer::new(tmp_repo_dir.path());
+    let http_server = HttpFileServer::new(tmp_repo_dir.path()).await;
     let base_url = url::Url::parse(&format!("http://{}/", http_server.local_addr())).unwrap();
     let _srv_handle = tokio::spawn(http_server.run());
     let repo = NamedObjectRepositoryHttp::new(reqwest::Client::new(), base_url, Default::default());

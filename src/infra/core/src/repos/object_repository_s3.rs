@@ -21,7 +21,7 @@ use kamu_core::*;
 use opendatafabric::{Multicodec, Multihash};
 use url::Url;
 
-use crate::utils::s3_context::{AsyncReadObj, S3Context};
+use crate::utils::s3_context::S3Context;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -103,7 +103,12 @@ where
         tracing::debug!(?key, "Checking for object");
 
         match self.s3_context.head_object(key).await {
-            Ok(output) => u64::try_from(output.content_length).map_err(|err| err.int_err().into()),
+            Ok(output) => u64::try_from(
+                output
+                    .content_length
+                    .ok_or_else(|| "S3 did not return content length".int_err())?,
+            )
+            .map_err(|err| err.int_err().into()),
             Err(err) => match err.into_service_error() {
                 // TODO: Detect credentials error
                 HeadObjectError::NotFound(_) => Err(GetError::NotFound(ObjectNotFoundError {
@@ -152,7 +157,8 @@ where
         let context_url = Url::parse(
             format!(
                 "s3://{}/{}",
-                self.s3_context.bucket, self.s3_context.key_prefix
+                self.s3_context.bucket(),
+                self.s3_context.key_prefix()
             )
             .as_str(),
         )
@@ -178,9 +184,9 @@ where
         let expires_at = presigned_conf.start_time() + presigned_conf.expires();
         let res = self
             .s3_context
-            .client
+            .client()
             .get_object()
-            .bucket(&self.s3_context.bucket)
+            .bucket(self.s3_context.bucket())
             .key(self.get_key(hash))
             .presigned(presigned_conf)
             .await
@@ -208,9 +214,9 @@ where
         let expires_at = presigned_conf.start_time() + presigned_conf.expires();
         let res = self
             .s3_context
-            .client
+            .client()
             .put_object()
-            .bucket(&self.s3_context.bucket)
+            .bucket(self.s3_context.bucket())
             .key(self.get_key(hash))
             .presigned(presigned_conf)
             .await
@@ -280,12 +286,8 @@ where
 
         tracing::debug!(?key, size, "Inserting object stream");
 
-        use tokio_util::io::ReaderStream;
-
-        let stream = ReaderStream::new(src);
-
         self.s3_context
-            .put_object_stream(key, stream, size)
+            .put_object_stream(key, src, size)
             .await
             // TODO: Detect credentials error
             .map_err(|e| e.into_service_error().int_err())?;

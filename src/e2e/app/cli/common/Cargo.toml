@@ -31,7 +31,7 @@ chrono = { version = "0.4", default-features = false, features = ["now"] }
 indoc = "2"
 pretty_assertions = "1"
 regex = "1"
-reqwest = { version = "0.11", default-features = false, features = ["json"] }
+reqwest = { version = "0.12", default-features = false, features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sqlx = { version = "0.8", default-features = false, features = [

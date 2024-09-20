@@ -61,7 +61,8 @@ impl Harness {
             multi_tenant: true,
             authorized_writes: true,
             base_catalog: Some(catalog),
-        });
+        })
+        .await;
 
         let system_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
         server_harness.system_time_source().set(system_time);
@@ -295,7 +296,7 @@ async fn test_data_query_handler_full() {
             .error_for_status()
             .unwrap();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "data": [{
@@ -307,7 +308,7 @@ async fn test_data_query_handler_full() {
                     "offset": 0,
                     "population": 100,
                 }],
-                "schema": "{\"fields\":[{\"name\":\"offset\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"city\",\"data_type\":\"Utf8\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"population\",\"data_type\":\"UInt64\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}}],\"metadata\":{}}",
+                "schema": "{\"fields\":[{\"name\":\"offset\",\"data_type\":\"Int64\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"city\",\"data_type\":\"Utf8\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"population\",\"data_type\":\"UInt64\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}}],\"metadata\":{}}",
                 "dataHash": "f9680c001200b3483eecc3d5c6b50ee6b8cba11b51c08f89ea1f53d3a334c743199f5fe656e",
                 "state": {
                     "inputs": [{
@@ -465,14 +466,14 @@ async fn test_data_query_handler_v2() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620a34bf5f8e0dbbe4ae6aefb60a3709d4eaaebd99173c90a0582c1b0011305a752",
-                    "outputHash": "f1620ba3be8f1b2ff3d37efc7051b43a1a78f635bb657874326ac394f99e486c6569d",
+                    "inputHash": "f1620986f955571b81e8f4c3753203fe08a9af520b84ec9079fd1351014d9fd24468a",
+                    "outputHash": "f16208d66e08ce876ba35ce00ea56f02faf83dbc086f877c443e3d493427ccad133f1",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "u2FwMK6jHGML0EBQ8X3Q7gfwUGLzZBe6jJeYRug6jDoZM8lvEqM_fUk9itia0htm7vRZ8MD_fezG2sgBCc8e-Bw",
+                    "proofValue": "uU6WTHFxAE2eMY4k0HGN8m-OGG9EkZSvjYa8-I8xWXVJBuMHWiUwtSeGCEjeFrCGn1ErYCs53t-8r0PHWxa2mDg",
                 }
             })
         );
@@ -619,14 +620,14 @@ async fn test_data_verify_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620c3e929e13d3f0f55ce24e7579919e01b356e79b4212a622b4fc2e7b0acb10d0d",
+                    "inputHash": "f1620deb55f2b02c11c74aba9a8b6c3cc740d7385c2ba3eb1d4b62a3b30ccfe116ec2",
                     "outputHash": "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2c",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "uZbm7fFcWc4l6iyvaKe_txdKntL3h3kvsGHOaKIbPV6c42PH1VnSmpYHMopv4TU67syzgoEdcS26AvpkSQb9dBQ",
+                    "proofValue": "u9rZLu4l6qisJUK8YlPNx3DCKy3jHFyOaFg5pheHrVdGt4ThdwCiWIwPjY5vE7GycGKy8axK7r8UEH-iGB2GtAQ",
                 }
             })
         );
@@ -1188,7 +1189,7 @@ async fn test_data_query_handler_schema_formats() {
             res.json::<serde_json::Value>().await.unwrap()["schema"]
                 .as_str()
                 .unwrap(),
-            r#"{"fields":[{"name":"offset","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"city","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"population","data_type":"UInt64","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}}],"metadata":{}}"#
+            r#"{"fields":[{"name":"offset","data_type":"Int64","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"city","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"population","data_type":"UInt64","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}}],"metadata":{}}"#
         );
 
         let res = cl
@@ -1210,7 +1211,7 @@ async fn test_data_query_handler_schema_formats() {
             res.json::<serde_json::Value>().await.unwrap()["schema"]
                 .as_str()
                 .unwrap(),
-            r#"{"fields":[{"name":"offset","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"city","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"population","data_type":"UInt64","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}}],"metadata":{}}"#
+            r#"{"fields":[{"name":"offset","data_type":"Int64","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"city","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"population","data_type":"UInt64","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}}],"metadata":{}}"#
         );
 
         let res = cl
@@ -1234,7 +1235,7 @@ async fn test_data_query_handler_schema_formats() {
                 .unwrap(),
             indoc::indoc!(
                 r#"message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED BYTE_ARRAY city (STRING);
                   REQUIRED INT64 population (INTEGER(64,false));
                 }
@@ -1261,7 +1262,7 @@ async fn test_data_query_handler_schema_formats() {
             res.json::<serde_json::Value>().await.unwrap()["schema"]
                 .as_str()
                 .unwrap(),
-            r#"{"name": "arrow_schema", "type": "struct", "fields": [{"name": "offset", "repetition": "OPTIONAL", "type": "INT64"}, {"name": "city", "repetition": "REQUIRED", "type": "BYTE_ARRAY", "logicalType": "STRING"}, {"name": "population", "repetition": "REQUIRED", "type": "INT64", "logicalType": "INTEGER(64,false)"}]}"#
+            r#"{"name": "arrow_schema", "type": "struct", "fields": [{"name": "offset", "repetition": "REQUIRED", "type": "INT64"}, {"name": "city", "repetition": "REQUIRED", "type": "BYTE_ARRAY", "logicalType": "STRING"}, {"name": "population", "repetition": "REQUIRED", "type": "INT64", "logicalType": "INTEGER(64,false)"}]}"#
         );
     };
 
@@ -1404,7 +1405,7 @@ async fn test_metadata_handler_schema_formats() {
                                 "dict_is_ordered": false,
                                 "metadata": {},
                                 "name": "offset",
-                                "nullable": true
+                                "nullable": false
                             },
                             {
                                 "data_type": "Int32",
@@ -1484,7 +1485,7 @@ async fn test_metadata_handler_schema_formats() {
                         "fields": [
                             {
                                 "name": "offset",
-                                "repetition": "OPTIONAL",
+                                "repetition": "REQUIRED",
                                 "type": "INT64"
                             },
                             {
@@ -1537,7 +1538,7 @@ async fn test_metadata_handler_schema_formats() {
             json!({
                 "output": {
                     "schemaFormat": "Parquet",
-                    "schema": "message arrow_schema {\n  OPTIONAL INT64 offset;\n  REQUIRED INT32 op;\n  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));\n  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));\n  REQUIRED BYTE_ARRAY city (STRING);\n  REQUIRED INT64 population (INTEGER(64,false));\n}\n",
+                    "schema": "message arrow_schema {\n  REQUIRED INT64 offset;\n  REQUIRED INT32 op;\n  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));\n  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));\n  REQUIRED BYTE_ARRAY city (STRING);\n  REQUIRED INT64 population (INTEGER(64,false));\n}\n",
                 }
             })
         );
