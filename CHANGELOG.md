@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--- - Fixed -->
 
 ## [Unreleased]
+### Changed
+- Major dependency upgrades:
+  - DataFusion 42
+  - HTTP stack v.1
+  - Axum 0.7
+  - latest AWS SDK
+  - latest versions of all remaining libs we depend on
 ### Fixed
 - Failed flows should still propagate `finishedAt` time
 
