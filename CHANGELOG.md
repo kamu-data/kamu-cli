@@ -17,8 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Axum 0.7
   - latest AWS SDK
   - latest versions of all remaining libs we depend on
+- Outbox refactoring towards true parallelism via Tokio spaned tasks instead of futures
 ### Fixed
 - Failed flows should still propagate `finishedAt` time
+- Eliminate span.enter, replaced with instrument everywhere
 
 ## [0.201.0] - 2024-09-18
 ### Added

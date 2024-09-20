@@ -80,7 +80,7 @@ impl<B> tower_http::trace::MakeSpan<B> for MakeSpan {
         let route = RouteOrUri::from(request);
 
         let span = crate::tracing::root_span!(
-            "http_request",
+            "Http::request",
             %method,
             %route,
             "otel.name" = tracing::field::Empty,

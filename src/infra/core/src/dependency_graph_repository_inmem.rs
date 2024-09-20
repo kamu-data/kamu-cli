@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
+use tracing::Instrument as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,13 +36,13 @@ impl DependencyGraphRepository for DependencyGraphRepositoryInMemory {
             let mut datasets_stream = self.dataset_repo.get_all_datasets();
 
             while let Some(Ok(dataset_handle)) = datasets_stream.next().await {
-                let dataset_span = tracing::debug_span!("Scanning dataset dependencies", dataset = %dataset_handle);
-                let _ = dataset_span.enter();
+                let span = tracing::debug_span!("Scanning dataset dependencies", dataset = %dataset_handle);
 
                 let summary = self
                     .dataset_repo
                     .get_dataset_by_handle(&dataset_handle)
                     .get_summary(GetSummaryOpts::default())
+                    .instrument(span)
                     .await
                     .int_err()?;
 

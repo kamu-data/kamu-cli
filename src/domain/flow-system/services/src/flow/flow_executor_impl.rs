@@ -29,6 +29,7 @@ use messaging_outbox::{
     OutboxExt,
 };
 use time_source::SystemTimeSource;
+use tracing::Instrument as _;
 
 use crate::{
     FlowAbortHelper,
@@ -224,78 +225,92 @@ impl FlowExecutorImpl {
     }
 
     #[transactional_method]
-    async fn run_flows_current_timeslot(&self) -> Result<(), InternalError> {
-        // Do we have a timeslot scheduled?
+    async fn tick_current_timeslot(&self) -> Result<(), InternalError> {
         let flow_event_store = transaction_catalog.get_one::<dyn FlowEventStore>().unwrap();
-        let maybe_nearest_flow_activation_moment =
-            flow_event_store.nearest_flow_activation_moment().await?;
+
+        // Do we have a timeslot scheduled?
+        let Some(nearest_flow_activation_moment) =
+            flow_event_store.nearest_flow_activation_moment().await?
+        else {
+            return Ok(());
+        };
 
         // Is it time to execute it yet?
         let current_time = self.time_source.now();
-        if let Some(nearest_flow_activation_moment) = maybe_nearest_flow_activation_moment
-            && nearest_flow_activation_moment <= current_time
-        {
-            let activation_span = tracing::info_span!("FlowExecutor::activation");
-            let _ = activation_span.enter();
-
-            let planned_flow_ids: Vec<_> = flow_event_store
-                .get_flows_scheduled_for_activation_at(nearest_flow_activation_moment)
-                .await?;
-
-            let mut planned_task_futures = Vec::new();
-            for planned_flow_id in planned_flow_ids {
-                let transaction_catalog = transaction_catalog.clone();
-                let flow_event_store = flow_event_store.clone();
-
-                planned_task_futures.push(async move {
-                    let mut flow = Flow::load(planned_flow_id, flow_event_store.as_ref())
-                        .await
-                        .int_err()?;
-
-                    if flow.can_schedule() {
-                        self.schedule_flow_task(
-                            transaction_catalog,
-                            &mut flow,
-                            nearest_flow_activation_moment,
-                        )
-                        .await?;
-                    } else {
-                        tracing::warn!(
-                            flow_id = %planned_flow_id,
-                            flow_status = %flow.status(),
-                            "Skipped flow scheduling as no longer relevant"
-                        );
-                    }
-
-                    Ok(())
-                });
-            }
-
-            let results = futures::future::join_all(planned_task_futures).await;
-            results
-                .into_iter()
-                .filter(Result::is_err)
-                .map(|e| e.err().unwrap())
-                .for_each(|e: InternalError| {
-                    tracing::error!(
-                        error = ?e,
-                        error_msg = %e,
-                        "Scheduling flow failed"
-                    );
-                });
-
-            // Publish progress event
-            let outbox = transaction_catalog.get_one::<dyn Outbox>().unwrap();
-            outbox
-                .post_message(
-                    MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
-                    FlowExecutorUpdatedMessage {
-                        update_time: nearest_flow_activation_moment,
-                        update_details: FlowExecutorUpdateDetails::ExecutedTimeslot,
-                    },
-                )
-                .await?;
+        if nearest_flow_activation_moment > current_time {
+            return Ok(());
         }
+
+        self.run_flows_for_timeslot(
+            nearest_flow_activation_moment,
+            flow_event_store,
+            transaction_catalog,
+        )
+        .instrument(observability::tracing::root_span!(
+            "FlowExecutor::activation"
+        ))
+        .await
+    }
+
+    async fn run_flows_for_timeslot(
+        &self,
+        activation_moment: DateTime<Utc>,
+        flow_event_store: Arc<dyn FlowEventStore>,
+        transaction_catalog: dill::Catalog,
+    ) -> Result<(), InternalError> {
+        let planned_flow_ids: Vec<_> = flow_event_store
+            .get_flows_scheduled_for_activation_at(activation_moment)
+            .await?;
+
+        let mut planned_task_futures = Vec::new();
+        for planned_flow_id in planned_flow_ids {
+            let transaction_catalog = transaction_catalog.clone();
+            let flow_event_store = flow_event_store.clone();
+
+            planned_task_futures.push(async move {
+                let mut flow = Flow::load(planned_flow_id, flow_event_store.as_ref())
+                    .await
+                    .int_err()?;
+
+                if flow.can_schedule() {
+                    self.schedule_flow_task(transaction_catalog, &mut flow, activation_moment)
+                        .await?;
+                } else {
+                    tracing::warn!(
+                        flow_id = %planned_flow_id,
+                        flow_status = %flow.status(),
+                        "Skipped flow scheduling as no longer relevant"
+                    );
+                }
+
+                Ok(())
+            });
+        }
+
+        let results = futures::future::join_all(planned_task_futures).await;
+        results
+            .into_iter()
+            .filter(Result::is_err)
+            .map(|e| e.err().unwrap())
+            .for_each(|e: InternalError| {
+                tracing::error!(
+                    error = ?e,
+                    error_msg = %e,
+                    "Scheduling flow failed"
+                );
+            });
+
+        // Publish progress event
+        let outbox = transaction_catalog.get_one::<dyn Outbox>().unwrap();
+        outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
+                FlowExecutorUpdatedMessage {
+                    update_time: activation_moment,
+                    update_details: FlowExecutorUpdateDetails::ExecutedTimeslot,
+                },
+            )
+            .await?;
 
         Ok(())
     }
@@ -433,11 +448,10 @@ impl FlowExecutor for FlowExecutorImpl {
     async fn run(&self) -> Result<(), InternalError> {
         // Main scanning loop
         loop {
-            let tick_span = tracing::trace_span!("FlowExecutor::tick");
-            let _ = tick_span.enter();
-
             // Run scheduling for current time slot
-            self.run_flows_current_timeslot().await?;
+            self.tick_current_timeslot()
+                .instrument(tracing::debug_span!("FlowExecutor::tick"))
+                .await?;
 
             self.time_source
                 .sleep(self.executor_config.awaiting_step)
