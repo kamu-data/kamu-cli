@@ -70,8 +70,8 @@ impl TestAPIServer {
         Self { server, local_addr }
     }
 
-    pub fn local_addr(&self) -> SocketAddr {
-        self.local_addr
+    pub fn local_addr(&self) -> &SocketAddr {
+        &self.local_addr
     }
 
     pub async fn run(self) -> Result<(), std::io::Error> {

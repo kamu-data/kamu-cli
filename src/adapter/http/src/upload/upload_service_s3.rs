@@ -76,10 +76,10 @@ impl UploadService for UploadServiceS3 {
 
         let presigned_request = self
             .s3_upload_context
-            .client
+            .client()
             .put_object()
             .acl(ObjectCannedAcl::Private)
-            .bucket(&self.s3_upload_context.bucket)
+            .bucket(self.s3_upload_context.bucket())
             .key(file_key.clone())
             .presigned(presigned_conf)
             .await

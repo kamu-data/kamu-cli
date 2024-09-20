@@ -157,7 +157,8 @@ where
         let context_url = Url::parse(
             format!(
                 "s3://{}/{}",
-                self.s3_context.bucket, self.s3_context.key_prefix
+                self.s3_context.bucket(),
+                self.s3_context.key_prefix()
             )
             .as_str(),
         )
@@ -183,9 +184,9 @@ where
         let expires_at = presigned_conf.start_time() + presigned_conf.expires();
         let res = self
             .s3_context
-            .client
+            .client()
             .get_object()
-            .bucket(&self.s3_context.bucket)
+            .bucket(self.s3_context.bucket())
             .key(self.get_key(hash))
             .presigned(presigned_conf)
             .await
@@ -213,9 +214,9 @@ where
         let expires_at = presigned_conf.start_time() + presigned_conf.expires();
         let res = self
             .s3_context
-            .client
+            .client()
             .put_object()
-            .bucket(&self.s3_context.bucket)
+            .bucket(self.s3_context.bucket())
             .key(self.get_key(hash))
             .presigned(presigned_conf)
             .await
