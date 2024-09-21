@@ -9,7 +9,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Config {
     /// Name of the service that will appear e.g. in OTEL traces
     pub service_name: String,
@@ -19,6 +19,8 @@ pub struct Config {
     pub default_log_levels: String,
     /// OpenTelemetry protocol endpoint to export traces to
     pub otlp_endpoint: Option<String>,
+    /// Tracing span limits
+    pub span_limits: SpanLimits,
 }
 
 impl Default for Config {
@@ -28,6 +30,7 @@ impl Default for Config {
             service_version: "0.0.0".to_string(),
             default_log_levels: "info".to_string(),
             otlp_endpoint: None,
+            span_limits: SpanLimits::default(),
         }
     }
 }
@@ -57,6 +60,36 @@ impl Config {
         {
             cfg.otlp_endpoint = Some(otlp_endpoint);
         }
+        if let Some(value) = std::env::var(format!("{prefix}MAX_EVENTS_PER_SPAN"))
+            .ok()
+            .and_then(|v| str::parse(&v).ok())
+        {
+            cfg.span_limits.max_events_per_span = value;
+        }
+        if let Some(value) = std::env::var(format!("{prefix}MAX_ATTRIBUTES_PER_SPAN"))
+            .ok()
+            .and_then(|v| str::parse(&v).ok())
+        {
+            cfg.span_limits.max_attributes_per_span = value;
+        }
+        if let Some(value) = std::env::var(format!("{prefix}MAX_LINKS_PER_SPAN"))
+            .ok()
+            .and_then(|v| str::parse(&v).ok())
+        {
+            cfg.span_limits.max_links_per_span = value;
+        }
+        if let Some(value) = std::env::var(format!("{prefix}MAX_ATTRIBUTES_PER_EVENT"))
+            .ok()
+            .and_then(|v| str::parse(&v).ok())
+        {
+            cfg.span_limits.max_attributes_per_event = value;
+        }
+        if let Some(value) = std::env::var(format!("{prefix}MAX_ATTRIBUTES_PER_LINK"))
+            .ok()
+            .and_then(|v| str::parse(&v).ok())
+        {
+            cfg.span_limits.max_attributes_per_link = value;
+        }
         cfg
     }
 
@@ -78,6 +111,59 @@ impl Config {
     pub fn with_otlp_endpoint(mut self, otlp_endpoint: impl Into<String>) -> Self {
         self.otlp_endpoint = Some(otlp_endpoint.into());
         self
+    }
+
+    pub fn with_max_events_per_span(mut self, value: u32) -> Self {
+        self.span_limits.max_events_per_span = value;
+        self
+    }
+
+    pub fn with_max_attributes_per_span(mut self, value: u32) -> Self {
+        self.span_limits.max_attributes_per_span = value;
+        self
+    }
+
+    pub fn with_max_links_per_span(mut self, value: u32) -> Self {
+        self.span_limits.max_links_per_span = value;
+        self
+    }
+
+    pub fn with_max_attributes_per_event(mut self, value: u32) -> Self {
+        self.span_limits.max_attributes_per_event = value;
+        self
+    }
+
+    pub fn with_max_attributes_per_link(mut self, value: u32) -> Self {
+        self.span_limits.max_attributes_per_link = value;
+        self
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Debug)]
+pub struct SpanLimits {
+    /// The max events that can be added to a `Span`.
+    pub max_events_per_span: u32,
+    /// The max attributes that can be added to a `Span`.
+    pub max_attributes_per_span: u32,
+    /// The max links that can be added to a `Span`.
+    pub max_links_per_span: u32,
+    /// The max attributes that can be added into an `Event`
+    pub max_attributes_per_event: u32,
+    /// The max attributes that can be added into a `Link`
+    pub max_attributes_per_link: u32,
+}
+
+impl Default for SpanLimits {
+    fn default() -> Self {
+        SpanLimits {
+            max_events_per_span: 128,
+            max_attributes_per_span: 128,
+            max_links_per_span: 128,
+            max_attributes_per_link: 128,
+            max_attributes_per_event: 128,
+        }
     }
 }
 

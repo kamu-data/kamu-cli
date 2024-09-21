@@ -148,9 +148,12 @@ fn init_otel_tracer(cfg: &Config) -> opentelemetry_sdk::trace::Tracer {
         .tracing()
         .with_exporter(otel_exporter)
         .with_trace_config(
-            opentelemetry_sdk::trace::config()
-                .with_max_events_per_span(64)
-                .with_max_attributes_per_span(16)
+            opentelemetry_sdk::trace::Config::default()
+                .with_max_events_per_span(cfg.span_limits.max_events_per_span)
+                .with_max_attributes_per_span(cfg.span_limits.max_attributes_per_span)
+                .with_max_links_per_span(cfg.span_limits.max_links_per_span)
+                .with_max_attributes_per_event(cfg.span_limits.max_attributes_per_event)
+                .with_max_attributes_per_link(cfg.span_limits.max_attributes_per_link)
                 .with_resource(opentelemetry_sdk::Resource::new([
                     KeyValue::new(otel_resource::SERVICE_NAME, cfg.service_name.clone()),
                     KeyValue::new(otel_resource::SERVICE_VERSION, cfg.service_version.clone()),
