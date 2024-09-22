@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- Support `List` and `Struct` arrow types in `json` and `json-aoa` encodings
+
 ## [0.202.1] - 2024-09-20
 ### Fixed
 - Open Telemetry integration fixes
