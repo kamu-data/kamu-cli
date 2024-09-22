@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.203.0] - 2024-09-22
 ### Added
 - Support `List` and `Struct` arrow types in `json` and `json-aoa` encodings
 
