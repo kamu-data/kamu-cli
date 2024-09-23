@@ -46,6 +46,24 @@ impl Accounts {
             .await?;
         Ok(maybe_account.map(Account::from_account))
     }
+
+    /// Returns account by access token
+    #[allow(unused_variables)]
+    #[allow(clippy::unused_async)]
+    async fn by_access_token(
+        &self,
+        ctx: &Context<'_>,
+        access_token: String,
+    ) -> Result<Option<Account>> {
+        let authentication_service =
+            from_catalog::<dyn kamu_accounts::AuthenticationService>(ctx).unwrap();
+
+        let account = authentication_service
+            .account_by_token(access_token)
+            .await?;
+
+        Ok(Some(Account::from_account(account)))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

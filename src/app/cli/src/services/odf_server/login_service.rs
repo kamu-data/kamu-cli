@@ -8,12 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::component;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::PROVIDER_PASSWORD;
 use kamu_adapter_http::LoginRequestBody;
+use opendatafabric::AccountName;
 use serde::Deserialize;
 use serde_json::json;
 use thiserror::Error;
@@ -265,6 +267,54 @@ impl LoginService {
                 response.text().await.unwrap()
             ),
         }
+    }
+
+    pub async fn get_account_name_by_access_token(
+        &self,
+        server_backend_url: &Url,
+        access_token: &str,
+        // ToDo change error
+    ) -> Result<AccountName, LoginError> {
+        let client = reqwest::Client::new();
+
+        let gql_url = server_backend_url.join("graphql").unwrap();
+
+        let gql_query = r#"
+            {
+              accounts {
+                byAccessToken(
+                    accessToken: "{access_token}"
+                ) {
+                    id
+                    accountName
+                    displayName
+                    accountType
+                    avatarUrl
+                    isAdmin
+                }
+              }
+            }
+            "#
+        .replace("{access_token}", access_token);
+
+        let response = client
+            .post(gql_url)
+            .json(&json!({"query": gql_query}))
+            .send()
+            .await
+            .int_err()?
+            .error_for_status()
+            .int_err()?;
+
+        let gql_response: serde_json::Value = response.json().await.int_err()?;
+        let account_name: AccountName = AccountName::from_str(
+            gql_response["data"]["accounts"]["byAccessToken"]["accountName"]
+                .as_str()
+                .unwrap(),
+        )
+        .int_err()?;
+
+        Ok(account_name)
     }
 }
 

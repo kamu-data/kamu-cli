@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::*;
@@ -696,7 +697,7 @@ impl SyncRef {
 pub trait UrlExt {
     fn ensure_trailing_slash(&mut self);
     fn is_odf_protocol(&self) -> bool;
-    fn into_odf_protoocol(&mut self) -> Result<(), InternalError>;
+    fn as_odf_protoocol(&self) -> Result<Url, InternalError>;
 
     /// Converts from odf+http(s) scheme to plain http(s)
     fn odf_to_transport_protocol(&self) -> Result<Url, InternalError>;
@@ -709,11 +710,9 @@ impl UrlExt for Url {
         }
     }
 
-    fn into_odf_protoocol(&mut self) -> Result<(), InternalError> {
-        match self.set_scheme(&format!("odf+{}", self.scheme())) {
-            Ok(_) => Ok(()),
-            Err(_) => InternalError::bail("Failed to build odf link"),
-        }
+    fn as_odf_protoocol(&self) -> Result<Url, InternalError> {
+        let url_string = self.as_str().replace("http", "odf+http");
+        Ok(Url::from_str(&url_string).int_err()?)
     }
 
     fn is_odf_protocol(&self) -> bool {

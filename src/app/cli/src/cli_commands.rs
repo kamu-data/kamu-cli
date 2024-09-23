@@ -279,6 +279,8 @@ pub fn get_command(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
             c.dataset.unwrap_or_default(),
             cli_catalog.get_one()?,
             c.all,
