@@ -64,7 +64,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 #[error("api error {status_code:?}")]
 pub struct ApiError {
-    status_code: http::StatusCode,
+    pub status_code: http::StatusCode,
     source: Box<dyn std::error::Error + Send + Sync + 'static>,
 }
 
@@ -97,6 +97,10 @@ impl ApiError {
 
     pub fn not_found(source: impl std::error::Error + Send + Sync + 'static) -> Self {
         Self::new(source, http::StatusCode::NOT_FOUND)
+    }
+
+    pub fn not_implemented(source: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::new(source, http::StatusCode::NOT_IMPLEMENTED)
     }
 
     pub fn not_found_without_body() -> Self {
@@ -287,6 +291,16 @@ impl ApiErrorCategorizable for GetError {
 }
 
 impl ApiErrorCategorizable for InsertError {
+    fn categorize(&self) -> ApiErrorCategory<'_> {
+        match &self {
+            Self::Access(e) => ApiErrorCategory::Access(e),
+            Self::Internal(e) => ApiErrorCategory::Internal(e),
+            _ => ApiErrorCategory::Other,
+        }
+    }
+}
+
+impl ApiErrorCategorizable for QueryError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),

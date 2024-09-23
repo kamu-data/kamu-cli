@@ -31,6 +31,7 @@ mod object_repository_s3;
 mod object_store_builder_local_fs;
 mod object_store_builder_s3;
 mod object_store_registry_impl;
+mod object_store_with_tracing;
 mod reference_repository_impl;
 
 pub use dataset_factory_impl::*;

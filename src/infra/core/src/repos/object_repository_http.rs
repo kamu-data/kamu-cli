@@ -15,12 +15,7 @@ use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::Multihash;
 use reqwest::Client;
-use tokio::io::AsyncRead;
 use url::Url;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,6 +50,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
         ObjectRepositoryProtocol::Http
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let url = self
             .base_url
@@ -88,6 +84,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
         panic!("get_size unsupported for HTTP object repository");
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         let url = self
             .base_url
@@ -125,6 +122,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
         Ok(data)
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
         let url = self
             .base_url

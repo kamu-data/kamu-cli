@@ -199,7 +199,7 @@ impl PollingIngestServiceImpl {
                 Ok(res)
             }
             Err(err) => {
-                tracing::error!(error = ?err, "Ingest iteration failed");
+                tracing::error!(error = ?err, error_msg = %err, "Ingest iteration failed");
                 listener.error(&err);
                 Err(err)
             }
@@ -636,7 +636,7 @@ impl PollingIngestService for PollingIngestServiceImpl {
             .await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(?dataset_refs))]
+    #[tracing::instrument(level = "info", skip_all)]
     async fn ingest_multi(
         &self,
         dataset_refs: Vec<DatasetRef>,

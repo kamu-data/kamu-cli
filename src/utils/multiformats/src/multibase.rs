@@ -12,7 +12,11 @@ use crate::stack_string::StackString;
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Multibase {
+    /// Hexadecimal (lowercase)
     Base16 = b'f',
+    /// RFC4648 no padding
+    Base64Url = b'u',
+    /// Base58 Bitcoin
     Base58Btc = b'z',
 }
 
@@ -30,6 +34,18 @@ impl Multibase {
                         Err(_) => Err(MultibaseError::Malformed),
                     }
                 }
+            }
+            b'u' => {
+                use base64::Engine as _;
+
+                base64::engine::general_purpose::URL_SAFE_NO_PAD
+                    .decode_slice(encoded, buf)
+                    .map_err(|e| match e {
+                        base64::DecodeSliceError::DecodeError(_) => MultibaseError::Malformed,
+                        base64::DecodeSliceError::OutputSliceTooSmall => {
+                            MultibaseError::BufferTooSmall
+                        }
+                    })
             }
             b'z' => match bs58::decode(encoded)
                 .with_alphabet(bs58::Alphabet::BITCOIN)
@@ -76,6 +92,15 @@ impl<'a, const S: usize> MultibaseFmt<'a, S> {
                 buf[0] = b'f';
                 let str_len = self.bytes.len() * 2;
                 hex::encode_to_slice(self.bytes, &mut buf[1..=str_len]).unwrap();
+                1 + str_len
+            }
+            Multibase::Base64Url => {
+                use base64::Engine as _;
+
+                buf[0] = b'u';
+                let str_len = base64::engine::general_purpose::URL_SAFE_NO_PAD
+                    .encode_slice(self.bytes, &mut buf[1..])
+                    .unwrap();
                 1 + str_len
             }
             Multibase::Base58Btc => {

@@ -58,7 +58,7 @@ impl GcService {
     pub fn evict_cache(&self) -> Result<GcResult, InternalError> {
         // TODO: Make const after https://github.com/chronotope/chrono/issues/309
         // Or make into a config option
-        let eviction_threshold: Duration = Duration::try_hours(24).unwrap();
+        let eviction_threshold: Duration = Duration::hours(24);
         let now = Utc::now();
         let mut entries_freed = 0;
         let mut bytes_freed = 0;

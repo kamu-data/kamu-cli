@@ -372,11 +372,17 @@ pub fn get_command(
                         sc.port,
                     ))
                 } else if sc.flight_sql {
-                    Box::new(SqlServerFlightSqlCommand::new(
-                        sc.address,
-                        sc.port,
-                        cli_catalog.get_one()?,
-                    ))
+                    cfg_if::cfg_if! {
+                        if #[cfg(feature = "flight-sql")] {
+                            Box::new(SqlServerFlightSqlCommand::new(
+                                sc.address,
+                                sc.port,
+                                cli_catalog.get_one()?,
+                            ))
+                        } else {
+                            return Err(CLIError::usage_error("Kamu was compiled without Flight SQL support"))
+                        }
+                    }
                 } else {
                     Box::new(SqlServerCommand::new(
                         cli_catalog.get_one()?,

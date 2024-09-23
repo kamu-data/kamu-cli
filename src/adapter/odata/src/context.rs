@@ -24,6 +24,7 @@ use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::dataframe::DataFrame;
 use datafusion_odata::collection::{CollectionAddr, QueryParams};
 use datafusion_odata::context::{CollectionContext, OnUnsupported, ServiceContext};
+use datafusion_odata::error::ODataError;
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
@@ -64,7 +65,7 @@ impl ServiceContext for ODataServiceContext {
         self.service_base_url.clone()
     }
 
-    async fn list_collections(&self) -> Vec<Arc<dyn CollectionContext>> {
+    async fn list_collections(&self) -> Result<Vec<Arc<dyn CollectionContext>>, ODataError> {
         use futures::TryStreamExt;
 
         let repo: Arc<dyn DatasetRepository> = self.catalog.get_one().unwrap();
@@ -93,7 +94,7 @@ impl ServiceContext for ODataServiceContext {
             }));
         }
 
-        collections
+        Ok(collections)
     }
 
     fn on_unsupported_feature(&self) -> OnUnsupported {
@@ -133,24 +134,28 @@ impl ODataCollectionContext {
 
 #[async_trait]
 impl CollectionContext for ODataCollectionContext {
-    fn addr(&self) -> &CollectionAddr {
-        &self.addr
+    fn addr(&self) -> Result<&CollectionAddr, ODataError> {
+        Ok(&self.addr)
     }
 
-    fn service_base_url(&self) -> String {
-        self.service_base_url.clone()
+    fn service_base_url(&self) -> Result<String, ODataError> {
+        Ok(self.service_base_url.clone())
     }
 
-    fn collection_base_url(&self) -> String {
-        format!("{}/{}", self.service_base_url(), self.collection_name())
+    fn collection_base_url(&self) -> Result<String, ODataError> {
+        Ok(format!(
+            "{}/{}",
+            self.service_base_url()?,
+            self.collection_name()?
+        ))
     }
 
-    fn collection_namespace(&self) -> String {
-        datafusion_odata::context::DEFAULT_NAMESPACE.to_string()
+    fn collection_namespace(&self) -> Result<String, ODataError> {
+        Ok(datafusion_odata::context::DEFAULT_NAMESPACE.to_string())
     }
 
-    fn collection_name(&self) -> String {
-        self.dataset_handle.alias.dataset_name.to_string()
+    fn collection_name(&self) -> Result<String, ODataError> {
+        Ok(self.dataset_handle.alias.dataset_name.to_string())
     }
 
     async fn last_updated_time(&self) -> DateTime<Utc> {
@@ -168,7 +173,7 @@ impl CollectionContext for ODataCollectionContext {
         last_block.system_time
     }
 
-    async fn schema(&self) -> SchemaRef {
+    async fn schema(&self) -> Result<SchemaRef, ODataError> {
         // TODO: Use QueryService after arrow schema is exposed
         // See: https://github.com/kamu-data/kamu-cli/issues/306
 
@@ -180,20 +185,20 @@ impl CollectionContext for ODataCollectionContext {
             .try_first()
             .await
             .map_err(|e| {
-                tracing::error!(error = ?e, "Resolving last data slice failed");
+                tracing::error!(error = ?e, error_msg = %e, "Resolving last data slice failed");
                 e
             })
             .int_err()
             .unwrap();
 
         if let Some(set_schema) = set_data_schema {
-            set_schema.schema_as_arrow().unwrap()
+            set_schema.schema_as_arrow().map_err(ODataError::internal)
         } else {
-            Arc::new(Schema::empty())
+            Ok(Arc::new(Schema::empty()))
         }
     }
 
-    async fn query(&self, query: QueryParams) -> datafusion::error::Result<DataFrame> {
+    async fn query(&self, query: QueryParams) -> Result<DataFrame, ODataError> {
         // TODO: Convert into config value
         let default_records_per_page: usize = std::env::var("KAMU_ODATA_DEFAULT_RECORDS_PER_PAGE")
             .ok()
@@ -205,7 +210,7 @@ impl CollectionContext for ODataCollectionContext {
             .as_metadata_chain()
             .accept_one(SearchSetVocabVisitor::new())
             .await
-            .map_err(|e| datafusion::error::DataFusionError::External(e.into()))?
+            .map_err(ODataError::internal)?
             .into_event()
             .map(Into::into)
             .unwrap_or_default();
@@ -217,14 +222,16 @@ impl CollectionContext for ODataCollectionContext {
             .await
             .unwrap();
 
-        query.apply(
-            df,
-            &self.addr,
-            &vocab.offset_column,
-            KEY_COLUMN_ALIAS,
-            default_records_per_page,
-            MAX_RECORDS_PER_PAGE,
-        )
+        query
+            .apply(
+                df,
+                &self.addr,
+                &vocab.offset_column,
+                KEY_COLUMN_ALIAS,
+                default_records_per_page,
+                MAX_RECORDS_PER_PAGE,
+            )
+            .map_err(ODataError::internal)
     }
 
     fn on_unsupported_feature(&self) -> OnUnsupported {

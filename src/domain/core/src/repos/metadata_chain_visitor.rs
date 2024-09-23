@@ -189,3 +189,31 @@ where
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Implementing this trait for [`Option`] significantly simplifes passing
+/// multiple optional visitors into [`MetadataChainExt::accept()`]
+impl<T> MetadataChainVisitor for Option<T>
+where
+    T: MetadataChainVisitor,
+{
+    type Error = T::Error;
+
+    fn initial_decision(&self) -> MetadataVisitorDecision {
+        match self {
+            Some(inner) => inner.initial_decision(),
+            None => MetadataVisitorDecision::Stop,
+        }
+    }
+
+    fn visit(
+        &mut self,
+        hashed_block_ref: HashedMetadataBlockRef,
+    ) -> Result<MetadataVisitorDecision, Self::Error> {
+        match self {
+            Some(inner) => inner.visit(hashed_block_ref),
+            None => unreachable!(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

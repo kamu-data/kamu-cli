@@ -4,14 +4,94 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-<!--- Recommendation: for ease of reading, use the following order: -->
-<!--- - Added -->
-<!--- - Changed -->
-<!--- - Fixed -->
+<!--
+Recommendation: for ease of reading, use the following order:
+- Added
+- Changed
+- Fixed
+-->
 
-### Unreleased
+## [0.203.0] - 2024-09-22
+### Added
+- Support `List` and `Struct` arrow types in `json` and `json-aoa` encodings
+
+## [0.202.1] - 2024-09-20
+### Fixed
+- Open Telemetry integration fixes
+
+## [0.202.0] - 2024-09-20
 ### Changed
+- Major dependency upgrades:
+  - DataFusion 42
+  - HTTP stack v.1
+  - Axum 0.7
+  - latest AWS SDK
+  - latest versions of all remaining libs we depend on
+- Outbox refactoring towards true parallelism via Tokio spaned tasks instead of futures
+### Fixed
+- Failed flows should still propagate `finishedAt` time
+- Eliminate span.enter, replaced with instrument everywhere
+
+## [0.201.0] - 2024-09-18
+### Added
+- REST API: New `/verify` endpoint allows verification of query commitment as per [documentation](https://docs.kamu.dev/node/commitments/#dispute-resolution) (#831)
+### Changed
+- Outbox main loop was revised to minimize the number of transactions:
+    - split outbox into planner and consumption jobs components
+    - planner analyzes current state and loads bunch of unprocessed messages within a 1 transaction only
+    - consumption jobs invoke consumers and detect their failures
+- Detecting concurrent modifications in flow and task event stores
+- Improved and cleaned handling of flow abortions at different stages of processing
+- Revised implementation of flow scheduling to avoid in-memory time wheel:
+    - recording `FlowEventScheduledForActivation` event (previously, placement moment into the time wheel)
+    - replaced binary heap based time wheel operations with event store queries
+    - Postgres/SQlite event stores additionally track activation time for the waiting flows
+    - in-memory event store keeps prepared map-based lookup structures for activation time
+
+## [0.200.0] - 2024-09-13
+### Added
+- Added first integration of Prometheus metrics starting with Outbox
+- Added `--metrics` CLI flag that will dump metrics into a file after command execution
+### Changed
+- Telemetry improvements:
+   - Improved data collected around transactional code
+   - Revised associating span objects with large JSON structures such as messages
+   - Suppressed several noisy, but not very useful events
+- Improved Outbox stability when message consumers fail
+- Similarly, Task Executor keeps executing next tasks in case running a task results in an internal error
+
+## [0.199.3] - 2024-09-11
+### Fixed
+- Associating correct input dataset that was hard compacted with the error during transformation of derived dataset
+
+## [0.199.2] - 2024-09-09
+### Added
+- REST API: The `/query` endpoint now supports response proofs via reproducibility and signing (#816)
+- REST API: New `/{dataset}/metadata` endpoint for retrieving schema, description, attachments etc. (#816)
+### Fixed
+- Fixed unguaranteed ordering of events when restoring event sourcing aggregates
+- Enqueuing and cancelling future flows should be done with transactions taken into account (via Outbox)
+
+## [0.199.1] - 2024-09-06
+### Fixed
+- Fixed crash when a derived dataset is manually forced to update while an existing flow 
+  for this dataset is already waiting for a batching condition
+
+## [0.199.0] - 2024-09-06
+### Added
+- Persistency has been enabled for Task and Flow domains. 
+  Both `TaskExecutor` and `FlowExecutor` now fully support transactional processing mode,
+  and save state in Postgres or Sqlite database.
+- Tasks now support attaching metadata properties. Storing task->flow association as this type of metadata.
+- Flows and Tasks now properly recover the unfinished requests after server restart
+### Changed
+- Simplified database schema for flow configurations and minimized number of migrations 
+   (breaking change of the database schema)
+- Introduced `pre_run()` phase in flow executor, task executor & outbox processor to avoid startup races
+- Explicit in-memory task queue has been eliminated and replaced with event store queries
 - Get Data Panel: use SmTP for pull & push links 
+- GQL api method `setConfigCompaction` allows to set `metadataOnly` configuration for both root and derived datasets
+- GQL api `triggerFlow` allows to trigger `HARD_COMPACTION` flow in `metadataOnly` mode for both root and derived datasets
 
 ## [0.198.2] - 2024-08-30
 ### Added

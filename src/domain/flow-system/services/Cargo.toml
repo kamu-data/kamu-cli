@@ -23,12 +23,14 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+database-common-macros = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-task-system = { workspace = true }
+observability = { workspace = true, default-features = false }
 opendatafabric = { workspace = true }
 time-source = { workspace = true }
 
@@ -50,8 +52,6 @@ serde_with = { version = "3", default-features = false }
 
 
 [dev-dependencies]
-database-common = { workspace = true }
-database-common-macros = { workspace = true }
 kamu = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
@@ -61,7 +61,7 @@ kamu-task-system-services = { workspace = true }
 
 cron = { version = "0.12", default-features = false }
 indoc = "2"
-mockall = "0.11"
+mockall = "0.13"
 pretty_assertions = "1"
 tempfile = "3"
 test-log = { version = "0.2", features = ["trace"] }

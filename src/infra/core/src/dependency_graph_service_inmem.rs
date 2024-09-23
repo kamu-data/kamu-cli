@@ -146,7 +146,11 @@ impl DependencyGraphServiceInMemory {
         dataset_upstream_id: &DatasetID,
         dataset_downstream_id: &DatasetID,
     ) {
-        tracing::debug!(downstream=%dataset_downstream_id, upstream=%dataset_upstream_id, "Adding dataset dependency");
+        tracing::debug!(
+            downstream = %dataset_downstream_id,
+            upstream = %dataset_upstream_id,
+            "Adding dataset dependency"
+        );
 
         let upstream_node_index = state.get_or_create_dataset_node(dataset_upstream_id);
         let downstream_node_index = state.get_or_create_dataset_node(dataset_downstream_id);
@@ -163,7 +167,11 @@ impl DependencyGraphServiceInMemory {
         dataset_upstream_id: &DatasetID,
         dataset_downstream_id: &DatasetID,
     ) {
-        tracing::debug!(downstream=%dataset_downstream_id, upstream=%dataset_upstream_id, "Removing dataset dependency");
+        tracing::debug!(
+            downstream = %dataset_downstream_id,
+            upstream = %dataset_upstream_id,
+            "Removing dataset dependency"
+        );
 
         let upstream_node_index = state.get_or_create_dataset_node(dataset_upstream_id);
         let downstream_node_index = state.get_or_create_dataset_node(dataset_downstream_id);
@@ -383,12 +391,18 @@ impl MessageConsumer for DependencyGraphServiceInMemory {}
 
 #[async_trait::async_trait]
 impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceInMemory {
-    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "DependencyGraphServiceInMemory[DatasetLifecycleMessage]"
+    )]
     async fn consume_message(
         &self,
         _: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
+        tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
+
         let mut state = self.state.write().await;
 
         match message {

@@ -1,4 +1,8 @@
+/* ------------------------------ */
+
 CREATE SEQUENCE outbox_message_id_seq AS BIGINT;
+
+/* ------------------------------ */
 
 CREATE TABLE outbox_messages(
     message_id BIGINT PRIMARY KEY DEFAULT NEXTVAL('outbox_message_id_seq'),
@@ -7,7 +11,9 @@ CREATE TABLE outbox_messages(
     occurred_on timestamptz NOT NULL
 );
 
-CREATE INDEX outbox_messages_producer_name_idx ON outbox_messages(producer_name);
+CREATE INDEX idx_outbox_messages_producer_name ON outbox_messages(producer_name);
+
+/* ------------------------------ */
 
 CREATE TABLE outbox_message_consumptions(
     consumer_name VARCHAR(200) NOT NULL,
@@ -15,3 +21,5 @@ CREATE TABLE outbox_message_consumptions(
     last_consumed_message_id BIGINT NOT NULL,
     PRIMARY KEY (consumer_name, producer_name)
 );
+
+/* ------------------------------ */

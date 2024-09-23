@@ -37,6 +37,8 @@ pub struct FlowState {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct FlowTimingRecords {
+    /// Flow scheduled and will be activated at time
+    pub scheduled_for_activation_at: Option<DateTime<Utc>>,
     /// Task scheduled and waiting for execution since time
     pub awaiting_executor_since: Option<DateTime<Utc>>,
     /// Started running at time
@@ -68,6 +70,10 @@ impl FlowState {
             .as_ref()
             .and_then(|outcome| outcome.try_result_as_ref())
     }
+
+    pub fn can_schedule(&self) -> bool {
+        matches!(self.status(), FlowStatus::Waiting)
+    }
 }
 
 impl Projection for FlowState {
@@ -91,6 +97,7 @@ impl Projection for FlowState {
                     triggers: vec![trigger],
                     start_condition: None,
                     timing: FlowTimingRecords {
+                        scheduled_for_activation_at: None,
                         awaiting_executor_since: None,
                         running_since: None,
                         finished_at: None,
@@ -110,7 +117,7 @@ impl Projection for FlowState {
                         start_condition,
                         ..
                     }) => {
-                        if s.outcome.is_some() || s.timing.running_since.is_some() {
+                        if s.outcome.is_some() || s.timing.awaiting_executor_since.is_some() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(FlowState {
@@ -128,12 +135,28 @@ impl Projection for FlowState {
                             Ok(FlowState { triggers, ..s })
                         }
                     }
+                    E::ScheduledForActivation(FlowEventScheduledForActivation {
+                        scheduled_for_activation_at,
+                        ..
+                    }) => {
+                        if s.outcome.is_some() || s.timing.awaiting_executor_since.is_some() {
+                            Err(ProjectionError::new(Some(s), event))
+                        } else {
+                            Ok(FlowState {
+                                timing: FlowTimingRecords {
+                                    scheduled_for_activation_at: Some(scheduled_for_activation_at),
+                                    ..s.timing
+                                },
+                                ..s
+                            })
+                        }
+                    }
                     E::TaskScheduled(FlowEventTaskScheduled {
                         event_time,
                         task_id,
                         ..
                     }) => {
-                        if s.outcome.is_some() {
+                        if s.outcome.is_some() || s.timing.scheduled_for_activation_at.is_none() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             let mut task_ids = s.task_ids;
@@ -184,26 +207,25 @@ impl Projection for FlowState {
                             // Ignore for idempotence motivation
                             Ok(s)
                         } else {
+                            let timing = FlowTimingRecords {
+                                finished_at: Some(event_time),
+                                ..s.timing
+                            };
                             match task_outcome {
                                 ts::TaskOutcome::Success(task_result) => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Success(task_result.clone().into())),
-                                    timing: FlowTimingRecords {
-                                        finished_at: Some(event_time),
-                                        ..s.timing
-                                    },
+                                    timing,
                                     ..s
                                 }),
                                 ts::TaskOutcome::Cancelled => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Aborted),
-                                    timing: FlowTimingRecords {
-                                        finished_at: Some(event_time),
-                                        ..s.timing
-                                    },
+                                    timing,
                                     ..s
                                 }),
                                 // TODO: support retries
                                 ts::TaskOutcome::Failed(task_error) => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Failed(task_error.into())),
+                                    timing,
                                     ..s
                                 }),
                             }

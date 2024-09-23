@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod flow_configuration_repository_test_suite;
+#![feature(assert_matches)]
 
-pub use flow_configuration_repository_test_suite::*;
+pub mod test_flow_configuration_event_store;
+pub mod test_flow_event_store;

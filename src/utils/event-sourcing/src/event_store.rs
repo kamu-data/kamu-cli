@@ -18,11 +18,7 @@ use crate::{EventID, Projection};
 #[async_trait::async_trait]
 pub trait EventStore<Proj: Projection>: Send + Sync {
     /// Returns the event history of an aggregate in chronological order
-    async fn get_events(
-        &self,
-        query: &Proj::Query,
-        opts: GetEventsOpts,
-    ) -> EventStream<Proj::Event>;
+    fn get_events(&self, query: &Proj::Query, opts: GetEventsOpts) -> EventStream<Proj::Event>;
 
     /// Persists a series of events
     ///
@@ -32,6 +28,7 @@ pub trait EventStore<Proj: Projection>: Send + Sync {
     async fn save_events(
         &self,
         query: &Proj::Query,
+        maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<Proj::Event>,
     ) -> Result<EventID, SaveEventsError>;
 
@@ -70,7 +67,21 @@ pub enum SaveEventsError {
     #[error("No events for saves")]
     NothingToSave,
 
-    // TODO: Concurrency control
+    #[error(transparent)]
+    ConcurrentModification(ConcurrentModificationError),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
+
+impl SaveEventsError {
+    pub fn concurrent_modification() -> Self {
+        Self::ConcurrentModification(ConcurrentModificationError {})
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+#[error("Concurrent modification")]
+pub struct ConcurrentModificationError {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

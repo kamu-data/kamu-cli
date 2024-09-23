@@ -7,4 +7,4 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_inmem_task_system_event_store;
+mod test_inmem_task_event_store;

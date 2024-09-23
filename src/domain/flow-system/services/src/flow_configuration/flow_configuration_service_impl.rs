@@ -155,7 +155,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
     }
 
     /// Set or modify dataset update schedule
-    #[tracing::instrument(level = "info", skip_all, fields(?flow_key, %paused, ?rule))]
+    #[tracing::instrument(level = "info", skip_all, fields(?flow_key, %paused))]
     async fn set_configuration(
         &self,
         request_time: DateTime<Utc>,
@@ -163,6 +163,13 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         paused: bool,
         rule: FlowConfigurationRule,
     ) -> Result<FlowConfigurationState, SetFlowConfigurationError> {
+        tracing::info!(
+            flow_key = ?flow_key,
+            paused = %paused,
+            rule = ?rule,
+            "Setting flow configuration"
+        );
+
         let maybe_flow_configuration =
             FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await?;
 
@@ -203,7 +210,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
                 }
             }
 
-            let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().await.try_collect().await?;
+            let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().try_collect().await?;
 
             for dataset_id in dataset_ids {
                 for dataset_flow_type in DatasetFlowType::all() {
@@ -347,12 +354,18 @@ impl MessageConsumer for FlowConfigurationServiceImpl {}
 
 #[async_trait::async_trait]
 impl MessageConsumerT<DatasetLifecycleMessage> for FlowConfigurationServiceImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?message))]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "FlowConfigurationServiceImpl[DatasetLifecycleMessage]"
+    )]
     async fn consume_message(
         &self,
         _: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
+        tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
+
         match message {
             DatasetLifecycleMessage::Deleted(message) => {
                 for flow_type in DatasetFlowType::all() {

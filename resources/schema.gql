@@ -5,8 +5,6 @@
 # make codegen-graphql-schema
 # ```
 
-directive @oneOf on INPUT_OBJECT
-
 type AccessTokenConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -995,11 +993,6 @@ type FlowConnection {
 	edges: [FlowEdge!]!
 }
 
-type FlowDatasetCompactedFailedError {
-	rootDataset: Dataset!
-	message: String!
-}
-
 union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionDatasetReset | FlowDescriptionSystemGC
 
 type FlowDescriptionDatasetExecuteTransform {
@@ -1085,6 +1078,12 @@ type FlowEventInitiated implements FlowEvent {
 	trigger: FlowTrigger!
 }
 
+type FlowEventScheduledForActivation implements FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+	scheduledForActivationAt: DateTime!
+}
+
 type FlowEventStartConditionUpdated implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
@@ -1106,14 +1105,19 @@ type FlowEventTriggerAdded implements FlowEvent {
 }
 
 type FlowFailedError {
-	reason: FlowFailedReason!
+	reason: FlowFailureReason!
 }
 
-type FlowFailedMessage {
+union FlowFailureReason = FlowFailureReasonGeneral | FlowFailureReasonInputDatasetCompacted
+
+type FlowFailureReasonGeneral {
 	message: String!
 }
 
-union FlowFailedReason = FlowFailedMessage | FlowDatasetCompactedFailedError
+type FlowFailureReasonInputDatasetCompacted {
+	inputDataset: Dataset!
+	message: String!
+}
 
 scalar FlowID
 
@@ -1402,13 +1406,6 @@ type Mutation {
 	system. This groups deals with their identities and permissions.
 	"""
 	accounts: AccountsMut!
-	"""
-	Tasks-related functionality group.
-	
-	Tasks are units of work scheduled and executed by the system to query
-	and process data.
-	"""
-	tasks: TasksMut!
 }
 
 type NoChanges implements CommitResult & UpdateReadmeResult {
@@ -1488,14 +1485,6 @@ type Query {
 	system. This groups deals with their identities and permissions.
 	"""
 	accounts: Accounts!
-	"""
-	Task-related functionality group.
-	
-	Tasks are units of scheduling that can perform many functions like
-	ingesting new data, running dataset transformations, answering ad-hoc
-	queries etc.
-	"""
-	tasks: Tasks!
 	"""
 	Search-related functionality group
 	"""
@@ -1813,26 +1802,6 @@ type Task {
 	finishedAt: DateTime
 }
 
-type TaskConnection {
-	"""
-	A shorthand for `edges { node { ... } }`
-	"""
-	nodes: [Task!]!
-	"""
-	Approximate number of total nodes
-	"""
-	totalCount: Int!
-	"""
-	Page information
-	"""
-	pageInfo: PageBasedInfo!
-	edges: [TaskEdge!]!
-}
-
-type TaskEdge {
-	node: Task!
-}
-
 scalar TaskID
 
 """
@@ -1869,30 +1838,6 @@ enum TaskStatus {
 	Task has reached a certain final outcome (see [`TaskOutcome`])
 	"""
 	FINISHED
-}
-
-type Tasks {
-	"""
-	Returns current state of a given task
-	"""
-	getTask(taskId: TaskID!): Task
-	"""
-	Returns states of tasks associated with a given dataset ordered by
-	creation time from newest to oldest
-	"""
-	listTasksByDataset(datasetId: DatasetID!, page: Int, perPage: Int): TaskConnection!
-}
-
-type TasksMut {
-	"""
-	Requests cancellation of the specified task
-	"""
-	cancelTask(taskId: TaskID!): Task!
-	"""
-	Schedules a task to update the specified dataset by performing polling
-	ingest or a derivative transformation
-	"""
-	createProbeTask(datasetId: DatasetID, busyTimeMs: Int, endWithOutcome: TaskOutcome): Task!
 }
 
 type TemporalTable {
@@ -2017,6 +1962,10 @@ type WebSocketProtocolDesc {
 	url: String!
 }
 
+directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+directive @oneOf on INPUT_OBJECT
+directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+directive @specifiedBy(url: String!) on SCALAR
 schema {
 	query: Query
 	mutation: Mutation

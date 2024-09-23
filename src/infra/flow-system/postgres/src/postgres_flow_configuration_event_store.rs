@@ -29,15 +29,14 @@ impl PostgresFlowConfigurationEventStore {
         }
     }
 
-    async fn get_system_events(
+    fn get_system_events(
         &self,
         fk_system: FlowKeySystem,
         maybe_from_id: Option<i64>,
         maybe_to_id: Option<i64>,
     ) -> EventStream<FlowConfigurationEvent> {
-        let mut tr = self.transaction.lock().await;
-
         Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
             let connection_mut = tr
                 .connection_mut()
                 .await?;
@@ -45,10 +44,11 @@ impl PostgresFlowConfigurationEventStore {
             let mut query_stream = sqlx::query!(
                 r#"
                 SELECT event_id, event_payload
-                FROM system_flow_configuration_events
+                FROM flow_configuration_events
                 WHERE system_flow_type = ($1::text)::system_flow_type
                     AND (cast($2 as INT8) IS NULL or event_id > $2)
                     AND (cast($3 as INT8) IS NULL or event_id <= $3)
+                ORDER BY event_id ASC
                 "#,
                 fk_system.flow_type as SystemFlowType,
                 maybe_from_id,
@@ -68,15 +68,14 @@ impl PostgresFlowConfigurationEventStore {
         })
     }
 
-    async fn get_dataset_events(
+    fn get_dataset_events(
         &self,
         fk_dataset: FlowKeyDataset,
         maybe_from_id: Option<i64>,
         maybe_to_id: Option<i64>,
     ) -> EventStream<FlowConfigurationEvent> {
-        let mut tr = self.transaction.lock().await;
-
         Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
             let connection_mut = tr
                 .connection_mut()
                 .await?;
@@ -84,11 +83,12 @@ impl PostgresFlowConfigurationEventStore {
             let mut query_stream = sqlx::query!(
                 r#"
                 SELECT event_id, event_payload
-                FROM dataset_flow_configuration_events
+                FROM flow_configuration_events
                 WHERE dataset_id = $1
                     AND dataset_flow_type = ($2::text)::dataset_flow_type
                     AND (cast($3 as INT8) IS NULL or event_id > $3)
                     AND (cast($4 as INT8) IS NULL or event_id <= $4)
+                ORDER BY event_id ASC
                 "#,
                 fk_dataset.dataset_id.to_string(),
                 fk_dataset.flow_type as DatasetFlowType,
@@ -114,7 +114,7 @@ impl PostgresFlowConfigurationEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore {
-    async fn get_events(
+    fn get_events(
         &self,
         flow_key: &FlowKey,
         opts: GetEventsOpts,
@@ -125,11 +125,9 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
         match flow_key.clone() {
             FlowKey::Dataset(fk_dataset) => {
                 self.get_dataset_events(fk_dataset, maybe_from_id, maybe_to_id)
-                    .await
             }
             FlowKey::System(fk_system) => {
                 self.get_system_events(fk_system, maybe_from_id, maybe_to_id)
-                    .await
             }
         }
     }
@@ -137,6 +135,7 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
     async fn save_events(
         &self,
         flow_key: &FlowKey,
+        _prev_stored_event_id: Option<EventID>, // TODO: detecting concurrent modifications
         events: Vec<FlowConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
         if events.is_empty() {
@@ -150,7 +149,7 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
             FlowKey::Dataset(fk_dataset) => {
                 let mut query_builder = QueryBuilder::<Postgres>::new(
                     r#"
-                    INSERT INTO dataset_flow_configuration_events (dataset_id, dataset_flow_type, event_type, event_time, event_payload)
+                    INSERT INTO flow_configuration_events (dataset_id, dataset_flow_type, event_type, event_time, event_payload)
                     "#,
                 );
 
@@ -167,7 +166,7 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
             FlowKey::System(fk_system) => {
                 let mut query_builder = QueryBuilder::<Postgres>::new(
                     r#"
-                    INSERT INTO system_flow_configuration_events (system_flow_type, event_type, event_time, event_payload)
+                    INSERT INTO flow_configuration_events (system_flow_type, event_type, event_time, event_payload)
                     "#,
                 );
 
@@ -207,19 +206,15 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
         // `bignumeric`, which is not suitable for us
         let result = sqlx::query!(
             r#"
-            SELECT SUM(event_count)::BIGINT as count
-            FROM (SELECT COUNT(event_id) as event_count
-                  FROM dataset_flow_configuration_events
-                  UNION ALL
-                  SELECT COUNT(event_id) as event_count
-                  FROM system_flow_configuration_events) as counts;
+            SELECT COUNT(event_id) AS events_count
+                FROM flow_configuration_events
             "#,
         )
         .fetch_one(connection_mut)
         .await
         .int_err()?;
 
-        let count = usize::try_from(result.count.unwrap()).int_err()?;
+        let count = usize::try_from(result.events_count.unwrap()).int_err()?;
 
         Ok(count)
     }
@@ -229,21 +224,23 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
 
 #[async_trait::async_trait]
 impl FlowConfigurationEventStore for PostgresFlowConfigurationEventStore {
-    async fn list_all_dataset_ids(&self) -> FailableDatasetIDStream<'_> {
-        let mut tr = self.transaction.lock().await;
-
+    fn list_all_dataset_ids(&self) -> FailableDatasetIDStream<'_> {
         Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+
             let connection_mut = tr.connection_mut().await?;
 
             let mut query_stream = sqlx::query!(
                 r#"
                 SELECT DISTINCT dataset_id
-                FROM dataset_flow_configuration_events
-                WHERE event_type = 'FlowConfigurationEventCreated'
+                    FROM flow_configuration_events
+                    WHERE
+                        dataset_id IS NOT NULL AND
+                        event_type = 'FlowConfigurationEventCreated'
                 "#,
             )
             .try_map(|event_row| {
-                DatasetID::from_did_str(event_row.dataset_id.as_str())
+                DatasetID::from_did_str(event_row.dataset_id.unwrap().as_str())
                     .map_err(|e| sqlx::Error::Decode(Box::new(e)))
             })
             .fetch(connection_mut)

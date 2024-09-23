@@ -44,6 +44,7 @@ impl DatabaseTransactionRunner {
         Self { catalog }
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     pub async fn transactional<H, HFut, HFutResultT, HFutResultE>(
         &self,
         callback: H,
@@ -53,6 +54,8 @@ impl DatabaseTransactionRunner {
         HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
         HFutResultE: From<InternalError>,
     {
+        use tracing::Instrument;
+
         // Extract transaction manager, specific for the database
         let db_transaction_manager = self
             .catalog
@@ -70,24 +73,32 @@ impl DatabaseTransactionRunner {
                 .add_value(transaction_ref.clone())
                 .build();
 
-            callback(catalog_with_transaction).await
+            callback(catalog_with_transaction)
+                .instrument(tracing::debug_span!("Transaction Body"))
+                .await
         };
 
         // Commit or rollback transaction depending on the result
         match result {
             // In case everything succeeded, commit the transaction
             Ok(res) => {
+                tracing::debug!("Transaction COMMIT");
+
                 db_transaction_manager
                     .commit_transaction(transaction_ref)
                     .await?;
+
                 Ok(res)
             }
 
             // Otherwise, do an explicit rollback
             Err(e) => {
+                tracing::warn!("Transaction ROLLBACK");
+
                 db_transaction_manager
                     .rollback_transaction(transaction_ref)
                     .await?;
+
                 Err(e)
             }
         }

@@ -83,7 +83,11 @@ impl AccountRepository for SqliteAccountRepository {
                     } else if sqlite_error_message.contains("accounts.provider_identity_key") {
                         CreateAccountDuplicateField::ProviderIdentityKey
                     } else {
-                        tracing::error!("Unexpected SQLite error message: {}", sqlite_error_message);
+                        tracing::error!(
+                            error = ?e,
+                            error_msg = sqlite_error_message,
+                            "Unexpected SQLite error"
+                        );
                         CreateAccountDuplicateField::Id
                     };
 

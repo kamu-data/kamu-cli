@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::{TaskID, TaskOutcome};
+use crate::{TaskID, TaskMetadata, TaskOutcome};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,17 +22,28 @@ pub enum TaskProgressMessage {
 }
 
 impl TaskProgressMessage {
-    pub fn running(event_time: DateTime<Utc>, task_id: TaskID) -> Self {
+    pub fn running(
+        event_time: DateTime<Utc>,
+        task_id: TaskID,
+        task_metadata: TaskMetadata,
+    ) -> Self {
         Self::Running(TaskProgressMessageRunning {
             event_time,
             task_id,
+            task_metadata,
         })
     }
 
-    pub fn finished(event_time: DateTime<Utc>, task_id: TaskID, outcome: TaskOutcome) -> Self {
+    pub fn finished(
+        event_time: DateTime<Utc>,
+        task_id: TaskID,
+        task_metadata: TaskMetadata,
+        outcome: TaskOutcome,
+    ) -> Self {
         Self::Finished(TaskProgressMessageFinished {
             event_time,
             task_id,
+            task_metadata,
             outcome,
         })
     }
@@ -46,6 +57,7 @@ impl Message for TaskProgressMessage {}
 pub struct TaskProgressMessageRunning {
     pub event_time: DateTime<Utc>,
     pub task_id: TaskID,
+    pub task_metadata: TaskMetadata,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,6 +66,7 @@ pub struct TaskProgressMessageRunning {
 pub struct TaskProgressMessageFinished {
     pub event_time: DateTime<Utc>,
     pub task_id: TaskID,
+    pub task_metadata: TaskMetadata,
     pub outcome: TaskOutcome,
 }
 

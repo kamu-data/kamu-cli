@@ -141,14 +141,14 @@ pub async fn platform_token_validate_handler(catalog: Extension<Catalog>) -> Res
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn is_dataset_optional_for_request(request: &http::Request<hyper::Body>) -> bool {
+fn is_dataset_optional_for_request(request: &http::Request<axum::body::Body>) -> bool {
     request.uri().path() == "/push"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn get_dataset_action_for_request(
-    request: &http::Request<hyper::Body>,
+    request: &http::Request<axum::body::Body>,
 ) -> kamu_core::auth::DatasetAction {
     if !request.method().is_safe() || request.uri().path() == "/push" {
         kamu_core::auth::DatasetAction::Write

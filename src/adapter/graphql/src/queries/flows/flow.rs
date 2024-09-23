@@ -8,14 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use futures::TryStreamExt;
 use kamu_core::{DatasetChangesService, PollingIngestService};
 use kamu_flow_system::FlowResultDatasetUpdate;
-use {kamu_flow_system as fs, kamu_task_system as ts, opendatafabric as odf};
+use {kamu_flow_system as fs, opendatafabric as odf};
 
 use super::{FlowConfigurationSnapshot, FlowEvent, FlowOutcome, FlowStartCondition, FlowTrigger};
 use crate::prelude::*;
 use crate::queries::{Account, Task};
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -154,11 +154,9 @@ impl Flow {
 
     /// Associated tasks
     async fn tasks(&self, ctx: &Context<'_>) -> Result<Vec<Task>> {
-        let task_scheduler = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
-
         let mut tasks = Vec::new();
         for task_id in &self.flow_state.task_ids {
-            let ts_task = task_scheduler.get_task(*task_id).await.int_err()?;
+            let ts_task = utils::get_task(ctx, *task_id).await?;
             tasks.push(Task::new(ts_task));
         }
         Ok(tasks)
@@ -168,9 +166,9 @@ impl Flow {
     async fn history(&self, ctx: &Context<'_>) -> Result<Vec<FlowEvent>> {
         let flow_event_store = from_catalog::<dyn fs::FlowEventStore>(ctx).unwrap();
 
+        use futures::TryStreamExt;
         let flow_events: Vec<_> = flow_event_store
             .get_events(&self.flow_state.flow_id, Default::default())
-            .await
             .try_collect()
             .await
             .int_err()?;

@@ -33,6 +33,50 @@ impl<Proj: Projection, State: EventStoreState<Proj>> InMemoryEventStore<Proj, St
     pub fn as_state(&self) -> Arc<Mutex<State>> {
         self.state.clone()
     }
+
+    fn detect_concurrent_modification(
+        &self,
+        state: &State,
+        query: &Proj::Query,
+        maybe_prev_stored_event_id: Option<EventID>,
+    ) -> Result<(), SaveEventsError> {
+        // Find last actually stored event that matches the given query.
+        // We can compute it's reverse index (index from the tail)
+        let maybe_last_stored_event_rindex = state
+            .get_events()
+            .iter()
+            .rev()
+            .enumerate()
+            .find(|(_, e)| e.matches_query(query))
+            .map(|(i, _)| i);
+
+        // 2 valid cases:
+        //  - we have an event, and we expect an event with the same id
+        //  - we don't have an event, and we don't expect an event too
+        // Other cases are indicators of concurrent modifications
+        match (maybe_prev_stored_event_id, maybe_last_stored_event_rindex) {
+            // Both event and expectation
+            (Some(prev_stored_event_id), Some(last_stored_event_rindex)) => {
+                // Convert reverse index into normal index
+                let total_events = state.events_count();
+                let last_stored_event_id =
+                    i64::try_from(total_events - last_stored_event_rindex).unwrap();
+
+                // Compare index of the event with the expectation
+                if last_stored_event_id != prev_stored_event_id.into_inner() {
+                    return Err(SaveEventsError::concurrent_modification());
+                }
+
+                Ok(())
+            }
+
+            // Neither event, nor expectation
+            (None, None) => Ok(()),
+
+            // Other cases are invalid
+            _ => Err(SaveEventsError::concurrent_modification()),
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -43,35 +87,31 @@ impl<Proj: Projection, State: EventStoreState<Proj>> EventStore<Proj>
         Ok(self.state.lock().unwrap().events_count())
     }
 
-    async fn get_events(
-        &self,
-        query: &Proj::Query,
-        opts: GetEventsOpts,
-    ) -> EventStream<Proj::Event> {
+    fn get_events(&self, query: &Proj::Query, opts: GetEventsOpts) -> EventStream<Proj::Event> {
         let query = query.clone();
 
         // TODO: This should be a buffered stream so we don't lock per event
         Box::pin(async_stream::try_stream! {
-            let mut seen = opts.from.map_or(0, |id| usize::try_from(id.into_inner() + 1).unwrap());
+            let mut seen = opts.from.map_or(0, |id| usize::try_from(id.into_inner()).unwrap());
 
             loop {
                 let next = {
                     let g = self.state.lock().unwrap();
-                    let to = opts.to.map_or(g.events_count(), |id| usize::try_from(id.into_inner() + 1).unwrap());
+                    let to = opts.to.map_or(g.events_count(), |id| usize::try_from(id.into_inner()).unwrap());
 
                     g.get_events()[..to]
                         .iter()
                         .enumerate()
                         .skip(seen)
                         .filter(|(_, e)| e.matches_query(&query))
-                        .map(|(i, e)| (i, e.clone()))
+                        .map(|(i, e)| (i + 1, e.clone()))
                         .next()
                 };
 
                 match next {
                     None => break,
                     Some((i, event)) => {
-                        seen = i + 1;
+                        seen = i;
                         yield (EventID::new(i64::try_from(i).unwrap()), event)
                     }
                 }
@@ -79,18 +119,23 @@ impl<Proj: Projection, State: EventStoreState<Proj>> EventStore<Proj>
         })
     }
 
-    // TODO: concurrency
     async fn save_events(
         &self,
-        _: &Proj::Query,
+        query: &Proj::Query,
+        maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<Proj::Event>,
     ) -> Result<EventID, SaveEventsError> {
+        // Add events only if there was no concurrent modification
         let mut g = self.state.lock().unwrap();
+        self.detect_concurrent_modification(&g, query, maybe_prev_stored_event_id)?;
+
+        // Everything is fine, so commit the events
         for event in events {
             g.add_event(event);
         }
 
-        Ok(EventID::new(i64::try_from(g.events_count() - 1).unwrap()))
+        // The id is computed from the index
+        Ok(EventID::new(i64::try_from(g.events_count()).unwrap()))
     }
 }
 

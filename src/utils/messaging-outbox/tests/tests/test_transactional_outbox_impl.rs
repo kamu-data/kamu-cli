@@ -132,9 +132,10 @@ impl TransactionalOutboxHarness {
         use futures::TryStreamExt;
         let outbox_messages: Vec<_> = self
             .outbox_message_repository
-            .get_producer_messages(producer_name, OutboxMessageID::new(0), 10)
-            .await
-            .unwrap()
+            .get_messages(
+                vec![(producer_name.to_owned(), OutboxMessageID::new(0))],
+                10,
+            )
             .try_collect()
             .await
             .unwrap();

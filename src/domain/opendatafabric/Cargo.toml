@@ -50,6 +50,7 @@ url = "2"
 ed25519-dalek = { version = "2", default-features = false, features = [
     "std",
     "fast",
+    "zeroize",
     "rand_core",
 ] }
 rand = "0.8"
@@ -63,11 +64,11 @@ serde_with = "3"
 serde_yaml = "0.9"
 
 # gRPC
-prost = "0.12"
-tonic = "0.11"
+prost = "0.13"
+tonic = "0.12"
 
 # Optional
-arrow = { optional = true, version = "52", default-features = false, features = [
+arrow = { optional = true, version = "53", default-features = false, features = [
     "ipc",
 ] }
 sqlx = { optional = true, version = "0.8", default-features = false }

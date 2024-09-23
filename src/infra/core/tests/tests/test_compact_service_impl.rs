@@ -133,7 +133,7 @@ async fn test_dataset_compact() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
@@ -398,7 +398,7 @@ async fn test_dataset_compaction_watermark_only_blocks() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
@@ -562,7 +562,7 @@ async fn test_dataset_compaction_limits() {
                 indoc!(
                     r#"
                     message arrow_schema {
-                      OPTIONAL INT64 offset;
+                      REQUIRED INT64 offset;
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
@@ -719,7 +719,7 @@ async fn test_dataset_compaction_keep_all_non_data_blocks() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
@@ -820,7 +820,7 @@ async fn test_large_dataset_compact() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
@@ -872,7 +872,7 @@ async fn test_large_dataset_compact() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));

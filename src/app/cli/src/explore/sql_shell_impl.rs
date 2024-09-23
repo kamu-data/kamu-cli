@@ -98,7 +98,7 @@ impl SqlShellImpl {
             })?;
 
             container
-                .wait_for_container(Duration::from_secs(20))
+                .wait_for_container(Duration::from_secs(30))
                 .await
                 .int_err()?;
 

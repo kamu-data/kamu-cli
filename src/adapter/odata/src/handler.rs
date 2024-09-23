@@ -21,6 +21,7 @@ use std::sync::Arc;
 use axum::Extension;
 use database_common_macros::transactional_handler;
 use datafusion_odata::collection::{CollectionAddr, QueryParamsRaw};
+use datafusion_odata::error::ODataError;
 use dill::Catalog;
 use http_common::ApiError;
 use kamu_core::*;
@@ -100,8 +101,9 @@ pub async fn odata_service_handler_common(
     account_name: Option<AccountName>,
 ) -> Result<axum::response::Response<String>, ApiError> {
     let ctx = ODataServiceContext::new(catalog, account_name);
-    let response =
-        datafusion_odata::handlers::odata_service_handler(Extension(Arc::new(ctx))).await;
+    let response = datafusion_odata::handlers::odata_service_handler(Extension(Arc::new(ctx)))
+        .await
+        .map_err(map_err)?;
 
     Ok(response)
 }
@@ -113,8 +115,9 @@ pub async fn odata_metadata_handler_common(
     account_name: Option<AccountName>,
 ) -> Result<axum::response::Response<String>, ApiError> {
     let ctx = ODataServiceContext::new(catalog, account_name);
-    let response =
-        datafusion_odata::handlers::odata_metadata_handler(Extension(Arc::new(ctx))).await;
+    let response = datafusion_odata::handlers::odata_metadata_handler(Extension(Arc::new(ctx)))
+        .await
+        .map_err(map_err)?;
 
     Ok(response)
 }
@@ -158,7 +161,21 @@ pub async fn odata_collection_handler_common(
         query,
         headers,
     )
-    .await;
+    .await
+    .map_err(map_err)?;
 
     Ok(response)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn map_err(err: ODataError) -> ApiError {
+    match err {
+        ODataError::UnsupportedDataType(err) => ApiError::not_implemented(err),
+        ODataError::UnsupportedFeature(err) => ApiError::not_implemented(err),
+        ODataError::CollectionNotFound(err) => ApiError::not_found(err),
+        ODataError::CollectionAddressNotAssigned(err) => ApiError::not_implemented(err),
+        ODataError::KeyColumnNotAssigned(err) => ApiError::not_implemented(err),
+        ODataError::Internal(err) => ApiError::new(err, http::StatusCode::INTERNAL_SERVER_ERROR),
+    }
 }

@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common::DatabasePaginationOpts;
+use database_common::PaginationOpts;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::{
@@ -25,7 +25,7 @@ use kamu_datasets::{
     SaveDatasetEnvVarError,
 };
 use opendatafabric::DatasetID;
-use secrecy::{ExposeSecret, Secret};
+use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
 use uuid::Uuid;
 
@@ -34,7 +34,7 @@ use uuid::Uuid;
 pub struct DatasetEnvVarServiceImpl {
     dataset_env_var_repository: Arc<dyn DatasetEnvVarRepository>,
     time_source: Arc<dyn SystemTimeSource>,
-    dataset_env_var_encryption_key: Secret<String>,
+    dataset_env_var_encryption_key: SecretString,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +51,7 @@ impl DatasetEnvVarServiceImpl {
         Self {
             dataset_env_var_repository,
             time_source,
-            dataset_env_var_encryption_key: Secret::new(
+            dataset_env_var_encryption_key: SecretString::from(
                 dataset_env_var_config
                     .encryption_key
                     .as_ref()
@@ -107,7 +107,7 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
     async fn get_all_dataset_env_vars_by_dataset_id(
         &self,
         dataset_id: &DatasetID,
-        pagination: Option<DatabasePaginationOpts>,
+        pagination: Option<PaginationOpts>,
     ) -> Result<DatasetEnvVarListing, GetDatasetEnvVarError> {
         let total_count = self
             .dataset_env_var_repository
@@ -119,11 +119,8 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
                 list: vec![],
             });
         }
-        let database_pagination = pagination.unwrap_or(DatabasePaginationOpts {
-            // We assume that it is impossible to reach dataset env vars count bigger
-            // than max i64 value
-            #[allow(clippy::cast_possible_wrap)]
-            limit: total_count as i64,
+        let database_pagination = pagination.unwrap_or(PaginationOpts {
+            limit: total_count,
             offset: 0,
         });
 

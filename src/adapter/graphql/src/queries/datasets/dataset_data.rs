@@ -26,6 +26,7 @@ impl DatasetData {
     }
 
     /// Total number of records in this dataset
+    #[tracing::instrument(level = "info", skip_all)]
     async fn num_records_total(&self, ctx: &Context<'_>) -> Result<u64> {
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let dataset = dataset_repo.get_dataset_by_handle(&self.dataset_handle);
@@ -38,6 +39,7 @@ impl DatasetData {
 
     /// An estimated size of data on disk not accounting for replication or
     /// caching
+    #[tracing::instrument(level = "info", skip_all)]
     async fn estimated_size(&self, ctx: &Context<'_>) -> Result<u64> {
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let dataset = dataset_repo.get_dataset_by_handle(&self.dataset_handle);
@@ -62,6 +64,7 @@ impl DatasetData {
     /// )
     /// order by offset
     /// ```
+    #[tracing::instrument(level = "info", skip_all)]
     async fn tail(
         &self,
         ctx: &Context<'_>,
@@ -70,6 +73,8 @@ impl DatasetData {
         data_format: Option<DataBatchFormat>,
         schema_format: Option<DataSchemaFormat>,
     ) -> Result<DataQueryResult> {
+        tracing::debug!(?data_format, ?schema_format, ?skip, ?limit, "Tail query");
+
         // TODO: Default to JsonSoA format once implemented
         let data_format = data_format.unwrap_or(DataBatchFormat::Json);
         let schema_format = schema_format.unwrap_or(DataSchemaFormat::Parquet);

@@ -62,18 +62,19 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query, ?opts))]
-    async fn get_events(
+    fn get_events(
         &self,
         query: &FlowKey,
         opts: GetEventsOpts,
     ) -> EventStream<FlowConfigurationEvent> {
-        self.inner.get_events(query, opts).await
+        self.inner.get_events(query, opts)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query, num_events = events.len()))]
     async fn save_events(
         &self,
         query: &FlowKey,
+        maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<FlowConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
         if events.is_empty() {
@@ -86,7 +87,9 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
             g.dataset_ids.push(flow_key.dataset_id.clone());
         }
 
-        self.inner.save_events(query, events).await
+        self.inner
+            .save_events(query, maybe_prev_stored_event_id, events)
+            .await
     }
 }
 
@@ -95,7 +98,7 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
 #[async_trait::async_trait]
 impl FlowConfigurationEventStore for InMemoryFlowConfigurationEventStore {
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn list_all_dataset_ids(&self) -> FailableDatasetIDStream {
+    fn list_all_dataset_ids(&self) -> FailableDatasetIDStream {
         use futures::StreamExt;
 
         let dataset_ids = self.inner.as_state().lock().unwrap().dataset_ids.clone();

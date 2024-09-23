@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::DatabasePaginationOpts;
+use database_common::PaginationOpts;
 use internal_error::InternalError;
 use opendatafabric::DatasetID;
 use uuid::Uuid;
@@ -45,7 +45,7 @@ pub trait DatasetEnvVarService: Sync + Send {
     async fn get_all_dataset_env_vars_by_dataset_id(
         &self,
         dataset_id: &DatasetID,
-        pagination: Option<DatabasePaginationOpts>,
+        pagination: Option<PaginationOpts>,
     ) -> Result<DatasetEnvVarListing, GetDatasetEnvVarError>;
 
     async fn delete_dataset_env_var(
@@ -66,3 +66,5 @@ pub struct DatasetEnvVarListing {
     pub list: Vec<DatasetEnvVar>,
     pub total_count: usize,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -12,9 +12,12 @@ use std::sync::Arc;
 
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
+use axum::Extension;
 use database_common::DatabaseTransactionRunner;
+use database_common_macros::transactional_handler;
 use dill::{Catalog, CatalogBuilder};
-use internal_error::InternalError;
+use http_common::ApiError;
+use internal_error::*;
 use kamu::domain::{Protocols, ServerUrlConfig};
 use kamu_accounts::{
     AccountConfig,
@@ -65,10 +68,8 @@ struct WebUIFeatureFlags {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct WebUIServer {
-    server: axum::Server<
-        hyper::server::conn::AddrIncoming,
-        axum::routing::IntoMakeService<axum::Router>,
-    >,
+    server: axum::serve::Serve<axum::routing::IntoMakeService<axum::Router>, axum::Router>,
+    local_addr: SocketAddr,
     access_token: String,
 }
 
@@ -84,15 +85,13 @@ impl WebUIServer {
         enable_dataset_env_vars_managment: bool,
         address: Option<IpAddr>,
         port: Option<u16>,
-    ) -> Self {
+    ) -> Result<Self, InternalError> {
         let addr = SocketAddr::from((
             address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
             port.unwrap_or(0),
         ));
-
-        let bound_addr = hyper::server::conn::AddrIncoming::bind(&addr).unwrap_or_else(|e| {
-            panic!("error binding to {addr}: {e}");
-        });
+        let listener = tokio::net::TcpListener::bind(addr).await.int_err()?;
+        let local_addr = listener.local_addr().unwrap();
 
         let account_config = predefined_accounts_config
             .find_account_config_by_name(&current_account_name)
@@ -111,10 +110,10 @@ impl WebUIServer {
             login_credentials_json: serde_json::to_string(&login_credentials).unwrap(),
         };
 
-        let web_ui_url = format!("http://{}", bound_addr.local_addr());
+        let web_ui_url = format!("http://{}", local_addr);
 
         let web_ui_config = WebUIConfig {
-            api_server_gql_url: format!("http://{}/graphql", bound_addr.local_addr()),
+            api_server_gql_url: format!("http://{}/graphql", local_addr),
             api_server_http_url: web_ui_url.clone(),
             login_instructions: Some(login_instructions.clone()),
             ingest_upload_file_limit_mb: file_upload_limit_config.max_file_size_in_mb(),
@@ -184,28 +183,35 @@ impl WebUIServer {
                 ),
             )
             .fallback(app_handler)
+            .layer(kamu_adapter_http::AuthenticationLayer::new())
             .layer(
-                tower::ServiceBuilder::new()
-                    .layer(tower_http::trace::TraceLayer::new_for_http())
-                    .layer(
-                        tower_http::cors::CorsLayer::new()
-                            .allow_origin(tower_http::cors::Any)
-                            .allow_methods(vec![http::Method::GET, http::Method::POST])
-                            .allow_headers(tower_http::cors::Any),
-                    )
-                    .layer(axum::extract::Extension(web_ui_catalog))
-                    .layer(axum::extract::Extension(gql_schema))
-                    .layer(axum::extract::Extension(web_ui_config))
-                    .layer(kamu_adapter_http::RunInDatabaseTransactionLayer::new())
-                    .layer(kamu_adapter_http::AuthenticationLayer::new()),
-            );
+                tower_http::cors::CorsLayer::new()
+                    .allow_origin(tower_http::cors::Any)
+                    .allow_methods(vec![http::Method::GET, http::Method::POST])
+                    .allow_headers(tower_http::cors::Any),
+            )
+            .layer(observability::axum::http_layer())
+            // Note: Healthcheck and metrics routes are placed before the tracing layer (layers
+            // execute bottom-up) to avoid spam in logs
+            .route(
+                "/system/health",
+                axum::routing::get(observability::health::health_handler),
+            )
+            .route(
+                "/system/metrics",
+                axum::routing::get(observability::metrics::metrics_handler),
+            )
+            .layer(axum::extract::Extension(web_ui_catalog))
+            .layer(axum::extract::Extension(gql_schema))
+            .layer(axum::extract::Extension(web_ui_config));
 
-        let server = axum::Server::builder(bound_addr).serve(app.into_make_service());
+        let server = axum::serve(listener, app.into_make_service());
 
-        Self {
+        Ok(Self {
             server,
+            local_addr,
             access_token,
-        }
+        })
     }
 
     async fn acquire_access_token(
@@ -228,15 +234,15 @@ impl WebUIServer {
             .await
     }
 
-    pub fn local_addr(&self) -> SocketAddr {
-        self.server.local_addr()
+    pub fn local_addr(&self) -> &SocketAddr {
+        &self.local_addr
     }
 
     pub fn get_access_token(&self) -> String {
         self.access_token.clone()
     }
 
-    pub async fn run(self) -> Result<(), hyper::Error> {
+    pub async fn run(self) -> Result<(), std::io::Error> {
         self.server.await
     }
 }
@@ -256,7 +262,7 @@ async fn app_handler(uri: Uri) -> impl IntoResponse {
 
     Response::builder()
         .header(http::header::CONTENT_TYPE, mime.as_ref())
-        .body(axum::body::Full::from(file.data))
+        .body(axum::body::Body::from(file.data))
         .unwrap()
 }
 
@@ -270,13 +276,16 @@ async fn runtime_config_handler(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[transactional_handler]
 async fn graphql_handler(
-    schema: axum::extract::Extension<kamu_adapter_graphql::Schema>,
-    catalog: axum::extract::Extension<Catalog>,
+    Extension(schema): Extension<kamu_adapter_graphql::Schema>,
+    Extension(catalog): Extension<Catalog>,
     req: async_graphql_axum::GraphQLRequest,
-) -> async_graphql_axum::GraphQLResponse {
-    let graphql_request = req.into_inner().data(catalog.0);
-    schema.execute(graphql_request).await.into()
+) -> Result<async_graphql_axum::GraphQLResponse, ApiError> {
+    let graphql_request = req.into_inner().data(catalog);
+    let graphql_response = schema.execute(graphql_request).await.into();
+
+    Ok(graphql_response)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

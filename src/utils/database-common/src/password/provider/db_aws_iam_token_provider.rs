@@ -8,12 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use aws_config::meta::region::RegionProviderChain;
+use aws_config::BehaviorVersion;
 use aws_credential_types::provider::ProvideCredentials;
 use chrono::Utc;
 use dill::*;
 use hmac::{Hmac, Mac};
 use internal_error::{InternalError, ResultIntoInternal};
-use secrecy::{ExposeSecret, Secret};
+use secrecy::{ExposeSecret, SecretString};
 use sha2::{Digest, Sha256};
 
 use crate::{DatabaseConnectionSettings, DatabaseCredentials, DatabasePasswordProvider};
@@ -23,13 +24,13 @@ use crate::{DatabaseConnectionSettings, DatabaseCredentials, DatabasePasswordPro
 #[component(pub)]
 #[interface(dyn DatabasePasswordProvider)]
 pub struct DatabaseAwsIamTokenProvider {
-    db_user_name: Secret<String>,
+    db_user_name: SecretString,
     db_connection_settings: DatabaseConnectionSettings,
 }
 
 impl DatabaseAwsIamTokenProvider {
     pub fn new(
-        db_user_name: Secret<String>,
+        db_user_name: SecretString,
         db_connection_settings: DatabaseConnectionSettings,
     ) -> Self {
         Self {
@@ -63,7 +64,10 @@ impl DatabaseAwsIamTokenProvider {
 impl DatabasePasswordProvider for DatabaseAwsIamTokenProvider {
     async fn provide_credentials(&self) -> Result<Option<DatabaseCredentials>, InternalError> {
         let region_provider = RegionProviderChain::default_provider().or_else("unspefified");
-        let config = aws_config::from_env().region(region_provider).load().await;
+        let config = aws_config::defaults(BehaviorVersion::latest())
+            .region(region_provider)
+            .load()
+            .await;
 
         let creds = config
             .credentials_provider()
@@ -111,7 +115,7 @@ impl DatabasePasswordProvider for DatabaseAwsIamTokenProvider {
 
         Ok(Some(DatabaseCredentials {
             user_name: self.db_user_name.clone(),
-            password: Secret::new(token),
+            password: SecretString::from(token),
         }))
     }
 }

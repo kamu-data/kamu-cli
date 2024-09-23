@@ -17,12 +17,11 @@ use crate::{NewOutboxMessage, OutboxMessage, OutboxMessageID};
 pub trait OutboxMessageRepository: Send + Sync {
     async fn push_message(&self, message: NewOutboxMessage) -> Result<(), InternalError>;
 
-    async fn get_producer_messages(
+    fn get_messages(
         &self,
-        producer_name: &str,
-        above_id: OutboxMessageID,
+        above_boundaries_by_producer: Vec<(String, OutboxMessageID)>,
         batch_size: usize,
-    ) -> Result<OutboxMessageStream, InternalError>;
+    ) -> OutboxMessageStream;
 
     async fn get_latest_message_ids_by_producer(
         &self,

@@ -33,7 +33,7 @@ use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
 use kamu_task_system::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
-use kamu_task_system_inmem::InMemoryTaskSystemEventStore;
+use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use opendatafabric::*;
@@ -42,6 +42,8 @@ use tokio::task::yield_now;
 
 use super::{
     FlowSystemTestListener,
+    ManualFlowAbortArgs,
+    ManualFlowAbortDriver,
     ManualFlowTriggerArgs,
     ManualFlowTriggerDriver,
     TaskDriver,
@@ -60,7 +62,10 @@ pub(crate) struct FlowHarness {
     pub catalog: dill::Catalog,
     pub dataset_repo: Arc<dyn DatasetRepository>,
     pub flow_configuration_service: Arc<dyn FlowConfigurationService>,
-    pub flow_service: Arc<dyn FlowService>,
+    pub flow_configuration_event_store: Arc<dyn FlowConfigurationEventStore>,
+    pub flow_service: Arc<dyn FlowExecutor>,
+    pub flow_query_service: Arc<dyn FlowQueryService>,
+    pub flow_event_store: Arc<dyn FlowEventStore>,
     pub auth_svc: Arc<dyn AuthenticationService>,
     pub fake_system_time_source: FakeSystemTimeSource,
 }
@@ -89,11 +94,14 @@ impl FlowHarness {
 
         let awaiting_step = overrides
             .awaiting_step
-            .unwrap_or(Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap());
+            .unwrap_or(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS));
 
-        let mandatory_throttling_period = overrides.mandatory_throttling_period.unwrap_or(
-            Duration::try_milliseconds(SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS).unwrap(),
-        );
+        let mandatory_throttling_period =
+            overrides
+                .mandatory_throttling_period
+                .unwrap_or(Duration::milliseconds(
+                    SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS,
+                ));
 
         let mock_dataset_changes = overrides.mock_dataset_changes.unwrap_or_default();
 
@@ -118,13 +126,11 @@ impl FlowHarness {
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<FlowSystemTestListener>()
-            .add_value(FlowServiceRunConfig::new(
+            .add_value(FlowExecutorConfig::new(
                 awaiting_step,
                 mandatory_throttling_period,
             ))
-            .add::<FlowServiceImpl>()
             .add::<InMemoryFlowEventStore>()
-            .add::<FlowConfigurationServiceImpl>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add_value(fake_system_time_source.clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
@@ -151,12 +157,13 @@ impl FlowHarness {
             .add::<DatasetOwnershipServiceInMemory>()
             .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
             .add::<TaskSchedulerImpl>()
-            .add::<InMemoryTaskSystemEventStore>()
+            .add::<InMemoryTaskEventStore>()
             .add::<LoginPasswordAuthProvider>()
             .add::<PredefinedAccountsRegistrator>()
             .add::<DatabaseTransactionRunner>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
+            kamu_flow_system_services::register_dependencies(&mut b);
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
@@ -170,9 +177,13 @@ impl FlowHarness {
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
             );
-            register_message_dispatcher::<FlowServiceUpdatedMessage>(
+            register_message_dispatcher::<FlowExecutorUpdatedMessage>(
                 &mut b,
-                MESSAGE_PRODUCER_KAMU_FLOW_SERVICE,
+                MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
+            );
+            register_message_dispatcher::<FlowProgressMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
             );
 
             b.build()
@@ -191,8 +202,13 @@ impl FlowHarness {
             .await
             .unwrap();
 
-        let flow_service = catalog.get_one::<dyn FlowService>().unwrap();
+        let flow_service = catalog.get_one::<dyn FlowExecutor>().unwrap();
+        let flow_query_service = catalog.get_one::<dyn FlowQueryService>().unwrap();
         let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
+        let flow_configuration_event_store = catalog
+            .get_one::<dyn FlowConfigurationEventStore>()
+            .unwrap();
+        let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
         let auth_svc = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
@@ -200,7 +216,10 @@ impl FlowHarness {
             _tmp_dir: tmp_dir,
             catalog,
             flow_service,
+            flow_query_service,
             flow_configuration_service,
+            flow_configuration_event_store,
+            flow_event_store,
             dataset_repo,
             fake_system_time_source,
             auth_svc,
@@ -414,11 +433,11 @@ impl FlowHarness {
         &self,
         args: ManualFlowTriggerArgs,
     ) -> ManualFlowTriggerDriver {
-        ManualFlowTriggerDriver::new(
-            self.catalog.get_one().unwrap(),
-            self.catalog.get_one().unwrap(),
-            args,
-        )
+        ManualFlowTriggerDriver::new(self.catalog.clone(), self.catalog.get_one().unwrap(), args)
+    }
+
+    pub fn manual_flow_abort_driver(&self, args: ManualFlowAbortArgs) -> ManualFlowAbortDriver {
+        ManualFlowAbortDriver::new(self.catalog.clone(), self.catalog.get_one().unwrap(), args)
     }
 
     pub fn now_datetime(&self) -> DateTime<Utc> {
@@ -427,7 +446,7 @@ impl FlowHarness {
 
     pub async fn advance_time(&self, time_quantum: Duration) {
         self.advance_time_custom_alignment(
-            Duration::try_milliseconds(SCHEDULING_ALIGNMENT_MS).unwrap(),
+            Duration::milliseconds(SCHEDULING_ALIGNMENT_MS),
             time_quantum,
         )
         .await;

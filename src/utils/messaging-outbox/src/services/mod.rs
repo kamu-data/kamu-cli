@@ -12,10 +12,8 @@ mod testing;
 
 mod outbox;
 mod outbox_config;
-mod outbox_transactional_processor;
 
 pub use implementation::*;
 pub use outbox::*;
 pub use outbox_config::*;
-pub use outbox_transactional_processor::*;
 pub use testing::*;

@@ -138,6 +138,7 @@ impl KamuFlightSqlService {
             .map_err(|e| Status::internal(format!("Error: {e}")))
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn get_catalogs(
         &self,
         ctx: &SessionContext,
@@ -629,6 +630,7 @@ impl KamuFlightSqlService {
 
     // TODO: PERF: Use DataFrame::execute_stream() not to load keep entire result in
     // memory
+    #[tracing::instrument(level = "info", skip_all)]
     async fn df_to_stream(
         &self,
         df: DataFrame,

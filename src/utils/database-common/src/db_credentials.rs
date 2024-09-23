@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use secrecy::Secret;
+use secrecy::SecretString;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct DatabaseCredentials {
-    pub user_name: Secret<String>,
-    pub password: Secret<String>,
+    pub user_name: SecretString,
+    pub password: SecretString,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

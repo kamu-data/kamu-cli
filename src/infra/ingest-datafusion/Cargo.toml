@@ -27,20 +27,19 @@ opendatafabric = { workspace = true, features = ["arrow"] }
 kamu-core = { workspace = true }
 kamu-data-utils = { workspace = true }
 
-datafusion = { version = "41", default-features = false }
+datafusion = { version = "42", default-features = false }
 digest = "0.10"
 geo-types = { version = "0.7", default-features = false, features = [] }
 geojson = { version = "0.24", default-features = false, features = [
     "geo-types",
 ] }
 glob = "0.3"
-object_store = { version = "0.10", features = ["aws"] }
 serde = { version = "1" }
 serde_json = "1"
 sha3 = "0.10"
-shapefile = { version = "0.5", features = ["geo-types"] }
+shapefile = { version = "0.6", features = ["geo-types"] }
 walkdir = "2"
-zip = { version = "0.6", default-features = false, features = [
+zip = { version = "2", default-features = false, features = [
     "deflate",
     "bzip2",
     "zstd",

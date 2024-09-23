@@ -10,11 +10,12 @@
 use kamu_core::{CompactionResult, PullResult, PullResultUpToDate};
 use kamu_task_system::{self as ts, ResetDatasetTaskError, UpdateDatasetTaskError};
 use opendatafabric::{DatasetID, Multihash};
+use serde::{Deserialize, Serialize};
 use ts::TaskError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowOutcome {
     /// Flow succeeded
     Success(FlowResult),
@@ -35,7 +36,7 @@ impl FlowOutcome {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowResult {
     Empty,
     DatasetUpdate(FlowResultDatasetUpdate),
@@ -54,15 +55,15 @@ impl FlowResult {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowError {
     Failed,
-    RootDatasetCompacted(FlowRootDatasetCompactedError),
+    InputDatasetCompacted(FlowInputDatasetCompactedError),
     ResetHeadNotFound,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowRootDatasetCompactedError {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FlowInputDatasetCompactedError {
     pub dataset_id: DatasetID,
 }
 
@@ -71,8 +72,8 @@ impl From<&TaskError> for FlowError {
         match value {
             TaskError::Empty => Self::Failed,
             TaskError::UpdateDatasetError(update_dataset_error) => match update_dataset_error {
-                UpdateDatasetTaskError::RootDatasetCompacted(err) => {
-                    Self::RootDatasetCompacted(FlowRootDatasetCompactedError {
+                UpdateDatasetTaskError::InputDatasetCompacted(err) => {
+                    Self::InputDatasetCompacted(FlowInputDatasetCompactedError {
                         dataset_id: err.dataset_id.clone(),
                     })
                 }
@@ -84,31 +85,31 @@ impl From<&TaskError> for FlowError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowResultDatasetUpdate {
     Changed(FlowResultDatasetUpdateChanged),
     UpToDate(FlowResultDatasetUpdateUpToDate),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowResultDatasetUpdateChanged {
     pub old_head: Option<Multihash>,
     pub new_head: Multihash,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowResultDatasetUpdateUpToDate {
     pub uncacheable: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowResultDatasetCompact {
     pub new_head: Multihash,
     pub old_num_blocks: usize,
     pub new_num_blocks: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowResultDatasetReset {
     pub new_head: Multihash,
 }

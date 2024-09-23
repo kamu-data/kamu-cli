@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use database_common::{DatabasePaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use opendatafabric::AccountID;
@@ -164,7 +164,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
     async fn get_access_tokens_by_account_id(
         &self,
         account_id: &AccountID,
-        pagination: &DatabasePaginationOpts,
+        pagination: &PaginationOpts,
     ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
         let mut tr = self.transaction.lock().await;
 
@@ -172,8 +172,8 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
             .connection_mut()
             .await
             .map_err(GetAccessTokenError::Internal)?;
-        let limit = pagination.limit;
-        let offset = pagination.offset;
+        let limit = i64::try_from(pagination.limit).unwrap();
+        let offset = i64::try_from(pagination.offset).unwrap();
         let account_id_string = account_id.to_string();
 
         let access_token_rows = sqlx::query_as!(

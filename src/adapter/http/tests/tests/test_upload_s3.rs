@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::net::{SocketAddr, TcpListener};
+use std::net::SocketAddr;
 
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
@@ -45,11 +45,9 @@ impl Harness {
         let s3_upload_context = S3Context::from_url(&s3.url).await;
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 0));
-        let bind_socket = TcpListener::bind(addr).unwrap();
-        let api_server_address = format!(
-            "http://localhost:{}",
-            bind_socket.local_addr().unwrap().port()
-        );
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        let api_server_address =
+            format!("http://localhost:{}", listener.local_addr().unwrap().port());
 
         let catalog = {
             let mut b = dill::CatalogBuilder::new();
@@ -93,7 +91,7 @@ impl Harness {
             .make_access_token(&DEFAULT_ACCOUNT_ID, 60)
             .unwrap();
 
-        let api_server = TestAPIServer::new(catalog, bind_socket, true);
+        let api_server = TestAPIServer::new(catalog, listener, true);
 
         Self {
             _s3: s3,

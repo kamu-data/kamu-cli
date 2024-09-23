@@ -181,7 +181,12 @@ impl UploadService for UploadServiceLocal {
 
         let file_path = upload_folder_path.join(&upload_token.file_name);
         tokio::fs::write(&file_path, file_data).await.map_err(|e| {
-            tracing::error!("{:?}", e);
+            tracing::error!(
+                error = ?e,
+                error_msg = %e,
+                file_path = %file_path.display(),
+                "Writing file failed"
+            );
             SaveUploadError::Internal(e.int_err())
         })?;
 

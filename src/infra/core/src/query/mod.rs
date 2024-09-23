@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -116,48 +117,38 @@ impl KamuSchema {
     async fn init_schema_cache(&self) -> Result<SchemaCache, InternalError> {
         let mut tables = HashMap::new();
 
-        if let Some(aliases) = &self.inner.options.aliases {
-            for (alias, id) in aliases {
+        let name_resolution_enabled = self.inner.options.input_datasets.is_empty();
+
+        if !name_resolution_enabled {
+            for (id, opts) in &self.inner.options.input_datasets {
                 let hdl = self
                     .inner
                     .dataset_repo
-                    .resolve_dataset_ref(&id.into())
+                    .resolve_dataset_ref(&id.as_local_ref())
                     .await
                     .int_err()?;
 
-                self.inner
+                if !self
+                    .inner
                     .dataset_action_authorizer
-                    .check_action_allowed(&hdl, auth::DatasetAction::Read)
-                    .await
-                    .int_err()?;
+                    .is_action_allowed(&hdl, auth::DatasetAction::Read)
+                    .await?
+                {
+                    // Ignore this alias and let the query fail with "not found" error
+                    continue;
+                }
 
                 let dataset = self.inner.dataset_repo.get_dataset_by_handle(&hdl);
 
-                let as_of = self
-                    .inner
-                    .options
-                    .as_of_state
-                    .as_ref()
-                    .and_then(|s| s.inputs.get(id))
-                    .cloned();
-
-                let hints = self
-                    .inner
-                    .options
-                    .hints
-                    .as_ref()
-                    .and_then(|h| h.get(id))
-                    .cloned();
-
                 tables.insert(
-                    alias.clone(),
+                    opts.alias.clone(),
                     Arc::new(KamuTable::new(
                         self.inner.session_config.clone(),
                         self.inner.table_options.clone(),
                         hdl,
                         dataset,
-                        as_of,
-                        hints,
+                        opts.block_hash.clone(),
+                        opts.hints.clone(),
                     )),
                 );
             }
@@ -166,47 +157,30 @@ impl KamuSchema {
             // possible at the public node scale. We need to patch DataFusion to support
             // unbounded catalogs.
             let mut dataset_handles = self.inner.dataset_repo.get_all_datasets();
-            let inputs_state = self
-                .inner
-                .options
-                .as_of_state
-                .as_ref()
-                .map(|s| &s.inputs)
-                .cloned()
-                .unwrap_or_default();
 
             while let Some(hdl) = dataset_handles.try_next().await.int_err()? {
-                if self
+                if !self
                     .inner
                     .dataset_action_authorizer
-                    .check_action_allowed(&hdl, auth::DatasetAction::Read)
-                    .await
-                    .is_ok()
+                    .is_action_allowed(&hdl, auth::DatasetAction::Read)
+                    .await?
                 {
-                    let dataset = self.inner.dataset_repo.get_dataset_by_handle(&hdl);
-
-                    let as_of = inputs_state.get(&hdl.id).cloned();
-
-                    let hints = self
-                        .inner
-                        .options
-                        .hints
-                        .as_ref()
-                        .and_then(|h| h.get(&hdl.id))
-                        .cloned();
-
-                    tables.insert(
-                        hdl.alias.to_string(),
-                        Arc::new(KamuTable::new(
-                            self.inner.session_config.clone(),
-                            self.inner.table_options.clone(),
-                            hdl,
-                            dataset,
-                            as_of,
-                            hints,
-                        )),
-                    );
+                    continue;
                 }
+
+                let dataset = self.inner.dataset_repo.get_dataset_by_handle(&hdl);
+
+                tables.insert(
+                    hdl.alias.to_string(),
+                    Arc::new(KamuTable::new(
+                        self.inner.session_config.clone(),
+                        self.inner.table_options.clone(),
+                        hdl,
+                        dataset,
+                        None,
+                        None,
+                    )),
+                );
             }
         }
 
@@ -539,7 +513,7 @@ impl TableProvider for KamuTable {
         None
     }
 
-    fn get_logical_plan(&self) -> Option<&LogicalPlan> {
+    fn get_logical_plan(&self) -> Option<Cow<LogicalPlan>> {
         None
     }
 

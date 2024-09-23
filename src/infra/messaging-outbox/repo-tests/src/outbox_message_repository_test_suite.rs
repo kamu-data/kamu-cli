@@ -108,9 +108,7 @@ pub async fn test_push_many_messages_and_read_parts(catalog: &Catalog) {
     }
 
     let messages: Vec<_> = outbox_message_repo
-        .get_producer_messages("A", OutboxMessageID::new(0), 3)
-        .await
-        .unwrap()
+        .get_messages(vec![("A".to_string(), OutboxMessageID::new(0))], 3)
         .try_collect()
         .await
         .unwrap();
@@ -121,9 +119,7 @@ pub async fn test_push_many_messages_and_read_parts(catalog: &Catalog) {
     }
 
     let messages: Vec<_> = outbox_message_repo
-        .get_producer_messages("A", OutboxMessageID::new(5), 4)
-        .await
-        .unwrap()
+        .get_messages(vec![("A".to_string(), OutboxMessageID::new(5))], 4)
         .try_collect()
         .await
         .unwrap();
@@ -171,18 +167,14 @@ pub async fn test_try_reading_above_max(catalog: &Catalog) {
     }
 
     let messages: Vec<_> = outbox_message_repo
-        .get_producer_messages("A", OutboxMessageID::new(5), 3)
-        .await
-        .unwrap()
+        .get_messages(vec![("A".to_string(), OutboxMessageID::new(5))], 3)
         .try_collect()
         .await
         .unwrap();
     assert_eq!(messages.len(), 0);
 
     let messages: Vec<_> = outbox_message_repo
-        .get_producer_messages("A", OutboxMessageID::new(3), 6)
-        .await
-        .unwrap()
+        .get_messages(vec![("A".to_string(), OutboxMessageID::new(3))], 6)
         .try_collect()
         .await
         .unwrap();
@@ -192,6 +184,159 @@ pub async fn test_try_reading_above_max(catalog: &Catalog) {
         let message = messages.get(i - 4).unwrap().clone();
         assert_expected_message_a(message, i32::try_from(i).unwrap());
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &Catalog) {
+    let outbox_message_repo = catalog.get_one::<dyn OutboxMessageRepository>().unwrap();
+
+    // Push a mix of messages for A and B producers (10 A, 5 B)
+    for i in 1..=10 {
+        outbox_message_repo
+            .push_message(NewOutboxMessage {
+                producer_name: "A".to_string(),
+                content_json: serde_json::to_value(&MessageA {
+                    x: i * 2,
+                    y: u64::try_from(256 + i).unwrap(),
+                })
+                .unwrap(),
+                occurred_on: Utc::now(),
+            })
+            .await
+            .unwrap();
+        if i % 2 == 0 {
+            outbox_message_repo
+                .push_message(NewOutboxMessage {
+                    producer_name: "B".to_string(),
+                    content_json: serde_json::to_value(&MessageB {
+                        a: format!("test_{i}"),
+                        b: vec![format!("foo_{i}"), format!("bar_{i}")],
+                    })
+                    .unwrap(),
+                    occurred_on: Utc::now(),
+                })
+                .await
+                .unwrap();
+        }
+    }
+
+    fn assert_expected_message_a(message: &OutboxMessage, i: i32) {
+        let original_message =
+            serde_json::from_value::<MessageA>(message.content_json.clone()).unwrap();
+
+        assert_eq!(original_message.x, i * 2);
+        assert_eq!(original_message.y, u64::try_from(256 + i).unwrap());
+    }
+
+    fn assert_expected_message_b(message: &OutboxMessage, i: i32) {
+        let original_message =
+            serde_json::from_value::<MessageB>(message.content_json.clone()).unwrap();
+
+        assert_eq!(original_message.a, format!("test_{i}"));
+        assert_eq!(
+            original_message.b,
+            vec![format!("foo_{i}"), format!("bar_{i}")]
+        );
+    }
+
+    // [00] #01 A (x=2, y=257)
+    // [01] #02 A (x=4, y=258)
+    // [02] #03 B (a="test_2", b=["foo_2", "bar_2"])
+    // [03] #04 A (x=6, y=259)
+    // [04] #05 A (x=8, y=260)
+    // [05] #06 B (a="test_4", b=["foo_4", "bar_4"])
+    // [06] #07 A (x=10, y=261)
+    // [07] #08 A (x=12, y=262)
+    // [08] #09 B (a="test_6", b=["foo_6", "bar_6"])
+    // [09] #10 A (x=14, y=263)
+    // [10] #11 A (x=16, y=264)
+    // [11] #12 B (a="test_8", b=["foo_8", "bar_8"])
+    // [12] #13 A (x=18, y=265)
+    // [13] #14 A (x=20, y=266)
+    // [14] #15 B (a="test_10", b=["foo_10", "bar_10"])
+
+    // No filters, reads all messages
+    let messages: Vec<_> = outbox_message_repo
+        .get_messages(vec![], 15)
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(messages.len(), 15);
+    assert_expected_message_a(&messages[3], 3);
+    assert_expected_message_a(&messages[10], 8);
+    assert_expected_message_b(&messages[8], 6);
+    assert_expected_message_b(&messages[14], 10);
+
+    // Multiple filters nearby
+    let messages: Vec<_> = outbox_message_repo
+        .get_messages(
+            vec![
+                ("A".to_string(), OutboxMessageID::new(11)),
+                ("B".to_string(), OutboxMessageID::new(12)),
+            ],
+            10,
+        )
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(messages.len(), 3);
+    assert_expected_message_a(&messages[0], 9);
+    assert_expected_message_a(&messages[1], 10);
+    assert_expected_message_b(&messages[2], 10);
+
+    // Multiple filters long distance, B above window
+    let messages: Vec<_> = outbox_message_repo
+        .get_messages(
+            vec![
+                ("A".to_string(), OutboxMessageID::new(2)),
+                ("B".to_string(), OutboxMessageID::new(9)),
+            ],
+            4,
+        )
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(messages.len(), 4);
+    assert_expected_message_a(&messages[0], 3);
+    assert_expected_message_a(&messages[1], 4);
+    assert_expected_message_a(&messages[2], 5);
+    assert_expected_message_a(&messages[3], 6);
+
+    // Multiple filters some distance, but overlap
+    let messages: Vec<_> = outbox_message_repo
+        .get_messages(
+            vec![
+                ("A".to_string(), OutboxMessageID::new(7)),
+                ("B".to_string(), OutboxMessageID::new(3)),
+            ],
+            4,
+        )
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(messages.len(), 4);
+    assert_expected_message_b(&messages[0], 4);
+    assert_expected_message_a(&messages[1], 6);
+    assert_expected_message_b(&messages[2], 6);
+    assert_expected_message_a(&messages[3], 7);
+
+    // Multiple filters, partially not existing
+    let messages: Vec<_> = outbox_message_repo
+        .get_messages(
+            vec![
+                ("A".to_string(), OutboxMessageID::new(10)),
+                ("C".to_string(), OutboxMessageID::new(0)),
+            ],
+            3,
+        )
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(messages.len(), 3);
+    assert_expected_message_a(&messages[0], 8);
+    assert_expected_message_a(&messages[1], 9);
+    assert_expected_message_a(&messages[2], 10);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

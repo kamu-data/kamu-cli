@@ -21,7 +21,7 @@ use kamu_core::*;
 use opendatafabric::{Multicodec, Multihash};
 use url::Url;
 
-use crate::utils::s3_context::{AsyncReadObj, S3Context};
+use crate::utils::s3_context::S3Context;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -80,6 +80,7 @@ where
         ObjectRepositoryProtocol::S3
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let key = self.get_key(hash);
 
@@ -95,13 +96,19 @@ where
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
     async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
         let key = self.get_key(hash);
 
         tracing::debug!(?key, "Checking for object");
 
         match self.s3_context.head_object(key).await {
-            Ok(output) => u64::try_from(output.content_length).map_err(|err| err.int_err().into()),
+            Ok(output) => u64::try_from(
+                output
+                    .content_length
+                    .ok_or_else(|| "S3 did not return content length".int_err())?,
+            )
+            .map_err(|err| err.int_err().into()),
             Err(err) => match err.into_service_error() {
                 // TODO: Detect credentials error
                 HeadObjectError::NotFound(_) => Err(GetError::NotFound(ObjectNotFoundError {
@@ -112,6 +119,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         use tokio::io::AsyncReadExt;
         let mut stream = self.get_stream(hash).await?;
@@ -122,6 +130,7 @@ where
         Ok(Bytes::from(data))
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
         let key = self.get_key(hash);
 
@@ -148,7 +157,8 @@ where
         let context_url = Url::parse(
             format!(
                 "s3://{}/{}",
-                self.s3_context.bucket, self.s3_context.key_prefix
+                self.s3_context.bucket(),
+                self.s3_context.key_prefix()
             )
             .as_str(),
         )
@@ -164,9 +174,7 @@ where
         hash: &Multihash,
         opts: ExternalTransferOpts,
     ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
-        let expires_in = opts
-            .expiration
-            .unwrap_or(chrono::Duration::try_seconds(3600).unwrap());
+        let expires_in = opts.expiration.unwrap_or(chrono::Duration::seconds(3600));
 
         let presigned_conf = PresigningConfig::builder()
             .expires_in(expires_in.to_std().unwrap())
@@ -176,9 +184,9 @@ where
         let expires_at = presigned_conf.start_time() + presigned_conf.expires();
         let res = self
             .s3_context
-            .client
+            .client()
             .get_object()
-            .bucket(&self.s3_context.bucket)
+            .bucket(self.s3_context.bucket())
             .key(self.get_key(hash))
             .presigned(presigned_conf)
             .await
@@ -196,9 +204,7 @@ where
         hash: &Multihash,
         opts: ExternalTransferOpts,
     ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
-        let expires_in = opts
-            .expiration
-            .unwrap_or(chrono::Duration::try_seconds(3600).unwrap());
+        let expires_in = opts.expiration.unwrap_or(chrono::Duration::seconds(3600));
 
         let presigned_conf = PresigningConfig::builder()
             .expires_in(expires_in.to_std().unwrap())
@@ -208,9 +214,9 @@ where
         let expires_at = presigned_conf.start_time() + presigned_conf.expires();
         let res = self
             .s3_context
-            .client
+            .client()
             .put_object()
-            .bucket(&self.s3_context.bucket)
+            .bucket(self.s3_context.bucket())
             .key(self.get_key(hash))
             .presigned(presigned_conf)
             .await
@@ -223,6 +229,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn insert_bytes<'a>(
         &'a self,
         data: &'a [u8],
@@ -256,6 +263,7 @@ where
         Ok(InsertResult { hash })
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn insert_stream<'a>(
         &'a self,
         src: Box<AsyncReadObj>,
@@ -278,12 +286,8 @@ where
 
         tracing::debug!(?key, size, "Inserting object stream");
 
-        use tokio_util::io::ReaderStream;
-
-        let stream = ReaderStream::new(src);
-
         self.s3_context
-            .put_object_stream(key, stream, size)
+            .put_object_stream(key, src, size)
             .await
             // TODO: Detect credentials error
             .map_err(|e| e.into_service_error().int_err())?;
@@ -291,6 +295,7 @@ where
         Ok(InsertResult { hash })
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn insert_file_move<'a>(
         &'a self,
         src: &Path,
@@ -302,6 +307,7 @@ where
         Ok(insert_result)
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {
         let key = self.get_key(hash);
 

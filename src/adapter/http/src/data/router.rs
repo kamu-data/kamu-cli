@@ -16,25 +16,37 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::ingest_handler::dataset_ingest_handler;
-use super::query_handler::{dataset_query_handler, dataset_query_handler_post};
-use super::tail_handler::dataset_tail_handler;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn root_router() -> axum::Router {
-    axum::Router::new().route(
-        "/query",
-        axum::routing::get(dataset_query_handler).post(dataset_query_handler_post),
-    )
+    axum::Router::new()
+        .route(
+            "/query",
+            axum::routing::get(super::query_handler::query_handler)
+                .post(super::query_handler::query_handler_post),
+        )
+        .route(
+            "/verify",
+            axum::routing::post(super::verify_handler::verify_handler),
+        )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn dataset_router() -> axum::Router {
     axum::Router::new()
-        .route("/tail", axum::routing::get(dataset_tail_handler))
-        .route("/ingest", axum::routing::post(dataset_ingest_handler))
+        .route(
+            "/tail",
+            axum::routing::get(super::tail_handler::dataset_tail_handler),
+        )
+        .route(
+            "/metadata",
+            axum::routing::get(super::metadata_handler::dataset_metadata_handler),
+        )
+        .route(
+            "/ingest",
+            axum::routing::post(super::ingest_handler::dataset_ingest_handler),
+        )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

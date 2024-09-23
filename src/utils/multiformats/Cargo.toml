@@ -22,12 +22,22 @@ doctest = false
 
 
 [dependencies]
+base64 = { version = "0.22", default-features = false, features = ["std"] }
 bs58 = { version = "0.5", default-features = false, features = [] }
 digest = { version = "0.10", default-features = false, features = [] }
-ed25519-dalek = { version = "2", default-features = false, features = ["std", "fast", "rand_core"] }
+ed25519-dalek = { version = "2", default-features = false, features = [
+    "std",
+    "fast",
+    "rand_core",
+] }
 hex = { version = "0.4", default-features = false, features = [] }
-rand = { version = "0.8", default-features = false, features = ["getrandom", "small_rng"] }
+rand = { version = "0.8", default-features = false, features = [
+    "getrandom",
+    "small_rng",
+] }
 sha3 = { version = "0.10", default-features = false, features = [] }
 serde = { version = "1", default-features = false, features = [] }
 thiserror = { version = "1", default-features = false, features = [] }
-unsigned-varint = { version = "0.8", default-features = false, features = ["std"] }
+unsigned-varint = { version = "0.8", default-features = false, features = [
+    "std",
+] }

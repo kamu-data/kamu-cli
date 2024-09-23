@@ -37,9 +37,9 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
     flow_id: FlowID,
     dataset_handle: &odf::DatasetHandle,
 ) -> Result<Option<FlowInDatasetError>> {
-    let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
+    let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
 
-    match flow_service.get_flow(flow_id.into()).await {
+    match flow_query_service.get_flow(flow_id.into()).await {
         Ok(flow_state) => match flow_state.flow_key {
             fs::FlowKey::Dataset(fk_dataset) => {
                 if fk_dataset.dataset_id != dataset_handle.id {
@@ -67,7 +67,13 @@ pub(crate) async fn ensure_expected_dataset_kind(
     ctx: &Context<'_>,
     dataset_handle: &odf::DatasetHandle,
     dataset_flow_type: DatasetFlowType,
+    flow_run_configuration_maybe: Option<&FlowRunConfiguration>,
 ) -> Result<Option<FlowIncompatibleDatasetKind>> {
+    if let Some(FlowRunConfiguration::Compaction(CompactionConditionInput::MetadataOnly(_))) =
+        flow_run_configuration_maybe
+    {
+        return Ok(None);
+    }
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
     match dataset_flow_type.dataset_kind_restriction() {
         Some(expected_kind) => {
@@ -170,16 +176,6 @@ pub(crate) async fn ensure_flow_preconditions(
         }
     }
     Ok(None)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn ensure_set_config_flow_supported(
-    dataset_flow_type: DatasetFlowType,
-    flow_configuration_type: &'static str,
-) -> bool {
-    let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
-    dataset_flow_type.config_restriction(flow_configuration_type)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use chrono::{SubsecRound, Utc};
-use database_common::DatabasePaginationOpts;
+use database_common::PaginationOpts;
 use dill::Catalog;
 use kamu_datasets::{
     DatasetEnvVar,
@@ -22,7 +22,7 @@ use kamu_datasets::{
     SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
 };
 use opendatafabric::DatasetID;
-use secrecy::Secret;
+use secrecy::SecretString;
 use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,7 +48,7 @@ pub async fn test_missing_dataset_env_var_not_found(catalog: &Catalog) {
     let dataset_env_vars = dataset_env_var_repo
         .get_all_dataset_env_vars_by_dataset_id(
             &DatasetID::new_seeded_ed25519(b"foo"),
-            &DatabasePaginationOpts {
+            &PaginationOpts {
                 offset: 0,
                 limit: 5,
             },
@@ -65,7 +65,7 @@ pub async fn test_insert_and_get_dataset_env_var(catalog: &Catalog) {
     let dataset_env_var_key = "foo";
     let dataset_env_var_key_string = "foo_value".to_string();
     let dataset_env_var_value =
-        DatasetEnvVarValue::Secret(Secret::new(dataset_env_var_key_string.clone()));
+        DatasetEnvVarValue::Secret(SecretString::from(dataset_env_var_key_string.clone()));
     let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
 
     let new_dataset_env_var = DatasetEnvVar::new(
@@ -97,7 +97,7 @@ pub async fn test_insert_and_get_dataset_env_var(catalog: &Catalog) {
     let db_dataset_env_vars = dataset_env_var_repo
         .get_all_dataset_env_vars_by_dataset_id(
             &dataset_id,
-            &DatabasePaginationOpts {
+            &PaginationOpts {
                 offset: 0,
                 limit: 5,
             },
@@ -113,8 +113,9 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
     let dataset_env_var_repo = catalog.get_one::<dyn DatasetEnvVarRepository>().unwrap();
     let secret_dataset_env_var_key = "foo";
     let secret_dataset_env_var_key_string = "foo_value".to_string();
-    let secret_dataset_env_var_value =
-        DatasetEnvVarValue::Secret(Secret::new(secret_dataset_env_var_key_string.clone()));
+    let secret_dataset_env_var_value = DatasetEnvVarValue::Secret(SecretString::from(
+        secret_dataset_env_var_key_string.clone(),
+    ));
     let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
 
     let new_secret_dataset_env_var = DatasetEnvVar::new(
@@ -151,7 +152,7 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
     let mut db_dataset_env_vars = dataset_env_var_repo
         .get_all_dataset_env_vars_by_dataset_id(
             &dataset_id,
-            &DatabasePaginationOpts {
+            &PaginationOpts {
                 offset: 0,
                 limit: 5,
             },
@@ -219,7 +220,7 @@ pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
     let db_dataset_env_vars = dataset_env_var_repo
         .get_all_dataset_env_vars_by_dataset_id(
             &dataset_id,
-            &DatabasePaginationOpts {
+            &PaginationOpts {
                 offset: 0,
                 limit: 5,
             },

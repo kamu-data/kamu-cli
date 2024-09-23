@@ -471,7 +471,7 @@ async fn test_sync_from_http() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
     let push_repo_url = Url::from_directory_path(tmp_repo_dir.path()).unwrap();
 
-    let server = HttpFileServer::new(tmp_repo_dir.path());
+    let server = HttpFileServer::new(tmp_repo_dir.path()).await;
     let pull_repo_url = Url::from_str(&format!("http://{}/", server.local_addr())).unwrap();
 
     let _server_hdl = tokio::spawn(server.run());

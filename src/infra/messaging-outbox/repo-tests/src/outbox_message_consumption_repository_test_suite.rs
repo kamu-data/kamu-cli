@@ -230,8 +230,6 @@ async fn read_boundaries(
     use futures::TryStreamExt;
     outbox_message_consumption_repo
         .list_consumption_boundaries()
-        .await
-        .unwrap()
         .try_collect()
         .await
         .unwrap()

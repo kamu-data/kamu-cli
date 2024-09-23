@@ -26,7 +26,6 @@ impl LoggedInGuard {
     }
 }
 
-#[async_trait::async_trait]
 impl Guard for LoggedInGuard {
     async fn check(&self, ctx: &Context<'_>) -> Result<()> {
         let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
@@ -56,7 +55,6 @@ impl AdminGuard {
     }
 }
 
-#[async_trait::async_trait]
 impl Guard for AdminGuard {
     async fn check(&self, ctx: &Context<'_>) -> Result<()> {
         let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();

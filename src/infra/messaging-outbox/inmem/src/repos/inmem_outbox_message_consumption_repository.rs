@@ -44,9 +44,7 @@ impl InMemoryOutboxMessageConsumptionRepository {
 
 #[async_trait::async_trait]
 impl OutboxMessageConsumptionRepository for InMemoryOutboxMessageConsumptionRepository {
-    async fn list_consumption_boundaries(
-        &self,
-    ) -> Result<OutboxMessageConsumptionBoundariesStream, InternalError> {
+    fn list_consumption_boundaries(&self) -> OutboxMessageConsumptionBoundariesStream {
         let boundaries = {
             let guard = self.state.lock().unwrap();
             guard
@@ -57,7 +55,7 @@ impl OutboxMessageConsumptionRepository for InMemoryOutboxMessageConsumptionRepo
                 .collect::<Vec<_>>()
         };
 
-        Ok(Box::pin(tokio_stream::iter(boundaries)))
+        Box::pin(tokio_stream::iter(boundaries))
     }
 
     async fn find_consumption_boundary(

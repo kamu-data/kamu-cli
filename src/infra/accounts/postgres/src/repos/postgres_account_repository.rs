@@ -66,9 +66,13 @@ impl AccountRepository for PostgresAccountRepository {
                         Some("accounts_pkey") => CreateAccountDuplicateField::Id,
                         Some("idx_accounts_email") => CreateAccountDuplicateField::Email,
                         Some("idx_accounts_name") => CreateAccountDuplicateField::Name,
-                        Some("idx_provider_identity_key") => CreateAccountDuplicateField::ProviderIdentityKey,
+                        Some("idx_accounts_provider_identity_key") => CreateAccountDuplicateField::ProviderIdentityKey,
                         _ => {
-                            tracing::error!("Unexpected Postgres error message: {}", e.message());
+                            tracing::error!(
+                                error = ?e,
+                                error_msg = e.message(),
+                                "Unexpected Postgres error"
+                            );
                             CreateAccountDuplicateField::Id
                         }
                     };

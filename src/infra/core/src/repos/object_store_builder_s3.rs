@@ -17,6 +17,7 @@ use object_store::aws::{AmazonS3Builder, AwsCredential};
 use object_store::CredentialProvider;
 use url::Url;
 
+use crate::repos::object_store_with_tracing::ObjectStoreWithTracing;
 use crate::utils::s3_context::S3Context;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,32 +45,29 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
     fn object_store_url(&self) -> Url {
         // TODO: This URL does not account for endpoint and it will collide in case we
         // work with multiple S3-like storages having same buckets names
-        Url::parse(format!("s3://{}/", self.s3_context.bucket).as_str()).unwrap()
+        Url::parse(format!("s3://{}/", self.s3_context.bucket()).as_str()).unwrap()
     }
 
-    #[tracing::instrument(
-        level = "info", skip_all,
-        fields(
-            endpoint=self.s3_context.endpoint,
-            region=self.s3_context.region(),
-            bucket=self.s3_context.bucket,
-            allow_http=self.allow_http,
-        ),
-    )]
+    #[tracing::instrument(level = "info", skip_all)]
     fn build_object_store(&self) -> Result<Arc<dyn object_store::ObjectStore>, InternalError> {
+        tracing::info!(
+            endpoint = self.s3_context.endpoint(),
+            region = self.s3_context.region(),
+            bucket = self.s3_context.bucket(),
+            allow_http = %self.allow_http,
+            "Building object store",
+        );
+
         let mut s3_builder = AmazonS3Builder::from_env()
             .with_credentials(Arc::new(AwsSdkCredentialProvider::new(
                 self.s3_context
-                    .client
-                    .config()
                     .credentials_provider()
-                    .unwrap()
-                    .clone(),
+                    .expect("No credentials provider"),
             )))
-            .with_bucket_name(self.s3_context.bucket.clone())
+            .with_bucket_name(self.s3_context.bucket())
             .with_allow_http(self.allow_http);
 
-        if let Some(endpoint) = &self.s3_context.endpoint {
+        if let Some(endpoint) = self.s3_context.endpoint() {
             s3_builder = s3_builder.with_endpoint(endpoint);
         }
 
@@ -80,12 +78,12 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
         let object_store = s3_builder
             .build()
             .map_err(|e| {
-                tracing::error!(error = ?e, "Failed to build S3 object store");
+                tracing::error!(error = ?e, error_msg = %e, "Failed to build S3 object store");
                 e
             })
             .int_err()?;
 
-        Ok(Arc::new(object_store))
+        Ok(Arc::new(ObjectStoreWithTracing::new(object_store)))
     }
 }
 

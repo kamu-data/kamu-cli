@@ -40,7 +40,7 @@ macro_rules! await_client_server_flow {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_service_handler() {
-    let harness = TestHarness::new();
+    let harness = TestHarness::new().await;
 
     harness.create_simple_dataset().await;
 
@@ -56,7 +56,7 @@ async fn test_service_handler() {
         );
 
         let body = res.text().await.unwrap();
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             body,
             indoc!(
                 r#"
@@ -85,7 +85,7 @@ async fn test_service_handler() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_metadata_handler() {
-    let harness = TestHarness::new();
+    let harness = TestHarness::new().await;
 
     harness.create_simple_dataset().await;
 
@@ -101,7 +101,7 @@ async fn test_metadata_handler() {
         );
 
         let body = res.text().await.unwrap();
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             body,
             indoc!(
                 r#"
@@ -110,8 +110,8 @@ async fn test_metadata_handler() {
                 <edmx:DataServices xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" m:DataServiceVersion="3.0" m:MaxDataServiceVersion="3.0">
                 <Schema Namespace="default" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
                 <EntityType Name="foo.bar">
-                <Key><PropertyRef Name="foo.bar"/></Key>
-                <Property Name="offset" Type="Edm.Int64" Nullable="true"/>
+                <Key><PropertyRef Name="offset"/></Key>
+                <Property Name="offset" Type="Edm.Int64" Nullable="false"/>
                 <Property Name="op" Type="Edm.Int32" Nullable="false"/>
                 <Property Name="system_time" Type="Edm.DateTime" Nullable="false"/>
                 <Property Name="date" Type="Edm.DateTime" Nullable="true"/>
@@ -138,7 +138,7 @@ async fn test_metadata_handler() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_collection_handler() {
-    let harness = TestHarness::new();
+    let harness = TestHarness::new().await;
 
     harness.create_simple_dataset().await;
 
@@ -154,7 +154,7 @@ async fn test_collection_handler() {
         );
 
         let body = res.text().await.unwrap();
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             body,
             indoc!(
                 r#"
@@ -234,7 +234,7 @@ async fn test_collection_handler() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_collection_handler_by_id() {
-    let harness = TestHarness::new();
+    let harness = TestHarness::new().await;
 
     harness.create_simple_dataset().await;
 
@@ -253,7 +253,7 @@ async fn test_collection_handler_by_id() {
         );
 
         let body = res.text().await.unwrap();
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             body,
             indoc!(
                 r#"
@@ -291,7 +291,7 @@ async fn test_collection_handler_by_id() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_collection_handler_by_id_not_found() {
-    let harness = TestHarness::new();
+    let harness = TestHarness::new().await;
 
     harness.create_simple_dataset().await;
 
@@ -319,11 +319,11 @@ struct TestHarness {
 }
 
 impl TestHarness {
-    fn new() -> Self {
-        Self::new_with_authorizer(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new())
+    async fn new() -> Self {
+        Self::new_with_authorizer(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new()).await
     }
 
-    fn new_with_authorizer<TDatasetAuthorizer: auth::DatasetActionAuthorizer + 'static>(
+    async fn new_with_authorizer<TDatasetAuthorizer: auth::DatasetActionAuthorizer + 'static>(
         dataset_action_authorizer: TDatasetAuthorizer,
     ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
@@ -370,7 +370,7 @@ impl TestHarness {
 
         let push_ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
 
-        let api_server = TestAPIServer::new(catalog.clone(), None, None, false);
+        let api_server = TestAPIServer::new(catalog.clone(), None, None, false).await;
 
         Self {
             temp_dir,

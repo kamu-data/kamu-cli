@@ -10,10 +10,10 @@
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 
-use axum::headers::Header;
 use database_common::DatabaseTransactionRunner;
 use dill::*;
 use futures::SinkExt;
+use headers::Header;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu::utils::smart_transfer_protocol::{
     DatasetFactoryFn,
@@ -28,6 +28,7 @@ use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+use tracing::Instrument;
 use url::Url;
 
 use crate::smart_protocol::errors::*;
@@ -691,6 +692,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                             .await
                     },
                 )
+                .instrument(tracing::debug_span!("SmartTransferProtocolClient::append_dataset_metadata_batch",))
                 .await
                 .int_err()?;
 

@@ -24,6 +24,7 @@ content:
               id,
               reported_date,
               gender,
+              age_group,
               location
             from "covid19.alberta.case-details.hm"
             union all
@@ -32,6 +33,7 @@ content:
               id,
               reported_date,
               gender,
+              age_group,
               location
             from "covid19.british-columbia.case-details.hm"
             union all
@@ -40,6 +42,7 @@ content:
               id,
               reported_date,
               gender,
+              age_group, 
               location
             from "covid19.ontario.case-details.hm"
             union all
@@ -48,6 +51,7 @@ content:
               id,
               reported_date,
               gender,
+              age_group,
               location
             from "covid19.quebec.case-details.hm"
           ) order by reported_date, province, id

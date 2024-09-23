@@ -40,6 +40,7 @@ sqlx = { version = "0.8", default-features = false, features = [
     "chrono"
 ] }
 tokio-stream = { version = "0.1", default-features = false }
+tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 database-common-macros = { workspace = true }
@@ -49,4 +50,4 @@ kamu-flow-system-repo-tests = { workspace = true }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
 test-group = { version = "1" }
-serde = { version = "1.0.198", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }

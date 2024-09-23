@@ -23,8 +23,10 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+database-common-macros = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
+observability = { workspace = true }
 opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
@@ -43,4 +45,5 @@ tracing = { version = "0.1", default-features = false }
 kamu-task-system-inmem = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
+mockall = "0.13"
 test-log = { version = "0.2", features = ["trace"] }

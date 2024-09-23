@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::net::{SocketAddr, TcpListener};
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
@@ -95,8 +95,8 @@ impl Harness {
         let system_time_source_stub = catalog.get_one::<SystemTimeSourceStub>().unwrap();
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 0));
-        let bind_socket = TcpListener::bind(addr).unwrap();
-        let api_server = TestAPIServer::new(catalog, bind_socket, true);
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        let api_server = TestAPIServer::new(catalog, listener, true);
 
         Self {
             run_info_dir,

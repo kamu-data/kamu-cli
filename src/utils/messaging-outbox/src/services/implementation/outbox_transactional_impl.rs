@@ -37,12 +37,14 @@ impl OutboxTransactionalImpl {
 
 #[async_trait::async_trait]
 impl Outbox for OutboxTransactionalImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(producer_name, content_json))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%producer_name))]
     async fn post_message_as_json(
         &self,
         producer_name: &str,
         content_json: &serde_json::Value,
     ) -> Result<(), InternalError> {
+        tracing::debug!(content_json = %content_json, "Saving outbox message into database");
+
         let new_outbox_message = NewOutboxMessage {
             content_json: content_json.clone(),
             producer_name: producer_name.to_string(),

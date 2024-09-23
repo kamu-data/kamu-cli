@@ -18,6 +18,7 @@ use internal_error::ResultIntoInternal;
 use kamu_accounts::*;
 use kamu_accounts_services::PasswordLoginCredentials;
 use kamu_adapter_oauth::*;
+use tracing::Instrument;
 
 use super::{CLIError, Command};
 use crate::OutputConfig;
@@ -118,6 +119,9 @@ impl APIServerRunCommand {
                     .int_err()
                     .map_err(CLIError::critical)
             })
+            .instrument(tracing::debug_span!(
+                "APIServerRunCommand::get_access_token"
+            ))
             .await?;
 
         Ok(login_response.access_token)
@@ -139,7 +143,8 @@ impl Command for APIServerRunCommand {
             self.port,
             self.external_address,
             self.e2e_output_data_path.as_ref(),
-        );
+        )
+        .await?;
 
         tracing::info!(
             "API server is listening on: http://{}",
@@ -166,6 +171,7 @@ impl Command for APIServerRunCommand {
             }
         }
 
+        api_server.pre_run().await.map_err(CLIError::critical)?;
         api_server.run().await.map_err(CLIError::critical)?;
 
         Ok(())

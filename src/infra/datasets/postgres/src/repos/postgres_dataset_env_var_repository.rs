@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabasePaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use opendatafabric::DatasetID;
@@ -78,7 +78,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
     async fn get_all_dataset_env_vars_by_dataset_id(
         &self,
         dataset_id: &DatasetID,
-        pagination: &DatabasePaginationOpts,
+        pagination: &PaginationOpts,
     ) -> Result<Vec<DatasetEnvVar>, GetDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
@@ -90,20 +90,20 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
         let dataset_env_var_rows = sqlx::query_as!(
             DatasetEnvVarRowModel,
             r#"
-                    SELECT
-                        id,
-                        key,
-                        value as "value: _",
-                        secret_nonce,
-                        created_at,
-                        dataset_id as "dataset_id: _"
-                    FROM dataset_env_vars
-                    WHERE dataset_id = $1
-                    LIMIT $2 OFFSET $3
-                    "#,
+            SELECT
+                id,
+                key,
+                value as "value: _",
+                secret_nonce,
+                created_at,
+                dataset_id as "dataset_id: _"
+            FROM dataset_env_vars
+            WHERE dataset_id = $1
+            LIMIT $2 OFFSET $3
+            "#,
             dataset_id.to_string(),
-            pagination.limit,
-            pagination.offset,
+            i64::try_from(pagination.limit).unwrap(),
+            i64::try_from(pagination.offset).unwrap(),
         )
         .fetch_all(connection_mut)
         .await
@@ -126,10 +126,10 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
 
         let dataset_env_vars_count = sqlx::query_scalar!(
             r#"
-                SELECT
-                    count(*)
-                FROM dataset_env_vars
-                WHERE dataset_id = $1
+            SELECT
+                count(*)
+            FROM dataset_env_vars
+            WHERE dataset_id = $1
             "#,
             dataset_id.to_string(),
         )
@@ -156,17 +156,17 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
         let dataset_env_var_row_maybe = sqlx::query_as!(
             DatasetEnvVarRowModel,
             r#"
-                    SELECT
-                        id,
-                        key,
-                        value as "value: _",
-                        secret_nonce,
-                        created_at,
-                        dataset_id as "dataset_id: _"
-                    FROM dataset_env_vars
-                    WHERE dataset_id = $1
-                    and key = $2
-                    "#,
+            SELECT
+                id,
+                key,
+                value as "value: _",
+                secret_nonce,
+                created_at,
+                dataset_id as "dataset_id: _"
+            FROM dataset_env_vars
+            WHERE dataset_id = $1
+            and key = $2
+            "#,
             dataset_id.to_string(),
             dataset_env_var_key,
         )
@@ -199,16 +199,16 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
         let dataset_env_var_row_maybe = sqlx::query_as!(
             DatasetEnvVarRowModel,
             r#"
-                SELECT
-                    id,
-                    key,
-                    value as "value: _",
-                    secret_nonce,
-                    created_at,
-                    dataset_id as "dataset_id: _"
-                FROM dataset_env_vars
-                WHERE id = $1
-                "#,
+            SELECT
+                id,
+                key,
+                value as "value: _",
+                secret_nonce,
+                created_at,
+                dataset_id as "dataset_id: _"
+            FROM dataset_env_vars
+            WHERE id = $1
+            "#,
             dataset_env_var_id,
         )
         .fetch_optional(connection_mut)

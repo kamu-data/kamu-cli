@@ -44,8 +44,13 @@ impl DatasetFlowRunsMut {
         dataset_flow_type: DatasetFlowType,
         flow_run_configuration: Option<FlowRunConfiguration>,
     ) -> Result<TriggerFlowResult> {
-        if let Some(e) =
-            ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
+        if let Some(e) = ensure_expected_dataset_kind(
+            ctx,
+            &self.dataset_handle,
+            dataset_flow_type,
+            flow_run_configuration.as_ref(),
+        )
+        .await?
         {
             return Ok(TriggerFlowResult::IncompatibleDatasetKind(e));
         }
@@ -66,7 +71,7 @@ impl DatasetFlowRunsMut {
         // TODO: for some datasets launching manually might not be an option:
         //   i.e., root datasets with push sources require input data to arrive
 
-        let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
+        let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
         let logged_account = utils::get_logged_account(ctx);
 
         let flow_run_snapshot = match FlowRunConfiguration::try_into_snapshot(
@@ -81,7 +86,7 @@ impl DatasetFlowRunsMut {
             Err(err) => return Ok(TriggerFlowResult::InvalidRunConfigurations(err)),
         };
 
-        let flow_state = flow_service
+        let flow_state = flow_query_service
             .trigger_manual_flow(
                 Utc::now(),
                 fs::FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
@@ -116,8 +121,8 @@ impl DatasetFlowRunsMut {
         }
 
         // Attempt cancelling scheduled tasks
-        let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
-        let flow_state = flow_service
+        let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
+        let flow_state = flow_query_service
             .cancel_scheduled_tasks(flow_id.into())
             .await
             .map_err(|e| match e {

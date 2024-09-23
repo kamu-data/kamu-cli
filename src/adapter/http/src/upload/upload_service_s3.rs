@@ -70,21 +70,16 @@ impl UploadService for UploadServiceS3 {
         let file_key = self.make_file_key(account_id, &upload_id, &file_name);
 
         let presigned_conf = PresigningConfig::builder()
-            .expires_in(
-                chrono::Duration::try_seconds(3600)
-                    .unwrap()
-                    .to_std()
-                    .unwrap(),
-            )
+            .expires_in(chrono::Duration::seconds(3600).to_std().unwrap())
             .build()
             .expect("Invalid presigning config");
 
         let presigned_request = self
             .s3_upload_context
-            .client
+            .client()
             .put_object()
             .acl(ObjectCannedAcl::Private)
-            .bucket(&self.s3_upload_context.bucket)
+            .bucket(self.s3_upload_context.bucket())
             .key(file_key.clone())
             .presigned(presigned_conf)
             .await
@@ -123,7 +118,12 @@ impl UploadService for UploadServiceS3 {
             .head_object(file_key)
             .await
             .map_err(ErrorIntoInternal::int_err)?;
-        Ok(usize::try_from(res.content_length).unwrap())
+
+        let content_length = res
+            .content_length
+            .ok_or_else(|| "S3 did not return content length".int_err())?;
+
+        Ok(usize::try_from(content_length).unwrap())
     }
 
     async fn upload_reference_into_stream(

@@ -77,12 +77,14 @@ impl OutboxDispatchingImpl {
 
 #[async_trait::async_trait]
 impl Outbox for OutboxDispatchingImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(producer_name, content_json))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%producer_name))]
     async fn post_message_as_json(
         &self,
         producer_name: &str,
         content_json: &serde_json::Value,
     ) -> Result<(), InternalError> {
+        tracing::debug!(content_json = %content_json, "Dispatching outbox message");
+
         if self.durable_producers.contains(producer_name) {
             self.transactional_outbox
                 .post_message_as_json(producer_name, content_json)

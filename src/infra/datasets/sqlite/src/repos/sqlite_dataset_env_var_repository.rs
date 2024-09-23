@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabasePaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use opendatafabric::DatasetID;
@@ -84,7 +84,7 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
     async fn get_all_dataset_env_vars_by_dataset_id(
         &self,
         dataset_id: &DatasetID,
-        pagination: &DatabasePaginationOpts,
+        pagination: &PaginationOpts,
     ) -> Result<Vec<DatasetEnvVar>, GetDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
@@ -92,8 +92,8 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
             .connection_mut()
             .await
             .map_err(GetDatasetEnvVarError::Internal)?;
-        let limit = pagination.limit;
-        let offset = pagination.offset;
+        let limit = i64::try_from(pagination.limit).unwrap();
+        let offset = i64::try_from(pagination.offset).unwrap();
         let dataset_id_string = dataset_id.to_string();
 
         let dataset_env_var_rows = sqlx::query_as!(

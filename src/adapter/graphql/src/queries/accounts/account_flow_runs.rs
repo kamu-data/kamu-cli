@@ -9,6 +9,7 @@
 
 use std::collections::HashSet;
 
+use database_common::PaginationOpts;
 use futures::TryStreamExt;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use kamu_accounts::Account as AccountEntity;
@@ -40,7 +41,7 @@ impl AccountFlowRuns {
         per_page: Option<usize>,
         filters: Option<AccountFlowFilters>,
     ) -> Result<FlowConnection> {
-        let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
+        let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
@@ -71,11 +72,11 @@ impl AccountFlowRuns {
             None => None,
         };
 
-        let flows_state_listing = flow_service
+        let flows_state_listing = flow_query_service
             .list_all_flows_by_account(
                 &self.account.id,
                 filters.unwrap_or_default(),
-                fs::FlowPaginationOpts {
+                PaginationOpts {
                     offset: page * per_page,
                     limit: per_page,
                 },
@@ -99,9 +100,9 @@ impl AccountFlowRuns {
     }
 
     async fn list_datasets_with_flow(&self, ctx: &Context<'_>) -> Result<DatasetConnection> {
-        let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
+        let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
 
-        let datasets_with_flows: Vec<_> = flow_service
+        let datasets_with_flows: Vec<_> = flow_query_service
             .list_all_datasets_with_flow_by_account(&self.account.id)
             .await
             .int_err()?

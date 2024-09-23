@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -14,6 +15,7 @@ use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use database_common::DatabaseTransactionRunner;
 use dill::*;
+use internal_error::InternalError;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
@@ -22,12 +24,15 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
-use kamu_flow_system_inmem::domain::FlowConfigurationUpdatedMessage;
-use kamu_flow_system_services::MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE;
+use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
+use kamu_flow_system_services::{
+    MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+};
 use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
-use tracing::warn;
+use tracing::{warn, Instrument};
 
 use crate::accounts::AccountService;
 use crate::error::*;
@@ -53,8 +58,15 @@ use crate::{
 pub const BINARY_NAME: &str = "kamu";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-const DEFAULT_LOGGING_CONFIG: &str = "info";
-const VERBOSE_LOGGING_CONFIG: &str = "debug";
+const LOG_LEVELS: [&str; 5] = [
+    // Default
+    "info",
+    // First level of verbosity simply direct log to foreground
+    "info",
+    "debug,hyper=info,oso=info",
+    "debug",
+    "trace",
+];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -165,6 +177,9 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         (guards, final_base_catalog, cli_catalog, output_config)
     };
 
+    // Register metrics
+    let metrics_registry = observability::metrics::register_all(&cli_catalog);
+
     // Evict cache
     if workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()? {
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
@@ -172,36 +187,41 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     initialize_components(&cli_catalog).await?;
 
-    let need_to_wrap_with_transaction = cli_commands::command_needs_transaction(&args);
-    let run_command = |catalog: Catalog| async move {
-        match cli_commands::get_command(&base_catalog, &catalog, args) {
-            Ok(mut command) => {
-                if command.needs_workspace() && !workspace_svc.is_in_workspace() {
-                    Err(CLIError::usage_error_from(NotInWorkspace))
-                } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
-                    Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-                } else if current_account.is_explicit() && !is_multi_tenant_workspace {
-                    Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
-                } else {
-                    command.before_run().await?;
-                    command.run().await
-                }
-            }
-            Err(e) => Err(e),
-        }
-    };
-    let is_database_used = maybe_db_connection_settings.is_some();
-    let command_result = if is_database_used && need_to_wrap_with_transaction {
-        let transaction_runner = DatabaseTransactionRunner::new(cli_catalog);
+    let is_transactional =
+        maybe_db_connection_settings.is_some() && cli_commands::command_needs_transaction(&args);
 
-        transaction_runner
-            .transactional(|transactional_catalog| async move {
-                run_command(transactional_catalog).await
-            })
-            .await
-    } else {
-        run_command(cli_catalog).await
-    };
+    let command_result: Result<(), CLIError> = maybe_transactional(
+        is_transactional,
+        cli_catalog,
+        |catalog: Catalog| async move {
+            let mut command = cli_commands::get_command(&base_catalog, &catalog, args)?;
+
+            if command.needs_workspace() && !workspace_svc.is_in_workspace() {
+                Err(CLIError::usage_error_from(NotInWorkspace))?;
+            }
+            if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
+                Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))?;
+            }
+            if current_account.is_explicit() && !is_multi_tenant_workspace {
+                Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))?;
+            }
+
+            command.validate_args().await?;
+
+            let command_name = command.name();
+
+            command
+                .run()
+                .instrument(tracing::info_span!(
+                    "Running command",
+                    %is_transactional,
+                    %command_name,
+                ))
+                .await
+        },
+    )
+    .instrument(tracing::debug_span!("app::run_command"))
+    .await;
 
     match &command_result {
         Ok(()) => {
@@ -223,12 +243,43 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     // Flush all logging sinks
     drop(guards);
 
+    if let Some(metrics_file) = &output_config.metrics_file {
+        if let Ok(mut file) = std::fs::File::create(metrics_file) {
+            use prometheus::Encoder as _;
+            let _ = prometheus::TextEncoder::new().encode(&metrics_registry.gather(), &mut file);
+            eprintln!("Saving metrics to {}", metrics_file.display());
+        }
+    }
+
     if let Some(trace_file) = &output_config.trace_file {
         // Run a web server and open the trace in the browser if the environment allows
         let _ = TraceServer::maybe_serve_in_browser(trace_file).await;
     }
 
     command_result
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn maybe_transactional<F, RF, RT, RE>(
+    transactional: bool,
+    cli_catalog: Catalog,
+    f: F,
+) -> Result<RT, RE>
+where
+    F: FnOnce(Catalog) -> RF,
+    RF: Future<Output = Result<RT, RE>>,
+    RE: From<InternalError>,
+{
+    if !transactional {
+        f(cli_catalog).await
+    } else {
+        let transaction_runner = DatabaseTransactionRunner::new(cli_catalog);
+
+        transaction_runner
+            .transactional(|transactional_catalog| async move { f(transactional_catalog).await })
+            .await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -276,6 +327,8 @@ pub fn configure_base_catalog(
     b.add_value(RunInfoDir::new(&workspace_layout.run_info_dir));
     b.add_value(CacheDir::new(&workspace_layout.cache_dir));
     b.add_value(RemoteReposDir::new(&workspace_layout.repos_dir));
+
+    b.add_value(prometheus::Registry::new());
 
     b.add::<ContainerRuntime>();
 
@@ -340,10 +393,6 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
 
-    b.add::<kamu_task_system_services::TaskSchedulerImpl>();
-
-    b.add::<kamu_task_system_services::TaskExecutorImpl>();
-
     b.add::<DependencyGraphServiceInMemory>();
 
     b.add::<DatasetOwnershipServiceInMemory>();
@@ -356,12 +405,13 @@ pub fn configure_base_catalog(
     b.add::<DeleteDatasetUseCaseImpl>();
     b.add::<RenameDatasetUseCaseImpl>();
 
-    b.add::<kamu_flow_system_services::FlowConfigurationServiceImpl>();
-    b.add::<kamu_flow_system_services::FlowServiceImpl>();
-    b.add_value(kamu_flow_system_inmem::domain::FlowServiceRunConfig::new(
-        chrono::Duration::try_seconds(1).unwrap(),
-        chrono::Duration::try_minutes(1).unwrap(),
+    kamu_task_system_services::register_dependencies(&mut b);
+
+    b.add_value(kamu_flow_system_inmem::domain::FlowExecutorConfig::new(
+        chrono::Duration::seconds(1),
+        chrono::Duration::minutes(1),
     ));
+    kamu_flow_system_services::register_dependencies(&mut b);
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 
@@ -402,7 +452,8 @@ pub fn configure_base_catalog(
     b.add::<messaging_outbox::OutboxTransactionalImpl>();
     b.add::<messaging_outbox::OutboxDispatchingImpl>();
     b.bind::<dyn Outbox, OutboxDispatchingImpl>();
-    b.add::<messaging_outbox::OutboxTransactionalProcessor>();
+    b.add::<messaging_outbox::OutboxExecutor>();
+    b.add::<messaging_outbox::OutboxExecutorMetrics>();
 
     register_message_dispatcher::<DatasetLifecycleMessage>(
         &mut b,
@@ -412,6 +463,10 @@ pub fn configure_base_catalog(
     register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+    );
+    register_message_dispatcher::<FlowProgressMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
     );
 
     b
@@ -455,6 +510,7 @@ async fn initialize_components(cli_catalog: &Catalog) -> Result<(), CLIError> {
                 .await
                 .map_err(CLIError::critical)
         })
+        .instrument(tracing::debug_span!("app::initialize_components"))
         .await?;
 
     Ok(())
@@ -576,6 +632,10 @@ pub fn register_config_in_catalog(
             .unwrap()
             .to_infra_cfg(),
     );
+
+    if let Some(identity_config) = config.identity.as_ref().unwrap().to_infra_cfg() {
+        catalog_builder.add_value(identity_config);
+    }
 
     let ipfs_conf = config.protocol.as_ref().unwrap().ipfs.as_ref().unwrap();
 
@@ -717,10 +777,9 @@ fn configure_logging(
     // Use configuration from RUST_LOG env var if provided
     let env_filter = match EnvFilter::try_from_default_env() {
         Ok(filter) => filter,
-        Err(_) => match output_config.verbosity_level {
-            0 | 1 => EnvFilter::new(DEFAULT_LOGGING_CONFIG),
-            _ => EnvFilter::new(VERBOSE_LOGGING_CONFIG),
-        },
+        Err(_) => EnvFilter::new(
+            LOG_LEVELS[(output_config.verbosity_level as usize).clamp(0, LOG_LEVELS.len() - 1)],
+        ),
     };
 
     if output_config.verbosity_level > 0 {
@@ -794,6 +853,18 @@ fn configure_output_format(args: &cli::Cli, workspace_svc: &WorkspaceService) ->
         None
     };
 
+    let metrics_file = if args.metrics && workspace_svc.is_in_workspace() {
+        Some(
+            workspace_svc
+                .layout()
+                .unwrap()
+                .run_info_dir
+                .join("kamu.metrics.txt"),
+        )
+    } else {
+        None
+    };
+
     let format = args.tabular_output_format().unwrap_or(if is_tty {
         OutputFormat::Table
     } else {
@@ -806,6 +877,7 @@ fn configure_output_format(args: &cli::Cli, workspace_svc: &WorkspaceService) ->
         is_tty,
         format,
         trace_file,
+        metrics_file,
     }
 }
 

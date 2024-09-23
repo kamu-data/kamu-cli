@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use datafusion::prelude::{DataFrame, Expr};
+use datafusion::logical_expr::SortExpr;
+use datafusion::prelude::DataFrame;
 use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,7 +39,7 @@ pub trait MergeStrategy: Send + Sync {
 
     /// Returns the sort expression best suited for the output of this strategy
     /// to perform before writing the final result.
-    fn sort_order(&self) -> Vec<Expr>;
+    fn sort_order(&self) -> Vec<SortExpr>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -11,10 +11,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use auth::OdfServerAccessTokenResolver;
-use axum::headers::Header;
 use container_runtime::ContainerRuntime;
 use database_common::NoOpDatabasePlugin;
 use dill::Component;
+use headers::Header;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;

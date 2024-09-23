@@ -49,6 +49,10 @@ pub struct Cli {
     #[arg(long)]
     pub trace: bool,
 
+    /// Dump all metrics at the end of command execution
+    #[arg(long)]
+    pub metrics: bool,
+
     /// Overrides system time clock with provided value
     #[arg(long, value_name = "T", hide = true)]
     pub system_time: Option<parsers::DateTimeRfc3339>,

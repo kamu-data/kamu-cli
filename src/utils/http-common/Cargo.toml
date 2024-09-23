@@ -25,7 +25,16 @@ doctest = false
 internal-error = { workspace = true }
 kamu-core = { workspace = true }
 
-axum = "0.6"
-http = "0.2"
+axum = { version = "0.7", default-features = false }
+http = { version = "1", default-features = false }
+tracing = { version = "0.1", default-features = false }
+serde = { version = "1", default-features = false }
 thiserror = { version = "1", default-features = false }
-tracing = "0.1"
+
+
+[dev-dependencies]
+strum = { version = "0.26", default-features = false, features = [
+    "std",
+    "derive",
+] }
+serde_json = { version = "1", default-features = false }

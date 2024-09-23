@@ -25,12 +25,13 @@ use crate::{Message, MessageConsumerT, MessageSubscription};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[tracing::instrument(level = "debug", skip_all, fields(%content_json))]
 pub async fn consume_deserialized_message<'a, TMessage: Message + 'static>(
     catalog: &Catalog,
     consumer_filter: ConsumerFilter<'a>,
     content_json: &str,
 ) -> Result<(), InternalError> {
+    tracing::debug!(content_json = %content_json, "Consuming outbox message");
+
     let message = serde_json::from_str::<TMessage>(content_json).int_err()?;
 
     let consumers = match consumer_filter {

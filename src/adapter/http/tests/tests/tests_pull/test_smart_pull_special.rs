@@ -45,7 +45,8 @@ async fn test_smart_pull_unauthenticated() {
             multi_tenant: false,
             authorized_writes: true,
             base_catalog: None,
-        }),
+        })
+        .await,
     )
     .await;
 
@@ -90,7 +91,8 @@ async fn test_smart_pull_incompatible_version_err() {
             multi_tenant: true,
             authorized_writes: true,
             base_catalog: None,
-        }),
+        })
+        .await,
     )
     .await;
 

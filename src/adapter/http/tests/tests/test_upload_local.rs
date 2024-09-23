@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::net::{SocketAddr, TcpListener};
+use std::net::SocketAddr;
 use std::ops::Add;
 use std::path::{Path, PathBuf};
 
@@ -46,11 +46,9 @@ struct Harness {
 impl Harness {
     async fn new() -> Self {
         let addr = SocketAddr::from(([127, 0, 0, 1], 0));
-        let bind_socket = TcpListener::bind(addr).unwrap();
-        let api_server_address = format!(
-            "http://localhost:{}",
-            bind_socket.local_addr().unwrap().port()
-        );
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        let api_server_address =
+            format!("http://localhost:{}", listener.local_addr().unwrap().port());
 
         let tempdir = tempfile::tempdir().unwrap();
         let cache_dir = tempdir.path().join("cache");
@@ -95,7 +93,7 @@ impl Harness {
             .make_access_token(&DEFAULT_ACCOUNT_ID, 60)
             .unwrap();
 
-        let api_server = TestAPIServer::new(catalog, bind_socket, true);
+        let api_server = TestAPIServer::new(catalog, listener, true);
 
         Self {
             _tempdir: tempdir,

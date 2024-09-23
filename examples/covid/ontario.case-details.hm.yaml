@@ -20,7 +20,16 @@ content:
             case when lower(gender) = 'male' then 'M' 
                  when lower(gender) = 'female' then 'F' 
                  else 'U' end as gender,
-            age_group,
+            case when age_group = '<20' then '<20' 
+                 when age_group = '20s' then '20s'
+                 when age_group = '30s' then '30s'
+                 when age_group = '40s' then '40s'
+                 when age_group = '50s' then '50s'
+                 when age_group = '60s' then '60s'
+                 when age_group = '70s' then '70s'
+                 when age_group = '80s' then '80+'
+                 when age_group = '90+' then '80+'
+                 else 'UNKNOWN' end as age_group,
             city as location
             FROM "covid19.ontario.case-details"
     - kind: SetVocab

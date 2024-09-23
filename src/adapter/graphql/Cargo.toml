@@ -37,7 +37,7 @@ kamu-flow-system-services = { workspace = true }
 event-sourcing = { workspace = true }
 
 
-async-graphql = { version = "6", features = [
+async-graphql = { version = "7", features = [
     "chrono",
     "url",
     "apollo_tracing",
@@ -45,12 +45,12 @@ async-graphql = { version = "6", features = [
 async-trait = { version = "0.1", default-features = false }
 cron = { version = "0.12", default-features = false }
 chrono = "0.4"
-datafusion = { version = "41", default-features = false, features = [
+datafusion = { version = "42", default-features = false, features = [
     "serde",
 ] } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 dill = "0.9"
 futures = "0.3"
-secrecy = "0.8"
+secrecy = "0.10"
 serde = { version = "1", default-features = false }
 serde_json = "1"
 tokio = { version = "1", default-features = false, features = [] }
@@ -76,7 +76,7 @@ time-source = { workspace = true }
 
 
 indoc = "2"
-mockall = "0.11"
+mockall = "0.13"
 tempfile = "3"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }

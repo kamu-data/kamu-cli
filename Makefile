@@ -26,6 +26,10 @@ lint:
 	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare --check);)
 
 
+.PHONY: clippy
+clippy:
+	cargo clippy --workspace --all-targets -- -D warnings
+
 ###############################################################################
 # Lint (with fixes)
 ###############################################################################
@@ -154,6 +158,10 @@ test-fast:
 .PHONY: test-e2e
 test-e2e:
 	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::e2e::)'
+
+.PHONY: test-database
+test-database:
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::database::)'
 
 ###############################################################################
 # Benchmarking

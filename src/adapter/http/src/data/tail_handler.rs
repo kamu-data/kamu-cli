@@ -25,7 +25,7 @@ use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::DatasetRef;
 
-use super::query_handler::{DataFormat, SchemaFormat};
+use super::query_types::{DataFormat, SchemaFormat};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,11 +33,14 @@ use super::query_handler::{DataFormat, SchemaFormat};
 // it should be properly re-designed in future to allow for different query
 // dialects, returning schema, error handling etc.
 #[transactional_handler]
+#[tracing::instrument(level = "info", skip_all, (%dataset_ref))]
 pub async fn dataset_tail_handler(
     Extension(catalog): Extension<Catalog>,
     Extension(dataset_ref): Extension<DatasetRef>,
     Query(params): Query<TailRequestParams>,
 ) -> Result<Json<TailResponseBody>, ApiError> {
+    tracing::debug!(request = ?params, "Tail");
+
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
 
     let df = query_svc
@@ -45,21 +48,25 @@ pub async fn dataset_tail_handler(
         .await
         .map_err(|e| match e {
             QueryError::DatasetNotFound(e) => ApiError::not_found(e),
+            QueryError::DatasetBlockNotFound(_) | QueryError::DataFusionError(_) => {
+                e.int_err().api_err()
+            }
             QueryError::DatasetSchemaNotAvailable(e) => ApiError::no_content(e),
-            QueryError::DataFusionError(e) => e.int_err().api_err(),
             QueryError::Access(e) => e.api_err(),
             QueryError::Internal(e) => e.api_err(),
         })?;
 
     let schema = if params.include_schema {
-        Some(super::query_handler::serialize_schema(df.schema(), params.schema_format).api_err()?)
+        Some(
+            super::query_types::serialize_schema(df.schema().as_arrow(), params.schema_format)
+                .api_err()?,
+        )
     } else {
         None
     };
 
     let record_batches = df.collect().await.int_err().api_err()?;
-    let json =
-        super::query_handler::serialize_data(&record_batches, params.data_format).api_err()?;
+    let json = super::query_types::serialize_data(&record_batches, params.data_format).api_err()?;
     let data = serde_json::value::RawValue::from_string(json).unwrap();
 
     Ok(Json(TailResponseBody { data, schema }))

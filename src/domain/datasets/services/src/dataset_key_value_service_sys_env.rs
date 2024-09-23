@@ -18,7 +18,7 @@ use kamu_datasets::{
     DatasetKeyValueService,
     FindDatasetEnvVarError,
 };
-use secrecy::Secret;
+use secrecy::SecretString;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -52,7 +52,7 @@ impl DatasetKeyValueService for DatasetKeyValueServiceSysEnv {
 
         // Fall back to system environment
         match std::env::var(dataset_env_var_key) {
-            Ok(value_string) => Ok(DatasetEnvVarValue::Secret(Secret::new(value_string))),
+            Ok(value_string) => Ok(DatasetEnvVarValue::Secret(SecretString::from(value_string))),
             Err(std::env::VarError::NotPresent) => Err(FindDatasetEnvVarError::NotFound(
                 DatasetEnvVarNotFoundError {
                     dataset_env_var_key: dataset_env_var_key.to_owned(),

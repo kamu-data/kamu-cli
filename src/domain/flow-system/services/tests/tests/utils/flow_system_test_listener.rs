@@ -11,10 +11,14 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
+use database_common::PaginationOpts;
 use dill::*;
 use internal_error::InternalError;
 use kamu_flow_system::*;
-use kamu_flow_system_services::MESSAGE_PRODUCER_KAMU_FLOW_SERVICE;
+use kamu_flow_system_services::{
+    MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
+    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+};
 use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
@@ -27,7 +31,7 @@ use time_source::FakeSystemTimeSource;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct FlowSystemTestListener {
-    flow_service: Arc<dyn FlowService>,
+    flow_query_service: Arc<dyn FlowQueryService>,
     fake_time_source: Arc<FakeSystemTimeSource>,
     state: Arc<Mutex<FlowSystemTestListenerState>>,
 }
@@ -43,19 +47,20 @@ struct FlowSystemTestListenerState {
 #[component(pub)]
 #[scope(Singleton)]
 #[interface(dyn MessageConsumer)]
-#[interface(dyn MessageConsumerT<FlowServiceUpdatedMessage>)]
+#[interface(dyn MessageConsumerT<FlowExecutorUpdatedMessage>)]
+#[interface(dyn MessageConsumerT<FlowProgressMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: "FlowSystemTestListener",
-    feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_SERVICE],
+    feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR, MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE],
     durability: MessageConsumptionDurability::BestEffort,
 })]
 impl FlowSystemTestListener {
     pub(crate) fn new(
-        flow_service: Arc<dyn FlowService>,
+        flow_query_service: Arc<dyn FlowQueryService>,
         fake_time_source: Arc<FakeSystemTimeSource>,
     ) -> Self {
         Self {
-            flow_service,
+            flow_query_service,
             fake_time_source,
             state: Arc::new(Mutex::new(FlowSystemTestListenerState::default())),
         }
@@ -64,8 +69,8 @@ impl FlowSystemTestListener {
     pub(crate) async fn make_a_snapshot(&self, update_time: DateTime<Utc>) {
         use futures::TryStreamExt;
         let flows: Vec<_> = self
-            .flow_service
-            .list_all_flows(FlowPaginationOpts {
+            .flow_query_service
+            .list_all_flows(PaginationOpts {
                 limit: 100,
                 offset: 0,
             })
@@ -235,13 +240,30 @@ impl std::fmt::Display for FlowSystemTestListener {
 impl MessageConsumer for FlowSystemTestListener {}
 
 #[async_trait::async_trait]
-impl MessageConsumerT<FlowServiceUpdatedMessage> for FlowSystemTestListener {
+impl MessageConsumerT<FlowExecutorUpdatedMessage> for FlowSystemTestListener {
     async fn consume_message(
         &self,
         _: &Catalog,
-        message: &FlowServiceUpdatedMessage,
+        message: &FlowExecutorUpdatedMessage,
     ) -> Result<(), InternalError> {
         self.make_a_snapshot(message.update_time).await;
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl MessageConsumerT<FlowProgressMessage> for FlowSystemTestListener {
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: &FlowProgressMessage,
+    ) -> Result<(), InternalError> {
+        match message {
+            FlowProgressMessage::Running(e) => self.make_a_snapshot(e.event_time).await,
+            FlowProgressMessage::Finished(e) => self.make_a_snapshot(e.event_time).await,
+            FlowProgressMessage::Cancelled(e) => self.make_a_snapshot(e.event_time).await,
+            FlowProgressMessage::Scheduled(_) => {}
+        }
         Ok(())
     }
 }

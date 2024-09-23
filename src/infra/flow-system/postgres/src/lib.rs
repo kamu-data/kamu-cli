@@ -11,5 +11,7 @@
 pub use kamu_flow_system as domain;
 
 mod postgres_flow_configuration_event_store;
+mod postgres_flow_event_store;
 
 pub use postgres_flow_configuration_event_store::*;
+pub use postgres_flow_event_store::*;

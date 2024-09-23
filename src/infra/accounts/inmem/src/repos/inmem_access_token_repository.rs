@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
-use database_common::DatabasePaginationOpts;
+use database_common::PaginationOpts;
 use dill::*;
 use internal_error::ErrorIntoInternal;
 use kamu_accounts::AccessToken;
@@ -132,7 +132,7 @@ impl AccessTokenRepository for InMemoryAccessTokenRepository {
     async fn get_access_tokens_by_account_id(
         &self,
         account_id: &AccountID,
-        pagination: &DatabasePaginationOpts,
+        pagination: &PaginationOpts,
     ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
         let guard = self.state.lock().unwrap();
 
@@ -140,8 +140,8 @@ impl AccessTokenRepository for InMemoryAccessTokenRepository {
             let access_tokens: Vec<_> = access_token_ids
                 .iter()
                 .map(|token_id| guard.tokens_by_id.get(token_id).unwrap().clone())
-                .skip(usize::try_from(pagination.offset).unwrap())
-                .take(usize::try_from(pagination.limit).unwrap())
+                .skip(pagination.offset)
+                .take(pagination.limit)
                 .collect();
             return Ok(access_tokens);
         }

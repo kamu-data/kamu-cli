@@ -24,17 +24,17 @@ pub(crate) enum FlowOutcome {
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowFailedError {
-    reason: FlowFailedReason,
+    reason: FlowFailureReason,
 }
 
 #[derive(Union)]
-pub(crate) enum FlowFailedReason {
-    FlowFailed(FlowFailedMessage),
-    FlowDatasetCompactedFailed(FlowDatasetCompactedFailedError),
+pub(crate) enum FlowFailureReason {
+    General(FlowFailureReasonGeneral),
+    InputDatasetCompacted(FlowFailureReasonInputDatasetCompacted),
 }
 
 #[derive(SimpleObject)]
-pub(crate) struct FlowFailedMessage {
+pub(crate) struct FlowFailureReasonGeneral {
     message: String,
 }
 
@@ -49,8 +49,8 @@ pub(crate) struct FlowAbortedResult {
 }
 
 #[derive(SimpleObject)]
-pub(crate) struct FlowDatasetCompactedFailedError {
-    root_dataset: Dataset,
+pub(crate) struct FlowFailureReasonInputDatasetCompacted {
+    input_dataset: Dataset,
     message: String,
 }
 
@@ -66,11 +66,11 @@ impl FlowOutcome {
                 }),
                 kamu_flow_system::FlowOutcome::Failed(err) => match err {
                     FlowError::Failed => Self::Failed(FlowFailedError {
-                        reason: FlowFailedReason::FlowFailed(FlowFailedMessage {
+                        reason: FlowFailureReason::General(FlowFailureReasonGeneral {
                             message: "FAILED".to_owned(),
                         }),
                     }),
-                    FlowError::RootDatasetCompacted(err) => {
+                    FlowError::InputDatasetCompacted(err) => {
                         let dataset_repository =
                             from_catalog::<dyn DatasetRepository>(ctx).unwrap();
                         let hdl = dataset_repository
@@ -84,16 +84,16 @@ impl FlowOutcome {
 
                         let dataset = Dataset::new(account, hdl);
                         Self::Failed(FlowFailedError {
-                            reason: FlowFailedReason::FlowDatasetCompactedFailed(
-                                FlowDatasetCompactedFailedError {
-                                    message: "Root dataset was compacted".to_owned(),
-                                    root_dataset: dataset,
+                            reason: FlowFailureReason::InputDatasetCompacted(
+                                FlowFailureReasonInputDatasetCompacted {
+                                    message: "Input dataset was compacted".to_owned(),
+                                    input_dataset: dataset,
                                 },
                             ),
                         })
                     }
                     FlowError::ResetHeadNotFound => Self::Failed(FlowFailedError {
-                        reason: FlowFailedReason::FlowFailed(FlowFailedMessage {
+                        reason: FlowFailureReason::General(FlowFailureReasonGeneral {
                             message: "New head hash to reset not found".to_owned(),
                         }),
                     }),

@@ -8,8 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
+use chrono::{DateTime, Utc};
+use database_common::PaginationOpts;
 use dill::*;
 use kamu_flow_system::{BorrowedFlowKeyDataset, *};
 use opendatafabric::{AccountID, DatasetID};
@@ -33,6 +35,8 @@ struct State {
     flow_key_by_flow_id: HashMap<FlowID, FlowKey>,
     dataset_flow_last_run_stats: HashMap<FlowKeyDataset, FlowRunStats>,
     system_flow_last_run_stats: HashMap<SystemFlowType, FlowRunStats>,
+    flows_by_scheduled_for_activation_time: BTreeMap<DateTime<Utc>, BTreeSet<FlowID>>,
+    scheduled_for_activation_time_by_flow_id: HashMap<FlowID, DateTime<Utc>>,
 }
 
 impl State {
@@ -58,6 +62,14 @@ impl State {
     fn matches_system_flow(&self, flow_id: FlowID, filters: &SystemFlowFilters) -> bool {
         if let Some(index_entry) = self.flow_search_index.get(&flow_id) {
             index_entry.matches_system_flow_filters(filters)
+        } else {
+            false
+        }
+    }
+
+    fn matches_any_flow(&self, flow_id: FlowID, filters: &AllFlowFilters) -> bool {
+        if let Some(index_entry) = self.flow_search_index.get(&flow_id) {
+            index_entry.matches_all_flow_filters(filters)
         } else {
             false
         }
@@ -94,6 +106,11 @@ impl FlowIndexEntry {
     pub fn matches_system_flow_filters(&self, filters: &SystemFlowFilters) -> bool {
         self.system_flow_type_matches(filters.by_flow_type)
             && self.flow_status_matches(filters.by_flow_status)
+            && self.initiator_matches(filters.by_initiator.as_ref())
+    }
+
+    pub fn matches_all_flow_filters(&self, filters: &AllFlowFilters) -> bool {
+        self.flow_status_matches(filters.by_flow_status)
             && self.initiator_matches(filters.by_initiator.as_ref())
     }
 
@@ -244,6 +261,57 @@ impl InMemoryFlowEventStore {
                 };
             }
         }
+
+        // Manage scheduled time changes- insertions
+        if let FlowEvent::ScheduledForActivation(e) = &event {
+            // Remove any possible previous enqueuing
+            Self::remove_flow_scheduling_record(state, e.flow_id);
+            // make new record
+            Self::insert_flow_scheduling_record(state, e.flow_id, e.scheduled_for_activation_at);
+        }
+        // and removals
+        else if let FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) = &event {
+            let flow_id = event.flow_id();
+            Self::remove_flow_scheduling_record(state, flow_id);
+        }
+    }
+
+    fn insert_flow_scheduling_record(
+        state: &mut State,
+        flow_id: FlowID,
+        scheduled_for_activation_at: DateTime<Utc>,
+    ) {
+        // Update direct lookup
+        state
+            .flows_by_scheduled_for_activation_time
+            .entry(scheduled_for_activation_at)
+            .and_modify(|flow_ids| {
+                flow_ids.insert(flow_id);
+            })
+            .or_insert_with(|| BTreeSet::from([flow_id]));
+
+        // Update reverse lookup
+        state
+            .scheduled_for_activation_time_by_flow_id
+            .insert(flow_id, scheduled_for_activation_at);
+    }
+
+    fn remove_flow_scheduling_record(state: &mut State, flow_id: FlowID) {
+        if let Some(scheduled_for_activation_at) = state
+            .scheduled_for_activation_time_by_flow_id
+            .remove(&flow_id)
+        {
+            let flow_ids = state
+                .flows_by_scheduled_for_activation_time
+                .get_mut(&scheduled_for_activation_at)
+                .unwrap();
+            flow_ids.remove(&flow_id);
+            if flow_ids.is_empty() {
+                state
+                    .flows_by_scheduled_for_activation_time
+                    .remove(&scheduled_for_activation_at);
+            }
+        }
     }
 }
 
@@ -257,14 +325,15 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%query, ?opts))]
-    async fn get_events(&self, query: &FlowID, opts: GetEventsOpts) -> EventStream<FlowEvent> {
-        self.inner.get_events(query, opts).await
+    fn get_events(&self, query: &FlowID, opts: GetEventsOpts) -> EventStream<FlowEvent> {
+        self.inner.get_events(query, opts)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%query, num_events = events.len()))]
     async fn save_events(
         &self,
         query: &FlowID,
+        maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<FlowEvent>,
     ) -> Result<EventID, SaveEventsError> {
         {
@@ -275,7 +344,9 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
             }
         }
 
-        self.inner.save_events(query, events).await
+        self.inner
+            .save_events(query, maybe_prev_stored_event_id, events)
+            .await
     }
 }
 
@@ -284,8 +355,65 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
 #[async_trait::async_trait]
 impl FlowEventStore for InMemoryFlowEventStore {
     #[tracing::instrument(level = "debug", skip_all)]
-    fn new_flow_id(&self) -> FlowID {
-        self.inner.as_state().lock().unwrap().next_flow_id()
+    async fn new_flow_id(&self) -> Result<FlowID, InternalError> {
+        Ok(self.inner.as_state().lock().unwrap().next_flow_id())
+    }
+
+    async fn try_get_pending_flow(
+        &self,
+        flow_key: &FlowKey,
+    ) -> Result<Option<FlowID>, InternalError> {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+
+        Ok(match flow_key {
+            FlowKey::Dataset(flow_key) => {
+                let waiting_filter = DatasetFlowFilters {
+                    by_flow_type: Some(flow_key.flow_type),
+                    by_flow_status: Some(FlowStatus::Waiting),
+                    by_initiator: None,
+                };
+
+                let running_filter = DatasetFlowFilters {
+                    by_flow_type: Some(flow_key.flow_type),
+                    by_flow_status: Some(FlowStatus::Running),
+                    by_initiator: None,
+                };
+
+                g.all_flows_by_dataset
+                    .get(&flow_key.dataset_id)
+                    .map(|dataset_flow_ids| {
+                        dataset_flow_ids.iter().rev().find(|flow_id| {
+                            g.matches_dataset_flow(**flow_id, &waiting_filter)
+                                || g.matches_dataset_flow(**flow_id, &running_filter)
+                        })
+                    })
+                    .unwrap_or_default()
+                    .copied()
+            }
+            FlowKey::System(flow_key) => {
+                let waiting_filter = SystemFlowFilters {
+                    by_flow_type: Some(flow_key.flow_type),
+                    by_flow_status: Some(FlowStatus::Waiting),
+                    by_initiator: None,
+                };
+
+                let running_filter = SystemFlowFilters {
+                    by_flow_type: Some(flow_key.flow_type),
+                    by_flow_status: Some(FlowStatus::Running),
+                    by_initiator: None,
+                };
+
+                g.all_system_flows
+                    .iter()
+                    .rev()
+                    .find(|flow_id| {
+                        g.matches_system_flow(**flow_id, &waiting_filter)
+                            || g.matches_system_flow(**flow_id, &running_filter)
+                    })
+                    .copied()
+            }
+        })
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?flow_type))]
@@ -315,12 +443,36 @@ impl FlowEventStore for InMemoryFlowEventStore {
             .unwrap_or_default())
     }
 
+    /// Returns nearest time when one or more flows are scheduled for activation
+    async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+        Ok(g.flows_by_scheduled_for_activation_time
+            .keys()
+            .next()
+            .copied())
+    }
+
+    /// Returns flows scheduled for activation at the given time
+    async fn get_flows_scheduled_for_activation_at(
+        &self,
+        scheduled_for_activation_at: DateTime<Utc>,
+    ) -> Result<Vec<FlowID>, InternalError> {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+
+        Ok(g.flows_by_scheduled_for_activation_time
+            .get(&scheduled_for_activation_at)
+            .map(|flow_ids| flow_ids.iter().copied().collect())
+            .unwrap_or_default())
+    }
+
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters, ?pagination))]
     fn get_all_flow_ids_by_dataset(
         &self,
         dataset_id: &DatasetID,
-        filters: DatasetFlowFilters,
-        pagination: FlowPaginationOpts,
+        filters: &DatasetFlowFilters,
+        pagination: PaginationOpts,
     ) -> FlowIDStream {
         let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
@@ -331,7 +483,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
                     dataset_flow_ids
                         .iter()
                         .rev()
-                        .filter(|flow_id| g.matches_dataset_flow(**flow_id, &filters))
+                        .filter(|flow_id| g.matches_dataset_flow(**flow_id, filters))
                         .skip(pagination.offset)
                         .take(pagination.limit)
                         .map(|flow_id| Ok(*flow_id))
@@ -383,7 +535,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
         &self,
         dataset_ids: HashSet<DatasetID>,
         filters: &DatasetFlowFilters,
-        pagination: FlowPaginationOpts,
+        pagination: PaginationOpts,
     ) -> FlowIDStream {
         let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
@@ -435,8 +587,8 @@ impl FlowEventStore for InMemoryFlowEventStore {
     #[tracing::instrument(level = "debug", skip_all, fields(?filters, ?pagination))]
     fn get_all_system_flow_ids(
         &self,
-        filters: SystemFlowFilters,
-        pagination: FlowPaginationOpts,
+        filters: &SystemFlowFilters,
+        pagination: PaginationOpts,
     ) -> FlowIDStream {
         let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
@@ -444,7 +596,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
             g.all_system_flows
                 .iter()
                 .rev()
-                .filter(|flow_id| g.matches_system_flow(**flow_id, &filters))
+                .filter(|flow_id| g.matches_system_flow(**flow_id, filters))
                 .skip(pagination.offset)
                 .take(pagination.limit)
                 .map(|flow_id| Ok(*flow_id))
@@ -467,27 +619,34 @@ impl FlowEventStore for InMemoryFlowEventStore {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?pagination))]
-    fn get_all_flow_ids(&self, pagination: FlowPaginationOpts) -> FlowIDStream {
+    fn get_all_flow_ids(
+        &self,
+        filters: &AllFlowFilters,
+        pagination: PaginationOpts,
+    ) -> FlowIDStream {
         let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
             g.all_flows
                 .iter()
                 .rev()
+                .filter(|flow_id| g.matches_any_flow(**flow_id, filters))
                 .skip(pagination.offset)
                 .take(pagination.limit)
                 .map(|flow_id| Ok(*flow_id))
                 .collect()
         };
-
         Box::pin(futures::stream::iter(flow_ids_page))
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn get_count_all_flows(&self) -> Result<usize, InternalError> {
+    async fn get_count_all_flows(&self, filters: &AllFlowFilters) -> Result<usize, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        Ok(g.all_flows.len())
+        Ok(g.all_flows
+            .iter()
+            .filter(|flow_id| g.matches_any_flow(**flow_id, filters))
+            .count())
     }
 }
 

@@ -16,7 +16,7 @@ use chrono::{DateTime, Utc};
 use internal_error::{BoxedError, ErrorIntoInternal, InternalError};
 use merge::Merge;
 use opendatafabric::DatasetID;
-use secrecy::{ExposeSecret, Secret};
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use thiserror::Error;
@@ -169,7 +169,7 @@ impl From<DatasetEnvVarRowModel> for DatasetEnvVar {
 }
 
 pub enum DatasetEnvVarValue {
-    Secret(Secret<String>),
+    Secret(SecretString),
     Regular(String),
 }
 
@@ -280,7 +280,7 @@ impl DatasetEnvVarsConfig {
 mod tests {
     use chrono::Utc;
     use opendatafabric::DatasetID;
-    use secrecy::Secret;
+    use secrecy::SecretString;
 
     use crate::{DatasetEnvVar, SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY};
 
@@ -290,7 +290,7 @@ mod tests {
         let new_env_var = DatasetEnvVar::new(
             "foo_key",
             Utc::now(),
-            &crate::DatasetEnvVarValue::Secret(Secret::new(secret_value.to_string())),
+            &crate::DatasetEnvVarValue::Secret(SecretString::from(secret_value.to_string())),
             &DatasetID::new_seeded_ed25519(b"foo"),
             SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
         )

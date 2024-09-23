@@ -43,19 +43,30 @@ impl OutboxImmediateImpl {
 
 #[async_trait::async_trait]
 impl Outbox for OutboxImmediateImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(producer_name, content_json))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%producer_name))]
     async fn post_message_as_json(
         &self,
         producer_name: &str,
         content_json: &serde_json::Value,
     ) -> Result<(), InternalError> {
+        tracing::debug!(content_json = %content_json, "Dispatching outbox message immediately");
+
         let maybe_dispatcher = self.message_dispatchers_by_producers.get(producer_name);
         if let Some(dispatcher) = maybe_dispatcher {
             let content_json = content_json.to_string();
 
-            dispatcher
+            let dispatch_result = dispatcher
                 .dispatch_message(&self.catalog, self.consumer_filter, &content_json)
-                .await?;
+                .await;
+            if let Err(e) = dispatch_result {
+                tracing::error!(
+                    error = ?e,
+                    error_msg = %e,
+                    producer_name,
+                    ?content_json,
+                    "Immediate outbox message dispatching faioed"
+                );
+            }
         }
 
         Ok(())

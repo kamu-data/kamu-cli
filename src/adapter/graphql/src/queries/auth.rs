@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::DatabasePaginationOpts;
+use database_common::PaginationOpts;
 
 use super::ViewAccessToken;
 use crate::prelude::*;
@@ -19,7 +19,7 @@ pub struct Auth;
 
 #[Object]
 impl Auth {
-    const DEFAULT_PER_PAGE: i64 = 15;
+    const DEFAULT_PER_PAGE: usize = 15;
 
     #[allow(clippy::unused_async)]
     async fn enabled_login_methods(&self, ctx: &Context<'_>) -> Result<Vec<&'static str>> {
@@ -33,8 +33,8 @@ impl Auth {
         &self,
         ctx: &Context<'_>,
         account_id: AccountID,
-        page: Option<i64>,
-        per_page: Option<i64>,
+        page: Option<usize>,
+        per_page: Option<usize>,
     ) -> Result<AccessTokenConnection> {
         check_logged_account_id_match(ctx, &account_id)?;
 
@@ -47,7 +47,7 @@ impl Auth {
         let access_token_listing = access_token_service
             .get_access_tokens_by_account_id(
                 &account_id,
-                &DatabasePaginationOpts {
+                &PaginationOpts {
                     offset: page * per_page,
                     limit: per_page,
                 },
@@ -63,8 +63,8 @@ impl Auth {
 
         Ok(AccessTokenConnection::new(
             access_tokens,
-            usize::try_from(page).unwrap(),
-            usize::try_from(per_page).unwrap(),
+            page,
+            per_page,
             access_token_listing.total_count,
         ))
     }

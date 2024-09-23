@@ -21,6 +21,7 @@ impl DataQueries {
     const DEFAULT_QUERY_LIMIT: u64 = 100;
 
     /// Executes a specified query and returns its result
+    #[tracing::instrument(level = "info", skip_all)]
     async fn query(
         &self,
         ctx: &Context<'_>,
@@ -31,6 +32,16 @@ impl DataQueries {
         skip: Option<u64>,
         limit: Option<u64>,
     ) -> Result<DataQueryResult> {
+        tracing::debug!(
+            %query,
+            ?query_dialect,
+            ?data_format,
+            ?schema_format,
+            ?skip,
+            ?limit,
+            "Query",
+        );
+
         // TODO: Default to JsonSoA format once implemented
         let data_format = data_format.unwrap_or(DataBatchFormat::Json);
         let schema_format = schema_format.unwrap_or(DataSchemaFormat::Parquet);

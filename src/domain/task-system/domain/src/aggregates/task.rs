@@ -15,11 +15,16 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Aggregate, Debug)]
-pub struct Task(Aggregate<TaskState, (dyn TaskSystemEventStore + 'static)>);
+pub struct Task(Aggregate<TaskState, (dyn TaskEventStore + 'static)>);
 
 impl Task {
     /// Creates a task with a pending `TaskCreated` event
-    pub fn new(now: DateTime<Utc>, task_id: TaskID, logical_plan: LogicalPlan) -> Self {
+    pub fn new(
+        now: DateTime<Utc>,
+        task_id: TaskID,
+        logical_plan: LogicalPlan,
+        metadata: Option<TaskMetadata>,
+    ) -> Self {
         Self(
             Aggregate::new(
                 task_id,
@@ -27,6 +32,7 @@ impl Task {
                     event_time: now,
                     task_id,
                     logical_plan,
+                    metadata,
                 },
             )
             .unwrap(),
@@ -44,7 +50,7 @@ impl Task {
 
     /// Task is queued or running and cancellation was not already requested
     pub fn can_cancel(&self) -> bool {
-        matches!(self.status, TaskStatus::Queued | TaskStatus::Running if !self.cancellation_requested)
+        matches!(self.status(), TaskStatus::Queued | TaskStatus::Running if !self.cancellation_requested)
     }
 
     /// Set cancellation flag (if not already set)
@@ -70,6 +76,14 @@ impl Task {
             event_time: now,
             task_id: self.task_id,
             outcome,
+        };
+        self.apply(event)
+    }
+
+    pub fn requeue(&mut self, now: DateTime<Utc>) -> Result<(), ProjectionError<TaskState>> {
+        let event = TaskEventRequeued {
+            event_time: now,
+            task_id: self.task_id,
         };
         self.apply(event)
     }
