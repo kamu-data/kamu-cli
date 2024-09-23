@@ -27,6 +27,10 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) type ProcessedConsumerTasksCount = usize;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) struct ProducerConsumptionJob {
     catalog: Catalog,
     routes_static_info: Arc<OutboxRoutesStaticInfo>,
@@ -71,12 +75,14 @@ impl ProducerConsumptionJob {
     pub(crate) async fn run_consumption_task(
         &self,
         consumption_task: ProducerConsumptionTask,
-    ) -> Result<(), InternalError> {
+    ) -> Result<ProcessedConsumerTasksCount, InternalError> {
         // Clone names of failing consumers before this iteration.
         let mut failing_consumer_names = {
             let g_failed_consumer_names = self.failed_consumer_names.lock().unwrap();
             g_failed_consumer_names.clone()
         };
+
+        let mut processed_consumer_tasks_count = 0;
 
         // Feed consumers if they are behind this message
         // We must respect the sequential order of messages,
@@ -129,6 +135,8 @@ impl ProducerConsumptionJob {
             while let Some(res) = join_set.join_next().await {
                 match res.int_err()? {
                     Ok(tx) => {
+                        processed_consumer_tasks_count += 1;
+
                         self.metrics
                             .messages_processed_total
                             .with_label_values(&[&tx.message.producer_name, &tx.consumer_name])
@@ -161,7 +169,7 @@ impl ProducerConsumptionJob {
         let mut g_failed_consumer_names = self.failed_consumer_names.lock().unwrap();
         *g_failed_consumer_names = failing_consumer_names;
 
-        Ok(())
+        Ok(processed_consumer_tasks_count)
     }
 }
 
