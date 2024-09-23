@@ -13,8 +13,67 @@ use database_common::*;
 use dill::{Catalog, CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
 use secrecy::SecretString;
+use tempfile::TempDir;
 
+use crate::config;
 use crate::config::{DatabaseConfig, DatabaseCredentialSourceConfig, RemoteDatabaseConfig};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub enum AppDatabaseConfig {
+    /// No settings are specified
+    None,
+    /// The user has specified custom database settings
+    Explicit(DatabaseConfig),
+    /// No settings are specified, default settings will be used
+    DefaultMultiTenant(DatabaseConfig),
+    /// Since there is no workspace, we use a temporary directory to create the
+    /// database
+    DefaultMultiTenantInitCommand(DatabaseConfig, TempDir),
+}
+
+impl AppDatabaseConfig {
+    pub fn into_inner(self) -> (Option<DatabaseConfig>, Option<TempDir>) {
+        match self {
+            AppDatabaseConfig::None => (None, None),
+            AppDatabaseConfig::Explicit(c) | AppDatabaseConfig::DefaultMultiTenant(c) => {
+                (Some(c), None)
+            }
+            AppDatabaseConfig::DefaultMultiTenantInitCommand(c, temp_dir) => {
+                (Some(c), Some(temp_dir))
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn get_app_database_config(
+    config: &config::CLIConfig,
+    multi_tenant_workspace: bool,
+    init_command: bool,
+) -> AppDatabaseConfig {
+    if let Some(database_config) = config.database.clone() {
+        return AppDatabaseConfig::Explicit(database_config);
+    }
+
+    if !multi_tenant_workspace {
+        // Default for multi-tenant workspace only
+        return AppDatabaseConfig::None;
+    };
+
+    if !init_command {
+        return AppDatabaseConfig::DefaultMultiTenant(
+            DatabaseConfig::sqlite_database_in_workspace_dir(),
+        );
+    }
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let config = DatabaseConfig::sqlite_database_in(temp_dir.as_ref());
+
+    AppDatabaseConfig::DefaultMultiTenantInitCommand(config, temp_dir)
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

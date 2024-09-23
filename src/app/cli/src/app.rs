@@ -32,17 +32,12 @@ use kamu_flow_system_services::{
 };
 use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
-use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{warn, Instrument};
 
 use crate::accounts::AccountService;
 use crate::cli::Command;
-use crate::config::{
-    DatabaseConfig,
-    DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME,
-    SQLITE_DATABASE_IN_WORKSPACE_PATH,
-};
+use crate::config::{DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME, SQLITE_DATABASE_IN_WORKSPACE_PATH};
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
@@ -53,6 +48,7 @@ use crate::{
     configure_database_components,
     configure_in_memory_components,
     connect_database_initially,
+    get_app_database_config,
     odf_server,
     spawn_password_refreshing_job,
     try_build_db_connection_settings,
@@ -808,59 +804,6 @@ pub fn register_config_in_catalog(
         Duration::seconds(outbox_config.awaiting_step_secs.unwrap()),
         outbox_config.batch_size.unwrap(),
     ));
-}
-
-fn get_app_database_config(
-    config: &config::CLIConfig,
-    multi_tenant_workspace: bool,
-    init_command: bool,
-) -> AppDatabaseConfig {
-    if let Some(database_config) = config.database.clone() {
-        return AppDatabaseConfig::Explicit(database_config);
-    }
-
-    if !multi_tenant_workspace {
-        // Default for multi-tenant workspace only
-        return AppDatabaseConfig::None;
-    };
-
-    if !init_command {
-        return AppDatabaseConfig::DefaultMultiTenant(
-            DatabaseConfig::sqlite_database_in_workspace_dir(),
-        );
-    }
-
-    let temp_dir = tempfile::tempdir().unwrap();
-    let config = DatabaseConfig::sqlite_database_in(temp_dir.as_ref());
-
-    AppDatabaseConfig::DefaultMultiTenantInitCommand(config, temp_dir)
-}
-
-#[derive(Debug)]
-enum AppDatabaseConfig {
-    /// No settings are specified
-    None,
-    /// The user has specified custom database settings
-    Explicit(DatabaseConfig),
-    /// No settings are specified, default settings will be used
-    DefaultMultiTenant(DatabaseConfig),
-    /// Since there is no workspace, we use a temporary directory to create the
-    /// database
-    DefaultMultiTenantInitCommand(DatabaseConfig, TempDir),
-}
-
-impl AppDatabaseConfig {
-    pub fn into_inner(self) -> (Option<DatabaseConfig>, Option<TempDir>) {
-        match self {
-            AppDatabaseConfig::None => (None, None),
-            AppDatabaseConfig::Explicit(c) | AppDatabaseConfig::DefaultMultiTenant(c) => {
-                (Some(c), None)
-            }
-            AppDatabaseConfig::DefaultMultiTenantInitCommand(c, temp_dir) => {
-                (Some(c), Some(temp_dir))
-            }
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
