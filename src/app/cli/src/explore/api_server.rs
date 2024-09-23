@@ -36,7 +36,7 @@ pub struct APIServer {
     local_addr: SocketAddr,
     task_executor: Arc<dyn TaskExecutor>,
     flow_executor: Arc<dyn FlowExecutor>,
-    outbox_processor: Arc<OutboxExecutor>,
+    outbox_executor: Arc<OutboxExecutor>,
     time_source: Arc<dyn SystemTimeSource>,
     maybe_shutdown_notify: Option<Arc<Notify>>,
 }
@@ -57,7 +57,7 @@ impl APIServer {
 
         let flow_executor = cli_catalog.get_one().unwrap();
 
-        let outbox_processor = cli_catalog.get_one().unwrap();
+        let outbox_executor = cli_catalog.get_one().unwrap();
 
         let time_source = base_catalog.get_one().unwrap();
 
@@ -178,7 +178,7 @@ impl APIServer {
             local_addr,
             task_executor,
             flow_executor,
-            outbox_processor,
+            outbox_executor,
             time_source,
             maybe_shutdown_notify,
         })
@@ -191,7 +191,9 @@ impl APIServer {
     pub async fn pre_run(&self) -> Result<(), InternalError> {
         self.task_executor.pre_run().await?;
         self.flow_executor.pre_run(self.time_source.now()).await?;
-        self.outbox_processor.pre_run().await?;
+        // NOTE: We don't need `self.outbox_executor.pre_run()` here,
+        //       since it has already been made.
+
         Ok(())
     }
 
@@ -212,7 +214,7 @@ impl APIServer {
 
         tokio::select! {
             res = server_run_fut => { res.int_err() },
-            res = self.outbox_processor.run() => { res.int_err() },
+            res = self.outbox_executor.run() => { res.int_err() },
             res = self.task_executor.run() => { res.int_err() },
             res = self.flow_executor.run() => { res.int_err() }
         }

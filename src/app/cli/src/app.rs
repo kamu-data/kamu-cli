@@ -11,11 +11,12 @@ use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
 
+use async_utils::ResultAsync;
 use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use database_common::DatabaseTransactionRunner;
 use dill::*;
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
@@ -36,7 +37,12 @@ use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStu
 use tracing::{warn, Instrument};
 
 use crate::accounts::AccountService;
-use crate::config::DatabaseConfig;
+use crate::cli::Command;
+use crate::config::{
+    DatabaseConfig,
+    DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME,
+    SQLITE_DATABASE_IN_WORKSPACE_PATH,
+};
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
@@ -83,8 +89,11 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     // Sometimes (in the case of predefined users), we need to know whether the
     // workspace to be created will be multi-tenant or not right away, even before
     // the `kamu init` command itself is processed.
-    let init_multi_tenant_workspace =
-        matches!(&args.command, cli::Command::Init(c) if c.multi_tenant);
+    let maybe_init_multi_tenant_flag = match &args.command {
+        Command::Init(c) => Some(c.multi_tenant),
+        _ => None,
+    };
+    let init_multi_tenant_workspace = maybe_init_multi_tenant_flag == Some(true);
     let workspace_svc = WorkspaceService::new(
         Arc::new(workspace_layout.clone()),
         init_multi_tenant_workspace,
@@ -101,22 +110,16 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
-    let database_config = config.database.clone().or_else(|| {
-        // If not explicitly configured, a SQLite database is used for a multi-tenant
-        // workspace
-        if is_multi_tenant_workspace {
-            Some(DatabaseConfig::sqlite_database_in_workspace_dir())
-        } else {
-            None
-        }
-    });
-
+    let is_init_command = maybe_init_multi_tenant_flag.is_some();
+    let app_database_config =
+        get_app_database_config(&config, is_multi_tenant_workspace, is_init_command);
+    let (database_config, maybe_sqlite_db_temp_dir) = app_database_config.into_inner();
     let maybe_db_connection_settings = database_config
         .as_ref()
         .and_then(try_build_db_connection_settings);
 
     // Configure application
-    let (guards, base_catalog, cli_catalog, output_config) = {
+    let (guards, base_catalog, cli_catalog, maybe_server_catalog, output_config) = {
         let dependencies_graph_repository = prepare_dependencies_graph_repository(
             &workspace_layout,
             is_multi_tenant_workspace,
@@ -127,6 +130,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             &workspace_layout,
             is_multi_tenant_workspace,
             args.system_time.map(Into::into),
+            args.e2e_output_data_path.is_some(),
         );
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
@@ -183,8 +187,24 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         let cli_catalog = configure_cli_catalog(&final_base_catalog, is_multi_tenant_workspace)
             .add_value(current_account.to_current_account_subject())
             .build();
+        let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
+            let server_catalog =
+                configure_server_catalog(&final_base_catalog, is_multi_tenant_workspace)
+                    .add_value(current_account.to_current_account_subject())
+                    .build();
 
-        (guards, final_base_catalog, cli_catalog, output_config)
+            Some(server_catalog)
+        } else {
+            None
+        };
+
+        (
+            guards,
+            final_base_catalog,
+            cli_catalog,
+            maybe_server_catalog,
+            output_config,
+        )
     };
 
     // Register metrics
@@ -195,25 +215,35 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
-    // Initialize components
-    match initialize_components(&cli_catalog).await {
-        Ok(_) => {}
-        Err(e) => {
-            tracing::error!(
-                error_dbg = ?e,
-                error = %e.pretty(true),
-                "Initialize components failed",
-            );
-            return Err(e);
-        }
+    if let Some(server_catalog) = &maybe_server_catalog {
+        match initialize_server_components(server_catalog).await {
+            Ok(_) => {}
+            Err(e) => {
+                tracing::error!(
+                    error_dbg = ?e,
+                    error = %e.pretty(true),
+                    "Initialize server components failed",
+                );
+                return Err(e);
+         }
     }
 
     let is_transactional =
         maybe_db_connection_settings.is_some() && cli_commands::command_needs_transaction(&args);
+    let work_catalog = maybe_server_catalog.unwrap_or(cli_catalog);
 
-    let command_result: Result<(), CLIError> = maybe_transactional(
+    {
+        let outbox_executor = work_catalog.get_one::<messaging_outbox::OutboxExecutor>()?;
+
+        outbox_executor
+            .pre_run()
+            .await
+            .map_err(CLIError::critical)?;
+    }
+
+    let mut command_result: Result<(), CLIError> = maybe_transactional(
         is_transactional,
-        cli_catalog,
+        work_catalog.clone(),
         |catalog: Catalog| async move {
             let mut command = cli_commands::get_command(&base_catalog, &catalog, args)?;
 
@@ -243,6 +273,37 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     )
     .instrument(tracing::debug_span!("app::run_command"))
     .await;
+
+    command_result = command_result
+        // If successful, then process the Outbox messages while they are present
+        .and_then_async(|_| async {
+            let outbox_executor = work_catalog.get_one::<messaging_outbox::OutboxExecutor>()?;
+
+            outbox_executor
+                .run_while_has_tasks()
+                .await
+                .map_err(CLIError::critical)
+        })
+        .instrument(tracing::debug_span!(
+            "Consume accumulated the Outbox messages"
+        ))
+        .await
+        // If we had a temporary directory, we move the database from it to the expected
+        // location.
+        .and_then_async(|_| async {
+            if let Some(sqlite_db_temp_dir) = maybe_sqlite_db_temp_dir {
+                let old_temp_db_path = sqlite_db_temp_dir
+                    .as_ref()
+                    .join(DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME);
+
+                tokio::fs::copy(old_temp_db_path, SQLITE_DATABASE_IN_WORKSPACE_PATH)
+                    .await
+                    .map_int_err(CLIError::critical)?;
+            };
+
+            Ok(())
+        })
+        .await;
 
     match &command_result {
         Ok(()) => {
@@ -284,7 +345,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
 async fn maybe_transactional<F, RF, RT, RE>(
     transactional: bool,
-    cli_catalog: Catalog,
+    work_catalog: Catalog,
     f: F,
 ) -> Result<RT, RE>
 where
@@ -293,9 +354,9 @@ where
     RE: From<InternalError>,
 {
     if !transactional {
-        f(cli_catalog).await
+        f(work_catalog).await
     } else {
-        let transaction_runner = DatabaseTransactionRunner::new(cli_catalog);
+        let transaction_runner = DatabaseTransactionRunner::new(work_catalog);
 
         transaction_runner
             .transactional(|transactional_catalog| async move { f(transactional_catalog).await })
@@ -340,6 +401,7 @@ pub fn configure_base_catalog(
     workspace_layout: &WorkspaceLayout,
     multi_tenant_workspace: bool,
     system_time: Option<DateTime<Utc>>,
+    is_e2e_testing: bool,
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
@@ -368,8 +430,6 @@ pub fn configure_base_catalog(
     b.bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>();
 
     b.add::<DatasetFactoryImpl>();
-
-    b.add::<DatasetChangesServiceImpl>();
 
     b.add::<RemoteRepositoryRegistryImpl>();
 
@@ -415,23 +475,12 @@ pub fn configure_base_catalog(
 
     b.add::<DependencyGraphServiceInMemory>();
 
-    b.add::<DatasetOwnershipServiceInMemory>();
-    b.add::<DatasetOwnershipServiceInMemoryStateInitializer>();
-
     b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
     b.add::<CommitDatasetEventUseCaseImpl>();
     b.add::<CreateDatasetUseCaseImpl>();
     b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
     b.add::<DeleteDatasetUseCaseImpl>();
     b.add::<RenameDatasetUseCaseImpl>();
-
-    kamu_task_system_services::register_dependencies(&mut b);
-
-    b.add_value(kamu_flow_system_inmem::domain::FlowExecutorConfig::new(
-        chrono::Duration::seconds(1),
-        chrono::Duration::minutes(1),
-    ));
-    kamu_flow_system_services::register_dependencies(&mut b);
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 
@@ -455,8 +504,6 @@ pub fn configure_base_catalog(
     b.add::<kamu_adapter_auth_oso::KamuAuthOso>();
     b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
 
-    b.add::<UploadServiceLocal>();
-
     b.add::<DatabaseTransactionRunner>();
 
     b.add::<RebacServiceImpl>();
@@ -479,15 +526,6 @@ pub fn configure_base_catalog(
         &mut b,
         MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
     );
-    register_message_dispatcher::<TaskProgressMessage>(&mut b, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR);
-    register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
-    );
-    register_message_dispatcher::<FlowProgressMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-    );
 
     b
 }
@@ -503,6 +541,44 @@ pub fn configure_cli_catalog(
     b.add::<GcService>();
     b.add_builder(WorkspaceService::builder().with_multi_tenant(multi_tenant_workspace));
     b.add::<odf_server::LoginService>();
+
+    b
+}
+
+// Public only for tests
+pub fn configure_server_catalog(
+    base_catalog: &Catalog,
+    multi_tenant_workspace: bool,
+) -> CatalogBuilder {
+    let mut b = CatalogBuilder::new_chained(base_catalog);
+
+    b.add_builder(WorkspaceService::builder().with_multi_tenant(multi_tenant_workspace));
+
+    b.add::<DatasetChangesServiceImpl>();
+
+    b.add::<DatasetOwnershipServiceInMemory>();
+    b.add::<DatasetOwnershipServiceInMemoryStateInitializer>();
+
+    kamu_task_system_services::register_dependencies(&mut b);
+
+    b.add_value(kamu_flow_system_inmem::domain::FlowExecutorConfig::new(
+        Duration::seconds(1),
+        Duration::minutes(1),
+    ));
+    kamu_flow_system_services::register_dependencies(&mut b);
+
+    b.add::<UploadServiceLocal>();
+
+    register_message_dispatcher::<FlowProgressMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+    );
+    register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+    );
+
+    register_message_dispatcher::<TaskProgressMessage>(&mut b, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR);
 
     b
 }
@@ -530,7 +606,7 @@ async fn initialize_server_components(server_catalog: &Catalog) -> Result<(), CL
                 .await
                 .map_err(CLIError::critical)
         })
-        .instrument(tracing::debug_span!("app::initialize_components"))
+        .instrument(tracing::debug_span!("app::initialize_server_components"))
         .await?;
 
     Ok(())
@@ -760,6 +836,7 @@ fn get_app_database_config(
     AppDatabaseConfig::DefaultMultiTenantInitCommand(config, temp_dir)
 }
 
+#[derive(Debug)]
 enum AppDatabaseConfig {
     /// No settings are specified
     None,

@@ -60,7 +60,7 @@ impl TaskDriver {
         self.ensure_task_matches_logical_plan().await;
 
         // Note: we can omit transaction, since this is a test-only abstraction
-        // with assummed immediate delivery
+        // with assumed immediate delivery
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,

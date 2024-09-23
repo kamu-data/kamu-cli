@@ -122,7 +122,10 @@ impl OutboxExecutor {
                 self.run_consumption_iteration().await?;
             }
             RunMode::WhileHasTasks => loop {
-                let processed_consumer_tasks_count = self.run_consumption_iteration().await?;
+                let processed_consumer_tasks_count = self
+                    .run_consumption_iteration()
+                    .instrument(tracing::debug_span!("OutboxExecutor::tick"))
+                    .await?;
 
                 if processed_consumer_tasks_count == 0 {
                     break;
