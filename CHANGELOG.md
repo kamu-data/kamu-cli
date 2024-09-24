@@ -11,9 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.203.1] - 2024-09-24
 ### Added
-- `kamu delete` command will respect dependency graph ordering allowing to delete multiple datasets without encountering dangling reference errors
+- Added database migration & scripting to create an application user with restricted permissions
+- `kamu delete` command will respect dependency graph ordering allowing to delete multiple datasets without encountering dangling reference 
 
 ## [0.203.0] - 2024-09-22
 ### Added
