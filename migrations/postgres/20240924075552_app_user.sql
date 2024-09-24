@@ -6,7 +6,7 @@ BEGIN
     -- Check role is not present
     IF NOT EXISTS (SELECT * FROM pg_roles WHERE rolname = rolename) THEN
         -- Create role and grant basic access
-        EXECUTE format('CREATE ROLE %I WITH LOGIN PASSWORD ''%I''', rolename, role_password);
+        EXECUTE format('CREATE ROLE %I WITH LOGIN PASSWORD ''%s''', rolename, role_password);
         EXECUTE format('GRANT CONNECT ON DATABASE %I TO %I', db_name, rolename);
         EXECUTE format('GRANT USAGE ON SCHEMA public TO %I', rolename);
         -- Privileges for existing objects
@@ -15,7 +15,7 @@ BEGIN
         -- Default privileges (affects future objects)
         EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I', rolename);
         EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE ON SEQUENCES TO %I', rolename);
-        RETURN 'CREATE ROLE';
+        RETURN format('CREATE ROLE %I', rolename);
     ELSE
         -- Role already exists
         RETURN format('ROLE ''%I'' ALREADY EXISTS', rolename);

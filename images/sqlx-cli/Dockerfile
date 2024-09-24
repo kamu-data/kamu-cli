@@ -10,8 +10,7 @@ ARG VERSION
 # cargo-binstall: preparation
 RUN apk add --no-cache \
     curl \
-    bash \
-    postgresql-client
+    bash
 
 # cargo-binstall: install
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash

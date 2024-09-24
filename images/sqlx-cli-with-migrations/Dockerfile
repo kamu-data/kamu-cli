@@ -10,7 +10,8 @@ RUN apk --no-cache add \
     bash \
     curl \
     jq \
-    aws-cli
+    aws-cli \
+    postgresql-client
 
 COPY scripts /scripts
 RUN chmod -R 0755 /scripts
