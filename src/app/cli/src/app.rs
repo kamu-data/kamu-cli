@@ -48,6 +48,7 @@ use crate::{
     configure_in_memory_components,
     connect_database_initially,
     get_app_database_config,
+    move_initial_database_to_workspace_if_needed,
     odf_server,
     spawn_password_refreshing_job,
     try_build_db_connection_settings,
@@ -283,16 +284,12 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         // If we had a temporary directory, we move the database from it to the expected
         // location.
         .and_then_async(|_| async {
-            if let Some(temp_database_path) = maybe_temp_database_path {
-                tokio::fs::copy(
-                    temp_database_path.path(),
-                    workspace_layout.default_multi_tenant_database_path(),
-                )
-                .await
-                .map_int_err(CLIError::critical)?;
-            };
-
-            Ok(())
+            move_initial_database_to_workspace_if_needed(
+                &workspace_layout,
+                maybe_temp_database_path,
+            )
+            .await
+            .map_int_err(CLIError::critical)
         })
         .await;
 

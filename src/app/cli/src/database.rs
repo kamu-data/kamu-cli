@@ -80,6 +80,23 @@ pub fn get_app_database_config(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn move_initial_database_to_workspace_if_needed(
+    workspace_layout: &WorkspaceLayout,
+    maybe_temp_database_path: Option<OwnedTempPath>,
+) -> Result<(), std::io::Error> {
+    if let Some(temp_database_path) = maybe_temp_database_path {
+        tokio::fs::copy(
+            temp_database_path.path(),
+            workspace_layout.default_multi_tenant_database_path(),
+        )
+        .await?;
+    };
+
+    Ok(())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub fn configure_database_components(
     b: &mut CatalogBuilder,
     raw_db_config: &DatabaseConfig,
