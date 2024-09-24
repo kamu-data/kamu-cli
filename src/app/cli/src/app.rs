@@ -574,7 +574,7 @@ pub fn configure_server_catalog(
     b
 }
 
-#[tracing::instrument(level = "info", skip_all)]
+#[tracing::instrument(level = "debug", skip_all)]
 async fn initialize_server_components(server_catalog: &Catalog) -> Result<(), CLIError> {
     // TODO: Generalize on-startup initialization into a trait
     DatabaseTransactionRunner::new(server_catalog.clone())
