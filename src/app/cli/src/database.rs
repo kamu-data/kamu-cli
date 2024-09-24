@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use database_common::*;
 use dill::{Catalog, CatalogBuilder, Component};
@@ -15,8 +15,8 @@ use internal_error::{InternalError, ResultIntoInternal};
 use secrecy::SecretString;
 use tempfile::TempDir;
 
-use crate::config;
 use crate::config::{DatabaseConfig, DatabaseCredentialSourceConfig, RemoteDatabaseConfig};
+use crate::{config, WorkspaceLayout, DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,19 +30,17 @@ pub enum AppDatabaseConfig {
     DefaultMultiTenant(DatabaseConfig),
     /// Since there is no workspace, we use a temporary directory to create the
     /// database
-    DefaultMultiTenantInitCommand(DatabaseConfig, TempDir),
+    DefaultMultiTenantInitCommand(DatabaseConfig, OwnedTempPath),
 }
 
 impl AppDatabaseConfig {
-    pub fn into_inner(self) -> (Option<DatabaseConfig>, Option<TempDir>) {
+    pub fn into_inner(self) -> (Option<DatabaseConfig>, Option<OwnedTempPath>) {
         match self {
             AppDatabaseConfig::None => (None, None),
             AppDatabaseConfig::Explicit(c) | AppDatabaseConfig::DefaultMultiTenant(c) => {
                 (Some(c), None)
             }
-            AppDatabaseConfig::DefaultMultiTenantInitCommand(c, temp_dir) => {
-                (Some(c), Some(temp_dir))
-            }
+            AppDatabaseConfig::DefaultMultiTenantInitCommand(c, path) => (Some(c), Some(path)),
         }
     }
 }
@@ -50,6 +48,7 @@ impl AppDatabaseConfig {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn get_app_database_config(
+    workspace_layout: &WorkspaceLayout,
     config: &config::CLIConfig,
     multi_tenant_workspace: bool,
     init_command: bool,
@@ -64,15 +63,19 @@ pub fn get_app_database_config(
     };
 
     if !init_command {
-        return AppDatabaseConfig::DefaultMultiTenant(
-            DatabaseConfig::sqlite_database_in_workspace_dir(),
-        );
+        let database_path = workspace_layout.default_multi_tenant_database_path();
+
+        return AppDatabaseConfig::DefaultMultiTenant(DatabaseConfig::sqlite(&database_path));
     }
 
     let temp_dir = tempfile::tempdir().unwrap();
-    let config = DatabaseConfig::sqlite_database_in(temp_dir.as_ref());
+    let database_path = temp_dir
+        .as_ref()
+        .join(DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME);
+    let config = DatabaseConfig::sqlite(&database_path);
+    let temp_database_path = OwnedTempPath::new(database_path, temp_dir);
 
-    AppDatabaseConfig::DefaultMultiTenantInitCommand(config, temp_dir)
+    AppDatabaseConfig::DefaultMultiTenantInitCommand(config, temp_database_path)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -291,6 +294,27 @@ fn init_database_password_provider(b: &mut CatalogBuilder, raw_db_config: &Datab
                 b.bind::<dyn DatabasePasswordProvider, DatabaseAwsIamTokenProvider>();
             }
         },
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct OwnedTempPath {
+    path: PathBuf,
+    _temp_dir: TempDir,
+}
+
+impl OwnedTempPath {
+    pub fn new(path: PathBuf, temp_dir: TempDir) -> Self {
+        Self {
+            path,
+            _temp_dir: temp_dir,
+        }
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 }
 

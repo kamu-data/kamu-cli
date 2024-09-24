@@ -37,7 +37,6 @@ use tracing::{warn, Instrument};
 
 use crate::accounts::AccountService;
 use crate::cli::Command;
-use crate::config::{DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME, SQLITE_DATABASE_IN_WORKSPACE_PATH};
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
@@ -107,9 +106,13 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     prepare_run_dir(&workspace_layout.run_info_dir);
 
     let is_init_command = maybe_init_multi_tenant_flag.is_some();
-    let app_database_config =
-        get_app_database_config(&config, is_multi_tenant_workspace, is_init_command);
-    let (database_config, maybe_sqlite_db_temp_dir) = app_database_config.into_inner();
+    let app_database_config = get_app_database_config(
+        &workspace_layout,
+        &config,
+        is_multi_tenant_workspace,
+        is_init_command,
+    );
+    let (database_config, maybe_temp_database_path) = app_database_config.into_inner();
     let maybe_db_connection_settings = database_config
         .as_ref()
         .and_then(try_build_db_connection_settings);
@@ -287,14 +290,13 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         // If we had a temporary directory, we move the database from it to the expected
         // location.
         .and_then_async(|_| async {
-            if let Some(sqlite_db_temp_dir) = maybe_sqlite_db_temp_dir {
-                let old_temp_db_path = sqlite_db_temp_dir
-                    .as_ref()
-                    .join(DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME);
-
-                tokio::fs::copy(old_temp_db_path, SQLITE_DATABASE_IN_WORKSPACE_PATH)
-                    .await
-                    .map_int_err(CLIError::critical)?;
+            if let Some(temp_database_path) = maybe_temp_database_path {
+                tokio::fs::copy(
+                    temp_database_path.path(),
+                    workspace_layout.default_multi_tenant_database_path(),
+                )
+                .await
+                .map_int_err(CLIError::critical)?;
             };
 
             Ok(())
