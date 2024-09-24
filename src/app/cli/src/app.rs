@@ -206,6 +206,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         )
     };
 
+    initialize_base_components(&base_catalog).await?;
+
     // Register metrics
     let metrics_registry = observability::metrics::register_all(&cli_catalog);
 
@@ -230,15 +232,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     let is_transactional =
         maybe_db_connection_settings.is_some() && cli_commands::command_needs_transaction(&args);
     let work_catalog = maybe_server_catalog.unwrap_or(cli_catalog);
-
-    {
-        let outbox_executor = work_catalog.get_one::<messaging_outbox::OutboxExecutor>()?;
-
-        outbox_executor
-            .pre_run()
-            .await
-            .map_err(CLIError::critical)?;
-    }
 
     let mut command_result: Result<(), CLIError> = maybe_transactional(
         is_transactional,
@@ -606,6 +599,19 @@ async fn initialize_server_components(server_catalog: &Catalog) -> Result<(), CL
         })
         .instrument(tracing::debug_span!("app::initialize_server_components"))
         .await?;
+
+    Ok(())
+}
+
+#[tracing::instrument(level = "debug", skip_all)]
+async fn initialize_base_components(base_catalog: &Catalog) -> Result<(), CLIError> {
+    // TODO: Generalize on-startup initialization into a trait
+    let outbox_executor = base_catalog.get_one::<messaging_outbox::OutboxExecutor>()?;
+
+    outbox_executor
+        .pre_run()
+        .await
+        .map_err(CLIError::critical)?;
 
     Ok(())
 }
