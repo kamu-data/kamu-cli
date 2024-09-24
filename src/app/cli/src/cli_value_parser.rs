@@ -9,7 +9,7 @@
 
 use std::str::FromStr;
 
-use opendatafabric as odf;
+use opendatafabric::{self as odf, RepoName};
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,6 +70,12 @@ pub(crate) fn dataset_ref_remote(s: &str) -> Result<odf::DatasetRefRemote, Strin
                        `repository/account/dataset-id` or `scheme://some-url`"
             .to_string()),
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn push_dataset_ref_remote(s: &str) -> Result<PushDatasetRef, String> {
+    PushDatasetRef::from_str(s)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -164,6 +170,38 @@ impl From<DatasetVisibility> for kamu::domain::DatasetVisibility {
         match value {
             DatasetVisibility::Private => kamu::domain::DatasetVisibility::Private,
             DatasetVisibility::Public => kamu::domain::DatasetVisibility::Public,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub enum PushDatasetRef {
+    RefRemote(odf::DatasetRefRemote),
+    Repository(odf::RepoName),
+}
+
+impl PushDatasetRef {
+    fn from_str(s: &str) -> Result<Self, String> {
+        if let Ok(dataset_ref) = dataset_ref_remote(s) {
+            return Ok(Self::RefRemote(dataset_ref));
+        }
+        if let Ok(repo_name) = repo_name(s) {
+            return Ok(Self::Repository(repo_name));
+        }
+        Err(
+            "Remote reference should be in form: `did:odf:...` or `repository/account/dataset-id` \
+             or `scheme://some-url`
+            or RepositoryID can only contain alphanumerics, dashes, and dots"
+                .to_string(),
+        )
+    }
+
+    pub fn into_repo_name(self) -> Option<RepoName> {
+        match self {
+            Self::RefRemote(_) => None,
+            Self::Repository(repo_name) => Some(repo_name),
         }
     }
 }

@@ -127,7 +127,7 @@ pub trait Command {
     }
 
     /// Will be called before running to perform various argument sanity checks
-    async fn validate_args(&mut self) -> Result<(), CLIError> {
+    async fn validate_args(&self) -> Result<(), CLIError> {
         Ok(())
     }
 

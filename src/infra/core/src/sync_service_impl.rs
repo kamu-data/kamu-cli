@@ -711,7 +711,7 @@ impl UrlExt for Url {
 
     fn as_odf_protoocol(&self) -> Result<Url, InternalError> {
         let url_string = self.as_str().replace("http", "odf+http");
-        Ok(Url::from_str(&url_string).int_err()?)
+        Url::from_str(&url_string).int_err()
     }
 
     fn is_odf_protocol(&self) -> bool {

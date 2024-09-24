@@ -86,8 +86,6 @@ impl AccessTokenRegistryService {
                         frontend_url: server_record.frontend_url.clone(),
                         access_token: ac.clone(),
                     });
-            } else {
-                continue;
             }
         }
         None
@@ -113,8 +111,6 @@ impl AccessTokenRegistryService {
                         frontend_url: server_record.frontend_url.clone(),
                         access_token: ac.clone(),
                     });
-            } else {
-                continue;
             }
         }
         None
@@ -140,8 +136,6 @@ impl AccessTokenRegistryService {
                         access_token: ac.clone(),
                     }
                 });
-            } else {
-                continue;
             }
         }
         None

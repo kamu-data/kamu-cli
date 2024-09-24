@@ -9,6 +9,7 @@
 
 use opendatafabric as odf;
 
+use super::WorkspaceAccountInfo;
 use crate::prelude::*;
 use crate::queries::Account;
 
@@ -54,7 +55,7 @@ impl Accounts {
         &self,
         ctx: &Context<'_>,
         access_token: String,
-    ) -> Result<Option<Account>> {
+    ) -> Result<WorkspaceAccountInfo> {
         let authentication_service =
             from_catalog::<dyn kamu_accounts::AuthenticationService>(ctx).unwrap();
 
@@ -62,7 +63,7 @@ impl Accounts {
             .account_by_token(access_token)
             .await?;
 
-        Ok(Some(Account::from_account(account)))
+        Ok(WorkspaceAccountInfo::new(Account::from_account(account)))
     }
 }
 

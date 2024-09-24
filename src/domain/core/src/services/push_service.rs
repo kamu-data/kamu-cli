@@ -12,6 +12,7 @@ use std::sync::Arc;
 use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
+use url::Url;
 
 use super::sync_service::*;
 use crate::{DatasetNotFoundError, GetDatasetError};
@@ -65,6 +66,14 @@ pub struct PushMultiOptions {
     pub add_aliases: bool,
     /// Sync options
     pub sync_options: SyncOptions,
+    /// Remote repository options, will be used if destination was not provided
+    pub remote_repo_opts: Option<PushRemoteRepoOpts>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PushRemoteRepoOpts {
+    pub remote_account_name: Option<AccountName>,
+    pub remote_repo_url: Url,
 }
 
 impl Default for PushMultiOptions {
@@ -74,6 +83,7 @@ impl Default for PushMultiOptions {
             all: false,
             add_aliases: true,
             sync_options: SyncOptions::default(),
+            remote_repo_opts: None,
         }
     }
 }

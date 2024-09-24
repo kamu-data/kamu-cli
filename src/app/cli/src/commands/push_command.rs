@@ -14,11 +14,11 @@ use console::style as s;
 use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
-use kamu::UrlExt;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
+use crate::cli_value_parser::PushDatasetRef;
 use crate::odf_server;
 use crate::output::OutputConfig;
 
@@ -39,7 +39,7 @@ pub struct PushCommand {
     recursive: bool,
     add_aliases: bool,
     force: bool,
-    to: Option<DatasetRefRemote>,
+    to: Option<PushDatasetRef>,
     dataset_visibility: DatasetVisibility,
     output_config: Arc<OutputConfig>,
 }
@@ -58,7 +58,7 @@ impl PushCommand {
         recursive: bool,
         add_aliases: bool,
         force: bool,
-        to: Option<DatasetRefRemote>,
+        to: Option<PushDatasetRef>,
         dataset_visibility: DatasetVisibility,
         output_config: Arc<OutputConfig>,
     ) -> Self
@@ -84,6 +84,45 @@ impl PushCommand {
         }
     }
 
+    async fn get_remote_repo_opts(
+        &self,
+        repo_name_maybe: Option<RepoName>,
+    ) -> Result<Option<PushRemoteRepoOpts>, CLIError> {
+        let repo_name = if repo_name_maybe.is_some() {
+            repo_name_maybe
+        } else {
+            let remote_repo_names: Vec<_> = self.remote_repo_reg.get_all_repositories().collect();
+            remote_repo_names.first().cloned()
+        };
+        if let Some(remote_repo_name) = repo_name {
+            let remote_repo = self
+                .remote_repo_reg
+                .get_repository(&remote_repo_name)
+                .map_err(CLIError::failure)?;
+            let mut result = PushRemoteRepoOpts {
+                remote_account_name: None,
+                remote_repo_url: remote_repo.url,
+            };
+
+            if let Some(access_token_info) = self
+                .access_token_reg_svc
+                .find_by_backend_url(&result.remote_repo_url)
+                && let Some(account_name) = self
+                    .login_svc
+                    .get_remote_account_name_by_access_token(
+                        &result.remote_repo_url,
+                        access_token_info.access_token.access_token.as_str(),
+                    )
+                    .await
+                    .map_err(CLIError::failure)?
+            {
+                result.remote_account_name = Some(account_name);
+            }
+            return Ok(Some(result));
+        }
+        Ok(None)
+    }
+
     async fn do_push(
         &self,
         listener: Option<Arc<dyn SyncMultiListener>>,
@@ -97,7 +136,7 @@ impl PushCommand {
             CurrentAccountSubject::Logged(l) => &l.account_name,
         };
 
-        if let Some(remote_ref) = &self.to {
+        if let Some(_remote_ref @ PushDatasetRef::RefRemote(dataset_ref_remote)) = &self.to {
             let local_ref = match self.refs[0].as_dataset_ref_any() {
                 Some(dataset_ref_any) => dataset_ref_any
                     .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
@@ -118,13 +157,14 @@ impl PushCommand {
                 .push_multi_ext(
                     vec![PushRequest {
                         local_ref: Some(local_ref),
-                        remote_ref: Some(remote_ref.clone()),
+                        remote_ref: Some(dataset_ref_remote.clone()),
                     }],
                     PushMultiOptions {
                         all: self.all,
                         recursive: self.recursive,
                         add_aliases: self.add_aliases,
                         sync_options: self.sync_options(),
+                        remote_repo_opts: None,
                     },
                     listener,
                 )
@@ -139,6 +179,13 @@ impl PushCommand {
             .try_collect()
             .await?;
 
+            let repo_name = if let Some(push_dataset_ref) = &self.to {
+                push_dataset_ref.clone().into_repo_name()
+            } else {
+                None
+            };
+            let remote_repo_opts = self.get_remote_repo_opts(repo_name).await?;
+
             Ok(self
                 .push_svc
                 .push_multi(
@@ -148,6 +195,7 @@ impl PushCommand {
                         recursive: self.recursive,
                         add_aliases: self.add_aliases,
                         sync_options: self.sync_options(),
+                        remote_repo_opts,
                     },
                     listener,
                 )
@@ -172,7 +220,7 @@ impl PushCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for PushCommand {
-    async fn validate_args(&mut self) -> Result<(), CLIError> {
+    async fn validate_args(&self) -> Result<(), CLIError> {
         if self.refs.is_empty() && !self.all {
             return Err(CLIError::usage_error("Specify a dataset or pass --all"));
         }
@@ -181,45 +229,6 @@ impl Command for PushCommand {
             return Err(CLIError::usage_error(
                 "Cannot specify multiple datasets when using --to",
             ));
-        }
-
-        if self.refs.len() == 1
-            && self.to.is_none()
-            && let Some(dataset_ref_any) = self.refs[0].as_dataset_ref_any()
-            // ToDo check remote
-            && let Ok(dataset_ref) = dataset_ref_any.as_local_ref(|_| false)
-            && let Some(dataset_name) = dataset_ref.dataset_name()
-        {
-            let remote_repo_names: Vec<_> = self.remote_repo_reg.get_all_repositories().collect();
-            if let Some(remote_repo_name) = remote_repo_names.first() {
-                let remote_repo = self
-                    .remote_repo_reg
-                    .get_repository(remote_repo_name)
-                    .map_err(CLIError::failure)?;
-                let remote_repo_url = remote_repo.url;
-                if let Some(access_token_info) = self
-                    .access_token_reg_svc
-                    .find_by_backend_url(&remote_repo_url)
-                {
-                    let account_name = self
-                        .login_svc
-                        .get_account_name_by_access_token(
-                            &remote_repo_url,
-                            access_token_info.access_token.access_token.as_str(),
-                        )
-                        .await
-                        .map_err(CLIError::failure)?;
-                    println!("account_name: {:?}", account_name);
-                    println!("account_name: {:?}", dataset_name);
-                    println!("remote_repo_url: {:?}", remote_repo_url);
-                    let mut odf_url = remote_repo_url
-                        .as_odf_protoocol()
-                        .map_err(CLIError::failure)?;
-                    odf_url.set_path(format!("{}/{dataset_name}", account_name).as_str());
-                    self.to = Some(DatasetRefRemote::from(&odf_url));
-                    println!("self.to: {:?}", self.to);
-                }
-            }
         }
 
         Ok(())
