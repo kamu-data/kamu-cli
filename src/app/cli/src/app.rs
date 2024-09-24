@@ -185,7 +185,18 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
-    initialize_components(&cli_catalog).await?;
+    // Initialize components
+    match initialize_components(&cli_catalog).await {
+        Ok(_) => {}
+        Err(e) => {
+            tracing::error!(
+                error_dbg = ?e,
+                error = %e.pretty(true),
+                "Initialize components failed",
+            );
+            return Err(e);
+        }
+    }
 
     let is_transactional =
         maybe_db_connection_settings.is_some() && cli_commands::command_needs_transaction(&args);
