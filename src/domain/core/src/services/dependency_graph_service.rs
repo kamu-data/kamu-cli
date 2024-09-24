@@ -50,11 +50,28 @@ pub trait DependencyGraphService: Sync + Send {
         &self,
         dataset_ids: Vec<DatasetID>,
     ) -> Result<DatasetIDStream, GetDependenciesError>;
+
+    /// Given a set of dataset IDs this will sort them in depth-first or
+    /// breadth-first graph traversal order which is useful for operations that
+    /// require upstream datasets to be processed before downstream or vice
+    /// versa
+    async fn in_dependency_order(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+        order: DependencyOrder,
+    ) -> Result<Vec<DatasetID>, GetDependenciesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type DatasetIDStream<'a> = std::pin::Pin<Box<dyn Stream<Item = DatasetID> + Send + 'a>>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub enum DependencyOrder {
+    BreadthFirst,
+    DepthFirst,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

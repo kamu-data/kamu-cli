@@ -557,6 +557,51 @@ async fn test_get_recursive_upstream_dependencies() {
     assert_eq!(result, expected_result);
 }
 
+#[test_log::test(tokio::test)]
+async fn test_in_dependency_order() {
+    let harness = create_large_dataset_graph().await;
+
+    // First, millde, last dataset in breadth-first preserve order
+    let result = harness
+        .in_dependency_order(
+            vec![
+                "test-root-foo",
+                "test-derive-foo-foo-foo",
+                "test-derive-foo-foo-foo-bar-foo-bar",
+            ],
+            DependencyOrder::BreadthFirst,
+        )
+        .await;
+    assert_eq!(
+        result,
+        vec![
+            "test-root-foo",
+            "test-derive-foo-foo-foo",
+            "test-derive-foo-foo-foo-bar-foo-bar"
+        ]
+    );
+
+    // First, millde, last dataset in depth-first reverse order
+    let result = harness
+        .in_dependency_order(
+            vec![
+                "test-root-foo",
+                "test-derive-foo-foo-foo",
+                "test-derive-foo-foo-foo-bar-foo-bar",
+            ],
+            DependencyOrder::DepthFirst,
+        )
+        .await;
+    assert_eq!(
+        result,
+        vec![
+            "test-derive-foo-foo-foo-bar-foo-bar",
+            "test-derive-foo-foo-foo",
+            "test-root-foo"
+        ]
+    );
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DependencyGraphHarness {
@@ -777,6 +822,34 @@ impl DependencyGraphHarness {
         }
 
         res.sort();
+        res
+    }
+
+    async fn in_dependency_order(
+        &self,
+        dataset_names: Vec<&str>,
+        order: DependencyOrder,
+    ) -> Vec<String> {
+        let dataset_ids: Vec<_> = future::join_all(
+            dataset_names
+                .iter()
+                .map(|dataset_name| async { self.dataset_id_by_name(dataset_name).await }),
+        )
+        .await;
+
+        let ids: Vec<_> = self
+            .dependency_graph_service
+            .in_dependency_order(dataset_ids, order)
+            .await
+            .int_err()
+            .unwrap();
+
+        let mut res = Vec::new();
+        for id in ids {
+            let dataset_alias = self.dataset_alias_by_id(&id).await;
+            res.push(format!("{dataset_alias}"));
+        }
+
         res
     }
 

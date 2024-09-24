@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use futures::{future, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt};
 use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
@@ -61,45 +61,36 @@ impl Command for DeleteCommand {
             return Err(CLIError::usage_error("Specify a dataset or use --all flag"));
         }
 
-        let dataset_ids: Vec<_> = if self.all {
-            self.dataset_repo
-                .get_all_datasets()
-                .map_ok(|dataset_handle| dataset_handle.id)
-                .try_collect()
-                .await?
+        let dataset_handles: Vec<DatasetHandle> = if self.all {
+            self.dataset_repo.get_all_datasets().try_collect().await?
         } else {
             filter_datasets_by_local_pattern(
                 self.dataset_repo.as_ref(),
                 self.dataset_ref_patterns.clone(),
             )
-            .map_ok(|dataset_handle| dataset_handle.id)
             .try_collect()
             .await?
         };
 
-        let dataset_refs: Vec<_> = if self.recursive
-            || self.all
-            || self
-                .dataset_ref_patterns
-                .contains(&DatasetRefPattern::Pattern(DatasetAliasPattern::new(
-                    None,
-                    DatasetNamePattern::new_unchecked("%"),
-                ))) {
+        let dataset_handles: Vec<DatasetHandle> = if !self.recursive {
+            dataset_handles
+        } else {
             self.dependency_graph_service
-                .get_recursive_downstream_dependencies(dataset_ids)
+                .get_recursive_downstream_dependencies(
+                    dataset_handles.into_iter().map(|h| h.id).collect(),
+                )
                 .await
                 .int_err()?
-                .map(DatasetRef::ID)
-                .collect()
-                .await
-        } else {
-            dataset_ids
-                .iter()
-                .map(|dataset_id| DatasetRef::ID(dataset_id.clone()))
-                .collect()
+                .map(DatasetID::into_local_ref)
+                .then(|hdl| {
+                    let repo = self.dataset_repo.clone();
+                    async move { repo.resolve_dataset_ref(&hdl).await }
+                })
+                .try_collect()
+                .await?
         };
 
-        if dataset_refs.is_empty() {
+        if dataset_handles.is_empty() {
             eprintln!(
                 "{}",
                 console::style("There are no datasets matching the pattern").yellow()
@@ -110,15 +101,10 @@ impl Command for DeleteCommand {
         let confirmed = if self.no_confirmation {
             true
         } else {
-            let dataset_aliases = future::join_all(dataset_refs.iter().map(|dataset_id| async {
-                let dataset_hdl = self
-                    .dataset_repo
-                    .resolve_dataset_ref(dataset_id)
-                    .await
-                    .unwrap();
-                dataset_hdl.alias.to_string()
-            }))
-            .await;
+            let dataset_aliases: Vec<String> = dataset_handles
+                .iter()
+                .map(|h| h.alias.to_string())
+                .collect();
 
             common::prompt_yes_no(&format!(
                 "{}\n  {}\n{}\nDo you wish to continue? [y/N]: ",
@@ -132,8 +118,22 @@ impl Command for DeleteCommand {
             return Err(CLIError::Aborted);
         }
 
-        for dataset_ref in &dataset_refs {
-            match self.delete_dataset.execute_via_ref(dataset_ref).await {
+        // TODO: Multiple rounds of resolving IDs to handles
+        let dataset_ids = self
+            .dependency_graph_service
+            .in_dependency_order(
+                dataset_handles.into_iter().map(|h| h.id).collect(),
+                DependencyOrder::DepthFirst,
+            )
+            .await
+            .map_err(CLIError::critical)?;
+
+        for id in &dataset_ids {
+            match self
+                .delete_dataset
+                .execute_via_ref(&id.as_local_ref())
+                .await
+            {
                 Ok(_) => Ok(()),
                 Err(DeleteDatasetError::DanglingReference(e)) => Err(CLIError::failure(e)),
                 Err(DeleteDatasetError::Access(e)) => Err(CLIError::failure(e)),
@@ -143,7 +143,7 @@ impl Command for DeleteCommand {
 
         eprintln!(
             "{}",
-            console::style(format!("Deleted {} dataset(s)", dataset_refs.len()))
+            console::style(format!("Deleted {} dataset(s)", dataset_ids.len()))
                 .green()
                 .bold()
         );

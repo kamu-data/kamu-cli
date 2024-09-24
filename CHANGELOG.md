@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- `kamu delete` command will respect dependency graph ordering allowing to delete multiple datasets without encountering dangling reference errors
+
 ## [0.203.0] - 2024-09-22
 ### Added
 - Support `List` and `Struct` arrow types in `json` and `json-aoa` encodings
