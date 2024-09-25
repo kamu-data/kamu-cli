@@ -67,6 +67,15 @@ jobs:
             container-runtime: podman
             ipfs: true
             database: true
+          - name: Linux / amd64 ("web-ui" feature)
+            runs-on: ubuntu-latest
+            cargo-flags: --profile ci --features web-ui -E 'none()'
+            nextest-flags: --cargo-profile ci --features web-ui
+            nextest-exclusions-main-set-tests: -E '!all()'
+            nextest-exclusions-database-set-part: -E '!all()'
+            container-runtime: ''
+            ipfs: false
+            database: false
           # TODO: Not running docker as it takes ~7 minutes to install
           # See: https://github.com/actions/runner/issues/1456
           - name: MacOS / amd64
@@ -147,6 +156,8 @@ jobs:
           echo "KAMU_CONTAINER_RUNTIME_TYPE=${{ matrix.container-runtime }}" >> $GITHUB_ENV
 
       - name: Build
+        # Note: only be used to test the "web-ui" feature building
+        env: KAMU_WEB_UI_DIR=../../../.github
         run: |
           cargo test ${{ matrix.cargo-flags }} --no-run
 

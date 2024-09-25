@@ -61,7 +61,8 @@ struct WebUILoginInstructions {
 #[serde(rename_all = "camelCase")]
 struct WebUIFeatureFlags {
     enable_logout: bool,
-    enable_scheduling: bool,
+    // TODO: just for test
+    // enable_scheduling: bool,
     // TODO: Correct a typo in `WebUIFeatureFlags`
     //       (content of `assets/runtime-config.json`)
     //       https://github.com/kamu-data/kamu-cli/issues/841
