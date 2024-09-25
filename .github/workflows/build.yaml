@@ -72,7 +72,7 @@ jobs:
             cargo-flags: --profile ci --features web-ui
             nextest-flags: --cargo-profile ci --features web-ui
             nextest-exclusions-main-set-tests: -E '!all()'
-            nextest-exclusions-database-set-part: -E '!all()'
+            nextest-exclusions-database-set-part: '& !all()'
             container-runtime: ''
             ipfs: false
             database: false
