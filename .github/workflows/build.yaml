@@ -60,8 +60,8 @@ jobs:
         include:
           - name: Linux / amd64
             runs-on: ubuntu-latest
-            cargo-flags: --profile ci --features ingest-ftp
-            nextest-flags: --cargo-profile ci --features ingest-ftp
+            cargo-flags: --profile ci --features ingest-ftp web-ui
+            nextest-flags: --cargo-profile ci --features ingest-ftp web-ui
             nextest-exclusions-main-set-tests: -E '!(test(::database::) | test(::spark::)| test(::flink::))'
             nextest-exclusions-database-set-part: ''
             container-runtime: podman
@@ -147,6 +147,10 @@ jobs:
           echo "KAMU_CONTAINER_RUNTIME_TYPE=${{ matrix.container-runtime }}" >> $GITHUB_ENV
 
       - name: Build
+        # Note: only be used to test the "web-ui" feature building
+        env:
+          # To test just building, we embed a tiny folder
+          KAMU_WEB_UI_DIR: '../../../.github'
         run: |
           cargo test ${{ matrix.cargo-flags }} --no-run
 

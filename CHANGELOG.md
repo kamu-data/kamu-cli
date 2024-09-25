@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.204.1] - 2024-09-25
+### Fixed
+- Fixed build regression, in case `web-ui` feature flag is used
+
 ## [0.204.0] - 2024-09-25
 ### Changed
 - If not explicitly configured, a SQLite database is used for a multi-tenant workspace
