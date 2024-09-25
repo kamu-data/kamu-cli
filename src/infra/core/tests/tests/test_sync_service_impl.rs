@@ -58,9 +58,7 @@ impl Default for AuthorizationExpectations {
     fn default() -> Self {
         Self {
             reads: 8,
-            // d2_reads: 2,
             writes: 1,
-            // d2_writes: 4,
         }
     }
 }
@@ -231,8 +229,7 @@ async fn do_test_sync(
     )
     .await;
 
-    // Subsequent sync
-    ////////////////////////////////////////////////////////
+    // Subsequent sync ////////////////////////////////////////////////////////
     let _b2 = DatasetTestHelper::append_random_data(
         dataset_repo_foo.as_ref(),
         &dataset_alias_foo,
@@ -283,8 +280,7 @@ async fn do_test_sync(
     )
     .await;
 
-    // Up to date
-    /////////////////////////////////////////////////////////////
+    // Up to date /////////////////////////////////////////////////////////////
     assert_matches!(
         sync_svc_foo
             .sync(
@@ -317,8 +313,7 @@ async fn do_test_sync(
     )
     .await;
 
-    // Datasets out-of-sync on push
-    //////////////////////////////////////////////
+    // Datasets out-of-sync on push //////////////////////////////////////////////
 
     // Push a new block into dataset_bar (which we were pulling into before)
     let exta_head = DatasetTestHelper::append_random_data(
@@ -398,8 +393,7 @@ async fn do_test_sync(
         }) if old_head == Some(exta_head.clone()) && new_head == b3
     );
 
-    // Datasets complex divergence
-    //////////////////////////////////////////////
+    // Datasets complex divergence //////////////////////////////////////////////
 
     let _b4 = DatasetTestHelper::append_random_data(
         dataset_repo_foo.as_ref(),
@@ -445,7 +439,7 @@ async fn do_test_sync(
         if src_head == b4_alt && dst_head == b5 && uncommon_blocks_in_src ==
     1 && uncommon_blocks_in_dst == 2 );
 
-    // Datasets corrupted transfer flow
+    // Datasets corrupted transfer flow /////////////////////////////////////////
     if is_ipfs {
         let _b6 = DatasetTestHelper::append_random_data(
             dataset_repo_foo.as_ref(),
