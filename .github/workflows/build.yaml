@@ -60,22 +60,13 @@ jobs:
         include:
           - name: Linux / amd64
             runs-on: ubuntu-latest
-            cargo-flags: --profile ci --features ingest-ftp
-            nextest-flags: --cargo-profile ci --features ingest-ftp
+            cargo-flags: --profile ci --features ingest-ftp web-ui
+            nextest-flags: --cargo-profile ci --features ingest-ftp web-ui
             nextest-exclusions-main-set-tests: -E '!(test(::database::) | test(::spark::)| test(::flink::))'
             nextest-exclusions-database-set-part: ''
             container-runtime: podman
             ipfs: true
             database: true
-          - name: Linux / amd64 ("web-ui" feature)
-            runs-on: ubuntu-latest
-            cargo-flags: --profile ci --features web-ui
-            nextest-flags: --cargo-profile ci --features web-ui
-            nextest-exclusions-main-set-tests: -E '!all()'
-            nextest-exclusions-database-set-part: '& !all()'
-            container-runtime: ''
-            ipfs: false
-            database: false
           # TODO: Not running docker as it takes ~7 minutes to install
           # See: https://github.com/actions/runner/issues/1456
           - name: MacOS / amd64
