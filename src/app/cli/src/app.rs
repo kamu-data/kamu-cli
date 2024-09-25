@@ -215,7 +215,14 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         )
     };
 
-    initialize_base_components(&base_catalog).await?;
+    if let Err(e) = initialize_base_components(&base_catalog).await {
+        tracing::error!(
+            error_dbg = ?e,
+            error = %e.pretty(true),
+            "Initialize base components failed",
+        );
+        return Err(e);
+    }
 
     // Register metrics
     let metrics_registry = observability::metrics::register_all(&cli_catalog);
@@ -226,16 +233,14 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     }
 
     if let Some(server_catalog) = &maybe_server_catalog {
-        match initialize_server_components(server_catalog).await {
-            Ok(_) => {}
-            Err(e) => {
-                tracing::error!(
-                    error_dbg = ?e,
-                    error = %e.pretty(true),
-                    "Initialize server components failed",
-                );
-                return Err(e);
-         }
+        if let Err(e) = initialize_server_components(server_catalog).await {
+            tracing::error!(
+                error_dbg = ?e,
+                error = %e.pretty(true),
+                "Initialize server components failed",
+            );
+            return Err(e);
+        }
     }
 
     let is_transactional =

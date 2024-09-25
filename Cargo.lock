@@ -1305,7 +1305,7 @@ dependencies = [
 
 [[package]]
 name = "async-utils"
-version = "0.202.0"
+version = "0.203.1"
 dependencies = [
  "async-trait",
 ]
