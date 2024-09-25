@@ -102,8 +102,8 @@ async fn do_test_sync(
 
     let catalog_foo = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add_value(ipfs_gateway)
-        .add_value(ipfs_client)
+        .add_value(ipfs_gateway.clone())
+        .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
         .add_value(dataset_authorizer_foo)
         .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
@@ -126,8 +126,8 @@ async fn do_test_sync(
 
     let catalog_bar = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add_value(IpfsGateway::default())
-        .add_value(IpfsClient::default())
+        .add_value(ipfs_gateway.clone())
+        .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
         .add_value(dataset_authorizer_bar)
         .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
