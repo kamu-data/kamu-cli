@@ -69,7 +69,7 @@ jobs:
             database: true
           - name: Linux / amd64 ("web-ui" feature)
             runs-on: ubuntu-latest
-            cargo-flags: --profile ci --features web-ui -E 'none()'
+            cargo-flags: --profile ci --features web-ui
             nextest-flags: --cargo-profile ci --features web-ui
             nextest-exclusions-main-set-tests: -E '!all()'
             nextest-exclusions-database-set-part: -E '!all()'
