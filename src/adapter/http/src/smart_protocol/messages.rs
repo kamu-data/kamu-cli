@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use kamu_core::DatasetVisibility;
-use opendatafabric::{DatasetID, Multihash};
+use opendatafabric::{DatasetAlias, DatasetID, Multihash};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -193,6 +193,7 @@ pub struct DatasetPushObjectsTransferAccepted {
 pub enum DatasetPushObjectsTransferError {
     Internal(TransferInternalError),
     RefCollision(DatasetPushObjectsTransferRefCollisionError),
+    NameCollision(DatasetPushObjectsTransferNameCollisionError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -201,6 +202,14 @@ pub enum DatasetPushObjectsTransferError {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsTransferRefCollisionError {
     pub dataset_id: DatasetID,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Dataset with such id already exists
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DatasetPushObjectsTransferNameCollisionError {
+    pub dataset_alias: DatasetAlias,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

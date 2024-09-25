@@ -144,6 +144,31 @@ impl AxumServerPushProtocolInstance {
                   "Push process aborted with error",
                 );
             }
+            Err(ref _e @ PushServerError::NameCollision(ref err)) => {
+                if let Err(write_err) = axum_write_payload::<DatasetPushObjectsTransferResponse>(
+                    &mut self.socket,
+                    DatasetPushObjectsTransferResponse::Err(
+                        DatasetPushObjectsTransferError::NameCollision(
+                            DatasetPushObjectsTransferNameCollisionError {
+                                dataset_alias: err.alias.clone(),
+                            },
+                        ),
+                    ),
+                )
+                .await
+                {
+                    tracing::error!(
+                      error = ?write_err,
+                      error_msg = %write_err,
+                      "Failed to send error to client with error",
+                    );
+                };
+                tracing::error!(
+                  error = ?err,
+                  error_msg = %err,
+                  "Push process aborted with error",
+                );
+            }
             Err(e) => tracing::error!(
               error = ?e,
               error_msg = %e,
@@ -218,6 +243,9 @@ impl AxumServerPushProtocolInstance {
                         return Err(PushServerError::RefCollision(RefCollisionError {
                             id: err.id.clone(),
                         }));
+                    }
+                    Err(ref _e @ CreateDatasetError::NameCollision(ref err)) => {
+                        return Err(PushServerError::NameCollision(err.clone()));
                     }
                     Err(e) => {
                         return Err(PushServerError::Internal(PhaseInternalError {
