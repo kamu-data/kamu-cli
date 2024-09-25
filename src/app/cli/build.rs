@@ -9,14 +9,27 @@
 
 use std::error::Error;
 
-use vergen::EmitBuilder;
-
 fn main() -> Result<(), Box<dyn Error>> {
-    EmitBuilder::builder()
+    // Preparing the build information
+    vergen::EmitBuilder::builder()
         .all_build()
         .all_git()
         .all_rustc()
         .all_cargo()
+        .fail_on_error()
         .emit()?;
+
+    // sqlx will cause kamu-cli to be rebuilt if already embedded migrations have
+    // changed.
+    //
+    // But if the migration was previously missing, the rebuild would not be
+    // triggered.
+    //
+    // To solve this, we tell the compiler to perform a rebuild
+    // in case of the migrations folder content has changed.
+    //
+    // NB. Working path: ./src/app/cli
+    println!("cargo:rerun-if-changed=../../../migrations/sqlite");
+
     Ok(())
 }

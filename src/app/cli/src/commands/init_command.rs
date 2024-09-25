@@ -41,18 +41,23 @@ impl Command for InitCommand {
         false
     }
 
-    async fn run(&mut self) -> Result<(), CLIError> {
-        if self.workspace_layout.root_dir.is_dir() {
-            return if self.exists_ok {
-                if !self.output_config.quiet {
-                    eprintln!("{}", console::style("Workspace already exists").yellow());
-                }
-                Ok(())
-            } else {
-                Err(CLIError::usage_error_from(AlreadyInWorkspace))
-            };
+    async fn validate_args(&self) -> Result<(), CLIError> {
+        if !self.workspace_layout.root_dir.is_dir() {
+            return Ok(());
         }
 
+        if self.exists_ok {
+            if !self.output_config.quiet {
+                eprintln!("{}", console::style("Workspace already exists").yellow());
+            }
+
+            Ok(())
+        } else {
+            Err(CLIError::usage_error_from(AlreadyInWorkspace))
+        }
+    }
+
+    async fn run(&mut self) -> Result<(), CLIError> {
         WorkspaceLayout::create(&self.workspace_layout.root_dir, self.multi_tenant)?;
 
         // TODO, write a workspace config

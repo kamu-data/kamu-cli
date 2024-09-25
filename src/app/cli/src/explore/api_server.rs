@@ -25,7 +25,6 @@ use kamu_adapter_http::e2e::e2e_router;
 use kamu_flow_system_inmem::domain::FlowExecutor;
 use kamu_task_system_inmem::domain::TaskExecutor;
 use messaging_outbox::OutboxExecutor;
-use time_source::SystemTimeSource;
 use tokio::sync::Notify;
 use url::Url;
 
@@ -36,8 +35,7 @@ pub struct APIServer {
     local_addr: SocketAddr,
     task_executor: Arc<dyn TaskExecutor>,
     flow_executor: Arc<dyn FlowExecutor>,
-    outbox_processor: Arc<OutboxExecutor>,
-    time_source: Arc<dyn SystemTimeSource>,
+    outbox_executor: Arc<OutboxExecutor>,
     maybe_shutdown_notify: Option<Arc<Notify>>,
 }
 
@@ -57,9 +55,7 @@ impl APIServer {
 
         let flow_executor = cli_catalog.get_one().unwrap();
 
-        let outbox_processor = cli_catalog.get_one().unwrap();
-
-        let time_source = base_catalog.get_one().unwrap();
+        let outbox_executor = cli_catalog.get_one().unwrap();
 
         let gql_schema = kamu_adapter_graphql::schema();
 
@@ -178,21 +174,13 @@ impl APIServer {
             local_addr,
             task_executor,
             flow_executor,
-            outbox_processor,
-            time_source,
+            outbox_executor,
             maybe_shutdown_notify,
         })
     }
 
     pub fn local_addr(&self) -> &SocketAddr {
         &self.local_addr
-    }
-
-    pub async fn pre_run(&self) -> Result<(), InternalError> {
-        self.task_executor.pre_run().await?;
-        self.flow_executor.pre_run(self.time_source.now()).await?;
-        self.outbox_processor.pre_run().await?;
-        Ok(())
     }
 
     pub async fn run(self) -> Result<(), InternalError> {
@@ -212,7 +200,7 @@ impl APIServer {
 
         tokio::select! {
             res = server_run_fut => { res.int_err() },
-            res = self.outbox_processor.run() => { res.int_err() },
+            res = self.outbox_executor.run() => { res.int_err() },
             res = self.task_executor.run() => { res.int_err() },
             res = self.flow_executor.run() => { res.int_err() }
         }

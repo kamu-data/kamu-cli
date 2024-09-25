@@ -15,6 +15,10 @@ use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME: &str = "workspace.sqlite.db";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO: Consider extracting to kamu-cli layer
 /// Describes the layout of the workspace on disk
 #[derive(Debug, Clone)]
@@ -67,6 +71,11 @@ impl WorkspaceLayout {
         }
 
         Ok(ws)
+    }
+
+    pub fn default_multi_tenant_database_path(&self) -> PathBuf {
+        self.root_dir
+            .join(DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME)
     }
 }
 

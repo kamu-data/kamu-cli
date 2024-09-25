@@ -8,10 +8,15 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
+use sqlx::migrate::Migrator;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::SqlitePool;
 
 use crate::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static SQLITE_MIGRATOR: Migrator = sqlx::migrate!("../../../migrations/sqlite");
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,11 +33,16 @@ impl SqlitePlugin {
         catalog_builder.add::<SqliteTransactionManager>();
     }
 
-    pub fn catalog_with_connected_pool(
+    pub async fn catalog_with_connected_pool(
         base_catalog: &Catalog,
         db_connection_settings: &DatabaseConnectionSettings,
     ) -> Result<Catalog, DatabaseError> {
         let sqlite_pool = Self::open_sqlite_pool(db_connection_settings);
+
+        SQLITE_MIGRATOR
+            .run(&sqlite_pool)
+            .await
+            .expect("Migration failed");
 
         Ok(CatalogBuilder::new_chained(base_catalog)
             .add_value(sqlite_pool)
@@ -41,7 +51,10 @@ impl SqlitePlugin {
 
     #[tracing::instrument(level = "info", skip_all)]
     fn open_sqlite_pool(db_connection_settings: &DatabaseConnectionSettings) -> SqlitePool {
-        let sqlite_options = SqliteConnectOptions::new().filename(&db_connection_settings.host);
+        let sqlite_options = SqliteConnectOptions::new()
+            .filename(&db_connection_settings.host)
+            .create_if_missing(true);
+
         SqlitePoolOptions::new()
             .max_connections(1)
             .connect_lazy_with(sqlite_options)

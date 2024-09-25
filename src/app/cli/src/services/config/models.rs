@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::Path;
+
 use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
 use database_common::DatabaseProvider;
 use duration_string::DurationString;
@@ -612,6 +614,12 @@ impl DatabaseConfig {
             database_name: String::from("kamu"),
             host: String::from("localhost"),
             port: Some(DatabaseProvider::Postgres.default_port()),
+        })
+    }
+
+    pub fn sqlite(database_path: &Path) -> Self {
+        Self::Sqlite(SqliteDatabaseConfig {
+            database_path: database_path.to_str().unwrap().into(),
         })
     }
 }

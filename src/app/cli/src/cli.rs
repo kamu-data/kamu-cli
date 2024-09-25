@@ -580,7 +580,7 @@ pub struct List {
     #[arg(long, hide = true)]
     pub target_account: Option<String>,
 
-    /// List accesssible datasets of all accounts
+    /// List accessible datasets of all accounts
     #[arg(long, hide = true)]
     pub all_accounts: bool,
 }
