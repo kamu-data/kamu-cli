@@ -11,6 +11,13 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.204.0] - 2024-09-25
+### Changed
+- If not explicitly configured, a SQLite database is used for a multi-tenant workspace
+- If a SQLite database is used, built-in migrations are automatically applied
+- Start processing added Outbox messages after successful command execution
+- DI: `ServerCatalog` added, to split dependencies
+
 ## [0.203.1] - 2024-09-24
 ### Added
 - Added database migration & scripting to create an application user with restricted permissions
@@ -23,13 +30,6 @@ Recommendation: for ease of reading, use the following order:
 ## [0.202.1] - 2024-09-20
 ### Fixed
 - Open Telemetry integration fixes
-
-## Unreleased
-### Changed
-- If not explicitly configured, a SQLite database is used for a multi-tenant workspace
-- If a SQLite database is used, built-in migrations are automatically applied
-- Start processing added Outbox messages after successful command execution
-- DI: `ServerCatalog` added, to split dependencies
 
 ## [0.202.0] - 2024-09-20
 ### Changed
