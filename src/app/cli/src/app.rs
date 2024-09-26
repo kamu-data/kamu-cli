@@ -93,11 +93,11 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     // Sometimes (in the case of predefined users), we need to know whether the
     // workspace to be created will be multi-tenant or not right away, even before
     // the `kamu init` command itself is processed.
-    let maybe_init_multi_tenant_flag = match &args.command {
-        Command::Init(c) => Some(c.multi_tenant),
+    let maybe_init_command = match &args.command {
+        Command::Init(c) => Some(c.clone()),
         _ => None,
     };
-    let init_multi_tenant_workspace = maybe_init_multi_tenant_flag == Some(true);
+    let init_multi_tenant_workspace = matches!(&maybe_init_command, Some(c) if c.multi_tenant);
     let workspace_svc = WorkspaceService::new(
         Arc::new(workspace_layout.clone()),
         init_multi_tenant_workspace,
@@ -114,12 +114,11 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
-    let is_init_command = maybe_init_multi_tenant_flag.is_some();
     let app_database_config = get_app_database_config(
         &workspace_layout,
         &config,
         is_multi_tenant_workspace,
-        is_init_command,
+        maybe_init_command,
     );
     let (database_config, maybe_temp_database_path) = app_database_config.into_inner();
     let maybe_db_connection_settings = database_config

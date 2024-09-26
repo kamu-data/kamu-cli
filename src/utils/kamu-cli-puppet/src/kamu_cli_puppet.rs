@@ -75,6 +75,13 @@ impl KamuCliPuppet {
         &self.workspace_path
     }
 
+    pub fn set_workspace_path_in_tmp_dir(&mut self) {
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        self.workspace_path = temp_dir.path().into();
+        self.temp_dir = Some(temp_dir);
+    }
+
     pub fn get_e2e_output_data_path(&self) -> PathBuf {
         let temp_dir = self.temp_dir.as_ref().unwrap().path();
 
