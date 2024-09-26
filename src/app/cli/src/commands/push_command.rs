@@ -92,6 +92,9 @@ impl PushCommand {
             repo_name_maybe
         } else {
             let remote_repo_names: Vec<_> = self.remote_repo_reg.get_all_repositories().collect();
+            if remote_repo_names.len() > 1 {
+                return Ok(None);
+            }
             remote_repo_names.first().cloned()
         };
         if let Some(remote_repo_name) = repo_name {

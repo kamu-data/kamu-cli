@@ -157,19 +157,18 @@ impl PushServiceImpl {
                     } else {
                         local_handle.alias.dataset_name.clone()
                     };
-                    let dataset_alias = DatasetAlias::new(
-                        remote_repo_opts.remote_account_name.clone(),
-                        push_dataset_name,
-                    );
                     let mut res_url = remote_repo_opts
                         .remote_repo_url
                         .clone()
                         .as_odf_protoocol()
                         .unwrap();
+                    if let Some(account_name) = &remote_repo_opts.remote_account_name {
+                        res_url.path_segments_mut().unwrap().push(account_name);
+                    }
                     res_url
                         .path_segments_mut()
                         .unwrap()
-                        .push(&dataset_alias.to_string());
+                        .push(&push_dataset_name);
                     return Ok(res_url.into());
                 }
                 Err(PushError::NoTarget)

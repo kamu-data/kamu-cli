@@ -280,19 +280,22 @@ impl LoginService {
 
         let gql_query = r#"
             {
-              accounts {
-                byAccessToken(
-                    accessToken: "{access_token}"
-                ) {
-                    id
-                    accountName
-                    displayName
-                    accountType
-                    avatarUrl
-                    isAdmin
+                accounts {
+                    byAccessToken(
+                        accessToken: "{access_token}"
+                    ) {
+                        isMultiTenant
+                        account {
+                            id
+                            accountName
+                            displayName
+                            accountType
+                            avatarUrl
+                            isAdmin
+                        }
+                    }
                 }
-              }
-            }
+            }   
             "#
         .replace("{access_token}", access_token);
 

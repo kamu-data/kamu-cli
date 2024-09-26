@@ -60,15 +60,17 @@ impl LoginCommand {
 
     fn new_login_with_token(
         &self,
-        odf_server_frontend_url: &Url,
+        odf_server_backend_url: &Url,
         access_token: &str,
     ) -> Result<(), CLIError> {
         self.access_token_registry_service.save_access_token(
             self.scope,
-            Some(odf_server_frontend_url),
-            odf_server_frontend_url,
+            Some(odf_server_backend_url),
+            odf_server_backend_url,
             access_token.to_string(),
         )?;
+        self.add_repository(odf_server_backend_url, odf_server_backend_url)?;
+
         Ok(())
     }
 
