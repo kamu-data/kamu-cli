@@ -67,7 +67,7 @@ impl TaskExecutorImpl {
         // Total number of running tasks
         let total_running_tasks = task_event_store.get_count_running_tasks().await?;
 
-        // Processe them in pages
+        // Process them in pages
         let mut processed_running_tasks = 0;
         while processed_running_tasks < total_running_tasks {
             // Load another page

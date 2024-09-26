@@ -171,7 +171,6 @@ impl Command for APIServerRunCommand {
             }
         }
 
-        api_server.pre_run().await.map_err(CLIError::critical)?;
         api_server.run().await.map_err(CLIError::critical)?;
 
         Ok(())
