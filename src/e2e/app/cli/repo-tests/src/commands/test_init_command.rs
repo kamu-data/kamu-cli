@@ -27,6 +27,25 @@ pub async fn test_init_multi_tenant_creates_sqlite_database(mut kamu: KamuCliPup
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_init_multi_tenant_with_exists_ok_flag_creates_sqlite_database(
+    mut kamu: KamuCliPuppet,
+) {
+    kamu.set_workspace_path_in_tmp_dir();
+
+    kamu.execute(["init", "--multi-tenant", "--exists-ok"])
+        .await
+        .success();
+
+    let expected_database_path = kamu
+        .workspace_path()
+        .join(KAMU_WORKSPACE_DIR_NAME)
+        .join(DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME);
+
+    assert!(expected_database_path.exists());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_init_exist_ok_st(mut kamu: KamuCliPuppet) {
     kamu.set_workspace_path_in_tmp_dir();
 

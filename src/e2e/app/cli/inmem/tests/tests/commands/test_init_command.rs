@@ -21,6 +21,15 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
+    fixture =
+        kamu_cli_e2e_repo_tests::test_init_multi_tenant_with_exists_ok_flag_creates_sqlite_database,
+    options = Options::default().with_no_workspace()
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = inmem,
     fixture = kamu_cli_e2e_repo_tests::test_init_exist_ok_st,
     options = Options::default().with_no_workspace()
 );
