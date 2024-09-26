@@ -18,6 +18,7 @@ Recommendation: for ease of reading, use the following order:
   - Add confirmation step to `system compact` command
   - Add support for patterns to `system compact` to process multiple datasets at once
   - Fixed argument parsing error in `kamu system compact` command
+- Simplified organization of startup initialization code over different components
 ### Fixed
  - Broken catalog issue for server and transactional modes  
 

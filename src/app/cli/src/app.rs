@@ -25,20 +25,12 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
-use kamu_flow_system_inmem::domain::{
-    FlowConfigurationUpdatedMessage,
-    FlowExecutor,
-    FlowProgressMessage,
-};
+use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
 };
-use kamu_task_system_inmem::domain::{
-    TaskExecutor,
-    TaskProgressMessage,
-    MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
-};
+use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{warn, Instrument};
@@ -225,23 +217,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
-    if maybe_server_catalog.is_some() {
-        if let Err(e) = initialize_server_components(&cli_catalog).await {
-            tracing::error!(
-                error_dbg = ?e,
-                error = %e.pretty(true),
-                "Initialize server components failed",
-            );
-            return Err(e);
-        }
-    } else if let Err(e) = initialize_base_components(&base_catalog).await {
-        tracing::error!(
-            error_dbg = ?e,
-            error = %e.pretty(true),
-            "Initialize base components failed",
-        );
-        return Err(e);
-    }
+    // Startup initializations
+    run_startup_initializations(&cli_catalog).await?;
 
     let is_transactional =
         maybe_db_connection_settings.is_some() && cli_commands::command_needs_transaction(&args);
@@ -284,7 +261,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     command_result = command_result
         // If successful, then process the Outbox messages while they are present
         .and_then_async(|_| async {
-            let outbox_executor = work_catalog.get_one::<messaging_outbox::OutboxExecutor>()?;
+            let outbox_executor = cli_catalog.get_one::<messaging_outbox::OutboxExecutor>()?;
             outbox_executor
                 .run_while_has_tasks()
                 .await
@@ -579,74 +556,19 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     b
 }
 
-#[tracing::instrument(level = "debug", skip_all)]
-async fn initialize_server_components(catalog: &Catalog) -> Result<(), CLIError> {
-    // TODO: Generalize on-startup initialization into a trait
-    DatabaseTransactionRunner::new(catalog.clone())
-        .transactional(|transactional_catalog| async move {
-            {
-                let registrator = transactional_catalog
-                    .get_one::<PredefinedAccountsRegistrator>()
-                    .map_err(CLIError::critical)?;
-
-                registrator
-                    .ensure_predefined_accounts_are_registered()
-                    .await
-                    .map_err(CLIError::critical)?;
-            }
-            {
-                let initializer = transactional_catalog
-                    .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
-                    .map_err(CLIError::critical)?;
-
-                initializer
-                    .eager_initialization()
-                    .await
-                    .map_err(CLIError::critical)
-            }
-        })
-        .await?;
-
-    // Have their own transactions
-    {
-        let outbox_executor = catalog.get_one::<messaging_outbox::OutboxExecutor>()?;
-
-        outbox_executor
-            .pre_run()
-            .await
-            .map_err(CLIError::critical)?;
-    }
-    {
-        let task_executor = catalog
-            .get_one::<dyn TaskExecutor>()
-            .map_err(CLIError::critical)?;
-
-        task_executor.pre_run().await.map_err(CLIError::critical)?;
-    }
-    {
-        let flow_executor = catalog
-            .get_one::<dyn FlowExecutor>()
-            .map_err(CLIError::critical)?;
-        let time_source = catalog
-            .get_one::<dyn SystemTimeSource>()
-            .map_err(CLIError::critical)?;
-
-        flow_executor
-            .pre_run(time_source.now())
-            .await
-            .map_err(CLIError::critical)
-    }
-}
-
-#[tracing::instrument(level = "debug", skip_all)]
-async fn initialize_base_components(base_catalog: &Catalog) -> Result<(), CLIError> {
-    // TODO: Generalize on-startup initialization into a trait
-    let outbox_executor = base_catalog.get_one::<messaging_outbox::OutboxExecutor>()?;
-
-    outbox_executor
-        .pre_run()
+async fn run_startup_initializations(catalog: &Catalog) -> Result<(), CLIError> {
+    let init_result = init_on_startup::run_startup_jobs(catalog)
         .await
-        .map_err(CLIError::critical)?;
+        .map_err(CLIError::critical);
+
+    if let Err(e) = init_result {
+        tracing::error!(
+            error_dbg = ?e,
+            error = %e.pretty(true),
+            "Initialize components failed",
+        );
+        return Err(e);
+    }
 
     Ok(())
 }

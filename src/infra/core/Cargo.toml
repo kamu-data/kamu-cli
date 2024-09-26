@@ -33,6 +33,7 @@ query-extensions-json = ["dep:datafusion-functions-json"]
 [dependencies]
 # Kamu
 container-runtime = { workspace = true }
+init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
@@ -100,7 +101,7 @@ libc = "0.2" # Signal names
 like = { version = "0.3", default-features = false }
 mockall = "0.13"
 pin-project = "1"
-petgraph = { version = "0.6", default-features = false }
+petgraph = { version = "0.6", default-features = false, features = ["stable_graph"]}
 rand = "0.8"
 regex = "1"
 tempfile = "3"

@@ -1,0 +1,32 @@
+[package]
+name = "init-on-startup"
+description = "Initialization of components at startup"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+database-common = { workspace = true }
+internal-error = { workspace = true }
+
+async-trait = "0.1"
+dill = "0.9"
+petgraph = { version = "0.6", default-features = false, features = ["stable_graph"]}
+thiserror = "1"
+tracing = "0.1"

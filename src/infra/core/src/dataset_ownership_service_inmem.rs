@@ -11,6 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dill::*;
+use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
 use kamu_accounts::{AuthenticationService, CurrentAccountSubject};
 use kamu_core::*;
@@ -207,6 +208,12 @@ pub struct DatasetOwnershipServiceInMemoryStateInitializer {
 }
 
 #[component(pub)]
+#[interface(dyn InitOnStartup)]
+#[meta(InitOnStartupMeta {
+    job_name: JOB_KAMU_CORE_DATASET_OWNERSHIP_INITIALIZER,
+    depends_on: &[kamu_accounts::JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR],
+    requires_transaction: true
+})]
 impl DatasetOwnershipServiceInMemoryStateInitializer {
     pub fn new(
         current_account_subject: Arc<CurrentAccountSubject>,
@@ -221,9 +228,18 @@ impl DatasetOwnershipServiceInMemoryStateInitializer {
             dataset_ownership_service,
         }
     }
+}
 
-    #[tracing::instrument(level = "debug", skip_all)]
-    pub async fn eager_initialization(&self) -> Result<(), InternalError> {
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl InitOnStartup for DatasetOwnershipServiceInMemoryStateInitializer {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "DatasetOwnershipServiceInMemoryStateInitializer::run_initialization"
+    )]
+    async fn run_initialization(&self) -> Result<(), InternalError> {
         let mut guard = self.dataset_ownership_service.state.write().await;
         if guard.initially_scanned {
             tracing::warn!("The service has already initialized");
@@ -275,8 +291,6 @@ impl DatasetOwnershipServiceInMemoryStateInitializer {
         }
 
         guard.initially_scanned = true;
-
-        tracing::debug!("Finished initializing dataset ownership data",);
 
         Ok(())
     }

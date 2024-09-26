@@ -707,14 +707,7 @@ impl FlowConfigHarness {
         // Init dataset with no sources
         let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
 
-        DatabaseTransactionRunner::new(catalog_authorized.clone())
-            .transactional(|transactional_catalog| async move {
-                let initializer = transactional_catalog
-                    .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
-                    .unwrap();
-
-                initializer.eager_initialization().await
-            })
+        init_on_startup::run_startup_jobs(&catalog_authorized)
             .await
             .unwrap();
 
