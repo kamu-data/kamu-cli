@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct IpfsClient {
     ipfs_path: Option<PathBuf>,
     default_allow_offline: bool,

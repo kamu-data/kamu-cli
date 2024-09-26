@@ -32,12 +32,9 @@ pub enum PropertyName {
 
 impl PropertyName {
     pub fn dataset_allows_anonymous_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
-        let value = if allows { "true" } else { "false" };
+        let property = DatasetPropertyName::allows_anonymous_read(allows);
 
-        (
-            Self::Dataset(DatasetPropertyName::AllowsAnonymousRead),
-            value.into(),
-        )
+        (Self::Dataset(property.0), property.1)
     }
 
     pub fn dataset_allows_public_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
@@ -120,6 +117,12 @@ pub enum DatasetPropertyName {
 }
 
 impl DatasetPropertyName {
+    pub fn allows_anonymous_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
+        let value = if allows { "true" } else { "false" };
+
+        (DatasetPropertyName::AllowsAnonymousRead, value.into())
+    }
+
     pub fn allows_public_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
         let value = if allows { "true" } else { "false" };
 

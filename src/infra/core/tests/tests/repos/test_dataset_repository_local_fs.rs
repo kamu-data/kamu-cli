@@ -248,3 +248,31 @@ async fn test_create_and_get_case_insensetive_dataset_multi_tenant() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_create_multiple_datasets_with_same_id() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let harness = LocalFsRepoHarness::create(&tempdir, false);
+
+    test_dataset_repository_shared::test_create_multiple_datasets_with_same_id(
+        harness.dataset_repo.as_ref(),
+        None,
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_create_multiple_datasets_with_same_id_multi_tenant() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let harness = LocalFsRepoHarness::create(&tempdir, true);
+
+    test_dataset_repository_shared::test_create_multiple_datasets_with_same_id(
+        harness.dataset_repo.as_ref(),
+        Some(DEFAULT_ACCOUNT_NAME.clone()),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

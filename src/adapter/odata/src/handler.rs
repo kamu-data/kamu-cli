@@ -171,6 +171,9 @@ pub async fn odata_collection_handler_common(
 
 fn map_err(err: ODataError) -> ApiError {
     match err {
+        ODataError::BadRequest(err) => ApiError::bad_request(err),
+        ODataError::FromUtf8Error(err) => ApiError::bad_request(err),
+        ODataError::UnsupportedNetProtocol(err) => ApiError::not_implemented(err),
         ODataError::UnsupportedDataType(err) => ApiError::not_implemented(err),
         ODataError::UnsupportedFeature(err) => ApiError::not_implemented(err),
         ODataError::CollectionNotFound(err) => ApiError::not_found(err),

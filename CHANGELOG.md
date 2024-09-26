@@ -11,6 +11,30 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Dataset creation with unique alias but with existing id for FS dataset storage mode
+
+## [0.204.2] - 2024-09-26
+### Fixed
+- `kamu init`: fixed regression in case of using `exists_ok` flag
+
+## [0.204.1] - 2024-09-25
+### Fixed
+- Fixed build regression, in case `web-ui` feature flag is used
+
+## [0.204.0] - 2024-09-25
+### Changed
+- If not explicitly configured, a SQLite database is used for a multi-tenant workspace
+- If a SQLite database is used, built-in migrations are automatically applied
+- Start processing added Outbox messages after successful command execution
+- DI: `ServerCatalog` added, to split dependencies
+
+## [0.203.1] - 2024-09-24
+### Added
+- Added database migration & scripting to create an application user with restricted permissions
+- `kamu delete` command will respect dependency graph ordering allowing to delete multiple datasets without encountering dangling reference 
+
 ## [0.203.0] - 2024-09-22
 ### Added
 - Support `List` and `Struct` arrow types in `json` and `json-aoa` encodings
@@ -162,7 +186,7 @@ Recommendation: for ease of reading, use the following order:
 ### Changed
 - Upgraded `sqlx` crate to v0.8
 - Renamed `setConfigSchedule` GQL api to `setConfigIngest`. Also extended
-  `setConfigIngest` with new field `fetchUncacheable` which indicates to ingone cache
+  `setConfigIngest` with new field `fetchUncacheable` which indicates to ignore cache
   during ingest step
 
 ## [0.195.1] - 2024-08-16

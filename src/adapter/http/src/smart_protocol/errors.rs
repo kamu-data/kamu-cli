@@ -10,7 +10,7 @@
 use std::fmt::{self, Display};
 
 use internal_error::{BoxedError, InternalError};
-use kamu_core::{InvalidIntervalError, RefCASError, RefCollisionError};
+use kamu_core::{InvalidIntervalError, NameCollisionError, RefCASError, RefCollisionError};
 use thiserror::Error;
 
 use super::phases::*;
@@ -173,6 +173,9 @@ pub enum PushServerError {
     RefCollision(RefCollisionError),
 
     #[error(transparent)]
+    NameCollision(NameCollisionError),
+
+    #[error(transparent)]
     Internal(PhaseInternalError),
 }
 
@@ -191,6 +194,9 @@ pub enum PushClientError {
 
     #[error(transparent)]
     RefCollision(RefCollisionError),
+
+    #[error(transparent)]
+    NameCollision(NameCollisionError),
 
     #[error(transparent)]
     Internal(

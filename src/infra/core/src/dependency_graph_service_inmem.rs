@@ -381,6 +381,34 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
 
         Ok(Box::pin(tokio_stream::iter(upstream_node_datasets)))
     }
+
+    async fn in_dependency_order(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+        order: DependencyOrder,
+    ) -> Result<Vec<DatasetID>, GetDependenciesError> {
+        self.ensure_datasets_initially_scanned()
+            .await
+            .int_err()
+            .map_err(GetDependenciesError::Internal)
+            .unwrap();
+
+        let original_set: std::collections::HashSet<_> = dataset_ids.iter().cloned().collect();
+
+        let mut result = match order {
+            DependencyOrder::BreadthFirst => {
+                self.run_recursive_reversed_breadth_first_search(dataset_ids)
+                    .await?
+            }
+            DependencyOrder::DepthFirst => {
+                self.run_recursive_depth_first_search(dataset_ids).await?
+            }
+        };
+
+        result.retain(|id| original_set.contains(id));
+
+        Ok(result)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -432,7 +432,7 @@ pub struct Ingest {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Initialize an empty workspace in the current directory
-#[derive(Debug, clap::Args)]
+#[derive(Debug, Clone, clap::Args)]
 #[command(after_help = r#"
 A workspace is where kamu stores all the important information about datasets (metadata) and in some cases raw data.
 
@@ -580,7 +580,7 @@ pub struct List {
     #[arg(long, hide = true)]
     pub target_account: Option<String>,
 
-    /// List accesssible datasets of all accounts
+    /// List accessible datasets of all accounts
     #[arg(long, hide = true)]
     pub all_accounts: bool,
 }

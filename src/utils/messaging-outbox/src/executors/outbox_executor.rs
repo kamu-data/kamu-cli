@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use database_common_macros::{transactional_method1, transactional_method2};
@@ -16,6 +17,14 @@ use internal_error::{InternalError, ResultIntoInternal};
 use tracing::Instrument as _;
 
 use crate::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum RunMode {
+    SingleIterationOnly,
+    WhileHasTasks,
+    MainRelayLoop,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -92,20 +101,49 @@ impl OutboxExecutor {
 
     pub async fn run(&self) -> Result<(), InternalError> {
         // Main consumption loop
-        loop {
-            self.run_consumption_iteration()
-                .instrument(tracing::debug_span!("OutboxExecutor::tick"))
-                .await?;
+        self.run_with_mode(RunMode::MainRelayLoop).await
+    }
 
-            tokio::time::sleep(self.config.awaiting_step.to_std().unwrap()).await;
-        }
+    #[tracing::instrument(level = "debug", skip_all)]
+    pub async fn run_while_has_tasks(&self) -> Result<(), InternalError> {
+        self.run_with_mode(RunMode::WhileHasTasks).await
     }
 
     // To be used by tests only!
     #[tracing::instrument(level = "debug", skip_all)]
     pub async fn run_single_iteration_only(&self) -> Result<(), InternalError> {
         // Run single iteration instead of a loop
-        self.run_consumption_iteration().await?;
+        self.run_with_mode(RunMode::SingleIterationOnly).await
+    }
+
+    async fn run_with_mode(&self, mode: RunMode) -> Result<(), InternalError> {
+        match mode {
+            RunMode::SingleIterationOnly => {
+                self.run_consumption_iteration().await?;
+            }
+            RunMode::WhileHasTasks => loop {
+                let processed_consumer_tasks_count = self
+                    .run_consumption_iteration()
+                    .instrument(tracing::debug_span!("OutboxExecutor::tick"))
+                    .await?;
+
+                if processed_consumer_tasks_count == 0 {
+                    break;
+                }
+            },
+            RunMode::MainRelayLoop => {
+                let loop_delay = self.config.awaiting_step.to_std().unwrap();
+
+                loop {
+                    self.run_consumption_iteration()
+                        .instrument(tracing::debug_span!("OutboxExecutor::tick"))
+                        .await?;
+
+                    tokio::time::sleep(loop_delay).await;
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -150,10 +188,13 @@ impl OutboxExecutor {
         Ok(())
     }
 
-    async fn run_consumption_iteration(&self) -> Result<(), InternalError> {
+    async fn run_consumption_iteration(
+        &self,
+    ) -> Result<ProcessedConsumerTasksCount, InternalError> {
         // Read current state of producers and consumptions
         // Prepare consumption tasks for each progressed producer
         let mut consumption_tasks_by_producer = self.prepare_consumption_iteration().await?;
+        let processed_consumer_tasks_counter = Arc::new(AtomicUsize::new(0));
 
         // Select jobs per consumption task, unless consumers are failing already
         let mut consumption_job_tasks = Vec::new();
@@ -171,7 +212,11 @@ impl OutboxExecutor {
             }
 
             // Plan task to run during this iteration
-            consumption_job_tasks.push((producer_consumption_job, producer_consumption_task));
+            consumption_job_tasks.push((
+                producer_consumption_job,
+                producer_consumption_task,
+                processed_consumer_tasks_counter.clone(),
+            ));
         }
 
         // Run iteration of consumption jobs of each producer concurrently
@@ -180,13 +225,19 @@ impl OutboxExecutor {
             .map(Ok)
             .try_for_each_concurrent(
                 /* limit */ None,
-                |(consumption_job, consumption_task)| async move {
-                    consumption_job.run_consumption_task(consumption_task).await
+                |(consumption_job, consumption_task, processed_consumer_tasks_counter)| async move {
+                    let processed = consumption_job
+                        .run_consumption_task(consumption_task)
+                        .await?;
+
+                    processed_consumer_tasks_counter.fetch_add(processed, Ordering::Relaxed);
+
+                    Ok(())
                 },
             )
             .await?;
 
-        Ok(())
+        Ok(processed_consumer_tasks_counter.load(Ordering::Relaxed))
     }
 
     #[transactional_method2(

@@ -7,14 +7,99 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use database_common::*;
 use dill::{Catalog, CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
 use secrecy::SecretString;
+use tempfile::TempDir;
 
+use crate::cli::Init;
 use crate::config::{DatabaseConfig, DatabaseCredentialSourceConfig, RemoteDatabaseConfig};
+use crate::{config, WorkspaceLayout, DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub enum AppDatabaseConfig {
+    /// No settings are specified
+    None,
+    /// The user has specified custom database settings
+    Explicit(DatabaseConfig),
+    /// No settings are specified, default settings will be used
+    DefaultMultiTenant(DatabaseConfig),
+    /// Since there is no workspace, we use a temporary directory to create the
+    /// database
+    DefaultMultiTenantInitCommand(DatabaseConfig, OwnedTempPath),
+}
+
+impl AppDatabaseConfig {
+    pub fn into_inner(self) -> (Option<DatabaseConfig>, Option<OwnedTempPath>) {
+        match self {
+            AppDatabaseConfig::None => (None, None),
+            AppDatabaseConfig::Explicit(c) | AppDatabaseConfig::DefaultMultiTenant(c) => {
+                (Some(c), None)
+            }
+            AppDatabaseConfig::DefaultMultiTenantInitCommand(c, path) => (Some(c), Some(path)),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn get_app_database_config(
+    workspace_layout: &WorkspaceLayout,
+    config: &config::CLIConfig,
+    multi_tenant_workspace: bool,
+    maybe_init_command: Option<Init>,
+) -> AppDatabaseConfig {
+    if let Some(database_config) = config.database.clone() {
+        return AppDatabaseConfig::Explicit(database_config);
+    }
+
+    if !multi_tenant_workspace {
+        // Default for multi-tenant workspace only
+        return AppDatabaseConfig::None;
+    };
+
+    match maybe_init_command {
+        // Note: do not overwrite the database if the "exists_ok" flag is present
+        Some(c) if !c.exists_ok => {
+            let temp_dir = tempfile::tempdir().unwrap();
+            let database_path = temp_dir
+                .as_ref()
+                .join(DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME);
+            let config = DatabaseConfig::sqlite(&database_path);
+            let temp_database_path = OwnedTempPath::new(database_path, temp_dir);
+
+            AppDatabaseConfig::DefaultMultiTenantInitCommand(config, temp_database_path)
+        }
+        _ => {
+            // Use already created database
+            let database_path = workspace_layout.default_multi_tenant_database_path();
+
+            AppDatabaseConfig::DefaultMultiTenant(DatabaseConfig::sqlite(&database_path))
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn move_initial_database_to_workspace_if_needed(
+    workspace_layout: &WorkspaceLayout,
+    maybe_temp_database_path: Option<OwnedTempPath>,
+) -> Result<(), std::io::Error> {
+    if let Some(temp_database_path) = maybe_temp_database_path {
+        tokio::fs::copy(
+            temp_database_path.path(),
+            workspace_layout.default_multi_tenant_database_path(),
+        )
+        .await?;
+    };
+
+    Ok(())
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -109,10 +194,10 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn try_build_db_connection_settings(
-    raw_db_config: DatabaseConfig,
+    raw_db_config: &DatabaseConfig,
 ) -> Option<DatabaseConnectionSettings> {
-    fn convert(c: RemoteDatabaseConfig, provider: DatabaseProvider) -> DatabaseConnectionSettings {
-        DatabaseConnectionSettings::new(provider, c.database_name, c.host, c.port)
+    fn convert(c: &RemoteDatabaseConfig, provider: DatabaseProvider) -> DatabaseConnectionSettings {
+        DatabaseConnectionSettings::new(provider, c.database_name.clone(), c.host.clone(), c.port)
     }
 
     match raw_db_config {
@@ -156,6 +241,7 @@ pub async fn connect_database_initially(base_catalog: &Catalog) -> Result<Catalo
         }
         DatabaseProvider::Sqlite => {
             SqlitePlugin::catalog_with_connected_pool(base_catalog, &db_connection_settings)
+                .await
                 .int_err()
         }
     }
@@ -231,6 +317,27 @@ fn init_database_password_provider(b: &mut CatalogBuilder, raw_db_config: &Datab
                 b.bind::<dyn DatabasePasswordProvider, DatabaseAwsIamTokenProvider>();
             }
         },
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct OwnedTempPath {
+    path: PathBuf,
+    _temp_dir: TempDir,
+}
+
+impl OwnedTempPath {
+    pub fn new(path: PathBuf, temp_dir: TempDir) -> Self {
+        Self {
+            path,
+            _temp_dir: temp_dir,
+        }
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 }
 
