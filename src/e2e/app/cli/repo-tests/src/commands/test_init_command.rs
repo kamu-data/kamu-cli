@@ -35,3 +35,35 @@ pub async fn test_init_exist_ok_st(mut kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_init_exist_ok_mt(mut kamu: KamuCliPuppet) {
+    kamu.set_workspace_path_in_tmp_dir();
+
+    kamu.execute(["init", "--multi-tenant"]).await.success();
+
+    let expected_database_path = kamu
+        .workspace_path()
+        .join(KAMU_WORKSPACE_DIR_NAME)
+        .join(DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME);
+
+    let modified_old = expected_database_path
+        .metadata()
+        .unwrap()
+        .modified()
+        .unwrap();
+
+    kamu.execute(["init", "--multi-tenant", "--exists-ok"])
+        .await
+        .success();
+
+    let modified_new = expected_database_path
+        .metadata()
+        .unwrap()
+        .modified()
+        .unwrap();
+
+    // Verify that the database has not been overwritten
+    assert_eq!(modified_old, modified_new);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
