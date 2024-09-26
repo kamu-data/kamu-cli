@@ -107,8 +107,6 @@ jobs:
   create_release:
     name: Create Release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     needs: [ build ]
     steps:
       - uses: actions/checkout@v4
