@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.204.2] - 2024-09-26
+### Fixed
+- `kamu init`: fixed regression in case of using `exists_ok` flag
+
 ## [0.204.1] - 2024-09-25
 ### Fixed
 - Fixed build regression, in case `web-ui` feature flag is used
