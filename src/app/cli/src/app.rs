@@ -114,11 +114,12 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
+    let is_init_command = maybe_init_command.is_some();
     let app_database_config = get_app_database_config(
         &workspace_layout,
         &config,
         is_multi_tenant_workspace,
-        maybe_init_command,
+        is_init_command,
     );
     let (database_config, maybe_temp_database_path) = app_database_config.into_inner();
     let maybe_db_connection_settings = database_config
