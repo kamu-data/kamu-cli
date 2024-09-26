@@ -669,3 +669,48 @@ async fn check_expected_datasets(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_create_multiple_datasets_with_same_id<
+    TDatasetRepository: DatasetRepository + DatasetRepositoryWriter,
+>(
+    repo: &TDatasetRepository,
+    account_name: Option<AccountName>,
+) {
+    let dataset_alias = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
+
+    assert_matches!(
+        repo.find_dataset_by_ref(&dataset_alias.as_local_ref())
+            .await
+            .err()
+            .unwrap(),
+        GetDatasetError::NotFound(_)
+    );
+    let seed_block =
+        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+            .build_typed();
+
+    let create_result = repo
+        .create_dataset(&dataset_alias, seed_block.clone())
+        .await
+        .unwrap();
+
+    assert_eq!(create_result.dataset_handle.alias, dataset_alias);
+
+    // We should see the dataset
+    assert!(repo
+        .find_dataset_by_ref(&dataset_alias.as_local_ref())
+        .await
+        .is_ok());
+
+    let dataset_alias = DatasetAlias::new(account_name, DatasetName::new_unchecked("bar"));
+
+    // Now test id collision with different alias
+    let create_result = repo.create_dataset(&dataset_alias, seed_block).await;
+
+    assert_matches!(
+        create_result.err(),
+        Some(CreateDatasetError::NameCollision(_))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

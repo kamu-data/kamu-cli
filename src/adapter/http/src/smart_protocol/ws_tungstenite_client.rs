@@ -327,6 +327,11 @@ impl WsSmartTransferProtocolClient {
                     DatasetPushObjectsTransferError::RefCollision(err) => {
                         PushClientError::RefCollision(RefCollisionError { id: err.dataset_id })
                     }
+                    DatasetPushObjectsTransferError::NameCollision(err) => {
+                        PushClientError::NameCollision(NameCollisionError {
+                            alias: err.dataset_alias,
+                        })
+                    }
                     DatasetPushObjectsTransferError::Internal(err) => {
                         PushClientError::Internal(InternalError::new(Box::new(
                             ClientInternalError::new(err.error_message.as_str(), err.phase),

@@ -185,7 +185,16 @@ impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
             .await
         {
             Ok(existing_handle) => Ok(Some(existing_handle)),
-            Err(GetDatasetError::NotFound(_)) => Ok(None),
+            // ToDo temporary fix, remove it on favor of
+            // https://github.com/kamu-data/kamu-cli/issues/342
+            Err(GetDatasetError::NotFound(_)) => match self
+                .resolve_dataset_ref(&(seed_block.event.dataset_id.clone().into()))
+                .await
+            {
+                Ok(existing_handle) => Ok(Some(existing_handle)),
+                Err(GetDatasetError::NotFound(_)) => Ok(None),
+                Err(GetDatasetError::Internal(e)) => Err(e),
+            },
             Err(GetDatasetError::Internal(e)) => Err(e),
         }?;
 

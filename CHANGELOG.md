@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Dataset creation with unique alias but with existing id for FS dataset storage mode
+
 ## [0.204.2] - 2024-09-26
 ### Fixed
 - `kamu init`: fixed regression in case of using `exists_ok` flag
