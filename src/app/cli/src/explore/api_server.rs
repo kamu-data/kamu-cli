@@ -41,8 +41,7 @@ pub struct APIServer {
 
 impl APIServer {
     pub async fn new(
-        base_catalog: &Catalog,
-        cli_catalog: &Catalog,
+        server_catalog: &Catalog,
         multi_tenant_workspace: bool,
         address: Option<IpAddr>,
         port: Option<u16>,
@@ -51,11 +50,11 @@ impl APIServer {
     ) -> Result<Self, InternalError> {
         // Background task executor must run with server privileges to execute tasks on
         // behalf of the system, as they are automatically scheduled
-        let task_executor = cli_catalog.get_one().unwrap();
+        let task_executor = server_catalog.get_one().unwrap();
 
-        let flow_executor = cli_catalog.get_one().unwrap();
+        let flow_executor = server_catalog.get_one().unwrap();
 
-        let outbox_executor = cli_catalog.get_one().unwrap();
+        let outbox_executor = server_catalog.get_one().unwrap();
 
         let gql_schema = kamu_adapter_graphql::schema();
 
@@ -82,7 +81,7 @@ impl APIServer {
 
         let default_protocols = Protocols::default();
 
-        let api_server_catalog = CatalogBuilder::new_chained(base_catalog)
+        let api_server_catalog = CatalogBuilder::new_chained(server_catalog)
             .add_value(ServerUrlConfig::new(Protocols {
                 base_url_rest,
                 base_url_platform: default_protocols.base_url_platform,
@@ -153,8 +152,8 @@ impl APIServer {
                 "/system/metrics",
                 axum::routing::get(observability::metrics::metrics_handler),
             )
-            .layer(axum::extract::Extension(gql_schema))
-            .layer(axum::extract::Extension(api_server_catalog));
+            .layer(Extension(gql_schema))
+            .layer(Extension(api_server_catalog));
 
         let is_e2e_testing = e2e_output_data_path.is_some();
         let maybe_shutdown_notify = if is_e2e_testing {

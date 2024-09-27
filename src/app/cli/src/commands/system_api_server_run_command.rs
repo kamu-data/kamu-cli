@@ -26,8 +26,7 @@ use crate::OutputConfig;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct APIServerRunCommand {
-    base_catalog: Catalog,
-    cli_catalog: Catalog,
+    server_catalog: Catalog,
     multi_tenant_workspace: bool,
     output_config: Arc<OutputConfig>,
     address: Option<IpAddr>,
@@ -42,8 +41,7 @@ pub struct APIServerRunCommand {
 
 impl APIServerRunCommand {
     pub fn new(
-        base_catalog: Catalog,
-        cli_catalog: Catalog,
+        server_catalog: Catalog,
         multi_tenant_workspace: bool,
         output_config: Arc<OutputConfig>,
         address: Option<IpAddr>,
@@ -56,8 +54,7 @@ impl APIServerRunCommand {
         e2e_output_data_path: Option<PathBuf>,
     ) -> Self {
         Self {
-            base_catalog,
-            cli_catalog,
+            server_catalog,
             multi_tenant_workspace,
             output_config,
             address,
@@ -69,22 +66,6 @@ impl APIServerRunCommand {
             github_auth_config,
             e2e_output_data_path,
         }
-    }
-
-    fn check_required_env_vars(&self) -> Result<(), CLIError> {
-        if self.multi_tenant_workspace {
-            if self.github_auth_config.client_id.is_empty() {
-                return Err(CLIError::missed_env_var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID));
-            }
-
-            if self.github_auth_config.client_secret.is_empty() {
-                return Err(CLIError::missed_env_var(
-                    ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET,
-                ));
-            }
-        }
-
-        Ok(())
     }
 
     async fn get_access_token(&self) -> Result<String, CLIError> {
@@ -106,18 +87,16 @@ impl APIServerRunCommand {
             password: account_config.get_password(),
         };
 
-        let login_response = DatabaseTransactionRunner::new(self.base_catalog.clone())
+        let login_response = DatabaseTransactionRunner::new(self.server_catalog.clone())
             .transactional_with(|auth_svc: Arc<dyn AuthenticationService>| async move {
                 auth_svc
                     .login(
                         PROVIDER_PASSWORD,
                         serde_json::to_string::<PasswordLoginCredentials>(&login_credentials)
-                            .int_err()
-                            .map_err(CLIError::critical)?,
+                            .map_int_err(CLIError::critical)?,
                     )
                     .await
-                    .int_err()
-                    .map_err(CLIError::critical)
+                    .map_int_err(CLIError::critical)
             })
             .instrument(tracing::debug_span!(
                 "APIServerRunCommand::get_access_token"
@@ -130,14 +109,27 @@ impl APIServerRunCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for APIServerRunCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
-        self.check_required_env_vars()?;
+    async fn validate_args(&self) -> Result<(), CLIError> {
+        if self.multi_tenant_workspace {
+            if self.github_auth_config.client_id.is_empty() {
+                return Err(CLIError::missed_env_var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID));
+            }
 
+            if self.github_auth_config.client_secret.is_empty() {
+                return Err(CLIError::missed_env_var(
+                    ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET,
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn run(&mut self) -> Result<(), CLIError> {
         let access_token = self.get_access_token().await?;
 
         let api_server = crate::explore::APIServer::new(
-            &self.base_catalog,
-            &self.cli_catalog,
+            &self.server_catalog,
             self.multi_tenant_workspace,
             self.address,
             self.port,

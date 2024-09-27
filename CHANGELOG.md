@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## Unreleased
 ### Changed
 - CLI command tweaks:
   - Make `--yes / -y` flag global
@@ -20,7 +20,10 @@ Recommendation: for ease of reading, use the following order:
   - Fixed argument parsing error in `kamu system compact` command
 - Simplified organization of startup initialization code over different components
 ### Fixed
- - Broken catalog issue for server and transactional modes  
+- Broken catalog issue for server and transactional modes  
+  - Added several E2E tests (happy paths) covering the Flows tab in the UI
+- Corrected behavior of `MySqlAccountRepository::get_accounts_by_ids()`, for the case of empty IDs collection
+- `kamu system compact`: fixed a panic during parsing dataset ID
 
 ## [0.204.3] - 2024-09-26
 ### Fixed

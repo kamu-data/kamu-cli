@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli_e2e_common::KamuApiServerClient;
+use kamu_cli_e2e_common::{KamuApiServerClient, KamuApiServerClientExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -227,63 +227,8 @@ pub async fn test_kamu_access_token_middleware(kamu_api_server_client: KamuApiSe
         .unwrap();
 
     // 3. Create dataset from snapshot with new token
-    let snapshot = indoc::indoc!(
-        r#"
-        kind: DatasetSnapshot
-        version: 1
-        content:
-          name: player-scores
-          kind: Root
-          metadata:
-            - kind: AddPushSource
-              sourceName: default
-              read:
-                kind: NdJson
-                schema:
-                  - "match_time TIMESTAMP"
-                  - "match_id BIGINT"
-                  - "player_id STRING"
-                  - "score BIGINT"
-              merge:
-                kind: Ledger
-                primaryKey:
-                  - match_id
-                  - player_id
-            - kind: SetVocab
-              eventTimeColumn: match_time
-        "#
-    )
-    .escape_default()
-    .to_string();
-
     kamu_api_server_client
-        .graphql_api_call_assert_with_token(
-            kamu_token.clone(),
-            indoc::indoc!(
-                r#"
-                mutation {
-                  datasets {
-                    createFromSnapshot(snapshot: "<snapshot>", snapshotFormat: YAML) {
-                      message
-                    }
-                  }
-                }
-                "#,
-            )
-            .replace("<snapshot>", snapshot.as_str())
-            .as_str(),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "datasets": {
-                    "createFromSnapshot": {
-                      "message": "Success"
-                    }
-                  }
-                }
-                "#,
-            )),
-        )
+        .create_player_scores_dataset_with_data(&kamu_token)
         .await;
 }
 

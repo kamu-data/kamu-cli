@@ -28,7 +28,7 @@ use crate::OutputConfig;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct UICommand {
-    base_catalog: Catalog,
+    server_catalog: Catalog,
     multi_tenant_workspace: bool,
     current_account_name: AccountName,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
@@ -42,7 +42,7 @@ pub struct UICommand {
 
 impl UICommand {
     pub fn new(
-        base_catalog: Catalog,
+        server_catalog: Catalog,
         multi_tenant_workspace: bool,
         current_account_name: AccountName,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
@@ -54,7 +54,7 @@ impl UICommand {
         get_token: bool,
     ) -> Self {
         Self {
-            base_catalog,
+            server_catalog,
             multi_tenant_workspace,
             current_account_name,
             predefined_accounts_config,
@@ -73,7 +73,7 @@ impl UICommand {
 impl Command for UICommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let web_server = crate::explore::WebUIServer::new(
-            self.base_catalog.clone(),
+            self.server_catalog.clone(),
             self.multi_tenant_workspace,
             self.current_account_name.clone(),
             self.predefined_accounts_config.clone(),

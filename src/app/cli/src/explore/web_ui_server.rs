@@ -80,7 +80,7 @@ pub struct WebUIServer {
 
 impl WebUIServer {
     pub async fn new(
-        base_catalog: Catalog,
+        server_catalog: Catalog,
         multi_tenant_workspace: bool,
         current_account_name: AccountName,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
@@ -132,7 +132,7 @@ impl WebUIServer {
             },
         };
 
-        let access_token = Self::acquire_access_token(base_catalog.clone(), &login_instructions)
+        let access_token = Self::acquire_access_token(server_catalog.clone(), &login_instructions)
             .await
             .expect("Token not retrieved");
 
@@ -140,7 +140,7 @@ impl WebUIServer {
 
         let default_protocols = Protocols::default();
 
-        let web_ui_catalog = CatalogBuilder::new_chained(&base_catalog)
+        let web_ui_catalog = CatalogBuilder::new_chained(&server_catalog)
             .add_value(ServerUrlConfig::new(Protocols {
                 base_url_platform: web_ui_url.clone(),
                 base_url_rest: web_ui_url,
