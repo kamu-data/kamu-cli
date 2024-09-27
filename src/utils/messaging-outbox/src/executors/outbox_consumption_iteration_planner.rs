@@ -156,11 +156,13 @@ impl OutboxConsumptionIterationPlanner {
             };
 
             // Extract list of consumers for this producer
-            let consumer_names = self
+            let Some(consumer_names) = self
                 .routes_static_info
                 .consumers_by_producers
                 .get(&producer_name)
-                .expect("Consumers must be present in static routes");
+            else {
+                continue;
+            };
 
             // Report queue length metrics
             for (consumer, last_consumed_message_id) in &consumption_boundaries_by_consumer {
