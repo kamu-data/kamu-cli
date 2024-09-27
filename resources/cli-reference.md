@@ -42,6 +42,7 @@ To regenerate this schema from existing code, use the following command:
 * `-v` — Sets the level of verbosity (repeat for more)
 * `--no-color` — Disable color output in the terminal
 * `-q`, `--quiet` — Suppress all non-essential output
+* `-y`, `--yes` — Do not ask for confirmation and assume the 'yes' answer
 * `--trace` — Record and visualize the command execution as perfetto.dev trace
 * `--metrics` — Dump all metrics at the end of command execution
 
@@ -233,7 +234,6 @@ Delete a dataset
 
 * `-a`, `--all` — Delete all datasets in the workspace
 * `-r`, `--recursive` — Also delete all transitive dependencies of specified datasets
-* `-y`, `--yes` — Don't ask for confirmation
 
 This command deletes the dataset from your workspace, including both metadata and the raw data.
 
@@ -769,16 +769,12 @@ Renaming is often useful when you pull a remote dataset by URL, and it gets auto
 
 Revert the dataset back to the specified state
 
-**Usage:** `kamu reset [OPTIONS] <DATASET> <HASH>`
+**Usage:** `kamu reset <DATASET> <HASH>`
 
 **Arguments:**
 
 * `<DATASET>` — Dataset reference
 * `<HASH>` — Hash of the block to reset to
-
-**Options:**
-
-* `-y`, `--yes` — Don't ask for confirmation
 
 Resetting a dataset to the specified block erases all metadata blocks that followed it and deletes all data added since that point. This can sometimes be useful to resolve conflicts, but otherwise should be used with care.
 
@@ -858,7 +854,6 @@ Deletes a reference to repository
 **Options:**
 
 * `-a`, `--all` — Delete all known repositories
-* `-y`, `--yes` — Don't ask for confirmation
 
 
 
@@ -942,7 +937,7 @@ Adds a remote alias to a dataset
 
 Deletes a remote alias associated with a dataset
 
-**Usage:** `kamu repo alias delete [OPTIONS] <DATASET> [ALIAS]`
+**Usage:** `kamu repo alias delete [OPTIONS] [DATASET] [ALIAS]`
 
 **Arguments:**
 
@@ -1194,11 +1189,11 @@ Prints the GraphQL schema
 
 Compact a dataset
 
-**Usage:** `kamu system compact [OPTIONS] <DATASET>`
+**Usage:** `kamu system compact [OPTIONS] [DATASET]...`
 
 **Arguments:**
 
-* `<DATASET>` — Local dataset reference
+* `<DATASET>` — Local dataset references
 
 **Options:**
 

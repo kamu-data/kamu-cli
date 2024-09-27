@@ -9,14 +9,16 @@
 
 use std::sync::Arc;
 
+use futures::StreamExt;
 use kamu::domain::*;
 use opendatafabric::*;
 
 use super::{CLIError, Command};
 
 pub struct AliasDeleteCommand {
+    dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    dataset: DatasetRef,
+    dataset: Option<DatasetRef>,
     alias: Option<DatasetRefRemote>,
     all: bool,
     pull: bool,
@@ -25,14 +27,16 @@ pub struct AliasDeleteCommand {
 
 impl AliasDeleteCommand {
     pub fn new(
+        dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        dataset: DatasetRef,
+        dataset: Option<DatasetRef>,
         alias: Option<DatasetRefRemote>,
         all: bool,
         pull: bool,
         push: bool,
     ) -> Self {
         Self {
+            dataset_repo,
             remote_alias_reg,
             dataset,
             alias,
@@ -41,14 +45,11 @@ impl AliasDeleteCommand {
             push,
         }
     }
-}
 
-#[async_trait::async_trait(?Send)]
-impl Command for AliasDeleteCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn delete_dataset_alias(&self) -> Result<usize, CLIError> {
         let mut aliases = self
             .remote_alias_reg
-            .get_remote_aliases(&self.dataset)
+            .get_remote_aliases(self.dataset.as_ref().unwrap())
             .await
             .map_err(CLIError::failure)?;
 
@@ -69,6 +70,49 @@ impl Command for AliasDeleteCommand {
         } else {
             return Err(CLIError::usage_error("Specify either an alias or --all"));
         }
+
+        Ok(count)
+    }
+
+    async fn delete_all_aliases(&self) -> Result<usize, CLIError> {
+        let mut count = 0;
+
+        let mut stream = self.dataset_repo.get_all_datasets();
+        while let Some(dataset_handle) =
+            stream.next().await.transpose().map_err(CLIError::failure)?
+        {
+            let mut aliases = self
+                .remote_alias_reg
+                .get_remote_aliases(&dataset_handle.into_local_ref())
+                .await?;
+
+            // --all --push - clears all push aliases only
+            // --all --pull - clears all pull aliases only
+            // --all - clears all
+            if self.pull || !self.push {
+                count += aliases.clear(RemoteAliasKind::Pull).await?;
+            }
+            if self.push || !self.pull {
+                count += aliases.clear(RemoteAliasKind::Push).await?;
+            }
+        }
+
+        Ok(count)
+    }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Command for AliasDeleteCommand {
+    async fn run(&mut self) -> Result<(), CLIError> {
+        let count = if self.dataset.is_some() {
+            self.delete_dataset_alias().await
+        } else if self.all {
+            self.delete_all_aliases().await
+        } else {
+            Err(CLIError::usage_error(
+                "Need to specify either a dataset or --all",
+            ))
+        }?;
 
         eprintln!(
             "{}",

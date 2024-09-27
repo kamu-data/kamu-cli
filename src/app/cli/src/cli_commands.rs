@@ -28,6 +28,7 @@ pub fn get_command(
             work_catalog.get_one()?,
             work_catalog.get_one()?,
             work_catalog.get_one()?,
+            work_catalog.get_one()?,
             c.manifest,
             c.name,
             c.recursive,
@@ -88,11 +89,11 @@ pub fn get_command(
         cli::Command::Delete(c) => Box::new(DeleteCommand::new(
             work_catalog.get_one()?,
             work_catalog.get_one()?,
+            work_catalog.get_one()?,
             validate_many_dataset_patterns(work_catalog, c.dataset)?,
             work_catalog.get_one()?,
             c.all,
             c.recursive,
-            c.yes,
         )),
         cli::Command::Ingest(c) => Box::new(IngestCommand::new(
             work_catalog.get_one()?,
@@ -301,9 +302,9 @@ pub fn get_command(
             )),
             cli::RepoSubCommand::Delete(sc) => Box::new(RepositoryDeleteCommand::new(
                 work_catalog.get_one()?,
+                work_catalog.get_one()?,
                 sc.repository.unwrap_or_default(),
                 sc.all,
-                sc.yes,
             )),
             cli::RepoSubCommand::List(_) => Box::new(RepositoryListCommand::new(
                 work_catalog.get_one()?,
@@ -319,6 +320,7 @@ pub fn get_command(
                     ssc.push,
                 )),
                 cli::RepoAliasSubCommand::Delete(ssc) => Box::new(AliasDeleteCommand::new(
+                    work_catalog.get_one()?,
                     work_catalog.get_one()?,
                     ssc.dataset,
                     ssc.alias,
@@ -337,9 +339,9 @@ pub fn get_command(
         cli::Command::Reset(c) => Box::new(ResetCommand::new(
             work_catalog.get_one()?,
             work_catalog.get_one()?,
+            work_catalog.get_one()?,
             validate_dataset_ref(work_catalog, c.dataset)?,
             c.hash,
-            c.yes,
         )),
         cli::Command::Search(c) => Box::new(SearchCommand::new(
             work_catalog.get_one()?,
@@ -423,7 +425,8 @@ pub fn get_command(
                 work_catalog.get_one()?,
                 work_catalog.get_one()?,
                 work_catalog.get_one()?,
-                validate_dataset_ref(work_catalog, sc.dataset)?,
+                work_catalog.get_one()?,
+                validate_many_dataset_patterns(work_catalog, sc.dataset)?,
                 sc.max_slice_size,
                 sc.max_slice_records,
                 sc.hard,

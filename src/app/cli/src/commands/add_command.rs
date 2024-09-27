@@ -13,12 +13,13 @@ use std::sync::Arc;
 use kamu::domain::*;
 use opendatafabric::*;
 
-use super::{common, BatchError, CLIError, Command};
-use crate::OutputConfig;
+use super::{BatchError, CLIError, Command};
+use crate::{Interact, OutputConfig};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AddCommand {
+    interact: Arc<Interact>,
     resource_loader: Arc<dyn ResourceLoader>,
     dataset_repo: Arc<dyn DatasetRepository>,
     create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
@@ -34,6 +35,7 @@ pub struct AddCommand {
 
 impl AddCommand {
     pub fn new<I, S>(
+        interact: Arc<Interact>,
         resource_loader: Arc<dyn ResourceLoader>,
         dataset_repo: Arc<dyn DatasetRepository>,
         create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
@@ -51,6 +53,7 @@ impl AddCommand {
         S: Into<String>,
     {
         Self {
+            interact,
             resource_loader,
             dataset_repo,
             create_dataset_from_snapshot,
@@ -279,20 +282,12 @@ impl Command for AddCommand {
             }
 
             if !already_exist.is_empty() {
-                let confirmed = common::prompt_yes_no(&format!(
-                    "{}: {}\n{}\nDo you wish to continue? [y/N]: ",
-                    console::style("You are about to replace following dataset(s)").yellow(),
-                    already_exist
-                        .iter()
-                        .map(|h| h.alias.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", "),
+                self.interact.require_confirmation(format!(
+                    "{}\n  {}\n{}",
+                    console::style("You are about to delete following dataset(s):").yellow(),
+                    itertools::join(already_exist.iter().map(|h| &h.alias), "\n  "),
                     console::style("This operation is irreversible!").yellow(),
-                ));
-
-                if !confirmed {
-                    return Err(CLIError::Aborted);
-                }
+                ))?;
 
                 // TODO: Private Datasets: delete permissions should be checked in multi-tenant
                 //                         scenario

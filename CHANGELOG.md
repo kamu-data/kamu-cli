@@ -11,6 +11,14 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- CLI command tweaks:
+  - Make `--yes / -y` flag global
+  - Add confirmation step to `system compact` command
+  - Add support for patterns to `system compact` to process multiple datasets at once
+  - Fixed argument parsing error in `kamu system compact` command
+
 ## [0.204.3] - 2024-09-26
 ### Fixed
 - Dataset creation with unique alias but with existing id for FS dataset storage mode

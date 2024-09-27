@@ -8,10 +8,12 @@
 // by the Apache License, Version 2.0.
 
 mod compact_progress;
+mod interact;
 mod output_config;
 mod verify_progress;
 
 pub use compact_progress::*;
+pub use interact::*;
 pub use output_config::*;
 pub use verify_progress::*;
 

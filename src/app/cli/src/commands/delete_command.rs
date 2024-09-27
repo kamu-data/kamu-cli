@@ -15,41 +15,42 @@ use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use opendatafabric::*;
 
-use super::{common, CLIError, Command};
+use super::{CLIError, Command};
+use crate::Interact;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DeleteCommand {
+    interact: Arc<Interact>,
     dataset_repo: Arc<dyn DatasetRepository>,
     delete_dataset: Arc<dyn DeleteDatasetUseCase>,
     dataset_ref_patterns: Vec<DatasetRefPattern>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     all: bool,
     recursive: bool,
-    no_confirmation: bool,
 }
 
 impl DeleteCommand {
     pub fn new<I>(
+        interact: Arc<Interact>,
         dataset_repo: Arc<dyn DatasetRepository>,
         delete_dataset: Arc<dyn DeleteDatasetUseCase>,
         dataset_ref_patterns: I,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         all: bool,
         recursive: bool,
-        no_confirmation: bool,
     ) -> Self
     where
         I: IntoIterator<Item = DatasetRefPattern>,
     {
         Self {
+            interact,
             dataset_repo,
             delete_dataset,
             dataset_ref_patterns: dataset_ref_patterns.into_iter().collect(),
             dependency_graph_service,
             all,
             recursive,
-            no_confirmation,
         }
     }
 }
@@ -98,25 +99,12 @@ impl Command for DeleteCommand {
             return Ok(());
         }
 
-        let confirmed = if self.no_confirmation {
-            true
-        } else {
-            let dataset_aliases: Vec<String> = dataset_handles
-                .iter()
-                .map(|h| h.alias.to_string())
-                .collect();
-
-            common::prompt_yes_no(&format!(
-                "{}\n  {}\n{}\nDo you wish to continue? [y/N]: ",
-                console::style("You are about to delete following dataset(s):").yellow(),
-                dataset_aliases.join("\n  "),
-                console::style("This operation is irreversible!").yellow(),
-            ))
-        };
-
-        if !confirmed {
-            return Err(CLIError::Aborted);
-        }
+        self.interact.require_confirmation(format!(
+            "{}\n  {}\n{}",
+            console::style("You are about to delete following dataset(s):").yellow(),
+            itertools::join(dataset_handles.iter().map(|h| &h.alias), "\n  "),
+            console::style("This operation is irreversible!").yellow(),
+        ))?;
 
         // TODO: Multiple rounds of resolving IDs to handles
         let dataset_ids = self
