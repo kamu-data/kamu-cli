@@ -194,19 +194,19 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             base_catalog
         };
 
-        let cli_catalog = configure_cli_catalog(&final_base_catalog, is_multi_tenant_workspace)
-            .add_value(current_account.to_current_account_subject())
-            .build();
         let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
-            let server_catalog =
-                configure_server_catalog(&final_base_catalog, is_multi_tenant_workspace)
-                    .add_value(current_account.to_current_account_subject())
-                    .build();
-
+            let server_catalog = configure_server_catalog(&final_base_catalog).build();
             Some(server_catalog)
         } else {
             None
         };
+
+        let cli_catalog = configure_cli_catalog(
+            maybe_server_catalog.as_ref().unwrap_or(&final_base_catalog),
+            is_multi_tenant_workspace,
+        )
+        .add_value(current_account.to_current_account_subject())
+        .build();
 
         (
             guards,
@@ -217,15 +217,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         )
     };
 
-    if let Err(e) = initialize_base_components(&base_catalog).await {
-        tracing::error!(
-            error_dbg = ?e,
-            error = %e.pretty(true),
-            "Initialize base components failed",
-        );
-        return Err(e);
-    }
-
     // Register metrics
     let metrics_registry = observability::metrics::register_all(&cli_catalog);
 
@@ -234,8 +225,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
-    if let Some(server_catalog) = &maybe_server_catalog {
-        if let Err(e) = initialize_server_components(server_catalog).await {
+    if maybe_server_catalog.is_some() {
+        if let Err(e) = initialize_server_components(&cli_catalog).await {
             tracing::error!(
                 error_dbg = ?e,
                 error = %e.pretty(true),
@@ -243,17 +234,25 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             );
             return Err(e);
         }
+    } else if let Err(e) = initialize_base_components(&base_catalog).await {
+        tracing::error!(
+            error_dbg = ?e,
+            error = %e.pretty(true),
+            "Initialize base components failed",
+        );
+        return Err(e);
     }
 
     let is_transactional =
         maybe_db_connection_settings.is_some() && cli_commands::command_needs_transaction(&args);
-    let work_catalog = maybe_server_catalog.unwrap_or(cli_catalog);
+    let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
 
     let mut command_result: Result<(), CLIError> = maybe_transactional(
         is_transactional,
-        work_catalog.clone(),
-        |catalog: Catalog| async move {
-            let mut command = cli_commands::get_command(&base_catalog, &catalog, args)?;
+        cli_catalog.clone(),
+        |maybe_transactional_cli_catalog: Catalog| async move {
+            let mut command =
+                cli_commands::get_command(work_catalog, &maybe_transactional_cli_catalog, args)?;
 
             if command.needs_workspace() && !workspace_svc.is_in_workspace() {
                 Err(CLIError::usage_error_from(NotInWorkspace))?;
@@ -286,7 +285,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         // If successful, then process the Outbox messages while they are present
         .and_then_async(|_| async {
             let outbox_executor = work_catalog.get_one::<messaging_outbox::OutboxExecutor>()?;
-
             outbox_executor
                 .run_while_has_tasks()
                 .await
@@ -348,7 +346,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
 async fn maybe_transactional<F, RF, RT, RE>(
     transactional: bool,
-    work_catalog: Catalog,
+    catalog: Catalog,
     f: F,
 ) -> Result<RT, RE>
 where
@@ -357,9 +355,9 @@ where
     RE: From<InternalError>,
 {
     if !transactional {
-        f(work_catalog).await
+        f(catalog).await
     } else {
-        let transaction_runner = DatabaseTransactionRunner::new(work_catalog);
+        let transaction_runner = DatabaseTransactionRunner::new(catalog);
 
         transaction_runner
             .transactional(|transactional_catalog| async move { f(transactional_catalog).await })
@@ -549,13 +547,8 @@ pub fn configure_cli_catalog(
 }
 
 // Public only for tests
-pub fn configure_server_catalog(
-    base_catalog: &Catalog,
-    multi_tenant_workspace: bool,
-) -> CatalogBuilder {
+pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
-
-    b.add_builder(WorkspaceService::builder().with_multi_tenant(multi_tenant_workspace));
 
     b.add::<DatasetChangesServiceImpl>();
 
@@ -587,9 +580,9 @@ pub fn configure_server_catalog(
 }
 
 #[tracing::instrument(level = "debug", skip_all)]
-async fn initialize_server_components(server_catalog: &Catalog) -> Result<(), CLIError> {
+async fn initialize_server_components(catalog: &Catalog) -> Result<(), CLIError> {
     // TODO: Generalize on-startup initialization into a trait
-    DatabaseTransactionRunner::new(server_catalog.clone())
+    DatabaseTransactionRunner::new(catalog.clone())
         .transactional(|transactional_catalog| async move {
             {
                 let registrator = transactional_catalog
@@ -616,17 +609,25 @@ async fn initialize_server_components(server_catalog: &Catalog) -> Result<(), CL
 
     // Have their own transactions
     {
-        let task_executor = server_catalog
+        let outbox_executor = catalog.get_one::<messaging_outbox::OutboxExecutor>()?;
+
+        outbox_executor
+            .pre_run()
+            .await
+            .map_err(CLIError::critical)?;
+    }
+    {
+        let task_executor = catalog
             .get_one::<dyn TaskExecutor>()
             .map_err(CLIError::critical)?;
 
         task_executor.pre_run().await.map_err(CLIError::critical)?;
     }
     {
-        let flow_executor = server_catalog
+        let flow_executor = catalog
             .get_one::<dyn FlowExecutor>()
             .map_err(CLIError::critical)?;
-        let time_source = server_catalog
+        let time_source = catalog
             .get_one::<dyn SystemTimeSource>()
             .map_err(CLIError::critical)?;
 

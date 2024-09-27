@@ -91,8 +91,7 @@ fn test_di_server_graph_validates(multi_tenant_workspace: bool) {
     );
     let base_catalog = base_catalog_builder.build();
 
-    let mut cli_catalog_builder =
-        kamu_cli::configure_server_catalog(&base_catalog, multi_tenant_workspace);
+    let mut cli_catalog_builder = kamu_cli::configure_server_catalog(&base_catalog);
 
     cli_catalog_builder.add_value(CurrentAccountSubject::new_test());
     cli_catalog_builder.add_value(JwtAuthenticationConfig::default());
