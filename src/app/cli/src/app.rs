@@ -245,14 +245,14 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     let is_transactional =
         maybe_db_connection_settings.is_some() && cli_commands::command_needs_transaction(&args);
-    let work_catalog = maybe_server_catalog.unwrap_or(base_catalog);
+    let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
 
     let mut command_result: Result<(), CLIError> = maybe_transactional(
         is_transactional,
-        work_catalog.clone(),
-        |maybe_transactional_catalog: Catalog| async move {
+        cli_catalog.clone(),
+        |maybe_transactional_cli_catalog: Catalog| async move {
             let mut command =
-                cli_commands::get_command(&maybe_transactional_catalog, &cli_catalog, args)?;
+                cli_commands::get_command(work_catalog, &maybe_transactional_cli_catalog, args)?;
 
             if command.needs_workspace() && !workspace_svc.is_in_workspace() {
                 Err(CLIError::usage_error_from(NotInWorkspace))?;
@@ -346,7 +346,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
 async fn maybe_transactional<F, RF, RT, RE>(
     transactional: bool,
-    work_catalog: Catalog,
+    catalog: Catalog,
     f: F,
 ) -> Result<RT, RE>
 where
@@ -355,9 +355,9 @@ where
     RE: From<InternalError>,
 {
     if !transactional {
-        f(work_catalog).await
+        f(catalog).await
     } else {
-        let transaction_runner = DatabaseTransactionRunner::new(work_catalog);
+        let transaction_runner = DatabaseTransactionRunner::new(catalog);
 
         transaction_runner
             .transactional(|transactional_catalog| async move { f(transactional_catalog).await })
