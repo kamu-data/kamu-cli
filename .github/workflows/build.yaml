@@ -74,7 +74,7 @@ jobs:
             cargo-flags: --profile ci --features ingest-ftp
             nextest-flags: --cargo-profile ci --features ingest-ftp
             nextest-exclusions-main-set-tests: -E '!(test(::containerized::) | test(::database::))'
-            nextest-exclusions-database-set-part: ''
+            nextest-exclusions-database-set-part: '& !(test(::containerized::))'
             container-runtime: ''
             ipfs: false
             database: false
@@ -85,7 +85,7 @@ jobs:
             cargo-flags: --profile ci
             nextest-flags: --cargo-profile ci
             nextest-exclusions-main-set-tests: -E '!(test(::containerized::) | test(::database::))'
-            nextest-exclusions-database-set-part: ''
+            nextest-exclusions-database-set-part: '& !(test(::containerized::))'
             container-runtime: ''
             ipfs: false
             database: false
