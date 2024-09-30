@@ -5710,6 +5710,7 @@ dependencies = [
  "opendatafabric",
  "reqwest",
  "tokio",
+ "tokio-retry",
 ]
 
 [[package]]

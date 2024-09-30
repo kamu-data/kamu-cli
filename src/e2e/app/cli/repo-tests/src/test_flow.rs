@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli_e2e_common::{KamuApiServerClient, KamuApiServerClientExt};
+use kamu_cli_e2e_common::{AccessToken, KamuApiServerClient, KamuApiServerClientExt};
+use tokio_retry::strategy::FixedInterval;
+use tokio_retry::Retry;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -576,7 +578,12 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+    wait_for_flows_to_finish(
+        &kamu_api_server_client,
+        derivative_dataset_id.as_str(),
+        token.clone(),
+    )
+    .await;
 
     kamu_api_server_client
         .graphql_api_call_assert_with_token(
@@ -1155,6 +1162,65 @@ fn get_dataset_list_flows_query(dataset_id: &str) -> String {
     .replace("$perPageTable", "15")
     .replace("$perPageTiles", "150")
     .replace("$filters", "{}")
+}
+
+async fn wait_for_flows_to_finish(
+    kamu_api_server_client: &KamuApiServerClient,
+    dataset_id: &str,
+    token: AccessToken,
+) {
+    let retry_strategy = FixedInterval::from_millis(5_000).take(10);
+
+    Retry::spawn(retry_strategy, || async {
+        let response = kamu_api_server_client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query getDatasetListFlows() {
+                      datasets {
+                        byId(datasetId: "<DATASET_ID>") {
+                          flows {
+                            runs {
+                              table: listFlows(
+                                page: 0
+                                perPage: 10
+                              ) {
+                                edges {
+                                  node {
+                                    status
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#
+                )
+                .replace("<DATASET_ID>", dataset_id)
+                .as_str(),
+                Some(token.clone()),
+            )
+            .await;
+
+        let edges = response["datasets"]["byId"]["flows"]["runs"]["table"]["edges"]
+            .as_array()
+            .unwrap();
+        let all_finished = edges.iter().all(|edge| {
+            let status = edge["node"]["status"].as_str().unwrap();
+
+            status == "FINISHED"
+        });
+
+        if all_finished {
+            Ok(())
+        } else {
+            Err(())
+        }
+    })
+    .await
+    .unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
