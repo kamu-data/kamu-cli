@@ -9,6 +9,7 @@
 
 mod commands;
 mod test_auth;
+mod test_flow;
 mod test_rest_api;
 mod test_selftest;
 mod test_smart_transfer_protocol;

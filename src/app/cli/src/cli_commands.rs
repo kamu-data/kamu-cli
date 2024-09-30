@@ -479,7 +479,6 @@ pub fn get_command(
         )),
         cli::Command::Ui(c) => {
             let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
-
             let current_account_subject = cli_catalog.get_one::<CurrentAccountSubject>()?;
 
             let current_account_name = match current_account_subject.as_ref() {

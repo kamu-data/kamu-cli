@@ -150,11 +150,13 @@ impl AccountRepository for MySqlAccountRepository {
             .await
             .map_err(GetAccountByIdError::Internal)?;
 
-        let placeholders = account_ids
-            .iter()
-            .map(|_| "?")
-            .collect::<Vec<_>>()
-            .join(", ");
+        let placeholders = account_ids.iter().map(|_| "?").collect::<Vec<_>>();
+        let placeholders_str = if placeholders.is_empty() {
+            // MySQL does not consider the “in ()” syntax correct, so we add NULL
+            "NULL".to_string()
+        } else {
+            placeholders.join(", ")
+        };
 
         let query_str = format!(
             r#"
@@ -170,7 +172,7 @@ impl AccountRepository for MySqlAccountRepository {
                     provider,
                     provider_identity_key
                 FROM accounts
-                WHERE id IN ({placeholders})
+                WHERE id IN ({placeholders_str})
                 "#,
         );
 

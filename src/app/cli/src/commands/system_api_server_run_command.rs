@@ -71,22 +71,6 @@ impl APIServerRunCommand {
         }
     }
 
-    fn check_required_env_vars(&self) -> Result<(), CLIError> {
-        if self.multi_tenant_workspace {
-            if self.github_auth_config.client_id.is_empty() {
-                return Err(CLIError::missed_env_var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID));
-            }
-
-            if self.github_auth_config.client_secret.is_empty() {
-                return Err(CLIError::missed_env_var(
-                    ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET,
-                ));
-            }
-        }
-
-        Ok(())
-    }
-
     async fn get_access_token(&self) -> Result<String, CLIError> {
         let current_account_name = match self.account_subject.as_ref() {
             CurrentAccountSubject::Logged(l) => l.account_name.clone(),
@@ -112,12 +96,10 @@ impl APIServerRunCommand {
                     .login(
                         PROVIDER_PASSWORD,
                         serde_json::to_string::<PasswordLoginCredentials>(&login_credentials)
-                            .int_err()
-                            .map_err(CLIError::critical)?,
+                            .map_int_err(CLIError::critical)?,
                     )
                     .await
-                    .int_err()
-                    .map_err(CLIError::critical)
+                    .map_int_err(CLIError::critical)
             })
             .instrument(tracing::debug_span!(
                 "APIServerRunCommand::get_access_token"
@@ -130,9 +112,23 @@ impl APIServerRunCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for APIServerRunCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
-        self.check_required_env_vars()?;
+    async fn validate_args(&self) -> Result<(), CLIError> {
+        if self.multi_tenant_workspace {
+            if self.github_auth_config.client_id.is_empty() {
+                return Err(CLIError::missed_env_var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID));
+            }
 
+            if self.github_auth_config.client_secret.is_empty() {
+                return Err(CLIError::missed_env_var(
+                    ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET,
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn run(&mut self) -> Result<(), CLIError> {
         let access_token = self.get_access_token().await?;
 
         let api_server = crate::explore::APIServer::new(
