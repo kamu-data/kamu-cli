@@ -228,7 +228,7 @@ pub async fn test_kamu_access_token_middleware(kamu_api_server_client: KamuApiSe
 
     // 3. Create dataset from snapshot with new token
     kamu_api_server_client
-        .create_player_scores_dataset_with_data(&kamu_token)
+        .create_player_scores_dataset(&kamu_token)
         .await;
 }
 
