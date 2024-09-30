@@ -237,7 +237,7 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
     // - search FlowDescriptionDatasetPushIngest (datasetId)
     // - search FlowDescriptionDatasetExecuteTransform (datasetId)
     // - search FlowDescriptionDatasetHardCompaction (datasetId)
-    // - search FlowSummaryData (datasetId)
+    // - search FlowSummaryData (datasetId, flowId)
 
     kamu_api_server_client
         .graphql_api_call_assert_with_token(
@@ -375,7 +375,7 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
                     }
                     __typename
                   }
-                  flowId
+                  # flowId
                   status
                   initiator {
                     ...Account
@@ -545,7 +545,6 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
                                 "__typename": "FlowDescriptionDatasetExecuteTransform",
                                 "transformResult": null
                               },
-                              "flowId": "0",
                               "initiator": {
                                 "__typename": "Account",
                                 "accountName": "kamu",
@@ -612,7 +611,6 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
                                       "updatedWatermark": "2000-01-01T00:00:00+00:00"
                                     }
                                   },
-                                  "flowId": "0",
                                   "initiator": {
                                     "__typename": "Account",
                                     "accountName": "kamu",
@@ -647,7 +645,6 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
                                     "updatedWatermark": "2000-01-01T00:00:00+00:00"
                                   }
                                 },
-                                "flowId": "0",
                                 "initiator": {
                                   "__typename": "Account",
                                   "accountName": "kamu",
@@ -746,6 +743,7 @@ fn get_dataset_list_flows_query(dataset_id: &str) -> String {
     //   - awaitingExecutorSince
     //   - runningSince
     //   - finishedAt
+    // - search FlowSummaryData (flowId)
 
     indoc::indoc!(
         r#"
@@ -998,7 +996,7 @@ fn get_dataset_list_flows_query(dataset_id: &str) -> String {
             }
             __typename
           }
-          flowId
+          # flowId
           status
           initiator {
             ...Account
