@@ -4794,8 +4794,11 @@ dependencies = [
  "database-common",
  "dill",
  "internal-error",
+ "paste",
  "petgraph",
+ "test-log",
  "thiserror",
+ "tokio",
  "tracing",
 ]
 
