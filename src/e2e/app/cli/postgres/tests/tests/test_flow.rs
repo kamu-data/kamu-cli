@@ -14,6 +14,7 @@ use kamu_cli_e2e_common::prelude::*;
 kamu_cli_run_api_server_e2e_test!(
     storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::test_get_dataset_list_flows,
+    extra_test_groups = "ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,6 +22,7 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_run_api_server_e2e_test!(
     storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::test_dataset_all_flows_paused,
+    extra_test_groups = "ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,6 +30,15 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_run_api_server_e2e_test!(
     storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::test_dataset_flows_initiators,
+    extra_test_groups = "ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::test_dataset_trigger_flow,
+    extra_test_groups = "ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
