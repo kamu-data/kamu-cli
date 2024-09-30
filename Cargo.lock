@@ -4788,7 +4788,7 @@ checksum = "b248f5224d1d606005e02c97f5aa4e88eeb230488bcc03bc9ca4d7991399f2b5"
 
 [[package]]
 name = "init-on-startup"
-version = "0.204.3"
+version = "0.204.4"
 dependencies = [
  "async-trait",
  "database-common",
