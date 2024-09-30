@@ -63,7 +63,7 @@ impl AliasListCommand {
         &self,
         schema: Arc<Schema>,
         datasets: &Vec<DatasetHandle>,
-    ) -> Result<RecordBatch, GetAliasesError> {
+    ) -> Result<RecordBatch, CLIError> {
         let mut col_dataset = Vec::new();
         let mut col_kind = Vec::new();
         let mut col_alias = Vec::new();
