@@ -9,13 +9,15 @@
 
 use std::sync::Arc;
 
+use datafusion::arrow::array::{RecordBatch, StringArray};
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use futures::TryStreamExt;
+use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
-use crate::records_writers::TableWriter;
 
 pub struct AliasListCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
@@ -39,38 +41,32 @@ impl AliasListCommand {
         }
     }
 
-    // TODO: support multiple format specifiers
-    async fn print_machine_readable(&self, datasets: &Vec<DatasetHandle>) -> Result<(), CLIError> {
-        use std::io::Write;
-
-        let mut out = std::io::stdout();
-        writeln!(out, "Dataset,Kind,Alias")?;
-
-        for ds in datasets {
-            let aliases = self
-                .remote_alias_reg
-                .get_remote_aliases(&ds.as_local_ref())
-                .await?;
-
-            for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
-                writeln!(out, "{},pull,{}", &ds.alias, &alias)?;
-            }
-            for alias in aliases.get_by_kind(RemoteAliasKind::Push) {
-                writeln!(out, "{},push,{}", &ds.alias, &alias)?;
-            }
-        }
-
-        Ok(())
+    fn records_format(&self) -> RecordsFormat {
+        RecordsFormat::new()
+            .with_default_column_format(ColumnFormat::default())
+            .with_column_formats(vec![
+                ColumnFormat::new().with_style_spec("l"),
+                ColumnFormat::new().with_style_spec("c"),
+                ColumnFormat::new().with_style_spec("l"),
+            ])
     }
 
-    async fn print_pretty(&self, datasets: &Vec<DatasetHandle>) -> Result<(), CLIError> {
-        use prettytable::*;
+    fn schema(&self) -> Arc<Schema> {
+        Arc::new(Schema::new(vec![
+            Field::new("Dataset", DataType::Utf8, false),
+            Field::new("Kind", DataType::Utf8, false),
+            Field::new("Alias", DataType::Utf8, false),
+        ]))
+    }
 
-        let mut items = 0;
-        let mut table = Table::new();
-        table.set_format(TableWriter::<Vec<u8>>::get_table_format());
-
-        table.set_titles(row![bc->"Dataset", bc->"Kind", bc->"Alias"]);
+    async fn records(
+        &self,
+        schema: Arc<Schema>,
+        datasets: &Vec<DatasetHandle>,
+    ) -> Result<RecordBatch, CLIError> {
+        let mut col_dataset = Vec::new();
+        let mut col_kind = Vec::new();
+        let mut col_alias = Vec::new();
 
         for ds in datasets {
             let aliases = self
@@ -85,35 +81,34 @@ impl AliasListCommand {
                 .get_by_kind(RemoteAliasKind::Push)
                 .map(ToString::to_string)
                 .collect();
+
             pull_aliases.sort();
             push_aliases.sort();
 
             for alias in pull_aliases {
-                items += 1;
-                table.add_row(Row::new(vec![
-                    Cell::new(&ds.alias.to_string()),
-                    Cell::new("Pull"),
-                    Cell::new(&alias),
-                ]));
+                col_dataset.push(ds.alias.to_string());
+                col_kind.push("Pull");
+                col_alias.push(alias);
             }
 
             for alias in push_aliases {
-                items += 1;
-                table.add_row(Row::new(vec![
-                    Cell::new(&ds.alias.to_string()),
-                    Cell::new("Push"),
-                    Cell::new(&alias),
-                ]));
+                col_dataset.push(ds.alias.to_string());
+                col_kind.push("Push");
+                col_alias.push(alias);
             }
         }
 
-        // Header doesn't render when there are no data rows in the table
-        if items == 0 {
-            table.add_row(Row::new(vec![Cell::new(""), Cell::new("")]));
-        }
+        let records = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(StringArray::from(col_dataset)),
+                Arc::new(StringArray::from(col_kind)),
+                Arc::new(StringArray::from(col_alias)),
+            ],
+        )
+        .int_err()?;
 
-        table.printstd();
-        Ok(())
+        Ok(records)
     }
 }
 
@@ -129,12 +124,15 @@ impl Command for AliasListCommand {
 
         datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
 
-        // TODO: replace with formatters
-        match self.output_config.format {
-            OutputFormat::Table => self.print_pretty(&datasets).await?,
-            OutputFormat::Csv => self.print_machine_readable(&datasets).await?,
-            fmt => unimplemented!("Unsupported format: {fmt:?}"),
-        }
+        let schema = self.schema();
+        let records = self.records(schema.clone(), &datasets).await?;
+
+        let mut writer = self
+            .output_config
+            .get_records_writer(&schema, self.records_format());
+
+        writer.write_batch(&records)?;
+        writer.finish()?;
 
         Ok(())
     }
