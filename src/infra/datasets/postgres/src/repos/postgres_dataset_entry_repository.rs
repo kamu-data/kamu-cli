@@ -15,13 +15,13 @@ use opendatafabric::{AccountID, DatasetID, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SqliteDatasetEntryRepository {
-    transaction: TransactionRefT<sqlx::Sqlite>,
+pub struct PostgresDatasetEntryRepository {
+    transaction: TransactionRefT<sqlx::Postgres>,
 }
 
 #[component(pub)]
 #[interface(dyn DatasetEntryRepository)]
-impl SqliteDatasetEntryRepository {
+impl PostgresDatasetEntryRepository {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
@@ -32,7 +32,7 @@ impl SqliteDatasetEntryRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DatasetEntryRepository for SqliteDatasetEntryRepository {
+impl DatasetEntryRepository for PostgresDatasetEntryRepository {
     async fn get_dataset_entry(
         &self,
         dataset_id: &DatasetID,
@@ -175,9 +175,9 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         .await
         .map_err(|e| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
-                let sqlite_error_message = e.message();
+                let postgres_error_message = e.message();
 
-                if sqlite_error_message.contains("dataset_entries.dataset_name") {
+                if postgres_error_message.contains("dataset_entries.dataset_name") {
                     DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into()
                 } else {
                     SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into()
