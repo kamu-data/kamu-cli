@@ -26,7 +26,8 @@ use crate::OutputConfig;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct APIServerRunCommand {
-    server_catalog: Catalog,
+    base_catalog: Catalog,
+    cli_catalog: Catalog,
     multi_tenant_workspace: bool,
     output_config: Arc<OutputConfig>,
     address: Option<IpAddr>,
@@ -41,7 +42,8 @@ pub struct APIServerRunCommand {
 
 impl APIServerRunCommand {
     pub fn new(
-        server_catalog: Catalog,
+        base_catalog: Catalog,
+        cli_catalog: Catalog,
         multi_tenant_workspace: bool,
         output_config: Arc<OutputConfig>,
         address: Option<IpAddr>,
@@ -54,7 +56,8 @@ impl APIServerRunCommand {
         e2e_output_data_path: Option<PathBuf>,
     ) -> Self {
         Self {
-            server_catalog,
+            base_catalog,
+            cli_catalog,
             multi_tenant_workspace,
             output_config,
             address,
@@ -87,7 +90,7 @@ impl APIServerRunCommand {
             password: account_config.get_password(),
         };
 
-        let login_response = DatabaseTransactionRunner::new(self.server_catalog.clone())
+        let login_response = DatabaseTransactionRunner::new(self.base_catalog.clone())
             .transactional_with(|auth_svc: Arc<dyn AuthenticationService>| async move {
                 auth_svc
                     .login(
@@ -129,7 +132,8 @@ impl Command for APIServerRunCommand {
         let access_token = self.get_access_token().await?;
 
         let api_server = crate::explore::APIServer::new(
-            &self.server_catalog,
+            &self.base_catalog,
+            &self.cli_catalog,
             self.multi_tenant_workspace,
             self.address,
             self.port,

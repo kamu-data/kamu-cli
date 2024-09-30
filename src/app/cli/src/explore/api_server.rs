@@ -41,7 +41,8 @@ pub struct APIServer {
 
 impl APIServer {
     pub async fn new(
-        server_catalog: &Catalog,
+        base_catalog: &Catalog,
+        cli_catalog: &Catalog,
         multi_tenant_workspace: bool,
         address: Option<IpAddr>,
         port: Option<u16>,
@@ -50,11 +51,11 @@ impl APIServer {
     ) -> Result<Self, InternalError> {
         // Background task executor must run with server privileges to execute tasks on
         // behalf of the system, as they are automatically scheduled
-        let task_executor = server_catalog.get_one().unwrap();
+        let task_executor = cli_catalog.get_one().unwrap();
 
-        let flow_executor = server_catalog.get_one().unwrap();
+        let flow_executor = cli_catalog.get_one().unwrap();
 
-        let outbox_executor = server_catalog.get_one().unwrap();
+        let outbox_executor = cli_catalog.get_one().unwrap();
 
         let gql_schema = kamu_adapter_graphql::schema();
 
@@ -81,7 +82,7 @@ impl APIServer {
 
         let default_protocols = Protocols::default();
 
-        let api_server_catalog = CatalogBuilder::new_chained(server_catalog)
+        let api_server_catalog = CatalogBuilder::new_chained(base_catalog)
             .add_value(ServerUrlConfig::new(Protocols {
                 base_url_rest,
                 base_url_platform: default_protocols.base_url_platform,
