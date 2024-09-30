@@ -176,8 +176,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         .map_err(|e| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 let postgres_error_message = e.message();
-
-                if postgres_error_message.contains("dataset_entries.dataset_name") {
+                if postgres_error_message.contains("idx_dataset_entries_owner_id_dataset_name") {
                     DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into()
                 } else {
                     SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into()
