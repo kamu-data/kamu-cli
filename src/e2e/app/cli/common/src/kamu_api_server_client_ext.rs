@@ -26,6 +26,7 @@ pub trait KamuApiServerClientExt {
     async fn create_dataset(&self, dataset_snapshot_yaml: &str, token: &AccessToken) -> DatasetId;
     async fn create_player_scores_dataset(&self, token: &AccessToken) -> DatasetId;
     async fn create_player_scores_dataset_with_data(&self, token: &AccessToken) -> DatasetId;
+    async fn create_leaderboard(&self, token: &AccessToken) -> DatasetId;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -107,6 +108,7 @@ impl KamuApiServerClientExt for KamuApiServerClient {
     }
 
     async fn create_player_scores_dataset(&self, token: &AccessToken) -> DatasetId {
+        // https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml
         let snapshot = indoc::indoc!(
             r#"
             kind: DatasetSnapshot
@@ -161,6 +163,56 @@ impl KamuApiServerClientExt for KamuApiServerClient {
         .await;
 
         dataset_id
+    }
+
+    async fn create_leaderboard(&self, token: &AccessToken) -> DatasetId {
+        // https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml
+        let snapshot = indoc::indoc!(
+            r#"
+            kind: DatasetSnapshot
+            version: 1
+            content:
+              name: leaderboard
+              kind: Derivative
+              metadata:
+                - kind: SetTransform
+                  inputs:
+                    - datasetRef: player-scores
+                      alias: player_scores
+                  transform:
+                    kind: Sql
+                    engine: risingwave
+                    queries:
+                      - alias: leaderboard
+                        # Note we are using explicit `crate materialized view` statement below
+                        # because RW does not currently support Top-N queries directly on sinks.
+                        #
+                        # Note `partition by 1` is currently required by RW engine
+                        # See: https://docs.risingwave.com/docs/current/window-functions/#syntax
+                        query: |
+                          create materialized view leaderboard as
+                          select
+                            *
+                          from (
+                            select
+                              row_number() over (partition by 1 order by score desc) as place,
+                              match_time,
+                              match_id,
+                              player_id,
+                              score
+                            from player_scores
+                          )
+                          where place <= 2
+                      - query: |
+                          select * from leaderboard
+                - kind: SetVocab
+                  eventTimeColumn: match_time
+            "#
+        )
+        .escape_default()
+        .to_string();
+
+        self.create_dataset(&snapshot, token).await
     }
 }
 
