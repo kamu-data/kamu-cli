@@ -12,6 +12,7 @@ use std::sync::Arc;
 use datafusion::arrow::array::{RecordBatch, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use futures::TryStreamExt;
+use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use opendatafabric::*;
 
@@ -105,7 +106,7 @@ impl AliasListCommand {
                 Arc::new(StringArray::from(col_alias)),
             ],
         )
-        .unwrap();
+        .int_err()?;
 
         Ok(records)
     }

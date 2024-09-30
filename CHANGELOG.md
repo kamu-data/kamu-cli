@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- `kamu repo alias list`: added JSON output alongside with other formats mentioned in the command's help
+
 ## [0.204.4] - 2024-09-30
 ### Changed
 - CLI command tweaks:
@@ -25,8 +29,6 @@ Recommendation: for ease of reading, use the following order:
 - Corrected behavior of `MySqlAccountRepository::get_accounts_by_ids()`, for the case of empty IDs collection
 
 ## [0.204.3] - 2024-09-26
-### Changed
-- `kamu repo alias list` now supports JSON alonside with other formats mentioned in the command's help
 ### Fixed
 - Dataset creation with unique alias but with existing id for FS dataset storage mode
 - `kamu init`: fixed regression in case of using `exists_ok` flag... finally
