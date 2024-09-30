@@ -26,420 +26,7 @@ pub async fn test_get_dataset_list_flows(kamu_api_server_client: KamuApiServerCl
     kamu_api_server_client
         .graphql_api_call_assert_with_token(
             token,
-            indoc::indoc!(
-                r#"
-                query getDatasetListFlows() {
-                  datasets {
-                    byId(datasetId: $datasetId) {
-                      ...DatasetListFlowsData
-                      flows {
-                        runs {
-                          table: listFlows(
-                            page: $page
-                            perPage: $perPageTable
-                            filters: $filters
-                          ) {
-                            ...FlowConnectionData
-                            __typename
-                          }
-                          tiles: listFlows(
-                            page: 0
-                            perPage: $perPageTiles
-                            filters: { byFlowType: null, byStatus: null, byInitiator: null }
-                          ) {
-                            ...FlowConnectionWidgetData
-                            __typename
-                          }
-                          __typename
-                        }
-                        __typename
-                      }
-                      __typename
-                    }
-                    __typename
-                  }
-                }
-
-                fragment DatasetListFlowsData on Dataset {
-                  ...DatasetBasics
-                  metadata {
-                    currentPollingSource {
-                      fetch {
-                        ...FetchStepUrlData
-                        ...FetchStepFilesGlobData
-                        ...FetchStepContainerData
-                        __typename
-                      }
-                      __typename
-                    }
-                    currentTransform {
-                      inputs {
-                        __typename
-                      }
-                      transform {
-                        ... on TransformSql {
-                          engine
-                          __typename
-                        }
-                        __typename
-                      }
-                      __typename
-                    }
-                    __typename
-                  }
-                  __typename
-                }
-
-                fragment DatasetBasics on Dataset {
-                  # id
-                  kind
-                  name
-                  owner {
-                    ...AccountBasics
-                    __typename
-                  }
-                  alias
-                  __typename
-                }
-
-                fragment AccountBasics on Account {
-                  id
-                  accountName
-                  __typename
-                }
-
-                fragment FetchStepUrlData on FetchStepUrl {
-                  url
-                  eventTime {
-                    ... on EventTimeSourceFromPath {
-                      pattern
-                      timestampFormat
-                      __typename
-                    }
-                    ... on EventTimeSourceFromMetadata {
-                      __typename
-                    }
-                    ... on EventTimeSourceFromSystemTime {
-                      __typename
-                    }
-                    __typename
-                  }
-                  headers {
-                    name
-                    value
-                    __typename
-                  }
-                  cache {
-                    __typename
-                  }
-                  __typename
-                }
-
-                fragment FetchStepFilesGlobData on FetchStepFilesGlob {
-                  path
-                  eventTime {
-                    ... on EventTimeSourceFromPath {
-                      pattern
-                      timestampFormat
-                      __typename
-                    }
-                    ... on EventTimeSourceFromMetadata {
-                      __typename
-                    }
-                    ... on EventTimeSourceFromSystemTime {
-                      __typename
-                    }
-                    __typename
-                  }
-                  cache {
-                    __typename
-                  }
-                  order
-                  __typename
-                }
-
-                fragment FetchStepContainerData on FetchStepContainer {
-                  image
-                  command
-                  args
-                  env {
-                    name
-                    value
-                    __typename
-                  }
-                  __typename
-                }
-
-                fragment FlowConnectionData on FlowConnection {
-                  nodes {
-                    ...FlowSummaryData
-                    __typename
-                  }
-                  totalCount
-                  pageInfo {
-                    ...DatasetPageInfo
-                    __typename
-                  }
-                  edges {
-                    node {
-                      ...FlowSummaryData
-                      __typename
-                    }
-                    __typename
-                  }
-                  __typename
-                }
-
-                fragment FlowSummaryData on Flow {
-                  description {
-                    ... on FlowDescriptionDatasetPollingIngest {
-                      datasetId
-                      ingestResult {
-                        ... on FlowDescriptionUpdateResultUpToDate {
-                          uncacheable
-                          __typename
-                        }
-                        ... on FlowDescriptionUpdateResultSuccess {
-                          numBlocks
-                          numRecords
-                          updatedWatermark
-                          __typename
-                        }
-                        __typename
-                      }
-                      __typename
-                    }
-                    ... on FlowDescriptionDatasetPushIngest {
-                      datasetId
-                      sourceName
-                      inputRecordsCount
-                      ingestResult {
-                        ... on FlowDescriptionUpdateResultUpToDate {
-                          uncacheable
-                          __typename
-                        }
-                        ... on FlowDescriptionUpdateResultSuccess {
-                          numBlocks
-                          numRecords
-                          updatedWatermark
-                          __typename
-                        }
-                        __typename
-                      }
-                      __typename
-                    }
-                    ... on FlowDescriptionDatasetExecuteTransform {
-                      datasetId
-                      transformResult {
-                        ... on FlowDescriptionUpdateResultUpToDate {
-                          uncacheable
-                          __typename
-                        }
-                        ... on FlowDescriptionUpdateResultSuccess {
-                          numBlocks
-                          numRecords
-                          updatedWatermark
-                          __typename
-                        }
-                        __typename
-                      }
-                      __typename
-                    }
-                    ... on FlowDescriptionDatasetHardCompaction {
-                      # datasetId
-                      compactionResult {
-                        ... on FlowDescriptionHardCompactionSuccess {
-                          originalBlocksCount
-                          resultingBlocksCount
-                          newHead
-                          __typename
-                        }
-                        ... on FlowDescriptionHardCompactionNothingToDo {
-                          message
-                          dummy
-                          __typename
-                        }
-                        __typename
-                      }
-                      __typename
-                    }
-                    ... on FlowDescriptionSystemGC {
-                      dummy
-                      __typename
-                    }
-                    ... on FlowDescriptionDatasetReset {
-                      datasetId
-                      resetResult {
-                        newHead
-                        __typename
-                      }
-                      __typename
-                    }
-                    __typename
-                  }
-                  flowId
-                  status
-                  initiator {
-                    ...Account
-                    __typename
-                  }
-                  outcome {
-                    ...FlowOutcomeData
-                    __typename
-                  }
-                  timing {
-                    awaitingExecutorSince
-                    runningSince
-                    finishedAt
-                    __typename
-                  }
-                  startCondition {
-                    __typename
-                    ... on FlowStartConditionThrottling {
-                      intervalSec
-                      wakeUpAt
-                      shiftedFrom
-                      __typename
-                    }
-                    ... on FlowStartConditionBatching {
-                      activeTransformRule {
-                        minRecordsToAwait
-                        maxBatchingInterval {
-                          ...TimeDeltaData
-                          __typename
-                        }
-                        __typename
-                      }
-                      batchingDeadline
-                      accumulatedRecordsCount
-                      watermarkModified
-                      __typename
-                    }
-                    ... on FlowStartConditionSchedule {
-                      wakeUpAt
-                      __typename
-                    }
-                    ... on FlowStartConditionExecutor {
-                      taskId
-                      __typename
-                    }
-                  }
-                  configSnapshot {
-                    ... on FlowConfigurationIngest {
-                      schedule {
-                        ... on TimeDelta {
-                          ...TimeDeltaData
-                          __typename
-                        }
-                        ... on Cron5ComponentExpression {
-                          cron5ComponentExpression
-                          __typename
-                        }
-                        __typename
-                      }
-                      fetchUncacheable
-                      __typename
-                    }
-                    ... on FlowConfigurationCompactionRule {
-                      compactionRule {
-                        __typename
-                      }
-                      __typename
-                    }
-                    __typename
-                  }
-                  __typename
-                }
-
-                fragment Account on Account {
-                  id
-                  accountName
-                  displayName
-                  accountType
-                  avatarUrl
-                  isAdmin
-                  __typename
-                }
-
-                fragment FlowOutcomeData on FlowOutcome {
-                  ... on FlowSuccessResult {
-                    message
-                    __typename
-                  }
-                  ... on FlowFailedError {
-                    reason {
-                      ... on FlowFailureReasonGeneral {
-                        message
-                        __typename
-                      }
-                      ... on FlowFailureReasonInputDatasetCompacted {
-                        message
-                        inputDataset {
-                          ...DatasetBasics
-                          __typename
-                        }
-                        __typename
-                      }
-                      __typename
-                    }
-                    __typename
-                  }
-                  ... on FlowAbortedResult {
-                    message
-                    __typename
-                  }
-                  __typename
-                }
-
-                fragment TimeDeltaData on TimeDelta {
-                  every
-                  unit
-                  __typename
-                }
-
-                fragment DatasetPageInfo on PageBasedInfo {
-                  hasNextPage
-                  hasPreviousPage
-                  currentPage
-                  totalPages
-                  __typename
-                }
-
-                fragment FlowConnectionWidgetData on FlowConnection {
-                  nodes {
-                    ...FlowItemWidgetData
-                    __typename
-                  }
-                  totalCount
-                  __typename
-                }
-
-                fragment FlowItemWidgetData on Flow {
-                  status
-                  initiator {
-                    accountName
-                    __typename
-                  }
-                  outcome {
-                    ...FlowOutcomeData
-                    __typename
-                  }
-                  timing {
-                    awaitingExecutorSince
-                    runningSince
-                    finishedAt
-                    __typename
-                  }
-                  __typename
-                }
-                "#
-            )
-            .replace("$datasetId", format!("\"{dataset_id}\"").as_str())
-            .replace("$page", "0")
-            .replace("$perPageTable", "15")
-            .replace("$perPageTiles", "150")
-            .replace("$filters", "{}")
-            .as_str(),
+            get_dataset_list_flows_query(&dataset_id).as_str(),
             Ok(indoc::indoc!(
                 r#"
                 {
@@ -992,430 +579,10 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
 
     tokio::time::sleep(std::time::Duration::from_secs(20)).await;
 
-    // The query is almost identical to kamu-web-ui, for ease of later edits.
-    // Except for commented dynamic dataset ID fields:
-    // - search FlowDescriptionDatasetHardCompaction (datasetId)
-    // - search DatasetBasics (id)
-    // - search FlowDescriptionDatasetExecuteTransform (id)
-    // - search FlowItemWidgetData.timing:
-    //   - awaitingExecutorSince
-    //   - runningSince
-    //   - finishedAt
-
     kamu_api_server_client
         .graphql_api_call_assert_with_token(
             token,
-            indoc::indoc!(
-                r#"
-                query getDatasetListFlows() {
-                  datasets {
-                    byId(datasetId: $datasetId) {
-                      ...DatasetListFlowsData
-                      flows {
-                        runs {
-                          table: listFlows(
-                            page: $page
-                            perPage: $perPageTable
-                            filters: $filters
-                          ) {
-                            ...FlowConnectionData
-                            __typename
-                          }
-                          tiles: listFlows(
-                            page: 0
-                            perPage: $perPageTiles
-                            filters: { byFlowType: null, byStatus: null, byInitiator: null }
-                          ) {
-                            ...FlowConnectionWidgetData
-                            __typename
-                          }
-                          __typename
-                        }
-                        __typename
-                      }
-                      __typename
-                    }
-                    __typename
-                  }
-                }
-
-                fragment DatasetListFlowsData on Dataset {
-                  ...DatasetBasics
-                  metadata {
-                    currentPollingSource {
-                      fetch {
-                        ...FetchStepUrlData
-                        ...FetchStepFilesGlobData
-                        ...FetchStepContainerData
-                        __typename
-                      }
-                      __typename
-                    }
-                    currentTransform {
-                      inputs {
-                        __typename
-                      }
-                      transform {
-                        ... on TransformSql {
-                          engine
-                          __typename
-                        }
-                        __typename
-                      }
-                      __typename
-                    }
-                    __typename
-                  }
-                  __typename
-                }
-
-                fragment DatasetBasics on Dataset {
-                  # id
-                  kind
-                  name
-                  owner {
-                    ...AccountBasics
-                    __typename
-                  }
-                  alias
-                  __typename
-                }
-
-                fragment AccountBasics on Account {
-                  id
-                  accountName
-                  __typename
-                }
-
-                fragment FetchStepUrlData on FetchStepUrl {
-                  url
-                  eventTime {
-                    ... on EventTimeSourceFromPath {
-                      pattern
-                      timestampFormat
-                      __typename
-                    }
-                    ... on EventTimeSourceFromMetadata {
-                      __typename
-                    }
-                    ... on EventTimeSourceFromSystemTime {
-                      __typename
-                    }
-                    __typename
-                  }
-                  headers {
-                    name
-                    value
-                    __typename
-                  }
-                  cache {
-                    __typename
-                  }
-                  __typename
-                }
-
-                fragment FetchStepFilesGlobData on FetchStepFilesGlob {
-                  path
-                  eventTime {
-                    ... on EventTimeSourceFromPath {
-                      pattern
-                      timestampFormat
-                      __typename
-                    }
-                    ... on EventTimeSourceFromMetadata {
-                      __typename
-                    }
-                    ... on EventTimeSourceFromSystemTime {
-                      __typename
-                    }
-                    __typename
-                  }
-                  cache {
-                    __typename
-                  }
-                  order
-                  __typename
-                }
-
-                fragment FetchStepContainerData on FetchStepContainer {
-                  image
-                  command
-                  args
-                  env {
-                    name
-                    value
-                    __typename
-                  }
-                  __typename
-                }
-
-                fragment FlowConnectionData on FlowConnection {
-                  nodes {
-                    ...FlowSummaryData
-                    __typename
-                  }
-                  totalCount
-                  pageInfo {
-                    ...DatasetPageInfo
-                    __typename
-                  }
-                  edges {
-                    node {
-                      ...FlowSummaryData
-                      __typename
-                    }
-                    __typename
-                  }
-                  __typename
-                }
-
-                fragment FlowSummaryData on Flow {
-                  description {
-                    ... on FlowDescriptionDatasetPollingIngest {
-                      datasetId
-                      ingestResult {
-                        ... on FlowDescriptionUpdateResultUpToDate {
-                          uncacheable
-                          __typename
-                        }
-                        ... on FlowDescriptionUpdateResultSuccess {
-                          numBlocks
-                          numRecords
-                          updatedWatermark
-                          __typename
-                        }
-                        __typename
-                      }
-                      __typename
-                    }
-                    ... on FlowDescriptionDatasetPushIngest {
-                      datasetId
-                      sourceName
-                      inputRecordsCount
-                      ingestResult {
-                        ... on FlowDescriptionUpdateResultUpToDate {
-                          uncacheable
-                          __typename
-                        }
-                        ... on FlowDescriptionUpdateResultSuccess {
-                          numBlocks
-                          numRecords
-                          updatedWatermark
-                          __typename
-                        }
-                        __typename
-                      }
-                      __typename
-                    }
-                    ... on FlowDescriptionDatasetExecuteTransform {
-                      # datasetId
-                      transformResult {
-                        ... on FlowDescriptionUpdateResultUpToDate {
-                          uncacheable
-                          __typename
-                        }
-                        ... on FlowDescriptionUpdateResultSuccess {
-                          numBlocks
-                          numRecords
-                          updatedWatermark
-                          __typename
-                        }
-                        __typename
-                      }
-                      __typename
-                    }
-                    ... on FlowDescriptionDatasetHardCompaction {
-                      # datasetId
-                      compactionResult {
-                        ... on FlowDescriptionHardCompactionSuccess {
-                          originalBlocksCount
-                          resultingBlocksCount
-                          newHead
-                          __typename
-                        }
-                        ... on FlowDescriptionHardCompactionNothingToDo {
-                          message
-                          dummy
-                          __typename
-                        }
-                        __typename
-                      }
-                      __typename
-                    }
-                    ... on FlowDescriptionSystemGC {
-                      dummy
-                      __typename
-                    }
-                    ... on FlowDescriptionDatasetReset {
-                      datasetId
-                      resetResult {
-                        newHead
-                        __typename
-                      }
-                      __typename
-                    }
-                    __typename
-                  }
-                  flowId
-                  status
-                  initiator {
-                    ...Account
-                    __typename
-                  }
-                  outcome {
-                    ...FlowOutcomeData
-                    __typename
-                  }
-                  timing {
-                    __typename
-                  }
-                  startCondition {
-                    __typename
-                    ... on FlowStartConditionThrottling {
-                      intervalSec
-                      wakeUpAt
-                      shiftedFrom
-                      __typename
-                    }
-                    ... on FlowStartConditionBatching {
-                      activeTransformRule {
-                        minRecordsToAwait
-                        maxBatchingInterval {
-                          ...TimeDeltaData
-                          __typename
-                        }
-                        __typename
-                      }
-                      batchingDeadline
-                      accumulatedRecordsCount
-                      watermarkModified
-                      __typename
-                    }
-                    ... on FlowStartConditionSchedule {
-                      wakeUpAt
-                      __typename
-                    }
-                    ... on FlowStartConditionExecutor {
-                      taskId
-                      __typename
-                    }
-                  }
-                  configSnapshot {
-                    ... on FlowConfigurationIngest {
-                      schedule {
-                        ... on TimeDelta {
-                          ...TimeDeltaData
-                          __typename
-                        }
-                        ... on Cron5ComponentExpression {
-                          cron5ComponentExpression
-                          __typename
-                        }
-                        __typename
-                      }
-                      fetchUncacheable
-                      __typename
-                    }
-                    ... on FlowConfigurationCompactionRule {
-                      compactionRule {
-                        __typename
-                      }
-                      __typename
-                    }
-                    __typename
-                  }
-                  __typename
-                }
-
-                fragment Account on Account {
-                  id
-                  accountName
-                  displayName
-                  accountType
-                  avatarUrl
-                  isAdmin
-                  __typename
-                }
-
-                fragment FlowOutcomeData on FlowOutcome {
-                  ... on FlowSuccessResult {
-                    message
-                    __typename
-                  }
-                  ... on FlowFailedError {
-                    reason {
-                      ... on FlowFailureReasonGeneral {
-                        message
-                        __typename
-                      }
-                      ... on FlowFailureReasonInputDatasetCompacted {
-                        message
-                        inputDataset {
-                          ...DatasetBasics
-                          __typename
-                        }
-                        __typename
-                      }
-                      __typename
-                    }
-                    __typename
-                  }
-                  ... on FlowAbortedResult {
-                    message
-                    __typename
-                  }
-                  __typename
-                }
-
-                fragment TimeDeltaData on TimeDelta {
-                  every
-                  unit
-                  __typename
-                }
-
-                fragment DatasetPageInfo on PageBasedInfo {
-                  hasNextPage
-                  hasPreviousPage
-                  currentPage
-                  totalPages
-                  __typename
-                }
-
-                fragment FlowConnectionWidgetData on FlowConnection {
-                  nodes {
-                    ...FlowItemWidgetData
-                    __typename
-                  }
-                  totalCount
-                  __typename
-                }
-
-                fragment FlowItemWidgetData on Flow {
-                  status
-                  initiator {
-                    accountName
-                    __typename
-                  }
-                  outcome {
-                    ...FlowOutcomeData
-                    __typename
-                  }
-                  timing {
-                    # awaitingExecutorSince
-                    # runningSince
-                    # finishedAt
-                    __typename
-                  }
-                  __typename
-                }
-                "#
-            )
-                .replace("$datasetId", format!("\"{derivative_dataset_id}\"").as_str())
-                .replace("$page", "0")
-                .replace("$perPageTable", "15")
-                .replace("$perPageTiles", "150")
-                .replace("$filters", "{}")
-                .as_str(),
+            get_dataset_list_flows_query(&derivative_dataset_id).as_str(),
             Ok(indoc::indoc!(
                 r#"
                 {
@@ -1563,6 +730,433 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
             )),
         )
         .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn get_dataset_list_flows_query(dataset_id: &str) -> String {
+    // The query is almost identical to kamu-web-ui, for ease of later edits.
+    // Except for commented dynamic dataset ID fields:
+    // - search FlowDescriptionDatasetHardCompaction (datasetId)
+    // - search DatasetBasics (id)
+    // - search FlowDescriptionDatasetExecuteTransform (id)
+    // - search FlowItemWidgetData.timing:
+    //   - awaitingExecutorSince
+    //   - runningSince
+    //   - finishedAt
+
+    indoc::indoc!(
+        r#"
+        query getDatasetListFlows() {
+          datasets {
+            byId(datasetId: $datasetId) {
+              ...DatasetListFlowsData
+              flows {
+                runs {
+                  table: listFlows(
+                    page: $page
+                    perPage: $perPageTable
+                    filters: $filters
+                  ) {
+                    ...FlowConnectionData
+                    __typename
+                  }
+                  tiles: listFlows(
+                    page: 0
+                    perPage: $perPageTiles
+                    filters: { byFlowType: null, byStatus: null, byInitiator: null }
+                  ) {
+                    ...FlowConnectionWidgetData
+                    __typename
+                  }
+                  __typename
+                }
+                __typename
+              }
+              __typename
+            }
+            __typename
+          }
+        }
+
+        fragment DatasetListFlowsData on Dataset {
+          ...DatasetBasics
+          metadata {
+            currentPollingSource {
+              fetch {
+                ...FetchStepUrlData
+                ...FetchStepFilesGlobData
+                ...FetchStepContainerData
+                __typename
+              }
+              __typename
+            }
+            currentTransform {
+              inputs {
+                __typename
+              }
+              transform {
+                ... on TransformSql {
+                  engine
+                  __typename
+                }
+                __typename
+              }
+              __typename
+            }
+            __typename
+          }
+          __typename
+        }
+
+        fragment DatasetBasics on Dataset {
+          # id
+          kind
+          name
+          owner {
+            ...AccountBasics
+            __typename
+          }
+          alias
+          __typename
+        }
+
+        fragment AccountBasics on Account {
+          id
+          accountName
+          __typename
+        }
+
+        fragment FetchStepUrlData on FetchStepUrl {
+          url
+          eventTime {
+            ... on EventTimeSourceFromPath {
+              pattern
+              timestampFormat
+              __typename
+            }
+            ... on EventTimeSourceFromMetadata {
+              __typename
+            }
+            ... on EventTimeSourceFromSystemTime {
+              __typename
+            }
+            __typename
+          }
+          headers {
+            name
+            value
+            __typename
+          }
+          cache {
+            __typename
+          }
+          __typename
+        }
+
+        fragment FetchStepFilesGlobData on FetchStepFilesGlob {
+          path
+          eventTime {
+            ... on EventTimeSourceFromPath {
+              pattern
+              timestampFormat
+              __typename
+            }
+            ... on EventTimeSourceFromMetadata {
+              __typename
+            }
+            ... on EventTimeSourceFromSystemTime {
+              __typename
+            }
+            __typename
+          }
+          cache {
+            __typename
+          }
+          order
+          __typename
+        }
+
+        fragment FetchStepContainerData on FetchStepContainer {
+          image
+          command
+          args
+          env {
+            name
+            value
+            __typename
+          }
+          __typename
+        }
+
+        fragment FlowConnectionData on FlowConnection {
+          nodes {
+            ...FlowSummaryData
+            __typename
+          }
+          totalCount
+          pageInfo {
+            ...DatasetPageInfo
+            __typename
+          }
+          edges {
+            node {
+              ...FlowSummaryData
+              __typename
+            }
+            __typename
+          }
+          __typename
+        }
+
+        fragment FlowSummaryData on Flow {
+          description {
+            ... on FlowDescriptionDatasetPollingIngest {
+              datasetId
+              ingestResult {
+                ... on FlowDescriptionUpdateResultUpToDate {
+                  uncacheable
+                  __typename
+                }
+                ... on FlowDescriptionUpdateResultSuccess {
+                  numBlocks
+                  numRecords
+                  updatedWatermark
+                  __typename
+                }
+                __typename
+              }
+              __typename
+            }
+            ... on FlowDescriptionDatasetPushIngest {
+              datasetId
+              sourceName
+              inputRecordsCount
+              ingestResult {
+                ... on FlowDescriptionUpdateResultUpToDate {
+                  uncacheable
+                  __typename
+                }
+                ... on FlowDescriptionUpdateResultSuccess {
+                  numBlocks
+                  numRecords
+                  updatedWatermark
+                  __typename
+                }
+                __typename
+              }
+              __typename
+            }
+            ... on FlowDescriptionDatasetExecuteTransform {
+              # datasetId
+              transformResult {
+                ... on FlowDescriptionUpdateResultUpToDate {
+                  uncacheable
+                  __typename
+                }
+                ... on FlowDescriptionUpdateResultSuccess {
+                  numBlocks
+                  numRecords
+                  updatedWatermark
+                  __typename
+                }
+                __typename
+              }
+              __typename
+            }
+            ... on FlowDescriptionDatasetHardCompaction {
+              # datasetId
+              compactionResult {
+                ... on FlowDescriptionHardCompactionSuccess {
+                  originalBlocksCount
+                  resultingBlocksCount
+                  newHead
+                  __typename
+                }
+                ... on FlowDescriptionHardCompactionNothingToDo {
+                  message
+                  dummy
+                  __typename
+                }
+                __typename
+              }
+              __typename
+            }
+            ... on FlowDescriptionSystemGC {
+              dummy
+              __typename
+            }
+            ... on FlowDescriptionDatasetReset {
+              datasetId
+              resetResult {
+                newHead
+                __typename
+              }
+              __typename
+            }
+            __typename
+          }
+          flowId
+          status
+          initiator {
+            ...Account
+            __typename
+          }
+          outcome {
+            ...FlowOutcomeData
+            __typename
+          }
+          timing {
+            __typename
+          }
+          startCondition {
+            __typename
+            ... on FlowStartConditionThrottling {
+              intervalSec
+              wakeUpAt
+              shiftedFrom
+              __typename
+            }
+            ... on FlowStartConditionBatching {
+              activeTransformRule {
+                minRecordsToAwait
+                maxBatchingInterval {
+                  ...TimeDeltaData
+                  __typename
+                }
+                __typename
+              }
+              batchingDeadline
+              accumulatedRecordsCount
+              watermarkModified
+              __typename
+            }
+            ... on FlowStartConditionSchedule {
+              wakeUpAt
+              __typename
+            }
+            ... on FlowStartConditionExecutor {
+              taskId
+              __typename
+            }
+          }
+          configSnapshot {
+            ... on FlowConfigurationIngest {
+              schedule {
+                ... on TimeDelta {
+                  ...TimeDeltaData
+                  __typename
+                }
+                ... on Cron5ComponentExpression {
+                  cron5ComponentExpression
+                  __typename
+                }
+                __typename
+              }
+              fetchUncacheable
+              __typename
+            }
+            ... on FlowConfigurationCompactionRule {
+              compactionRule {
+                __typename
+              }
+              __typename
+            }
+            __typename
+          }
+          __typename
+        }
+
+        fragment Account on Account {
+          id
+          accountName
+          displayName
+          accountType
+          avatarUrl
+          isAdmin
+          __typename
+        }
+
+        fragment FlowOutcomeData on FlowOutcome {
+          ... on FlowSuccessResult {
+            message
+            __typename
+          }
+          ... on FlowFailedError {
+            reason {
+              ... on FlowFailureReasonGeneral {
+                message
+                __typename
+              }
+              ... on FlowFailureReasonInputDatasetCompacted {
+                message
+                inputDataset {
+                  ...DatasetBasics
+                  __typename
+                }
+                __typename
+              }
+              __typename
+            }
+            __typename
+          }
+          ... on FlowAbortedResult {
+            message
+            __typename
+          }
+          __typename
+        }
+
+        fragment TimeDeltaData on TimeDelta {
+          every
+          unit
+          __typename
+        }
+
+        fragment DatasetPageInfo on PageBasedInfo {
+          hasNextPage
+          hasPreviousPage
+          currentPage
+          totalPages
+          __typename
+        }
+
+        fragment FlowConnectionWidgetData on FlowConnection {
+          nodes {
+            ...FlowItemWidgetData
+            __typename
+          }
+          totalCount
+          __typename
+        }
+
+        fragment FlowItemWidgetData on Flow {
+          status
+          initiator {
+            accountName
+            __typename
+          }
+          outcome {
+            ...FlowOutcomeData
+            __typename
+          }
+          timing {
+            # awaitingExecutorSince
+            # runningSince
+            # finishedAt
+            __typename
+          }
+          __typename
+        }
+        "#
+    )
+    .replace("$datasetId", format!("\"{dataset_id}\"").as_str())
+    .replace("$page", "0")
+    .replace("$perPageTable", "15")
+    .replace("$perPageTiles", "150")
+    .replace("$filters", "{}")
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
