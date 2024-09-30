@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- Postgres implementation for dataset entry and account Re-BAC repositories
 ### Changed
 - `kamu repo alias list`: added JSON output alongside with other formats mentioned in the command's help
 
