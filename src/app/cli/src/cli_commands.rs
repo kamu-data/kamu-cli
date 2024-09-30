@@ -400,9 +400,7 @@ pub fn get_command(
                     let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
 
                     Box::new(APIServerRunCommand::new(
-                        // TODO: base?
                         base_catalog.clone(),
-                        cli_catalog.clone(),
                         workspace_svc.is_multi_tenant_workspace(),
                         cli_catalog.get_one()?,
                         sc.address,
@@ -490,7 +488,6 @@ pub fn get_command(
             };
 
             Box::new(UICommand::new(
-                // TODO: base?
                 base_catalog.clone(),
                 workspace_svc.is_multi_tenant_workspace(),
                 current_account_name,
