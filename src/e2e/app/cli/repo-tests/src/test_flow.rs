@@ -576,7 +576,7 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(20)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
 
     kamu_api_server_client
         .graphql_api_call_assert_with_token(
