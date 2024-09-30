@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE dataset_entries\n                SET dataset_name = $2\n                WHERE dataset_id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bacc55b51774aa35292e6585824de5781b20c1d3ffbd2fe80553a418eea616fa"
+}

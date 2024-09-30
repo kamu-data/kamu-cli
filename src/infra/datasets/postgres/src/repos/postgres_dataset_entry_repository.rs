@@ -45,7 +45,6 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             .map_err(GetDatasetEntryError::Internal)?;
 
         let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
-        let dataset_id_as_str = stack_dataset_id.as_str();
 
         let maybe_dataset_entry_row = sqlx::query_as!(
             DatasetEntryRowModel,
@@ -57,7 +56,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             FROM dataset_entries
             WHERE dataset_id = $1
             "#,
-            dataset_id_as_str,
+            stack_dataset_id.as_str(),
         )
         .fetch_optional(connection_mut)
         .await
@@ -83,8 +82,6 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             .map_err(GetDatasetEntryByNameError::Internal)?;
 
         let stack_owner_id = owner_id.as_did_str().to_stack_string();
-        let owner_id_as_str = stack_owner_id.as_str();
-        let dataset_name_as_str = name.as_str();
 
         let maybe_dataset_entry_row = sqlx::query_as!(
             DatasetEntryRowModel,
@@ -95,10 +92,10 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                    created_at   as "created_at: _"
             FROM dataset_entries
             WHERE owner_id = $1
-              AND dataset_name = $2
+                  AND dataset_name = $2
             "#,
-            owner_id_as_str,
-            dataset_name_as_str
+            stack_owner_id.as_str(),
+            name.as_str()
         )
         .fetch_optional(connection_mut)
         .await
@@ -123,7 +120,6 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             .map_err(GetDatasetEntriesByOwnerIdError::Internal)?;
 
         let stack_owner_id = owner_id.as_did_str().to_stack_string();
-        let owner_id_as_str = stack_owner_id.as_str();
 
         let dataset_entry_rows = sqlx::query_as!(
             DatasetEntryRowModel,
@@ -135,7 +131,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             FROM dataset_entries
             WHERE owner_id = $1
             "#,
-            owner_id_as_str,
+            stack_owner_id.as_str(),
         )
         .fetch_all(connection_mut)
         .await
@@ -156,19 +152,16 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             .map_err(SaveDatasetEntryError::Internal)?;
 
         let stack_dataset_id = dataset_entry.id.as_did_str().to_stack_string();
-        let dataset_id_as_str = stack_dataset_id.as_str();
         let stack_owner_id = dataset_entry.owner_id.as_did_str().to_stack_string();
-        let owner_id_as_str = stack_owner_id.as_str();
-        let dataset_name_as_str = dataset_entry.name.as_str();
 
         sqlx::query!(
             r#"
             INSERT INTO dataset_entries(dataset_id, owner_id, dataset_name, created_at)
-            VALUES ($1, $2, $3, $4)
+                VALUES ($1, $2, $3, $4)
             "#,
-            dataset_id_as_str,
-            owner_id_as_str,
-            dataset_name_as_str,
+            stack_dataset_id.as_str(),
+            stack_owner_id.as_str(),
+            dataset_entry.name.as_str(),
             dataset_entry.created_at,
         )
         .execute(connection_mut)
@@ -201,17 +194,15 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             .map_err(UpdateDatasetEntryNameError::Internal)?;
 
         let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
-        let dataset_id_as_str = stack_dataset_id.as_str();
-        let new_dataset_name_as_str = new_name.as_str();
 
         let update_result = sqlx::query!(
             r#"
             UPDATE dataset_entries
-            SET dataset_name = $2
-            WHERE dataset_id = $1
+                SET dataset_name = $2
+                WHERE dataset_id = $1
             "#,
-            dataset_id_as_str,
-            new_dataset_name_as_str,
+            stack_dataset_id.as_str(),
+            new_name.as_str(),
         )
         .execute(&mut *connection_mut)
         .await
@@ -241,14 +232,12 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             .map_err(DeleteEntryDatasetError::Internal)?;
 
         let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
-        let dataset_id_as_str = stack_dataset_id.as_str();
+
         let delete_result = sqlx::query!(
             r#"
-            DELETE
-            FROM dataset_entries
-            WHERE dataset_id = $1
+            DELETE FROM dataset_entries WHERE dataset_id = $1
             "#,
-            dataset_id_as_str,
+            stack_dataset_id.as_str(),
         )
         .execute(&mut *connection_mut)
         .await

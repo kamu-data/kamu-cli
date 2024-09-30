@@ -5462,6 +5462,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-auth-rebac-postgres"
+version = "0.204.4"
+dependencies = [
+ "async-trait",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "internal-error",
+ "kamu-auth-rebac",
+ "kamu-auth-rebac-repo-tests",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "tokio",
+]
+
+[[package]]
 name = "kamu-auth-rebac-repo-tests"
 version = "0.204.4"
 dependencies = [

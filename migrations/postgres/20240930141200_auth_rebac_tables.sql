@@ -1,8 +1,12 @@
 /* ------------------------------ */
 
+CREATE TYPE rebac_entity_type AS ENUM ('account', 'dataset');
+
+/* ------------------------------ */
+
 CREATE TABLE auth_rebac_properties
 (
-    entity_type    VARCHAR(25)  NOT NULL,
+    entity_type    rebac_entity_type NOT NULL,
     entity_id      VARCHAR(100) NOT NULL,
     property_name  VARCHAR(50)  NOT NULL,
     property_value VARCHAR(50)  NOT NULL
@@ -18,10 +22,10 @@ CREATE UNIQUE INDEX idx_auth_rebac_properties_entity_property_name
 
 CREATE TABLE auth_rebac_relations
 (
-    subject_entity_type VARCHAR(25)  NOT NULL,
+    subject_entity_type rebac_entity_type NOT NULL,
     subject_entity_id   VARCHAR(100) NOT NULL,
     relationship        VARCHAR(50)  NOT NULL,
-    object_entity_type  VARCHAR(25)  NOT NULL,
+    object_entity_type  rebac_entity_type NOT NULL,
     object_entity_id    VARCHAR(100) NOT NULL
 );
 
