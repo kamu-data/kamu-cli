@@ -7,16 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(error_generic_member_access)]
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mod entities;
-mod jobs;
-mod repos;
-mod services;
-mod testing;
+pub const JOB_KAMU_TASKS_EXECUTOR_RECOVERY: &str =
+    "dev.kamu.domain.task-system.TaskExecutorRecovery";
 
-pub use entities::*;
-pub use jobs::*;
-pub use repos::*;
-pub use services::*;
-pub use testing::*;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

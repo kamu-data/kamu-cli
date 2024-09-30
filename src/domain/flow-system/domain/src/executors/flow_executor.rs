@@ -14,9 +14,6 @@ use internal_error::{InternalError, ResultIntoInternal};
 
 #[async_trait::async_trait]
 pub trait FlowExecutor: Sync + Send {
-    /// Runs initialization phase
-    async fn pre_run(&self, planned_start_time: DateTime<Utc>) -> Result<(), InternalError>;
-
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError>;
 }

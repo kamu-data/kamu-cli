@@ -63,7 +63,7 @@ pub(crate) struct FlowHarness {
     pub dataset_repo: Arc<dyn DatasetRepository>,
     pub flow_configuration_service: Arc<dyn FlowConfigurationService>,
     pub flow_configuration_event_store: Arc<dyn FlowConfigurationEventStore>,
-    pub flow_service: Arc<dyn FlowExecutor>,
+    pub flow_executor: Arc<FlowExecutorImpl>,
     pub flow_query_service: Arc<dyn FlowQueryService>,
     pub flow_event_store: Arc<dyn FlowEventStore>,
     pub auth_svc: Arc<dyn AuthenticationService>,
@@ -89,6 +89,34 @@ impl FlowHarness {
         let datasets_dir = tmp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
+        let accounts_catalog = {
+            let predefined_accounts_config = if overrides.custom_account_names.is_empty() {
+                PredefinedAccountsConfig::single_tenant()
+            } else {
+                let mut predefined_accounts_config = PredefinedAccountsConfig::new();
+                for account_name in overrides.custom_account_names {
+                    predefined_accounts_config
+                        .predefined
+                        .push(AccountConfig::from_name(account_name));
+                }
+                predefined_accounts_config
+            };
+
+            let mut b = dill::CatalogBuilder::new();
+            b.add_value(predefined_accounts_config)
+                .add::<LoginPasswordAuthProvider>()
+                .add::<PredefinedAccountsRegistrator>()
+                .add::<InMemoryAccountRepository>();
+
+            NoOpDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
+
+        init_on_startup::run_startup_jobs(&accounts_catalog)
+            .await
+            .unwrap();
+
         let t = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
         let fake_system_time_source = FakeSystemTimeSource::new(t);
 
@@ -105,20 +133,8 @@ impl FlowHarness {
 
         let mock_dataset_changes = overrides.mock_dataset_changes.unwrap_or_default();
 
-        let predefined_accounts_config = if overrides.custom_account_names.is_empty() {
-            PredefinedAccountsConfig::single_tenant()
-        } else {
-            let mut predefined_accounts_config = PredefinedAccountsConfig::new();
-            for account_name in overrides.custom_account_names {
-                predefined_accounts_config
-                    .predefined
-                    .push(AccountConfig::from_name(account_name));
-            }
-            predefined_accounts_config
-        };
-
         let catalog = {
-            let mut b = dill::CatalogBuilder::new();
+            let mut b = dill::CatalogBuilder::new_chained(&accounts_catalog);
 
             b.add_builder(
                 messaging_outbox::OutboxImmediateImpl::builder()
@@ -148,21 +164,16 @@ impl FlowHarness {
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<DeleteDatasetUseCaseImpl>()
             .add::<AuthenticationServiceImpl>()
-            .add_value(predefined_accounts_config)
             .add_value(JwtAuthenticationConfig::default())
-            .add::<InMemoryAccountRepository>()
             .add::<AccessTokenServiceImpl>()
             .add::<InMemoryAccessTokenRepository>()
             .add::<DependencyGraphServiceInMemory>()
             .add::<DatasetOwnershipServiceInMemory>()
-            .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
-            .add::<LoginPasswordAuthProvider>()
-            .add::<PredefinedAccountsRegistrator>()
-            .add::<DatabaseTransactionRunner>();
+            .add::<DatabaseTransactionRunner>()
+            .add::<DatasetOwnershipServiceInMemoryStateInitializer>();
 
-            NoOpDatabasePlugin::init_database_components(&mut b);
             kamu_flow_system_services::register_dependencies(&mut b);
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
@@ -189,20 +200,7 @@ impl FlowHarness {
             b.build()
         };
 
-        DatabaseTransactionRunner::new(catalog.clone())
-            .transactional(|transactional_catalog| async move {
-                let registrator = transactional_catalog
-                    .get_one::<PredefinedAccountsRegistrator>()
-                    .unwrap();
-
-                registrator
-                    .ensure_predefined_accounts_are_registered()
-                    .await
-            })
-            .await
-            .unwrap();
-
-        let flow_service = catalog.get_one::<dyn FlowExecutor>().unwrap();
+        let flow_executor = catalog.get_one::<FlowExecutorImpl>().unwrap();
         let flow_query_service = catalog.get_one::<dyn FlowQueryService>().unwrap();
         let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
         let flow_configuration_event_store = catalog
@@ -215,7 +213,7 @@ impl FlowHarness {
         Self {
             _tmp_dir: tmp_dir,
             catalog,
-            flow_service,
+            flow_executor,
             flow_query_service,
             flow_configuration_service,
             flow_configuration_event_store,
@@ -275,6 +273,22 @@ impl FlowHarness {
     }
 
     pub async fn eager_initialization(&self) {
+        self.initialize_dependency_graph().await;
+
+        use init_on_startup::InitOnStartup;
+        let dataset_ownership_initializer = self
+            .catalog
+            .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
+            .unwrap();
+        dataset_ownership_initializer
+            .run_initialization()
+            .await
+            .unwrap();
+
+        self.flow_executor.run_initialization().await.unwrap();
+    }
+
+    pub async fn initialize_dependency_graph(&self) {
         let dependency_graph_service = self
             .catalog
             .get_one::<dyn DependencyGraphService>()
@@ -286,19 +300,12 @@ impl FlowHarness {
             .eager_initialization(&dependency_graph_repository)
             .await
             .unwrap();
-
-        self.catalog
-            .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
-            .unwrap()
-            .eager_initialization()
-            .await
-            .unwrap();
     }
 
     pub async fn delete_dataset(&self, dataset_id: &DatasetID) {
         // Eagerly push dependency graph initialization before deletes.
         // It's ignored, if requested 2nd time
-        self.eager_initialization().await;
+        self.initialize_dependency_graph().await;
 
         // Do the actual deletion
         let delete_dataset = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();

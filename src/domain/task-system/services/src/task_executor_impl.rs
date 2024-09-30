@@ -12,6 +12,7 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use database_common_macros::{transactional_method1, transactional_method2};
 use dill::*;
+use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use kamu_task_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
@@ -29,6 +30,12 @@ pub struct TaskExecutorImpl {
 
 #[component(pub)]
 #[interface(dyn TaskExecutor)]
+#[interface(dyn InitOnStartup)]
+#[meta(InitOnStartupMeta {
+    job_name: JOB_KAMU_TASKS_EXECUTOR_RECOVERY,
+    depends_on: &[],
+    requires_transaction: false,
+})]
 #[scope(Singleton)]
 impl TaskExecutorImpl {
     pub fn new(
@@ -202,12 +209,6 @@ impl TaskExecutorImpl {
 
 #[async_trait::async_trait]
 impl TaskExecutor for TaskExecutorImpl {
-    #[tracing::instrument(level = "info", skip_all)]
-    async fn pre_run(&self) -> Result<(), InternalError> {
-        self.recover_running_tasks().await?;
-        Ok(())
-    }
-
     // TODO: Error and panic handling strategy
     async fn run(&self) -> Result<(), InternalError> {
         loop {
@@ -219,6 +220,15 @@ impl TaskExecutor for TaskExecutorImpl {
     #[tracing::instrument(level = "info", skip_all)]
     async fn run_single_task(&self) -> Result<(), InternalError> {
         self.run_task_iteration().await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl InitOnStartup for TaskExecutorImpl {
+    async fn run_initialization(&self) -> Result<(), InternalError> {
+        self.recover_running_tasks().await
     }
 }
 

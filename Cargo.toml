@@ -11,6 +11,7 @@ members = [
     "src/utils/event-sourcing",
     "src/utils/event-sourcing-macros",
     "src/utils/http-common",
+    "src/utils/init-on-startup",
     "src/utils/internal-error",
     "src/utils/kamu-cli-puppet",
     "src/utils/messaging-outbox",
@@ -101,6 +102,7 @@ enum-variants = { version = "0.204.3", path = "src/utils/enum-variants", default
 event-sourcing = { version = "0.204.3", path = "src/utils/event-sourcing", default-features = false }
 event-sourcing-macros = { version = "0.204.3", path = "src/utils/event-sourcing-macros", default-features = false }
 http-common = { version = "0.204.3", path = "src/utils/http-common", default-features = false }
+init-on-startup = { version = "0.204.3", path = "src/utils/init-on-startup", default-features = false }
 internal-error = { version = "0.204.3", path = "src/utils/internal-error", default-features = false }
 kamu-cli-puppet = { version = "0.204.3", path = "src/utils/kamu-cli-puppet", default-features = false }
 kamu-data-utils = { version = "0.204.3", path = "src/utils/data-utils", default-features = false }

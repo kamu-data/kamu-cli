@@ -12,7 +12,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use database_common_macros::{transactional_method1, transactional_method2};
-use dill::{component, scope, Catalog, Singleton};
+use dill::*;
+use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
 use tracing::Instrument as _;
 
@@ -28,6 +29,10 @@ enum RunMode {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const JOB_MESSAGING_OUTBOX_STARTUP: &str = "dev.kamu.utils.outbox.OutboxExecutorStartup";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct OutboxExecutor {
     catalog: Catalog,
     config: Arc<OutboxConfig>,
@@ -37,6 +42,12 @@ pub struct OutboxExecutor {
 }
 
 #[component(pub)]
+#[interface(dyn InitOnStartup)]
+#[meta(InitOnStartupMeta {
+    job_name: JOB_MESSAGING_OUTBOX_STARTUP,
+    depends_on: &[],
+    requires_transaction: false,
+})]
 #[scope(Singleton)]
 impl OutboxExecutor {
     pub fn new(
@@ -88,15 +99,6 @@ impl OutboxExecutor {
             all_durable_messaging_routes,
             consumers_by_producers,
         )
-    }
-
-    #[tracing::instrument(level = "info", skip_all)]
-    pub async fn pre_run(&self) -> Result<(), InternalError> {
-        // Trace current routes
-        self.debug_outbox_routes();
-
-        // Make sure consumption records represent the routes
-        self.init_consumption_records().await
     }
 
     pub async fn run(&self) -> Result<(), InternalError> {
@@ -256,6 +258,20 @@ impl OutboxExecutor {
         );
 
         planner.plan_consumption_tasks_by_producer().await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl InitOnStartup for OutboxExecutor {
+    #[tracing::instrument(level = "debug", skip_all, name = "OutboxExecutor::run_initialization")]
+    async fn run_initialization(&self) -> Result<(), InternalError> {
+        // Trace current routes
+        self.debug_outbox_routes();
+
+        // Make sure consumption records represent the routes
+        self.init_consumption_records().await
     }
 }
 
