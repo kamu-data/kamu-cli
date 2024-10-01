@@ -23,8 +23,10 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-kamu-datasets = { workspace = true }
 internal-error = { workspace = true }
+kamu-core = { workspace = true }
+kamu-datasets = { workspace = true }
+messaging-outbox = { workspace = true }
 opendatafabric = { workspace = true }
 time-source = { workspace = true }
 
