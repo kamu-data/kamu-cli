@@ -222,8 +222,6 @@ impl InitOnStartup for DatasetEntryService {
         name = "DatasetEntryService::run_initialization"
     )]
     async fn run_initialization(&self) -> Result<(), InternalError> {
-        // TODO: skip the search if we are not in workspace
-
         if self.has_datasets_indexed().await? {
             tracing::debug!("Skip initialization: datasets already have indexed");
 

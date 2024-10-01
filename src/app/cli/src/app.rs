@@ -212,13 +212,17 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     // Register metrics
     let metrics_registry = observability::metrics::register_all(&cli_catalog);
 
-    // Evict cache
-    if workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()? {
-        cli_catalog.get_one::<GcService>()?.evict_cache()?;
-    }
+    let is_workspace_upgrade_needed = workspace_svc.is_upgrade_needed()?;
 
-    // Startup initializations
-    run_startup_initializations(&cli_catalog).await?;
+    if workspace_svc.is_in_workspace() {
+        // Evict cache
+        if !is_workspace_upgrade_needed {
+            cli_catalog.get_one::<GcService>()?.evict_cache()?;
+        }
+
+        // Startup initializations
+        run_startup_initializations(&cli_catalog).await?;
+    }
 
     let is_transactional =
         maybe_db_connection_settings.is_some() && cli_commands::command_needs_transaction(&args);
@@ -234,7 +238,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             if command.needs_workspace() && !workspace_svc.is_in_workspace() {
                 Err(CLIError::usage_error_from(NotInWorkspace))?;
             }
-            if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
+            if command.needs_workspace() && is_workspace_upgrade_needed {
                 Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))?;
             }
             if current_account.is_explicit() && !is_multi_tenant_workspace {
