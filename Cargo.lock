@@ -5927,6 +5927,7 @@ dependencies = [
  "chrono",
  "database-common",
  "dill",
+ "init-on-startup",
  "internal-error",
  "kamu-core",
  "kamu-datasets",

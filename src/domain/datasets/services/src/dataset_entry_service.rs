@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, interface, meta, Catalog};
+use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::{
     DatasetLifecycleMessage,
@@ -27,7 +28,7 @@ use messaging_outbox::{
 };
 use time_source::SystemTimeSource;
 
-use crate::MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE;
+use crate::{JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER, MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -40,6 +41,12 @@ use crate::MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE;
         MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
     ],
     durability: MessageConsumptionDurability::Durable,
+})]
+#[interface(dyn InitOnStartup)]
+#[meta(InitOnStartupMeta {
+    job_name: JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
+    depends_on: &[],
+    requires_transaction: true,
 })]
 pub struct DatasetEntryService {
     dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
@@ -101,6 +108,20 @@ impl DatasetEntryService {
             .await
             .int_err()
     }
+
+    async fn has_datasets_indexed(&self) -> Result<bool, InternalError> {
+        let stored_dataset_entries_count = self
+            .dataset_entry_repo
+            .dataset_entries_count()
+            .await
+            .int_err()?;
+
+        Ok(stored_dataset_entries_count > 0)
+    }
+
+    async fn index_datasets(&self) -> Result<(), InternalError> {
+        todo!()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -141,6 +162,19 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetEntryService {
                 Ok(())
             }
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl InitOnStartup for DatasetEntryService {
+    async fn run_initialization(&self) -> Result<(), InternalError> {
+        if self.has_datasets_indexed().await? {
+            return Ok(());
+        }
+
+        self.index_datasets().await
     }
 }
 
