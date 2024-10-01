@@ -16,6 +16,7 @@ Recommendation: for ease of reading, use the following order:
 - Postgres implementation for dataset entry and account Re-BAC repositories
 ### Changed
 - `kamu repo alias list`: added JSON output alongside with other formats mentioned in the command's help
+- Private Datasets, `DatasetEntry` integration that will allow us to build dataset indexing
 
 ## [0.204.4] - 2024-09-30
 ### Changed
