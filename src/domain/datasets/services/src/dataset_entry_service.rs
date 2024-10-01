@@ -147,7 +147,9 @@ impl DatasetEntryService {
 
         // TODO: in one transaction?
         for dataset_handle in dataset_handles {
-            let owner_account_id = self.get_dataset_owner_id(&dataset_handle).await?;
+            let owner_account_id = self
+                .get_dataset_owner_id(&dataset_handle.alias.account_name)
+                .await?;
             let dataset_entry = DatasetEntry::new(
                 dataset_handle.id,
                 owner_account_id.clone(),
@@ -166,9 +168,9 @@ impl DatasetEntryService {
 
     async fn get_dataset_owner_id(
         &self,
-        dataset_handle: &odf::DatasetHandle,
+        maybe_owner_name: &Option<odf::AccountName>,
     ) -> Result<odf::AccountID, InternalError> {
-        match &dataset_handle.alias.account_name {
+        match &maybe_owner_name {
             Some(account_name) => {
                 let account = self
                     .account_repository
