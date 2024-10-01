@@ -25,7 +25,7 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
-use kamu_datasets_services::DatasetEntryService;
+use kamu_datasets_services::{DatasetEntryService, DatasetEntryServiceInitializationSkipper};
 use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
@@ -134,6 +134,10 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             args.e2e_output_data_path.is_some(),
         );
 
+        if is_init_command {
+            base_catalog_builder.add_value(DatasetEntryServiceInitializationSkipper {});
+        }
+
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
 
@@ -214,15 +218,13 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     let is_workspace_upgrade_needed = workspace_svc.is_upgrade_needed()?;
 
-    if workspace_svc.is_in_workspace() {
+    if workspace_svc.is_in_workspace() && !is_workspace_upgrade_needed {
         // Evict cache
-        if !is_workspace_upgrade_needed {
-            cli_catalog.get_one::<GcService>()?.evict_cache()?;
-        }
-
-        // Startup initializations
-        run_startup_initializations(&cli_catalog).await?;
+        cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
+
+    // Startup initializations
+    run_startup_initializations(&cli_catalog).await?;
 
     let is_transactional =
         maybe_db_connection_settings.is_some() && cli_commands::command_needs_transaction(&args);

@@ -40,6 +40,11 @@ use crate::{JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER, MESSAGE_CONSUMER_KAMU_DATAS
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+pub struct DatasetEntryServiceInitializationSkipper {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[component(pub)]
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
 #[meta(MessageConsumerMeta {
@@ -60,6 +65,7 @@ pub struct DatasetEntryService {
     time_source: Arc<dyn SystemTimeSource>,
     dataset_repo: Arc<dyn DatasetRepository>,
     account_repository: Arc<dyn AccountRepository>,
+    maybe_initialization_skipper: Option<Arc<DatasetEntryServiceInitializationSkipper>>,
 }
 
 impl DatasetEntryService {
@@ -68,12 +74,14 @@ impl DatasetEntryService {
         time_source: Arc<dyn SystemTimeSource>,
         dataset_repo: Arc<dyn DatasetRepository>,
         account_repository: Arc<dyn AccountRepository>,
+        maybe_initialization_skipper: Option<Arc<DatasetEntryServiceInitializationSkipper>>,
     ) -> Self {
         Self {
             dataset_entry_repo,
             time_source,
             dataset_repo,
             account_repository,
+            maybe_initialization_skipper,
         }
     }
 
@@ -226,6 +234,12 @@ impl InitOnStartup for DatasetEntryService {
         name = "DatasetEntryService::run_initialization"
     )]
     async fn run_initialization(&self) -> Result<(), InternalError> {
+        if self.maybe_initialization_skipper.is_some() {
+            tracing::debug!("Skip initialization: since a skipper is present");
+
+            return Ok(());
+        }
+
         if self.has_datasets_indexed().await? {
             tracing::debug!("Skip initialization: datasets already have indexed");
 
