@@ -17,11 +17,15 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{
     CreateDatasetResult,
+    DatasetLifecycleMessage,
     DatasetRepository,
     GetDatasetError,
     RenameDatasetError,
     RenameDatasetUseCase,
+    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
+use messaging_outbox::{MockOutbox, Outbox};
+use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetKind, DatasetName};
 use time_source::SystemTimeSourceDefault;
 
@@ -34,8 +38,10 @@ async fn test_rename_dataset_success_via_ref() {
 
     let mock_authorizer =
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, true);
+    let mut mock_outbox = MockOutbox::new();
+    RenameUseCaseHarness::add_outbox_dataset_renamed_expectation(&mut mock_outbox, 1);
 
-    let harness = RenameUseCaseHarness::new(mock_authorizer);
+    let harness = RenameUseCaseHarness::new(mock_authorizer, mock_outbox);
     harness.create_root_dataset(&alias_foo).await;
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
@@ -61,7 +67,7 @@ async fn test_rename_dataset_success_via_ref() {
 
 #[tokio::test]
 async fn test_rename_dataset_not_found() {
-    let harness = RenameUseCaseHarness::new(MockDatasetActionAuthorizer::new());
+    let harness = RenameUseCaseHarness::new(MockDatasetActionAuthorizer::new(), MockOutbox::new());
 
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
     assert_matches!(
@@ -84,6 +90,7 @@ async fn test_rename_dataset_unauthorized() {
 
     let harness = RenameUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, false),
+        MockOutbox::new(),
     );
 
     harness.create_root_dataset(&alias_foo).await;
@@ -111,7 +118,10 @@ struct RenameUseCaseHarness {
 }
 
 impl RenameUseCaseHarness {
-    fn new(mock_dataset_action_authorizer: MockDatasetActionAuthorizer) -> Self {
+    fn new(
+        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_outbox: MockOutbox,
+    ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
         let datasets_dir = tempdir.path().join("datasets");
@@ -130,6 +140,8 @@ impl RenameUseCaseHarness {
             .add_value(mock_dataset_action_authorizer)
             .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
             .add::<SystemTimeSourceDefault>()
+            .add_value(mock_outbox)
+            .bind::<dyn Outbox, MockOutbox>()
             .build();
 
         let use_case = catalog.get_one::<dyn RenameDatasetUseCase>().unwrap();
@@ -167,6 +179,22 @@ impl RenameUseCaseHarness {
             .find_dataset_by_ref(&alias.as_local_ref())
             .await?;
         Ok(())
+    }
+
+    fn add_outbox_dataset_renamed_expectation(mock_outbox: &mut MockOutbox, times: usize) {
+        mock_outbox
+            .expect_post_message_as_json()
+            .with(
+                eq(MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE),
+                function(|message_as_json: &serde_json::Value| {
+                    matches!(
+                        serde_json::from_value::<DatasetLifecycleMessage>(message_as_json.clone()),
+                        Ok(DatasetLifecycleMessage::Renamed(_))
+                    )
+                }),
+            )
+            .times(times)
+            .returning(|_, _| Ok(()));
     }
 }
 
