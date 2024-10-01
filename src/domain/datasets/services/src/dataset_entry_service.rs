@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method2;
 use dill::{component, interface, meta, Catalog};
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
@@ -63,26 +62,26 @@ pub struct DatasetEntryServiceInitializationSkipper {}
     requires_transaction: true,
 })]
 pub struct DatasetEntryService {
-    catalog: Catalog,
     dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
     time_source: Arc<dyn SystemTimeSource>,
     dataset_repo: Arc<dyn DatasetRepository>,
+    account_repository: Arc<dyn AccountRepository>,
     maybe_initialization_skipper: Option<Arc<DatasetEntryServiceInitializationSkipper>>,
 }
 
 impl DatasetEntryService {
     pub fn new(
-        catalog: Catalog,
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
         time_source: Arc<dyn SystemTimeSource>,
         dataset_repo: Arc<dyn DatasetRepository>,
+        account_repository: Arc<dyn AccountRepository>,
         maybe_initialization_skipper: Option<Arc<DatasetEntryServiceInitializationSkipper>>,
     ) -> Self {
         Self {
-            catalog,
             dataset_entry_repo,
             time_source,
             dataset_repo,
+            account_repository,
             maybe_initialization_skipper,
         }
     }
@@ -147,17 +146,13 @@ impl DatasetEntryService {
 
         let dataset_handles: Vec<_> = self.dataset_repo.get_all_datasets().try_collect().await?;
 
-        self.transactional_dataset_handles_processing(dataset_handles)
+        self.concurrent_dataset_handles_processing(dataset_handles)
             .await?;
 
         Ok(())
     }
 
-    #[transactional_method2(
-        dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
-        account_repository: Arc<dyn AccountRepository>
-    )]
-    async fn transactional_dataset_handles_processing(
+    async fn concurrent_dataset_handles_processing(
         &self,
         dataset_handles: Vec<DatasetHandle>,
     ) -> Result<(), InternalError> {
@@ -165,8 +160,8 @@ impl DatasetEntryService {
         let now = self.time_source.now();
 
         for dataset_handle in dataset_handles {
-            let task_account_repository = account_repository.clone();
-            let task_dataset_entry_repo = dataset_entry_repo.clone();
+            let task_account_repository = self.account_repository.clone();
+            let task_dataset_entry_repo = self.dataset_entry_repo.clone();
             let task_now = now.clone();
 
             join_set.spawn(async move {
