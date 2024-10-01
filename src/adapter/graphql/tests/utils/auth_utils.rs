@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::DatabaseTransactionRunner;
 use kamu_accounts::*;
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{LoginPasswordAuthProvider, PredefinedAccountsRegistrator};
@@ -45,16 +44,7 @@ pub async fn authentication_catalogs(
         .add_value(predefined_accounts_config)
         .build();
 
-    DatabaseTransactionRunner::new(catalog_authorized.clone())
-        .transactional(|transactional_catalog| async move {
-            let registrator = transactional_catalog
-                .get_one::<PredefinedAccountsRegistrator>()
-                .unwrap();
-
-            registrator
-                .ensure_predefined_accounts_are_registered()
-                .await
-        })
+    init_on_startup::run_startup_jobs(&catalog_authorized)
         .await
         .unwrap();
 

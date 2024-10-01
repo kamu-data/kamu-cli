@@ -79,18 +79,7 @@ impl Harness {
             b.build()
         };
 
-        DatabaseTransactionRunner::new(catalog.clone())
-            .transactional(|transactional_catalog| async move {
-                let registrator = transactional_catalog
-                    .get_one::<PredefinedAccountsRegistrator>()
-                    .unwrap();
-
-                registrator
-                    .ensure_predefined_accounts_are_registered()
-                    .await
-            })
-            .await
-            .unwrap();
+        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
         let system_time_source_stub = catalog.get_one::<SystemTimeSourceStub>().unwrap();
 

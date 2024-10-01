@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use database_common::NoOpDatabasePlugin;
 use dill::*;
+use init_on_startup::InitOnStartup;
 use internal_error::InternalError;
 use kamu_messaging_outbox_inmem::{
     InMemoryOutboxMessageConsumptionRepository,
@@ -49,7 +50,7 @@ async fn test_deliver_messages_of_one_type() {
     };
 
     let harness = OutboxExecutorHarness::new();
-    harness.outbox_processor.pre_run().await.unwrap();
+    harness.outbox_processor.run_initialization().await.unwrap();
 
     harness
         .outbox
@@ -111,7 +112,7 @@ async fn test_deliver_messages_of_two_types() {
     };
 
     let harness = OutboxExecutorHarness::new();
-    harness.outbox_processor.pre_run().await.unwrap();
+    harness.outbox_processor.run_initialization().await.unwrap();
 
     harness
         .outbox
@@ -174,7 +175,7 @@ async fn test_deliver_messages_multiple_consumers() {
     };
 
     let harness = OutboxExecutorHarness::new();
-    harness.outbox_processor.pre_run().await.unwrap();
+    harness.outbox_processor.run_initialization().await.unwrap();
 
     harness
         .outbox
@@ -235,7 +236,7 @@ async fn test_deliver_messages_multiple_consumers() {
 #[test_log::test(tokio::test)]
 async fn test_deliver_messages_with_partial_consumption() {
     let harness = OutboxExecutorHarness::new();
-    harness.outbox_processor.pre_run().await.unwrap();
+    harness.outbox_processor.run_initialization().await.unwrap();
 
     let message_texts = ["foo", "bar", "baz", "super", "duper"];
     for message_text in message_texts {

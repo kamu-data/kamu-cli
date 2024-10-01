@@ -19,6 +19,7 @@ mod aggregates;
 mod dataset_flow_key;
 mod entities;
 mod executors;
+mod jobs;
 mod repos;
 mod services;
 
@@ -27,5 +28,6 @@ pub use dataset_flow_key::*;
 pub use entities::*;
 pub use executors::*;
 pub use flow_messages_types::*;
+pub use jobs::*;
 pub use repos::*;
 pub use services::*;

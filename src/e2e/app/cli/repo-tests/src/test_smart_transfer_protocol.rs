@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli_e2e_common::KamuApiServerClient;
+use kamu_cli_e2e_common::{KamuApiServerClient, KamuApiServerClientExt};
 use kamu_cli_puppet::KamuCliPuppet;
 use reqwest::Url;
 
@@ -15,29 +15,7 @@ use reqwest::Url;
 
 pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServerClient) {
     // 1. Grub a token
-    let token = {
-        let login_response = kamu_api_server_client
-            .graphql_api_call(
-                indoc::indoc!(
-                    r#"
-                    mutation {
-                      auth {
-                        login(loginMethod: "oauth_github", loginCredentialsJson: "{\"login\":\"e2e-user\"}") {
-                          accessToken
-                        }
-                      }
-                    }
-                    "#,
-                ),
-                None,
-            )
-            .await;
-
-        login_response["auth"]["login"]["accessToken"]
-            .as_str()
-            .map(ToOwned::to_owned)
-            .unwrap()
-    };
+    let token = kamu_api_server_client.login_as_e2e_user().await;
 
     let kamu_api_server_dataset_endpoint = {
         let base_url = kamu_api_server_client.get_base_url();

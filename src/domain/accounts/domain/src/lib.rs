@@ -10,11 +10,13 @@
 #![feature(error_generic_member_access)]
 
 mod entities;
+mod jobs;
 mod repos;
 mod services;
 mod testing;
 
 pub use entities::*;
+pub use jobs::*;
 pub use repos::*;
 pub use services::*;
 pub use testing::*;

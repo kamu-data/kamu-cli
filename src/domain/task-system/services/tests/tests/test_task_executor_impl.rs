@@ -44,8 +44,10 @@ async fn test_pre_run_requeues_running_tasks() {
     assert_eq!(task_2.status(), TaskStatus::Running);
     assert_eq!(task_3.status(), TaskStatus::Queued);
 
-    // A pre-run must convert all Running into Queued
-    harness.task_executor.pre_run().await.unwrap();
+    // A recovery must convert all Running into Queued
+    init_on_startup::run_startup_jobs(&harness.catalog)
+        .await
+        .unwrap();
 
     // 1, 2, 3 - Queued
     let task_1 = harness.get_task(task_id_1).await;
@@ -133,7 +135,7 @@ async fn test_run_two_of_three_tasks() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct TaskExecutorHarness {
-    _catalog: Catalog,
+    catalog: Catalog,
     task_executor: Arc<dyn TaskExecutor>,
     task_scheduler: Arc<dyn TaskScheduler>,
 }
@@ -158,7 +160,7 @@ impl TaskExecutorHarness {
         let task_scheduler = catalog.get_one().unwrap();
 
         Self {
-            _catalog: catalog,
+            catalog,
             task_executor,
             task_scheduler,
         }

@@ -153,8 +153,8 @@ impl APIServer {
                 "/system/metrics",
                 axum::routing::get(observability::metrics::metrics_handler),
             )
-            .layer(axum::extract::Extension(gql_schema))
-            .layer(axum::extract::Extension(api_server_catalog));
+            .layer(Extension(gql_schema))
+            .layer(Extension(api_server_catalog));
 
         let is_e2e_testing = e2e_output_data_path.is_some();
         let maybe_shutdown_notify = if is_e2e_testing {

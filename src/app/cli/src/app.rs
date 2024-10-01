@@ -25,20 +25,12 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
-use kamu_flow_system_inmem::domain::{
-    FlowConfigurationUpdatedMessage,
-    FlowExecutor,
-    FlowProgressMessage,
-};
+use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
 };
-use kamu_task_system_inmem::domain::{
-    TaskExecutor,
-    TaskProgressMessage,
-    MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
-};
+use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{warn, Instrument};
@@ -114,11 +106,12 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
+    let is_init_command = maybe_init_command.is_some();
     let app_database_config = get_app_database_config(
         &workspace_layout,
         &config,
         is_multi_tenant_workspace,
-        maybe_init_command,
+        is_init_command,
     );
     let (database_config, maybe_temp_database_path) = app_database_config.into_inner();
     let maybe_db_connection_settings = database_config
@@ -157,6 +150,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             .add_value(dependencies_graph_repository)
             .bind::<dyn DependencyGraphRepository, DependencyGraphRepositoryInMemory>();
 
+        base_catalog_builder.add_value(Interact::new(args.yes));
+
         let output_config = configure_output_format(&args, &workspace_svc);
         base_catalog_builder.add_value(output_config.clone());
 
@@ -191,19 +186,19 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             base_catalog
         };
 
-        let cli_catalog = configure_cli_catalog(&final_base_catalog, is_multi_tenant_workspace)
-            .add_value(current_account.to_current_account_subject())
-            .build();
         let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
-            let server_catalog =
-                configure_server_catalog(&final_base_catalog, is_multi_tenant_workspace)
-                    .add_value(current_account.to_current_account_subject())
-                    .build();
-
+            let server_catalog = configure_server_catalog(&final_base_catalog).build();
             Some(server_catalog)
         } else {
             None
         };
+
+        let cli_catalog = configure_cli_catalog(
+            maybe_server_catalog.as_ref().unwrap_or(&final_base_catalog),
+            is_multi_tenant_workspace,
+        )
+        .add_value(current_account.to_current_account_subject())
+        .build();
 
         (
             guards,
@@ -214,15 +209,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         )
     };
 
-    if let Err(e) = initialize_base_components(&base_catalog).await {
-        tracing::error!(
-            error_dbg = ?e,
-            error = %e.pretty(true),
-            "Initialize base components failed",
-        );
-        return Err(e);
-    }
-
     // Register metrics
     let metrics_registry = observability::metrics::register_all(&cli_catalog);
 
@@ -231,26 +217,19 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
-    if let Some(server_catalog) = &maybe_server_catalog {
-        if let Err(e) = initialize_server_components(server_catalog).await {
-            tracing::error!(
-                error_dbg = ?e,
-                error = %e.pretty(true),
-                "Initialize server components failed",
-            );
-            return Err(e);
-        }
-    }
+    // Startup initializations
+    run_startup_initializations(&cli_catalog).await?;
 
     let is_transactional =
         maybe_db_connection_settings.is_some() && cli_commands::command_needs_transaction(&args);
-    let work_catalog = maybe_server_catalog.unwrap_or(cli_catalog);
+    let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
 
     let mut command_result: Result<(), CLIError> = maybe_transactional(
         is_transactional,
-        work_catalog.clone(),
-        |catalog: Catalog| async move {
-            let mut command = cli_commands::get_command(&base_catalog, &catalog, args)?;
+        cli_catalog.clone(),
+        |maybe_transactional_cli_catalog: Catalog| async move {
+            let mut command =
+                cli_commands::get_command(work_catalog, &maybe_transactional_cli_catalog, args)?;
 
             if command.needs_workspace() && !workspace_svc.is_in_workspace() {
                 Err(CLIError::usage_error_from(NotInWorkspace))?;
@@ -282,8 +261,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     command_result = command_result
         // If successful, then process the Outbox messages while they are present
         .and_then_async(|_| async {
-            let outbox_executor = work_catalog.get_one::<messaging_outbox::OutboxExecutor>()?;
-
+            let outbox_executor = cli_catalog.get_one::<messaging_outbox::OutboxExecutor>()?;
             outbox_executor
                 .run_while_has_tasks()
                 .await
@@ -345,7 +323,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
 async fn maybe_transactional<F, RF, RT, RE>(
     transactional: bool,
-    work_catalog: Catalog,
+    catalog: Catalog,
     f: F,
 ) -> Result<RT, RE>
 where
@@ -354,9 +332,9 @@ where
     RE: From<InternalError>,
 {
     if !transactional {
-        f(work_catalog).await
+        f(catalog).await
     } else {
-        let transaction_runner = DatabaseTransactionRunner::new(work_catalog);
+        let transaction_runner = DatabaseTransactionRunner::new(catalog);
 
         transaction_runner
             .transactional(|transactional_catalog| async move { f(transactional_catalog).await })
@@ -548,13 +526,8 @@ pub fn configure_cli_catalog(
 }
 
 // Public only for tests
-pub fn configure_server_catalog(
-    base_catalog: &Catalog,
-    multi_tenant_workspace: bool,
-) -> CatalogBuilder {
+pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
-
-    b.add_builder(WorkspaceService::builder().with_multi_tenant(multi_tenant_workspace));
 
     b.add::<DatasetChangesServiceImpl>();
 
@@ -585,66 +558,19 @@ pub fn configure_server_catalog(
     b
 }
 
-#[tracing::instrument(level = "debug", skip_all)]
-async fn initialize_server_components(server_catalog: &Catalog) -> Result<(), CLIError> {
-    // TODO: Generalize on-startup initialization into a trait
-    DatabaseTransactionRunner::new(server_catalog.clone())
-        .transactional(|transactional_catalog| async move {
-            {
-                let registrator = transactional_catalog
-                    .get_one::<PredefinedAccountsRegistrator>()
-                    .map_err(CLIError::critical)?;
-
-                registrator
-                    .ensure_predefined_accounts_are_registered()
-                    .await
-                    .map_err(CLIError::critical)?;
-            }
-            {
-                let initializer = transactional_catalog
-                    .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
-                    .map_err(CLIError::critical)?;
-
-                initializer
-                    .eager_initialization()
-                    .await
-                    .map_err(CLIError::critical)
-            }
-        })
-        .await?;
-
-    // Have their own transactions
-    {
-        let task_executor = server_catalog
-            .get_one::<dyn TaskExecutor>()
-            .map_err(CLIError::critical)?;
-
-        task_executor.pre_run().await.map_err(CLIError::critical)?;
-    }
-    {
-        let flow_executor = server_catalog
-            .get_one::<dyn FlowExecutor>()
-            .map_err(CLIError::critical)?;
-        let time_source = server_catalog
-            .get_one::<dyn SystemTimeSource>()
-            .map_err(CLIError::critical)?;
-
-        flow_executor
-            .pre_run(time_source.now())
-            .await
-            .map_err(CLIError::critical)
-    }
-}
-
-#[tracing::instrument(level = "debug", skip_all)]
-async fn initialize_base_components(base_catalog: &Catalog) -> Result<(), CLIError> {
-    // TODO: Generalize on-startup initialization into a trait
-    let outbox_executor = base_catalog.get_one::<messaging_outbox::OutboxExecutor>()?;
-
-    outbox_executor
-        .pre_run()
+async fn run_startup_initializations(catalog: &Catalog) -> Result<(), CLIError> {
+    let init_result = init_on_startup::run_startup_jobs(catalog)
         .await
-        .map_err(CLIError::critical)?;
+        .map_err(CLIError::critical);
+
+    if let Err(e) = init_result {
+        tracing::error!(
+            error_dbg = ?e,
+            error = %e.pretty(true),
+            "Initialize components failed",
+        );
+        return Err(e);
+    }
 
     Ok(())
 }

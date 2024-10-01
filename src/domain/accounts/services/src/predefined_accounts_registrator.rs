@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
+use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::*;
 use kamu_accounts::*;
 
@@ -25,6 +26,12 @@ pub struct PredefinedAccountsRegistrator {
 }
 
 #[component(pub)]
+#[interface(dyn InitOnStartup)]
+#[meta(InitOnStartupMeta {
+    job_name: JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
+    depends_on: &[],
+    requires_transaction: true,
+})]
 impl PredefinedAccountsRegistrator {
     pub fn new(
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
@@ -36,24 +43,6 @@ impl PredefinedAccountsRegistrator {
             login_password_auth_provider,
             account_repository,
         }
-    }
-
-    pub async fn ensure_predefined_accounts_are_registered(&self) -> Result<(), InternalError> {
-        for account_config in &self.predefined_accounts_config.predefined {
-            let account_id = account_config.get_id();
-            let is_unknown_account =
-                match self.account_repository.get_account_by_id(&account_id).await {
-                    Ok(_) => Ok(false),
-                    Err(GetAccountByIdError::NotFound(_)) => Ok(true),
-                    Err(GetAccountByIdError::Internal(e)) => Err(e),
-                }?;
-
-            if is_unknown_account {
-                self.register_unknown_account(account_config).await?;
-            }
-        }
-
-        Ok(())
     }
 
     async fn register_unknown_account(
@@ -85,6 +74,34 @@ impl PredefinedAccountsRegistrator {
             self.login_password_auth_provider
                 .save_password(&account.account_name, account_config.get_password())
                 .await?;
+        }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl InitOnStartup for PredefinedAccountsRegistrator {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "PredefinedAccountsRegistrator::run_initialization"
+    )]
+    async fn run_initialization(&self) -> Result<(), InternalError> {
+        for account_config in &self.predefined_accounts_config.predefined {
+            let account_id = account_config.get_id();
+            let is_unknown_account =
+                match self.account_repository.get_account_by_id(&account_id).await {
+                    Ok(_) => Ok(false),
+                    Err(GetAccountByIdError::NotFound(_)) => Ok(true),
+                    Err(GetAccountByIdError::Internal(e)) => Err(e),
+                }?;
+
+            if is_unknown_account {
+                self.register_unknown_account(account_config).await?;
+            }
         }
 
         Ok(())

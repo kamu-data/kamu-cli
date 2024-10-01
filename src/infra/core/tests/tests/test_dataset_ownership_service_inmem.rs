@@ -110,7 +110,7 @@ impl DatasetOwnershipHarness {
                 .push(AccountConfig::from_name(account_name));
         }
 
-        let catalog = {
+        let base_catalog = {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<SystemTimeSourceDefault>()
@@ -129,7 +129,6 @@ impl DatasetOwnershipHarness {
                 .add::<InMemoryAccountRepository>()
                 .add::<InMemoryAccessTokenRepository>()
                 .add::<DatasetOwnershipServiceInMemory>()
-                .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
                 .add::<DatabaseTransactionRunner>()
                 .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>();
@@ -139,18 +138,17 @@ impl DatasetOwnershipHarness {
             b.build()
         };
 
-        DatabaseTransactionRunner::new(catalog.clone())
-            .transactional(|transactional_catalog| async move {
-                let registrator = transactional_catalog
-                    .get_one::<PredefinedAccountsRegistrator>()
-                    .unwrap();
-
-                registrator
-                    .ensure_predefined_accounts_are_registered()
-                    .await
-            })
+        init_on_startup::run_startup_jobs(&base_catalog)
             .await
             .unwrap();
+
+        // Attach ownership initializer in separate catalog,
+        // so that the startup job is not run before creating datasets
+        let catalog = {
+            let mut b = dill::CatalogBuilder::new_chained(&base_catalog);
+            b.add::<DatasetOwnershipServiceInMemoryStateInitializer>();
+            b.build()
+        };
 
         let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
 
@@ -168,12 +166,12 @@ impl DatasetOwnershipHarness {
     }
 
     async fn eager_initialization(&self) {
-        self.catalog
+        use init_on_startup::InitOnStartup;
+        let initializer = self
+            .catalog
             .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
-            .unwrap()
-            .eager_initialization()
-            .await
             .unwrap();
+        initializer.run_initialization().await.unwrap();
     }
 
     async fn create_multi_tenant_datasets(&mut self) {

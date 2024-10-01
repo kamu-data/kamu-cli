@@ -18,22 +18,19 @@ use super::{CLIError, Command};
 pub struct RepositoryAddCommand {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     name: RepoName,
-    url: String,
+    url: Url,
 }
 
 impl RepositoryAddCommand {
-    pub fn new<S>(
+    pub fn new(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         name: RepoName,
-        url: S,
-    ) -> Self
-    where
-        S: Into<String>,
-    {
+        url: Url,
+    ) -> Self {
         Self {
             remote_repo_reg,
             name,
-            url: url.into(),
+            url,
         }
     }
 }
@@ -41,13 +38,8 @@ impl RepositoryAddCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for RepositoryAddCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let url = Url::parse(&self.url).map_err(|e| {
-            eprintln!("{}: {}", console::style("Invalid URL").red(), e);
-            CLIError::Aborted
-        })?;
-
         self.remote_repo_reg
-            .add_repository(&self.name, url)
+            .add_repository(&self.name, self.url.clone())
             .map_err(CLIError::failure)?;
 
         eprintln!("{}: {}", console::style("Added").green(), &self.name);

@@ -12,6 +12,7 @@
 
 pub mod auth;
 pub mod entities;
+pub mod jobs;
 pub mod messages;
 pub mod repos;
 pub mod services;
@@ -19,6 +20,7 @@ pub mod use_cases;
 pub mod utils;
 
 pub use entities::{SetRefError, *};
+pub use jobs::*;
 pub use messages::*;
 pub use repos::{DatasetNotFoundError, *};
 pub use services::*;

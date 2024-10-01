@@ -46,6 +46,7 @@ container-runtime = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 http-common = { workspace = true }
+init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 observability = { workspace = true, features = ["prometheus"] }
 time-source = { workspace = true }
@@ -93,6 +94,7 @@ kamu-messaging-outbox-sqlite = { workspace = true }
 
 kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
+kamu-auth-rebac-postgres = { workspace = true }
 kamu-auth-rebac-sqlite = { workspace = true }
 
 # CLI

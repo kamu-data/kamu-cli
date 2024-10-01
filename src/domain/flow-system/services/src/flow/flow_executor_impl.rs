@@ -16,6 +16,7 @@ use database_common::PaginationOpts;
 use database_common_macros::transactional_method;
 use dill::*;
 use futures::TryStreamExt;
+use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
 use kamu_core::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE};
 use kamu_flow_system::*;
@@ -65,6 +66,12 @@ pub struct FlowExecutorImpl {
         MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE
     ],
     durability: MessageConsumptionDurability::Durable,
+})]
+#[interface(dyn InitOnStartup)]
+#[meta(InitOnStartupMeta {
+    job_name: JOB_KAMU_FLOW_EXECUTOR_RECOVERY,
+    depends_on: &[],
+    requires_transaction: false,
 })]
 #[scope(Singleton)]
 impl FlowExecutorImpl {
@@ -438,12 +445,6 @@ impl FlowExecutorImpl {
 
 #[async_trait::async_trait]
 impl FlowExecutor for FlowExecutorImpl {
-    #[tracing::instrument(level = "info", skip_all)]
-    async fn pre_run(&self, planned_start_time: DateTime<Utc>) -> Result<(), InternalError> {
-        let start_time = self.executor_config.round_time(planned_start_time)?;
-        self.recover_initial_flows_state(start_time).await
-    }
-
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError> {
         // Main scanning loop
@@ -457,6 +458,16 @@ impl FlowExecutor for FlowExecutorImpl {
                 .sleep(self.executor_config.awaiting_step)
                 .await;
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl InitOnStartup for FlowExecutorImpl {
+    async fn run_initialization(&self) -> Result<(), InternalError> {
+        let start_time = self.executor_config.round_time(self.time_source.now())?;
+        self.recover_initial_flows_state(start_time).await
     }
 }
 

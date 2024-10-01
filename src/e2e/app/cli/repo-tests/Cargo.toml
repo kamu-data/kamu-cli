@@ -38,6 +38,7 @@ chrono = { version = "0.4", default-features = false }
 indoc = "2"
 reqwest = { version = "0.12", default-features = false, features = [] }
 tokio = { version = "1", default-features = false, features = [] }
+tokio-retry = "0.3"
 
 
 [dev-dependencies]

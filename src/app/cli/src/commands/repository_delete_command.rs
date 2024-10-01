@@ -13,32 +13,32 @@ use kamu::domain::*;
 use opendatafabric::RepoName;
 
 use super::{CLIError, Command};
-use crate::commands::common;
+use crate::Interact;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RepositoryDeleteCommand {
+    interact: Arc<Interact>,
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     names: Vec<RepoName>,
     all: bool,
-    no_confirmation: bool,
 }
 
 impl RepositoryDeleteCommand {
     pub fn new<I>(
+        interact: Arc<Interact>,
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         names: I,
         all: bool,
-        no_confirmation: bool,
     ) -> Self
     where
         I: IntoIterator<Item = RepoName>,
     {
         Self {
+            interact,
             remote_repo_reg,
             names: names.into_iter().collect(),
             all,
-            no_confirmation,
         }
     }
 }
@@ -63,23 +63,11 @@ impl Command for RepositoryDeleteCommand {
             ));
         }
 
-        let confirmed = if self.no_confirmation {
-            true
-        } else {
-            common::prompt_yes_no(&format!(
-                "{}: {}\nDo you wish to continue? [y/N]: ",
-                console::style("You are about to delete following repository(s)").yellow(),
-                repo_names
-                    .iter()
-                    .map(RepoName::as_str)
-                    .collect::<Vec<&str>>()
-                    .join(", "),
-            ))
-        };
-
-        if !confirmed {
-            return Err(CLIError::Aborted);
-        }
+        self.interact.require_confirmation(format!(
+            "{}: {}",
+            console::style("You are about to delete following repository(s)").yellow(),
+            itertools::join(&repo_names, ", "),
+        ))?;
 
         for name in &repo_names {
             self.remote_repo_reg

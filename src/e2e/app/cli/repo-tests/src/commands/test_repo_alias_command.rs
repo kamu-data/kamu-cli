@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
 use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::*;
 
@@ -38,41 +38,53 @@ pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
     .await;
 
     let dataset_aliases = vec![
-        "http://pull.example.com/".to_string(),
-        "http://pull.example1.com/".to_string(),
-        "http://pull.example2.com/".to_string(),
+        RepoAlias {
+            dataset: "foo".parse().unwrap(),
+            kind: "Pull".to_string(),
+            alias: "http://pull.example.com/".to_string(),
+        },
+        RepoAlias {
+            dataset: "foo".parse().unwrap(),
+            kind: "Pull".to_string(),
+            alias: "http://pull.example1.com/".to_string(),
+        },
+        RepoAlias {
+            dataset: "foo".parse().unwrap(),
+            kind: "Pull".to_string(),
+            alias: "http://pull.example2.com/".to_string(),
+        },
     ];
 
-    for dataset_alias in &dataset_aliases {
-        kamu.execute(["repo", "alias", "add", "foo", dataset_alias, "--pull"])
+    for repo_alias in &dataset_aliases {
+        kamu.execute(["repo", "alias", "add", "foo", &repo_alias.alias, "--pull"])
             .await
             .success();
     }
 
-    let (pull_aliases, _push_aliases) = kamu
+    let aliases = kamu
         .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
         .await;
-    assert_eq!(pull_aliases, dataset_aliases);
+    assert_eq!(aliases, dataset_aliases);
 
     // Test remove single pull alias
-    kamu.execute(["repo", "alias", "rm", "foo", dataset_aliases[2].as_str()])
+    kamu.execute(["repo", "alias", "rm", "foo", &dataset_aliases[2].alias])
         .await
         .success();
 
-    let (pull_aliases, _push_aliases) = kamu
+    let aliases = kamu
         .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
         .await;
-    assert_eq!(pull_aliases, dataset_aliases[..2]);
+    assert_eq!(aliases, dataset_aliases[..2]);
 
     // Test remove all pull aliases
     kamu.execute(["repo", "alias", "rm", "--all", "foo"])
         .await
         .success();
 
-    let (pull_aliases, _push_aliases) = kamu
+    let aliases = kamu
         .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
         .await;
-    assert!(pull_aliases.is_empty());
+    assert!(aliases.is_empty());
 }
 
 pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
@@ -100,40 +112,52 @@ pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
     .await;
 
     let dataset_aliases = vec![
-        "http://push.example.com/".to_string(),
-        "http://push.example1.com/".to_string(),
-        "http://push.example2.com/".to_string(),
+        RepoAlias {
+            dataset: "foo".parse().unwrap(),
+            kind: "Push".to_string(),
+            alias: "http://push.example.com/".to_string(),
+        },
+        RepoAlias {
+            dataset: "foo".parse().unwrap(),
+            kind: "Push".to_string(),
+            alias: "http://push.example1.com/".to_string(),
+        },
+        RepoAlias {
+            dataset: "foo".parse().unwrap(),
+            kind: "Push".to_string(),
+            alias: "http://push.example2.com/".to_string(),
+        },
     ];
 
-    for dataset_alias in &dataset_aliases {
-        kamu.execute(["repo", "alias", "add", "foo", dataset_alias, "--push"])
+    for repo_alias in &dataset_aliases {
+        kamu.execute(["repo", "alias", "add", "foo", &repo_alias.alias, "--push"])
             .await
             .success();
     }
 
-    let (_pull_aliases, push_aliases) = kamu
+    let aliases = kamu
         .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
         .await;
-    assert_eq!(push_aliases, dataset_aliases);
+    assert_eq!(aliases, dataset_aliases);
 
     // Test remove single push alias
-    kamu.execute(["repo", "alias", "rm", "foo", dataset_aliases[2].as_str()])
+    kamu.execute(["repo", "alias", "rm", "foo", &dataset_aliases[2].alias])
         .await
         .success();
 
-    let (_pull_aliases, push_aliases) = kamu
+    let aliases = kamu
         .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
         .await;
-    assert_eq!(push_aliases, dataset_aliases[..2]);
+    assert_eq!(aliases, dataset_aliases[..2]);
     // Test remove all push aliases
     kamu.execute(["repo", "alias", "rm", "--all", "foo"])
         .await
         .success();
 
-    let (_pull_aliases, push_aliases) = kamu
+    let aliases = kamu
         .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
         .await;
-    assert!(push_aliases.is_empty());
+    assert!(aliases.is_empty());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

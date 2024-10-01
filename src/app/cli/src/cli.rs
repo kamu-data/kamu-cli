@@ -45,6 +45,10 @@ pub struct Cli {
     #[arg(long, short = 'q')]
     pub quiet: bool,
 
+    /// Do not ask for confirmation and assume the 'yes' answer
+    #[arg(long, short = 'y')]
+    pub yes: bool,
+
     /// Record and visualize the command execution as perfetto.dev trace
     #[arg(long)]
     pub trace: bool,
@@ -358,10 +362,6 @@ pub struct Delete {
     /// Also delete all transitive dependencies of specified datasets
     #[arg(long, short = 'r')]
     pub recursive: bool,
-
-    /// Don't ask for confirmation
-    #[arg(long, short = 'y')]
-    pub yes: bool,
 
     /// Local dataset reference(s)
     #[arg(value_parser = parsers::dataset_ref_pattern)]
@@ -963,10 +963,6 @@ Resetting a dataset to the specified block erases all metadata blocks that follo
 Keep in mind that blocks that were pushed to a repository could've been already observed by other people, so resetting the history will not let you take that data back and instead create conflicts for the downstream consumers of your data.
 "#)]
 pub struct Reset {
-    /// Don't ask for confirmation
-    #[arg(long, short = 'y')]
-    pub yes: bool,
-
     /// Dataset reference
     #[arg(index = 1, value_parser = parsers::dataset_ref)]
     pub dataset: odf::DatasetRef,
@@ -1032,7 +1028,7 @@ pub struct RepoAdd {
 
     /// URL of the repository
     #[arg(index = 2)]
-    pub url: String,
+    pub url: url::Url,
 }
 
 /// Deletes a reference to repository
@@ -1042,10 +1038,6 @@ pub struct RepoDelete {
     /// Delete all known repositories
     #[arg(long, short = 'a')]
     pub all: bool,
-
-    /// Don't ask for confirmation
-    #[arg(long, short = 'y')]
-    pub yes: bool,
 
     /// Repository name(s)
     #[arg(value_parser = parsers::repo_name)]
@@ -1130,7 +1122,7 @@ pub struct RepoAliasDelete {
 
     /// Local dataset reference
     #[arg(index = 1, value_parser = parsers::dataset_ref)]
-    pub dataset: odf::DatasetRef,
+    pub dataset: Option<odf::DatasetRef>,
 
     /// Remote dataset name
     #[arg(index = 2, value_parser = parsers::dataset_ref_remote)]
@@ -1386,9 +1378,9 @@ pub struct SystemCompact {
     #[arg(long)]
     pub verify: bool,
 
-    /// Local dataset reference
-    #[arg(value_parser = parsers::repo_name)]
-    pub dataset: odf::DatasetRef,
+    /// Local dataset references
+    #[arg(value_parser = parsers::dataset_ref_pattern)]
+    pub dataset: Vec<odf::DatasetRefPattern>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

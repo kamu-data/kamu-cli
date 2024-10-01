@@ -8,89 +8,23 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{NaiveTime, SecondsFormat, Utc};
-use kamu_cli_e2e_common::{ExpectedResponseBody, KamuApiServerClient, RequestBody};
+use kamu_cli_e2e_common::{
+    ExpectedResponseBody,
+    KamuApiServerClient,
+    KamuApiServerClientExt,
+    RequestBody,
+};
 use reqwest::{Method, StatusCode};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiServerClient) {
     // 1. Grub a token
-    let login_response = kamu_api_server_client
-        .graphql_api_call(indoc::indoc!(
-                r#"
-                mutation {
-                  auth {
-                    login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
-                      accessToken
-                    }
-                  }
-                }
-                "#,
-            ), None)
-        .await;
-    let token = login_response["auth"]["login"]["accessToken"]
-        .as_str()
-        .map(ToOwned::to_owned)
-        .unwrap();
+    let token = kamu_api_server_client.login_as_kamu().await;
 
     // 2. Create a dataset
-    let snapshot = indoc::indoc!(
-        r#"
-        kind: DatasetSnapshot
-        version: 1
-        content:
-          name: player-scores
-          kind: Root
-          metadata:
-            - kind: AddPushSource
-              sourceName: default
-              read:
-                kind: NdJson
-                schema:
-                  - "match_time TIMESTAMP"
-                  - "match_id BIGINT"
-                  - "player_id STRING"
-                  - "score BIGINT"
-              merge:
-                kind: Ledger
-                primaryKey:
-                  - match_id
-                  - player_id
-            - kind: SetVocab
-              eventTimeColumn: match_time
-        "#
-    )
-    .escape_default()
-    .to_string();
-
     kamu_api_server_client
-        .graphql_api_call_assert_with_token(
-            token.clone(),
-            indoc::indoc!(
-                r#"
-                mutation {
-                  datasets {
-                    createFromSnapshot(snapshot: "<snapshot>", snapshotFormat: YAML) {
-                      message
-                    }
-                  }
-                }
-                "#,
-            )
-            .replace("<snapshot>", snapshot.as_str())
-            .as_str(),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "datasets": {
-                    "createFromSnapshot": {
-                      "message": "Success"
-                    }
-                  }
-                }
-                "#,
-            )),
-        )
+        .create_player_scores_dataset(&token)
         .await;
 
     // 3. Try to get the dataset tail

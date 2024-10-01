@@ -14,20 +14,6 @@ use kamu::domain::PullImageListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn prompt_yes_no(msg: &str) -> bool {
-    use read_input::prelude::*;
-
-    let answer: String = input()
-        .repeat_msg(msg)
-        .default("n".to_owned())
-        .add_test(|v| matches!(v.as_ref(), "n" | "N" | "no" | "y" | "Y" | "yes"))
-        .get();
-
-    !matches!(answer.as_ref(), "n" | "N" | "no")
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub struct PullImageProgress {
     image_purpose: &'static str,
     progress_bar: Mutex<Option<indicatif::ProgressBar>>,

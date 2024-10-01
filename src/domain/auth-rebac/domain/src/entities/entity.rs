@@ -17,7 +17,7 @@ use crate::Relation;
 #[cfg_attr(
     feature = "sqlx",
     derive(sqlx::Type),
-    sqlx(type_name = "entity_type", rename_all = "lowercase")
+    sqlx(type_name = "rebac_entity_type", rename_all = "lowercase")
 )]
 pub enum EntityType {
     Dataset,

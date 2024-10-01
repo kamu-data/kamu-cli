@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use futures::TryStreamExt as _;
 use kamu::domain::{
     CompactionOptions,
     CompactionService,
@@ -17,15 +18,23 @@ use kamu::domain::{
     VerificationOptions,
     VerificationService,
 };
-use opendatafabric::{DatasetHandle, DatasetRef};
+use opendatafabric::{DatasetHandle, DatasetRefPattern};
 
-use crate::{BatchError, CLIError, Command, CompactionMultiProgress, VerificationMultiProgress};
+use crate::{
+    BatchError,
+    CLIError,
+    Command,
+    CompactionMultiProgress,
+    Interact,
+    VerificationMultiProgress,
+};
 
 pub struct CompactCommand {
+    interact: Arc<Interact>,
     dataset_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
     compaction_svc: Arc<dyn CompactionService>,
-    dataset_ref: DatasetRef,
+    dataset_ref_patterns: Vec<DatasetRefPattern>,
     max_slice_size: u64,
     max_slice_records: u64,
     is_hard: bool,
@@ -35,10 +44,11 @@ pub struct CompactCommand {
 
 impl CompactCommand {
     pub fn new(
+        interact: Arc<Interact>,
         dataset_repo: Arc<dyn DatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
         compaction_svc: Arc<dyn CompactionService>,
-        dataset_ref: DatasetRef,
+        dataset_ref_patterns: Vec<DatasetRefPattern>,
         max_slice_size: u64,
         max_slice_records: u64,
         is_hard: bool,
@@ -46,10 +56,11 @@ impl CompactCommand {
         keep_metadata_only: bool,
     ) -> Self {
         Self {
+            interact,
             dataset_repo,
             verification_svc,
             compaction_svc,
-            dataset_ref,
+            dataset_ref_patterns,
             max_slice_size,
             max_slice_records,
             is_hard,
@@ -85,25 +96,45 @@ impl CompactCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for CompactCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
+        if self.dataset_ref_patterns.is_empty() {
+            return Err(CLIError::usage_error("Specify a dataset or a pattern"));
+        }
+
         if !self.is_hard {
             return Err(CLIError::usage_error(
                 "Soft compactions are not yet supported",
             ));
         }
-        let dataset_handle = self
-            .dataset_repo
-            .resolve_dataset_ref(&self.dataset_ref)
-            .await
-            .map_err(CLIError::failure)?;
+
+        let dataset_handles: Vec<DatasetHandle> = {
+            kamu::utils::datasets_filtering::filter_datasets_by_local_pattern(
+                self.dataset_repo.as_ref(),
+                self.dataset_ref_patterns.clone(),
+            )
+            .try_collect()
+            .await?
+        };
+
+        self.interact.require_confirmation(format!(
+            "{}\n  {}\n{}",
+            console::style(
+                "You are about to perform a hard compaction of the following dataset(s):"
+            )
+            .yellow(),
+            itertools::join(dataset_handles.iter().map(|h| &h.alias), "\n  "),
+            console::style("This operation is history-altering and irreversible!").yellow(),
+        ))?;
 
         if self.is_verify {
-            if let Err(err) = self.verify_dataset(&dataset_handle).await {
-                eprintln!(
-                    "{}",
-                    console::style("Cannot perform compaction, dataset is invalid".to_string())
-                        .red()
-                );
-                return Err(err);
+            for hdl in &dataset_handles {
+                if let Err(err) = self.verify_dataset(hdl).await {
+                    eprintln!(
+                        "{}",
+                        console::style("Cannot perform compaction, dataset is invalid".to_string())
+                            .red()
+                    );
+                    return Err(err);
+                }
             }
         }
 
@@ -117,7 +148,7 @@ impl Command for CompactCommand {
         let compaction_results = self
             .compaction_svc
             .compact_multi(
-                vec![dataset_handle.as_local_ref()],
+                dataset_handles.into_iter().map(Into::into).collect(),
                 CompactionOptions {
                     max_slice_size: Some(self.max_slice_size),
                     max_slice_records: Some(self.max_slice_records),

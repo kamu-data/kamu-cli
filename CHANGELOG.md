@@ -12,8 +12,28 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- Postgres implementation for dataset entry and account Re-BAC repositories
+### Changed
+- `kamu repo alias list`: added JSON output alongside with other formats mentioned in the command's help
+
+## [0.204.4] - 2024-09-30
+### Changed
+- CLI command tweaks:
+  - Make `--yes / -y` flag global
+  - Add confirmation step to `system compact` command
+  - Add support for patterns to `system compact` to process multiple datasets at once
+  - Fixed argument parsing error in `kamu system compact` command
+- Simplified organization of startup initialization code over different components
+### Fixed
+- Broken catalog issue for server and transactional modes  
+  - Added several E2E tests (happy paths) covering the Flows tab in the UI
+- Corrected behavior of `MySqlAccountRepository::get_accounts_by_ids()`, for the case of empty IDs collection
+
+## [0.204.3] - 2024-09-26
 ### Fixed
 - Dataset creation with unique alias but with existing id for FS dataset storage mode
+- `kamu init`: fixed regression in case of using `exists_ok` flag... finally
 
 ## [0.204.2] - 2024-09-26
 ### Fixed

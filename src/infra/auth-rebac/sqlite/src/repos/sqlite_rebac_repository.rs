@@ -10,27 +10,7 @@
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_auth_rebac::{
-    DeleteEntitiesRelationError,
-    DeleteEntityPropertiesError,
-    DeleteEntityPropertyError,
-    Entity,
-    EntityType,
-    EntityWithRelation,
-    EntityWithRelationRowModel,
-    GetEntityPropertiesError,
-    GetRelationsBetweenEntitiesError,
-    InsertEntitiesRelationError,
-    PropertyName,
-    PropertyRowModel,
-    PropertyValue,
-    RebacRepository,
-    Relation,
-    RelationRowModel,
-    SetEntityPropertyError,
-    SubjectEntityRelationsByObjectTypeError,
-    SubjectEntityRelationsError,
-};
+use kamu_auth_rebac::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

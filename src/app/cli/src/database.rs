@@ -15,7 +15,6 @@ use internal_error::{InternalError, ResultIntoInternal};
 use secrecy::SecretString;
 use tempfile::TempDir;
 
-use crate::cli::Init;
 use crate::config::{DatabaseConfig, DatabaseCredentialSourceConfig, RemoteDatabaseConfig};
 use crate::{config, WorkspaceLayout, DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME};
 
@@ -52,7 +51,7 @@ pub fn get_app_database_config(
     workspace_layout: &WorkspaceLayout,
     config: &config::CLIConfig,
     multi_tenant_workspace: bool,
-    maybe_init_command: Option<Init>,
+    init_command: bool,
 ) -> AppDatabaseConfig {
     if let Some(database_config) = config.database.clone() {
         return AppDatabaseConfig::Explicit(database_config);
@@ -63,24 +62,22 @@ pub fn get_app_database_config(
         return AppDatabaseConfig::None;
     };
 
-    match maybe_init_command {
-        // Note: do not overwrite the database if the "exists_ok" flag is present
-        Some(c) if !c.exists_ok => {
-            let temp_dir = tempfile::tempdir().unwrap();
-            let database_path = temp_dir
-                .as_ref()
-                .join(DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME);
-            let config = DatabaseConfig::sqlite(&database_path);
-            let temp_database_path = OwnedTempPath::new(database_path, temp_dir);
+    let database_path = workspace_layout.default_multi_tenant_database_path();
+    let database_not_exist = !database_path.exists();
 
-            AppDatabaseConfig::DefaultMultiTenantInitCommand(config, temp_database_path)
-        }
-        _ => {
-            // Use already created database
-            let database_path = workspace_layout.default_multi_tenant_database_path();
+    // Note: do not overwrite the database if present
+    if init_command && database_not_exist {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let database_path = temp_dir
+            .as_ref()
+            .join(DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME);
+        let config = DatabaseConfig::sqlite(&database_path);
+        let temp_database_path = OwnedTempPath::new(database_path, temp_dir);
 
-            AppDatabaseConfig::DefaultMultiTenant(DatabaseConfig::sqlite(&database_path))
-        }
+        AppDatabaseConfig::DefaultMultiTenantInitCommand(config, temp_database_path)
+    } else {
+        // Use already created database
+        AppDatabaseConfig::DefaultMultiTenant(DatabaseConfig::sqlite(&database_path))
     }
 }
 
@@ -116,6 +113,7 @@ pub fn configure_database_components(
             b.add::<kamu_accounts_postgres::PostgresAccessTokenRepository>();
 
             b.add::<kamu_datasets_postgres::PostgresDatasetEnvVarRepository>();
+            b.add::<kamu_datasets_postgres::PostgresDatasetEntryRepository>();
 
             b.add::<kamu_flow_system_postgres::PostgresFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_postgres::PostgresFlowEventStore>();
@@ -125,8 +123,7 @@ pub fn configure_database_components(
             b.add::<kamu_messaging_outbox_postgres::PostgresOutboxMessageRepository>();
             b.add::<kamu_messaging_outbox_postgres::PostgresOutboxMessageConsumptionRepository>();
 
-            // TODO: Private Datasets: implement database-related version
-            b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
+            b.add::<kamu_auth_rebac_postgres::PostgresRebacRepository>();
         }
         DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
             MySqlPlugin::init_database_components(b);
@@ -138,6 +135,7 @@ pub fn configure_database_components(
             b.add::<kamu_accounts_mysql::MySqlAccessTokenRepository>();
 
             b.add::<kamu_datasets_inmem::InMemoryDatasetEnvVarRepository>();
+            b.add::<kamu_datasets_inmem::InMemoryDatasetEntryRepository>();
 
             b.add::<kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_inmem::InMemoryFlowEventStore>();
@@ -156,6 +154,7 @@ pub fn configure_database_components(
             b.add::<kamu_accounts_sqlite::SqliteAccessTokenRepository>();
 
             b.add::<kamu_datasets_sqlite::SqliteDatasetEnvVarRepository>();
+            b.add::<kamu_datasets_sqlite::SqliteDatasetEntryRepository>();
 
             b.add::<kamu_flow_system_sqlite::SqliteFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowEventStore>();
@@ -186,6 +185,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_flow_system_inmem::InMemoryFlowEventStore>();
     b.add::<kamu_task_system_inmem::InMemoryTaskEventStore>();
     b.add::<kamu_datasets_inmem::InMemoryDatasetEnvVarRepository>();
+    b.add::<kamu_datasets_inmem::InMemoryDatasetEntryRepository>();
     b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 
     NoOpDatabasePlugin::init_database_components(b);

@@ -10,21 +10,7 @@
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_datasets::{
-    DatasetEntry,
-    DatasetEntryByNameNotFoundError,
-    DatasetEntryNameCollisionError,
-    DatasetEntryNotFoundError,
-    DatasetEntryRepository,
-    DatasetEntryRowModel,
-    DeleteEntryDatasetError,
-    GetDatasetEntriesByOwnerIdError,
-    GetDatasetEntryByNameError,
-    GetDatasetEntryError,
-    SaveDatasetEntryError,
-    SaveDatasetEntryErrorDuplicate,
-    UpdateDatasetEntryNameError,
-};
+use kamu_datasets::*;
 use opendatafabric::{AccountID, DatasetID, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -222,11 +208,11 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         let update_result = sqlx::query!(
             r#"
             UPDATE dataset_entries
-            SET dataset_name = $2
-            WHERE dataset_id = $1
+                SET dataset_name = $1
+                WHERE dataset_id = $2
             "#,
-            dataset_id_as_str,
             new_dataset_name_as_str,
+            dataset_id_as_str,
         )
         .execute(&mut *connection_mut)
         .await

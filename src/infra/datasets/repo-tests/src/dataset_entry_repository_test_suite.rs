@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use chrono::Utc;
+use chrono::{SubsecRound, Utc};
 use dill::Catalog;
 use kamu_accounts::{Account, AccountRepository, AccountType};
 use kamu_datasets::{
@@ -408,7 +408,7 @@ fn new_dataset_entry_with(owner: &Account, dataset_name: &str) -> DatasetEntry {
     let (_, dataset_id) = DatasetID::new_generated_ed25519();
     let owner_id = owner.id.clone();
     let dataset_alias = DatasetName::new_unchecked(dataset_name);
-    let created_at = Utc::now();
+    let created_at = Utc::now().round_subsecs(6);
 
     DatasetEntry::new(dataset_id, owner_id, dataset_alias, created_at)
 }

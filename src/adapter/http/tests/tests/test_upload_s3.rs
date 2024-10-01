@@ -9,7 +9,7 @@
 
 use std::net::SocketAddr;
 
-use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
+use database_common::NoOpDatabasePlugin;
 use dill::Component;
 use http::{HeaderMap, HeaderName, HeaderValue};
 use internal_error::{InternalError, ResultIntoInternal};
@@ -73,18 +73,7 @@ impl Harness {
             b.build()
         };
 
-        DatabaseTransactionRunner::new(catalog.clone())
-            .transactional(|transactional_catalog| async move {
-                let registrator = transactional_catalog
-                    .get_one::<PredefinedAccountsRegistrator>()
-                    .unwrap();
-
-                registrator
-                    .ensure_predefined_accounts_are_registered()
-                    .await
-            })
-            .await
-            .unwrap();
+        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
         let authentication_service = catalog.get_one::<AuthenticationServiceImpl>().unwrap();
         let access_token = authentication_service

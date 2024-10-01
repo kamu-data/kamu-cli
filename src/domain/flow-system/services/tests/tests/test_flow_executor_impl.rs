@@ -55,17 +55,10 @@ async fn test_read_initial_config_and_queue_without_waiting() {
         .await;
     harness.eager_initialization().await;
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -196,8 +189,6 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
         .await
         .unwrap();
 
-    harness.eager_initialization().await;
-
     // Mimic we are recovering from server restart, where a waiting flow for "foo"
     // existed already
     let flow_id = harness.flow_event_store.new_flow_id().await.unwrap();
@@ -237,11 +228,12 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
         .await
         .unwrap();
 
+    harness.eager_initialization().await;
+
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -328,10 +320,9 @@ async fn test_cron_config() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -458,17 +449,10 @@ async fn test_manual_trigger() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -676,17 +660,10 @@ async fn test_ingest_trigger_with_ingest_config() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -884,17 +861,10 @@ async fn test_manual_trigger_compaction() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -1052,17 +1022,10 @@ async fn test_manual_trigger_reset() {
         "foo".to_string(),
     );
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -1194,17 +1157,10 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
     test_flow_listener.define_dataset_display_name(foo_bar_id.clone(), "foo_bar".to_string());
     test_flow_listener.define_dataset_display_name(foo_baz_id.clone(), "foo_baz".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
       // Run API service
-      res = harness.flow_service.run() => res.int_err(),
+      res = harness.flow_executor.run() => res.int_err(),
 
       // Run simulation script and task drivers
       _ = async {
@@ -1399,17 +1355,10 @@ async fn test_manual_trigger_compaction_with_config() {
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -1527,17 +1476,10 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
     test_flow_listener.define_dataset_display_name(foo_bar_id.clone(), "foo_bar".to_string());
     test_flow_listener.define_dataset_display_name(foo_baz_id.clone(), "foo_baz".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
       // Run API service
-      res = harness.flow_service.run() => res.int_err(),
+      res = harness.flow_executor.run() => res.int_err(),
 
       // Run simulation script and task drivers
       _ = async {
@@ -1762,17 +1704,10 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
     test_flow_listener
         .define_dataset_display_name(foo_bar_baz_id.clone(), "foo_bar_baz".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -1999,17 +1934,10 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
     test_flow_listener
         .define_dataset_display_name(foo_bar_baz_id.clone(), "foo_bar_baz".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -2141,17 +2069,10 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
     test_flow_listener.define_dataset_display_name(foo_bar_id.clone(), "foo_bar".to_string());
     test_flow_listener.define_dataset_display_name(foo_baz_id.clone(), "foo_baz".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -2318,10 +2239,9 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -2551,10 +2471,9 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
       // Run API service
-      res = harness.flow_service.run() => res.int_err(),
+      res = harness.flow_executor.run() => res.int_err(),
 
       // Run simulation script and task drivers
       _ = async {
@@ -2772,17 +2691,10 @@ async fn test_dataset_deleted() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -2968,17 +2880,10 @@ async fn test_task_completions_trigger_next_loop_on_success() {
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
     test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -3200,17 +3105,10 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -3436,10 +3334,9 @@ async fn test_throttling_manual_triggers() {
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
       // Run API service
-      res = harness.flow_service.run() => res.int_err(),
+      res = harness.flow_executor.run() => res.int_err(),
 
       // Run simulation script and task drivers
       _ = async {
@@ -3616,17 +3513,10 @@ async fn test_throttling_derived_dataset_with_2_parents() {
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
     test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
       // Run API service
-      res = harness.flow_service.run() => res.int_err(),
+      res = harness.flow_executor.run() => res.int_err(),
 
       // Run simulation script and task drivers
       _ = async {
@@ -4090,17 +3980,10 @@ async fn test_batching_condition_records_reached() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
       // Run API service
-      res = harness.flow_service.run() => res.int_err(),
+      res = harness.flow_executor.run() => res.int_err(),
 
       // Run simulation script and task drivers
       _ = async {
@@ -4420,17 +4303,10 @@ async fn test_batching_condition_timeout() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
       // Run API service
-      res = harness.flow_service.run() => res.int_err(),
+      res = harness.flow_executor.run() => res.int_err(),
 
       // Run simulation script and task drivers
       _ = async {
@@ -4701,17 +4577,10 @@ async fn test_batching_condition_watermark() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
       // Run API service
-      res = harness.flow_service.run() => res.int_err(),
+      res = harness.flow_executor.run() => res.int_err(),
 
       // Run simulation script and task drivers
       _ = async {
@@ -5052,17 +4921,10 @@ async fn test_batching_condition_with_2_inputs() {
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
     test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
       // Run API service
-      res = harness.flow_service.run() => res.int_err(),
+      res = harness.flow_executor.run() => res.int_err(),
 
       // Run simulation script and task drivers
       _ = async {
@@ -5523,17 +5385,10 @@ async fn test_list_all_flow_initiators() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -5690,17 +5545,10 @@ async fn test_list_all_datasets_with_flow() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -5845,17 +5693,10 @@ async fn test_abort_flow_before_scheduling_tasks() {
         .await;
     harness.eager_initialization().await;
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual aborts script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -5948,17 +5789,10 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
         .await;
     harness.eager_initialization().await;
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -6056,17 +5890,10 @@ async fn test_abort_flow_after_task_running_has_started() {
         .await;
     harness.eager_initialization().await;
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
@@ -6153,17 +5980,10 @@ async fn test_abort_flow_after_task_finishes() {
         .await;
     harness.eager_initialization().await;
 
-    // Remember start time
-    let start_time = harness
-        .now_datetime()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-
     // Run scheduler concurrently with manual triggers script
-    harness.flow_service.pre_run(start_time).await.unwrap();
     tokio::select! {
         // Run API service
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_executor.run() => res.int_err(),
 
         // Run simulation script and task drivers
         _ = async {
