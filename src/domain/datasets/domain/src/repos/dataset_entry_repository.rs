@@ -17,6 +17,8 @@ use crate::DatasetEntry;
 
 #[async_trait::async_trait]
 pub trait DatasetEntryRepository: Send + Sync {
+    async fn dataset_entries_count(&self) -> Result<usize, GetDatasetEntryError>;
+
     async fn get_dataset_entry(
         &self,
         dataset_id: &DatasetID,

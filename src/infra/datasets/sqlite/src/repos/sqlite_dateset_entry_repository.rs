@@ -33,6 +33,27 @@ impl SqliteDatasetEntryRepository {
 
 #[async_trait::async_trait]
 impl DatasetEntryRepository for SqliteDatasetEntryRepository {
+    async fn dataset_entries_count(&self) -> Result<usize, GetDatasetEntryError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(GetDatasetEntryError::Internal)?;
+
+        let dataset_entries_count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*)
+            FROM dataset_entries
+            "#,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .map_int_err(GetDatasetEntryError::Internal)?;
+
+        Ok(usize::try_from(dataset_entries_count).unwrap_or(0))
+    }
+
     async fn get_dataset_entry(
         &self,
         dataset_id: &DatasetID,
