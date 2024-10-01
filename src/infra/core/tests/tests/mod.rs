@@ -18,7 +18,6 @@ mod test_dependency_graph_inmem;
 mod test_metadata_chain_comparator;
 mod test_pull_service_impl;
 mod test_query_service_impl;
-mod test_remote_alias_resolver_impl;
 mod test_reset_service_impl;
 mod test_resource_loader_impl;
 mod test_schema_utils;
