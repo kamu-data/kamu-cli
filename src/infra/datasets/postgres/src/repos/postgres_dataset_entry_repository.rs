@@ -198,11 +198,11 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         let update_result = sqlx::query!(
             r#"
             UPDATE dataset_entries
-                SET dataset_name = $2
-                WHERE dataset_id = $1
+                SET dataset_name = $1
+                WHERE dataset_id = $2
             "#,
-            stack_dataset_id.as_str(),
             new_name.as_str(),
+            stack_dataset_id.as_str(),
         )
         .execute(&mut *connection_mut)
         .await

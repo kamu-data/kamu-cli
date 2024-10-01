@@ -208,11 +208,11 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         let update_result = sqlx::query!(
             r#"
             UPDATE dataset_entries
-            SET dataset_name = $2
-            WHERE dataset_id = $1
+                SET dataset_name = $1
+                WHERE dataset_id = $2
             "#,
-            dataset_id_as_str,
             new_dataset_name_as_str,
+            dataset_id_as_str,
         )
         .execute(&mut *connection_mut)
         .await

@@ -5575,6 +5575,7 @@ dependencies = [
  "kamu-adapter-oauth",
  "kamu-adapter-odata",
  "kamu-auth-rebac-inmem",
+ "kamu-auth-rebac-postgres",
  "kamu-auth-rebac-services",
  "kamu-auth-rebac-sqlite",
  "kamu-cli-puppet",
