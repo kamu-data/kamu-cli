@@ -46,3 +46,76 @@ impl From<GetDatasetError> for GetAliasesError {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// RemoteAliasResolver
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait]
+pub trait RemoteAliasResolver: Send + Sync {
+    async fn resolve_remote_alias(
+        &self,
+        dataset_ref_maybe: Option<&DatasetRef>,
+        transfer_dataset_ref_maybe: Option<TransferDatasetRef>,
+        remote_alias_kind: &RemoteAliasKind,
+    ) -> Result<DatasetRefRemote, ResolveAliasError>;
+}
+
+#[derive(Error, Debug)]
+pub enum ResolveAliasError {
+    #[error(transparent)]
+    RepositoryNotFound(
+        #[from]
+        #[backtrace]
+        RepositoryNotFoundError,
+    ),
+    #[error(transparent)]
+    AmbiguousRepository(
+        #[from]
+        #[backtrace]
+        AmbiguousRepositoryError,
+    ),
+    #[error(transparent)]
+    EmptyRepositoryList(
+        #[from]
+        #[backtrace]
+        EmptyRepositoryListError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+#[derive(Error, Debug)]
+#[error("Cannot choose between multiple repositories")]
+pub struct AmbiguousRepositoryError {}
+
+#[derive(Error, Debug)]
+#[error("Repositories list is empty")]
+pub struct EmptyRepositoryListError {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum GetRemoteAccountError {
+    #[error(transparent)]
+    InvalidResponse(InvalidGQLResponseError),
+
+    #[error(transparent)]
+    Internal(InternalError),
+}
+
+#[derive(Debug, Error)]
+#[error("Invalid gql response: {response}")]
+pub struct InvalidGQLResponseError {
+    pub response: String,
+}
+
+impl From<InternalError> for GetRemoteAccountError {
+    fn from(value: InternalError) -> Self {
+        Self::Internal(value)
+    }
+}

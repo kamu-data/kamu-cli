@@ -268,71 +268,6 @@ impl LoginService {
             ),
         }
     }
-
-    // Return account name if remote workspace is in multitenant mode
-    pub async fn get_remote_account_name_by_access_token(
-        &self,
-        server_backend_url: &Url,
-        access_token: &str,
-    ) -> Result<Option<AccountName>, GetRemoteAccountError> {
-        let client = reqwest::Client::new();
-        let gql_url = server_backend_url.join("graphql").unwrap();
-
-        let gql_query = r#"
-            {
-                accounts {
-                    byAccessToken(
-                        accessToken: "{access_token}"
-                    ) {
-                        isMultiTenant
-                        account {
-                            id
-                            accountName
-                            displayName
-                            accountType
-                            avatarUrl
-                            isAdmin
-                        }
-                    }
-                }
-            }
-            "#
-        .replace("{access_token}", access_token);
-
-        let response = client
-            .post(gql_url)
-            .json(&json!({"query": gql_query}))
-            .send()
-            .await
-            .int_err()?
-            .error_for_status()
-            .int_err()?;
-
-        let gql_response: serde_json::Value = response.json().await.int_err()?;
-        let is_multi_tenant_maybe =
-            gql_response["data"]["accounts"]["byAccessToken"]["isMultiTenant"].as_bool();
-
-        if let Some(is_multi_tenant) = is_multi_tenant_maybe
-            && is_multi_tenant
-        {
-            if let Some(gql_account_name) =
-                gql_response["data"]["accounts"]["byAccessToken"]["account"]["accountName"].as_str()
-            {
-                let account_name = AccountName::from_str(gql_account_name).map_err(|_| {
-                    GetRemoteAccountError::InvalidResponse(InvalidGQLResponseError {
-                        response: gql_response.to_string(),
-                    })
-                })?;
-                return Ok(Some(account_name));
-            }
-            return Err(GetRemoteAccountError::InvalidResponse(
-                InvalidGQLResponseError {
-                    response: gql_response.to_string(),
-                },
-            ));
-        }
-        Ok(None)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -370,27 +305,6 @@ pub struct LoginErrorAccessFailed {
 }
 
 impl From<InternalError> for LoginError {
-    fn from(value: InternalError) -> Self {
-        Self::Internal(value)
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum GetRemoteAccountError {
-    #[error(transparent)]
-    InvalidResponse(InvalidGQLResponseError),
-
-    #[error(transparent)]
-    Internal(InternalError),
-}
-
-#[derive(Debug, Error)]
-#[error("Invalid gql response: {response}")]
-pub struct InvalidGQLResponseError {
-    pub response: String,
-}
-
-impl From<InternalError> for GetRemoteAccountError {
     fn from(value: InternalError) -> Self {
         Self::Internal(value)
     }

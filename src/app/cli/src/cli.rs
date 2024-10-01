@@ -10,9 +10,9 @@
 use std::path::PathBuf;
 
 use clap::{ArgAction, Parser};
-use opendatafabric as odf;
+use opendatafabric::{self as odf, TransferDatasetRef};
 
-use crate::cli_value_parser::{self as parsers, PushDatasetRef};
+use crate::cli_value_parser::{self as parsers};
 use crate::{
     LineageOutputFormat,
     MetadataLogOutputFormat,
@@ -904,8 +904,8 @@ pub struct Push {
     pub no_alias: bool,
 
     /// Remote alias or a URL to push to
-    #[arg(long, value_name = "REM", value_parser = parsers::push_dataset_ref_remote)]
-    pub to: Option<PushDatasetRef>,
+    #[arg(long, value_name = "REM", value_parser = parsers::tranfer_dataset_ref_remote)]
+    pub to: Option<TransferDatasetRef>,
 
     /// Overwrite remote version with local, even if revisions have diverged
     #[arg(long, short = 'f')]

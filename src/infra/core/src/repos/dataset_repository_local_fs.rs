@@ -213,8 +213,8 @@ impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
             {
                 // Existing head
                 Ok(_) => {
-                    return Err(CreateDatasetError::NameCollision(NameCollisionError {
-                        alias: dataset_alias.clone(),
+                    return Err(CreateDatasetError::RefCollision(RefCollisionError {
+                        id: existing_dataset_handle.id,
                     }));
                 }
 

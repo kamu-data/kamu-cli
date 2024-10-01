@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use auth::OdfServerAccessTokenResolver;
 use dill::*;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
@@ -16,11 +17,10 @@ use opendatafabric::*;
 use serde_json::json;
 use url::Url;
 
-use crate::UrlExt;
-
 pub struct PushServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+    access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
     sync_svc: Arc<dyn SyncService>,
 }
 
@@ -30,11 +30,13 @@ impl PushServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+        access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
         sync_svc: Arc<dyn SyncService>,
     ) -> Self {
         Self {
             dataset_repo,
             remote_alias_reg,
+            access_token_resolver,
             sync_svc,
         }
     }
@@ -145,31 +147,11 @@ impl PushServiceImpl {
 
         match push_aliases.len() {
             0 => {
-                if let Some(remote_repo_opts) = &options.remote_repo_opts {
-                    let push_dataset_name = if let Some(remote_dataset_name) = self
-                        .resolve_remote_dataset_name(
-                            &remote_repo_opts.remote_repo_url,
-                            &local_handle.id,
-                        )
-                        .await?
-                    {
-                        remote_dataset_name
-                    } else {
-                        local_handle.alias.dataset_name.clone()
-                    };
-                    let mut res_url = remote_repo_opts
-                        .remote_repo_url
-                        .clone()
-                        .as_odf_protoocol()
-                        .unwrap();
-                    if let Some(account_name) = &remote_repo_opts.remote_account_name {
-                        res_url.path_segments_mut().unwrap().push(account_name);
-                    }
-                    res_url
-                        .path_segments_mut()
-                        .unwrap()
-                        .push(&push_dataset_name);
-                    return Ok(res_url.into());
+                if let Some(dataset_ref) = self
+                    .resolve_remote_dataset_name(local_handle, options)
+                    .await?
+                {
+                    return Ok(dataset_ref);
                 }
                 Err(PushError::NoTarget)
             }
@@ -179,6 +161,41 @@ impl PushServiceImpl {
     }
 
     async fn resolve_remote_dataset_name(
+        &self,
+        local_handle: &DatasetHandle,
+        options: &PushMultiOptions,
+    ) -> Result<Option<DatasetRefRemote>, PushError> {
+        if let Some(remote_repo_opts) = &options.remote_repo_opts {
+            let token = self
+                .access_token_resolver
+                .resolve_odf_dataset_access_token(&remote_repo_opts.remote_repo_url);
+
+            let push_dataset_name = if let Some(remote_dataset_name) = self
+                .fetch_remote_dataset_name(&remote_repo_opts.remote_repo_url, &local_handle.id)
+                .await?
+            {
+                remote_dataset_name
+            } else {
+                local_handle.alias.dataset_name.clone()
+            };
+            let mut res_url = remote_repo_opts
+                .remote_repo_url
+                .clone()
+                .as_odf_protoocol()
+                .unwrap();
+            if let Some(account_name) = &remote_repo_opts.remote_account_name {
+                res_url.path_segments_mut().unwrap().push(account_name);
+            }
+            res_url
+                .path_segments_mut()
+                .unwrap()
+                .push(&push_dataset_name);
+            return Ok(Some(res_url.into()));
+        }
+        Ok(None)
+    }
+
+    async fn fetch_remote_dataset_name(
         &self,
         remote_server_url: &Url,
         dataset_id: &DatasetID,

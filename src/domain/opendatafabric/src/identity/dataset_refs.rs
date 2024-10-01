@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::fmt;
+use std::fmt::{self};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -927,5 +927,125 @@ impl std::str::FromStr for DatasetRefAnyPattern {
 }
 
 super::dataset_identity::impl_parse_error!(DatasetRefAnyPattern);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RepositoryRef {
+    pub repo_name: RepoName,
+    pub account_name: Option<AccountName>,
+    pub dataset_name: Option<DatasetName>,
+}
+
+impl RepositoryRef {
+    fn try_get_dataset_alias(s: &str) -> Result<Option<DatasetAlias>, ()> {
+        if s.is_empty() {
+            return Ok(None);
+        }
+        match s.split_once("/") {
+            Some((account, dataset)) => {
+                if let Ok(dataset_name) = DatasetName::from_str(dataset)
+                    && let Ok(account_name) = AccountName::from_str(account)
+                {
+                    return Ok(Some(DatasetAlias::new(Some(account_name), dataset_name)));
+                }
+            }
+            None => {
+                if let Ok(dataset_name) = DatasetName::from_str(s) {
+                    return Ok(Some(DatasetAlias::new(None, dataset_name)));
+                }
+            }
+        }
+        Err(())
+    }
+}
+
+impl std::str::FromStr for RepositoryRef {
+    type Err = ParseError<Self>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.is_empty() {
+            return Err(Self::Err::new(s));
+        }
+        match s.split_once("/") {
+            Some((repo, rest)) => {
+                if let Ok(repo_name) = RepoName::try_from(repo) {
+                    let mut result = Self {
+                        repo_name,
+                        account_name: None,
+                        dataset_name: None,
+                    };
+                    if let Ok(Some(dataset_alias)) = Self::try_get_dataset_alias(rest) {
+                        result.account_name = dataset_alias.account_name;
+                        result.dataset_name = Some(dataset_alias.dataset_name);
+                    }
+                    return Ok(result);
+                }
+            }
+            None => {
+                if let Ok(repo_name) = RepoName::try_from(s) {
+                    return Ok(Self {
+                        repo_name,
+                        account_name: None,
+                        dataset_name: None,
+                    });
+                }
+            }
+        }
+        return Err(Self::Err::new(s));
+    }
+}
+
+impl fmt::Display for RepositoryRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/", self.repo_name)?;
+        if let Some(acc) = &self.account_name {
+            write!(f, "{acc}/")?;
+        }
+        if let Some(dataset_name) = &self.dataset_name {
+            write!(f, "{dataset_name}")?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum TransferDatasetRef {
+    RemoteRef(DatasetRefRemote),
+    RepoRef(RepositoryRef),
+}
+
+impl std::str::FromStr for TransferDatasetRef {
+    type Err = ParseError<Self>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Ok(dataset_ref_remote) = DatasetRefRemote::try_from(s) {
+            return Ok(Self::RemoteRef(dataset_ref_remote));
+        }
+        let repository_ref = RepositoryRef::from_str(s).unwrap();
+        return Ok(Self::RepoRef(repository_ref));
+    }
+}
+
+impl TransferDatasetRef {
+    pub fn into_repo_name(self) -> Option<RepoName> {
+        match self {
+            Self::RemoteRef(_) => None,
+            Self::RepoRef(repo_ref) => Some(repo_ref.repo_name),
+        }
+    }
+}
+
+impl fmt::Display for TransferDatasetRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RemoteRef(v) => write!(f, "{v}"),
+            Self::RepoRef(v) => write!(f, "{v}"),
+        }
+    }
+}
+
+super::dataset_identity::impl_parse_error!(TransferDatasetRef);
+super::dataset_identity::impl_parse_error!(RepositoryRef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

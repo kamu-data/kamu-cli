@@ -37,6 +37,7 @@ mod provenance_service_impl;
 mod pull_service_impl;
 mod push_service_impl;
 mod query_service_impl;
+mod remote_alias_resolver_impl;
 mod remote_aliases_registry_impl;
 mod remote_repository_registry_impl;
 mod reset_service_impl;
