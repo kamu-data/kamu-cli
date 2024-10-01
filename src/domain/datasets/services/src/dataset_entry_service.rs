@@ -24,7 +24,6 @@ use messaging_outbox::{
     MessageConsumerT,
     MessageConsumptionDurability,
 };
-use opendatafabric::DatasetName;
 use time_source::SystemTimeSource;
 
 use crate::MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE;
@@ -59,18 +58,16 @@ impl DatasetEntryService {
 
     async fn handle_dataset_lifecycle_created_message(
         &self,
-        DatasetLifecycleMessageCreated {
+        message @ DatasetLifecycleMessageCreated {
             dataset_id,
             owner_account_id,
             ..
         }: &DatasetLifecycleMessageCreated,
     ) -> Result<(), InternalError> {
-        // TODO: replace with real name
-        let name = DatasetName::new_unchecked("temp-name");
         let entry = DatasetEntry::new(
             dataset_id.clone(),
             owner_account_id.clone(),
-            name,
+            message.dataset_name().into_owned(),
             self.time_source.now(),
         );
 
