@@ -12,11 +12,13 @@ use std::sync::Arc;
 use dill::{component, interface, meta, Catalog};
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_accounts::{AccountRepository, DEFAULT_ACCOUNT_ID};
 use kamu_core::{
     DatasetLifecycleMessage,
     DatasetLifecycleMessageCreated,
     DatasetLifecycleMessageDeleted,
     DatasetLifecycleMessageRenamed,
+    DatasetRepository,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use kamu_datasets::{DatasetEntry, DatasetEntryRepository};
@@ -26,6 +28,7 @@ use messaging_outbox::{
     MessageConsumerT,
     MessageConsumptionDurability,
 };
+use opendatafabric as odf;
 use time_source::SystemTimeSource;
 
 use crate::{JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER, MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE};
@@ -51,16 +54,22 @@ use crate::{JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER, MESSAGE_CONSUMER_KAMU_DATAS
 pub struct DatasetEntryService {
     dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
     time_source: Arc<dyn SystemTimeSource>,
+    dataset_repo: Arc<dyn DatasetRepository>,
+    account_repository: Arc<dyn AccountRepository>,
 }
 
 impl DatasetEntryService {
     pub fn new(
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
         time_source: Arc<dyn SystemTimeSource>,
+        dataset_repo: Arc<dyn DatasetRepository>,
+        account_repository: Arc<dyn AccountRepository>,
     ) -> Self {
         Self {
             dataset_entry_repo,
             time_source,
+            dataset_repo,
+            account_repository,
         }
     }
 
@@ -120,7 +129,45 @@ impl DatasetEntryService {
     }
 
     async fn index_datasets(&self) -> Result<(), InternalError> {
-        todo!()
+        use futures::TryStreamExt;
+
+        let dataset_handles: Vec<_> = self.dataset_repo.get_all_datasets().try_collect().await?;
+
+        // TODO: in one transaction?
+        for dataset_handle in dataset_handles {
+            let owner_account_id = self.get_dataset_owner_id(&dataset_handle).await?;
+            let dataset_entry = DatasetEntry::new(
+                dataset_handle.id,
+                owner_account_id.clone(),
+                dataset_handle.alias.dataset_name,
+                self.time_source.now(),
+            );
+
+            self.dataset_entry_repo
+                .save_dataset_entry(&dataset_entry)
+                .await
+                .int_err()?;
+        }
+
+        Ok(())
+    }
+
+    async fn get_dataset_owner_id(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Result<odf::AccountID, InternalError> {
+        match &dataset_handle.alias.account_name {
+            Some(account_name) => {
+                let account = self
+                    .account_repository
+                    .get_account_by_name(account_name)
+                    .await
+                    .int_err()?;
+
+                Ok(account.id)
+            }
+            None => Ok(DEFAULT_ACCOUNT_ID.clone()),
+        }
     }
 }
 
@@ -169,8 +216,17 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetEntryService {
 
 #[async_trait::async_trait]
 impl InitOnStartup for DatasetEntryService {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "DatasetEntryService::run_initialization"
+    )]
     async fn run_initialization(&self) -> Result<(), InternalError> {
+        // TODO: skip the search if we are not in workspace
+
         if self.has_datasets_indexed().await? {
+            tracing::debug!("Skip initialization: datasets already have indexed");
+
             return Ok(());
         }
 
