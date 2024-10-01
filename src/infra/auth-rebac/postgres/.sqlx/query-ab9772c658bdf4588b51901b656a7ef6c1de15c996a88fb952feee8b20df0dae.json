@@ -5,10 +5,30 @@
     "columns": [],
     "parameters": {
       "Left": [
+        {
+          "Custom": {
+            "name": "rebac_entity_type",
+            "kind": {
+              "Enum": [
+                "account",
+                "dataset"
+              ]
+            }
+          }
+        },
         "Varchar",
         "Varchar",
-        "Varchar",
-        "Varchar",
+        {
+          "Custom": {
+            "name": "rebac_entity_type",
+            "kind": {
+              "Enum": [
+                "account",
+                "dataset"
+              ]
+            }
+          }
+        },
         "Varchar"
       ]
     },

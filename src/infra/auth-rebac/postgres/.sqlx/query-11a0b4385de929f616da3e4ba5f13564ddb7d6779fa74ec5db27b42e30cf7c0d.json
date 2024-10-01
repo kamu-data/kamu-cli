@@ -11,9 +11,29 @@
     ],
     "parameters": {
       "Left": [
+        {
+          "Custom": {
+            "name": "rebac_entity_type",
+            "kind": {
+              "Enum": [
+                "account",
+                "dataset"
+              ]
+            }
+          }
+        },
         "Text",
-        "Text",
-        "Text",
+        {
+          "Custom": {
+            "name": "rebac_entity_type",
+            "kind": {
+              "Enum": [
+                "account",
+                "dataset"
+              ]
+            }
+          }
+        },
         "Text"
       ]
     },

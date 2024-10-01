@@ -6,7 +6,17 @@
       {
         "ordinal": 0,
         "name": "entity_type: EntityType",
-        "type_info": "Varchar"
+        "type_info": {
+          "Custom": {
+            "name": "rebac_entity_type",
+            "kind": {
+              "Enum": [
+                "account",
+                "dataset"
+              ]
+            }
+          }
+        }
       },
       {
         "ordinal": 1,
@@ -21,9 +31,29 @@
     ],
     "parameters": {
       "Left": [
+        {
+          "Custom": {
+            "name": "rebac_entity_type",
+            "kind": {
+              "Enum": [
+                "account",
+                "dataset"
+              ]
+            }
+          }
+        },
         "Text",
-        "Text",
-        "Text"
+        {
+          "Custom": {
+            "name": "rebac_entity_type",
+            "kind": {
+              "Enum": [
+                "account",
+                "dataset"
+              ]
+            }
+          }
+        }
       ]
     },
     "nullable": [
