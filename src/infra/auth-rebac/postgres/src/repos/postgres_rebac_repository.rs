@@ -14,13 +14,13 @@ use kamu_auth_rebac::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SqliteRebacRepository {
-    transaction: TransactionRefT<sqlx::Sqlite>,
+pub struct PostgresRebacRepository {
+    transaction: TransactionRefT<sqlx::Postgres>,
 }
 
 #[component(pub)]
 #[interface(dyn RebacRepository)]
-impl SqliteRebacRepository {
+impl PostgresRebacRepository {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
@@ -31,7 +31,7 @@ impl SqliteRebacRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl RebacRepository for SqliteRebacRepository {
+impl RebacRepository for PostgresRebacRepository {
     async fn set_entity_property(
         &self,
         entity: &Entity,
@@ -45,20 +45,16 @@ impl RebacRepository for SqliteRebacRepository {
             .await
             .map_err(SetEntityPropertyError::Internal)?;
 
-        let entity_id_as_str = entity.entity_id.as_ref();
-        let property_name_as_str = property_name.to_string();
-        let property_value_as_str = property_value.as_ref();
-
         sqlx::query!(
             r#"
             INSERT INTO auth_rebac_properties (entity_type, entity_id, property_name, property_value) VALUES ($1, $2, $3, $4)
             ON CONFLICT(entity_type, entity_id, property_name)
                 DO UPDATE SET property_value = excluded.property_value
             "#,
-            entity.entity_type,
-            entity_id_as_str,
-            property_name_as_str,
-            property_value_as_str,
+            entity.entity_type as EntityType,
+            entity.entity_id.as_ref(),
+            property_name.to_string(),
+            property_value.as_ref(),
         )
         .execute(connection_mut)
         .await
@@ -79,9 +75,6 @@ impl RebacRepository for SqliteRebacRepository {
             .await
             .map_err(DeleteEntityPropertyError::Internal)?;
 
-        let entity_id_as_str = entity.entity_id.as_ref();
-        let property_name_as_str = property_name.to_string();
-
         let delete_result = sqlx::query!(
             r#"
             DELETE
@@ -90,9 +83,9 @@ impl RebacRepository for SqliteRebacRepository {
               AND entity_id = $2
               AND property_name = $3
             "#,
-            entity.entity_type,
-            entity_id_as_str,
-            property_name_as_str,
+            entity.entity_type as EntityType,
+            entity.entity_id.as_ref(),
+            property_name.to_string(),
         )
         .execute(&mut *connection_mut)
         .await
@@ -116,8 +109,6 @@ impl RebacRepository for SqliteRebacRepository {
             .await
             .map_err(DeleteEntityPropertiesError::Internal)?;
 
-        let entity_id_as_str = entity.entity_id.as_ref();
-
         let delete_result = sqlx::query!(
             r#"
             DELETE
@@ -125,8 +116,8 @@ impl RebacRepository for SqliteRebacRepository {
             WHERE entity_type = $1
               AND entity_id = $2
             "#,
-            entity.entity_type,
-            entity_id_as_str,
+            entity.entity_type as EntityType,
+            entity.entity_id.as_ref(),
         )
         .execute(&mut *connection_mut)
         .await
@@ -150,8 +141,6 @@ impl RebacRepository for SqliteRebacRepository {
             .await
             .map_err(GetEntityPropertiesError::Internal)?;
 
-        let entity_id_as_str = entity.entity_id.as_ref();
-
         let row_models = sqlx::query_as!(
             PropertyRowModel,
             r#"
@@ -160,8 +149,8 @@ impl RebacRepository for SqliteRebacRepository {
             WHERE entity_type = $1
               AND entity_id = $2
             "#,
-            entity.entity_type,
-            entity_id_as_str,
+            entity.entity_type as EntityType,
+            entity.entity_id.as_ref(),
         )
         .fetch_all(connection_mut)
         .await
@@ -187,21 +176,18 @@ impl RebacRepository for SqliteRebacRepository {
             .await
             .map_err(InsertEntitiesRelationError::Internal)?;
 
-        let subject_entity_id_as_str = subject_entity.entity_id.as_ref();
-        let relation_as_str = relationship.to_string();
-        let object_entity_id_as_str = object_entity.entity_id.as_ref();
-
         sqlx::query!(
             r#"
-            INSERT INTO auth_rebac_relations (subject_entity_type, subject_entity_id, relationship, object_entity_type,
-                                              object_entity_id)
+            INSERT INTO auth_rebac_relations (
+                subject_entity_type, subject_entity_id, relationship, object_entity_type, object_entity_id
+            )
             VALUES ($1, $2, $3, $4, $5)
             "#,
-            subject_entity.entity_type,
-            subject_entity_id_as_str,
-            relation_as_str,
-            object_entity.entity_type,
-            object_entity_id_as_str,
+            subject_entity.entity_type as EntityType,
+            subject_entity.entity_id.as_ref(),
+            relationship.to_string(),
+            object_entity.entity_type as EntityType,
+            object_entity.entity_id.as_ref(),
         )
         .execute(connection_mut)
         .await
@@ -232,10 +218,6 @@ impl RebacRepository for SqliteRebacRepository {
             .await
             .map_err(DeleteEntitiesRelationError::Internal)?;
 
-        let subject_entity_id_as_str = subject_entity.entity_id.as_ref();
-        let relation_as_str = relationship.to_string();
-        let object_entity_id_as_str = object_entity.entity_id.as_ref();
-
         let delete_result = sqlx::query!(
             r#"
             DELETE
@@ -246,11 +228,11 @@ impl RebacRepository for SqliteRebacRepository {
               AND object_entity_type = $4
               AND object_entity_id = $5
             "#,
-            subject_entity.entity_type,
-            subject_entity_id_as_str,
-            relation_as_str,
-            object_entity.entity_type,
-            object_entity_id_as_str,
+            subject_entity.entity_type as EntityType,
+            subject_entity.entity_id.as_ref(),
+            relationship.to_string(),
+            object_entity.entity_type as EntityType,
+            object_entity.entity_id.as_ref(),
         )
         .execute(&mut *connection_mut)
         .await
@@ -278,8 +260,6 @@ impl RebacRepository for SqliteRebacRepository {
             .await
             .map_err(SubjectEntityRelationsError::Internal)?;
 
-        let subject_entity_id_as_str = subject_entity.entity_id.as_ref();
-
         let row_models = sqlx::query_as!(
             EntityWithRelationRowModel,
             r#"
@@ -290,8 +270,8 @@ impl RebacRepository for SqliteRebacRepository {
             WHERE subject_entity_type = $1
               AND subject_entity_id = $2
             "#,
-            subject_entity.entity_type,
-            subject_entity_id_as_str,
+            subject_entity.entity_type as EntityType,
+            subject_entity.entity_id.as_ref(),
         )
         .fetch_all(connection_mut)
         .await
@@ -316,8 +296,6 @@ impl RebacRepository for SqliteRebacRepository {
             .await
             .map_err(SubjectEntityRelationsByObjectTypeError::Internal)?;
 
-        let subject_entity_id_as_str = subject_entity.entity_id.as_ref();
-
         let row_models = sqlx::query_as!(
             EntityWithRelationRowModel,
             r#"
@@ -329,9 +307,9 @@ impl RebacRepository for SqliteRebacRepository {
               AND subject_entity_id = $2
               AND object_entity_type = $3
             "#,
-            subject_entity.entity_type,
-            subject_entity_id_as_str,
-            object_entity_type,
+            subject_entity.entity_type as EntityType,
+            subject_entity.entity_id.as_ref(),
+            object_entity_type as EntityType,
         )
         .fetch_all(connection_mut)
         .await
@@ -356,9 +334,6 @@ impl RebacRepository for SqliteRebacRepository {
             .await
             .map_err(GetRelationsBetweenEntitiesError::Internal)?;
 
-        let subject_entity_id_as_str = subject_entity.entity_id.as_ref();
-        let object_entity_id_as_str = object_entity.entity_id.as_ref();
-
         let row_models = sqlx::query_as!(
             RelationRowModel,
             r#"
@@ -369,10 +344,10 @@ impl RebacRepository for SqliteRebacRepository {
               AND object_entity_type = $3
               AND object_entity_id = $4
             "#,
-            subject_entity.entity_type,
-            subject_entity_id_as_str,
-            object_entity.entity_type,
-            object_entity_id_as_str,
+            subject_entity.entity_type as EntityType,
+            subject_entity.entity_id.as_ref(),
+            object_entity.entity_type as EntityType,
+            object_entity.entity_id.as_ref(),
         )
         .fetch_all(connection_mut)
         .await

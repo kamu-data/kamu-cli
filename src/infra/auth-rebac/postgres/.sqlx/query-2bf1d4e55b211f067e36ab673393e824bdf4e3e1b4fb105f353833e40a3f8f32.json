@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE\n            FROM auth_rebac_properties\n            WHERE entity_type = $1\n              AND entity_id = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "rebac_entity_type",
+            "kind": {
+              "Enum": [
+                "account",
+                "dataset"
+              ]
+            }
+          }
+        },
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2bf1d4e55b211f067e36ab673393e824bdf4e3e1b4fb105f353833e40a3f8f32"
+}

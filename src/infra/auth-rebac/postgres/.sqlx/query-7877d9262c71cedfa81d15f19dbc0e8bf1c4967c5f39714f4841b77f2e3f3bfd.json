@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO auth_rebac_properties (entity_type, entity_id, property_name, property_value) VALUES ($1, $2, $3, $4)\n            ON CONFLICT(entity_type, entity_id, property_name)\n                DO UPDATE SET property_value = excluded.property_value\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "rebac_entity_type",
+            "kind": {
+              "Enum": [
+                "account",
+                "dataset"
+              ]
+            }
+          }
+        },
+        "Varchar",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7877d9262c71cedfa81d15f19dbc0e8bf1c4967c5f39714f4841b77f2e3f3bfd"
+}

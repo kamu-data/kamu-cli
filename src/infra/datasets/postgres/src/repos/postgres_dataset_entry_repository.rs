@@ -15,13 +15,13 @@ use opendatafabric::{AccountID, DatasetID, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SqliteDatasetEntryRepository {
-    transaction: TransactionRefT<sqlx::Sqlite>,
+pub struct PostgresDatasetEntryRepository {
+    transaction: TransactionRefT<sqlx::Postgres>,
 }
 
 #[component(pub)]
 #[interface(dyn DatasetEntryRepository)]
-impl SqliteDatasetEntryRepository {
+impl PostgresDatasetEntryRepository {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
@@ -32,7 +32,7 @@ impl SqliteDatasetEntryRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DatasetEntryRepository for SqliteDatasetEntryRepository {
+impl DatasetEntryRepository for PostgresDatasetEntryRepository {
     async fn get_dataset_entry(
         &self,
         dataset_id: &DatasetID,
@@ -45,7 +45,6 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             .map_err(GetDatasetEntryError::Internal)?;
 
         let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
-        let dataset_id_as_str = stack_dataset_id.as_str();
 
         let maybe_dataset_entry_row = sqlx::query_as!(
             DatasetEntryRowModel,
@@ -57,7 +56,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             FROM dataset_entries
             WHERE dataset_id = $1
             "#,
-            dataset_id_as_str,
+            stack_dataset_id.as_str(),
         )
         .fetch_optional(connection_mut)
         .await
@@ -83,8 +82,6 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             .map_err(GetDatasetEntryByNameError::Internal)?;
 
         let stack_owner_id = owner_id.as_did_str().to_stack_string();
-        let owner_id_as_str = stack_owner_id.as_str();
-        let dataset_name_as_str = name.as_str();
 
         let maybe_dataset_entry_row = sqlx::query_as!(
             DatasetEntryRowModel,
@@ -95,10 +92,10 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                    created_at   as "created_at: _"
             FROM dataset_entries
             WHERE owner_id = $1
-              AND dataset_name = $2
+                  AND dataset_name = $2
             "#,
-            owner_id_as_str,
-            dataset_name_as_str
+            stack_owner_id.as_str(),
+            name.as_str()
         )
         .fetch_optional(connection_mut)
         .await
@@ -123,7 +120,6 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             .map_err(GetDatasetEntriesByOwnerIdError::Internal)?;
 
         let stack_owner_id = owner_id.as_did_str().to_stack_string();
-        let owner_id_as_str = stack_owner_id.as_str();
 
         let dataset_entry_rows = sqlx::query_as!(
             DatasetEntryRowModel,
@@ -135,7 +131,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             FROM dataset_entries
             WHERE owner_id = $1
             "#,
-            owner_id_as_str,
+            stack_owner_id.as_str(),
         )
         .fetch_all(connection_mut)
         .await
@@ -156,28 +152,24 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             .map_err(SaveDatasetEntryError::Internal)?;
 
         let stack_dataset_id = dataset_entry.id.as_did_str().to_stack_string();
-        let dataset_id_as_str = stack_dataset_id.as_str();
         let stack_owner_id = dataset_entry.owner_id.as_did_str().to_stack_string();
-        let owner_id_as_str = stack_owner_id.as_str();
-        let dataset_name_as_str = dataset_entry.name.as_str();
 
         sqlx::query!(
             r#"
             INSERT INTO dataset_entries(dataset_id, owner_id, dataset_name, created_at)
-            VALUES ($1, $2, $3, $4)
+                VALUES ($1, $2, $3, $4)
             "#,
-            dataset_id_as_str,
-            owner_id_as_str,
-            dataset_name_as_str,
+            stack_dataset_id.as_str(),
+            stack_owner_id.as_str(),
+            dataset_entry.name.as_str(),
             dataset_entry.created_at,
         )
         .execute(connection_mut)
         .await
         .map_err(|e| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
-                let sqlite_error_message = e.message();
-
-                if sqlite_error_message.contains("dataset_entries.dataset_name") {
+                let postgres_error_message = e.message();
+                if postgres_error_message.contains("idx_dataset_entries_owner_id_dataset_name") {
                     DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into()
                 } else {
                     SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into()
@@ -202,8 +194,6 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             .map_err(UpdateDatasetEntryNameError::Internal)?;
 
         let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
-        let dataset_id_as_str = stack_dataset_id.as_str();
-        let new_dataset_name_as_str = new_name.as_str();
 
         let update_result = sqlx::query!(
             r#"
@@ -211,8 +201,8 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                 SET dataset_name = $1
                 WHERE dataset_id = $2
             "#,
-            new_dataset_name_as_str,
-            dataset_id_as_str,
+            new_name.as_str(),
+            stack_dataset_id.as_str(),
         )
         .execute(&mut *connection_mut)
         .await
@@ -242,14 +232,12 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             .map_err(DeleteEntryDatasetError::Internal)?;
 
         let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
-        let dataset_id_as_str = stack_dataset_id.as_str();
+
         let delete_result = sqlx::query!(
             r#"
-            DELETE
-            FROM dataset_entries
-            WHERE dataset_id = $1
+            DELETE FROM dataset_entries WHERE dataset_id = $1
             "#,
-            dataset_id_as_str,
+            stack_dataset_id.as_str(),
         )
         .execute(&mut *connection_mut)
         .await

@@ -5462,6 +5462,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-auth-rebac-postgres"
+version = "0.204.4"
+dependencies = [
+ "async-trait",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "internal-error",
+ "kamu-auth-rebac",
+ "kamu-auth-rebac-repo-tests",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "tokio",
+]
+
+[[package]]
 name = "kamu-auth-rebac-repo-tests"
 version = "0.204.4"
 dependencies = [
@@ -5558,6 +5575,7 @@ dependencies = [
  "kamu-adapter-oauth",
  "kamu-adapter-odata",
  "kamu-auth-rebac-inmem",
+ "kamu-auth-rebac-postgres",
  "kamu-auth-rebac-services",
  "kamu-auth-rebac-sqlite",
  "kamu-cli-puppet",
@@ -5874,6 +5892,7 @@ dependencies = [
  "database-common-macros",
  "dill",
  "internal-error",
+ "kamu-accounts-postgres",
  "kamu-datasets",
  "kamu-datasets-repo-tests",
  "opendatafabric",
