@@ -22,6 +22,7 @@ pub enum DatasetLifecycleMessage {
     Created(DatasetLifecycleMessageCreated),
     DependenciesUpdated(DatasetLifecycleMessageDependenciesUpdated),
     Deleted(DatasetLifecycleMessageDeleted),
+    Renamed(DatasetLifecycleMessageRenamed),
 }
 
 impl DatasetLifecycleMessage {
@@ -48,6 +49,20 @@ impl DatasetLifecycleMessage {
 
     pub fn deleted(dataset_id: DatasetID) -> Self {
         Self::Deleted(DatasetLifecycleMessageDeleted { dataset_id })
+    }
+
+    pub fn renamed(
+        dataset_id: DatasetID,
+        owner_account_id: AccountID,
+        old_dataset_name: DatasetName,
+        new_dataset_name: DatasetName,
+    ) -> Self {
+        Self::Renamed(DatasetLifecycleMessageRenamed {
+            dataset_id,
+            owner_account_id,
+            old_dataset_name,
+            new_dataset_name,
+        })
     }
 }
 
@@ -89,6 +104,16 @@ pub struct DatasetLifecycleMessageDependenciesUpdated {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetLifecycleMessageDeleted {
     pub dataset_id: DatasetID,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DatasetLifecycleMessageRenamed {
+    pub dataset_id: DatasetID,
+    pub owner_account_id: AccountID,
+    pub old_dataset_name: DatasetName,
+    pub new_dataset_name: DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -15,6 +15,7 @@ use kamu_core::{
     DatasetLifecycleMessage,
     DatasetLifecycleMessageCreated,
     DatasetLifecycleMessageDeleted,
+    DatasetLifecycleMessageRenamed,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use kamu_datasets::{DatasetEntry, DatasetEntryRepository};
@@ -86,6 +87,20 @@ impl DatasetEntryService {
             .await
             .int_err()
     }
+
+    async fn handle_dataset_lifecycle_renamed_message(
+        &self,
+        DatasetLifecycleMessageRenamed {
+            dataset_id,
+            new_dataset_name,
+            ..
+        }: &DatasetLifecycleMessageRenamed,
+    ) -> Result<(), InternalError> {
+        self.dataset_entry_repo
+            .update_dataset_entry_name(dataset_id, new_dataset_name)
+            .await
+            .int_err()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -108,7 +123,6 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetEntryService {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
 
-        // TODO: handle rename
         match message {
             DatasetLifecycleMessage::Created(message) => {
                 self.handle_dataset_lifecycle_created_message(message).await
@@ -116,6 +130,10 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetEntryService {
 
             DatasetLifecycleMessage::Deleted(message) => {
                 self.handle_dataset_lifecycle_deleted_message(message).await
+            }
+
+            DatasetLifecycleMessage::Renamed(message) => {
+                self.handle_dataset_lifecycle_renamed_message(message).await
             }
 
             DatasetLifecycleMessage::DependenciesUpdated(_) => {

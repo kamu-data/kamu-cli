@@ -187,7 +187,8 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetOwnershipServiceInMemo
                     guard.account_ids_by_dataset_id.remove(&message.dataset_id);
                 }
             }
-            DatasetLifecycleMessage::DependenciesUpdated(_) => {
+            DatasetLifecycleMessage::DependenciesUpdated(_)
+            | DatasetLifecycleMessage::Renamed(_) => {
                 // No action required
             }
         }
