@@ -12,7 +12,11 @@ use std::sync::Arc;
 use dill::{component, interface, meta, Catalog};
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_accounts::{AccountRepository, DEFAULT_ACCOUNT_ID};
+use kamu_accounts::{
+    AccountRepository,
+    DEFAULT_ACCOUNT_ID,
+    JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
+};
 use kamu_core::{
     DatasetLifecycleMessage,
     DatasetLifecycleMessageCreated,
@@ -48,7 +52,7 @@ use crate::{JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER, MESSAGE_CONSUMER_KAMU_DATAS
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {
     job_name: JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
-    depends_on: &[],
+    depends_on: &[JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR],
     requires_transaction: true,
 })]
 pub struct DatasetEntryService {
