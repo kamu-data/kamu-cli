@@ -162,7 +162,7 @@ impl DatasetEntryService {
         for dataset_handle in dataset_handles {
             let task_account_repository = self.account_repository.clone();
             let task_dataset_entry_repo = self.dataset_entry_repo.clone();
-            let task_now = now.clone();
+            let task_now = now;
 
             join_set.spawn(async move {
                 let owner_account_id = get_dataset_owner_id(
