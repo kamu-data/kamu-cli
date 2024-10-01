@@ -942,7 +942,7 @@ impl RepositoryRef {
         if s.is_empty() {
             return Ok(None);
         }
-        match s.split_once("/") {
+        match s.split_once('/') {
             Some((account, dataset)) => {
                 if let Ok(dataset_name) = DatasetName::from_str(dataset)
                     && let Ok(account_name) = AccountName::from_str(account)
@@ -967,7 +967,7 @@ impl std::str::FromStr for RepositoryRef {
         if s.is_empty() {
             return Err(Self::Err::new(s));
         }
-        match s.split_once("/") {
+        match s.split_once('/') {
             Some((repo, rest)) => {
                 if let Ok(repo_name) = RepoName::try_from(repo) {
                     let mut result = Self {
@@ -992,7 +992,7 @@ impl std::str::FromStr for RepositoryRef {
                 }
             }
         }
-        return Err(Self::Err::new(s));
+        Err(Self::Err::new(s))
     }
 }
 
@@ -1023,7 +1023,7 @@ impl std::str::FromStr for TransferDatasetRef {
             return Ok(Self::RemoteRef(dataset_ref_remote));
         }
         let repository_ref = RepositoryRef::from_str(s).unwrap();
-        return Ok(Self::RepoRef(repository_ref));
+        Ok(Self::RepoRef(repository_ref))
     }
 }
 
@@ -1042,6 +1042,12 @@ impl fmt::Display for TransferDatasetRef {
             Self::RemoteRef(v) => write!(f, "{v}"),
             Self::RepoRef(v) => write!(f, "{v}"),
         }
+    }
+}
+
+impl From<DatasetRefRemote> for TransferDatasetRef {
+    fn from(value: DatasetRefRemote) -> Self {
+        Self::RemoteRef(value)
     }
 }
 

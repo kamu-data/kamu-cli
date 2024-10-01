@@ -247,7 +247,7 @@ impl ClientSideHarness {
             .push_multi_ext(
                 vec![PushRequest {
                     local_ref: Some(dataset_local_ref),
-                    remote_ref: Some(dataset_remote_ref),
+                    remote_ref: Some(dataset_remote_ref.into()),
                 }],
                 PushMultiOptions {
                     sync_options: SyncOptions {

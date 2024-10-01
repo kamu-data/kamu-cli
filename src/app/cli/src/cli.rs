@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 
 use clap::{ArgAction, Parser};
-use opendatafabric::{self as odf, TransferDatasetRef};
+use opendatafabric::{self as odf, RepoName, TransferDatasetRef};
 
 use crate::cli_value_parser::{self as parsers};
 use crate::{
@@ -656,6 +656,14 @@ pub struct Login {
     /// ODF server URL (defaults to kamu.dev)
     #[arg()]
     pub server: Option<parsers::UrlHttps>,
+
+    /// Repository name which will be used to store in repositories list
+    #[arg(long, value_parser = parsers::repo_name)]
+    pub repo_name: Option<RepoName>,
+
+    /// Don't automatically add a remote repository for this host
+    #[arg(long)]
+    pub skip_add_repo: bool,
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -904,7 +912,7 @@ pub struct Push {
     pub no_alias: bool,
 
     /// Remote alias or a URL to push to
-    #[arg(long, value_name = "REM", value_parser = parsers::tranfer_dataset_ref_remote)]
+    #[arg(long, value_name = "REM", value_parser = parsers::transfer_dataset_ref_remote)]
     pub to: Option<TransferDatasetRef>,
 
     /// Overwrite remote version with local, even if revisions have diverged

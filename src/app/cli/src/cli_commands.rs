@@ -219,6 +219,8 @@ pub fn get_command(
                 c.server.map(Into::into),
                 c.access_token,
                 c.check,
+                c.repo_name,
+                c.skip_add_repo,
             )),
         },
         cli::Command::Logout(c) => Box::new(LogoutCommand::new(
@@ -276,9 +278,6 @@ pub fn get_command(
             }
         }
         cli::Command::Push(c) => Box::new(PushCommand::new(
-            work_catalog.get_one()?,
-            work_catalog.get_one()?,
-            work_catalog.get_one()?,
             work_catalog.get_one()?,
             work_catalog.get_one()?,
             work_catalog.get_one()?,

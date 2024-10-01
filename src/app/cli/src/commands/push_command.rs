@@ -18,7 +18,6 @@ use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
-use crate::odf_server;
 use crate::output::OutputConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,9 +28,6 @@ pub struct PushCommand {
     push_svc: Arc<dyn PushService>,
     dataset_repo: Arc<dyn DatasetRepository>,
     search_svc: Arc<dyn SearchService>,
-    remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-    login_svc: Arc<odf_server::LoginService>,
-    access_token_reg_svc: Arc<odf_server::AccessTokenRegistryService>,
     refs: Vec<DatasetRefAnyPattern>,
     current_account_subject: Arc<CurrentAccountSubject>,
     all: bool,
@@ -48,9 +44,6 @@ impl PushCommand {
         push_svc: Arc<dyn PushService>,
         dataset_repo: Arc<dyn DatasetRepository>,
         search_svc: Arc<dyn SearchService>,
-        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-        login_svc: Arc<odf_server::LoginService>,
-        access_token_reg_svc: Arc<odf_server::AccessTokenRegistryService>,
         refs: I,
         current_account_subject: Arc<CurrentAccountSubject>,
         all: bool,
@@ -68,9 +61,6 @@ impl PushCommand {
             push_svc,
             dataset_repo,
             search_svc,
-            remote_repo_reg,
-            login_svc,
-            access_token_reg_svc,
             refs: refs.into_iter().collect(),
             current_account_subject,
             all,
@@ -96,7 +86,7 @@ impl PushCommand {
             CurrentAccountSubject::Logged(l) => &l.account_name,
         };
 
-        if let Some(_remote_ref @ TransferDatasetRef::RemoteRef(dataset_ref_remote)) = &self.to {
+        if let Some(transfer_ref) = &self.to {
             let local_ref = match self.refs[0].as_dataset_ref_any() {
                 Some(dataset_ref_any) => dataset_ref_any
                     .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
@@ -117,7 +107,7 @@ impl PushCommand {
                 .push_multi_ext(
                     vec![PushRequest {
                         local_ref: Some(local_ref),
-                        remote_ref: Some(dataset_ref_remote.clone()),
+                        remote_ref: Some(transfer_ref.clone()),
                     }],
                     PushMultiOptions {
                         all: self.all,
@@ -137,12 +127,6 @@ impl PushCommand {
             )
             .try_collect()
             .await?;
-
-            let repo_name = if let Some(push_dataset_ref) = &self.to {
-                push_dataset_ref.clone().into_repo_name()
-            } else {
-                None
-            };
 
             Ok(self
                 .push_svc

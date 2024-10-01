@@ -34,21 +34,21 @@ use time_source::SystemTimeSourceDefault;
 #[tokio::test]
 async fn test_set_watermark_rejects_on_derivative() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = PushTestHarness::new_with_authorizer(
+    let harness = RemoteAliasResolverHarness::new_with_authorizer(
         tmp_dir.path(),
         AlwaysHappyDatasetActionAuthorizer::new(),
         true,
     );
 }
 
-struct PushTestHarness {
+struct RemoteAliasResolverHarness {
     dataset_repo: Arc<DatasetRepositoryLocalFs>,
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     push_svc: Arc<dyn PushService>,
 }
 
-impl PushTestHarness {
+impl RemoteAliasResolverHarness {
     fn new(tmp_path: &PathBuf, multi_tenant: bool) -> Self {
         Self::new_with_authorizer(
             tmp_path,
@@ -62,8 +62,6 @@ impl PushTestHarness {
         dataset_action_authorizer: TDatasetAuthorizer,
         multi_tenant: bool,
     ) -> Self {
-        // let calls = Arc::new(Mutex::new(Vec::new()));
-
         let datasets_dir_path = tmp_path.join("datasets");
         std::fs::create_dir(&datasets_dir_path).unwrap();
 

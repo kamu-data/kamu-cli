@@ -74,7 +74,7 @@ pub(crate) fn dataset_ref_remote(s: &str) -> Result<odf::DatasetRefRemote, Strin
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn tranfer_dataset_ref_remote(s: &str) -> Result<odf::TransferDatasetRef, String> {
+pub(crate) fn transfer_dataset_ref_remote(s: &str) -> Result<odf::TransferDatasetRef, String> {
     match odf::TransferDatasetRef::from_str(s) {
         Ok(push_dataset_ref) => Ok(push_dataset_ref),
         Err(_) => Err("Remote reference should be in form: `did:odf:...` or \

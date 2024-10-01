@@ -27,6 +27,8 @@ pub struct LoginCommand {
     server: Option<Url>,
     access_token: Option<String>,
     check: bool,
+    repo_name: Option<RepoName>,
+    skip_add_repo: bool,
 }
 
 impl LoginCommand {
@@ -39,6 +41,8 @@ impl LoginCommand {
         server: Option<Url>,
         access_token: Option<String>,
         check: bool,
+        repo_name: Option<RepoName>,
+        skip_add_repo: bool,
     ) -> Self {
         Self {
             login_service,
@@ -49,6 +53,8 @@ impl LoginCommand {
             server,
             access_token,
             check,
+            repo_name,
+            skip_add_repo,
         }
     }
 
@@ -75,8 +81,12 @@ impl LoginCommand {
     }
 
     fn add_repository(&self, frontend_url: &Url, backend_url: &Url) -> Result<(), CLIError> {
-        let repo_name =
-            RepoName::try_from(frontend_url.host_str().unwrap()).map_err(CLIError::failure)?;
+        if self.skip_add_repo {
+            return Ok(());
+        }
+        let repo_name = self.repo_name.clone().unwrap_or(
+            RepoName::try_from(frontend_url.host_str().unwrap()).map_err(CLIError::failure)?,
+        );
         match self
             .remote_repo_reg
             .add_repository(&repo_name, backend_url.clone())

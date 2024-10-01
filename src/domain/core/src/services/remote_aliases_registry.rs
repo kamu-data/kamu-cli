@@ -55,10 +55,16 @@ impl From<GetDatasetError> for GetAliasesError {
 pub trait RemoteAliasResolver: Send + Sync {
     async fn resolve_remote_alias(
         &self,
-        dataset_ref_maybe: Option<&DatasetRef>,
+        local_dataset_handle: &DatasetHandle,
         transfer_dataset_ref_maybe: Option<TransferDatasetRef>,
-        remote_alias_kind: &RemoteAliasKind,
+        remote_alias_kind: RemoteAliasKind,
     ) -> Result<DatasetRefRemote, ResolveAliasError>;
+
+    async fn inverse_lookup_dataset_by_alias(
+        &self,
+        remote_ref: &TransferDatasetRef,
+        remote_alias_kind: RemoteAliasKind,
+    ) -> Result<DatasetHandle, ResolveAliasError>;
 }
 
 #[derive(Error, Debug)]
@@ -69,18 +75,12 @@ pub enum ResolveAliasError {
         #[backtrace]
         RepositoryNotFoundError,
     ),
-    #[error(transparent)]
-    AmbiguousRepository(
-        #[from]
-        #[backtrace]
-        AmbiguousRepositoryError,
-    ),
-    #[error(transparent)]
-    EmptyRepositoryList(
-        #[from]
-        #[backtrace]
-        EmptyRepositoryListError,
-    ),
+    #[error("Cannot choose between multiple repositories")]
+    AmbiguousRepository,
+    #[error("Cannot choose between multiple push aliases")]
+    AmbiguousAlias,
+    #[error("Repositories list is empty")]
+    EmptyRepositoryList,
     #[error(transparent)]
     Internal(
         #[from]
@@ -89,13 +89,19 @@ pub enum ResolveAliasError {
     ),
 }
 
-#[derive(Error, Debug)]
-#[error("Cannot choose between multiple repositories")]
-pub struct AmbiguousRepositoryError {}
-
-#[derive(Error, Debug)]
-#[error("Repositories list is empty")]
-pub struct EmptyRepositoryListError {}
+impl From<ResolveAliasError> for PushError {
+    fn from(val: ResolveAliasError) -> Self {
+        match val {
+            ResolveAliasError::AmbiguousAlias | ResolveAliasError::AmbiguousRepository => {
+                Self::AmbiguousTarget
+            }
+            ResolveAliasError::EmptyRepositoryList | ResolveAliasError::RepositoryNotFound(_) => {
+                Self::NoTarget
+            }
+            ResolveAliasError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

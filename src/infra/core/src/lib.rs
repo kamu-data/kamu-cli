@@ -60,6 +60,7 @@ pub use provenance_service_impl::*;
 pub use pull_service_impl::*;
 pub use push_service_impl::*;
 pub use query_service_impl::*;
+pub use remote_alias_resolver_impl::*;
 pub use remote_aliases_registry_impl::*;
 pub use remote_repository_registry_impl::*;
 pub use repos::*;

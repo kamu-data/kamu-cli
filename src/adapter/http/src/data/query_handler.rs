@@ -34,7 +34,6 @@ pub async fn query_handler_post(
     Extension(catalog): Extension<Catalog>,
     Json(body): Json<RequestBody>,
 ) -> Result<Json<ResponseBody>, ApiError> {
-    println!("body: {:?}", body);
     match body {
         RequestBody::V1(body) => query_handler_post_v1(catalog, body).await,
         RequestBody::V2(body) => query_handler_post_v2(catalog, body).await,

@@ -9,14 +9,12 @@
 
 use std::future::IntoFuture;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::component;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::PROVIDER_PASSWORD;
 use kamu_adapter_http::LoginRequestBody;
-use opendatafabric::AccountName;
 use serde::Deserialize;
 use serde_json::json;
 use thiserror::Error;
