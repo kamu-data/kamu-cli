@@ -29,10 +29,7 @@ pub trait KamuCliPuppetExt {
 
     async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot);
 
-    async fn get_list_of_repo_aliases(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> (Vec<String>, Vec<String>);
+    async fn get_list_of_repo_aliases(&self, dataset_ref: &DatasetRef) -> Vec<RepoAlias>;
 
     async fn complete<T>(&self, input: T, current: usize) -> Vec<String>
     where
@@ -78,10 +75,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             .success();
     }
 
-    async fn get_list_of_repo_aliases(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> (Vec<String>, Vec<String>) {
+    async fn get_list_of_repo_aliases(&self, dataset_ref: &DatasetRef) -> Vec<RepoAlias> {
         let assert = self
             .execute([
                 "repo",
@@ -89,31 +83,14 @@ impl KamuCliPuppetExt for KamuCliPuppet {
                 "list",
                 dataset_ref.to_string().as_str(),
                 "--output-format",
-                "csv",
+                "json",
             ])
             .await
             .success();
 
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
-        stdout
-            .lines()
-            .skip(1) // Skip header
-            .fold((vec![], vec![]), |mut acc, line| {
-                // Skip name
-                let mut line_it = line.split(',').skip(1);
-
-                let alias_kind = line_it.next().unwrap();
-                let alias = line_it.next().unwrap().to_string();
-
-                match alias_kind {
-                    "pull" => acc.0.push(alias),
-                    "push" => acc.1.push(alias),
-                    _ => panic!("Unexpected alias kind: {alias_kind}"),
-                }
-
-                acc
-            })
+        serde_json::from_str(stdout).unwrap()
     }
 
     async fn complete<T>(&self, input: T, current: usize) -> Vec<String>
@@ -224,6 +201,14 @@ pub struct DatasetRecord {
     pub blocks: usize,
     pub size: usize,
     pub watermark: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "PascalCase", deny_unknown_fields)]
+pub struct RepoAlias {
+    pub dataset: DatasetName,
+    pub kind: String,
+    pub alias: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
