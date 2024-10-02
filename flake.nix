@@ -22,7 +22,7 @@
       {
         devShells.default = with pkgs; mkShell {
           buildInputs = [
-            rust-bin.nightly."2024-06-13".default
+            (rust-bin.fromRustupToolchainFile ./rust-toolchain)
             rust-analyzer
             jq
             kubo
