@@ -86,7 +86,7 @@ impl DatasetLifecycleMessageCreated {
         if let Some(name) = &self.dataset_name {
             Cow::Borrowed(name)
         } else {
-            tracing::warn!("Dataset [{}] does not has a name", self.dataset_id);
+            tracing::warn!("Dataset '{}' does not has a name", self.dataset_id);
 
             Cow::Owned(DatasetName::new_unchecked("???"))
         }
