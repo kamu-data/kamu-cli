@@ -106,6 +106,7 @@ impl ClientSideHarness {
         b.add::<RemoteRepositoryRegistryImpl>();
 
         b.add::<RemoteAliasesRegistryImpl>();
+        b.add::<RemoteAliasResolverImpl>();
 
         b.add::<EngineProvisionerNull>();
 
