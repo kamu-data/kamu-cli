@@ -15,12 +15,12 @@ use datafusion::arrow::datatypes::*;
 use datafusion::prelude::*;
 use ed25519_dalek::Signer;
 use kamu::domain::*;
+use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_adapter_http::data::query_types::IdentityConfig;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::*;
 use serde_json::json;
-use testing::MetadataFactory;
 
 use crate::harness::*;
 
