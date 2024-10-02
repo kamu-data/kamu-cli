@@ -36,7 +36,7 @@ use opendatafabric as odf;
 use opendatafabric::DatasetHandle;
 use time_source::SystemTimeSource;
 
-use crate::{JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER, MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE};
+use crate::{JOB_KAMU_DATASETS_DATASET_ENTRY_SERVICE, MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -57,7 +57,7 @@ pub struct DatasetEntryServiceInitializationSkipper {}
 })]
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {
-    job_name: JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
+    job_name: JOB_KAMU_DATASETS_DATASET_ENTRY_SERVICE,
     depends_on: &[JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR],
     requires_transaction: true,
 })]
