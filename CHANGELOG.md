@@ -20,6 +20,7 @@ Recommendation: for ease of reading, use the following order:
   - Extend `DatasetLifecycleMessageCreated` with `dataset_name` field
   - Introducing `DatasetLifecycleMessageRenamed`
 - Simplified error handling code in repositories
+- Hidden part of the test code behind the feature gate
 
 ## [0.204.4] - 2024-09-30
 ### Changed
