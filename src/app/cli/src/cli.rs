@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 
 use clap::{ArgAction, Parser};
-use opendatafabric::{self as odf, RepoName, TransferDatasetRef};
+use opendatafabric as odf;
 
 use crate::cli_value_parser::{self as parsers};
 use crate::{
@@ -659,7 +659,7 @@ pub struct Login {
 
     /// Repository name which will be used to store in repositories list
     #[arg(long, value_parser = parsers::repo_name)]
-    pub repo_name: Option<RepoName>,
+    pub repo_name: Option<odf::RepoName>,
 
     /// Don't automatically add a remote repository for this host
     #[arg(long)]
@@ -913,7 +913,7 @@ pub struct Push {
 
     /// Remote alias or a URL to push to
     #[arg(long, value_name = "REM", value_parser = parsers::transfer_dataset_ref_remote)]
-    pub to: Option<TransferDatasetRef>,
+    pub to: Option<odf::TransferDatasetRef>,
 
     /// Overwrite remote version with local, even if revisions have diverged
     #[arg(long, short = 'f')]

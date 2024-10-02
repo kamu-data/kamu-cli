@@ -286,3 +286,24 @@ fn test_dataset_ref_any_pattern() {
         ),
     );
 }
+
+#[test]
+fn test_transfer_dataset_ref() {
+    // Parse valid remote dataset ref
+    let param = "http://net.example.com";
+    let res = TransferDatasetRef::from_str(param).unwrap();
+
+    assert_eq!(
+        res,
+        TransferDatasetRef::RemoteRef(DatasetRefRemote::from_str(param).unwrap())
+    );
+
+    // Parse valid repository ref
+    let param = "net.example.com";
+    let res = TransferDatasetRef::from_str(param).unwrap();
+
+    assert_eq!(
+        res,
+        TransferDatasetRef::Repository(RepoName::new_unchecked(param))
+    );
+}

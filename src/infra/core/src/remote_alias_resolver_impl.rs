@@ -13,7 +13,7 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric as odf;
+use opendatafabric::{self as odf, DatasetRefRemote};
 use serde_json::json;
 use url::Url;
 
@@ -81,8 +81,11 @@ impl RemoteAliasResolverImpl {
         dataset_handle: &odf::DatasetHandle,
         remote_repo_url: &Url,
     ) -> Result<odf::DatasetName, ResolveAliasError> {
-        let result = if let Some(remote_dataset_name) = RemoteAliasResolverApiHelper::
-            fetch_remote_dataset_name(remote_repo_url, &dataset_handle.id)
+        let result = if let Some(remote_dataset_name) =
+            RemoteAliasResolverApiHelper::fetch_remote_dataset_name(
+                remote_repo_url,
+                &dataset_handle.id,
+            )
             .await?
         {
             remote_dataset_name
@@ -109,13 +112,18 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
 
         if let Some(transfer_dataset_ref) = &transfer_dataset_ref_maybe {
             match transfer_dataset_ref {
+                odf::TransferDatasetRef::RemoteRef(
+                    _dataset_ref_remote @ DatasetRefRemote::Alias(dataset_alias_remote),
+                ) => {
+                    repo_name = dataset_alias_remote.repo_name.clone();
+                    account_name.clone_from(&dataset_alias_remote.account_name);
+                    dataset_name = Some(dataset_alias_remote.dataset_name.clone());
+                }
                 odf::TransferDatasetRef::RemoteRef(dataset_ref_remote) => {
                     return Ok(dataset_ref_remote.clone());
                 }
-                odf::TransferDatasetRef::RepoRef(repo_ref) => {
-                    repo_name = repo_ref.repo_name.clone();
-                    account_name.clone_from(&repo_ref.account_name);
-                    dataset_name.clone_from(&repo_ref.dataset_name);
+                odf::TransferDatasetRef::Repository(repository_name) => {
+                    repo_name = repository_name.clone();
                 }
             }
         } else {
@@ -138,10 +146,10 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
         let remote_repo = self.remote_repo_reg.get_repository(&repo_name).int_err()?;
 
         if account_name.is_none() {
-            account_name = RemoteAliasResolverApiHelper::
-                resolve_remote_account_name(&remote_repo.url)
-                .await
-                .int_err()?;
+            account_name =
+                RemoteAliasResolverApiHelper::resolve_remote_account_name(&remote_repo.url)
+                    .await
+                    .int_err()?;
         }
         let push_dataset_name = dataset_name.unwrap_or(
             self.resolve_remote_dataset_name(local_dataset_handle, &remote_repo.url)

@@ -90,14 +90,6 @@ impl PushServiceImpl {
                 local_ref: None,
                 remote_ref: None,
             } => panic!("Push request must contain either local or remote reference"),
-            PushRequest {
-                local_ref: Some(_),
-                remote_ref: Some(_transfer_ref @ TransferDatasetRef::RemoteRef(remote_ref)),
-            } => Ok(PushItem {
-                local_handle,
-                remote_ref: remote_ref.clone(),
-                original_request: request,
-            }),
             push_request => match self
                 .remote_alias_resolver
                 .resolve_remote_alias(
