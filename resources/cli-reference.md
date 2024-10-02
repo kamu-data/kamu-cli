@@ -20,7 +20,7 @@ To regenerate this schema from existing code, use the following command:
 * `inspect` — Group of commands for exploring dataset metadata
 * `list [ls]` — List all datasets in the workspace
 * `log` — Shows dataset metadata history
-* `login` — Authentiates with a remote ODF server interactively
+* `login` — Authenticates with a remote ODF server interactively
 * `logout` — Logs out from a remote Kamu server
 * `new` — Creates a new dataset manifest from a template
 * `notebook` — Starts the notebook server for exploring the data in the workspace
