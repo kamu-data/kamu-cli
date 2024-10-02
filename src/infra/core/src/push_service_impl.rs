@@ -192,6 +192,9 @@ impl PushService for PushServiceImpl {
                     remote_ref: Some(_transfer_ref @ TransferDatasetRef::RemoteRef(remote_ref)),
                 } = request
                 {
+                    if let DatasetRefRemote::Alias(_) = &remote_ref {
+                        continue;
+                    }
                     // TODO: Improve error handling
                     self.remote_alias_reg
                         .get_remote_aliases(local_ref)

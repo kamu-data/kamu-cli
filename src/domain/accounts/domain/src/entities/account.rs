@@ -30,8 +30,7 @@ lazy_static! {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Account {
     pub id: AccountID,
     pub account_name: AccountName,
