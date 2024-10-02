@@ -68,17 +68,21 @@ pub const PROVIDER_PASSWORD: &str = "password";
 #[cfg(any(feature = "testing", test))]
 impl Account {
     pub fn dummy() -> Self {
+        Self::test(DEFAULT_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME_STR)
+    }
+
+    pub fn test(id: AccountID, name: &str) -> Self {
         Self {
-            id: DEFAULT_ACCOUNT_ID.clone(),
-            account_name: DEFAULT_ACCOUNT_NAME.clone(),
+            id,
+            account_name: AccountName::new_unchecked(name),
             account_type: AccountType::User,
-            display_name: DEFAULT_ACCOUNT_NAME_STR.to_string(),
+            display_name: name.to_string(),
             avatar_url: None,
             email: None,
             registered_at: DUMMY_REGISTRATION_TIME.to_utc(),
             is_admin: false,
             provider: String::from(PROVIDER_PASSWORD),
-            provider_identity_key: String::from(DEFAULT_ACCOUNT_NAME_STR),
+            provider_identity_key: String::from(name),
         }
     }
 }

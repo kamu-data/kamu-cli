@@ -7,13 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use chrono::{DateTime, TimeZone, Utc};
 use dill::{Catalog, CatalogBuilder, Component};
-use kamu::{DatasetRepositoryLocalFs, DatasetRepositoryWriter};
-use kamu_accounts::CurrentAccountSubject;
+use init_on_startup::InitOnStartup;
+use kamu::{DatasetRepositoryWriter, MockDatasetRepositoryWriter};
+use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject};
 use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_core::testing::MockDatasetRepository;
 use kamu_core::{
     DatasetLifecycleMessage,
     DatasetRepository,
@@ -24,7 +26,7 @@ use kamu_datasets::{DatasetEntry, DatasetEntryRepository, MockDatasetEntryReposi
 use kamu_datasets_services::DatasetEntryService;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
 use mockall::predicate::eq;
-use opendatafabric::{AccountID, DatasetID, DatasetName};
+use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle, DatasetID, DatasetName};
 use tempfile::TempDir;
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 
@@ -54,7 +56,10 @@ async fn test_correctly_handles_outbox_messages() {
         dataset_id.clone(),
     );
 
-    let harness = DatasetEntryServiceHarness::new(mock_dataset_entry_repository);
+    let harness = DatasetEntryServiceHarness::new(
+        mock_dataset_entry_repository,
+        MockDatasetRepository::new(),
+    );
 
     harness
         .mimic_dataset_created(
@@ -78,14 +83,120 @@ async fn test_correctly_handles_outbox_messages() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_indexes_datasets_correctly() {
+    let dataset_name_1 = "dataset1";
+    let dataset_name_2 = "dataset2";
+    let dataset_name_3 = "dataset3";
+    let (_, dataset_id_1) = DatasetID::new_generated_ed25519();
+    let (_, dataset_id_2) = DatasetID::new_generated_ed25519();
+    let (_, dataset_id_3) = DatasetID::new_generated_ed25519();
+    let dataset_handles = vec![
+        DatasetHandle::new(
+            dataset_id_1.clone(),
+            DatasetAlias::new(
+                Some(AccountName::new_unchecked("user1")),
+                DatasetName::new_unchecked(dataset_name_1),
+            ),
+        ),
+        DatasetHandle::new(
+            dataset_id_2.clone(),
+            DatasetAlias::new(
+                Some(AccountName::new_unchecked("user1")),
+                DatasetName::new_unchecked(dataset_name_2),
+            ),
+        ),
+        DatasetHandle::new(
+            dataset_id_3.clone(),
+            DatasetAlias::new(
+                Some(AccountName::new_unchecked("user2")),
+                DatasetName::new_unchecked(dataset_name_3),
+            ),
+        ),
+    ];
+
+    let mut mock_dataset_repository = MockDatasetRepository::new();
+    DatasetEntryServiceHarness::add_get_all_datasets_expectation(
+        &mut mock_dataset_repository,
+        dataset_handles,
+    );
+
+    let mut mock_dataset_entry_repository = MockDatasetEntryRepository::new();
+    DatasetEntryServiceHarness::add_dataset_entries_count_expectation(
+        &mut mock_dataset_entry_repository,
+    );
+    let dataset_entry_collector = Arc::new(RwLock::new(Vec::new()));
+    DatasetEntryServiceHarness::add_save_dataset_entry_expectation_with_state(
+        &mut mock_dataset_entry_repository,
+        dataset_entry_collector.clone(),
+    );
+
+    let harness =
+        DatasetEntryServiceHarness::new(mock_dataset_entry_repository, mock_dataset_repository);
+
+    let (_, owner_account_id_1) = AccountID::new_generated_ed25519();
+    harness
+        .account_repo
+        .create_account(&Account::test(owner_account_id_1.clone(), "user1"))
+        .await
+        .unwrap();
+    let (_, owner_account_id_2) = AccountID::new_generated_ed25519();
+    harness
+        .account_repo
+        .create_account(&Account::test(owner_account_id_2.clone(), "user2"))
+        .await
+        .unwrap();
+
+    harness
+        .dataset_entry_service
+        .run_initialization()
+        .await
+        .unwrap();
+
+    let mut dataset_entries = dataset_entry_collector.read().unwrap().clone();
+
+    dataset_entries.sort_by(|l, r| l.name.cmp(&r.name));
+
+    pretty_assertions::assert_eq!(
+        dataset_entries,
+        vec![
+            DatasetEntry {
+                id: dataset_id_1,
+                owner_id: owner_account_id_1.clone(),
+                name: DatasetName::new_unchecked(dataset_name_1),
+                created_at: frozen_time_point(),
+            },
+            DatasetEntry {
+                id: dataset_id_2,
+                owner_id: owner_account_id_1,
+                name: DatasetName::new_unchecked(dataset_name_2),
+                created_at: frozen_time_point(),
+            },
+            DatasetEntry {
+                id: dataset_id_3,
+                owner_id: owner_account_id_2,
+                name: DatasetName::new_unchecked(dataset_name_3),
+                created_at: frozen_time_point(),
+            }
+        ]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct DatasetEntryServiceHarness {
     _catalog: Catalog,
     _temp_dir: TempDir,
     outbox: Arc<dyn Outbox>,
+    dataset_entry_service: Arc<DatasetEntryService>,
+    account_repo: Arc<dyn AccountRepository>,
 }
 
 impl DatasetEntryServiceHarness {
-    fn new(mock_dataset_entry_repository: MockDatasetEntryRepository) -> Self {
+    fn new(
+        mock_dataset_entry_repository: MockDatasetEntryRepository,
+        mock_dataset_repository: MockDatasetRepository,
+    ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let datasets_dir = temp_dir.path().join("datasets");
 
@@ -100,17 +211,18 @@ impl DatasetEntryServiceHarness {
 
         let t = frozen_time_point();
         let fake_system_time_source = FakeSystemTimeSource::new(t);
-
         b.add_value(fake_system_time_source);
         b.bind::<dyn SystemTimeSource, FakeSystemTimeSource>();
-        b.add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(false),
-        );
-        b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
-        b.bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>();
-        b.add::<InMemoryAccountRepository>();
+
+        b.add_value(mock_dataset_repository);
+        b.bind::<dyn DatasetRepository, MockDatasetRepository>();
+
+        b.add_value(MockDatasetRepositoryWriter::new());
+        b.bind::<dyn DatasetRepositoryWriter, MockDatasetRepositoryWriter>();
+
+        let account_repository = InMemoryAccountRepository::new();
+        b.add_value(account_repository);
+        b.bind::<dyn AccountRepository, InMemoryAccountRepository>();
 
         b.add_builder(
             OutboxImmediateImpl::builder()
@@ -130,9 +242,13 @@ impl DatasetEntryServiceHarness {
         Self {
             _temp_dir: temp_dir,
             outbox: catalog.get_one().unwrap(),
+            dataset_entry_service: catalog.get_one().unwrap(),
+            account_repo: catalog.get_one().unwrap(),
             _catalog: catalog,
         }
     }
+
+    // Outbox: mimic messages
 
     async fn mimic_dataset_created(
         &self,
@@ -187,24 +303,21 @@ impl DatasetEntryServiceHarness {
             .unwrap();
     }
 
-    fn add_save_dataset_entry_expectation(
-        mock_dataset_entry_repository: &mut MockDatasetEntryRepository,
-        dataset_id: DatasetID,
-        owner_account_id: AccountID,
-        dataset_name: DatasetName,
-    ) {
-        let expected_entry = DatasetEntry::new(
-            dataset_id,
-            owner_account_id,
-            dataset_name,
-            frozen_time_point(),
-        );
+    // Expectation: MockDatasetEntryRepository
 
+    fn add_save_dataset_entry_expectation_with_state(
+        mock_dataset_entry_repository: &mut MockDatasetEntryRepository,
+        state: Arc<RwLock<Vec<DatasetEntry>>>,
+    ) {
         mock_dataset_entry_repository
             .expect_save_dataset_entry()
-            .with(eq(expected_entry))
-            .times(1)
-            .returning(|_| Ok(()));
+            .returning(move |dataset_entry| {
+                let mut writable_state = state.write().unwrap();
+
+                (*writable_state).push(dataset_entry.clone());
+
+                Ok(())
+            });
     }
 
     fn add_update_dataset_entry_name_expectation(
@@ -228,6 +341,51 @@ impl DatasetEntryServiceHarness {
             .with(eq(dataset_id))
             .times(1)
             .returning(|_| Ok(()));
+    }
+
+    fn add_save_dataset_entry_expectation(
+        mock_dataset_entry_repository: &mut MockDatasetEntryRepository,
+        dataset_id: DatasetID,
+        owner_account_id: AccountID,
+        dataset_name: DatasetName,
+    ) {
+        let expected_entry = DatasetEntry::new(
+            dataset_id,
+            owner_account_id,
+            dataset_name,
+            frozen_time_point(),
+        );
+
+        mock_dataset_entry_repository
+            .expect_save_dataset_entry()
+            .with(eq(expected_entry))
+            .times(1)
+            .returning(|_| Ok(()));
+    }
+
+    fn add_dataset_entries_count_expectation(
+        mock_dataset_entry_repository: &mut MockDatasetEntryRepository,
+    ) {
+        mock_dataset_entry_repository
+            .expect_dataset_entries_count()
+            .times(1)
+            .returning(|| Ok(0));
+    }
+
+    // Expectation: MockDatasetRepository
+
+    fn add_get_all_datasets_expectation(
+        mock_dataset_repository: &mut MockDatasetRepository,
+        dataset_handles: Vec<DatasetHandle>,
+    ) {
+        mock_dataset_repository
+            .expect_get_all_datasets()
+            .times(1)
+            .returning(move || {
+                let stream = futures::stream::iter(dataset_handles.clone().into_iter().map(Ok));
+
+                Box::pin(stream)
+            });
     }
 }
 
