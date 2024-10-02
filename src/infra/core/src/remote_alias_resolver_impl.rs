@@ -12,16 +12,16 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::auth::OdfServerAccessTokenResolver;
 use kamu_core::*;
-use opendatafabric::{self as odf, AccountName};
+use opendatafabric as odf;
 use serde_json::json;
 use url::Url;
 
 use crate::UrlExt;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct RemoteAliasResolverImpl {
-    access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
@@ -31,82 +31,15 @@ pub struct RemoteAliasResolverImpl {
 #[interface(dyn RemoteAliasResolver)]
 impl RemoteAliasResolverImpl {
     pub fn new(
-        access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     ) -> Self {
         Self {
-            access_token_resolver,
             remote_repo_reg,
             dataset_repo,
             remote_alias_reg,
         }
-    }
-
-    // Return account name if remote workspace is in multitenant mode
-    pub async fn get_remote_account_name_by_access_token(
-        &self,
-        server_backend_url: &Url,
-        access_token: &str,
-    ) -> Result<Option<odf::AccountName>, GetRemoteAccountError> {
-        let client = reqwest::Client::new();
-        let gql_url = server_backend_url.join("graphql").unwrap();
-
-        let gql_query = r#"
-            {
-                accounts {
-                    byAccessToken(
-                        accessToken: "{access_token}"
-                    ) {
-                        isMultiTenant
-                        account {
-                            id
-                            accountName
-                            displayName
-                            accountType
-                            avatarUrl
-                            isAdmin
-                        }
-                    }
-                }
-            }
-            "#
-        .replace("{access_token}", access_token);
-
-        let response = client
-            .post(gql_url)
-            .json(&json!({"query": gql_query}))
-            .send()
-            .await
-            .int_err()?
-            .error_for_status()
-            .int_err()?;
-
-        let gql_response: serde_json::Value = response.json().await.int_err()?;
-        let is_multi_tenant_maybe =
-            gql_response["data"]["accounts"]["byAccessToken"]["isMultiTenant"].as_bool();
-
-        if let Some(is_multi_tenant) = is_multi_tenant_maybe
-            && is_multi_tenant
-        {
-            if let Some(gql_account_name) =
-                gql_response["data"]["accounts"]["byAccessToken"]["account"]["accountName"].as_str()
-            {
-                let account_name = odf::AccountName::from_str(gql_account_name).map_err(|_| {
-                    GetRemoteAccountError::InvalidResponse(InvalidGQLResponseError {
-                        response: gql_response.to_string(),
-                    })
-                })?;
-                return Ok(Some(account_name));
-            }
-            return Err(GetRemoteAccountError::InvalidResponse(
-                InvalidGQLResponseError {
-                    response: gql_response.to_string(),
-                },
-            ));
-        }
-        Ok(None)
     }
 
     async fn fetch_remote_alias(
@@ -143,67 +76,13 @@ impl RemoteAliasResolverImpl {
         Ok(res_url.into())
     }
 
-    async fn fetch_remote_dataset_name(
-        &self,
-        remote_server_url: &Url,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<Option<odf::DatasetName>, ResolveAliasError> {
-        let client = reqwest::Client::new();
-        let mut server_url = remote_server_url.clone();
-        server_url.path_segments_mut().unwrap().push("graphql");
-
-        let gql_query = r#"
-            query Datasets {
-                datasets {
-                    byId(datasetId: "{dataset_id}") {
-                        name
-                    }
-                }
-            }
-            "#
-        .replace("{dataset_id}", &dataset_id.to_string());
-
-        let response = client
-            .post(server_url)
-            .json(&json!({"query": gql_query}))
-            .send()
-            .await
-            .int_err()?
-            .error_for_status()
-            .int_err()?;
-
-        let gql_response: serde_json::Value = response.json().await.int_err()?;
-
-        if let Some(gql_dataset_name) = gql_response["data"]["datasets"]["byId"]["name"].as_str() {
-            let dataset_name = odf::DatasetName::try_from(gql_dataset_name).int_err()?;
-            return Ok(Some(dataset_name));
-        }
-        Ok(None)
-    }
-
-    async fn resolve_remote_account_name(
-        &self,
-        remote_repo_url: &Url,
-    ) -> Result<Option<AccountName>, InternalError> {
-        if let Some(access_token) = self
-            .access_token_resolver
-            .resolve_odf_dataset_access_token(remote_repo_url)
-        {
-            return self
-                .get_remote_account_name_by_access_token(remote_repo_url, access_token.as_str())
-                .await
-                .int_err();
-        }
-        Ok(None)
-    }
-
     async fn resolve_remote_dataset_name(
         &self,
         dataset_handle: &odf::DatasetHandle,
         remote_repo_url: &Url,
     ) -> Result<odf::DatasetName, ResolveAliasError> {
-        let result = if let Some(remote_dataset_name) = self
-            .fetch_remote_dataset_name(remote_repo_url, &dataset_handle.id)
+        let result = if let Some(remote_dataset_name) = RemoteAliasResolverApiHelper::
+            fetch_remote_dataset_name(remote_repo_url, &dataset_handle.id)
             .await?
         {
             remote_dataset_name
@@ -213,6 +92,8 @@ impl RemoteAliasResolverImpl {
         Ok(result)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl RemoteAliasResolver for RemoteAliasResolverImpl {
@@ -257,8 +138,8 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
         let remote_repo = self.remote_repo_reg.get_repository(&repo_name).int_err()?;
 
         if account_name.is_none() {
-            account_name = self
-                .resolve_remote_account_name(&remote_repo.url)
+            account_name = RemoteAliasResolverApiHelper::
+                resolve_remote_account_name(&remote_repo.url)
                 .await
                 .int_err()?;
         }
@@ -316,5 +197,94 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             }
         }
         Err(ResolveAliasError::EmptyRepositoryList)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct RemoteAliasResolverApiHelper {}
+
+impl RemoteAliasResolverApiHelper {
+    // Return account name if remote workspace is in multi tenant mode
+    pub async fn resolve_remote_account_name(
+        server_backend_url: &Url,
+    ) -> Result<Option<odf::AccountName>, GetRemoteAccountError> {
+        let client = reqwest::Client::new();
+
+        let workspace_info_response = client
+            .get(server_backend_url.join("workspace/info").unwrap())
+            .send()
+            .await
+            .int_err()?
+            .error_for_status()
+            .int_err()?;
+        let json_workspace_info_response: serde_json::Value =
+            workspace_info_response.json().await.int_err()?;
+
+        if let Some(is_multi_tenant) = json_workspace_info_response["isMultiTenant"].as_bool()
+            && !is_multi_tenant
+        {
+            return Ok(None);
+        }
+
+        let account_response = client
+            .get(server_backend_url.join("me").unwrap())
+            .send()
+            .await
+            .int_err()?
+            .error_for_status()
+            .int_err()?;
+        let json_account_response: serde_json::Value = account_response.json().await.int_err()?;
+
+        if let Some(api_account_name) = json_account_response["accountName"].as_str() {
+            let account_name = odf::AccountName::from_str(api_account_name).map_err(|_| {
+                GetRemoteAccountError::InvalidResponse(InvalidApiResponseError {
+                    response: json_account_response.to_string(),
+                })
+            })?;
+            return Ok(Some(account_name));
+        }
+        Err(GetRemoteAccountError::InvalidResponse(
+            InvalidApiResponseError {
+                response: json_account_response.to_string(),
+            },
+        ))
+    }
+
+    pub async fn fetch_remote_dataset_name(
+        remote_server_url: &Url,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Option<odf::DatasetName>, ResolveAliasError> {
+        let client = reqwest::Client::new();
+        let mut server_url = remote_server_url.clone();
+        server_url.path_segments_mut().unwrap().push("graphql");
+
+        let gql_query = r#"
+            query Datasets {
+                datasets {
+                    byId(datasetId: "{dataset_id}") {
+                        name
+                    }
+                }
+            }
+            "#
+        .replace("{dataset_id}", &dataset_id.to_string());
+
+        let response = client
+            .post(server_url)
+            .json(&json!({"query": gql_query}))
+            .send()
+            .await
+            .int_err()?
+            .error_for_status()
+            .int_err()?;
+
+        let gql_response: serde_json::Value = response.json().await.int_err()?;
+
+        if let Some(gql_dataset_name) = gql_response["data"]["datasets"]["byId"]["name"].as_str() {
+            let dataset_name = odf::DatasetName::try_from(gql_dataset_name).int_err()?;
+            return Ok(Some(dataset_name));
+        }
+        Ok(None)
     }
 }

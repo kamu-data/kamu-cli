@@ -108,7 +108,7 @@ impl From<ResolveAliasError> for PushError {
 #[derive(Debug, Error)]
 pub enum GetRemoteAccountError {
     #[error(transparent)]
-    InvalidResponse(InvalidGQLResponseError),
+    InvalidResponse(InvalidApiResponseError),
 
     #[error(transparent)]
     Internal(InternalError),
@@ -116,7 +116,7 @@ pub enum GetRemoteAccountError {
 
 #[derive(Debug, Error)]
 #[error("Invalid gql response: {response}")]
-pub struct InvalidGQLResponseError {
+pub struct InvalidApiResponseError {
     pub response: String,
 }
 

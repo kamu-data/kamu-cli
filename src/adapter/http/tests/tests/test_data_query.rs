@@ -25,7 +25,6 @@ use testing::MetadataFactory;
 use crate::harness::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 struct Harness {
     #[allow(dead_code)]
     run_info_dir: tempfile::TempDir,
@@ -57,11 +56,16 @@ impl Harness {
             .add::<EngineProvisionerNull>()
             .build();
 
-        let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
-            authorized_writes: true,
-            base_catalog: Some(catalog),
-        })
+        let server_harness = ServerSideLocalFsHarness::new(
+            ServerSideHarnessOptions {
+                multi_tenant: true,
+                authorized_writes: true,
+                base_catalog: Some(catalog),
+            },
+            ServerSideHarnessOverrides {
+                mock_authentication_service: None,
+            },
+        )
         .await;
 
         let system_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();

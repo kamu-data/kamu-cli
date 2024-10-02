@@ -50,6 +50,7 @@ use super::{
     server_authentication_mock,
     ServerSideHarness,
     ServerSideHarnessOptions,
+    ServerSideHarnessOverrides,
     TestAPIServer,
     SERVER_ACCOUNT_NAME,
 };
@@ -66,7 +67,10 @@ pub(crate) struct ServerSideLocalFsHarness {
 }
 
 impl ServerSideLocalFsHarness {
-    pub async fn new(options: ServerSideHarnessOptions) -> Self {
+    pub async fn new(
+        options: ServerSideHarnessOptions,
+        overrides: ServerSideHarnessOverrides,
+    ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
         let datasets_dir = tempdir.path().join("datasets");
@@ -88,6 +92,9 @@ impl ServerSideLocalFsHarness {
             let addr = SocketAddr::from(([127, 0, 0, 1], 0));
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
             let base_url_rest = format!("http://{}", listener.local_addr().unwrap());
+            let mock_auth_service = overrides
+                .mock_authentication_service
+                .unwrap_or(server_authentication_mock());
 
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add_value(CacheDir::new(cache_dir))
@@ -102,7 +109,7 @@ impl ServerSideLocalFsHarness {
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-                .add_value(server_authentication_mock())
+                .add_value(mock_auth_service)
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add::<CompactionServiceImpl>()

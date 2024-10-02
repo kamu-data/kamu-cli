@@ -19,6 +19,7 @@ use crate::harness::{
     ClientSideHarnessOptions,
     ServerSideHarness,
     ServerSideHarnessOptions,
+    ServerSideHarnessOverrides,
     ServerSideLocalFsHarness,
 };
 use crate::tests::tests_push::scenarios::*;
@@ -32,11 +33,16 @@ async fn test_smart_push_new_dataset_unauthenticated() {
             multi_tenant: false,
             authenticated_remotely: false,
         }),
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
-            authorized_writes: true,
-            base_catalog: None,
-        })
+        ServerSideLocalFsHarness::new(
+            ServerSideHarnessOptions {
+                multi_tenant: true,
+                authorized_writes: true,
+                base_catalog: None,
+            },
+            ServerSideHarnessOverrides {
+                mock_authentication_service: None,
+            },
+        )
         .await,
     )
     .await;
@@ -78,11 +84,16 @@ async fn test_smart_push_new_dataset_wrong_user() {
             multi_tenant: false,
             authenticated_remotely: true,
         }),
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
-            authorized_writes: true,
-            base_catalog: None,
-        })
+        ServerSideLocalFsHarness::new(
+            ServerSideHarnessOptions {
+                multi_tenant: true,
+                authorized_writes: true,
+                base_catalog: None,
+            },
+            ServerSideHarnessOverrides {
+                mock_authentication_service: None,
+            },
+        )
         .await,
     )
     .await;
@@ -129,11 +140,16 @@ async fn test_smart_push_existing_dataset_unauthenticated() {
             multi_tenant: false,
             authenticated_remotely: false,
         }),
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
-            authorized_writes: false,
-            base_catalog: None,
-        })
+        ServerSideLocalFsHarness::new(
+            ServerSideHarnessOptions {
+                multi_tenant: true,
+                authorized_writes: false,
+                base_catalog: None,
+            },
+            ServerSideHarnessOverrides {
+                mock_authentication_service: None,
+            },
+        )
         .await,
     )
     .await;
@@ -173,11 +189,16 @@ async fn test_smart_push_existing_dataset_unauthorized() {
             multi_tenant: false,
             authenticated_remotely: true,
         }),
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
-            authorized_writes: false,
-            base_catalog: None,
-        })
+        ServerSideLocalFsHarness::new(
+            ServerSideHarnessOptions {
+                multi_tenant: true,
+                authorized_writes: false,
+                base_catalog: None,
+            },
+            ServerSideHarnessOverrides {
+                mock_authentication_service: None,
+            },
+        )
         .await,
     )
     .await;
@@ -217,11 +238,16 @@ async fn test_smart_push_existing_ref_collision() {
             multi_tenant: true,
             authenticated_remotely: true,
         }),
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
-            authorized_writes: true,
-            base_catalog: None,
-        })
+        ServerSideLocalFsHarness::new(
+            ServerSideHarnessOptions {
+                multi_tenant: true,
+                authorized_writes: true,
+                base_catalog: None,
+            },
+            ServerSideHarnessOverrides {
+                mock_authentication_service: None,
+            },
+        )
         .await,
     )
     .await;
@@ -259,11 +285,16 @@ async fn test_smart_push_incompatible_version_err() {
             multi_tenant: true,
             authenticated_remotely: true,
         }),
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
-            authorized_writes: true,
-            base_catalog: None,
-        })
+        ServerSideLocalFsHarness::new(
+            ServerSideHarnessOptions {
+                multi_tenant: true,
+                authorized_writes: true,
+                base_catalog: None,
+            },
+            ServerSideHarnessOverrides {
+                mock_authentication_service: None,
+            },
+        )
         .await,
     )
     .await;

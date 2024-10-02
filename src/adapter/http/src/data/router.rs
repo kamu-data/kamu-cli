@@ -33,6 +33,10 @@ pub fn root_router() -> axum::Router {
             "/workspace/info",
             axum::routing::get(super::workspace_info_handler::workspace_info_handler),
         )
+        .route(
+            "/me",
+            axum::routing::get(super::account_handler::account_handler),
+        )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -80,6 +80,10 @@ pub(crate) struct ServerSideHarnessOptions {
     pub base_catalog: Option<dill::Catalog>,
 }
 
+pub(crate) struct ServerSideHarnessOverrides {
+    pub mock_authentication_service: Option<MockAuthenticationService>,
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn server_authentication_mock() -> MockAuthenticationService {

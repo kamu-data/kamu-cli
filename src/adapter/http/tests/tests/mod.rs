@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_account_info;
 mod test_authentication_layer;
 mod test_data_ingest;
 mod test_data_query;
@@ -16,6 +17,7 @@ mod test_protocol_dataset_helpers;
 mod test_routing;
 mod test_upload_local;
 mod test_upload_s3;
+mod test_workspace_info;
 mod tests_pull;
 mod tests_push;
 
@@ -37,6 +39,9 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                         multi_tenant: false,
                         authorized_writes: true,
                         base_catalog: None,
+                    },
+                    ServerSideHarnessOverrides {
+                        mock_authentication_service: None,
                     }).await,
                 )
                 .await;
@@ -52,6 +57,9 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                         multi_tenant: true,
                         authorized_writes: true,
                         base_catalog: None,
+                    },
+                    ServerSideHarnessOverrides {
+                        mock_authentication_service: None,
                     }).await,
                 )
                 .await;
@@ -67,6 +75,9 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                         multi_tenant: false,
                         authorized_writes: true,
                         base_catalog: None,
+                    },
+                    ServerSideHarnessOverrides {
+                        mock_authentication_service: None,
                     }).await,
                 )
                 .await;
@@ -82,6 +93,9 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                         multi_tenant: true,
                         authorized_writes: true,
                         base_catalog: None,
+                    },
+                    ServerSideHarnessOverrides {
+                        mock_authentication_service: None,
                     }).await,
                 )
                 .await;

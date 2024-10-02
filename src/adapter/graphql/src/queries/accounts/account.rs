@@ -13,7 +13,6 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
 };
-use kamu_core::DatasetRepository;
 use opendatafabric as odf;
 use tokio::sync::OnceCell;
 
@@ -186,28 +185,6 @@ impl Account {
         Ok(Some(AccountFlows::new(
             self.get_full_account_info(ctx).await?.clone(),
         )))
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct WorkspaceAccountInfo {
-    account: Account,
-}
-
-#[Object]
-impl WorkspaceAccountInfo {
-    #[graphql(skip)]
-    pub(crate) fn new(account: Account) -> Self {
-        Self { account }
-    }
-
-    async fn account(&self) -> &Account {
-        &self.account
-    }
-
-    async fn is_multi_tenant(&self, ctx: &Context<'_>) -> bool {
-        let dataset_repo = from_catalog::<dyn DatasetRepository>(ctx).unwrap();
-        dataset_repo.is_multi_tenant()
     }
 }
 

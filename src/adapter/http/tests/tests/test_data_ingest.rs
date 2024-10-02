@@ -601,11 +601,16 @@ impl DataIngestHarness {
             .add_value(FileUploadLimitConfig::new_in_bytes(1000))
             .build();
 
-        let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
-            authorized_writes: true,
-            base_catalog: Some(catalog),
-        })
+        let server_harness = ServerSideLocalFsHarness::new(
+            ServerSideHarnessOptions {
+                multi_tenant: true,
+                authorized_writes: true,
+                base_catalog: Some(catalog),
+            },
+            ServerSideHarnessOverrides {
+                mock_authentication_service: None,
+            },
+        )
         .await;
 
         let system_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
