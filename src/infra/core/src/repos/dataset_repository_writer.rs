@@ -12,7 +12,7 @@ use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg_attr(feature = "testing", mockall::automock)]
+#[cfg_attr(any(feature = "testing", test), mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetRepositoryWriter: Sync + Send {
     async fn create_dataset(
