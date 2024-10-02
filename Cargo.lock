@@ -5789,6 +5789,7 @@ dependencies = [
  "kamu-accounts",
  "kamu-datasets",
  "messaging-outbox",
+ "mockall",
  "object_store",
  "opendatafabric",
  "pathdiff",

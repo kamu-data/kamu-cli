@@ -46,8 +46,9 @@ uuid = { version = "1", default-features = false }
 
 
 [dev-dependencies]
-kamu = { workspace = true }
+kamu = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
+kamu-core = { workspace = true, features = ["testing"] }
 kamu-datasets = { workspace = true, features = ["testing"] }
 kamu-datasets-inmem = { workspace = true }
 

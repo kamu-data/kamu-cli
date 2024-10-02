@@ -21,6 +21,12 @@ workspace = true
 doctest = false
 
 
+[features]
+default = []
+
+testing = ["dep:mockall"]
+
+
 [dependencies]
 kamu-accounts = { workspace = true }
 kamu-datasets = { workspace = true }
@@ -53,3 +59,10 @@ object_store = { version = "0.11", default-features = false }
 # TODO: Make serde optional
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_with = { version = "3", default-features = false }
+
+# Optional
+mockall = { optional = true, version = "0.13", default-features = false }
+
+
+[dev-dependencies]
+mockall = { version = "0.13", default-features = false }
