@@ -36,10 +36,7 @@ impl AccountRepository for PostgresAccountRepository {
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(CreateAccountError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         sqlx::query!(
             r#"
@@ -95,10 +92,7 @@ impl AccountRepository for PostgresAccountRepository {
     ) -> Result<Account, GetAccountByIdError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetAccountByIdError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let maybe_account_row = sqlx::query_as!(
             AccountRowModel,
@@ -121,8 +115,7 @@ impl AccountRepository for PostgresAccountRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(GetAccountByIdError::Internal)?;
+        .int_err()?;
 
         if let Some(account_row) = maybe_account_row {
             Ok(account_row.into())
@@ -139,10 +132,7 @@ impl AccountRepository for PostgresAccountRepository {
     ) -> Result<Vec<Account>, GetAccountByIdError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetAccountByIdError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let accounts_search: Vec<_> = account_ids
             .iter()
@@ -170,8 +160,7 @@ impl AccountRepository for PostgresAccountRepository {
         )
         .fetch_all(connection_mut)
         .await
-        .int_err()
-        .map_err(GetAccountByIdError::Internal)?;
+        .int_err()?;
 
         Ok(account_rows.into_iter().map(Into::into).collect())
     }
@@ -182,10 +171,7 @@ impl AccountRepository for PostgresAccountRepository {
     ) -> Result<Account, GetAccountByNameError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetAccountByNameError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let maybe_account_row = sqlx::query_as!(
             AccountRowModel,
@@ -208,8 +194,7 @@ impl AccountRepository for PostgresAccountRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(GetAccountByNameError::Internal)?;
+        .int_err()?;
 
         if let Some(account_row) = maybe_account_row {
             Ok(account_row.into())
@@ -228,10 +213,7 @@ impl AccountRepository for PostgresAccountRepository {
     ) -> Result<Option<AccountID>, FindAccountIdByProviderIdentityKeyError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(FindAccountIdByProviderIdentityKeyError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let maybe_account_row = sqlx::query!(
             r#"
@@ -243,8 +225,7 @@ impl AccountRepository for PostgresAccountRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(FindAccountIdByProviderIdentityKeyError::Internal)?;
+        .int_err()?;
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
     }
@@ -255,10 +236,7 @@ impl AccountRepository for PostgresAccountRepository {
     ) -> Result<Option<AccountID>, FindAccountIdByEmailError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(FindAccountIdByEmailError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let maybe_account_row = sqlx::query!(
             r#"
@@ -270,8 +248,7 @@ impl AccountRepository for PostgresAccountRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(FindAccountIdByEmailError::Internal)?;
+        .int_err()?;
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
     }
@@ -282,10 +259,7 @@ impl AccountRepository for PostgresAccountRepository {
     ) -> Result<Option<AccountID>, FindAccountIdByNameError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(FindAccountIdByNameError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let maybe_account_row = sqlx::query!(
             r#"
@@ -297,8 +271,7 @@ impl AccountRepository for PostgresAccountRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(FindAccountIdByNameError::Internal)?;
+        .int_err()?;
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
     }
@@ -315,10 +288,7 @@ impl PasswordHashRepository for PostgresAccountRepository {
     ) -> Result<(), SavePasswordHashError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(SavePasswordHashError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         sqlx::query!(
             r#"
@@ -330,8 +300,7 @@ impl PasswordHashRepository for PostgresAccountRepository {
         )
         .execute(connection_mut)
         .await
-        .int_err()
-        .map_err(SavePasswordHashError::Internal)?;
+        .int_err()?;
 
         Ok(())
     }
@@ -342,10 +311,7 @@ impl PasswordHashRepository for PostgresAccountRepository {
     ) -> Result<Option<String>, FindPasswordHashError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(FindPasswordHashError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let maybe_password_row = sqlx::query!(
             r#"
@@ -357,8 +323,7 @@ impl PasswordHashRepository for PostgresAccountRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(FindPasswordHashError::Internal)?;
+        .int_err()?;
 
         Ok(maybe_password_row.map(|password_row| password_row.password_hash))
     }

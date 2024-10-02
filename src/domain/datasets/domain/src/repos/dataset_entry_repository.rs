@@ -60,7 +60,7 @@ pub enum GetDatasetEntryError {
     NotFound(#[from] DatasetEntryNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -83,7 +83,7 @@ pub enum GetDatasetEntryByNameError {
     NotFound(#[from] DatasetEntryByNameNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -107,7 +107,7 @@ impl DatasetEntryByNameNotFoundError {
 #[derive(Error, Debug)]
 pub enum GetDatasetEntriesByOwnerIdError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -121,7 +121,7 @@ pub enum SaveDatasetEntryError {
     NameCollision(#[from] DatasetEntryNameCollisionError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -147,7 +147,7 @@ pub enum UpdateDatasetEntryNameError {
     NameCollision(#[from] DatasetEntryNameCollisionError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -170,7 +170,7 @@ pub enum DeleteEntryDatasetError {
     NotFound(#[from] DatasetEntryNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -64,10 +64,10 @@ pub trait DatasetEnvVarRepository: Send + Sync {
 #[derive(Error, Debug)]
 pub enum SaveDatasetEnvVarError {
     #[error(transparent)]
-    Internal(InternalError),
+    Duplicate(SaveDatasetEnvVarErrorDuplicate),
 
     #[error(transparent)]
-    Duplicate(SaveDatasetEnvVarErrorDuplicate),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -85,7 +85,7 @@ pub enum GetDatasetEnvVarError {
     NotFound(DatasetEnvVarNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -102,7 +102,7 @@ pub enum DeleteDatasetEnvVarError {
     NotFound(DatasetEnvVarNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -113,5 +113,7 @@ pub enum ModifyDatasetEnvVarError {
     NotFound(DatasetEnvVarNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

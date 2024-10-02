@@ -56,10 +56,10 @@ pub trait AccessTokenRepository: Send + Sync {
 #[derive(Error, Debug)]
 pub enum CreateAccessTokenError {
     #[error(transparent)]
-    Internal(InternalError),
+    Duplicate(CreateAccessTokenErrorDuplicate),
 
     #[error(transparent)]
-    Duplicate(CreateAccessTokenErrorDuplicate),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -76,7 +76,7 @@ pub enum GetAccessTokenError {
     NotFound(AccessTokenNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -96,7 +96,7 @@ pub enum FindAccountByTokenError {
     NotFound(AccessTokenNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,5 +110,7 @@ pub enum RevokeTokenError {
     NotFound(AccessTokenNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

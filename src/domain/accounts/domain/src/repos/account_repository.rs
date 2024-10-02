@@ -57,10 +57,10 @@ pub trait AccountRepository: Send + Sync {
 #[derive(Error, Debug)]
 pub enum CreateAccountError {
     #[error(transparent)]
-    Internal(InternalError),
+    Duplicate(CreateAccountErrorDuplicate),
 
     #[error(transparent)]
-    Duplicate(CreateAccountErrorDuplicate),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -100,7 +100,7 @@ pub enum GetAccountByIdError {
     NotFound(AccountNotFoundByIdError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -117,7 +117,7 @@ pub enum GetAccountByNameError {
     NotFound(AccountNotFoundByNameError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -131,7 +131,7 @@ pub struct AccountNotFoundByNameError {
 #[derive(Error, Debug)]
 pub enum FindAccountIdByProviderIdentityKeyError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -139,7 +139,7 @@ pub enum FindAccountIdByProviderIdentityKeyError {
 #[derive(Error, Debug)]
 pub enum FindAccountIdByEmailError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -147,7 +147,7 @@ pub enum FindAccountIdByEmailError {
 #[derive(Error, Debug)]
 pub enum FindAccountIdByNameError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

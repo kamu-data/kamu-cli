@@ -19,6 +19,7 @@ Recommendation: for ease of reading, use the following order:
 - Private Datasets, `DatasetEntry` integration that will allow us to build dataset indexing
   - Extend `DatasetLifecycleMessageCreated` with `dataset_name` field
   - Introducing `DatasetLifecycleMessageRenamed`
+- Simplified error handling code in repositories
 
 ## [0.204.4] - 2024-09-30
 ### Changed
