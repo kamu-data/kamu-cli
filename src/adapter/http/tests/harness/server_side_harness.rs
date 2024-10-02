@@ -27,13 +27,8 @@ use kamu::domain::{
 };
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::DatasetLayout;
-use kamu_accounts::{
-    Account,
-    AccountType,
-    CurrentAccountSubject,
-    MockAuthenticationService,
-    PROVIDER_PASSWORD,
-};
+use kamu_accounts::testing::MockAuthenticationService;
+use kamu_accounts::{Account, AccountType, CurrentAccountSubject, PROVIDER_PASSWORD};
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle};
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;

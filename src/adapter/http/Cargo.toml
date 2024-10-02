@@ -90,6 +90,7 @@ uuid = { version = "1", default-features = false, features = ["v4"] }
 [dev-dependencies]
 container-runtime = { workspace = true }
 init-on-startup = { workspace = true }
+kamu-accounts = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-datasets-services = { workspace = true }

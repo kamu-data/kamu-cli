@@ -36,7 +36,6 @@ kamu-flow-system = { workspace = true }
 kamu-flow-system-services = { workspace = true }
 event-sourcing = { workspace = true }
 
-
 async-graphql = { version = "7", features = [
     "chrono",
     "url",
@@ -65,7 +64,7 @@ uuid = { version = "1", default-features = false }
 # TODO: Limit to mock or in-memory implementations only
 container-runtime = { workspace = true }
 init-on-startup = { workspace = true }
-messaging-outbox = { workspace = true }
+kamu-accounts = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
@@ -73,8 +72,8 @@ kamu-datasets-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
+messaging-outbox = { workspace = true }
 time-source = { workspace = true }
-
 
 indoc = "2"
 mockall = "0.13"

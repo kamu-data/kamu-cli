@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::value;
+use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{
     Account,
     AuthenticationService,
-    MockAuthenticationService,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
     DEFAULT_ACCOUNT_NAME_STR,
