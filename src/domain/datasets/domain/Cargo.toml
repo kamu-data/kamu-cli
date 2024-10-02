@@ -24,6 +24,7 @@ doctest = false
 [features]
 default = []
 sqlx = ["dep:sqlx"]
+testing = ["dep:mockall"]
 
 
 [dependencies]
@@ -45,5 +46,7 @@ uuid = { version = "1", default-features = false, features = ["v4"] }
 sqlx = { optional = true, version = "0.8", default-features = false, features = [
     "macros",
 ] }
+mockall = { optional = true, version = "0.13", default-features = false }
+
 
 [dev-dependencies]

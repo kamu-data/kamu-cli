@@ -15,6 +15,7 @@ use crate::DatasetEntry;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetEntryRepository: Send + Sync {
     async fn dataset_entries_count(&self) -> Result<usize, GetDatasetEntryError>;
