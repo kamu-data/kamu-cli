@@ -11,4 +11,5 @@
 
 pub mod data;
 pub mod schema;
+#[cfg(any(feature = "testing", test))]
 pub mod testing;
