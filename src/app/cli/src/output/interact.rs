@@ -13,17 +13,29 @@ use crate::CLIError;
 pub struct Interact {
     /// Don't ask user for confirmation and assume 'yes'
     pub assume_yes: bool,
+
+    /// Whether the current session supports interactive input from the user
+    pub is_tty: bool,
 }
 
 impl Interact {
-    pub fn new(assume_yes: bool) -> Self {
-        Self { assume_yes }
+    pub fn new(assume_yes: bool, is_tty: bool) -> Self {
+        Self { assume_yes, is_tty }
     }
 
     pub fn require_confirmation(&self, prompt: impl std::fmt::Display) -> Result<(), CLIError> {
         use read_input::prelude::*;
 
         let prompt = format!("{prompt}\nDo you wish to continue? [y/N]: ");
+
+        if !self.is_tty {
+            return if self.assume_yes {
+                Ok(())
+            } else {
+                eprintln!("{prompt} Assuming 'no' because --yes flag was not provided");
+                Err(CLIError::Aborted)
+            };
+        }
 
         let answer: String = input()
             .repeat_msg(prompt)

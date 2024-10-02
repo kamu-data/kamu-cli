@@ -150,10 +150,9 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             .add_value(dependencies_graph_repository)
             .bind::<dyn DependencyGraphRepository, DependencyGraphRepositoryInMemory>();
 
-        base_catalog_builder.add_value(Interact::new(args.yes));
-
         let output_config = configure_output_format(&args, &workspace_svc);
         base_catalog_builder.add_value(output_config.clone());
+        base_catalog_builder.add_value(Interact::new(args.yes, output_config.is_tty));
 
         let guards = configure_logging(&output_config, &workspace_layout, args.no_color);
 
