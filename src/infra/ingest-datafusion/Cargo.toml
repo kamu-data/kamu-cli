@@ -59,6 +59,8 @@ url = { version = "2", features = ["serde"] }
 
 
 [dev-dependencies]
+kamu-data-utils = { workspace = true, features = ["testing"] }
+
 criterion = { version = "0.5", features = ["async_tokio"] }
 indoc = "2"
 pretty_assertions = "1"

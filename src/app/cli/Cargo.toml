@@ -198,6 +198,7 @@ libc = "0.2" # For getting uid:gid
 
 
 [dev-dependencies]
+kamu = { workspace = true, features = ["testing"] }
 kamu-cli-puppet = { workspace = true, default-features = false, features = [
     "extensions",
 ] }
