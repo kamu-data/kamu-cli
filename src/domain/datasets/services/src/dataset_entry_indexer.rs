@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use dill::{component, interface, meta};
@@ -83,21 +84,18 @@ impl DatasetEntryIndexer {
     ) -> Result<(), InternalError> {
         let mut join_set = tokio::task::JoinSet::new();
         let now = self.time_source.now();
+        let account_name_id_mapping = self.build_account_name_id_mapping(&dataset_handles).await?;
 
         for dataset_handle in dataset_handles {
-            let task_account_repository = self.account_repository.clone();
-            let task_dataset_entry_repo = self.dataset_entry_repo.clone();
+            let task_owner_account_id =
+                account_name_id_mapping[&dataset_handle.alias.account_name].clone();
             let task_now = now;
+            let task_dataset_entry_repo = self.dataset_entry_repo.clone();
 
             join_set.spawn(async move {
-                let owner_account_id = get_dataset_owner_id(
-                    &task_account_repository,
-                    &dataset_handle.alias.account_name,
-                )
-                .await?;
                 let dataset_entry = DatasetEntry::new(
                     dataset_handle.id,
-                    owner_account_id.clone(),
+                    task_owner_account_id,
                     dataset_handle.alias.dataset_name,
                     task_now,
                 );
@@ -116,6 +114,45 @@ impl DatasetEntryIndexer {
         }
 
         Ok(())
+    }
+
+    async fn build_account_name_id_mapping(
+        &self,
+        dataset_handles: &[DatasetHandle],
+    ) -> Result<HashMap<Option<odf::AccountName>, odf::AccountID>, InternalError> {
+        let mut map = HashMap::new();
+
+        for dataset_handle in dataset_handles {
+            let maybe_owner_name = &dataset_handle.alias.account_name;
+
+            if map.contains_key(maybe_owner_name) {
+                continue;
+            }
+
+            let owner_account_id = self.get_dataset_owner_id(maybe_owner_name).await?;
+
+            map.insert(maybe_owner_name.clone(), owner_account_id);
+        }
+
+        Ok(map)
+    }
+
+    async fn get_dataset_owner_id(
+        &self,
+        maybe_owner_name: &Option<odf::AccountName>,
+    ) -> Result<odf::AccountID, InternalError> {
+        match &maybe_owner_name {
+            Some(account_name) => {
+                let account = self
+                    .account_repository
+                    .get_account_by_name(account_name)
+                    .await
+                    .int_err()?;
+
+                Ok(account.id)
+            }
+            None => Ok(DEFAULT_ACCOUNT_ID.clone()),
+        }
     }
 }
 
@@ -136,27 +173,6 @@ impl InitOnStartup for DatasetEntryIndexer {
         }
 
         self.index_datasets().await
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helpers
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn get_dataset_owner_id(
-    account_repository: &Arc<dyn AccountRepository>,
-    maybe_owner_name: &Option<odf::AccountName>,
-) -> Result<odf::AccountID, InternalError> {
-    match &maybe_owner_name {
-        Some(account_name) => {
-            let account = account_repository
-                .get_account_by_name(account_name)
-                .await
-                .int_err()?;
-
-            Ok(account.id)
-        }
-        None => Ok(DEFAULT_ACCOUNT_ID.clone()),
     }
 }
 
