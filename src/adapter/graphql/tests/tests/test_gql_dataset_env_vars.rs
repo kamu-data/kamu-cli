@@ -14,6 +14,7 @@ use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
+    DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
@@ -352,6 +353,7 @@ impl DatasetEnvVarsHarness {
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<DatasetRegistryRepoBridge>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()

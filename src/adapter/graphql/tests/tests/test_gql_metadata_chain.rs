@@ -539,6 +539,7 @@ impl GraphQLMetadataChainHarness {
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<DatasetRegistryRepoBridge>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);

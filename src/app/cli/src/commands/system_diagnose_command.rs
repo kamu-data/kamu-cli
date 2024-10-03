@@ -19,11 +19,11 @@ use futures::TryStreamExt;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::engine::normalize_logs;
 use kamu::domain::{
-    DatasetRepository,
+    DatasetRegistry,
     OwnedFile,
     VerificationOptions,
     VerificationRequest,
-    VerificationService,
+    VerifyDatasetUseCase,
 };
 use kamu::utils::docker_images::BUSYBOX;
 use random_names::get_random_name;
@@ -40,22 +40,22 @@ const FAILED_MESSAGE: &str = "failed";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SystemDiagnoseCommand {
-    dataset_repo: Arc<dyn DatasetRepository>,
-    verification_svc: Arc<dyn VerificationService>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
     container_runtime: Arc<ContainerRuntime>,
     workspace_svc: Arc<WorkspaceService>,
 }
 
 impl SystemDiagnoseCommand {
     pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
-        verification_svc: Arc<dyn VerificationService>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
+        verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
         container_runtime: Arc<ContainerRuntime>,
         workspace_svc: Arc<WorkspaceService>,
     ) -> Self {
         Self {
-            dataset_repo,
-            verification_svc,
+            dataset_registry,
+            verify_dataset_use_case,
             container_runtime,
             workspace_svc,
         }
@@ -98,8 +98,8 @@ impl Command for SystemDiagnoseCommand {
         // Add checks which required workspace initialization
         if self.workspace_svc.is_in_workspace() {
             diagnostic_checks.push(Box::new(CheckWorkspaceConsistent {
-                dataset_repo: self.dataset_repo.clone(),
-                verification_svc: self.verification_svc.clone(),
+                dataset_registry: self.dataset_registry.clone(),
+                verify_dataset_use_case: self.verify_dataset_use_case.clone(),
             }));
         }
 
@@ -330,8 +330,8 @@ impl DiagnosticCheck for CheckContainerRuntimeVolumeMount {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct CheckWorkspaceConsistent {
-    dataset_repo: Arc<dyn DatasetRepository>,
-    verification_svc: Arc<dyn VerificationService>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
 }
 
 #[async_trait::async_trait]
@@ -352,29 +352,28 @@ impl DiagnosticCheck for CheckWorkspaceConsistent {
             progress_cloned.draw();
         });
 
-        let verification_requests: Vec<_> = self
-            .dataset_repo
-            .get_all_datasets()
-            .map_ok(|hdl| VerificationRequest {
-                dataset_ref: hdl.as_local_ref(),
-                block_range: (None, None),
-            })
+        let dataset_handles: Vec<_> = self
+            .dataset_registry
+            .all_dataset_handles()
             .try_collect()
             .await?;
 
-        let verify_options = VerificationOptions {
-            check_integrity: true,
-            check_logical_hashes: false,
-            replay_transformations: false,
-        };
+        let mut verification_tasks = Vec::new();
+        for dataset_handle in dataset_handles {
+            verification_tasks.push(VerificationRequest {
+                target: dataset_handle,
+                block_range: (None, None),
+                options: VerificationOptions {
+                    check_integrity: true,
+                    check_logical_hashes: false,
+                    replay_transformations: false,
+                },
+            });
+        }
 
         let results = self
-            .verification_svc
-            .verify_multi(
-                verification_requests,
-                verify_options.clone(),
-                Some(progress.clone()),
-            )
+            .verify_dataset_use_case
+            .execute_multi(verification_tasks, Some(progress.clone()))
             .await;
 
         for result in results {

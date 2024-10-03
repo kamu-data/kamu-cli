@@ -27,13 +27,6 @@ const DEFAULT_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS: usize = 10;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-type BoxedCreateDatasetFuture = std::pin::Pin<
-    Box<dyn std::future::Future<Output = Result<CreateDatasetResult, CreateDatasetError>> + Send>,
->;
-
-pub type DatasetFactoryFn =
-    Box<dyn FnOnce(MetadataBlockTyped<Seed>) -> BoxedCreateDatasetFuture + Send>;
-
 #[derive(Debug, Eq, PartialEq)]
 pub struct SimpleProtocolTransferOptions {
     pub max_parallel_transfers: usize,
@@ -72,7 +65,7 @@ impl SimpleTransferProtocol {
         trust_source_hashes: bool,
         force: bool,
         listener: Arc<dyn SyncListener + 'static>,
-    ) -> Result<SyncResult, SyncError> {
+    ) -> Result<SyncResponse, SyncError> {
         listener.begin();
 
         let empty_chain = MetadataChainImpl::new(
@@ -105,7 +98,13 @@ impl SimpleTransferProtocol {
         .await?;
 
         match chains_comparison {
-            CompareChainsResult::Equal => return Ok(SyncResult::UpToDate),
+            CompareChainsResult::Equal => {
+                return Ok(SyncResponse {
+                    result: SyncResult::UpToDate,
+                    local_dataset: maybe_dst
+                        .expect("Destination must exist in up-to-date scenario"),
+                })
+            }
             CompareChainsResult::LhsAhead { .. } => { /* Skip */ }
             CompareChainsResult::LhsBehind {
                 ref rhs_ahead_blocks,
@@ -182,10 +181,13 @@ impl SimpleTransferProtocol {
         )
         .await?;
 
-        Ok(SyncResult::Updated {
-            old_head,
-            new_head: src_head,
-            num_blocks: num_blocks as u64,
+        Ok(SyncResponse {
+            result: SyncResult::Updated {
+                old_head,
+                new_head: src_head,
+                num_blocks: num_blocks as u64,
+            },
+            local_dataset: dst,
         })
     }
 

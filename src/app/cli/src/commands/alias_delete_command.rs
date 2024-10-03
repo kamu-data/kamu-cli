@@ -16,10 +16,10 @@ use opendatafabric::*;
 use super::{CLIError, Command};
 
 pub struct AliasDeleteCommand {
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    dataset: Option<DatasetRef>,
-    alias: Option<DatasetRefRemote>,
+    maybe_dataset_ref: Option<DatasetRef>,
+    maybe_alias: Option<DatasetRefRemote>,
     all: bool,
     pull: bool,
     push: bool,
@@ -27,19 +27,19 @@ pub struct AliasDeleteCommand {
 
 impl AliasDeleteCommand {
     pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        dataset: Option<DatasetRef>,
-        alias: Option<DatasetRefRemote>,
+        maybe_dataset_ref: Option<DatasetRef>,
+        maybe_alias: Option<DatasetRefRemote>,
         all: bool,
         pull: bool,
         push: bool,
     ) -> Self {
         Self {
-            dataset_repo,
+            dataset_registry,
             remote_alias_reg,
-            dataset,
-            alias,
+            maybe_dataset_ref,
+            maybe_alias,
             all,
             pull,
             push,
@@ -47,9 +47,15 @@ impl AliasDeleteCommand {
     }
 
     async fn delete_dataset_alias(&self) -> Result<usize, CLIError> {
+        let dataset = self
+            .dataset_registry
+            .get_dataset_by_ref(self.maybe_dataset_ref.as_ref().unwrap())
+            .await
+            .map_err(CLIError::failure)?;
+
         let mut aliases = self
             .remote_alias_reg
-            .get_remote_aliases(self.dataset.as_ref().unwrap())
+            .get_remote_aliases(dataset)
             .await
             .map_err(CLIError::failure)?;
 
@@ -58,7 +64,7 @@ impl AliasDeleteCommand {
         if self.all {
             count += aliases.clear(RemoteAliasKind::Pull).await?;
             count += aliases.clear(RemoteAliasKind::Push).await?;
-        } else if let Some(alias) = &self.alias {
+        } else if let Some(alias) = &self.maybe_alias {
             let both = !self.pull && !self.push;
 
             if (self.pull || both) && aliases.delete(alias, RemoteAliasKind::Pull).await? {
@@ -77,14 +83,10 @@ impl AliasDeleteCommand {
     async fn delete_all_aliases(&self) -> Result<usize, CLIError> {
         let mut count = 0;
 
-        let mut stream = self.dataset_repo.get_all_datasets();
-        while let Some(dataset_handle) =
-            stream.next().await.transpose().map_err(CLIError::failure)?
-        {
-            let mut aliases = self
-                .remote_alias_reg
-                .get_remote_aliases(&dataset_handle.into_local_ref())
-                .await?;
+        let mut stream = self.dataset_registry.all_dataset_handles();
+        while let Some(hdl) = stream.next().await.transpose().map_err(CLIError::failure)? {
+            let dataset = self.dataset_registry.get_dataset_by_handle(&hdl);
+            let mut aliases = self.remote_alias_reg.get_remote_aliases(dataset).await?;
 
             // --all --push - clears all push aliases only
             // --all --pull - clears all pull aliases only
@@ -104,7 +106,7 @@ impl AliasDeleteCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for AliasDeleteCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let count = if self.dataset.is_some() {
+        let count = if self.maybe_dataset_ref.is_some() {
             self.delete_dataset_alias().await
         } else if self.all {
             self.delete_all_aliases().await

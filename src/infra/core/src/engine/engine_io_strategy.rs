@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use container_runtime::*;
 use datafusion::arrow::datatypes::SchemaRef;
@@ -25,8 +24,8 @@ use crate::ObjectRepositoryLocalFSSha3;
 pub trait EngineIoStrategy: Send + Sync {
     async fn materialize_request(
         &self,
-        dataset: &dyn Dataset,
         request: TransformRequestExt,
+        datasets_map: &WorkingDatasetsMap,
         operation_dir: &Path,
     ) -> Result<MaterializedEngineRequest, InternalError>;
 }
@@ -46,15 +45,9 @@ pub struct MaterializedEngineRequest {
 
 /// This IO strategy materializes all inputs as local file system files and pass
 /// them to the engines via mounted volumes.
-pub struct EngineIoStrategyLocalVolume {
-    dataset_repo: Arc<dyn DatasetRepository>,
-}
+pub struct EngineIoStrategyLocalVolume {}
 
 impl EngineIoStrategyLocalVolume {
-    pub fn new(dataset_repo: Arc<dyn DatasetRepository>) -> Self {
-        Self { dataset_repo }
-    }
-
     async fn materialize_object(
         &self,
         repo: &dyn ObjectRepository,
@@ -92,8 +85,8 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
     #[tracing::instrument(skip_all)]
     async fn materialize_request(
         &self,
-        dataset: &dyn Dataset,
         request: TransformRequestExt,
+        datasets_map: &WorkingDatasetsMap,
         operation_dir: &Path,
     ) -> Result<MaterializedEngineRequest, InternalError> {
         let host_in_dir = operation_dir.join("in");
@@ -110,9 +103,11 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
 
         let mut volumes = vec![(host_out_dir, container_out_dir, VolumeAccess::ReadWrite).into()];
 
+        let target_dataset = datasets_map.get_by_handle(&request.dataset_handle);
+
         let prev_checkpoint_path = self
             .maybe_materialize_object(
-                dataset.as_checkpoint_repo(),
+                target_dataset.as_checkpoint_repo(),
                 request.prev_checkpoint.as_ref(),
                 &container_in_dir,
                 &mut volumes,
@@ -121,9 +116,7 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
 
         let mut query_inputs = Vec::new();
         for input in request.inputs {
-            let input_dataset = self
-                .dataset_repo
-                .get_dataset_by_handle(&input.dataset_handle);
+            let input_dataset = datasets_map.get_by_handle(&input.dataset_handle);
 
             let mut data_paths = Vec::new();
             for hash in input.data_slices {
@@ -199,15 +192,9 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
 /// This IO strategy is used for engines that cannot work directly with remote
 /// storage. It will download the input data and checkpoint locally and mount it
 /// as files.
-pub struct EngineIoStrategyRemoteProxy {
-    dataset_repo: Arc<dyn DatasetRepository>,
-}
+pub struct EngineIoStrategyRemoteProxy {}
 
 impl EngineIoStrategyRemoteProxy {
-    pub fn new(dataset_repo: Arc<dyn DatasetRepository>) -> Self {
-        Self { dataset_repo }
-    }
-
     async fn materialize_object(
         &self,
         repo: &dyn ObjectRepository,
@@ -262,8 +249,8 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
     #[tracing::instrument(skip_all)]
     async fn materialize_request(
         &self,
-        dataset: &dyn Dataset,
         request: TransformRequestExt,
+        datasets_map: &WorkingDatasetsMap,
         operation_dir: &Path,
     ) -> Result<MaterializedEngineRequest, InternalError> {
         // TODO: PERF: Parallel data transfer
@@ -281,9 +268,11 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
 
         let mut volumes = vec![(host_out_dir, container_out_dir, VolumeAccess::ReadWrite).into()];
 
+        let target_dataset = datasets_map.get_by_handle(&request.dataset_handle);
+
         let prev_checkpoint_path = self
             .maybe_materialize_object(
-                dataset.as_checkpoint_repo(),
+                target_dataset.as_checkpoint_repo(),
                 request.prev_checkpoint.as_ref(),
                 &host_in_dir,
                 &container_in_dir,
@@ -293,9 +282,7 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
 
         let mut query_inputs = Vec::new();
         for input in request.inputs {
-            let input_dataset = self
-                .dataset_repo
-                .get_dataset_by_handle(&input.dataset_handle);
+            let input_dataset = datasets_map.get_by_handle(&input.dataset_handle);
 
             let mut data_paths = Vec::new();
             for hash in input.data_slices {

@@ -127,10 +127,20 @@ pub async fn dataset_ingest_handler(
                 Some(time_source.now())
             });
 
+    // Resolve dataset
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+    let resolved_dataset = dataset_registry
+        .get_resolved_dataset_by_ref(&dataset_ref)
+        .await
+        .map_err(ApiError::not_found)?;
+
+    // TODO: authorization!
+
+    // Run ingestion
     let ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
     match ingest_svc
         .ingest_from_file_stream(
-            &dataset_ref,
+            resolved_dataset,
             params.source_name.as_deref(),
             arguments.data_stream,
             PushIngestOpts {

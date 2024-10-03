@@ -11,6 +11,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use auth::DatasetAction;
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::catalog::{CatalogProvider, SchemaProvider, Session};
 use datafusion::common::{Constraints, Statistics};
@@ -81,40 +82,39 @@ struct KamuSchemaImpl {
     // from ever being released.
     session_config: Arc<SessionConfig>,
     table_options: Arc<TableOptions>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     options: QueryOptions,
-    cache: Mutex<SchemaCache>,
-}
-
-#[derive(Default)]
-struct SchemaCache {
-    tables: Option<HashMap<String, Arc<KamuTable>>>,
+    tables: Mutex<HashMap<String, Arc<KamuTable>>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl KamuSchema {
-    pub fn new(
+    pub async fn prepare(
         session_context: &SessionContext,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         options: QueryOptions,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, InternalError> {
+        let schema = Self {
             inner: Arc::new(KamuSchemaImpl {
                 session_config: Arc::new(session_context.copied_config()),
                 table_options: Arc::new(session_context.copied_table_options()),
-                dataset_repo,
+                dataset_registry,
                 dataset_action_authorizer,
                 options,
-                cache: Mutex::new(SchemaCache::default()),
+                tables: Mutex::new(HashMap::new()),
             }),
-        }
+        };
+
+        schema.init_schema_cache().await?;
+
+        Ok(schema)
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    async fn init_schema_cache(&self) -> Result<SchemaCache, InternalError> {
+    async fn init_schema_cache(&self) -> Result<(), InternalError> {
         let mut tables = HashMap::new();
 
         let name_resolution_enabled = self.inner.options.input_datasets.is_empty();
@@ -123,8 +123,8 @@ impl KamuSchema {
             for (id, opts) in &self.inner.options.input_datasets {
                 let hdl = self
                     .inner
-                    .dataset_repo
-                    .resolve_dataset_ref(&id.as_local_ref())
+                    .dataset_registry
+                    .resolve_dataset_handle_by_ref(&id.as_local_ref())
                     .await
                     .int_err()?;
 
@@ -138,7 +138,7 @@ impl KamuSchema {
                     continue;
                 }
 
-                let dataset = self.inner.dataset_repo.get_dataset_by_handle(&hdl);
+                let dataset = self.inner.dataset_registry.get_dataset_by_handle(&hdl);
 
                 tables.insert(
                     opts.alias.clone(),
@@ -156,19 +156,23 @@ impl KamuSchema {
             // TODO: PERF: Scanning all datasets is not just super expensive - it may not be
             // possible at the public node scale. We need to patch DataFusion to support
             // unbounded catalogs.
-            let mut dataset_handles = self.inner.dataset_repo.get_all_datasets();
+            let all_dataset_handles: Vec<_> = self
+                .inner
+                .dataset_registry
+                .all_dataset_handles()
+                .try_collect()
+                .await
+                .int_err()?;
 
-            while let Some(hdl) = dataset_handles.try_next().await.int_err()? {
-                if !self
-                    .inner
-                    .dataset_action_authorizer
-                    .is_action_allowed(&hdl, auth::DatasetAction::Read)
-                    .await?
-                {
-                    continue;
-                }
+            let readable_dataset_handles = self
+                .inner
+                .dataset_action_authorizer
+                .filter_datasets_allowing(all_dataset_handles, DatasetAction::Read)
+                .await
+                .int_err()?;
 
-                let dataset = self.inner.dataset_repo.get_dataset_by_handle(&hdl);
+            for hdl in readable_dataset_handles {
+                let dataset = self.inner.dataset_registry.get_dataset_by_handle(&hdl);
 
                 tables.insert(
                     hdl.alias.to_string(),
@@ -184,36 +188,10 @@ impl KamuSchema {
             }
         }
 
-        Ok(SchemaCache {
-            tables: Some(tables),
-        })
-    }
+        let mut guard = self.inner.tables.lock().unwrap();
+        *guard = tables;
 
-    async fn ensure_cache(&self) -> Result<std::sync::MutexGuard<SchemaCache>, InternalError> {
-        {
-            let cache = self.inner.cache.lock().unwrap();
-            if cache.tables.is_some() {
-                return Ok(cache);
-            }
-        }
-
-        let new_cache = self.init_schema_cache().await?;
-
-        {
-            let mut cache = self.inner.cache.lock().unwrap();
-            *cache = new_cache;
-            Ok(cache)
-        }
-    }
-
-    async fn table_names_impl(&self) -> Result<Vec<String>, InternalError> {
-        let cache = self.ensure_cache().await?;
-        Ok(cache.tables.as_ref().unwrap().keys().cloned().collect())
-    }
-
-    async fn table_exist_impl(&self, name: &str) -> Result<bool, InternalError> {
-        let cache = self.ensure_cache().await?;
-        Ok(cache.tables.as_ref().unwrap().contains_key(name))
+        Ok(())
     }
 }
 
@@ -225,48 +203,20 @@ impl SchemaProvider for KamuSchema {
         self
     }
 
-    // TODO: Datafusion should make this function async
     fn table_names(&self) -> Vec<String> {
-        let this = self.clone();
-
-        std::thread::spawn(move || {
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-
-            runtime.block_on(this.table_names_impl())
-        })
-        .join()
-        .unwrap()
-        .unwrap()
+        let guard = self.inner.tables.lock().unwrap();
+        guard.keys().cloned().collect()
     }
 
     fn table_exist(&self, name: &str) -> bool {
-        let this = self.clone();
-        let name = name.to_owned();
-
-        std::thread::spawn(move || {
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-
-            runtime.block_on(this.table_exist_impl(&name))
-        })
-        .join()
-        .unwrap()
-        .unwrap_or(false)
+        let guard = self.inner.tables.lock().unwrap();
+        guard.contains_key(name)
     }
 
     async fn table(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>, DataFusionError> {
         let table = {
-            let cache = self
-                .ensure_cache()
-                .await
-                .map_err(|e| DataFusionError::External(e.into()))?;
-
-            cache.tables.as_ref().unwrap().get(name).cloned()
+            let guard = self.inner.tables.lock().unwrap();
+            guard.get(name).cloned()
         };
 
         if let Some(table) = table {

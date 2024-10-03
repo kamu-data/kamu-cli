@@ -7,29 +7,28 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_trait::async_trait;
+use std::sync::Arc;
+
 use internal_error::InternalError;
-use opendatafabric::*;
+use opendatafabric::{AccountName, DatasetName, DatasetPushTarget, RepoName};
 use thiserror::Error;
 
 use crate::*;
 
-#[async_trait]
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
 pub trait RemoteAliasesRegistry: Send + Sync {
     async fn get_remote_aliases(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset: Arc<dyn Dataset>,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError>;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Debug)]
 pub enum GetAliasesError {
-    #[error(transparent)]
-    DatasetNotFound(
-        #[from]
-        #[backtrace]
-        DatasetNotFoundError,
-    ),
     #[error(transparent)]
     Internal(
         #[from]
@@ -38,30 +37,23 @@ pub enum GetAliasesError {
     ),
 }
 
-impl From<GetDatasetError> for GetAliasesError {
-    fn from(v: GetDatasetError) -> Self {
-        match v {
-            GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
-            GetDatasetError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // RemoteAliasResolver
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait]
+#[async_trait::async_trait]
 pub trait RemoteAliasResolver: Send + Sync {
     // Resolve remote push target.
     // Firstly try to resolve from AliasRegistry, if cannot do it
     // try to resolve via repository registry
     async fn resolve_push_target(
         &self,
-        local_dataset_handle: &DatasetHandle,
+        local_target: ResolvedDataset,
         dataset_push_target_maybe: Option<DatasetPushTarget>,
     ) -> Result<RemoteTarget, ResolveAliasError>;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct RemoteTarget {
@@ -153,3 +145,5 @@ impl From<InternalError> for GetRemoteAccountError {
         Self::Internal(value)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

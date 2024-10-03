@@ -157,6 +157,7 @@ impl FlowHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add_value(mock_dataset_changes)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
             .add_value(CurrentAccountSubject::new_test())

@@ -82,7 +82,7 @@ impl<TServerHarness: ServerSideHarness>
 
         // Extend server-side dataset with new node
         server_repo
-            .find_dataset_by_ref(&make_dataset_ref(&server_account_name, "foo"))
+            .get_dataset_by_ref(&make_dataset_ref(&server_account_name, "foo"))
             .await
             .unwrap()
             .commit_event(

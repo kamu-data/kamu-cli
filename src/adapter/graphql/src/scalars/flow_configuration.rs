@@ -522,8 +522,8 @@ impl FlowRunConfiguration {
                 }
             }
             DatasetFlowType::Reset => {
-                let dataset_repo = from_catalog::<dyn kamu_core::DatasetRepository>(ctx).unwrap();
-                let dataset = dataset_repo.get_dataset_by_handle(dataset_handle);
+                let dataset_registry = from_catalog::<dyn kamu_core::DatasetRegistry>(ctx).unwrap();
+                let dataset = dataset_registry.get_dataset_by_handle(dataset_handle);
 
                 // Assume unwrap safe such as we have checked this existance during
                 // validation step

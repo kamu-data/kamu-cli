@@ -65,6 +65,7 @@ impl DatasetFactoryImpl {
             ObjectRepositoryLocalFS::new(layout.data_dir),
             ObjectRepositoryLocalFS::new(layout.checkpoints_dir),
             NamedObjectRepositoryLocalFS::new(layout.info_dir),
+            Some(Url::from_directory_path(&layout.root_dir).unwrap()),
         )
     }
 
@@ -101,6 +102,7 @@ impl DatasetFactoryImpl {
                 base_url.join("info/").unwrap(),
                 header_map,
             ),
+            None,
         )
     }
 
@@ -130,6 +132,7 @@ impl DatasetFactoryImpl {
             ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/")),
             ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
             NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
+            None,
         ))
     }
 
@@ -212,6 +215,7 @@ impl DatasetFactoryImpl {
                 Default::default(),
             ),
             NamedObjectRepositoryIpfsHttp::new(client.clone(), dataset_url.join("info/").unwrap()),
+            None,
         ))
     }
 

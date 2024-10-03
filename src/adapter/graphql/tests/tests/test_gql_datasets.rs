@@ -693,6 +693,7 @@ impl GraphQLDatasetsHarness {
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<DatasetRegistryRepoBridge>()
                 .add_value(mock_authentication_service)
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>();

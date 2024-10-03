@@ -12,6 +12,7 @@ use std::sync::Arc;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::engine::*;
+use kamu_core::WorkingDatasetsMap;
 use opendatafabric::*;
 
 /// An in-process engine using Apache Arrow Datafusion framework.
@@ -114,6 +115,7 @@ impl Engine for EngineDatafusionInproc {
     async fn execute_transform(
         &self,
         _request: TransformRequestExt,
+        _datasets_map: &WorkingDatasetsMap,
     ) -> Result<TransformResponseExt, EngineError> {
         unimplemented!(
             "Derivative transformations must be executed by a versioned out-of-process engine"

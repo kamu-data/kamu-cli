@@ -110,7 +110,7 @@ async fn get_dataset_by_id(
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
     let dataset_handle = dataset_repo
-        .resolve_dataset_ref(&dataset_id.clone().as_local_ref())
+        .resolve_dataset_handle_by_ref(&dataset_id.clone().as_local_ref())
         .await
         .map_err(|err| match err {
             GetDatasetError::NotFound(e) => ApiError::not_found(e),

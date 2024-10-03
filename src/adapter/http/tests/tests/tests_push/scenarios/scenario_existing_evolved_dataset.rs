@@ -82,7 +82,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingEvolvedDatasetScenario<
         let client_repo = client_harness.dataset_repository();
         let client_dataset_ref = make_dataset_ref(&client_account_name, "foo");
         client_repo
-            .find_dataset_by_ref(&client_dataset_ref)
+            .get_dataset_by_ref(&client_dataset_ref)
             .await
             .unwrap()
             .commit_event(

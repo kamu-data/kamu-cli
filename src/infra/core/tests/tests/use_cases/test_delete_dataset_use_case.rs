@@ -13,6 +13,7 @@ use std::sync::Arc;
 use dill::{Catalog, Component};
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
 use kamu::{
+    DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
     DeleteDatasetUseCaseImpl,
@@ -24,6 +25,8 @@ use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{
     CreateDatasetResult,
     DatasetLifecycleMessage,
+    DatasetRegistry,
+    DatasetRegistryExt,
     DatasetRepository,
     DeleteDatasetError,
     DeleteDatasetUseCase,
@@ -228,6 +231,7 @@ impl DeleteUseCaseHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<DependencyGraphServiceInMemory>()
             .add_value(mock_dataset_action_authorizer)
@@ -294,9 +298,9 @@ impl DeleteUseCaseHarness {
     }
 
     async fn check_dataset_exists(&self, alias: &DatasetAlias) -> Result<(), GetDatasetError> {
-        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().unwrap();
-        dataset_repo
-            .find_dataset_by_ref(&alias.as_local_ref())
+        let dataset_registry = self.catalog.get_one::<dyn DatasetRegistry>().unwrap();
+        dataset_registry
+            .get_dataset_by_ref(&alias.as_local_ref())
             .await?;
         Ok(())
     }

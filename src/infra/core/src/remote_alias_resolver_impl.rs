@@ -44,12 +44,12 @@ impl RemoteAliasResolverImpl {
 
     async fn fetch_remote_url(
         &self,
-        local_handle: &odf::DatasetHandle,
+        dataset: Arc<dyn Dataset>,
         remote_alias_kind: RemoteAliasKind,
     ) -> Result<Option<Url>, ResolveAliasError> {
         let remote_aliases = self
             .remote_alias_reg
-            .get_remote_aliases(&local_handle.as_local_ref())
+            .get_remote_aliases(dataset)
             .await
             .int_err()?;
 
@@ -113,7 +113,7 @@ impl RemoteAliasResolverImpl {
 impl RemoteAliasResolver for RemoteAliasResolverImpl {
     async fn resolve_push_target(
         &self,
-        local_dataset_handle: &odf::DatasetHandle,
+        local_target: ResolvedDataset,
         dataset_push_target_maybe: Option<odf::DatasetPushTarget>,
     ) -> Result<RemoteTarget, ResolveAliasError> {
         let (repo_name, mut account_name, dataset_name) = if let Some(dataset_push_target) =
@@ -134,7 +134,7 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             }
         } else {
             if let Some(remote_url) = self
-                .fetch_remote_url(local_dataset_handle, RemoteAliasKind::Push)
+                .fetch_remote_url(local_target.dataset, RemoteAliasKind::Push)
                 .await?
             {
                 return Ok(RemoteTarget::new(remote_url, None, None, None));
@@ -172,7 +172,7 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             dn
         } else {
             self.resolve_remote_dataset_name(
-                local_dataset_handle,
+                &local_target.handle,
                 &transfer_url,
                 access_token_maybe.as_ref(),
             )

@@ -66,6 +66,7 @@ async fn create_catalog_with_local_workspace(
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add::<CreateDatasetUseCaseImpl>()
             .add::<DummyOutboxImpl>()
             .add::<SystemTimeSourceDefault>()

@@ -24,12 +24,14 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS;
 use kamu::{
     DatasetFactoryImpl,
+    DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
     IpfsGateway,
     RemoteReposDir,
     RemoteRepositoryRegistryImpl,
+    SyncRequestBuilder,
     SyncServiceImpl,
 };
 use kamu_accounts::CurrentAccountSubject;
@@ -47,7 +49,11 @@ async fn setup_dataset(
     tmp_workspace_dir: &Path,
     dataset_alias: &DatasetAlias,
     ipfs: Option<(IpfsGateway, IpfsClient)>,
-) -> (Arc<dyn SyncService>, Arc<DatasetRepositoryLocalFs>) {
+) -> (
+    Arc<dyn SyncService>,
+    Arc<SyncRequestBuilder>,
+    Arc<DatasetRepositoryLocalFs>,
+) {
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
     let catalog = dill::CatalogBuilder::new()
@@ -61,16 +67,19 @@ async fn setup_dataset(
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add::<DatasetRegistryRepoBridge>()
         .add_value(RemoteReposDir::new(tmp_workspace_dir.join("repos")))
         .add::<RemoteRepositoryRegistryImpl>()
         .add::<auth::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
+        .add::<SyncRequestBuilder>()
         .add::<DummySmartTransferProtocolClient>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .build();
 
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
+    let sync_request_builder = catalog.get_one::<SyncRequestBuilder>().unwrap();
     let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
 
     // Add dataset
@@ -94,7 +103,7 @@ async fn setup_dataset(
     )
     .await;
 
-    (sync_svc, dataset_repo)
+    (sync_svc, sync_request_builder, dataset_repo)
 }
 
 async fn append_data_to_dataset(
@@ -111,6 +120,7 @@ async fn append_data_to_dataset(
 
 async fn do_test_sync(
     sync_svc: Arc<dyn SyncService>,
+    sync_request_builder: Arc<SyncRequestBuilder>,
     dataset_alias: &DatasetAlias,
     pull_repo_url: &DatasetRefRemote,
     push_repo_url: &DatasetRefRemote,
@@ -118,8 +128,10 @@ async fn do_test_sync(
 ) {
     let _push_res = sync_svc
         .sync(
-            &dataset_alias.as_any_ref(),
-            &push_repo_url.as_any_ref(),
+            sync_request_builder
+                .build_sync_request(dataset_alias.as_any_ref(), push_repo_url.as_any_ref(), true)
+                .await
+                .unwrap(),
             SyncOptions::default(),
             None,
         )
@@ -127,8 +139,10 @@ async fn do_test_sync(
 
     let _pull_res = sync_svc
         .sync(
-            &pull_repo_url.as_any_ref(),
-            &dataset_alias.as_any_ref(),
+            sync_request_builder
+                .build_sync_request(pull_repo_url.as_any_ref(), dataset_alias.as_any_ref(), true)
+                .await
+                .unwrap(),
             SyncOptions::default(),
             None,
         )
@@ -170,7 +184,7 @@ fn bench_with_1_parallel(c: &mut Criterion) {
 
     let (dataset_alias, pull_repo_url, push_repo_url) = rt.block_on(build_temp_dirs(&rt));
 
-    let (sync_service_impl, dataset_repo) = rt.block_on(setup_dataset(
+    let (sync_service_impl, sync_request_builder, dataset_repo) = rt.block_on(setup_dataset(
         tmp_workspace_dir.path(),
         &dataset_alias,
         None,
@@ -183,6 +197,7 @@ fn bench_with_1_parallel(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(do_test_sync(
                 sync_service_impl.clone(),
+                sync_request_builder.clone(),
                 &dataset_alias,
                 &DatasetRefRemote::from(&pull_repo_url),
                 &DatasetRefRemote::from(&push_repo_url),
@@ -200,7 +215,7 @@ fn bench_with_10_parallels(c: &mut Criterion) {
 
     let (dataset_alias, pull_repo_url, push_repo_url) = rt.block_on(build_temp_dirs(&rt));
 
-    let (sync_service_impl, dataset_repo) = rt.block_on(setup_dataset(
+    let (sync_service_impl, sync_request_builder, dataset_repo) = rt.block_on(setup_dataset(
         tmp_workspace_dir.path(),
         &dataset_alias,
         None,
@@ -213,6 +228,7 @@ fn bench_with_10_parallels(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(do_test_sync(
                 sync_service_impl.clone(),
+                sync_request_builder.clone(),
                 &dataset_alias,
                 &DatasetRefRemote::from(&pull_repo_url),
                 &DatasetRefRemote::from(&push_repo_url),

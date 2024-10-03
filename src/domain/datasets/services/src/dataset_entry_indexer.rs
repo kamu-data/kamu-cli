@@ -80,7 +80,11 @@ impl DatasetEntryIndexer {
     async fn index_datasets(&self) -> Result<(), InternalError> {
         use futures::TryStreamExt;
 
-        let dataset_handles: Vec<_> = self.dataset_repo.get_all_datasets().try_collect().await?;
+        let dataset_handles: Vec<_> = self
+            .dataset_repo
+            .all_dataset_handles()
+            .try_collect()
+            .await?;
 
         let account_name_id_mapping = self.build_account_name_id_mapping(&dataset_handles).await?;
 

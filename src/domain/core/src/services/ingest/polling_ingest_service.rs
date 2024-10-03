@@ -31,14 +31,14 @@ pub trait PollingIngestService: Send + Sync {
     /// Returns an active polling source, if any
     async fn get_active_polling_source(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError>;
 
     /// Uses polling source definition in metadata to ingest data from an
     /// external source
     async fn ingest(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
         options: PollingIngestOptions,
         listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PollingIngestError>;
@@ -46,7 +46,7 @@ pub trait PollingIngestService: Send + Sync {
     /// A batch version of [PollingIngestService::ingest]
     async fn ingest_multi(
         &self,
-        dataset_refs: Vec<DatasetRef>,
+        targets: Vec<ResolvedDataset>,
         options: PollingIngestOptions,
         listener: Option<Arc<dyn PollingIngestMultiListener>>,
     ) -> Vec<PollingIngestResponse>;

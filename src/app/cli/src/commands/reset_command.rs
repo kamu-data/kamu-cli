@@ -19,8 +19,8 @@ use crate::Interact;
 
 pub struct ResetCommand {
     interact: Arc<Interact>,
-    dataset_repo: Arc<dyn DatasetRepository>,
-    reset_svc: Arc<dyn ResetService>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    reset_dataset_use_case: Arc<dyn ResetDatasetUseCase>,
     dataset_ref: DatasetRef,
     block_hash: Multihash,
 }
@@ -28,15 +28,15 @@ pub struct ResetCommand {
 impl ResetCommand {
     pub fn new(
         interact: Arc<Interact>,
-        dataset_repo: Arc<dyn DatasetRepository>,
-        reset_svc: Arc<dyn ResetService>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
+        reset_dataset_use_case: Arc<dyn ResetDatasetUseCase>,
         dataset_ref: DatasetRef,
         block_hash: Multihash,
     ) -> Self {
         Self {
             interact,
-            dataset_repo,
-            reset_svc,
+            dataset_registry,
+            reset_dataset_use_case,
             dataset_ref,
             block_hash,
         }
@@ -47,8 +47,8 @@ impl ResetCommand {
 impl Command for ResetCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let dataset_handle = self
-            .dataset_repo
-            .resolve_dataset_ref(&self.dataset_ref)
+            .dataset_registry
+            .resolve_dataset_handle_by_ref(&self.dataset_ref)
             .await?;
 
         self.interact.require_confirmation(format!(
@@ -58,8 +58,8 @@ impl Command for ResetCommand {
             console::style("This operation is irreversible!").yellow(),
         ))?;
 
-        self.reset_svc
-            .reset_dataset(&dataset_handle, Some(&self.block_hash), None)
+        self.reset_dataset_use_case
+            .execute(&dataset_handle, Some(&self.block_hash), None)
             .await
             .map_err(CLIError::failure)?;
 

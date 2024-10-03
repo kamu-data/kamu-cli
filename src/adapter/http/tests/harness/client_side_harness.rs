@@ -48,8 +48,8 @@ const CLIENT_ACCOUNT_NAME: &str = "kamu-client";
 pub(crate) struct ClientSideHarness {
     tempdir: TempDir,
     catalog: dill::Catalog,
-    pull_service: Arc<dyn PullService>,
-    push_service: Arc<dyn PushService>,
+    pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
+    push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
     access_token_resover: Arc<dyn OdfServerAccessTokenResolver>,
     options: ClientSideHarnessOptions,
 }
@@ -104,7 +104,8 @@ impl ClientSideHarness {
                 .with_multi_tenant(options.multi_tenant),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>();
+        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+        .add::<DatasetRegistryRepoBridge>();
 
         b.add::<RemoteRepositoryRegistryImpl>();
 
@@ -127,14 +128,16 @@ impl ClientSideHarness {
         b.add::<SmartTransferProtocolClientWs>();
 
         b.add::<SyncServiceImpl>();
+        b.add::<SyncRequestBuilder>();
 
-        b.add::<TransformServiceImpl>();
+        b.add::<TransformRequestPlannerImpl>();
+        b.add::<TransformExecutionServiceImpl>();
 
         b.add::<CompactionServiceImpl>();
 
-        b.add::<PullServiceImpl>();
+        b.add::<PullRequestPlannerImpl>();
 
-        b.add::<PushServiceImpl>();
+        b.add::<PushRequestPlannerImpl>();
 
         b.add::<DatasetKeyValueServiceSysEnv>();
 
@@ -142,6 +145,12 @@ impl ClientSideHarness {
         b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
         b.add::<CommitDatasetEventUseCaseImpl>();
         b.add::<CreateDatasetUseCaseImpl>();
+        b.add::<PushDatasetUseCaseImpl>();
+
+        b.add_builder(
+            PullDatasetUseCaseImpl::builder().with_in_multi_tenant_mode(options.multi_tenant),
+        )
+        .bind::<dyn PullDatasetUseCase, PullDatasetUseCaseImpl>();
 
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
@@ -151,8 +160,8 @@ impl ClientSideHarness {
 
         let catalog = b.build();
 
-        let pull_service = catalog.get_one::<dyn PullService>().unwrap();
-        let push_service = catalog.get_one::<dyn PushService>().unwrap();
+        let pull_dataset_use_case = catalog.get_one::<dyn PullDatasetUseCase>().unwrap();
+        let push_dataset_use_case = catalog.get_one::<dyn PushDatasetUseCase>().unwrap();
         let access_token_resover = catalog
             .get_one::<dyn OdfServerAccessTokenResolver>()
             .unwrap();
@@ -160,8 +169,8 @@ impl ClientSideHarness {
         Self {
             tempdir,
             catalog,
-            pull_service,
-            push_service,
+            pull_dataset_use_case,
+            push_dataset_use_case,
             access_token_resover,
             options,
         }
@@ -212,10 +221,12 @@ impl ClientSideHarness {
         dataset_ref: DatasetRefAny,
         force: bool,
     ) -> Vec<PullResponse> {
-        self.pull_service
-            .pull_multi(
-                vec![dataset_ref],
-                PullMultiOptions {
+        self.pull_dataset_use_case
+            .execute_multi(
+                vec![PullRequest::from_any_ref(&dataset_ref, |_| {
+                    !self.options.multi_tenant
+                })],
+                PullOptions {
                     sync_options: SyncOptions {
                         create_if_not_exists: true,
                         force,
@@ -247,9 +258,15 @@ impl ClientSideHarness {
         force: bool,
         dataset_visibility: DatasetVisibility,
     ) -> Vec<PushResponse> {
-        self.push_service
-            .push_multi(
-                vec![dataset_local_ref],
+        let dataset_handle = self
+            .dataset_repository()
+            .resolve_dataset_handle_by_ref(&dataset_local_ref)
+            .await
+            .unwrap();
+
+        self.push_dataset_use_case
+            .execute_multi(
+                vec![dataset_handle],
                 PushMultiOptions {
                     sync_options: SyncOptions {
                         create_if_not_exists: true,
@@ -263,6 +280,7 @@ impl ClientSideHarness {
                 None,
             )
             .await
+            .unwrap()
     }
 
     pub async fn push_dataset_result(
@@ -282,7 +300,7 @@ impl ClientSideHarness {
             .await;
 
         match &(results.first().unwrap().result) {
-            Ok(sync_result) => sync_result.clone(),
+            Ok(sync_response) => sync_response.result.clone(),
             Err(e) => {
                 println!("Error: {e:#?}");
                 panic!("Failure")

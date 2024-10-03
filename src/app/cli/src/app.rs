@@ -25,7 +25,7 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
-use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryService};
+use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
@@ -191,7 +191,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         };
 
         let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
-            let server_catalog = configure_server_catalog(&final_base_catalog).build();
+            let server_catalog =
+                configure_server_catalog(&final_base_catalog, is_multi_tenant_workspace).build();
             Some(server_catalog)
         } else {
             None
@@ -432,6 +433,8 @@ pub fn configure_base_catalog(
     b.add::<PushIngestServiceImpl>();
 
     b.add::<TransformServiceImpl>();
+    b.add::<TransformRequestPlannerImpl>();
+    b.add::<TransformExecutionServiceImpl>();
 
     b.add::<VerificationServiceImpl>();
 
@@ -440,10 +443,13 @@ pub fn configure_base_catalog(
     b.add::<SearchServiceImpl>();
 
     b.add::<SyncServiceImpl>();
+    b.add::<SyncRequestBuilder>();
 
-    b.add::<PullServiceImpl>();
+    b.add::<PullRequestPlannerImpl>();
 
-    b.add::<PushServiceImpl>();
+    b.add::<PushRequestPlannerImpl>();
+
+    b.add::<WatermarkServiceImpl>();
 
     b.add::<ResetServiceImpl>();
 
@@ -463,10 +469,20 @@ pub fn configure_base_catalog(
 
     b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
     b.add::<CommitDatasetEventUseCaseImpl>();
+    b.add::<CompactDatasetUseCaseImpl>();
     b.add::<CreateDatasetUseCaseImpl>();
     b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
     b.add::<DeleteDatasetUseCaseImpl>();
+    b.add::<PushDatasetUseCaseImpl>();
     b.add::<RenameDatasetUseCaseImpl>();
+    b.add::<ResetDatasetUseCaseImpl>();
+    b.add::<SetWatermarkUseCaseImpl>();
+    b.add::<VerifyDatasetUseCaseImpl>();
+
+    b.add_builder(
+        PullDatasetUseCaseImpl::builder().with_in_multi_tenant_mode(multi_tenant_workspace),
+    )
+    .bind::<dyn PullDatasetUseCase, PullDatasetUseCaseImpl>();
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 
@@ -498,7 +514,7 @@ pub fn configure_base_catalog(
         b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
     }
 
-    b.add::<DatasetEntryService>();
+    b.add::<DatasetEntryServiceImpl>();
 
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()
@@ -534,7 +550,10 @@ pub fn configure_cli_catalog(
 }
 
 // Public only for tests
-pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
+pub fn configure_server_catalog(
+    base_catalog: &Catalog,
+    is_multi_tenant_workspace: bool,
+) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
 
     b.add::<DatasetChangesServiceImpl>();
@@ -542,7 +561,7 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     b.add::<DatasetOwnershipServiceInMemory>();
     b.add::<DatasetOwnershipServiceInMemoryStateInitializer>();
 
-    kamu_task_system_services::register_dependencies(&mut b);
+    kamu_task_system_services::register_dependencies(&mut b, is_multi_tenant_workspace);
 
     b.add_value(kamu_flow_system_inmem::domain::FlowExecutorConfig::new(
         Duration::seconds(1),

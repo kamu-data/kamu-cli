@@ -27,8 +27,6 @@ use super::ingest_common;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PushIngestServiceImpl {
-    dataset_repo: Arc<dyn DatasetRepository>,
-    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     data_format_registry: Arc<dyn DataFormatRegistry>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -42,8 +40,6 @@ pub struct PushIngestServiceImpl {
 #[dill::interface(dyn PushIngestService)]
 impl PushIngestServiceImpl {
     pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
-        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
         data_format_registry: Arc<dyn DataFormatRegistry>,
         time_source: Arc<dyn SystemTimeSource>,
@@ -51,8 +47,6 @@ impl PushIngestServiceImpl {
         run_info_dir: Arc<RunInfoDir>,
     ) -> Self {
         Self {
-            dataset_repo,
-            dataset_action_authorizer,
             object_store_registry,
             data_format_registry,
             time_source,
@@ -63,20 +57,12 @@ impl PushIngestServiceImpl {
 
     async fn do_ingest(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
         source_name: Option<&str>,
         source: DataSource,
         opts: PushIngestOpts,
         listener: Arc<dyn PushIngestListener>,
     ) -> Result<PushIngestResult, PushIngestError> {
-        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
-
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
-            .await?;
-
-        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
-
         let operation_id = get_random_name(None, 10);
         let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
         std::fs::create_dir_all(&operation_dir).int_err()?;
@@ -85,19 +71,19 @@ impl PushIngestServiceImpl {
             ingest_common::new_session_context(self.object_store_registry.clone());
 
         let mut data_writer = self
-            .make_data_writer(dataset.clone(), source_name, ctx.clone())
+            .make_data_writer(target.dataset.clone(), source_name, ctx.clone())
             .await?;
 
         let push_source = match (data_writer.source_event(), opts.auto_create_push_source) {
             // No push source, and it's allowed to create
             (None, true) => {
                 let add_push_source_event = self
-                    .auto_create_push_source(dataset.clone(), "auto", &opts)
+                    .auto_create_push_source(target.dataset.clone(), "auto", &opts)
                     .await?;
 
                 // Update data writer, as we've modified the dataset
                 data_writer = self
-                    .make_data_writer(dataset.clone(), source_name, ctx.clone())
+                    .make_data_writer(target.dataset.clone(), source_name, ctx.clone())
                     .await?;
                 Ok(add_push_source_event)
             }
@@ -432,16 +418,16 @@ impl PushIngestServiceImpl {
 
 #[async_trait::async_trait]
 impl PushIngestService for PushIngestServiceImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.handle))]
     async fn get_active_push_sources(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
     ) -> Result<Vec<(Multihash, MetadataBlockTyped<AddPushSource>)>, GetDatasetError> {
         use futures::TryStreamExt;
 
         // TODO: Support source disabling and evolution
-        let dataset = self.dataset_repo.find_dataset_by_ref(dataset_ref).await?;
-        let stream = dataset
+        let stream = target
+            .dataset
             .as_metadata_chain()
             .iter_blocks()
             .filter_map_ok(|(h, b)| b.into_typed().map(|b| (h, b)));
@@ -449,10 +435,10 @@ impl PushIngestService for PushIngestServiceImpl {
         Ok(stream.try_collect().await.int_err()?)
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.handle))]
     async fn ingest_from_url(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
         source_name: Option<&str>,
         url: url::Url,
         opts: PushIngestOpts,
@@ -462,20 +448,14 @@ impl PushIngestService for PushIngestServiceImpl {
 
         tracing::info!(%url, ?opts, "Ingesting from url");
 
-        self.do_ingest(
-            dataset_ref,
-            source_name,
-            DataSource::Url(url),
-            opts,
-            listener,
-        )
-        .await
+        self.do_ingest(target, source_name, DataSource::Url(url), opts, listener)
+            .await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.handle))]
     async fn ingest_from_file_stream(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
         source_name: Option<&str>,
         data: Box<dyn AsyncRead + Send + Unpin>,
         opts: PushIngestOpts,
@@ -486,7 +466,7 @@ impl PushIngestService for PushIngestServiceImpl {
         tracing::info!(?opts, "Ingesting from file stream");
 
         self.do_ingest(
-            dataset_ref,
+            target,
             source_name,
             DataSource::Stream(data),
             opts,

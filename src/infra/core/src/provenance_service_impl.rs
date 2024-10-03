@@ -20,7 +20,7 @@ use opendatafabric::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ProvenanceServiceImpl {
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
 }
 
@@ -28,11 +28,11 @@ pub struct ProvenanceServiceImpl {
 #[interface(dyn ProvenanceService)]
 impl ProvenanceServiceImpl {
     pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     ) -> Self {
         Self {
-            dataset_repo,
+            dataset_registry,
             dataset_action_authorizer,
         }
     }
@@ -47,53 +47,41 @@ impl ProvenanceServiceImpl {
             .check_action_allowed(dataset_handle, auth::DatasetAction::Read)
             .await?;
 
-        if let Some(dataset) = self
-            .dataset_repo
-            .try_get_dataset(&dataset_handle.as_local_ref())
-            .await?
-        {
-            let summary = dataset
-                .get_summary(GetSummaryOpts::default())
-                .await
-                .int_err()?;
+        let dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
 
-            let mut resolved_inputs = Vec::new();
-            for input_id in &summary.dependencies {
-                let handle = self
-                    .dataset_repo
-                    .resolve_dataset_ref(&input_id.as_local_ref())
+        let summary = dataset
+            .get_summary(GetSummaryOpts::default())
+            .await
+            .int_err()?;
+
+        let mut resolved_inputs = Vec::new();
+        for input_id in &summary.dependencies {
+            let handle = self
+                .dataset_registry
+                .resolve_dataset_handle_by_ref(&input_id.as_local_ref())
+                .await?;
+
+            resolved_inputs.push(ResolvedTransformInput {
+                // TODO: This likely needs to be changed into query alias
+                name: handle.alias.dataset_name.clone(),
+                handle,
+            });
+        }
+
+        let dataset_info = NodeInfo::Local {
+            id: summary.id.clone(),
+            alias: dataset_handle.alias.clone(),
+            kind: summary.kind,
+            dependencies: &resolved_inputs,
+        };
+
+        if visitor.enter(&dataset_info) {
+            for input in &resolved_inputs {
+                self.visit_upstream_dependencies_rec(&input.handle, visitor)
                     .await?;
-
-                resolved_inputs.push(ResolvedTransformInput {
-                    // TODO: This likely needs to be changed into query alias
-                    name: handle.alias.dataset_name.clone(),
-                    handle,
-                });
             }
 
-            let dataset_info = NodeInfo::Local {
-                id: summary.id.clone(),
-                alias: dataset_handle.alias.clone(),
-                kind: summary.kind,
-                dependencies: &resolved_inputs,
-            };
-
-            if visitor.enter(&dataset_info) {
-                for input in &resolved_inputs {
-                    self.visit_upstream_dependencies_rec(&input.handle, visitor)
-                        .await?;
-                }
-
-                visitor.exit(&dataset_info);
-            }
-        } else {
-            // Remote dataset
-            let dataset_info = NodeInfo::Remote {
-                id: dataset_handle.id.clone(),
-                alias: dataset_handle.alias.clone(),
-            };
-
-            visitor.enter(&dataset_info);
+            visitor.exit(&dataset_info);
         }
 
         Ok(())
@@ -108,7 +96,10 @@ impl ProvenanceService for ProvenanceServiceImpl {
         visitor: &mut dyn LineageVisitor,
         _options: LineageOptions,
     ) -> Result<(), GetLineageError> {
-        let hdl = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+        let hdl = self
+            .dataset_registry
+            .resolve_dataset_handle_by_ref(dataset_ref)
+            .await?;
         self.visit_upstream_dependencies_rec(&hdl, visitor).await
     }
 }

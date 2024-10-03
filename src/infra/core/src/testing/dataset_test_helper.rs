@@ -88,7 +88,7 @@ impl DatasetTestHelper {
         let tmp_dir = tempfile::tempdir().unwrap();
 
         let ds = dataset_repo
-            .find_dataset_by_ref(&dataset_ref.into())
+            .get_dataset_by_ref(&dataset_ref.into())
             .await
             .unwrap();
 

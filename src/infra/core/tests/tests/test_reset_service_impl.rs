@@ -30,7 +30,6 @@ async fn test_reset_dataset_with_2revisions_drop_last() {
     assert_eq!(test_case.hash_polling_source_block, current_head);
 
     let result = harness
-        .reset_svc
         .reset_dataset(
             &test_case.dataset_handle,
             Some(&test_case.hash_seed_block),
@@ -57,7 +56,6 @@ async fn test_reset_dataset_with_2revisions_without_changes() {
     assert_eq!(test_case.hash_polling_source_block, current_head);
 
     let result = harness
-        .reset_svc
         .reset_dataset(
             &test_case.dataset_handle,
             Some(&test_case.hash_polling_source_block),
@@ -84,7 +82,6 @@ async fn test_reset_dataset_to_non_existing_block_fails() {
         Multihash::from_multibase("zW1a3CNT52HXiJNniLkWMeev3CPRy9QiNRMWGyTrVNg4hY8").unwrap();
 
     let result = harness
-        .reset_svc
         .reset_dataset(
             &test_case.dataset_handle,
             Some(&a_hash_not_present_in_chain),
@@ -100,7 +97,6 @@ async fn test_reset_dataset_with_wrong_head() {
     let test_case = harness.a_chain_with_2_blocks().await;
 
     let result = harness
-        .reset_svc
         .reset_dataset(
             &test_case.dataset_handle,
             Some(&test_case.hash_seed_block),
@@ -119,7 +115,6 @@ async fn test_reset_dataset_with_default_seed_block() {
     assert_eq!(test_case.hash_polling_source_block, current_head);
 
     let result = harness
-        .reset_svc
         .reset_dataset(
             &test_case.dataset_handle,
             None,
@@ -175,8 +170,6 @@ impl ResetTestHarness {
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
             .add_value(CurrentAccountSubject::new_test())
-            .add_value(MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1, true))
-            .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
@@ -228,6 +221,18 @@ impl ResetTestHarness {
             .new_head;
 
         ChainWith2BlocksTestCase::new(dataset_handle, hash_seed_block, hash_polling_source_block)
+    }
+
+    async fn reset_dataset(
+        &self,
+        dataset_handle: &DatasetHandle,
+        block_hash: Option<&Multihash>,
+        old_head_maybe: Option<&Multihash>,
+    ) -> Result<Multihash, ResetError> {
+        let dataset = self.resolve_dataset(dataset_handle);
+        self.reset_svc
+            .reset_dataset(dataset, block_hash, old_head_maybe)
+            .await
     }
 
     async fn get_dataset_head(&self, dataset_handle: &DatasetHandle) -> Multihash {

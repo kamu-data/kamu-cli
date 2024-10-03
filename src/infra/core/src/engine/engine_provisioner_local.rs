@@ -49,7 +49,6 @@ impl EngineProvisionerLocal {
     pub fn new(
         config: EngineProvisionerLocalConfig,
         container_runtime: Arc<ContainerRuntime>,
-        dataset_repo: Arc<dyn DatasetRepository>,
         run_info_dir: Arc<RunInfoDir>,
     ) -> Self {
         let engine_config = ODFEngineConfig {
@@ -63,28 +62,24 @@ impl EngineProvisionerLocal {
                 engine_config.clone(),
                 &config.spark_image,
                 run_info_dir.clone(),
-                dataset_repo.clone(),
             )),
             flink_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.flink_image,
                 run_info_dir.clone(),
-                dataset_repo.clone(),
             )),
             datafusion_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.datafusion_image,
                 run_info_dir.clone(),
-                dataset_repo.clone(),
             )),
             risingwave_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.risingwave_image,
                 run_info_dir.clone(),
-                dataset_repo.clone(),
             )),
             container_runtime,
             inner: Arc::new(Inner {
@@ -306,8 +301,9 @@ impl Engine for EngineHandle {
     async fn execute_transform(
         &self,
         request: TransformRequestExt,
+        datasets_map: &WorkingDatasetsMap,
     ) -> Result<TransformResponseExt, EngineError> {
-        self.engine.execute_transform(request).await
+        self.engine.execute_transform(request, datasets_map).await
     }
 }
 

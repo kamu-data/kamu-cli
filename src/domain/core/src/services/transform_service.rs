@@ -25,26 +25,26 @@ pub trait TransformService: Send + Sync {
     /// Returns an active transform, if any
     async fn get_active_transform(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError>;
 
     async fn transform(
         &self,
-        dataset_ref: &DatasetRef,
-        transform_options: TransformOptions,
+        target: ResolvedDataset,
+        transform_options: &TransformOptions,
         listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError>;
 
     async fn transform_multi(
         &self,
-        dataset_refs: Vec<DatasetRef>,
-        transform_options: TransformOptions,
+        targets: Vec<ResolvedDataset>,
+        transform_options: &TransformOptions,
         listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetRef, Result<TransformResult, TransformError>)>;
 
     async fn verify_transform(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
         block_range: (Option<Multihash>, Option<Multihash>),
         listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<(), VerificationError>;
@@ -78,6 +78,7 @@ pub trait TransformListener: Send + Sync {
     fn begin(&self) {}
     fn success(&self, _result: &TransformResult) {}
     fn error(&self, _error: &TransformError) {}
+    fn execute_error(&self, _error: &TransformExecuteError) {}
 
     fn get_engine_provisioning_listener(
         self: Arc<Self>,

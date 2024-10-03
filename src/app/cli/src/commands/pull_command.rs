@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -26,8 +27,8 @@ use crate::output::OutputConfig;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PullCommand {
-    pull_svc: Arc<dyn PullService>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     search_svc: Arc<dyn SearchService>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefAnyPattern>,
@@ -39,12 +40,13 @@ pub struct PullCommand {
     add_aliases: bool,
     force: bool,
     reset_derivatives_on_diverged_input: bool,
+    in_multi_tenant_mode: bool,
 }
 
 impl PullCommand {
     pub fn new<I>(
-        pull_svc: Arc<dyn PullService>,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         search_svc: Arc<dyn SearchService>,
         output_config: Arc<OutputConfig>,
         refs: I,
@@ -56,13 +58,14 @@ impl PullCommand {
         add_aliases: bool,
         force: bool,
         reset_derivatives_on_diverged_input: bool,
+        in_multi_tenant_mode: bool,
     ) -> Self
     where
         I: IntoIterator<Item = DatasetRefAnyPattern>,
     {
         Self {
-            pull_svc,
-            dataset_repo,
+            pull_dataset_use_case,
+            dataset_registry,
             search_svc,
             output_config,
             refs: refs.into_iter().collect(),
@@ -74,6 +77,7 @@ impl PullCommand {
             add_aliases,
             force,
             reset_derivatives_on_diverged_input,
+            in_multi_tenant_mode,
         }
     }
 
@@ -93,20 +97,27 @@ impl PullCommand {
             }
         };
 
-        Ok(self
-            .pull_svc
-            .pull_multi_ext(
-                vec![PullRequest {
-                    local_ref: Some(local_name.into()),
-                    remote_ref: Some(remote_ref),
-                }],
-                PullMultiOptions {
+        self.pull_dataset_use_case
+            .execute_multi(
+                vec![PullRequest::remote(
+                    remote_ref,
+                    Some(DatasetAlias::new(
+                        if self.in_multi_tenant_mode {
+                            Some(self.current_account_subject.account_name().clone())
+                        } else {
+                            None
+                        },
+                        local_name.clone(),
+                    )),
+                )],
+                PullOptions {
                     add_aliases: self.add_aliases,
                     ..Default::default()
                 },
                 listener,
             )
-            .await?)
+            .await
+            .map_err(CLIError::failure)
     }
 
     async fn pull_multi(
@@ -114,12 +125,13 @@ impl PullCommand {
         listener: Option<Arc<dyn PullMultiListener>>,
         current_account_name: &AccountName,
     ) -> Result<Vec<PullResponse>, CLIError> {
-        let dataset_refs: Vec<_> = if !self.all {
+        let dataset_any_refs: Vec<_> = if !self.all {
             filter_datasets_by_any_pattern(
-                self.dataset_repo.as_ref(),
+                self.dataset_registry.as_ref(),
                 self.search_svc.clone(),
                 self.refs.clone(),
                 current_account_name,
+                self.in_multi_tenant_mode,
             )
             .try_collect()
             .await?
@@ -127,20 +139,38 @@ impl PullCommand {
             vec![]
         };
 
-        Ok(self
-            .pull_svc
-            .pull_multi(
-                dataset_refs,
-                PullMultiOptions {
+        let requests = dataset_any_refs
+            .into_iter()
+            .map(|r| PullRequest::from_any_ref(&r, |_| !self.in_multi_tenant_mode))
+            .collect();
+
+        // TODO: consider moving this logic into pull planner
+        let requests: Vec<_> = if !self.all {
+            requests
+        } else {
+            use futures::TryStreamExt;
+            self.dataset_registry
+                .all_dataset_handles_by_owner(current_account_name)
+                .map_ok(|hdl| PullRequest::local(hdl.as_local_ref()))
+                .try_collect()
+                .await?
+        };
+
+        self.pull_dataset_use_case
+            .execute_multi(
+                requests,
+                PullOptions {
                     recursive: self.recursive,
-                    all: self.all,
                     add_aliases: self.add_aliases,
-                    reset_derivatives_on_diverged_input: self.reset_derivatives_on_diverged_input,
                     ingest_options: PollingIngestOptions {
                         fetch_uncacheable: self.fetch_uncacheable,
                         exhaust_sources: true,
                         dataset_env_vars: HashMap::new(),
                         schema_inference: SchemaInferenceOpts::default(),
+                    },
+                    transform_options: TransformOptions {
+                        reset_derivatives_on_diverged_input: self
+                            .reset_derivatives_on_diverged_input,
                     },
                     sync_options: SyncOptions {
                         force: self.force,
@@ -149,12 +179,13 @@ impl PullCommand {
                 },
                 listener,
             )
-            .await?)
+            .await
+            .map_err(CLIError::failure)
     }
 
     async fn pull_with_progress(&self) -> Result<Vec<PullResponse>, CLIError> {
         let pull_progress =
-            PrettyPullProgress::new(self.fetch_uncacheable, self.dataset_repo.is_multi_tenant());
+            PrettyPullProgress::new(self.fetch_uncacheable, self.in_multi_tenant_mode);
         let listener = Arc::new(pull_progress.clone());
         self.pull(Some(listener)).await
     }
@@ -163,30 +194,23 @@ impl PullCommand {
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
-        let current_account_name = match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => {
-                return Err(CLIError::usage_error(
-                    "Anonymous account misused, use multi-tenant alias",
-                ))
-            }
-            CurrentAccountSubject::Logged(l) => &l.account_name,
-        };
         if self.as_name.is_some() {
             self.sync_from(listener).await
         } else {
+            let current_account_name = self.current_account_subject.account_name();
             self.pull_multi(listener, current_account_name).await
         }
     }
 
     fn describe_response(&self, pr: &PullResponse) -> String {
-        let local_ref = pr.local_ref.as_ref().or(pr
-            .original_request
+        let local_ref = pr.maybe_local_ref.as_ref().map(Cow::Borrowed).or(pr
+            .maybe_original_request
             .as_ref()
-            .and_then(|r| r.local_ref.as_ref()));
-        let remote_ref = pr.remote_ref.as_ref().or(pr
-            .original_request
+            .and_then(PullRequest::local_ref));
+        let remote_ref = pr.maybe_remote_ref.as_ref().or(pr
+            .maybe_original_request
             .as_ref()
-            .and_then(|r| r.remote_ref.as_ref()));
+            .and_then(|r| r.remote_ref()));
         match (local_ref, remote_ref) {
             (Some(local_ref), Some(remote_ref)) => {
                 format!("sync {local_ref} from {remote_ref}")

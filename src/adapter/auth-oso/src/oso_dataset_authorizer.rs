@@ -12,7 +12,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::ErrorIntoInternal;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_core::auth::*;
 use kamu_core::AccessError;
@@ -121,6 +121,69 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         }
 
         allowed_actions
+    }
+
+    async fn filter_datasets_allowing(
+        &self,
+        dataset_handles: Vec<DatasetHandle>,
+        action: DatasetAction,
+    ) -> Result<Vec<DatasetHandle>, InternalError> {
+        let mut matched_dataset_handles = Vec::new();
+        for hdl in dataset_handles {
+            let is_allowed = self
+                .oso
+                .is_allowed(
+                    self.actor(),
+                    action.to_string(),
+                    self.dataset_resource(&hdl),
+                )
+                .int_err()?;
+            if is_allowed {
+                matched_dataset_handles.push(hdl);
+            }
+        }
+
+        Ok(matched_dataset_handles)
+    }
+
+    async fn classify_datasets_by_allowance(
+        &self,
+        dataset_handles: Vec<DatasetHandle>,
+        action: DatasetAction,
+    ) -> Result<ClassifyByAllowanceResponse, InternalError> {
+        let mut matched_dataset_handles = Vec::new();
+        let mut unmatched_results = Vec::new();
+
+        for hdl in dataset_handles {
+            let is_allowed = self
+                .oso
+                .is_allowed(
+                    self.actor(),
+                    action.to_string(),
+                    self.dataset_resource(&hdl),
+                )
+                .int_err()?;
+            if is_allowed {
+                matched_dataset_handles.push(hdl);
+            } else {
+                let dataset_ref = hdl.as_local_ref();
+                unmatched_results.push((
+                    hdl,
+                    DatasetActionUnauthorizedError::Access(AccessError::Forbidden(
+                        DatasetActionNotEnoughPermissionsError {
+                            action,
+                            dataset_ref,
+                        }
+                        .into(),
+                    )),
+                ));
+            }
+        }
+
+        Ok(ClassifyByAllowanceResponse {
+            authorized_handles: matched_dataset_handles,
+            unauthorized_handles_with_errors: unmatched_results,
+        })
     }
 }
 

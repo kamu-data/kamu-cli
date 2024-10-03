@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use futures::{future, StreamExt, TryStreamExt};
 use internal_error::InternalError;
-use kamu_core::{DatasetRepository, GetDatasetError, SearchError, SearchOptions, SearchService};
+use kamu_core::{DatasetRegistry, GetDatasetError, SearchError, SearchOptions, SearchService};
 use opendatafabric::{
     AccountName,
     DatasetAliasRemote,
@@ -33,7 +33,7 @@ type FilteredDatasetRefAnyStream<'a> =
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn filter_datasets_by_local_pattern(
-    dataset_repo: &dyn DatasetRepository,
+    dataset_registry: &dyn DatasetRegistry,
     dataset_ref_patterns: Vec<DatasetRefPattern>,
 ) -> FilteredDatasetHandleStream<'_> {
     // We assume here that resolving specific references one by one is more
@@ -46,12 +46,12 @@ pub fn filter_datasets_by_local_pattern(
         Box::pin(async_stream::try_stream! {
             for dataset_ref_pattern in &dataset_ref_patterns {
                 // TODO: PERF: Create a batch version of `resolve_dataset_ref`
-                yield dataset_repo.resolve_dataset_ref(dataset_ref_pattern.as_dataset_ref().unwrap()).await?;
+                yield dataset_registry.resolve_dataset_handle_by_ref(dataset_ref_pattern.as_dataset_ref().unwrap()).await?;
             }
         })
     } else {
-        dataset_repo
-            .get_all_datasets()
+        dataset_registry
+            .all_dataset_handles()
             .try_filter(move |dataset_handle| {
                 future::ready(
                     dataset_ref_patterns
@@ -67,13 +67,12 @@ pub fn filter_datasets_by_local_pattern(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn filter_datasets_by_any_pattern<'a>(
-    dataset_repo: &'a dyn DatasetRepository,
+    dataset_registry: &'a dyn DatasetRegistry,
     search_svc: Arc<dyn SearchService>,
     dataset_ref_any_patterns: Vec<DatasetRefAnyPattern>,
     current_account_name: &AccountName,
+    is_multitenant_mode: bool,
 ) -> FilteredDatasetRefAnyStream<'a> {
-    let is_multitenant_mode = dataset_repo.is_multi_tenant();
-
     let (all_ref_patterns, static_refs): (Vec<_>, Vec<_>) = dataset_ref_any_patterns
         .into_iter()
         .partition(DatasetRefAnyPattern::is_pattern);
@@ -86,7 +85,7 @@ pub fn filter_datasets_by_any_pattern<'a>(
     let remote_patterns_stream =
         get_remote_datasets_stream(search_svc, remote_ref_patterns, is_multitenant_mode);
     let local_patterns_stream =
-        get_local_datasets_stream(dataset_repo, local_ref_patterns, current_account_name);
+        get_local_datasets_stream(dataset_registry, local_ref_patterns, current_account_name);
 
     static_datasets_stream
         .chain(remote_patterns_stream)
@@ -165,12 +164,12 @@ pub fn matches_remote_ref_pattern(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn get_local_datasets_stream<'a>(
-    dataset_repo: &'a dyn DatasetRepository,
+    dataset_registry: &'a dyn DatasetRegistry,
     dataset_ref_patterns: Vec<DatasetRefAnyPattern>,
     current_account_name: &AccountName,
 ) -> impl Stream<Item = Result<DatasetRefAny, GetDatasetError>> + 'a {
-    dataset_repo
-        .get_datasets_by_owner(current_account_name)
+    dataset_registry
+        .all_dataset_handles_by_owner(current_account_name)
         .try_filter(move |dataset_handle| {
             future::ready(dataset_ref_patterns.iter().any(|dataset_ref_pattern| {
                 matches_local_ref_pattern(dataset_ref_pattern, dataset_handle)

@@ -12,7 +12,12 @@ use std::sync::Arc;
 
 use dill::{Catalog, Component};
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
-use kamu::{CommitDatasetEventUseCaseImpl, DatasetRepositoryLocalFs, DatasetRepositoryWriter};
+use kamu::{
+    CommitDatasetEventUseCaseImpl,
+    DatasetRegistryRepoBridge,
+    DatasetRepositoryLocalFs,
+    DatasetRepositoryWriter,
+};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{
@@ -146,6 +151,7 @@ impl CommitDatasetEventUseCaseHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(mock_dataset_action_authorizer)
             .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>()

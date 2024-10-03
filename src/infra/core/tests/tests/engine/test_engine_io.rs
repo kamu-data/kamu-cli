@@ -37,18 +37,14 @@ async fn test_engine_io_common<
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
         Arc::new(ContainerRuntime::default()),
-        dataset_repo.clone(),
         run_info_dir.clone(),
     ));
 
-    let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
     let object_store_registry = Arc::new(ObjectStoreRegistryImpl::new(object_stores));
     let time_source = Arc::new(SystemTimeSourceDefault);
     let dataset_env_var_sys_env = Arc::new(DatasetKeyValueServiceSysEnv::new());
 
     let ingest_svc = PollingIngestServiceImpl::new(
-        dataset_repo.clone(),
-        dataset_action_authorizer.clone(),
         Arc::new(FetchService::new(
             Arc::new(ContainerRuntime::default()),
             None,
@@ -68,12 +64,9 @@ async fn test_engine_io_common<
 
     let transform_svc = TransformServiceImpl::new(
         dataset_repo.clone(),
-        dataset_action_authorizer.clone(),
         engine_provisioner.clone(),
         Arc::new(SystemTimeSourceDefault),
         Arc::new(CompactionServiceImpl::new(
-            dataset_action_authorizer.clone(),
-            dataset_repo.clone(),
             object_store_registry.clone(),
             time_source.clone(),
             run_info_dir.clone(),
@@ -122,14 +115,15 @@ async fn test_engine_io_common<
 
     let root_alias = root_snapshot.name.clone();
 
-    dataset_repo
+    let root_created = dataset_repo
         .create_dataset_from_snapshot(root_snapshot)
         .await
-        .unwrap();
+        .unwrap()
+        .create_dataset_result;
 
     ingest_svc
         .ingest(
-            &root_alias.as_local_ref(),
+            ResolvedDataset::from(&root_created),
             PollingIngestOptions::default(),
             None,
         )
@@ -151,19 +145,16 @@ async fn test_engine_io_common<
         )
         .build();
 
-    let deriv_alias = deriv_snapshot.name.clone();
-
-    let dataset_deriv = dataset_repo
+    let deriv_created = dataset_repo
         .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()
-        .create_dataset_result
-        .dataset;
+        .create_dataset_result;
 
     let block_hash = match transform_svc
         .transform(
-            &deriv_alias.as_local_ref(),
-            TransformOptions::default(),
+            ResolvedDataset::from(&deriv_created),
+            &TransformOptions::default(),
             None,
         )
         .await
@@ -173,7 +164,8 @@ async fn test_engine_io_common<
         v => panic!("Unexpected result: {v:?}"),
     };
 
-    let block = dataset_deriv
+    let block = deriv_created
+        .dataset
         .as_metadata_chain()
         .get_block(&block_hash)
         .await
@@ -207,7 +199,7 @@ async fn test_engine_io_common<
 
     ingest_svc
         .ingest(
-            &root_alias.as_local_ref(),
+            ResolvedDataset::from(&root_created),
             PollingIngestOptions::default(),
             None,
         )
@@ -216,8 +208,8 @@ async fn test_engine_io_common<
 
     let block_hash = match transform_svc
         .transform(
-            &deriv_alias.as_local_ref(),
-            TransformOptions::default(),
+            ResolvedDataset::from(&deriv_created),
+            &TransformOptions::default(),
             None,
         )
         .await
@@ -227,7 +219,8 @@ async fn test_engine_io_common<
         v => panic!("Unexpected result: {v:?}"),
     };
 
-    let block = dataset_deriv
+    let block = deriv_created
+        .dataset
         .as_metadata_chain()
         .get_block(&block_hash)
         .await
@@ -245,7 +238,7 @@ async fn test_engine_io_common<
     ///////////////////////////////////////////////////////////////////////////
 
     let verify_result = transform_svc
-        .verify_transform(&deriv_alias.as_local_ref(), (None, None), None)
+        .verify_transform(ResolvedDataset::from(&deriv_created), (None, None), None)
         .await;
 
     assert_matches!(verify_result, Ok(()));

@@ -9,7 +9,7 @@
 
 use dill::Component;
 use indoc::indoc;
-use kamu::DatasetRepositoryLocalFs;
+use kamu::{DatasetRegistryRepoBridge, DatasetRepositoryLocalFs};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::DatasetRepository;
 use time_source::SystemTimeSourceDefault;
@@ -67,10 +67,8 @@ async fn test_internal_error() {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add::<DatasetRegistryRepoBridge>()
         .build();
-
-    // Note: Not creating a repo to cause an error
-    let _ = cat.get_one::<dyn DatasetRepository>().unwrap();
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema.execute(async_graphql::Request::new(indoc!(

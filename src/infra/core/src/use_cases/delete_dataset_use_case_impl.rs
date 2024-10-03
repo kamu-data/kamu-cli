@@ -15,7 +15,7 @@ use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::{
     DanglingReferenceError,
     DatasetLifecycleMessage,
-    DatasetRepository,
+    DatasetRegistry,
     DeleteDatasetError,
     DeleteDatasetUseCase,
     DependencyGraphService,
@@ -32,7 +32,7 @@ use crate::DatasetRepositoryWriter;
 #[component(pub)]
 #[interface(dyn DeleteDatasetUseCase)]
 pub struct DeleteDatasetUseCaseImpl {
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
@@ -41,14 +41,14 @@ pub struct DeleteDatasetUseCaseImpl {
 
 impl DeleteDatasetUseCaseImpl {
     pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
-            dataset_repo,
+            dataset_registry,
             dataset_repo_writer,
             dataset_action_authorizer,
             dependency_graph_service,
@@ -73,8 +73,8 @@ impl DeleteDatasetUseCaseImpl {
             let mut children = Vec::with_capacity(downstream_dataset_ids.len());
             for downstream_dataset_id in downstream_dataset_ids {
                 let hdl = self
-                    .dataset_repo
-                    .resolve_dataset_ref(&downstream_dataset_id.as_local_ref())
+                    .dataset_registry
+                    .resolve_dataset_handle_by_ref(&downstream_dataset_id.as_local_ref())
                     .await
                     .int_err()?;
                 children.push(hdl);
@@ -94,7 +94,11 @@ impl DeleteDatasetUseCaseImpl {
 #[async_trait::async_trait]
 impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
     async fn execute_via_ref(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError> {
-        let dataset_handle = match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
+        let dataset_handle = match self
+            .dataset_registry
+            .resolve_dataset_handle_by_ref(dataset_ref)
+            .await
+        {
             Ok(h) => Ok(h),
             Err(GetDatasetError::NotFound(e)) => Err(DeleteDatasetError::NotFound(e)),
             Err(GetDatasetError::Internal(e)) => Err(DeleteDatasetError::Internal(e)),

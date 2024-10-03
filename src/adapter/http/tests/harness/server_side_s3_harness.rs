@@ -33,6 +33,7 @@ use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
     DatasetLayout,
+    DatasetRegistryRepoBridge,
     DatasetRepositoryS3,
     DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
@@ -103,6 +104,7 @@ impl ServerSideS3Harness {
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()
+                .add::<DatasetRegistryRepoBridge>()
                 .add_value(server_authentication_mock(&account))
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))

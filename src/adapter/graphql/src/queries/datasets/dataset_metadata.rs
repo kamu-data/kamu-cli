@@ -10,6 +10,8 @@
 use chrono::prelude::*;
 use kamu_core::{
     self as domain,
+    DatasetRegistry,
+    DatasetRegistryExt,
     MetadataChainExt,
     SearchSetAttachmentsVisitor,
     SearchSetInfoVisitor,
@@ -34,8 +36,8 @@ impl DatasetMetadata {
 
     #[graphql(skip)]
     fn get_dataset(&self, ctx: &Context<'_>) -> std::sync::Arc<dyn domain::Dataset> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        dataset_repo.get_dataset_by_handle(&self.dataset_handle)
+        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
+        dataset_registry.get_dataset_by_handle(&self.dataset_handle)
     }
 
     /// Access to the temporal metadata chain of the dataset
@@ -94,11 +96,11 @@ impl DatasetMetadata {
             .collect()
             .await;
 
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
         let mut upstream = Vec::with_capacity(upstream_dataset_ids.len());
         for upstream_dataset_id in upstream_dataset_ids {
-            let hdl = dataset_repo
-                .resolve_dataset_ref(&upstream_dataset_id.as_local_ref())
+            let hdl = dataset_registry
+                .resolve_dataset_handle_by_ref(&upstream_dataset_id.as_local_ref())
                 .await
                 .int_err()?;
             let maybe_account = Account::from_dataset_alias(ctx, &hdl.alias).await?;
@@ -129,11 +131,11 @@ impl DatasetMetadata {
             .collect()
             .await;
 
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
         let mut downstream = Vec::with_capacity(downstream_dataset_ids.len());
         for downstream_dataset_id in downstream_dataset_ids {
-            let hdl = dataset_repo
-                .resolve_dataset_ref(&downstream_dataset_id.as_local_ref())
+            let hdl = dataset_registry
+                .resolve_dataset_handle_by_ref(&downstream_dataset_id.as_local_ref())
                 .await
                 .int_err()?;
             let maybe_account = Account::from_dataset_alias(ctx, &hdl.alias).await?;
@@ -152,10 +154,13 @@ impl DatasetMetadata {
 
     /// Current polling source used by the root dataset
     async fn current_polling_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {
+        let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
         let polling_ingest_svc = from_catalog::<dyn domain::PollingIngestService>(ctx).unwrap();
 
         let source = polling_ingest_svc
-            .get_active_polling_source(&self.dataset_handle.as_local_ref())
+            .get_active_polling_source(
+                dataset_registry.get_resolved_dataset_by_handle(&self.dataset_handle),
+            )
             .await
             .int_err()?;
 
@@ -165,9 +170,12 @@ impl DatasetMetadata {
     /// Current push sources used by the root dataset
     async fn current_push_sources(&self, ctx: &Context<'_>) -> Result<Vec<AddPushSource>> {
         let push_ingest_svc = from_catalog::<dyn domain::PushIngestService>(ctx).unwrap();
+        let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
 
         let mut push_sources: Vec<AddPushSource> = push_ingest_svc
-            .get_active_push_sources(&self.dataset_handle.as_local_ref())
+            .get_active_push_sources(
+                dataset_registry.get_resolved_dataset_by_handle(&self.dataset_handle),
+            )
             .await
             .int_err()?
             .into_iter()
@@ -181,12 +189,16 @@ impl DatasetMetadata {
 
     /// Current transformation used by the derivative dataset
     async fn current_transform(&self, ctx: &Context<'_>) -> Result<Option<SetTransform>> {
-        let transform_svc = from_catalog::<dyn domain::TransformService>(ctx).unwrap();
+        let transform_request_planner =
+            from_catalog::<dyn kamu_core::TransformRequestPlanner>(ctx).unwrap();
 
-        let source = transform_svc
-            .get_active_transform(&self.dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
+        let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
+
+        let source = transform_request_planner
+            .get_active_transform(
+                dataset_registry.get_resolved_dataset_by_handle(&self.dataset_handle),
+            )
+            .await?;
 
         Ok(source.map(|(_hash, block)| block.event.into()))
     }

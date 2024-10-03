@@ -19,7 +19,6 @@ use kamu_core::*;
 use opendatafabric::*;
 use time_source::SystemTimeSource;
 use tokio::sync::Mutex;
-use url::Url;
 
 use crate::utils::s3_context::S3Context;
 use crate::*;
@@ -89,6 +88,7 @@ impl DatasetRepositoryS3 {
                 ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/")),
                 ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
                 NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
+                None,
             ))
         } else {
             Arc::new(DatasetImpl::new(
@@ -103,6 +103,7 @@ impl DatasetRepositoryS3 {
                 ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/")),
                 ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
                 NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
+                None,
             ))
         }
     }
@@ -225,21 +226,12 @@ impl DatasetRepositoryS3 {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl DatasetRegistry for DatasetRepositoryS3 {
-    async fn get_dataset_url(&self, _dataset_ref: &DatasetRef) -> Result<Url, GetDatasetUrlError> {
-        unimplemented!("get_dataset_url not supported by S3 repository")
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
 impl DatasetRepository for DatasetRepositoryS3 {
     fn is_multi_tenant(&self) -> bool {
         self.multi_tenant
     }
 
-    async fn resolve_dataset_ref(
+    async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<DatasetHandle, GetDatasetError> {
@@ -249,7 +241,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
                 // TODO: this is really really slow and expensive!
                 let normalized_alias = self.normalize_alias(alias);
                 use futures::StreamExt;
-                let mut datasets = self.get_all_datasets();
+                let mut datasets = self.all_dataset_handles();
                 while let Some(hdl) = datasets.next().await {
                     let hdl = hdl?;
                     if hdl.alias == normalized_alias {
@@ -281,11 +273,11 @@ impl DatasetRepository for DatasetRepositoryS3 {
         }
     }
 
-    fn get_all_datasets(&self) -> DatasetHandleStream<'_> {
+    fn all_dataset_handles(&self) -> DatasetHandleStream<'_> {
         self.stream_datasets_if(|_| true)
     }
 
-    fn get_datasets_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_> {
+    fn all_dataset_handles_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_> {
         if !self.is_multi_tenant() && *account_name != DEFAULT_ACCOUNT_NAME_STR {
             return Box::pin(futures::stream::empty());
         }
@@ -298,15 +290,6 @@ impl DatasetRepository for DatasetRepositoryS3 {
                 true
             }
         })
-    }
-
-    async fn find_dataset_by_ref(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
-        let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_impl(&dataset_handle.id);
-        Ok(dataset)
     }
 
     fn get_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset> {
@@ -328,7 +311,7 @@ impl DatasetRepositoryWriter for DatasetRepositoryS3 {
 
         // Check if a dataset with the same alias can be resolved successfully
         let maybe_existing_dataset_handle = match self
-            .resolve_dataset_ref(&dataset_alias.as_local_ref())
+            .resolve_dataset_handle_by_ref(&dataset_alias.as_local_ref())
             .await
         {
             Ok(existing_handle) => Ok(Some(existing_handle)),
@@ -446,7 +429,10 @@ impl DatasetRepositoryWriter for DatasetRepositoryS3 {
             DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
 
         // Note: should collision check be moved to use case level?
-        match self.resolve_dataset_ref(&new_alias.as_local_ref()).await {
+        match self
+            .resolve_dataset_handle_by_ref(&new_alias.as_local_ref())
+            .await
+        {
             Ok(_) => Err(RenameDatasetError::NameCollision(NameCollisionError {
                 alias: DatasetAlias::new(
                     dataset_handle.alias.account_name.clone(),

@@ -49,39 +49,12 @@ async fn assert_in_sync(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct AuthorizationExpectations {
-    pub reads: usize,
-    pub writes: usize,
-}
-
-impl Default for AuthorizationExpectations {
-    fn default() -> Self {
-        Self {
-            reads: 8,
-            writes: 1,
-        }
-    }
-}
-
-fn construct_authorizer(
-    authorization_expectations: &AuthorizationExpectations,
-    alias: &DatasetAlias,
-) -> impl auth::DatasetActionAuthorizer {
-    MockDatasetActionAuthorizer::new()
-        .expect_check_read_dataset(alias, authorization_expectations.reads, true)
-        .expect_check_write_dataset(alias, authorization_expectations.writes, true)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 async fn do_test_sync(
     tmp_workspace_dir_foo: &Path,
     tmp_workspace_dir_bar: &Path,
     push_ref: &DatasetRefRemote,
     pull_ref: &DatasetRefRemote,
     ipfs: Option<(IpfsGateway, IpfsClient)>,
-    auth_expectations_foo: AuthorizationExpectations,
-    auth_expectations_bar: AuthorizationExpectations,
 ) {
     // Tests sync between "foo" -> remote -> "bar"
     let dataset_alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
@@ -89,9 +62,6 @@ async fn do_test_sync(
     let is_ipfs = ipfs.is_none();
 
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
-
-    let dataset_authorizer_foo = construct_authorizer(&auth_expectations_foo, &dataset_alias_foo);
-    let dataset_authorizer_bar = construct_authorizer(&auth_expectations_bar, &dataset_alias_bar);
 
     let datasets_dir_foo = tmp_workspace_dir_foo.join("datasets");
     let datasets_dir_bar = tmp_workspace_dir_bar.join("datasets");
@@ -103,8 +73,6 @@ async fn do_test_sync(
         .add_value(ipfs_gateway.clone())
         .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
-        .add_value(dataset_authorizer_foo)
-        .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(datasets_dir_foo)
@@ -112,11 +80,13 @@ async fn do_test_sync(
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+        .add::<DatasetRegistryRepoBridge>()
         .add_value(RemoteReposDir::new(tmp_workspace_dir_foo.join("repos")))
         .add::<RemoteRepositoryRegistryImpl>()
         .add::<auth::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
+        .add::<SyncRequestBuilder>()
         .add::<DummySmartTransferProtocolClient>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()
@@ -127,8 +97,6 @@ async fn do_test_sync(
         .add_value(ipfs_gateway.clone())
         .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
-        .add_value(dataset_authorizer_bar)
-        .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(datasets_dir_bar)
@@ -136,42 +104,37 @@ async fn do_test_sync(
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+        .add::<DatasetRegistryRepoBridge>()
         .add_value(RemoteReposDir::new(tmp_workspace_dir_bar.join("repos")))
         .add::<RemoteRepositoryRegistryImpl>()
         .add::<auth::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
+        .add::<SyncRequestBuilder>()
         .add::<DummySmartTransferProtocolClient>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()
         .build();
 
     let sync_svc_foo = catalog_foo.get_one::<dyn SyncService>().unwrap();
-    let sync_svc_bar = catalog_bar.get_one::<dyn SyncService>().unwrap();
+    let sync_request_builder_foo = catalog_foo.get_one::<SyncRequestBuilder>().unwrap();
     let dataset_repo_foo = catalog_foo.get_one::<DatasetRepositoryLocalFs>().unwrap();
+
+    let sync_svc_bar = catalog_bar.get_one::<dyn SyncService>().unwrap();
+    let sync_request_builder_bar = catalog_bar.get_one::<SyncRequestBuilder>().unwrap();
     let dataset_repo_bar = catalog_bar.get_one::<DatasetRepositoryLocalFs>().unwrap();
 
     // Dataset does not exist locally / remotely
     assert_matches!(
-        sync_svc_foo
-            .sync(
-                &dataset_alias_foo.as_any_ref(),
-                &push_ref.as_any_ref(),
-                SyncOptions::default(),
-                None,
-            )
+        sync_request_builder_foo
+            .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), true)
             .await,
         Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == dataset_alias_foo.as_any_ref()
     );
 
     assert_matches!(
-        sync_svc_bar
-            .sync(
-                &pull_ref.as_any_ref(),
-                &dataset_alias_bar.as_any_ref(),
-                SyncOptions::default(),
-                None,
-            )
+        sync_request_builder_bar
+            .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), true)
             .await,
         Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == pull_ref.as_any_ref()
     );
@@ -192,33 +155,44 @@ async fn do_test_sync(
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
-        sync_svc_foo.sync(
-            &dataset_alias_foo.as_any_ref(),
-            &push_ref.as_any_ref(),
-            SyncOptions { create_if_not_exists: false, ..Default::default() },
-            None
-        ).await,
+        sync_request_builder_foo
+            .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+            .await,
         Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == push_ref.as_any_ref()
     );
 
     assert_matches!(
-        sync_svc_foo.sync(&dataset_alias_foo.as_any_ref(), &push_ref.as_any_ref(),  SyncOptions::default(), None).await,
-        Ok(SyncResult::Updated {
+        sync_svc_foo.sync(
+            sync_request_builder_foo
+                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), true)
+                .await
+                .unwrap(),
+            SyncOptions::default(),
+            None
+        ).await,
+        Ok(SyncResponse { result: SyncResult::Updated {
             old_head: None,
             new_head,
             num_blocks: 2,
             ..
-        }) if new_head == b1
+        }, ..}) if new_head == b1
     );
 
     assert_matches!(
-        sync_svc_bar.sync(&pull_ref.as_any_ref(), &dataset_alias_bar.as_any_ref(), SyncOptions::default(), None).await,
-        Ok(SyncResult::Updated {
+        sync_svc_bar.sync(
+            sync_request_builder_bar
+                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), true)
+                .await
+                .unwrap(),
+            SyncOptions::default(),
+            None
+        ).await,
+        Ok(SyncResponse { result: SyncResult::Updated {
             old_head: None,
             new_head,
             num_blocks: 2,
             ..
-        }) if new_head == b1
+        }, ..}) if new_head == b1
     );
 
     assert_in_sync(
@@ -245,7 +219,13 @@ async fn do_test_sync(
     .await;
 
     assert_matches!(
-        sync_svc_foo.sync(&pull_ref.as_any_ref(), &dataset_alias_foo.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc_foo.sync(
+            sync_request_builder_foo.build_sync_request(pull_ref.as_any_ref(), dataset_alias_foo.as_any_ref(), false)
+                .await
+                .unwrap(),
+            SyncOptions::default(),
+            None
+        ).await,
         Err(SyncError::DestinationAhead(DestinationAheadError {
             src_head,
             dst_head, dst_ahead_size: 2 }))
@@ -253,23 +233,35 @@ async fn do_test_sync(
     );
 
     assert_matches!(
-        sync_svc_foo.sync(&dataset_alias_foo.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
-        Ok(SyncResult::Updated {
+        sync_svc_foo.sync(
+            sync_request_builder_foo.build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+                .await
+                .unwrap(),
+            SyncOptions::default(),
+            None
+        ).await,
+        Ok(SyncResponse { result: SyncResult::Updated {
             old_head,
             new_head,
             num_blocks: 2,
             ..
-        }) if old_head.as_ref() == Some(&b1) && new_head == b3
+        }, ..}) if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
     assert_matches!(
-        sync_svc_bar.sync(&pull_ref.as_any_ref(), &dataset_alias_bar.as_any_ref(), SyncOptions::default(), None).await,
-        Ok(SyncResult::Updated {
+        sync_svc_bar.sync(
+            sync_request_builder_bar.build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
+                .await
+                .unwrap(),
+            SyncOptions::default(),
+            None
+        ).await,
+        Ok(SyncResponse { result: SyncResult::Updated {
             old_head,
             new_head,
             num_blocks: 2,
             ..
-        }) if old_head.as_ref() == Some(&b1) && new_head == b3
+        }, ..}) if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
     assert_in_sync(
@@ -284,25 +276,43 @@ async fn do_test_sync(
     assert_matches!(
         sync_svc_foo
             .sync(
-                &dataset_alias_foo.as_any_ref(),
-                &push_ref.as_any_ref(),
+                sync_request_builder_foo
+                    .build_sync_request(
+                        dataset_alias_foo.as_any_ref(),
+                        push_ref.as_any_ref(),
+                        false
+                    )
+                    .await
+                    .unwrap(),
                 SyncOptions::default(),
                 None
             )
             .await,
-        Ok(SyncResult::UpToDate)
+        Ok(SyncResponse {
+            result: SyncResult::UpToDate,
+            ..
+        })
     );
 
     assert_matches!(
         sync_svc_bar
             .sync(
-                &pull_ref.as_any_ref(),
-                &dataset_alias_bar.as_any_ref(),
+                sync_request_builder_bar
+                    .build_sync_request(
+                        pull_ref.as_any_ref(),
+                        dataset_alias_bar.as_any_ref(),
+                        false
+                    )
+                    .await
+                    .unwrap(),
                 SyncOptions::default(),
                 None
             )
             .await,
-        Ok(SyncResult::UpToDate)
+        Ok(SyncResponse {
+            result: SyncResult::UpToDate,
+            ..
+        })
     );
 
     assert_in_sync(
@@ -324,18 +334,37 @@ async fn do_test_sync(
     .await;
 
     assert_matches!(
-        sync_svc_bar.sync(&dataset_alias_bar.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
-        Ok(SyncResult::Updated {
+        sync_svc_bar.sync(
+            sync_request_builder_bar.build_sync_request(dataset_alias_bar.as_any_ref(), push_ref.as_any_ref(), false)
+                .await
+                .unwrap(),
+            SyncOptions::default(),
+            None
+        ).await,
+        Ok(SyncResponse { result: SyncResult::Updated {
             old_head,
             new_head,
             num_blocks: 1,
             ..
-        }) if old_head == Some(b3.clone()) && new_head == exta_head
+        }, ..}) if old_head == Some(b3.clone()) && new_head == exta_head
     );
 
     // Try push from dataset_foo
     assert_matches!(
-        sync_svc_foo.sync(&dataset_alias_foo.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc_foo
+            .sync(
+                sync_request_builder_foo
+                    .build_sync_request(
+                        dataset_alias_foo.as_any_ref(),
+                        push_ref.as_any_ref(),
+                        false
+                    )
+                    .await
+                    .unwrap(),
+                SyncOptions::default(),
+                None
+            )
+            .await,
         Err(SyncError::DestinationAhead(DestinationAheadError {
             src_head, dst_head, dst_ahead_size: 1
         })) if src_head == b3 && dst_head == exta_head
@@ -346,8 +375,14 @@ async fn do_test_sync(
     assert_matches!(
         sync_svc_foo
             .sync(
-                &dataset_alias_foo.as_any_ref(),
-                &push_ref.as_any_ref(),
+                sync_request_builder_foo
+                    .build_sync_request(
+                        dataset_alias_foo.as_any_ref(),
+                        push_ref.as_any_ref(),
+                        false
+                    )
+                    .await
+                    .unwrap(),
                 SyncOptions {
                     force: true,
                     ..SyncOptions::default()
@@ -355,17 +390,23 @@ async fn do_test_sync(
                 None
             )
             .await,
-        Ok(SyncResult::Updated {
+        Ok(SyncResponse { result: SyncResult::Updated {
             old_head,
             new_head,
             num_blocks: 4, // full resynchronization: seed, b1, b2, b3
             ..
-        }) if old_head == Some(exta_head.clone()) && new_head == b3
+        }, ..}) if old_head == Some(exta_head.clone()) && new_head == b3
     );
 
     // Try pulling dataset_bar: should fail, destination is ahead
     assert_matches!(
-        sync_svc_bar.sync(&pull_ref.as_any_ref(), &dataset_alias_bar.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc_bar.sync(
+            sync_request_builder_bar.build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
+                .await
+                .unwrap(),
+            SyncOptions::default(),
+            None
+        ).await,
         Err(SyncError::DestinationAhead(DestinationAheadError {
             src_head,
             dst_head, dst_ahead_size: 1
@@ -374,10 +415,10 @@ async fn do_test_sync(
 
     // Try pulling dataset_bar with --force: should abandon diverged_head
     assert_matches!(
-        sync_svc_bar
-            .sync(
-                &pull_ref.as_any_ref(),
-                &dataset_alias_bar.as_any_ref(),
+        sync_svc_bar.sync(
+            sync_request_builder_bar.build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
+                .await
+                .unwrap(),
                 SyncOptions {
                     force: true,
                     .. SyncOptions::default()
@@ -385,12 +426,12 @@ async fn do_test_sync(
                 None
             )
             .await,
-        Ok(SyncResult::Updated {
+        Ok(SyncResponse { result: SyncResult::Updated {
             old_head,
             new_head,
             num_blocks: 4, // full resynchronization: seed, b1, b2, b3
             ..
-        }) if old_head == Some(exta_head.clone()) && new_head == b3
+        }, ..}) if old_head == Some(exta_head.clone()) && new_head == b3
     );
 
     // Datasets complex divergence //////////////////////////////////////////////
@@ -417,17 +458,36 @@ async fn do_test_sync(
     .await;
 
     assert_matches!(
-        sync_svc_foo.sync(&dataset_alias_foo.as_any_ref(), &push_ref.as_any_ref(),
-    SyncOptions::default(), None).await,     Ok(SyncResult::Updated {
+        sync_svc_foo
+            .sync(
+                sync_request_builder_foo
+                    .build_sync_request(
+                        dataset_alias_foo.as_any_ref(),
+                        push_ref.as_any_ref(),
+                        false
+                    )
+                    .await
+                    .unwrap(),
+                SyncOptions::default(),
+                None
+            )
+            .await,
+        Ok(SyncResponse { result: SyncResult::Updated {
             old_head,
             new_head,
             num_blocks: 2,
             ..
-        }) if old_head.as_ref() == Some(&b3) && new_head == b5
+        }, ..}) if old_head.as_ref() == Some(&b3) && new_head == b5
     );
 
     assert_matches!(
-        sync_svc_bar.sync(&dataset_alias_bar.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc_bar.sync(
+            sync_request_builder_bar.build_sync_request(dataset_alias_bar.as_any_ref(), push_ref.as_any_ref(), false)
+                .await
+                .unwrap(),
+            SyncOptions::default(), 
+            None
+        ).await,
         Err(SyncError::DatasetsDiverged(DatasetsDivergedError {
             src_head,
             dst_head,
@@ -466,10 +526,16 @@ async fn do_test_sync(
         assert_matches!(
             sync_svc_foo
             .sync(
-                &dataset_alias_foo.as_any_ref(),
-                &push_ref.as_any_ref(),
+                sync_request_builder_foo
+                    .build_sync_request(
+                        dataset_alias_foo.as_any_ref(),
+                        push_ref.as_any_ref(),
+                        false
+                    )
+                    .await
+                    .unwrap(),
                 SyncOptions::default(),
-                None,
+                None
             )
             .await,
             Err(SyncError::Corrupted(CorruptedSourceError {
@@ -495,11 +561,6 @@ async fn test_sync_to_from_local_fs() {
         &DatasetRefRemote::from(&repo_url),
         &DatasetRefRemote::from(&repo_url),
         None,
-        AuthorizationExpectations::default(),
-        AuthorizationExpectations {
-            reads: 2,
-            writes: 4,
-        },
     )
     .await;
 }
@@ -519,11 +580,6 @@ async fn test_sync_to_from_s3() {
         &DatasetRefRemote::from(&s3.url),
         &DatasetRefRemote::from(&s3.url),
         None,
-        AuthorizationExpectations::default(),
-        AuthorizationExpectations {
-            reads: 2,
-            writes: 4,
-        },
     )
     .await;
 }
@@ -549,11 +605,6 @@ async fn test_sync_from_http() {
         &DatasetRefRemote::from(push_repo_url),
         &DatasetRefRemote::from(pull_repo_url),
         None,
-        AuthorizationExpectations::default(),
-        AuthorizationExpectations {
-            reads: 2,
-            writes: 4,
-        },
     )
     .await;
 }
@@ -583,14 +634,6 @@ async fn test_sync_to_from_ipfs() {
             },
             ipfs_client,
         )),
-        AuthorizationExpectations {
-            reads: 7,
-            ..Default::default()
-        },
-        AuthorizationExpectations {
-            reads: 2,
-            writes: 4,
-        },
     )
     .await;
 }

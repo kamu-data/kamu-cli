@@ -25,7 +25,7 @@ use crate::OutputConfig;
 
 pub struct IngestCommand {
     data_format_reg: Arc<dyn DataFormatRegistry>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     push_ingest_svc: Arc<dyn PushIngestService>,
     output_config: Arc<OutputConfig>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
@@ -41,7 +41,7 @@ pub struct IngestCommand {
 impl IngestCommand {
     pub fn new<I, S>(
         data_format_reg: Arc<dyn DataFormatRegistry>,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         push_ingest_svc: Arc<dyn PushIngestService>,
         output_config: Arc<OutputConfig>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
@@ -59,7 +59,7 @@ impl IngestCommand {
     {
         Self {
             data_format_reg,
-            dataset_repo,
+            dataset_registry,
             push_ingest_svc,
             output_config,
             remote_alias_reg,
@@ -85,9 +85,10 @@ impl IngestCommand {
         &self,
         dataset_handle: &DatasetHandle,
     ) -> Result<(), CLIError> {
+        let dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
         let aliases = self
             .remote_alias_reg
-            .get_remote_aliases(&dataset_handle.as_local_ref())
+            .get_remote_aliases(dataset)
             .await
             .map_err(CLIError::failure)?;
         let pull_aliases: Vec<_> = aliases
@@ -102,7 +103,7 @@ impl IngestCommand {
             )));
         }
 
-        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
+        let dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
         let dataset_kind = dataset
             .get_summary(GetSummaryOpts::default())
             .await
@@ -152,8 +153,8 @@ impl Command for IngestCommand {
         }
 
         let dataset_handle = self
-            .dataset_repo
-            .resolve_dataset_ref(&self.dataset_ref)
+            .dataset_registry
+            .resolve_dataset_handle_by_ref(&self.dataset_ref)
             .await
             .map_err(CLIError::failure)?;
 
@@ -194,7 +195,8 @@ impl Command for IngestCommand {
             let result = self
                 .push_ingest_svc
                 .ingest_from_url(
-                    &self.dataset_ref,
+                    self.dataset_registry
+                        .get_resolved_dataset_by_handle(&dataset_handle),
                     self.source_name.as_deref(),
                     url,
                     PushIngestOpts {

@@ -154,6 +154,7 @@ libc = "0.2" # For getting uid:gid
 
 [dev-dependencies]
 database-common = { workspace = true }
+kamu = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-data-utils = { workspace = true, features = ["testing"] }

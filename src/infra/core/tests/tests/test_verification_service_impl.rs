@@ -15,13 +15,13 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use dill::Component;
 use kamu::domain::*;
-use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer, ParquetWriterHelper};
+use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
 
-use super::test_pull_service_impl::TestTransformService;
+use crate::utils::dummy_transform_service::DummyTransformService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,10 +36,6 @@ async fn test_verify_data_consistency() {
     let catalog = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
         .add_value(CurrentAccountSubject::new_test())
-        .add_value(
-            MockDatasetActionAuthorizer::new().expect_check_read_dataset(&dataset_alias, 3, true),
-        )
-        .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(datasets_dir)
@@ -47,8 +43,8 @@ async fn test_verify_data_consistency() {
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-        .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
-        .bind::<dyn TransformService, TestTransformService>()
+        .add_value(DummyTransformService::new(Arc::new(Mutex::new(Vec::new()))))
+        .bind::<dyn TransformService, DummyTransformService>()
         .add::<VerificationServiceImpl>()
         .build();
 
@@ -68,7 +64,7 @@ async fn test_verify_data_consistency() {
         .await
         .unwrap();
 
-    dataset_repo_writer
+    let create_result = dataset_repo_writer
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(dataset_alias.clone())
@@ -82,17 +78,22 @@ async fn test_verify_data_consistency() {
                 .build(),
         )
         .await
-        .unwrap();
+        .unwrap()
+        .create_dataset_result;
+
+    let dataset = dataset_repo.get_dataset_by_handle(&create_result.dataset_handle);
 
     assert_matches!(
         verification_svc
             .verify(
-                &dataset_alias.as_local_ref(),
-                (None, None),
-                VerificationOptions {
-                    check_integrity: true,
-                    check_logical_hashes: true,
-                    replay_transformations: false
+                VerificationRequest {
+                    target: ResolvedDataset::from(&create_result),
+                    block_range: (None, None),
+                    options: VerificationOptions {
+                        check_integrity: true,
+                        check_logical_hashes: true,
+                        replay_transformations: false
+                    },
                 },
                 None,
             )
@@ -121,11 +122,6 @@ async fn test_verify_data_consistency() {
         kamu_data_utils::data::hash::get_file_physical_hash(&data_path).unwrap();
 
     // Commit data
-    let dataset = dataset_repo
-        .find_dataset_by_ref(&dataset_alias.as_local_ref())
-        .await
-        .unwrap();
-
     let head = dataset
         .commit_add_data(
             AddDataParams {
@@ -161,12 +157,14 @@ async fn test_verify_data_consistency() {
     assert_matches!(
         verification_svc
             .verify(
-                &dataset_alias.as_local_ref(),
-                (None, None),
-                VerificationOptions {
-                    check_integrity: true,
-                    check_logical_hashes: true,
-                    replay_transformations: false
+                VerificationRequest {
+                    target: ResolvedDataset::from(&create_result),
+                    block_range: (None, None),
+                    options: VerificationOptions {
+                        check_integrity: true,
+                        check_logical_hashes: true,
+                        replay_transformations: false
+                    },
                 },
                 None,
             )
@@ -195,9 +193,15 @@ async fn test_verify_data_consistency() {
     // Check verification fails
     assert_matches!(
         verification_svc.verify(
-            &dataset_alias.as_local_ref(),
-            (None, None),
-            VerificationOptions {check_integrity: true, check_logical_hashes: true, replay_transformations: false},
+            VerificationRequest {
+                target: ResolvedDataset::from(&create_result),
+                block_range: (None, None),
+                options: VerificationOptions {
+                    check_integrity: true,
+                    check_logical_hashes: true,
+                    replay_transformations: false
+                },
+            },
             None,
         ).await,
         VerificationResult {

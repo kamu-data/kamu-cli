@@ -33,12 +33,12 @@ impl Dataset {
 
     #[graphql(skip)]
     pub async fn from_ref(ctx: &Context<'_>, dataset_ref: &odf::DatasetRef) -> Result<Dataset> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
 
         // TODO: Should we resolve reference at this point or allow unresolved and fail
         // later?
-        let hdl = dataset_repo
-            .resolve_dataset_ref(dataset_ref)
+        let hdl = dataset_registry
+            .resolve_dataset_handle_by_ref(dataset_ref)
             .await
             .int_err()?;
         let account = Account::from_dataset_alias(ctx, &hdl.alias)
@@ -49,8 +49,8 @@ impl Dataset {
 
     #[graphql(skip)]
     fn get_dataset(&self, ctx: &Context<'_>) -> std::sync::Arc<dyn domain::Dataset> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        dataset_repo.get_dataset_by_handle(&self.dataset_handle)
+        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
+        dataset_registry.get_dataset_by_handle(&self.dataset_handle)
     }
 
     /// Unique identifier of the dataset

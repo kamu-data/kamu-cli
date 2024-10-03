@@ -145,7 +145,7 @@ pub async fn test_compact_verify(kamu: KamuCliPuppet) {
         ],
         None,
         Some([
-            "verify with dataset_ref: player-scores",
+            "verify with target_alias: player-scores",
             "1 dataset(s) were compacted",
         ]),
     )

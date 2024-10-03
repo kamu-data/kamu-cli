@@ -19,7 +19,7 @@ mod mock_dataset_changes_service;
 mod mock_dependency_graph_repository;
 mod mock_odf_server_access_token_resolver;
 mod mock_polling_source_service;
-mod mock_transform_service;
+mod mock_transform_request_planner;
 mod parquet_reader_helper;
 mod parquet_writer_helper;
 
@@ -35,6 +35,6 @@ pub use mock_dataset_changes_service::*;
 pub use mock_dependency_graph_repository::*;
 pub use mock_odf_server_access_token_resolver::*;
 pub use mock_polling_source_service::*;
-pub use mock_transform_service::*;
+pub use mock_transform_request_planner::*;
 pub use parquet_reader_helper::*;
 pub use parquet_writer_helper::*;

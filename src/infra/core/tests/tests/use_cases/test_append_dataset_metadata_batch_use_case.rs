@@ -16,6 +16,7 @@ use dill::{Catalog, Component};
 use kamu::testing::MetadataFactory;
 use kamu::{
     AppendDatasetMetadataBatchUseCaseImpl,
+    DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
 };
@@ -24,6 +25,7 @@ use kamu_core::{
     AppendDatasetMetadataBatchUseCase,
     CreateDatasetResult,
     DatasetLifecycleMessage,
+    DatasetRegistry,
     DatasetRepository,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
@@ -54,7 +56,7 @@ async fn test_append_dataset_metadata_batch() {
     let create_result_foo = harness.create_dataset(&alias_foo, DatasetKind::Root).await;
 
     let foo_dataset = harness
-        .dataset_repo
+        .dataset_registry
         .get_dataset_by_handle(&create_result_foo.dataset_handle);
 
     let set_info_block = MetadataBlock {
@@ -107,7 +109,7 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
         .await;
 
     let bar_dataset = harness
-        .dataset_repo
+        .dataset_registry
         .get_dataset_by_handle(&create_result_bar.dataset_handle);
 
     let set_transform_block = MetadataBlock {
@@ -140,7 +142,7 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
 struct AppendDatasetMetadataBatchUseCaseHarness {
     _temp_dir: tempfile::TempDir,
     catalog: Catalog,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     use_case: Arc<dyn AppendDatasetMetadataBatchUseCase>,
 }
 
@@ -160,6 +162,7 @@ impl AppendDatasetMetadataBatchUseCaseHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<SystemTimeSourceDefault>()
             .add_value(mock_outbox)
@@ -170,13 +173,13 @@ impl AppendDatasetMetadataBatchUseCaseHarness {
             .get_one::<dyn AppendDatasetMetadataBatchUseCase>()
             .unwrap();
 
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
 
         Self {
             _temp_dir: tempdir,
             catalog,
             use_case,
-            dataset_repo,
+            dataset_registry,
         }
     }
 

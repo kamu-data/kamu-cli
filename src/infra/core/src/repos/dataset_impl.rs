@@ -13,6 +13,7 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
+use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,6 +22,7 @@ pub struct DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> {
     data_repo: DataRepo,
     checkpoint_repo: CheckpointRepo,
     info_repo: InfoRepo,
+    maybe_ipfs_compatible_url: Option<Url>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,12 +40,14 @@ where
         data_repo: DataRepo,
         checkpoint_repo: CheckpointRepo,
         info_repo: InfoRepo,
+        maybe_ipfs_compatible_url: Option<Url>,
     ) -> Self {
         Self {
             metadata_chain,
             data_repo,
             checkpoint_repo,
             info_repo,
+            maybe_ipfs_compatible_url,
         }
     }
 
@@ -583,6 +587,10 @@ where
         };
 
         summary.ok_or_else(|| GetSummaryError::EmptyDataset)
+    }
+
+    fn try_get_ipfs_compatible_url(&self) -> Option<&Url> {
+        self.maybe_ipfs_compatible_url.as_ref()
     }
 
     fn as_metadata_chain(&self) -> &dyn MetadataChain {

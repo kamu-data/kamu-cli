@@ -18,6 +18,7 @@
 
 use std::sync::Arc;
 
+use auth::{DatasetAction, DatasetActionAuthorizer};
 use axum::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
@@ -58,7 +59,6 @@ impl ODataServiceContext {
     }
 }
 
-// TODO: Authorization checks
 #[async_trait]
 impl ServiceContext for ODataServiceContext {
     fn service_base_url(&self) -> String {
@@ -68,19 +68,28 @@ impl ServiceContext for ODataServiceContext {
     async fn list_collections(&self) -> Result<Vec<Arc<dyn CollectionContext>>, ODataError> {
         use futures::TryStreamExt;
 
-        let repo: Arc<dyn DatasetRepository> = self.catalog.get_one().unwrap();
+        let registry: Arc<dyn DatasetRegistry> = self.catalog.get_one().unwrap();
+        let authorizer: Arc<dyn DatasetActionAuthorizer> = self.catalog.get_one().unwrap();
 
-        let datasets = if let Some(account_name) = &self.account_name {
-            repo.get_datasets_by_owner(account_name)
+        let dataset_handles = if let Some(account_name) = &self.account_name {
+            registry.all_dataset_handles_by_owner(account_name)
         } else {
-            repo.get_all_datasets()
+            registry.all_dataset_handles()
         };
 
-        let datasets: Vec<_> = datasets.try_collect().await.unwrap();
+        let dataset_handles: Vec<_> = dataset_handles
+            .try_collect()
+            .await
+            .map_err(ODataError::internal)?;
+
+        let dataset_handles = authorizer
+            .filter_datasets_allowing(dataset_handles, DatasetAction::Read)
+            .await
+            .map_err(ODataError::internal)?;
 
         let mut collections: Vec<Arc<dyn CollectionContext>> = Vec::new();
-        for dataset_handle in datasets {
-            let dataset = repo.get_dataset_by_handle(&dataset_handle);
+        for dataset_handle in dataset_handles {
+            let dataset = registry.get_dataset_by_handle(&dataset_handle);
 
             collections.push(Arc::new(ODataCollectionContext {
                 catalog: self.catalog.clone(),

@@ -15,9 +15,10 @@ use opendatafabric::*;
 use super::{CLIError, Command};
 
 pub struct AliasAddCommand {
+    dataset_registry: Arc<dyn DatasetRegistry>,
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    dataset: DatasetRef,
+    dataset_ref: DatasetRef,
     alias: DatasetRefRemote,
     pull: bool,
     push: bool,
@@ -25,6 +26,7 @@ pub struct AliasAddCommand {
 
 impl AliasAddCommand {
     pub fn new(
+        dataset_registry: Arc<dyn DatasetRegistry>,
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         dataset: DatasetRef,
@@ -33,9 +35,10 @@ impl AliasAddCommand {
         push: bool,
     ) -> Self {
         Self {
+            dataset_registry,
             remote_repo_reg,
             remote_alias_reg,
-            dataset,
+            dataset_ref: dataset,
             alias,
             pull,
             push,
@@ -58,9 +61,15 @@ impl Command for AliasAddCommand {
                 .map_err(CLIError::failure)?;
         }
 
+        let dataset = self
+            .dataset_registry
+            .get_dataset_by_ref(&self.dataset_ref)
+            .await
+            .map_err(CLIError::failure)?;
+
         let mut aliases = self
             .remote_alias_reg
-            .get_remote_aliases(&self.dataset)
+            .get_remote_aliases(dataset)
             .await
             .map_err(CLIError::failure)?;
 

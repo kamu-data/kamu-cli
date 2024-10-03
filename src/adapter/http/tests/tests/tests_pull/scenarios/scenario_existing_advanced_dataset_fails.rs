@@ -75,7 +75,7 @@ impl<TServerHarness: ServerSideHarness>
         // Extend client-side dataset with new node
         let client_repo = client_harness.dataset_repository();
         client_repo
-            .find_dataset_by_ref(&make_dataset_ref(&client_account_name, "foo"))
+            .get_dataset_by_ref(&make_dataset_ref(&client_account_name, "foo"))
             .await
             .unwrap()
             .commit_event(

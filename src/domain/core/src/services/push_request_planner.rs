@@ -7,14 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
 
 use super::sync_service::*;
-use super::RepositoryNotFoundError;
+use super::{RemoteTarget, RepositoryNotFoundError};
 use crate::{DatasetNotFoundError, GetDatasetError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -22,23 +20,42 @@ use crate::{DatasetNotFoundError, GetDatasetError};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait PushService: Send + Sync {
-    async fn push_multi(
+pub trait PushRequestPlanner: Send + Sync {
+    async fn collect_plan(
         &self,
-        dataset_refs: Vec<DatasetRef>,
-        options: PushMultiOptions,
-        sync_listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<PushResponse>;
+        dataset_handles: &[DatasetHandle],
+        push_target: Option<&DatasetPushTarget>,
+    ) -> (Vec<PushItem>, Vec<PushResponse>);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
+pub struct PushItem {
+    pub local_handle: DatasetHandle,
+    pub remote_target: RemoteTarget,
+    pub push_target: Option<DatasetPushTarget>,
+}
+
+impl PushItem {
+    pub fn as_response(&self, result: Result<SyncResponse, SyncError>) -> PushResponse {
+        PushResponse {
+            local_handle: Some(self.local_handle.clone()),
+            target: self.push_target.clone(),
+            result: result.map_err(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct PushResponse {
     /// Local dataset handle, if resolved
     pub local_handle: Option<DatasetHandle>,
     /// Destination reference, if resolved
     pub target: Option<DatasetPushTarget>,
     /// Result of the push operation
-    pub result: Result<SyncResult, PushError>,
+    pub result: Result<SyncResponse, PushError>,
 }
 
 impl std::fmt::Display for PushResponse {
@@ -51,6 +68,8 @@ impl std::fmt::Display for PushResponse {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct PushMultiOptions {
@@ -122,3 +141,5 @@ impl From<GetDatasetError> for PushError {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,11 +9,16 @@
 
 use std::sync::Arc;
 
-use kamu_core::{Dataset, DatasetVisibility, SyncError, SyncListener, SyncResult};
+use kamu_core::{
+    Dataset,
+    DatasetFactoryFn,
+    DatasetVisibility,
+    SyncError,
+    SyncListener,
+    SyncResponse,
+};
 use opendatafabric::Multihash;
 use url::Url;
-
-pub use super::simple_transfer_protocol::DatasetFactoryFn;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -52,7 +57,7 @@ pub trait SmartTransferProtocolClient: Sync + Send {
         dst_factory: Option<DatasetFactoryFn>,
         listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
-    ) -> Result<SyncResult, SyncError>;
+    ) -> Result<SyncResponse, SyncError>;
 
     async fn push_protocol_client_flow(
         &self,
@@ -61,7 +66,7 @@ pub trait SmartTransferProtocolClient: Sync + Send {
         dst_head: Option<&Multihash>,
         listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
-    ) -> Result<SyncResult, SyncError>;
+    ) -> Result<SyncResponse, SyncError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

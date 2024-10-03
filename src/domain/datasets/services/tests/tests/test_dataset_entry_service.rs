@@ -23,7 +23,7 @@ use kamu_core::{
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use kamu_datasets::{DatasetEntry, DatasetEntryRepository, MockDatasetEntryRepository};
-use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryService};
+use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
 use mockall::predicate::eq;
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle, DatasetID, DatasetName};
@@ -198,7 +198,7 @@ impl DatasetEntryServiceHarness {
         let catalog = {
             let mut b = CatalogBuilder::new();
 
-            b.add::<DatasetEntryService>();
+            b.add::<DatasetEntryServiceImpl>();
             b.add::<DatasetEntryIndexer>();
 
             b.add_value(mock_dataset_entry_repository);
@@ -374,11 +374,10 @@ impl DatasetEntryServiceHarness {
         dataset_handles: Vec<DatasetHandle>,
     ) {
         mock_dataset_repository
-            .expect_get_all_datasets()
+            .expect_all_dataset_handles()
             .times(1)
             .returning(move || {
                 let stream = futures::stream::iter(dataset_handles.clone().into_iter().map(Ok));
-
                 Box::pin(stream)
             });
     }

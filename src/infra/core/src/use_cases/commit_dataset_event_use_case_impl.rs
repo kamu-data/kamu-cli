@@ -17,7 +17,7 @@ use kamu_core::{
     CommitOpts,
     CommitResult,
     DatasetLifecycleMessage,
-    DatasetRepository,
+    DatasetRegistry,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
@@ -28,19 +28,19 @@ use opendatafabric::{DatasetHandle, MetadataEvent};
 #[component(pub)]
 #[interface(dyn CommitDatasetEventUseCase)]
 pub struct CommitDatasetEventUseCaseImpl {
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     outbox: Arc<dyn Outbox>,
 }
 
 impl CommitDatasetEventUseCaseImpl {
     pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
-            dataset_repo,
+            dataset_registry,
             dataset_action_authorizer,
             outbox,
         }
@@ -59,7 +59,7 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
             .check_action_allowed(dataset_handle, DatasetAction::Write)
             .await?;
 
-        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
+        let dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
 
         let commit_result = dataset.commit_event(event, opts).await?;
 

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{GetSummaryOpts, MetadataChainExt};
+use kamu_core::{DatasetRegistry, DatasetRegistryExt, GetSummaryOpts, MetadataChainExt};
 use {kamu_flow_system as fs, opendatafabric as odf};
 
 use super::FlowNotFound;
@@ -106,12 +106,16 @@ pub(crate) async fn ensure_flow_preconditions(
     dataset_flow_type: DatasetFlowType,
     flow_run_configuration: Option<&FlowRunConfiguration>,
 ) -> Result<Option<FlowPreconditionsNotMet>> {
+    let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
+    let target = dataset_registry.get_resolved_dataset_by_handle(dataset_handle);
+
     match dataset_flow_type {
         DatasetFlowType::Ingest => {
             let polling_ingest_svc =
                 from_catalog::<dyn kamu_core::PollingIngestService>(ctx).unwrap();
+
             let source_res = polling_ingest_svc
-                .get_active_polling_source(&dataset_handle.as_local_ref())
+                .get_active_polling_source(target)
                 .await
                 .int_err()?;
             if source_res.is_none() {
@@ -121,13 +125,12 @@ pub(crate) async fn ensure_flow_preconditions(
             }
         }
         DatasetFlowType::ExecuteTransform => {
-            let transform_svc = from_catalog::<dyn kamu_core::TransformService>(ctx).unwrap();
+            let transform_request_planner =
+                from_catalog::<dyn kamu_core::TransformRequestPlanner>(ctx).unwrap();
 
-            let source_res = transform_svc
-                .get_active_transform(&dataset_handle.as_local_ref())
-                .await
-                .int_err()?;
-
+            let source_res = transform_request_planner
+                .get_active_transform(target)
+                .await?;
             if source_res.is_none() {
                 return Ok(Some(FlowPreconditionsNotMet {
                     preconditions: "No SetTransform event defined".to_string(),
@@ -140,12 +143,8 @@ pub(crate) async fn ensure_flow_preconditions(
                 && let FlowRunConfiguration::Reset(reset_configuration) = flow_configuration
             {
                 if let Some(new_head_hash) = &reset_configuration.new_head_hash() {
-                    let dataset_repo =
-                        from_catalog::<dyn kamu_core::DatasetRepository>(ctx).unwrap();
-
-                    let dataset = dataset_repo.get_dataset_by_handle(dataset_handle);
-                    let current_head_hash_maybe = dataset
-                        .as_metadata_chain()
+                    let metadata_chain = target.dataset.as_metadata_chain();
+                    let current_head_hash_maybe = metadata_chain
                         .try_get_ref(&kamu_core::BlockRef::Head)
                         .await
                         .int_err()?;
@@ -154,8 +153,7 @@ pub(crate) async fn ensure_flow_preconditions(
                             preconditions: "Dataset does not contain any blocks".to_string(),
                         }));
                     }
-                    if !dataset
-                        .as_metadata_chain()
+                    if !metadata_chain
                         .contains_block(new_head_hash)
                         .await
                         .int_err()?
