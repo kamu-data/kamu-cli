@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
-
 use messaging_outbox::Message;
 use opendatafabric::{AccountID, DatasetID, DatasetName};
 use serde::{Deserialize, Serialize};
@@ -36,7 +34,7 @@ impl DatasetLifecycleMessage {
             dataset_id,
             owner_account_id,
             dataset_visibility,
-            dataset_name: Some(dataset_name),
+            dataset_name,
         })
     }
 
@@ -76,21 +74,7 @@ pub struct DatasetLifecycleMessageCreated {
     pub owner_account_id: AccountID,
     #[serde(default)]
     pub dataset_visibility: DatasetVisibility,
-    // Note: Since we already have messages stored in the database,
-    //       to avoid breaking serialization, we use Optional type
-    dataset_name: Option<DatasetName>,
-}
-
-impl DatasetLifecycleMessageCreated {
-    pub fn dataset_name(&self) -> Cow<DatasetName> {
-        if let Some(name) = &self.dataset_name {
-            Cow::Borrowed(name)
-        } else {
-            tracing::warn!("Dataset '{}' does not has a name", self.dataset_id);
-
-            Cow::Owned(DatasetName::new_unchecked("???"))
-        }
-    }
+    pub dataset_name: DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

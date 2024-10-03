@@ -59,16 +59,17 @@ impl DatasetEntryService {
 
     async fn handle_dataset_lifecycle_created_message(
         &self,
-        message @ DatasetLifecycleMessageCreated {
+        DatasetLifecycleMessageCreated {
             dataset_id,
             owner_account_id,
+            dataset_name,
             ..
         }: &DatasetLifecycleMessageCreated,
     ) -> Result<(), InternalError> {
         let entry = DatasetEntry::new(
             dataset_id.clone(),
             owner_account_id.clone(),
-            message.dataset_name().into_owned(),
+            dataset_name.clone(),
             self.time_source.now(),
         );
 
