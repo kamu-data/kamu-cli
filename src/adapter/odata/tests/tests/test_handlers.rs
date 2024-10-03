@@ -346,13 +346,11 @@ impl TestHarness {
                 .add_value(CurrentAccountSubject::new_test())
                 .add_value(dataset_action_authorizer)
                 .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
-                .add_builder(
-                    DatasetRepositoryLocalFs::builder()
-                        .with_root(datasets_dir)
-                        .with_multi_tenant(false),
-                )
+                .add_value(TenancyConfig::SingleTenant)
+                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<DatasetRegistryRepoBridge>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add_value(SystemTimeSourceStub::new_set(
                     Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
@@ -370,7 +368,8 @@ impl TestHarness {
 
         let push_ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
 
-        let api_server = TestAPIServer::new(catalog.clone(), None, None, false).await;
+        let api_server =
+            TestAPIServer::new(catalog.clone(), None, None, TenancyConfig::SingleTenant).await;
 
         Self {
             temp_dir,
@@ -432,7 +431,7 @@ impl TestHarness {
 
         self.push_ingest_svc
             .ingest_from_url(
-                &ds.dataset_handle.as_local_ref(),
+                ResolvedDataset::from(&ds),
                 None,
                 url::Url::from_file_path(&src_path).unwrap(),
                 PushIngestOpts::default(),

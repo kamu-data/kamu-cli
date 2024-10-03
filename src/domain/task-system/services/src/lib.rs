@@ -11,11 +11,13 @@
 pub use kamu_task_system as domain;
 
 mod dependencies;
+mod task_definition_planner_impl;
 mod task_executor_impl;
-mod task_logical_plan_runner_impl;
+mod task_runner_impl;
 mod task_scheduler_impl;
 
 pub use dependencies::*;
+pub use task_definition_planner_impl::*;
 pub use task_executor_impl::*;
-pub use task_logical_plan_runner_impl::*;
+pub use task_runner_impl::*;
 pub use task_scheduler_impl::*;

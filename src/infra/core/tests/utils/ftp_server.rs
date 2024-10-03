@@ -33,7 +33,7 @@ impl FtpServer {
             .unwrap();
 
         if !server_dir.exists() {
-            std::fs::create_dir(&server_dir).unwrap();
+            std::fs::create_dir(server_dir).unwrap();
         }
 
         // TODO: this is likely very brittle because of all the port mapping

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu::domain::TenancyConfig;
 use kamu_accounts::{PredefinedAccountsConfig, DEFAULT_ACCOUNT_NAME_STR};
 
 use crate::accounts::models::*;
@@ -16,29 +17,27 @@ use crate::accounts::models::*;
 pub struct AccountService {}
 
 impl AccountService {
-    pub fn default_account_name(multi_tenant_workspace: bool) -> String {
-        if multi_tenant_workspace {
-            whoami::username()
-        } else {
-            String::from(DEFAULT_ACCOUNT_NAME_STR)
+    pub fn default_account_name(tenancy_config: TenancyConfig) -> String {
+        match tenancy_config {
+            TenancyConfig::MultiTenant => whoami::username(),
+            TenancyConfig::SingleTenant => String::from(DEFAULT_ACCOUNT_NAME_STR),
         }
     }
 
-    pub fn default_user_name(multi_tenant_workspace: bool) -> String {
-        if multi_tenant_workspace {
-            whoami::realname()
-        } else {
-            String::from(DEFAULT_ACCOUNT_NAME_STR)
+    pub fn default_user_name(tenancy_config: TenancyConfig) -> String {
+        match tenancy_config {
+            TenancyConfig::MultiTenant => whoami::realname(),
+            TenancyConfig::SingleTenant => String::from(DEFAULT_ACCOUNT_NAME_STR),
         }
     }
 
     pub fn current_account_indication(
         account: Option<String>,
-        multi_tenant_workspace: bool,
+        tenancy_config: TenancyConfig,
         predefined_accounts_config: &PredefinedAccountsConfig,
     ) -> CurrentAccountIndication {
         let (current_account, user_name, specified_explicitly) = {
-            let default_account_name = AccountService::default_account_name(multi_tenant_workspace);
+            let default_account_name = AccountService::default_account_name(tenancy_config);
 
             if let Some(account) = account {
                 (
@@ -52,13 +51,13 @@ impl AccountService {
                     true,
                 )
             } else {
-                let default_user_name = AccountService::default_user_name(multi_tenant_workspace);
+                let default_user_name = AccountService::default_user_name(tenancy_config);
 
                 (default_account_name, default_user_name, false)
             }
         };
 
-        let is_admin = if multi_tenant_workspace {
+        let is_admin = if tenancy_config == TenancyConfig::MultiTenant {
             predefined_accounts_config
                 .predefined
                 .iter()

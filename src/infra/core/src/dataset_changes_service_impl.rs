@@ -14,14 +14,15 @@ use futures::TryStreamExt;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::{
     BlockRef,
-    Dataset,
     DatasetChangesService,
     DatasetIntervalIncrement,
-    DatasetRepository,
+    DatasetRegistry,
+    DatasetRegistryExt,
     GetDatasetError,
     GetIncrementError,
     GetRefError,
     MetadataChainExt,
+    ResolvedDataset,
     SearchSingleDataBlockVisitor,
 };
 use opendatafabric::{DataSlice, DatasetID, MetadataEvent, Multihash};
@@ -29,7 +30,7 @@ use opendatafabric::{DataSlice, DatasetID, MetadataEvent, Multihash};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetChangesServiceImpl {
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,16 +38,16 @@ pub struct DatasetChangesServiceImpl {
 #[component(pub)]
 #[interface(dyn DatasetChangesService)]
 impl DatasetChangesServiceImpl {
-    pub fn new(dataset_repo: Arc<dyn DatasetRepository>) -> Self {
-        Self { dataset_repo }
+    pub fn new(dataset_registry: Arc<dyn DatasetRegistry>) -> Self {
+        Self { dataset_registry }
     }
 
     async fn resolve_dataset_by_id(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<Arc<dyn Dataset>, GetIncrementError> {
-        self.dataset_repo
-            .find_dataset_by_ref(&dataset_id.as_local_ref())
+    ) -> Result<ResolvedDataset, GetIncrementError> {
+        self.dataset_registry
+            .get_dataset_by_ref(&dataset_id.as_local_ref())
             .await
             .map_err(|e| match e {
                 GetDatasetError::NotFound(e) => GetIncrementError::DatasetNotFound(e),
@@ -56,9 +57,9 @@ impl DatasetChangesServiceImpl {
 
     async fn resolve_dataset_head(
         &self,
-        dataset: &dyn Dataset,
+        resolved_dataset: &ResolvedDataset,
     ) -> Result<Multihash, GetIncrementError> {
-        dataset
+        resolved_dataset
             .as_metadata_chain()
             .as_reference_repo()
             .get(&BlockRef::Head)
@@ -73,7 +74,7 @@ impl DatasetChangesServiceImpl {
     // TODO: PERF: Avoid multiple passes over metadata chain
     async fn make_increment_from_interval(
         &self,
-        dataset: Arc<dyn Dataset>,
+        resolved_dataset: &ResolvedDataset,
         old_head: Option<&Multihash>,
         new_head: &Multihash,
     ) -> Result<DatasetIntervalIncrement, InternalError> {
@@ -86,7 +87,7 @@ impl DatasetChangesServiceImpl {
         let mut latest_watermark = None;
 
         // Scan blocks (from new head to old head)
-        let mut block_stream = dataset
+        let mut block_stream = resolved_dataset
             .as_metadata_chain()
             .iter_blocks_interval(new_head, old_head, false);
 
@@ -147,7 +148,7 @@ impl DatasetChangesServiceImpl {
             // Did we have any head before?
             if let Some(old_head) = &old_head {
                 // Yes, so try locating the previous watermark containing node
-                let previous_nearest_watermark = dataset
+                let previous_nearest_watermark = resolved_dataset
                     .as_metadata_chain()
                     .accept_one_by_hash(old_head, SearchSingleDataBlockVisitor::next())
                     .await
@@ -196,10 +197,10 @@ impl DatasetChangesService for DatasetChangesServiceImpl {
         old_head: Option<&'a Multihash>,
         new_head: &'a Multihash,
     ) -> Result<DatasetIntervalIncrement, GetIncrementError> {
-        let dataset = self.resolve_dataset_by_id(dataset_id).await?;
+        let resolved_dataset = self.resolve_dataset_by_id(dataset_id).await?;
 
         let increment = self
-            .make_increment_from_interval(dataset, old_head, new_head)
+            .make_increment_from_interval(&resolved_dataset, old_head, new_head)
             .await
             .map_err(GetIncrementError::Internal)?;
 
@@ -211,11 +212,11 @@ impl DatasetChangesService for DatasetChangesServiceImpl {
         dataset_id: &'a DatasetID,
         old_head: Option<&'a Multihash>,
     ) -> Result<DatasetIntervalIncrement, GetIncrementError> {
-        let dataset = self.resolve_dataset_by_id(dataset_id).await?;
-        let current_head = self.resolve_dataset_head(dataset.as_ref()).await?;
+        let resolved_dataset = self.resolve_dataset_by_id(dataset_id).await?;
+        let current_head = self.resolve_dataset_head(&resolved_dataset).await?;
 
         let increment = self
-            .make_increment_from_interval(dataset, old_head, &current_head)
+            .make_increment_from_interval(&resolved_dataset, old_head, &current_head)
             .await
             .map_err(GetIncrementError::Internal)?;
 

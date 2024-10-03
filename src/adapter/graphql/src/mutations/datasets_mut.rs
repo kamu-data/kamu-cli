@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{self as domain, CreateDatasetUseCaseOptions, DatasetRepositoryExt};
+use kamu_core::{self as domain, CreateDatasetUseCaseOptions, DatasetRegistryExt};
 use opendatafabric as odf;
 
 use crate::mutations::DatasetMut;
@@ -25,9 +25,9 @@ pub struct DatasetsMut;
 impl DatasetsMut {
     /// Returns a mutable dataset by its ID
     async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<DatasetMut>> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let hdl = dataset_repo
-            .try_resolve_dataset_ref(&dataset_id.as_local_ref())
+        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
+        let hdl = dataset_registry
+            .try_resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
             .await?;
         Ok(hdl.map(DatasetMut::new))
     }

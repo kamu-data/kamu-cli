@@ -11,19 +11,40 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use database_common::NoOpDatabasePlugin;
-use dill::{Catalog, CatalogBuilder};
+use dill::{Catalog, CatalogBuilder, Component};
+use kamu::utils::ipfs_wrapper::IpfsClient;
+use kamu::{
+    DatasetFactoryImpl,
+    DatasetRegistryRepoBridge,
+    DatasetRepositoryLocalFs,
+    DatasetRepositoryWriter,
+    IpfsGateway,
+    PullRequestPlannerImpl,
+    RemoteAliasesRegistryImpl,
+    RemoteReposDir,
+    RemoteRepositoryRegistryImpl,
+    SyncRequestBuilder,
+    TransformRequestPlannerImpl,
+};
+use kamu_accounts::CurrentAccountSubject;
+use kamu_core::auth::DummyOdfServerAccessTokenResolver;
+use kamu_core::{DatasetRepository, TenancyConfig};
+use kamu_datasets::DatasetEnvVarsConfig;
+use kamu_datasets_inmem::InMemoryDatasetEnvVarRepository;
+use kamu_datasets_services::DatasetEnvVarServiceImpl;
 use kamu_task_system::*;
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::*;
 use messaging_outbox::{MockOutbox, Outbox};
 use mockall::predicate::{eq, function};
+use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_pre_run_requeues_running_tasks() {
-    let harness = TaskExecutorHarness::new(MockOutbox::new(), MockTaskLogicalPlanRunner::new());
+    let harness = TaskExecutorHarness::new(MockOutbox::new(), MockTaskRunner::new());
 
     // Schedule 3 tasks
     let task_id_1 = harness.schedule_probe_task().await;
@@ -67,15 +88,15 @@ async fn test_run_single_task() {
     TaskExecutorHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
 
     // Expect logical plan runner to run probe
-    let mut mock_plan_runner = MockTaskLogicalPlanRunner::new();
+    let mut mock_task_runner = MockTaskRunner::new();
     TaskExecutorHarness::add_run_probe_plan_expectations(
-        &mut mock_plan_runner,
-        Probe::default(),
+        &mut mock_task_runner,
+        LogicalPlanProbe::default(),
         1,
     );
 
     // Schedule the only task
-    let harness = TaskExecutorHarness::new(mock_outbox, mock_plan_runner);
+    let harness = TaskExecutorHarness::new(mock_outbox, mock_task_runner);
     let task_id = harness.schedule_probe_task().await;
     let task = harness.get_task(task_id).await;
     assert_eq!(task.status(), TaskStatus::Queued);
@@ -98,15 +119,15 @@ async fn test_run_two_of_three_tasks() {
     TaskExecutorHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(1));
 
     // Expect logical plan runner to run probe twice
-    let mut mock_plan_runner = MockTaskLogicalPlanRunner::new();
+    let mut mock_task_runner = MockTaskRunner::new();
     TaskExecutorHarness::add_run_probe_plan_expectations(
-        &mut mock_plan_runner,
-        Probe::default(),
+        &mut mock_task_runner,
+        LogicalPlanProbe::default(),
         2,
     );
 
     // Schedule 3 tasks
-    let harness = TaskExecutorHarness::new(mock_outbox, mock_plan_runner);
+    let harness = TaskExecutorHarness::new(mock_outbox, mock_task_runner);
     let task_id_1 = harness.schedule_probe_task().await;
     let task_id_2 = harness.schedule_probe_task().await;
     let task_id_3 = harness.schedule_probe_task().await;
@@ -135,22 +156,51 @@ async fn test_run_two_of_three_tasks() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct TaskExecutorHarness {
+    _tempdir: TempDir,
     catalog: Catalog,
     task_executor: Arc<dyn TaskExecutor>,
     task_scheduler: Arc<dyn TaskScheduler>,
 }
 
 impl TaskExecutorHarness {
-    pub fn new(mock_outbox: MockOutbox, mock_plan_runner: MockTaskLogicalPlanRunner) -> Self {
+    pub fn new(mock_outbox: MockOutbox, mock_task_runner: MockTaskRunner) -> Self {
+        let tempdir = tempfile::tempdir().unwrap();
+
+        let datasets_dir = tempdir.path().join("datasets");
+        std::fs::create_dir(&datasets_dir).unwrap();
+
+        let repos_dir = tempdir.path().join("repos");
+        std::fs::create_dir(&repos_dir).unwrap();
+
         let mut b = CatalogBuilder::new();
         b.add::<TaskExecutorImpl>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
-            .add_value(mock_plan_runner)
-            .bind::<dyn TaskLogicalPlanRunner, MockTaskLogicalPlanRunner>()
+            .add::<TaskDefinitionPlannerImpl>()
+            .add_value(mock_task_runner)
+            .bind::<dyn TaskRunner, MockTaskRunner>()
             .add_value(mock_outbox)
             .bind::<dyn Outbox, MockOutbox>()
-            .add::<SystemTimeSourceDefault>();
+            .add::<SystemTimeSourceDefault>()
+            .add::<PullRequestPlannerImpl>()
+            .add::<TransformRequestPlannerImpl>()
+            .add::<SyncRequestBuilder>()
+            .add::<DatasetFactoryImpl>()
+            .add::<RemoteAliasesRegistryImpl>()
+            .add_value(RemoteReposDir::new(repos_dir))
+            .add::<RemoteRepositoryRegistryImpl>()
+            .add_value(IpfsGateway::default())
+            .add_value(IpfsClient::default())
+            .add::<DummyOdfServerAccessTokenResolver>()
+            .add::<DatasetEnvVarServiceImpl>()
+            .add::<InMemoryDatasetEnvVarRepository>()
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
+            .add_value(CurrentAccountSubject::new_test())
+            .add_value(TenancyConfig::SingleTenant)
+            .add_value(DatasetEnvVarsConfig::sample());
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -160,6 +210,7 @@ impl TaskExecutorHarness {
         let task_scheduler = catalog.get_one().unwrap();
 
         Self {
+            _tempdir: tempdir,
             catalog,
             task_executor,
             task_scheduler,
@@ -168,7 +219,13 @@ impl TaskExecutorHarness {
 
     async fn schedule_probe_task(&self) -> TaskID {
         self.task_scheduler
-            .create_task(Probe { ..Probe::default() }.into(), None)
+            .create_task(
+                LogicalPlanProbe {
+                    ..LogicalPlanProbe::default()
+                }
+                .into(),
+                None,
+            )
             .await
             .unwrap()
             .task_id
@@ -221,13 +278,19 @@ impl TaskExecutorHarness {
     }
 
     fn add_run_probe_plan_expectations(
-        mock_plan_runner: &mut MockTaskLogicalPlanRunner,
-        probe: Probe,
+        mock_task_runner: &mut MockTaskRunner,
+        probe: LogicalPlanProbe,
         times: usize,
     ) {
-        mock_plan_runner
-            .expect_run_plan()
-            .with(eq(LogicalPlan::Probe(probe)))
+        mock_task_runner
+            .expect_run_task()
+            .withf(move |td| {
+                matches!(
+                    td,
+                    TaskDefinition::Probe(TaskDefinitionProbe { probe: probe_ })
+                    if probe_ == &probe
+                )
+            })
             .times(times)
             .returning(|_| Ok(TaskOutcome::Success(TaskResult::Empty)));
     }
@@ -236,11 +299,11 @@ impl TaskExecutorHarness {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 mockall::mock! {
-    pub TaskLogicalPlanRunner {}
+    pub TaskRunner {}
 
     #[async_trait::async_trait]
-    impl TaskLogicalPlanRunner for TaskLogicalPlanRunner {
-        async fn run_plan(&self, logical_plan: &LogicalPlan) -> Result<TaskOutcome, InternalError>;
+    impl TaskRunner for TaskRunner {
+        async fn run_task(&self, task_definition: TaskDefinition) -> Result<TaskOutcome, InternalError>;
     }
 }
 

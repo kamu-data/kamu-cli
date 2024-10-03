@@ -68,7 +68,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingUpToDateDatasetScenario
 
         let client_dataset_ref: DatasetRef = make_dataset_ref(&client_account_name, "foo");
         commit_add_data_event(
-            client_harness.dataset_repository().as_ref(),
+            client_harness.dataset_registry().as_ref(),
             &client_dataset_ref,
             &client_dataset_layout,
             None,

@@ -33,10 +33,10 @@ test_message_type!(A);
 test_message_type!(B);
 test_message_type!(C);
 
-test_message_consumer!(A, A, TEST_PRODUCER_A, Durable);
-test_message_consumer!(B, B, TEST_PRODUCER_B, Durable);
-test_message_consumer!(C, C1, TEST_PRODUCER_C, Durable);
-test_message_consumer!(C, C2, TEST_PRODUCER_C, Durable);
+test_message_consumer!(A, A, TEST_PRODUCER_A, Transactional);
+test_message_consumer!(B, B, TEST_PRODUCER_B, Transactional);
+test_message_consumer!(C, C1, TEST_PRODUCER_C, Transactional);
+test_message_consumer!(C, C2, TEST_PRODUCER_C, Transactional);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -17,7 +17,7 @@ use kamu::{CreateDatasetUseCaseImpl, DatasetRepositoryLocalFs, DatasetRepository
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_auth_oso::{KamuAuthOso, OsoDatasetAuthorizer};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::{AccessError, CreateDatasetUseCase, DatasetRepository};
+use kamu_core::{AccessError, CreateDatasetUseCase, DatasetRepository, TenancyConfig};
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle, DatasetKind};
 use tempfile::TempDir;
@@ -116,11 +116,8 @@ impl DatasetAuthorizerHarness {
             ))
             .add::<KamuAuthOso>()
             .add::<OsoDatasetAuthorizer>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(true),
-            )
+            .add_value(TenancyConfig::MultiTenant)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<CreateDatasetUseCaseImpl>()

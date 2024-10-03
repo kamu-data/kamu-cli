@@ -19,7 +19,7 @@ use kamu_core::engine::*;
 use kamu_core::*;
 use odf::engine::{EngineGrpcClient, ExecuteRawQueryError, ExecuteTransformError};
 use odf::TransformResponseSuccess;
-use opendatafabric as odf;
+use opendatafabric::{self as odf};
 
 use super::engine_container::{EngineContainer, LogsConfig};
 use super::engine_io_strategy::*;
@@ -30,7 +30,6 @@ pub struct ODFEngine {
     engine_config: ODFEngineConfig,
     image: String,
     run_info_dir: Arc<RunInfoDir>,
-    dataset_repo: Arc<dyn DatasetRepository>,
 }
 
 impl ODFEngine {
@@ -39,34 +38,24 @@ impl ODFEngine {
         engine_config: ODFEngineConfig,
         image: &str,
         run_info_dir: Arc<RunInfoDir>,
-        dataset_repo: Arc<dyn DatasetRepository>,
     ) -> Self {
         Self {
             container_runtime,
             engine_config,
             image: image.to_owned(),
             run_info_dir,
-            dataset_repo,
         }
     }
 
     // TODO: Currently we are always proxying remote inputs, but in future we should
     // have a capabilities mechanism for engines to declare that they can work
     // with some remote storages directly without us needing to proxy data.
-    fn get_io_strategy(&self, request: &TransformRequestExt) -> Arc<dyn EngineIoStrategy> {
-        let dataset = self
-            .dataset_repo
-            .get_dataset_by_handle(&request.dataset_handle);
-
-        match dataset.as_data_repo().protocol() {
-            ObjectRepositoryProtocol::LocalFs { .. } => {
-                Arc::new(EngineIoStrategyLocalVolume::new(self.dataset_repo.clone()))
-            }
+    fn get_io_strategy(&self, target_dataset: &dyn Dataset) -> Arc<dyn EngineIoStrategy> {
+        match target_dataset.as_data_repo().protocol() {
+            ObjectRepositoryProtocol::LocalFs { .. } => Arc::new(EngineIoStrategyLocalVolume {}),
             ObjectRepositoryProtocol::Memory
             | ObjectRepositoryProtocol::Http
-            | ObjectRepositoryProtocol::S3 => {
-                Arc::new(EngineIoStrategyRemoteProxy::new(self.dataset_repo.clone()))
-            }
+            | ObjectRepositoryProtocol::S3 => Arc::new(EngineIoStrategyRemoteProxy {}),
         }
     }
 
@@ -355,11 +344,8 @@ impl Engine for ODFEngine {
     async fn execute_transform(
         &self,
         request: TransformRequestExt,
+        datasets_map: &ResolvedDatasetsMap,
     ) -> Result<TransformResponseExt, EngineError> {
-        let dataset = self
-            .dataset_repo
-            .get_dataset_by_handle(&request.dataset_handle);
-
         let operation_id = request.operation_id.clone();
         let operation_dir = self
             .run_info_dir
@@ -368,10 +354,11 @@ impl Engine for ODFEngine {
         std::fs::create_dir(&operation_dir).int_err()?;
         std::fs::create_dir(&logs_dir).int_err()?;
 
-        let io_strategy = self.get_io_strategy(&request);
+        let target = datasets_map.get_by_handle(&request.dataset_handle);
+        let io_strategy = self.get_io_strategy(target.as_ref());
 
         let materialized_request = io_strategy
-            .materialize_request(dataset.as_ref(), request, &operation_dir)
+            .materialize_request(request, datasets_map, &operation_dir)
             .await
             .int_err()?;
 

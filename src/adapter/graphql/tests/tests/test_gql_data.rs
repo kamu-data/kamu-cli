@@ -35,7 +35,7 @@ use time_source::SystemTimeSourceDefault;
 
 async fn create_catalog_with_local_workspace(
     tempdir: &Path,
-    is_multitenant: bool,
+    tenancy_config: TenancyConfig,
 ) -> dill::Catalog {
     let datasets_dir = tempdir.join("datasets");
     std::fs::create_dir(&datasets_dir).unwrap();
@@ -59,13 +59,11 @@ async fn create_catalog_with_local_workspace(
         b.add::<DependencyGraphServiceInMemory>()
             .add_value(current_account_subject)
             .add_value(predefined_accounts_config)
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(is_multitenant),
-            )
+            .add_value(tenancy_config)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add::<CreateDatasetUseCaseImpl>()
             .add::<DummyOutboxImpl>()
             .add::<SystemTimeSourceDefault>()
@@ -162,7 +160,8 @@ async fn create_test_dataset(
 #[test_log::test(tokio::test)]
 async fn test_dataset_tail_schema() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(tempdir.path(), true).await;
+    let catalog =
+        create_catalog_with_local_workspace(tempdir.path(), TenancyConfig::MultiTenant).await;
     create_test_dataset(&catalog, tempdir.path(), None).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -222,7 +221,8 @@ async fn test_dataset_tail_schema() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_tail_some() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(tempdir.path(), true).await;
+    let catalog =
+        create_catalog_with_local_workspace(tempdir.path(), TenancyConfig::MultiTenant).await;
     create_test_dataset(&catalog, tempdir.path(), None).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -265,7 +265,8 @@ async fn test_dataset_tail_some() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_tail_empty() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(tempdir.path(), true).await;
+    let catalog =
+        create_catalog_with_local_workspace(tempdir.path(), TenancyConfig::MultiTenant).await;
     create_test_dataset(&catalog, tempdir.path(), None).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -310,7 +311,8 @@ async fn test_dataset_tail_empty() {
 #[test_log::test(tokio::test)]
 async fn test_data_query_some() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(tempdir.path(), true).await;
+    let catalog =
+        create_catalog_with_local_workspace(tempdir.path(), TenancyConfig::MultiTenant).await;
     create_test_dataset(&catalog, tempdir.path(), None).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -377,7 +379,8 @@ async fn test_data_query_some() {
 #[test_log::test(tokio::test)]
 async fn test_data_query_error_sql_unparsable() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(tempdir.path(), true).await;
+    let catalog =
+        create_catalog_with_local_workspace(tempdir.path(), TenancyConfig::MultiTenant).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -423,7 +426,8 @@ async fn test_data_query_error_sql_unparsable() {
 #[test_log::test(tokio::test)]
 async fn test_data_query_error_sql_missing_function() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(tempdir.path(), true).await;
+    let catalog =
+        create_catalog_with_local_workspace(tempdir.path(), TenancyConfig::MultiTenant).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema

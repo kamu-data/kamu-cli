@@ -14,7 +14,7 @@ use auth::OdfServerAccessTokenResolver;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric as odf;
+use opendatafabric::{self as odf, DatasetHandle};
 use url::Url;
 
 use crate::UrlExt;
@@ -44,12 +44,12 @@ impl RemoteAliasResolverImpl {
 
     async fn fetch_remote_url(
         &self,
-        local_handle: &odf::DatasetHandle,
+        dataset_handle: &DatasetHandle,
         remote_alias_kind: RemoteAliasKind,
     ) -> Result<Option<Url>, ResolveAliasError> {
         let remote_aliases = self
             .remote_alias_reg
-            .get_remote_aliases(&local_handle.as_local_ref())
+            .get_remote_aliases(dataset_handle)
             .await
             .int_err()?;
 
@@ -75,13 +75,11 @@ impl RemoteAliasResolverImpl {
     ) -> Result<Url, InternalError> {
         let mut res_url = repo_url.clone().as_odf_protocol().int_err()?;
 
-        {
-            let mut path_segments = res_url.path_segments_mut().unwrap();
-            if let Some(account_name) = account_name_maybe {
-                path_segments.push(account_name);
-            }
-            path_segments.push(dataset_name);
+        if let Some(account_name) = account_name_maybe {
+            res_url = res_url.join(format!("{account_name}/").as_str()).unwrap();
         }
+        res_url = res_url.join(dataset_name).unwrap();
+
         Ok(res_url)
     }
 
@@ -111,9 +109,10 @@ impl RemoteAliasResolverImpl {
 
 #[async_trait::async_trait]
 impl RemoteAliasResolver for RemoteAliasResolverImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(dataset_handle, ?dataset_push_target_maybe))]
     async fn resolve_push_target(
         &self,
-        local_dataset_handle: &odf::DatasetHandle,
+        dataset_handle: &DatasetHandle,
         dataset_push_target_maybe: Option<odf::DatasetPushTarget>,
     ) -> Result<RemoteTarget, ResolveAliasError> {
         let (repo_name, mut account_name, dataset_name) = if let Some(dataset_push_target) =
@@ -134,7 +133,7 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             }
         } else {
             if let Some(remote_url) = self
-                .fetch_remote_url(local_dataset_handle, RemoteAliasKind::Push)
+                .fetch_remote_url(dataset_handle, RemoteAliasKind::Push)
                 .await?
             {
                 return Ok(RemoteTarget::new(remote_url, None, None, None));
@@ -172,7 +171,7 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             dn
         } else {
             self.resolve_remote_dataset_name(
-                local_dataset_handle,
+                dataset_handle,
                 &transfer_url,
                 access_token_maybe.as_ref(),
             )

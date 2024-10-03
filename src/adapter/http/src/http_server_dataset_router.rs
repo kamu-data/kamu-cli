@@ -11,6 +11,7 @@ use axum::{Extension, Json};
 use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::{ApiError, ApiErrorResponse, IntoApiError, ResultIntoApiError};
+use kamu_core::TenancyConfig;
 use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
 use utoipa_axum::router::OpenApiRouter;
@@ -58,22 +59,21 @@ pub fn smart_transfer_protocol_router() -> OpenApiRouter {
 
 pub fn add_dataset_resolver_layer(
     dataset_router: OpenApiRouter,
-    multi_tenant: bool,
+    tenancy_config: TenancyConfig,
 ) -> OpenApiRouter {
     use axum::extract::Path;
 
-    if multi_tenant {
-        dataset_router.layer(DatasetResolverLayer::new(
+    match tenancy_config {
+        TenancyConfig::MultiTenant => dataset_router.layer(DatasetResolverLayer::new(
             |Path(p): Path<DatasetByAccountAndName>| {
                 odf::DatasetAlias::new(Some(p.account_name), p.dataset_name).into_local_ref()
             },
             is_dataset_optional_for_request,
-        ))
-    } else {
-        dataset_router.layer(DatasetResolverLayer::new(
+        )),
+        TenancyConfig::SingleTenant => dataset_router.layer(DatasetResolverLayer::new(
             |Path(p): Path<DatasetByName>| p.dataset_name.as_local_ref(),
             is_dataset_optional_for_request,
-        ))
+        )),
     }
 }
 

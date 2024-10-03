@@ -9,6 +9,7 @@
 
 use clap::CommandFactory as _;
 use dill::Catalog;
+use kamu::domain::TenancyConfig;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 
@@ -22,6 +23,13 @@ pub fn get_command(
     cli_catalog: &Catalog,
     args: cli::Cli,
 ) -> Result<Box<dyn Command>, CLIError> {
+    let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
+    let tenancy_config = if workspace_svc.is_multi_tenant_workspace() {
+        TenancyConfig::MultiTenant
+    } else {
+        TenancyConfig::SingleTenant
+    };
+
     let command: Box<dyn Command> = match args.command {
         cli::Command::Add(c) => Box::new(AddCommand::new(
             cli_catalog.get_one()?,
@@ -36,9 +44,9 @@ pub fn get_command(
             c.stdin,
             c.visibility.into(),
             cli_catalog.get_one()?,
+            tenancy_config,
         )),
         cli::Command::Complete(c) => {
-            let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
             let in_workspace =
                 workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()?;
 
@@ -122,7 +130,7 @@ pub fn get_command(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     c.exists_ok,
-                    c.multi_tenant,
+                    tenancy_config,
                 ))
             }
         }
@@ -150,7 +158,6 @@ pub fn get_command(
             )),
         },
         cli::Command::List(c) => {
-            let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
             let user_config = cli_catalog.get_one::<kamu_accounts::PredefinedAccountsConfig>()?;
 
             Box::new(ListCommand::new(
@@ -158,7 +165,7 @@ pub fn get_command(
                 cli_catalog.get_one()?,
                 accounts::AccountService::current_account_indication(
                     args.account,
-                    workspace_svc.is_multi_tenant_workspace(),
+                    tenancy_config,
                     user_config.as_ref(),
                 ),
                 accounts::AccountService::related_account_indication(
@@ -166,6 +173,7 @@ pub fn get_command(
                     c.all_accounts,
                 ),
                 cli_catalog.get_one()?,
+                tenancy_config,
                 c.wide,
             ))
         }
@@ -254,7 +262,7 @@ pub fn get_command(
                 Box::new(SetWatermarkCommand::new(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
-                    cli_catalog.get_one()?,
+                    tenancy_config,
                     c.dataset.unwrap_or_default(),
                     c.all,
                     c.recursive,
@@ -266,6 +274,7 @@ pub fn get_command(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
+                    tenancy_config,
                     c.dataset.unwrap_or_default(),
                     cli_catalog.get_one()?,
                     c.all,
@@ -289,6 +298,7 @@ pub fn get_command(
             c.to,
             c.visibility.into(),
             cli_catalog.get_one()?,
+            tenancy_config,
         )),
         cli::Command::Rename(c) => Box::new(RenameCommand::new(
             cli_catalog.get_one()?,
@@ -313,6 +323,7 @@ pub fn get_command(
             )),
             cli::RepoSubCommand::Alias(sc) => match sc.subcommand {
                 cli::RepoAliasSubCommand::Add(ssc) => Box::new(AliasAddCommand::new(
+                    cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     ssc.dataset,
@@ -397,24 +408,20 @@ pub fn get_command(
         },
         cli::Command::System(c) => match c.subcommand {
             cli::SystemSubCommand::ApiServer(sc) => match sc.subcommand {
-                None => {
-                    let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
-
-                    Box::new(APIServerRunCommand::new(
-                        base_catalog.clone(),
-                        cli_catalog.clone(),
-                        workspace_svc.is_multi_tenant_workspace(),
-                        cli_catalog.get_one()?,
-                        sc.address,
-                        sc.http_port,
-                        sc.external_address,
-                        sc.get_token,
-                        cli_catalog.get_one()?,
-                        cli_catalog.get_one()?,
-                        cli_catalog.get_one()?,
-                        args.e2e_output_data_path,
-                    ))
-                }
+                None => Box::new(APIServerRunCommand::new(
+                    base_catalog.clone(),
+                    cli_catalog.clone(),
+                    tenancy_config,
+                    cli_catalog.get_one()?,
+                    sc.address,
+                    sc.http_port,
+                    sc.external_address,
+                    sc.get_token,
+                    cli_catalog.get_one()?,
+                    cli_catalog.get_one()?,
+                    cli_catalog.get_one()?,
+                    args.e2e_output_data_path,
+                )),
                 Some(cli::SystemApiServerSubCommand::GqlQuery(ssc)) => Box::new(
                     APIServerGqlQueryCommand::new(base_catalog.clone(), ssc.query, ssc.full),
                 ),
@@ -464,6 +471,7 @@ pub fn get_command(
             cli::SystemSubCommand::Ipfs(sc) => match sc.subcommand {
                 cli::SystemIpfsSubCommand::Add(ssc) => Box::new(SystemIpfsAddCommand::new(
                     cli_catalog.get_one()?,
+                    cli_catalog.get_one()?,
                     ssc.dataset,
                 )),
             },
@@ -479,7 +487,6 @@ pub fn get_command(
             cli_catalog.get_one()?,
         )),
         cli::Command::Ui(c) => {
-            let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
             let current_account_subject = cli_catalog.get_one::<CurrentAccountSubject>()?;
 
             let current_account_name = match current_account_subject.as_ref() {
@@ -491,7 +498,7 @@ pub fn get_command(
 
             Box::new(UICommand::new(
                 base_catalog.clone(),
-                workspace_svc.is_multi_tenant_workspace(),
+                tenancy_config,
                 current_account_name,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
@@ -525,15 +532,11 @@ pub fn get_command(
 pub fn command_needs_transaction(args: &cli::Cli) -> bool {
     match &args.command {
         cli::Command::System(c) => match &c.subcommand {
-            cli::SystemSubCommand::GenerateToken(_) => true,
-            _ => false,
+            cli::SystemSubCommand::ApiServer(_) => false,
+            _ => true,
         },
-        cli::Command::Add(_)
-        | cli::Command::Delete(_)
-        | cli::Command::Rename(_)
-        | cli::Command::Push(_)
-        | cli::Command::Pull(_) => true,
-        _ => false,
+        cli::Command::Ui(_) => false,
+        _ => true,
     }
 }
 

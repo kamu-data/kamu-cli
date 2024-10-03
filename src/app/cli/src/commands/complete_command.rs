@@ -21,7 +21,7 @@ use super::{CLIError, Command};
 use crate::config::ConfigService;
 
 pub struct CompleteCommand {
-    dataset_repo: Option<Arc<dyn DatasetRepository>>,
+    dataset_registry: Option<Arc<dyn DatasetRegistry>>,
     remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
     remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
     config_service: Arc<ConfigService>,
@@ -34,7 +34,7 @@ pub struct CompleteCommand {
 // but we have to do this until clap supports custom completer functions
 impl CompleteCommand {
     pub fn new<S>(
-        dataset_repo: Option<Arc<dyn DatasetRepository>>,
+        dataset_registry: Option<Arc<dyn DatasetRegistry>>,
         remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
         remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
         config_service: Arc<ConfigService>,
@@ -46,7 +46,7 @@ impl CompleteCommand {
         S: Into<String>,
     {
         Self {
-            dataset_repo,
+            dataset_registry,
             remote_repo_reg,
             remote_alias_reg,
             config_service,
@@ -74,8 +74,8 @@ impl CompleteCommand {
     }
 
     async fn complete_dataset(&self, output: &mut impl Write, prefix: &str) {
-        if let Some(repo) = self.dataset_repo.as_ref() {
-            let mut datasets = repo.get_all_datasets();
+        if let Some(registry) = self.dataset_registry.as_ref() {
+            let mut datasets = registry.all_dataset_handles();
             while let Some(dataset_handle) = datasets.try_next().await.unwrap() {
                 if dataset_handle.alias.dataset_name.starts_with(prefix) {
                     writeln!(output, "{}", dataset_handle.alias).unwrap();
@@ -95,14 +95,11 @@ impl CompleteCommand {
     }
 
     async fn complete_alias(&self, output: &mut impl Write, prefix: &str) {
-        if let Some(repo) = self.dataset_repo.as_ref() {
+        if let Some(registry) = self.dataset_registry.as_ref() {
             if let Some(reg) = self.remote_alias_reg.as_ref() {
-                let mut datasets = repo.get_all_datasets();
-                while let Some(dataset_handle) = datasets.try_next().await.unwrap() {
-                    let aliases = reg
-                        .get_remote_aliases(&dataset_handle.as_local_ref())
-                        .await
-                        .unwrap();
+                let mut datasets = registry.all_dataset_handles();
+                while let Some(hdl) = datasets.try_next().await.unwrap() {
+                    let aliases = reg.get_remote_aliases(&hdl).await.unwrap();
                     for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
                         if alias.to_string().starts_with(prefix) {
                             writeln!(output, "{alias}").unwrap();

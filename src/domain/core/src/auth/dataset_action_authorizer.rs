@@ -40,6 +40,18 @@ pub trait DatasetActionAuthorizer: Sync + Send {
     }
 
     async fn get_allowed_actions(&self, dataset_handle: &DatasetHandle) -> HashSet<DatasetAction>;
+
+    async fn filter_datasets_allowing(
+        &self,
+        dataset_handles: Vec<DatasetHandle>,
+        action: DatasetAction,
+    ) -> Result<Vec<DatasetHandle>, InternalError>;
+
+    async fn classify_datasets_by_allowance(
+        &self,
+        dataset_handles: Vec<DatasetHandle>,
+        action: DatasetAction,
+    ) -> Result<ClassifyByAllowanceResponse, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,6 +105,14 @@ pub struct DatasetActionNotEnoughPermissionsError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
+pub struct ClassifyByAllowanceResponse {
+    pub authorized_handles: Vec<DatasetHandle>,
+    pub unauthorized_handles_with_errors: Vec<(DatasetHandle, DatasetActionUnauthorizedError)>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[component(pub)]
 #[interface(dyn DatasetActionAuthorizer)]
 pub struct AlwaysHappyDatasetActionAuthorizer {}
@@ -116,6 +136,25 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
 
     async fn get_allowed_actions(&self, _dataset_handle: &DatasetHandle) -> HashSet<DatasetAction> {
         HashSet::from([DatasetAction::Read, DatasetAction::Write])
+    }
+
+    async fn filter_datasets_allowing(
+        &self,
+        dataset_handles: Vec<DatasetHandle>,
+        _action: DatasetAction,
+    ) -> Result<Vec<DatasetHandle>, InternalError> {
+        Ok(dataset_handles)
+    }
+
+    async fn classify_datasets_by_allowance(
+        &self,
+        dataset_handles: Vec<DatasetHandle>,
+        _action: DatasetAction,
+    ) -> Result<ClassifyByAllowanceResponse, InternalError> {
+        Ok(ClassifyByAllowanceResponse {
+            authorized_handles: dataset_handles,
+            unauthorized_handles_with_errors: vec![],
+        })
     }
 }
 

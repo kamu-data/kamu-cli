@@ -12,6 +12,7 @@ use std::sync::Arc;
 use internal_error::{BoxedError, InternalError};
 use opendatafabric::*;
 use thiserror::Error;
+use url::Url;
 
 use crate::utils::metadata_chain_comparator::CompareChainsError;
 use crate::*;
@@ -24,31 +25,77 @@ use crate::*;
 pub trait SyncService: Send + Sync {
     async fn sync(
         &self,
-        src: &DatasetRefAny,
-        dst: &DatasetRefAny,
+        request: SyncRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError>;
 
-    async fn sync_multi(
-        &self,
-        requests: Vec<SyncRequest>,
-        options: SyncOptions,
-        listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<SyncResultMulti>;
-
     /// Adds dataset to IPFS and returns the root CID.
     /// Unlike `sync` it does not do IPNS resolution and publishing.
-    async fn ipfs_add(&self, src: &DatasetRef) -> Result<String, SyncError>;
+    async fn ipfs_add(&self, src: ResolvedDataset) -> Result<String, IpfsAddError>;
 }
 
-#[derive(Debug, Clone)]
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
 pub struct SyncRequest {
-    pub src: DatasetRefAny,
-    pub dst: DatasetRefAny,
+    pub src: SyncRef,
+    pub dst: SyncRef,
 }
 
 #[derive(Debug, Clone)]
+pub enum SyncRef {
+    Local(ResolvedDataset),
+    LocalNew(DatasetAlias),
+    Remote(SyncRefRemote),
+}
+
+impl SyncRef {
+    pub fn is_local(&self) -> bool {
+        match self {
+            Self::Local(_) | Self::LocalNew(_) => true,
+            Self::Remote(_) => false,
+        }
+    }
+
+    // If remote, refers to resolved repository URL
+    pub fn as_internal_any_ref(&self) -> DatasetRefAny {
+        match self {
+            Self::Local(local_ref) => local_ref.get_handle().as_any_ref(),
+            Self::LocalNew(alias) => alias.as_any_ref(),
+            Self::Remote(remote_ref) => DatasetRefAny::Url(remote_ref.url.clone()),
+        }
+    }
+
+    // If remote, returns the original unresolved ref
+    pub fn as_user_friendly_any_ref(&self) -> DatasetRefAny {
+        match self {
+            Self::Local(local_ref) => local_ref.get_handle().as_any_ref(),
+            Self::LocalNew(alias) => alias.as_any_ref(),
+            Self::Remote(remote_ref) => remote_ref.original_remote_ref.as_any_ref(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct SyncRefRemote {
+    pub url: Arc<Url>,
+    pub dataset: Arc<dyn Dataset>,
+    pub original_remote_ref: DatasetRefRemote,
+}
+
+impl std::fmt::Debug for SyncRefRemote {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SyncRefRemote")
+            .field("url", &self.url)
+            .field("original_remote_ref", &self.original_remote_ref)
+            .finish_non_exhaustive()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone)]
 pub struct SyncOptions {
     /// Whether the source of data can be assumed non-malicious to skip hash sum
     /// and other expensive checks. Defaults to `true` when the source is
@@ -76,6 +123,8 @@ impl Default for SyncOptions {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SyncResult {
     UpToDate,
@@ -84,13 +133,6 @@ pub enum SyncResult {
         new_head: Multihash,
         num_blocks: u64,
     },
-}
-
-#[derive(Debug)]
-pub struct SyncResultMulti {
-    pub src: DatasetRefAny,
-    pub dst: DatasetRefAny,
-    pub result: Result<SyncResult, SyncError>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -178,6 +220,8 @@ pub enum SyncError {
     #[error(transparent)]
     UnsupportedProtocol(#[from] UnsupportedProtocolError),
     #[error(transparent)]
+    UnsupportedIpfsStorageType(#[from] UnsupportedIpfsStorageTypeError),
+    #[error(transparent)]
     RepositoryNotFound(
         #[from]
         #[backtrace]
@@ -200,6 +244,21 @@ pub enum SyncError {
         #[backtrace]
         AccessError,
     ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum IpfsAddError {
+    #[error(transparent)]
+    UnsupportedIpfsStorageType(#[from] UnsupportedIpfsStorageTypeError),
+
     #[error(transparent)]
     Internal(
         #[from]
@@ -297,15 +356,6 @@ impl From<GetDatasetError> for SyncError {
     }
 }
 
-impl From<auth::DatasetActionUnauthorizedError> for SyncError {
-    fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
-        match v {
-            auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
 impl From<GetRepoError> for SyncError {
     fn from(v: GetRepoError) -> Self {
         match v {
@@ -327,9 +377,28 @@ impl From<BuildDatasetError> for SyncError {
 impl From<CompareChainsError> for SyncError {
     fn from(v: CompareChainsError) -> Self {
         match v {
-            CompareChainsError::Corrupted(e) => SyncError::Corrupted(e),
-            CompareChainsError::Access(e) => SyncError::Access(e),
-            CompareChainsError::Internal(e) => SyncError::Internal(e),
+            CompareChainsError::Corrupted(e) => Self::Corrupted(e),
+            CompareChainsError::Access(e) => Self::Access(e),
+            CompareChainsError::Internal(e) => Self::Internal(e),
         }
     }
 }
+
+impl From<IpfsAddError> for SyncError {
+    fn from(v: IpfsAddError) -> Self {
+        match v {
+            IpfsAddError::UnsupportedIpfsStorageType(e) => Self::UnsupportedIpfsStorageType(e),
+            IpfsAddError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("Dataset storage type '{}' is unsupported for IPFS operations", url.scheme())]
+pub struct UnsupportedIpfsStorageTypeError {
+    pub url: Url,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

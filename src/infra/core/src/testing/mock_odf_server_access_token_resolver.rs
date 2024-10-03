@@ -14,6 +14,7 @@ use url::Url;
 
 mockall::mock! {
     pub OdfServerAccessTokenResolver {}
+
     #[async_trait::async_trait]
     impl OdfServerAccessTokenResolver for OdfServerAccessTokenResolver {
         fn resolve_odf_dataset_access_token(

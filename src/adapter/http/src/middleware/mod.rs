@@ -11,10 +11,8 @@ mod authentication_layer;
 mod dataset_authorization_layer;
 mod dataset_resolver_layer;
 mod headers;
-mod run_in_database_transaction_layer;
 
 pub use authentication_layer::*;
 pub use dataset_authorization_layer::*;
 pub use dataset_resolver_layer::*;
 pub use headers::*;
-pub use run_in_database_transaction_layer::*;

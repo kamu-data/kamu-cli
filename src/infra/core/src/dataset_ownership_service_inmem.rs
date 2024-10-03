@@ -19,7 +19,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageConsumptionDurability,
+    MessageDeliveryMechanism,
 };
 use opendatafabric::{AccountID, AccountName, DatasetID};
 
@@ -45,7 +45,7 @@ struct State {
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_CORE_DATASET_OWNERSHIP_SERVICE,
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE],
-    durability: MessageConsumptionDurability::BestEffort,
+    delivery: MessageDeliveryMechanism::Immediate,
 })]
 #[scope(Singleton)]
 impl DatasetOwnershipServiceInMemory {
@@ -203,7 +203,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetOwnershipServiceInMemo
 
 pub struct DatasetOwnershipServiceInMemoryStateInitializer {
     current_account_subject: Arc<CurrentAccountSubject>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     authentication_service: Arc<dyn AuthenticationService>,
     dataset_ownership_service: Arc<DatasetOwnershipServiceInMemory>,
 }
@@ -218,13 +218,13 @@ pub struct DatasetOwnershipServiceInMemoryStateInitializer {
 impl DatasetOwnershipServiceInMemoryStateInitializer {
     pub fn new(
         current_account_subject: Arc<CurrentAccountSubject>,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         authentication_service: Arc<dyn AuthenticationService>,
         dataset_ownership_service: Arc<DatasetOwnershipServiceInMemory>,
     ) -> Self {
         Self {
             current_account_subject,
-            dataset_repo,
+            dataset_registry,
             authentication_service,
             dataset_ownership_service,
         }
@@ -254,7 +254,7 @@ impl InitOnStartup for DatasetOwnershipServiceInMemoryStateInitializer {
 
         let mut account_ids_by_name: HashMap<AccountName, AccountID> = HashMap::new();
 
-        let mut datasets_stream = self.dataset_repo.get_all_datasets();
+        let mut datasets_stream = self.dataset_registry.all_dataset_handles();
         while let Some(Ok(dataset_handle)) = datasets_stream.next().await {
             let account_name = match dataset_handle.alias.account_name {
                 Some(account_name) => account_name,

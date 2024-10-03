@@ -18,7 +18,6 @@ use dill::{component, interface};
 use domain::{
     CompactionError,
     CompactionListener,
-    CompactionMultiListener,
     CompactionOptions,
     CompactionPhase,
     CompactionResult,
@@ -33,10 +32,7 @@ use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use opendatafabric::{
     Checkpoint,
-    DatasetHandle,
     DatasetKind,
-    DatasetRef,
-    DatasetRefPattern,
     DatasetVocabulary,
     MetadataEvent,
     Multihash,
@@ -48,12 +44,11 @@ use random_names::get_random_name;
 use time_source::SystemTimeSource;
 use url::Url;
 
-use crate::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use crate::*;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct CompactionServiceImpl {
-    dataset_repo: Arc<dyn DatasetRepository>,
-    dataset_authorizer: Arc<dyn domain::auth::DatasetActionAuthorizer>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     time_source: Arc<dyn SystemTimeSource>,
     run_info_dir: Arc<RunInfoDir>,
@@ -99,19 +94,17 @@ struct ChainFilesInfo {
     data_slice_batches: Vec<DataSliceBatch>,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[component(pub)]
 #[interface(dyn CompactionService)]
 impl CompactionServiceImpl {
     pub fn new(
-        dataset_authorizer: Arc<dyn domain::auth::DatasetActionAuthorizer>,
-        dataset_repo: Arc<dyn DatasetRepository>,
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
         time_source: Arc<dyn SystemTimeSource>,
         run_info_dir: Arc<RunInfoDir>,
     ) -> Self {
         Self {
-            dataset_repo,
-            dataset_authorizer,
             object_store_registry,
             time_source,
             run_info_dir,
@@ -120,7 +113,7 @@ impl CompactionServiceImpl {
 
     async fn gather_chain_info(
         &self,
-        dataset: Arc<dyn Dataset>,
+        target: &ResolvedDataset,
         max_slice_size: u64,
         max_slice_records: u64,
         keep_metadata_only: bool,
@@ -137,10 +130,10 @@ impl CompactionServiceImpl {
 
         ////////////////////////////////////////////////////////////////////////////////
 
-        let chain = dataset.as_metadata_chain();
+        let chain = target.as_metadata_chain();
         let head = chain.resolve_ref(&BlockRef::Head).await?;
         let mut block_stream = chain.iter_blocks_interval(&head, None, false);
-        let object_data_repo = dataset.as_data_repo();
+        let object_data_repo = target.as_data_repo();
 
         while let Some((block_hash, block)) = block_stream.try_next().await? {
             old_num_blocks += 1;
@@ -315,10 +308,10 @@ impl CompactionServiceImpl {
 
     async fn commit_new_blocks(
         &self,
-        dataset: Arc<dyn Dataset>,
+        target: &ResolvedDataset,
         chain_files_info: &ChainFilesInfo,
     ) -> Result<(Vec<Url>, Multihash, usize), CompactionError> {
-        let chain = dataset.as_metadata_chain();
+        let chain = target.as_metadata_chain();
         let mut current_head = chain_files_info.old_head.clone();
         let mut old_data_slices: Vec<Url> = vec![];
         // set it to 1 to include seed block
@@ -329,7 +322,7 @@ impl CompactionServiceImpl {
                 DataSliceBatch::SingleBlock(block_hash) => {
                     let block = chain.get_block(block_hash).await.int_err()?;
 
-                    let commit_result = dataset
+                    let commit_result = target
                         .commit_event(
                             block.event,
                             CommitOpts {
@@ -366,7 +359,7 @@ impl CompactionServiceImpl {
                         .clone()
                         .map(|r| CheckpointRef::Existed(r.physical_hash));
 
-                    let commit_result = dataset
+                    let commit_result = target
                         .commit_add_data(
                             add_data_params,
                             Some(OwnedFile::new(
@@ -394,10 +387,10 @@ impl CompactionServiceImpl {
         Ok((old_data_slices, current_head, new_num_blocks))
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn compact_dataset_impl(
         &self,
-        dataset: Arc<dyn Dataset>,
+        target: ResolvedDataset,
         max_slice_size: u64,
         max_slice_records: u64,
         keep_metadata_only: bool,
@@ -408,7 +401,7 @@ impl CompactionServiceImpl {
         listener.begin_phase(CompactionPhase::GatherChainInfo);
         let mut chain_files_info = self
             .gather_chain_info(
-                dataset.clone(),
+                &target,
                 max_slice_size,
                 max_slice_records,
                 keep_metadata_only,
@@ -430,11 +423,10 @@ impl CompactionServiceImpl {
         .await?;
 
         listener.begin_phase(CompactionPhase::CommitNewBlocks);
-        let (_old_data_slices, new_head, new_num_blocks) = self
-            .commit_new_blocks(dataset.clone(), &chain_files_info)
-            .await?;
+        let (_old_data_slices, new_head, new_num_blocks) =
+            self.commit_new_blocks(&target, &chain_files_info).await?;
 
-        dataset
+        target
             .as_metadata_chain()
             .set_ref(
                 &BlockRef::Head,
@@ -459,22 +451,18 @@ impl CompactionServiceImpl {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 impl CompactionService for CompactionServiceImpl {
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", skip_all, fields(target=?target.get_handle(), ?options))]
     async fn compact_dataset(
         &self,
-        dataset_handle: &DatasetHandle,
+        target: ResolvedDataset,
         options: CompactionOptions,
         maybe_listener: Option<Arc<dyn CompactionListener>>,
     ) -> Result<CompactionResult, CompactionError> {
-        self.dataset_authorizer
-            .check_action_allowed(dataset_handle, domain::auth::DatasetAction::Write)
-            .await?;
-
-        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
-
-        let dataset_kind = dataset
+        let dataset_kind = target
             .get_summary(GetSummaryOpts::default())
             .await
             .int_err()?
@@ -483,7 +471,7 @@ impl CompactionService for CompactionServiceImpl {
         if !options.keep_metadata_only && dataset_kind != DatasetKind::Root {
             return Err(CompactionError::InvalidDatasetKind(
                 InvalidDatasetKindError {
-                    dataset_name: dataset_handle.alias.dataset_name.clone(),
+                    dataset_alias: target.get_alias().clone(),
                 },
             ));
         }
@@ -497,7 +485,7 @@ impl CompactionService for CompactionServiceImpl {
 
         match self
             .compact_dataset_impl(
-                dataset,
+                target,
                 max_slice_size,
                 max_slice_records,
                 options.keep_metadata_only,
@@ -515,44 +503,6 @@ impl CompactionService for CompactionServiceImpl {
             }
         }
     }
-
-    async fn compact_multi(
-        &self,
-        dataset_refs: Vec<DatasetRef>,
-        options: CompactionOptions,
-        multi_listener: Option<Arc<dyn CompactionMultiListener>>,
-    ) -> Vec<CompactionResponse> {
-        let filtered_dataset_results = filter_datasets_by_local_pattern(
-            self.dataset_repo.as_ref(),
-            dataset_refs
-                .into_iter()
-                .map(DatasetRefPattern::Ref)
-                .collect(),
-        )
-        .try_collect()
-        .await;
-
-        let dataset_handles: Vec<_> = if let Ok(matched_datasets) = filtered_dataset_results {
-            matched_datasets
-        } else {
-            return vec![];
-        };
-
-        let listener = multi_listener.unwrap_or(Arc::new(NullCompactionMultiListener {}));
-
-        let mut result = vec![];
-        for dataset_handle in &dataset_handles {
-            result.push(CompactionResponse {
-                dataset_ref: dataset_handle.as_local_ref(),
-                result: self
-                    .compact_dataset(
-                        dataset_handle,
-                        options.clone(),
-                        listener.begin_compact(dataset_handle),
-                    )
-                    .await,
-            });
-        }
-        result
-    }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

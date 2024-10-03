@@ -29,19 +29,17 @@ use crate::mock_engine_provisioner;
 
 struct TransformTestHarness {
     _tempdir: TempDir,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
-    transform_service: Arc<TransformServiceImpl>,
+    transform_request_planner: Arc<dyn TransformRequestPlanner>,
+    transform_elab_svc: Arc<dyn TransformElaborationService>,
+    transform_exec_svc: Arc<dyn TransformExecutionService>,
     compaction_service: Arc<dyn CompactionService>,
     push_ingest_svc: Arc<PushIngestServiceImpl>,
 }
 
 impl TransformTestHarness {
-    pub fn new_custom<
-        TAuthorizer: auth::DatasetActionAuthorizer + 'static,
-        TEngineProvisioner: EngineProvisioner + 'static,
-    >(
-        dataset_action_authorizer: TAuthorizer,
+    pub fn new_custom<TEngineProvisioner: EngineProvisioner + 'static>(
         engine_provisioner: TEngineProvisioner,
     ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
@@ -53,15 +51,11 @@ impl TransformTestHarness {
         let catalog = dill::CatalogBuilder::new()
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CurrentAccountSubject::new_test())
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(false),
-            )
+            .add_value(TenancyConfig::SingleTenant)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add_value(dataset_action_authorizer)
-            .bind::<dyn auth::DatasetActionAuthorizer, TAuthorizer>()
             .add::<SystemTimeSourceDefault>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
@@ -71,25 +65,26 @@ impl TransformTestHarness {
             .bind::<dyn PushIngestService, PushIngestServiceImpl>()
             .add_value(engine_provisioner)
             .bind::<dyn EngineProvisioner, TEngineProvisioner>()
-            .add::<TransformServiceImpl>()
+            .add::<TransformRequestPlannerImpl>()
+            .add::<TransformElaborationServiceImpl>()
+            .add::<TransformExecutionServiceImpl>()
             .add::<VerificationServiceImpl>()
             .build();
 
         Self {
             _tempdir: tempdir,
-            dataset_repo: catalog.get_one().unwrap(),
+            dataset_registry: catalog.get_one().unwrap(),
             dataset_repo_writer: catalog.get_one().unwrap(),
-            transform_service: catalog.get_one().unwrap(),
             compaction_service: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
+            transform_request_planner: catalog.get_one().unwrap(),
+            transform_elab_svc: catalog.get_one().unwrap(),
+            transform_exec_svc: catalog.get_one().unwrap(),
         }
     }
 
     pub fn new() -> Self {
-        Self::new_custom(
-            auth::AlwaysHappyDatasetActionAuthorizer::new(),
-            EngineProvisionerNull,
-        )
+        Self::new_custom(EngineProvisionerNull)
     }
 
     pub async fn new_root(&self, name: &str) -> DatasetHandle {
@@ -112,7 +107,7 @@ impl TransformTestHarness {
         &self,
         name: &str,
         inputs: &[DatasetAlias],
-    ) -> (DatasetHandle, SetTransform) {
+    ) -> (CreateDatasetResult, SetTransform) {
         let transform = MetadataFactory::set_transform()
             .inputs_from_refs(inputs)
             .build();
@@ -129,7 +124,7 @@ impl TransformTestHarness {
             .await
             .unwrap()
             .create_dataset_result;
-        (create_result.dataset_handle, transform)
+        (create_result, transform)
     }
 
     pub async fn append_block(
@@ -137,12 +132,13 @@ impl TransformTestHarness {
         dataset_ref: impl Into<DatasetRef>,
         block: MetadataBlock,
     ) -> Multihash {
-        let ds = self
-            .dataset_repo
-            .find_dataset_by_ref(&dataset_ref.into())
+        let resolved_dataset = self
+            .dataset_registry
+            .get_dataset_by_ref(&dataset_ref.into())
             .await
             .unwrap();
-        ds.as_metadata_chain()
+        resolved_dataset
+            .as_metadata_chain()
             .append(block, AppendOpts::default())
             .await
             .unwrap()
@@ -154,12 +150,12 @@ impl TransformTestHarness {
         alias: &DatasetAlias,
         records: u64,
     ) -> (Multihash, MetadataBlockTyped<AddData>) {
-        let ds = self
-            .dataset_repo
-            .find_dataset_by_ref(&alias.as_local_ref())
+        let resolved_dataset = self
+            .dataset_registry
+            .get_dataset_by_ref(&alias.as_local_ref())
             .await
             .unwrap();
-        let chain = ds.as_metadata_chain();
+        let chain = resolved_dataset.as_metadata_chain();
         let offset = chain
             .iter_blocks()
             .filter_map_ok(|(_, b)| b.event.into_variant::<AddData>())
@@ -188,12 +184,12 @@ impl TransformTestHarness {
         (block_hash, block.into_typed::<AddData>().unwrap())
     }
 
-    async fn ingest_data(&self, data_str: String, dataset_ref: &DatasetRef) {
+    async fn ingest_data(&self, data_str: String, dataset_created: &CreateDatasetResult) {
         let data = std::io::Cursor::new(data_str);
 
         self.push_ingest_svc
             .ingest_from_file_stream(
-                dataset_ref,
+                ResolvedDataset::from(dataset_created),
                 None,
                 Box::new(data),
                 PushIngestOpts::default(),
@@ -201,6 +197,46 @@ impl TransformTestHarness {
             )
             .await
             .unwrap();
+    }
+
+    async fn elaborate_transform(
+        &self,
+        deriv_dataset: &CreateDatasetResult,
+        options: TransformOptions,
+    ) -> Result<TransformElaboration, TransformElaborateError> {
+        let target = ResolvedDataset::from(deriv_dataset);
+        self.transform_elab_svc
+            .elaborate_transform(
+                target.clone(),
+                self.transform_request_planner
+                    .build_transform_preliminary_plan(target)
+                    .await
+                    .unwrap(),
+                options,
+                None,
+            )
+            .await
+    }
+
+    async fn transform(
+        &self,
+        deriv_dataset: &CreateDatasetResult,
+        options: TransformOptions,
+    ) -> Result<TransformResult, TransformError> {
+        let target = ResolvedDataset::from(deriv_dataset);
+        let elaboration = self
+            .elaborate_transform(deriv_dataset, options)
+            .await
+            .map_err(TransformError::Elaborate)?;
+        match elaboration {
+            TransformElaboration::UpToDate => Ok(TransformResult::UpToDate),
+            TransformElaboration::Elaborated(plan) => self
+                .transform_exec_svc
+                .execute_transform(target, plan, None)
+                .await
+                .1
+                .map_err(TransformError::Execute),
+        }
     }
 }
 
@@ -214,21 +250,22 @@ async fn test_get_next_operation() {
     let (bar, bar_source) = harness.new_deriv("bar", &[foo.alias.clone()]).await;
 
     // No data - no work
-    assert_eq!(
-        harness
-            .transform_service
-            .get_next_operation(&bar, Utc::now())
-            .await
-            .unwrap(),
-        None
-    );
+    let elaboration = harness
+        .elaborate_transform(&bar, TransformOptions::default())
+        .await
+        .unwrap();
+    assert_matches!(elaboration, TransformElaboration::UpToDate);
 
     let (foo_head, foo_block) = harness.append_data_block(&foo.alias, 10).await;
     let foo_slice = foo_block.event.new_data.as_ref().unwrap();
 
+    let elaboration = harness
+        .elaborate_transform(&bar, TransformOptions::default())
+        .await
+        .unwrap();
     assert!(matches!(
-        harness.transform_service.get_next_operation(&bar, Utc::now()).await.unwrap(),
-        Some(TransformRequestExt{ transform, inputs, .. })
+        elaboration,
+        TransformElaboration::Elaborated(TransformPlan { request: TransformRequestExt{ transform, inputs, .. }, datasets_map: _ } )
         if transform == bar_source.transform &&
         inputs == vec![TransformRequestInputExt {
             dataset_handle: foo.clone(),
@@ -246,63 +283,6 @@ async fn test_get_next_operation() {
             }],
         }]
     ));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_transform_enforces_authorization() {
-    let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new()
-        .expect_check_read_dataset(
-            &DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
-            1,
-            true,
-        )
-        .expect_check_write_dataset(
-            &DatasetAlias::new(None, DatasetName::new_unchecked("bar")),
-            1,
-            true,
-        );
-
-    let harness = TransformTestHarness::new_custom(
-        mock_dataset_action_authorizer,
-        mock_engine_provisioner::MockEngineProvisioner::new().stub_provision_engine(),
-    );
-
-    let foo = harness.new_root("foo").await;
-    let (_, _) = harness.append_data_block(&foo.alias, 10).await;
-
-    let (bar, _) = harness.new_deriv("bar", &[foo.alias.clone()]).await;
-
-    let transform_result = harness
-        .transform_service
-        .transform(&bar.as_local_ref(), TransformOptions::default(), None)
-        .await;
-
-    assert_matches!(transform_result, Ok(_));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_transform_unauthorized() {
-    let harness = TransformTestHarness::new_custom(
-        MockDatasetActionAuthorizer::denying(),
-        EngineProvisionerNull,
-    );
-
-    let foo = harness.new_root("foo").await;
-    let (bar, _) = harness.new_deriv("bar", &[foo.alias.clone()]).await;
-
-    let transform_result = harness
-        .transform_service
-        .transform(&bar.as_local_ref(), TransformOptions::default(), None)
-        .await;
-
-    assert_matches!(
-        transform_result,
-        Err(TransformError::Access(AccessError::Forbidden(_)))
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -390,7 +370,7 @@ async fn test_get_verification_plan_one_to_one() {
         .unwrap()
         .new_head;
 
-    let deriv_hdl = deriv_create_result.dataset_handle;
+    let deriv_hdl = &deriv_create_result.dataset_handle;
     let deriv_initial_sequence_number = 2;
 
     // T1: Root data added
@@ -429,15 +409,21 @@ async fn test_get_verification_plan_one_to_one() {
 
     // T2: Transform [SEED; T1]
     let t2 = Utc.with_ymd_and_hms(2020, 1, 2, 12, 0, 0).unwrap();
-    let deriv_req_t2 = harness
-        .transform_service
-        .get_next_operation(&deriv_hdl, t2)
+    let deriv_req_t2 = match harness
+        .elaborate_transform(&deriv_create_result, TransformOptions::default())
         .await
         .unwrap()
-        .unwrap();
+    {
+        TransformElaboration::Elaborated(plan) => TransformRequestExt {
+            system_time: t2,
+            ..plan.request
+        },
+        TransformElaboration::UpToDate => panic!("Unexpected transform elab status"),
+    };
+
     let deriv_head_t2 = harness
         .append_block(
-            &deriv_hdl,
+            deriv_hdl,
             MetadataFactory::metadata_block(ExecuteTransform {
                 query_inputs: vec![ExecuteTransformInput {
                     dataset_id: root_hdl.id.clone(),
@@ -501,15 +487,20 @@ async fn test_get_verification_plan_one_to_one() {
 
     // T4: Transform (T1; T3]
     let t4 = Utc.with_ymd_and_hms(2020, 1, 4, 12, 0, 0).unwrap();
-    let deriv_req_t4 = harness
-        .transform_service
-        .get_next_operation(&deriv_hdl, t4)
+    let deriv_req_t4 = match harness
+        .elaborate_transform(&deriv_create_result, TransformOptions::default())
         .await
         .unwrap()
-        .unwrap();
+    {
+        TransformElaboration::Elaborated(plan) => TransformRequestExt {
+            system_time: t4,
+            ..plan.request
+        },
+        TransformElaboration::UpToDate => panic!("Unexpected transform elab status"),
+    };
     let deriv_head_t4 = harness
         .append_block(
-            &deriv_hdl,
+            deriv_hdl,
             MetadataFactory::metadata_block(ExecuteTransform {
                 query_inputs: vec![ExecuteTransformInput {
                     dataset_id: root_hdl.id.clone(),
@@ -559,15 +550,20 @@ async fn test_get_verification_plan_one_to_one() {
 
     // T6: Transform (T3; T5]
     let t6 = Utc.with_ymd_and_hms(2020, 1, 6, 12, 0, 0).unwrap();
-    let deriv_req_t6 = harness
-        .transform_service
-        .get_next_operation(&deriv_hdl, t6)
+    let deriv_req_t6 = match harness
+        .elaborate_transform(&deriv_create_result, TransformOptions::default())
         .await
         .unwrap()
-        .unwrap();
+    {
+        TransformElaboration::Elaborated(plan) => TransformRequestExt {
+            system_time: t6,
+            ..plan.request
+        },
+        TransformElaboration::UpToDate => panic!("Unexpected transform elab status"),
+    };
     let deriv_head_t6 = harness
         .append_block(
-            &deriv_hdl,
+            deriv_hdl,
             MetadataFactory::metadata_block(ExecuteTransform {
                 query_inputs: vec![ExecuteTransformInput {
                     dataset_id: root_hdl.id.clone(),
@@ -596,44 +592,47 @@ async fn test_get_verification_plan_one_to_one() {
         )
         .await;
 
-    let plan = harness
-        .transform_service
-        .get_verification_plan(&deriv_hdl, (None, None))
+    let operation: VerifyTransformOperation = harness
+        .transform_request_planner
+        .build_transform_verification_plan(
+            ResolvedDataset::from(&deriv_create_result),
+            (None, None),
+        )
         .await
         .unwrap();
 
-    let deriv_ds = harness.dataset_repo.get_dataset_by_handle(&deriv_hdl);
-    let deriv_chain = deriv_ds.as_metadata_chain();
+    let deriv_chain = deriv_create_result.dataset.as_metadata_chain();
 
-    assert_eq!(plan.len(), 3);
+    assert_eq!(operation.steps.len(), 3);
 
-    assert_eq!(plan[0].expected_hash, deriv_head_t2);
+    assert_eq!(operation.steps[0].expected_hash, deriv_head_t2);
     assert_eq!(
-        plan[0].expected_block,
+        operation.steps[0].expected_block,
         deriv_chain.get_block(&deriv_head_t2).await.unwrap()
     );
 
-    assert_eq!(plan[1].expected_hash, deriv_head_t4);
+    assert_eq!(operation.steps[1].expected_hash, deriv_head_t4);
     assert_eq!(
-        plan[1].expected_block,
+        operation.steps[1].expected_block,
         deriv_chain.get_block(&deriv_head_t4).await.unwrap()
     );
 
-    assert_eq!(plan[2].expected_hash, deriv_head_t6);
+    assert_eq!(operation.steps[2].expected_hash, deriv_head_t6);
     assert_eq!(
-        plan[2].expected_block,
+        operation.steps[2].expected_block,
         deriv_chain.get_block(&deriv_head_t6).await.unwrap()
     );
 
-    assert_requests_equivalent(&plan[0].request, deriv_req_t2);
-    assert_requests_equivalent(&plan[1].request, deriv_req_t4);
-    assert_requests_equivalent(&plan[2].request, deriv_req_t6);
+    assert_requests_equivalent(&operation.steps[0].request, deriv_req_t2);
+    assert_requests_equivalent(&operation.steps[1].request, deriv_req_t4);
+    assert_requests_equivalent(&operation.steps[2].request, deriv_req_t6);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_transform_with_compaction_retry() {
     let harness = TransformTestHarness::new_custom(
-        auth::AlwaysHappyDatasetActionAuthorizer::new(),
         mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
     );
     let root_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
@@ -680,10 +679,7 @@ async fn test_transform_with_compaction_retry() {
             "
     );
     harness
-        .ingest_data(
-            data_str.to_string(),
-            &foo_created_result.dataset_handle.as_local_ref(),
-        )
+        .ingest_data(data_str.to_string(), &foo_created_result)
         .await;
     let data_str = indoc!(
         "
@@ -694,56 +690,43 @@ async fn test_transform_with_compaction_retry() {
             "
     );
     harness
-        .ingest_data(
-            data_str.to_string(),
-            &foo_created_result.dataset_handle.as_local_ref(),
-        )
+        .ingest_data(data_str.to_string(), &foo_created_result)
         .await;
 
     let (bar, _) = harness
         .new_deriv("bar", &[foo_created_result.dataset_handle.alias.clone()])
         .await;
 
-    let transform_result = harness
-        .transform_service
-        .transform(&bar.as_local_ref(), TransformOptions::default(), None)
-        .await;
-
+    let transform_result = harness.transform(&bar, TransformOptions::default()).await;
     assert_matches!(transform_result, Ok(TransformResult::Updated { .. }));
+
+    let foo_dataset = harness
+        .dataset_registry
+        .get_dataset_by_handle(&foo_created_result.dataset_handle);
 
     harness
         .compaction_service
-        .compact_dataset(
-            &foo_created_result.dataset_handle,
-            CompactionOptions::default(),
-            None,
-        )
+        .compact_dataset(foo_dataset, CompactionOptions::default(), None)
         .await
         .unwrap();
 
-    let transform_result = harness
-        .transform_service
-        .transform(&bar.as_local_ref(), TransformOptions::default(), None)
-        .await;
+    let transform_result = harness.transform(&bar, TransformOptions::default()).await;
 
     assert_matches!(
         transform_result,
-        Err(TransformError::InvalidInputInterval(
-            InvalidInputIntervalError { .. }
+        Err(TransformError::Elaborate(
+            TransformElaborateError::InvalidInputInterval(InvalidInputIntervalError { .. })
         ))
     );
 
     let transform_result = harness
-        .transform_service
         .transform(
-            &bar.as_local_ref(),
+            &bar,
             TransformOptions {
                 reset_derivatives_on_diverged_input: true,
             },
-            None,
         )
         .await;
-
     assert_matches!(transform_result, Ok(TransformResult::Updated { .. }));
 }
 

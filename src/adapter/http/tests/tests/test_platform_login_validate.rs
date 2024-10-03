@@ -22,6 +22,7 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_http::{LoginRequestBody, LoginResponseBody};
+use kamu_core::TenancyConfig;
 use opendatafabric::AccountName;
 use serde_json::json;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -85,7 +86,7 @@ impl Harness {
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 0));
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-        let api_server = TestAPIServer::new(catalog, listener, true);
+        let api_server = TestAPIServer::new(catalog, listener, TenancyConfig::MultiTenant);
 
         Self {
             run_info_dir,

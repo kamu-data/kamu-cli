@@ -16,9 +16,9 @@ use opendatafabric::*;
 use super::{CLIError, Command};
 
 pub struct SetWatermarkCommand {
-    dataset_repo: Arc<dyn DatasetRepository>,
-    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    pull_svc: Arc<dyn PullService>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    set_watermark_use_case: Arc<dyn SetWatermarkUseCase>,
+    tenancy_config: TenancyConfig,
     refs: Vec<DatasetRefAnyPattern>,
     all: bool,
     recursive: bool,
@@ -27,9 +27,9 @@ pub struct SetWatermarkCommand {
 
 impl SetWatermarkCommand {
     pub fn new<I, S>(
-        dataset_repo: Arc<dyn DatasetRepository>,
-        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        pull_svc: Arc<dyn PullService>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
+        set_watermark_use_case: Arc<dyn SetWatermarkUseCase>,
+        tenancy_config: TenancyConfig,
         refs: I,
         all: bool,
         recursive: bool,
@@ -40,9 +40,9 @@ impl SetWatermarkCommand {
         I: IntoIterator<Item = DatasetRefAnyPattern>,
     {
         Self {
-            dataset_repo,
-            remote_alias_reg,
-            pull_svc,
+            dataset_registry,
+            set_watermark_use_case,
+            tenancy_config,
             refs: refs.into_iter().collect(),
             all,
             recursive,
@@ -80,38 +80,25 @@ impl Command for SetWatermarkCommand {
         let dataset_ref = self.refs[0]
             .as_dataset_ref_any()
             .unwrap()
-            .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
+            .as_local_ref(|_| self.tenancy_config == TenancyConfig::SingleTenant)
             .map_err(|_| CLIError::usage_error("Expected a local dataset reference"))?;
 
-        let aliases = self
-            .remote_alias_reg
-            .get_remote_aliases(&dataset_ref)
+        let dataset_handle = self
+            .dataset_registry
+            .resolve_dataset_handle_by_ref(&dataset_ref)
             .await
-            .map_err(CLIError::failure)?;
-        let pull_aliases: Vec<_> = aliases
-            .get_by_kind(RemoteAliasKind::Pull)
-            .map(ToString::to_string)
-            .collect();
-
-        if !pull_aliases.is_empty() {
-            // TODO: Should this check be performed at domain model level?
-            return Err(CLIError::usage_error(format!(
-                "Setting watermark on a remote dataset will cause histories to diverge. Existing \
-                 pull aliases:\n{}",
-                pull_aliases.join("\n- ")
-            )));
-        }
+            .map_err(CLIError::critical)?;
 
         match self
-            .pull_svc
-            .set_watermark(&dataset_ref, watermark.into())
+            .set_watermark_use_case
+            .execute(&dataset_handle, watermark.into())
             .await
         {
-            Ok(PullResult::UpToDate(_)) => {
+            Ok(SetWatermarkResult::UpToDate) => {
                 eprintln!("{}", console::style("Watermark was up-to-date").yellow());
                 Ok(())
             }
-            Ok(PullResult::Updated { new_head, .. }) => {
+            Ok(SetWatermarkResult::Updated { new_head, .. }) => {
                 eprintln!(
                     "{}",
                     console::style(format!(
@@ -125,7 +112,6 @@ impl Command for SetWatermarkCommand {
             Err(
                 e @ (SetWatermarkError::IsDerivative
                 | SetWatermarkError::IsRemote
-                | SetWatermarkError::NotFound(_)
                 | SetWatermarkError::Access(_)),
             ) => Err(CLIError::failure(e)),
             Err(e @ SetWatermarkError::Internal(_)) => Err(CLIError::critical(e)),

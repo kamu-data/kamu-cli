@@ -25,6 +25,22 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = dataset_entry_repo::test_stream_many_entries,
+    harness = InMemoryDatasetEntryRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_entry_repo::test_get_multiple_entries,
+    harness = InMemoryDatasetEntryRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = dataset_entry_repo::test_get_dataset_entry_by_name,
     harness = InMemoryDatasetEntryRepositoryHarness
 );

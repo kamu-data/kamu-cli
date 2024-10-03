@@ -20,12 +20,13 @@ use kamu::testing::{
     MockDatasetChangesService,
     MockDependencyGraphRepository,
     MockPollingIngestService,
-    MockTransformService,
+    MockTransformRequestPlanner,
 };
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
     DatasetOwnershipServiceInMemory,
     DatasetOwnershipServiceInMemoryStateInitializer,
+    DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
@@ -54,7 +55,7 @@ async fn test_list_account_flows() {
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
@@ -136,7 +137,7 @@ async fn test_list_account_flows() {
 async fn test_list_datasets_with_flow() {
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
@@ -248,7 +249,7 @@ async fn test_pause_resume_account_flows() {
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
@@ -454,7 +455,7 @@ async fn test_account_configs_all_paused() {
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
@@ -631,7 +632,7 @@ struct FlowConfigHarness {
 struct FlowRunsHarnessOverrides {
     dependency_graph_mock: Option<MockDependencyGraphRepository>,
     dataset_changes_mock: Option<MockDatasetChangesService>,
-    transform_service_mock: Option<MockTransformService>,
+    transform_planner_mock: Option<MockTransformRequestPlanner>,
     polling_service_mock: Option<MockPollingIngestService>,
     mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
 }
@@ -644,7 +645,7 @@ impl FlowConfigHarness {
 
         let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
         let dependency_graph_mock = overrides.dependency_graph_mock.unwrap_or_default();
-        let transform_service_mock = overrides.transform_service_mock.unwrap_or_default();
+        let transform_planner_mock = overrides.transform_planner_mock.unwrap_or_default();
         let polling_service_mock = overrides.polling_service_mock.unwrap_or_default();
         let mock_dataset_action_authorizer =
             overrides.mock_dataset_action_authorizer.unwrap_or_default();
@@ -657,13 +658,11 @@ impl FlowConfigHarness {
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(true),
-            )
+            .add_value(TenancyConfig::MultiTenant)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add_value(dataset_changes_mock)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
@@ -685,8 +684,8 @@ impl FlowConfigHarness {
             ))
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
-            .add_value(transform_service_mock)
-            .bind::<dyn TransformService, MockTransformService>()
+            .add_value(transform_planner_mock)
+            .bind::<dyn TransformRequestPlanner, MockTransformRequestPlanner>()
             .add_value(polling_service_mock)
             .bind::<dyn PollingIngestService, MockPollingIngestService>()
             .add::<DatasetOwnershipServiceInMemory>()

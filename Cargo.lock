@@ -5161,6 +5161,7 @@ dependencies = [
  "filetime",
  "flatbuffers",
  "flate2",
+ "fs_extra",
  "futures",
  "glob",
  "hex",
@@ -5170,6 +5171,7 @@ dependencies = [
  "init-on-startup",
  "internal-error",
  "itertools 0.13.0",
+ "kamu",
  "kamu-accounts",
  "kamu-accounts-inmem",
  "kamu-accounts-services",
@@ -5185,6 +5187,7 @@ dependencies = [
  "mockall",
  "nanoid",
  "object_store",
+ "oop",
  "opendatafabric",
  "parking_lot",
  "petgraph",
@@ -6041,7 +6044,8 @@ dependencies = [
  "serde",
  "serde_with",
  "sqlx",
- "thiserror 1.0.69",
+ "thiserror",
+ "tokio-stream",
  "uuid",
 ]
 
@@ -6049,11 +6053,13 @@ dependencies = [
 name = "kamu-datasets-inmem"
 version = "0.207.3"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "database-common",
  "database-common-macros",
  "dill",
+ "futures",
  "internal-error",
  "kamu-accounts-inmem",
  "kamu-datasets",
@@ -6072,11 +6078,13 @@ dependencies = [
 name = "kamu-datasets-postgres"
 version = "0.207.3"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "database-common",
  "database-common-macros",
  "dill",
+ "futures",
  "internal-error",
  "kamu-accounts-postgres",
  "kamu-datasets",
@@ -6098,6 +6106,7 @@ dependencies = [
  "chrono",
  "database-common",
  "dill",
+ "futures",
  "kamu-accounts",
  "kamu-datasets",
  "opendatafabric",
@@ -6109,6 +6118,7 @@ dependencies = [
 name = "kamu-datasets-services"
 version = "0.207.3"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "database-common",
@@ -6140,11 +6150,13 @@ dependencies = [
 name = "kamu-datasets-sqlite"
 version = "0.207.3"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "database-common",
  "database-common-macros",
  "dill",
+ "futures",
  "internal-error",
  "kamu-accounts-sqlite",
  "kamu-datasets",
@@ -6464,6 +6476,7 @@ dependencies = [
  "database-common",
  "enum-variants",
  "event-sourcing",
+ "internal-error",
  "kamu-core",
  "messaging-outbox",
  "opendatafabric",
@@ -6540,8 +6553,12 @@ dependencies = [
  "futures",
  "init-on-startup",
  "internal-error",
+ "kamu",
+ "kamu-accounts",
  "kamu-core",
  "kamu-datasets",
+ "kamu-datasets-inmem",
+ "kamu-datasets-services",
  "kamu-task-system",
  "kamu-task-system-inmem",
  "messaging-outbox",
@@ -6549,6 +6566,7 @@ dependencies = [
  "observability",
  "opendatafabric",
  "serde_json",
+ "tempfile",
  "test-log",
  "time-source",
  "tokio",
@@ -7474,6 +7492,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 dependencies = [
  "parking_lot_core",
+]
+
+[[package]]
+name = "oop"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a3014baf68cf315fbfc3c3d69efd1f79fea3c3ac44d9cd9e10b7cf8fd8e4920"
+dependencies = [
+ "oop-macro",
+]
+
+[[package]]
+name = "oop-macro"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e493043dcf88be852a9716f7b065640867a72cab403f360003534e8cbf11bf84"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
 ]
 
 [[package]]

@@ -22,7 +22,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageConsumptionDurability,
+    MessageDeliveryMechanism,
 };
 
 use crate::{RebacServiceImpl, MESSAGE_CONSUMER_KAMU_REBAC_SERVICE};
@@ -41,7 +41,7 @@ pub struct MultiTenantRebacDatasetLifecycleMessageConsumer {
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
     ],
-    durability: MessageConsumptionDurability::Durable,
+    delivery: MessageDeliveryMechanism::Immediate,
 })]
 impl MultiTenantRebacDatasetLifecycleMessageConsumer {
     pub fn new(rebac_service: Arc<RebacServiceImpl>) -> Self {

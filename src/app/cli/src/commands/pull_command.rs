@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -26,10 +27,11 @@ use crate::output::OutputConfig;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PullCommand {
-    pull_svc: Arc<dyn PullService>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     search_svc: Arc<dyn SearchService>,
     output_config: Arc<OutputConfig>,
+    tenancy_config: TenancyConfig,
     refs: Vec<DatasetRefAnyPattern>,
     current_account_subject: Arc<CurrentAccountSubject>,
     all: bool,
@@ -43,10 +45,11 @@ pub struct PullCommand {
 
 impl PullCommand {
     pub fn new<I>(
-        pull_svc: Arc<dyn PullService>,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         search_svc: Arc<dyn SearchService>,
         output_config: Arc<OutputConfig>,
+        tenancy_config: TenancyConfig,
         refs: I,
         current_account_subject: Arc<CurrentAccountSubject>,
         all: bool,
@@ -61,10 +64,11 @@ impl PullCommand {
         I: IntoIterator<Item = DatasetRefAnyPattern>,
     {
         Self {
-            pull_svc,
-            dataset_repo,
+            pull_dataset_use_case,
+            dataset_registry,
             search_svc,
             output_config,
+            tenancy_config,
             refs: refs.into_iter().collect(),
             current_account_subject,
             all,
@@ -93,20 +97,28 @@ impl PullCommand {
             }
         };
 
-        Ok(self
-            .pull_svc
-            .pull_multi_ext(
-                vec![PullRequest {
-                    local_ref: Some(local_name.into()),
-                    remote_ref: Some(remote_ref),
-                }],
-                PullMultiOptions {
+        self.pull_dataset_use_case
+            .execute_multi(
+                vec![PullRequest::remote(
+                    remote_ref,
+                    Some(DatasetAlias::new(
+                        match self.tenancy_config {
+                            TenancyConfig::MultiTenant => {
+                                Some(self.current_account_subject.account_name().clone())
+                            }
+                            TenancyConfig::SingleTenant => None,
+                        },
+                        local_name.clone(),
+                    )),
+                )],
+                PullOptions {
                     add_aliases: self.add_aliases,
                     ..Default::default()
                 },
                 listener,
             )
-            .await?)
+            .await
+            .map_err(CLIError::failure)
     }
 
     async fn pull_multi(
@@ -114,12 +126,13 @@ impl PullCommand {
         listener: Option<Arc<dyn PullMultiListener>>,
         current_account_name: &AccountName,
     ) -> Result<Vec<PullResponse>, CLIError> {
-        let dataset_refs: Vec<_> = if !self.all {
+        let dataset_any_refs: Vec<_> = if !self.all {
             filter_datasets_by_any_pattern(
-                self.dataset_repo.as_ref(),
+                self.dataset_registry.as_ref(),
                 self.search_svc.clone(),
                 self.refs.clone(),
                 current_account_name,
+                self.tenancy_config,
             )
             .try_collect()
             .await?
@@ -127,34 +140,48 @@ impl PullCommand {
             vec![]
         };
 
-        Ok(self
-            .pull_svc
-            .pull_multi(
-                dataset_refs,
-                PullMultiOptions {
-                    recursive: self.recursive,
-                    all: self.all,
-                    add_aliases: self.add_aliases,
-                    reset_derivatives_on_diverged_input: self.reset_derivatives_on_diverged_input,
-                    ingest_options: PollingIngestOptions {
-                        fetch_uncacheable: self.fetch_uncacheable,
-                        exhaust_sources: true,
-                        dataset_env_vars: HashMap::new(),
-                        schema_inference: SchemaInferenceOpts::default(),
-                    },
-                    sync_options: SyncOptions {
-                        force: self.force,
-                        ..SyncOptions::default()
-                    },
-                },
-                listener,
-            )
-            .await?)
+        let options = PullOptions {
+            recursive: self.recursive,
+            add_aliases: self.add_aliases,
+            ingest_options: PollingIngestOptions {
+                fetch_uncacheable: self.fetch_uncacheable,
+                exhaust_sources: true,
+                dataset_env_vars: HashMap::new(),
+                schema_inference: SchemaInferenceOpts::default(),
+            },
+            transform_options: TransformOptions {
+                reset_derivatives_on_diverged_input: self.reset_derivatives_on_diverged_input,
+            },
+            sync_options: SyncOptions {
+                force: self.force,
+                ..SyncOptions::default()
+            },
+        };
+
+        if self.all {
+            self.pull_dataset_use_case
+                .execute_all_owned(options, listener)
+                .await
+                .map_err(CLIError::failure)
+        } else {
+            let requests = dataset_any_refs
+                .into_iter()
+                .map(|r| {
+                    PullRequest::from_any_ref(&r, |_| {
+                        self.tenancy_config == TenancyConfig::SingleTenant
+                    })
+                })
+                .collect();
+
+            self.pull_dataset_use_case
+                .execute_multi(requests, options, listener)
+                .await
+                .map_err(CLIError::failure)
+        }
     }
 
     async fn pull_with_progress(&self) -> Result<Vec<PullResponse>, CLIError> {
-        let pull_progress =
-            PrettyPullProgress::new(self.fetch_uncacheable, self.dataset_repo.is_multi_tenant());
+        let pull_progress = PrettyPullProgress::new(self.fetch_uncacheable, self.tenancy_config);
         let listener = Arc::new(pull_progress.clone());
         self.pull(Some(listener)).await
     }
@@ -163,30 +190,23 @@ impl PullCommand {
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
-        let current_account_name = match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => {
-                return Err(CLIError::usage_error(
-                    "Anonymous account misused, use multi-tenant alias",
-                ))
-            }
-            CurrentAccountSubject::Logged(l) => &l.account_name,
-        };
         if self.as_name.is_some() {
             self.sync_from(listener).await
         } else {
+            let current_account_name = self.current_account_subject.account_name();
             self.pull_multi(listener, current_account_name).await
         }
     }
 
     fn describe_response(&self, pr: &PullResponse) -> String {
-        let local_ref = pr.local_ref.as_ref().or(pr
-            .original_request
+        let local_ref = pr.maybe_local_ref.as_ref().map(Cow::Borrowed).or(pr
+            .maybe_original_request
             .as_ref()
-            .and_then(|r| r.local_ref.as_ref()));
-        let remote_ref = pr.remote_ref.as_ref().or(pr
-            .original_request
+            .and_then(PullRequest::local_ref));
+        let remote_ref = pr.maybe_remote_ref.as_ref().or(pr
+            .maybe_original_request
             .as_ref()
-            .and_then(|r| r.remote_ref.as_ref()));
+            .and_then(|r| r.remote_ref()));
         match (local_ref, remote_ref) {
             (Some(local_ref), Some(remote_ref)) => {
                 format!("sync {local_ref} from {remote_ref}")
@@ -278,15 +298,15 @@ impl Command for PullCommand {
 struct PrettyPullProgress {
     multi_progress: Arc<indicatif::MultiProgress>,
     fetch_uncacheable: bool,
-    multi_tenant_workspace: bool,
+    tenancy_config: TenancyConfig,
 }
 
 impl PrettyPullProgress {
-    fn new(fetch_uncacheable: bool, multi_tenant_workspace: bool) -> Self {
+    fn new(fetch_uncacheable: bool, tenancy_config: TenancyConfig) -> Self {
         Self {
             multi_progress: Arc::new(indicatif::MultiProgress::new()),
             fetch_uncacheable,
-            multi_tenant_workspace,
+            tenancy_config,
         }
     }
 }
@@ -337,7 +357,7 @@ impl SyncMultiListener for PrettyPullProgress {
         dst: &DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
-            dst.as_local_ref(|_| !self.multi_tenant_workspace)
+            dst.as_local_ref(|_| self.tenancy_config == TenancyConfig::SingleTenant)
                 .expect("Expected local ref"),
             src.as_remote_ref(|_| true).expect("Expected remote ref"),
             self.multi_progress.clone(),
@@ -693,14 +713,25 @@ impl TransformListener for PrettyTransformProgress {
             .finish_with_message(Self::spinner_message(&self.dataset_handle, 0, msg));
     }
 
-    fn error(&self, _error: &TransformError) {
+    fn elaborate_error(&self, _error: &TransformElaborateError) {
         self.curr_progress
             .lock()
             .unwrap()
             .finish_with_message(Self::spinner_message(
                 &self.dataset_handle,
                 0,
-                console::style("Failed to update derivative dataset").red(),
+                console::style("Failed to update derivative dataset (elaborate phase)").red(),
+            ));
+    }
+
+    fn execute_error(&self, _error: &TransformExecuteError) {
+        self.curr_progress
+            .lock()
+            .unwrap()
+            .finish_with_message(Self::spinner_message(
+                &self.dataset_handle,
+                0,
+                console::style("Failed to update derivative dataset (execute phase)").red(),
             ));
     }
 

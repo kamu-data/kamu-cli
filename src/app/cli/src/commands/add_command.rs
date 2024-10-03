@@ -21,7 +21,7 @@ use crate::{Interact, OutputConfig};
 pub struct AddCommand {
     interact: Arc<Interact>,
     resource_loader: Arc<dyn ResourceLoader>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
     delete_dataset: Arc<dyn DeleteDatasetUseCase>,
     snapshot_refs: Vec<String>,
@@ -31,13 +31,14 @@ pub struct AddCommand {
     stdin: bool,
     dataset_visibility: DatasetVisibility,
     output_config: Arc<OutputConfig>,
+    tenancy_config: TenancyConfig,
 }
 
 impl AddCommand {
     pub fn new<I, S>(
         interact: Arc<Interact>,
         resource_loader: Arc<dyn ResourceLoader>,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
         delete_dataset: Arc<dyn DeleteDatasetUseCase>,
         snapshot_refs_iter: I,
@@ -47,6 +48,7 @@ impl AddCommand {
         stdin: bool,
         dataset_visibility: DatasetVisibility,
         output_config: Arc<OutputConfig>,
+        tenancy_config: TenancyConfig,
     ) -> Self
     where
         I: IntoIterator<Item = S>,
@@ -55,7 +57,7 @@ impl AddCommand {
         Self {
             interact,
             resource_loader,
-            dataset_repo,
+            dataset_registry,
             create_dataset_from_snapshot,
             delete_dataset,
             snapshot_refs: snapshot_refs_iter.into_iter().map(Into::into).collect(),
@@ -65,6 +67,7 @@ impl AddCommand {
             stdin,
             dataset_visibility,
             output_config,
+            tenancy_config,
         }
     }
 
@@ -229,7 +232,9 @@ impl Command for AddCommand {
                 "Name override can be used only when adding a single manifest",
             ));
         }
-        if !self.dataset_repo.is_multi_tenant() && !self.dataset_visibility.is_private() {
+        if self.tenancy_config == TenancyConfig::SingleTenant
+            && !self.dataset_visibility.is_private()
+        {
             return Err(CLIError::usage_error(
                 "Only multi-tenant workspaces support non-private dataset visibility",
             ));
@@ -274,8 +279,8 @@ impl Command for AddCommand {
             let mut already_exist = Vec::new();
             for s in &snapshots {
                 if let Some(hdl) = self
-                    .dataset_repo
-                    .try_resolve_dataset_ref(&s.name.as_local_ref())
+                    .dataset_registry
+                    .try_resolve_dataset_handle_by_ref(&s.name.as_local_ref())
                     .await?
                 {
                     already_exist.push(hdl);

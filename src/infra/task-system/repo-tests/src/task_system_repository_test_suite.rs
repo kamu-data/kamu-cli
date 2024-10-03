@@ -59,9 +59,9 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     let event_1 = TaskEventCreated {
         event_time: Utc::now(),
         task_id: task_id_1,
-        logical_plan: Probe {
+        logical_plan: LogicalPlanProbe {
             dataset_id: Some(dataset_id.clone()),
-            ..Probe::default()
+            ..LogicalPlanProbe::default()
         }
         .into(),
         metadata: None,
@@ -70,9 +70,9 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     let event_2 = TaskEventCreated {
         event_time: Utc::now(),
         task_id: task_id_2,
-        logical_plan: Probe {
+        logical_plan: LogicalPlanProbe {
             dataset_id: Some(dataset_id.clone()),
-            ..Probe::default()
+            ..LogicalPlanProbe::default()
         }
         .into(),
         metadata: None,
@@ -137,9 +137,9 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     let event_1 = TaskEventCreated {
         event_time: Utc::now(),
         task_id,
-        logical_plan: Probe {
+        logical_plan: LogicalPlanProbe {
             dataset_id: Some(dataset_id.clone()),
-            ..Probe::default()
+            ..LogicalPlanProbe::default()
         }
         .into(),
         metadata: None,
@@ -235,9 +235,9 @@ pub async fn test_event_store_get_events_by_tasks(catalog: &Catalog) {
     let event_1_1 = TaskEventCreated {
         event_time: Utc::now(),
         task_id: task_id_1,
-        logical_plan: Probe {
+        logical_plan: LogicalPlanProbe {
             dataset_id: Some(dataset_id.clone()),
-            ..Probe::default()
+            ..LogicalPlanProbe::default()
         }
         .into(),
         metadata: None,
@@ -246,9 +246,9 @@ pub async fn test_event_store_get_events_by_tasks(catalog: &Catalog) {
     let event_2_1 = TaskEventCreated {
         event_time: Utc::now(),
         task_id: task_id_2,
-        logical_plan: Probe {
+        logical_plan: LogicalPlanProbe {
             dataset_id: Some(dataset_id.clone()),
-            ..Probe::default()
+            ..LogicalPlanProbe::default()
         }
         .into(),
         metadata: None,
@@ -349,9 +349,9 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     let event_1_1 = TaskEventCreated {
         event_time: Utc::now(),
         task_id: task_id_1_1,
-        logical_plan: Probe {
+        logical_plan: LogicalPlanProbe {
             dataset_id: Some(dataset_id_foo.clone()),
-            ..Probe::default()
+            ..LogicalPlanProbe::default()
         }
         .into(),
         metadata: None,
@@ -360,9 +360,9 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     let event_1_2 = TaskEventCreated {
         event_time: Utc::now(),
         task_id: task_id_1_2,
-        logical_plan: Probe {
+        logical_plan: LogicalPlanProbe {
             dataset_id: Some(dataset_id_foo.clone()),
-            ..Probe::default()
+            ..LogicalPlanProbe::default()
         }
         .into(),
         metadata: None,
@@ -371,9 +371,9 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     let event_2_1 = TaskEventCreated {
         event_time: Utc::now(),
         task_id: task_id_2_1,
-        logical_plan: Probe {
+        logical_plan: LogicalPlanProbe {
             dataset_id: Some(dataset_id_bar.clone()),
-            ..Probe::default()
+            ..LogicalPlanProbe::default()
         }
         .into(),
         metadata: None,
@@ -382,9 +382,9 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     let event_2_2 = TaskEventCreated {
         event_time: Utc::now(),
         task_id: task_id_2_2,
-        logical_plan: Probe {
+        logical_plan: LogicalPlanProbe {
             dataset_id: Some(dataset_id_bar.clone()),
-            ..Probe::default()
+            ..LogicalPlanProbe::default()
         }
         .into(),
         metadata: None,
@@ -523,7 +523,7 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
             vec![TaskEventCreated {
                 event_time: Utc::now(),
                 task_id: task_id_1,
-                logical_plan: Probe::default().into(),
+                logical_plan: LogicalPlanProbe::default().into(),
                 metadata: None,
             }
             .into()],
@@ -615,7 +615,7 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
                 vec![TaskEventCreated {
                     event_time: Utc::now(),
                     task_id,
-                    logical_plan: Probe::default().into(),
+                    logical_plan: LogicalPlanProbe::default().into(),
                     metadata: None,
                 }
                 .into()],
@@ -770,7 +770,7 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
                 vec![TaskEventCreated {
                     event_time: Utc::now(),
                     task_id,
-                    logical_plan: Probe::default().into(),
+                    logical_plan: LogicalPlanProbe::default().into(),
                     metadata: None,
                 }
                 .into()],
@@ -945,7 +945,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
             vec![TaskEventCreated {
                 event_time: Utc::now(),
                 task_id,
-                logical_plan: Probe::default().into(),
+                logical_plan: LogicalPlanProbe::default().into(),
                 metadata: None,
             }
             .into()],
@@ -961,7 +961,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
             vec![TaskEventCreated {
                 event_time: Utc::now(),
                 task_id,
-                logical_plan: Probe::default().into(),
+                logical_plan: LogicalPlanProbe::default().into(),
                 metadata: None,
             }
             .into()],

@@ -12,6 +12,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use ::serde::Deserialize;
 use axum::extract::{FromRequestParts, Path};
+use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -38,21 +39,23 @@ async fn setup_repo() -> RepoFixture {
     let datasets_dir = tmp_dir.path().join("datasets");
     std::fs::create_dir(&datasets_dir).unwrap();
 
-    let catalog = dill::CatalogBuilder::new()
-        .add::<SystemTimeSourceDefault>()
+    let mut b = dill::CatalogBuilder::new();
+    b.add::<SystemTimeSourceDefault>()
         .add::<DummyOutboxImpl>()
         .add::<DependencyGraphServiceInMemory>()
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(false),
-        )
+        .add_value(TenancyConfig::SingleTenant)
+        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+        .add::<DatasetRegistryRepoBridge>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-        .build();
+        .add::<DatabaseTransactionRunner>();
+
+    NoOpDatabasePlugin::init_database_components(&mut b);
+
+    let catalog = b.build();
 
     let create_dataset_from_snapshot = catalog
         .get_one::<dyn CreateDatasetFromSnapshotUseCase>()

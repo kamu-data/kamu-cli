@@ -18,6 +18,7 @@
 
 use std::sync::Arc;
 
+use auth::{DatasetAction, DatasetActionAuthorizer};
 use axum::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
@@ -58,7 +59,6 @@ impl ODataServiceContext {
     }
 }
 
-// TODO: Authorization checks
 #[async_trait]
 impl ServiceContext for ODataServiceContext {
     fn service_base_url(&self) -> String {
@@ -68,19 +68,28 @@ impl ServiceContext for ODataServiceContext {
     async fn list_collections(&self) -> Result<Vec<Arc<dyn CollectionContext>>, ODataError> {
         use futures::TryStreamExt;
 
-        let repo: Arc<dyn DatasetRepository> = self.catalog.get_one().unwrap();
+        let registry: Arc<dyn DatasetRegistry> = self.catalog.get_one().unwrap();
+        let authorizer: Arc<dyn DatasetActionAuthorizer> = self.catalog.get_one().unwrap();
 
-        let datasets = if let Some(account_name) = &self.account_name {
-            repo.get_datasets_by_owner(account_name)
+        let dataset_handles = if let Some(account_name) = &self.account_name {
+            registry.all_dataset_handles_by_owner(account_name)
         } else {
-            repo.get_all_datasets()
+            registry.all_dataset_handles()
         };
 
-        let datasets: Vec<_> = datasets.try_collect().await.unwrap();
+        let dataset_handles: Vec<_> = dataset_handles
+            .try_collect()
+            .await
+            .map_err(ODataError::internal)?;
+
+        let dataset_handles = authorizer
+            .filter_datasets_allowing(dataset_handles, DatasetAction::Read)
+            .await
+            .map_err(ODataError::internal)?;
 
         let mut collections: Vec<Arc<dyn CollectionContext>> = Vec::new();
-        for dataset_handle in datasets {
-            let dataset = repo.get_dataset_by_handle(&dataset_handle);
+        for dataset_handle in dataset_handles {
+            let resolved_dataset = registry.get_dataset_by_handle(&dataset_handle);
 
             collections.push(Arc::new(ODataCollectionContext {
                 catalog: self.catalog.clone(),
@@ -88,8 +97,7 @@ impl ServiceContext for ODataServiceContext {
                     name: dataset_handle.alias.dataset_name.to_string(),
                     key: None,
                 },
-                dataset_handle,
-                dataset,
+                resolved_dataset,
                 service_base_url: self.service_base_url.clone(),
             }));
         }
@@ -107,8 +115,7 @@ impl ServiceContext for ODataServiceContext {
 pub(crate) struct ODataCollectionContext {
     catalog: Catalog,
     addr: CollectionAddr,
-    dataset_handle: DatasetHandle,
-    dataset: Arc<dyn Dataset>,
+    resolved_dataset: ResolvedDataset,
     service_base_url: String,
 }
 
@@ -116,8 +123,7 @@ impl ODataCollectionContext {
     pub(crate) fn new(
         catalog: Catalog,
         addr: CollectionAddr,
-        dataset_handle: DatasetHandle,
-        dataset: Arc<dyn Dataset>,
+        resolved_dataset: ResolvedDataset,
     ) -> Self {
         let config = catalog.get_one::<ServerUrlConfig>().unwrap();
         let service_base_url = config.protocols.odata_base_url();
@@ -125,8 +131,7 @@ impl ODataCollectionContext {
         Self {
             catalog,
             addr,
-            dataset_handle,
-            dataset,
+            resolved_dataset,
             service_base_url,
         }
     }
@@ -155,14 +160,14 @@ impl CollectionContext for ODataCollectionContext {
     }
 
     fn collection_name(&self) -> Result<String, ODataError> {
-        Ok(self.dataset_handle.alias.dataset_name.to_string())
+        Ok(self.resolved_dataset.get_alias().dataset_name.to_string())
     }
 
     async fn last_updated_time(&self) -> DateTime<Utc> {
         use futures::TryStreamExt;
 
         let (_, last_block) = self
-            .dataset
+            .resolved_dataset
             .as_metadata_chain()
             .iter_blocks()
             .try_next()
@@ -178,7 +183,7 @@ impl CollectionContext for ODataCollectionContext {
         // See: https://github.com/kamu-data/kamu-cli/issues/306
 
         let set_data_schema = self
-            .dataset
+            .resolved_dataset
             .as_metadata_chain()
             .iter_blocks()
             .filter_map_ok(|(_, b)| b.event.into_variant::<SetDataSchema>())
@@ -206,7 +211,7 @@ impl CollectionContext for ODataCollectionContext {
             .unwrap_or(DEFAULT_RECORDS_PER_PAGE);
 
         let vocab: DatasetVocabulary = self
-            .dataset
+            .resolved_dataset
             .as_metadata_chain()
             .accept_one(SearchSetVocabVisitor::new())
             .await
@@ -218,7 +223,7 @@ impl CollectionContext for ODataCollectionContext {
         let query_svc: Arc<dyn QueryService> = self.catalog.get_one().unwrap();
 
         let df = query_svc
-            .get_data(&self.dataset_handle.as_local_ref())
+            .get_data(&self.resolved_dataset.get_handle().as_local_ref())
             .await
             .unwrap();
 

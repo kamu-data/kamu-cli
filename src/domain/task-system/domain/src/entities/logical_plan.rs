@@ -20,13 +20,13 @@ use crate::TaskOutcome;
 pub enum LogicalPlan {
     /// Perform an update on a dataset like update from polling source or a
     /// derivative transform
-    UpdateDataset(UpdateDataset),
+    UpdateDataset(LogicalPlanUpdateDataset),
     /// A task that can be used for testing the scheduling system
-    Probe(Probe),
+    Probe(LogicalPlanProbe),
     /// Perform a dataset hard compaction
-    HardCompactionDataset(HardCompactionDataset),
+    HardCompactDataset(LogicalPlanHardCompactDataset),
     /// Perform a dataset resetting
-    Reset(ResetDataset),
+    ResetDataset(LogicalPlanResetDataset),
 }
 
 impl LogicalPlan {
@@ -35,10 +35,8 @@ impl LogicalPlan {
         match self {
             LogicalPlan::UpdateDataset(upd) => Some(&upd.dataset_id),
             LogicalPlan::Probe(p) => p.dataset_id.as_ref(),
-            LogicalPlan::HardCompactionDataset(hard_compaction) => {
-                Some(&hard_compaction.dataset_id)
-            }
-            LogicalPlan::Reset(reset) => Some(&reset.dataset_id),
+            LogicalPlan::HardCompactDataset(hard_compaction) => Some(&hard_compaction.dataset_id),
+            LogicalPlan::ResetDataset(reset) => Some(&reset.dataset_id),
         }
     }
 }
@@ -48,7 +46,7 @@ impl LogicalPlan {
 /// Perform an update on a dataset like update from polling source or a
 /// derivative transform
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct UpdateDataset {
+pub struct LogicalPlanUpdateDataset {
     /// ID of the dataset to update
     pub dataset_id: DatasetID,
     pub fetch_uncacheable: bool,
@@ -58,7 +56,7 @@ pub struct UpdateDataset {
 
 /// A task that can be used for testing the scheduling system
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub struct Probe {
+pub struct LogicalPlanProbe {
     /// ID of the dataset this task should be associated with
     pub dataset_id: Option<DatasetID>,
     pub busy_time: Option<std::time::Duration>,
@@ -69,7 +67,7 @@ pub struct Probe {
 
 /// A task to perform a hard compaction of dataset
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct HardCompactionDataset {
+pub struct LogicalPlanHardCompactDataset {
     pub dataset_id: DatasetID,
     pub max_slice_size: Option<u64>,
     pub max_slice_records: Option<u64>,
@@ -80,7 +78,7 @@ pub struct HardCompactionDataset {
 
 /// A task to perform the resetting of a dataset
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResetDataset {
+pub struct LogicalPlanResetDataset {
     pub dataset_id: DatasetID,
     pub new_head_hash: Option<Multihash>,
     pub old_head_hash: Option<Multihash>,
@@ -91,5 +89,11 @@ pub struct ResetDataset {
 
 // TODO: Replace with derive macro
 impl_enum_with_variants!(LogicalPlan);
-impl_enum_variant!(LogicalPlan::UpdateDataset(UpdateDataset));
-impl_enum_variant!(LogicalPlan::Probe(Probe));
+impl_enum_variant!(LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset));
+impl_enum_variant!(LogicalPlan::Probe(LogicalPlanProbe));
+impl_enum_variant!(LogicalPlan::ResetDataset(LogicalPlanResetDataset));
+impl_enum_variant!(LogicalPlan::HardCompactDataset(
+    LogicalPlanHardCompactDataset
+));
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

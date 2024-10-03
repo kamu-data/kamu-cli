@@ -81,18 +81,18 @@ impl DatasetTestHelper {
     }
 
     pub async fn append_random_data(
-        dataset_repo: &dyn DatasetRepository,
+        dataset_registry: &dyn DatasetRegistry,
         dataset_ref: impl Into<DatasetRef>,
         data_size: usize,
     ) -> Multihash {
         let tmp_dir = tempfile::tempdir().unwrap();
 
-        let ds = dataset_repo
-            .find_dataset_by_ref(&dataset_ref.into())
+        let resolved_dataset = dataset_registry
+            .get_dataset_by_ref(&dataset_ref.into())
             .await
             .unwrap();
 
-        let prev_data = ds
+        let prev_data = resolved_dataset
             .as_metadata_chain()
             .iter_blocks()
             .filter_map_ok(|(_, b)| match b.event {
@@ -123,21 +123,22 @@ impl DatasetTestHelper {
             end: start + num_records - 1,
         };
 
-        ds.commit_add_data(
-            AddDataParams {
-                prev_checkpoint,
-                prev_offset,
-                new_offset_interval: Some(new_offset_interval),
-                new_watermark: None,
-                new_source_state: None,
-            },
-            Some(OwnedFile::new(data_path)),
-            Some(CheckpointRef::New(OwnedFile::new(checkpoint_path))),
-            CommitOpts::default(),
-        )
-        .await
-        .unwrap()
-        .new_head
+        resolved_dataset
+            .commit_add_data(
+                AddDataParams {
+                    prev_checkpoint,
+                    prev_offset,
+                    new_offset_interval: Some(new_offset_interval),
+                    new_watermark: None,
+                    new_source_state: None,
+                },
+                Some(OwnedFile::new(data_path)),
+                Some(CheckpointRef::New(OwnedFile::new(checkpoint_path))),
+                CommitOpts::default(),
+            )
+            .await
+            .unwrap()
+            .new_head
     }
 }
 

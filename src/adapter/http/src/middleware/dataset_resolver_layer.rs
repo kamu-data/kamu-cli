@@ -16,7 +16,9 @@ use axum::body::Body;
 use axum::extract::FromRequestParts;
 use axum::response::Response;
 use axum::RequestExt;
-use kamu_core::{DatasetRepository, GetDatasetError};
+use database_common::DatabaseTransactionRunner;
+use internal_error::InternalError;
+use kamu_core::{DatasetRegistry, DatasetRegistryExt, GetDatasetError, ResolvedDataset};
 use opendatafabric::DatasetRef;
 use tower::{Layer, Service};
 
@@ -141,21 +143,45 @@ where
                     .get::<dill::Catalog>()
                     .expect("Catalog not found in http server extensions");
 
-                let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+                enum CheckResult {
+                    CheckedDataset(ResolvedDataset),
+                    ErrorResponse(Response<Body>),
+                }
 
-                let dataset = match dataset_repo.find_dataset_by_ref(&dataset_ref).await {
-                    Ok(ds) => ds,
-                    Err(GetDatasetError::NotFound(err)) => {
-                        tracing::warn!("Dataset not found: {:?}", err);
-                        return Ok(not_found_response());
+                let dataset_ref = dataset_ref.clone();
+
+                let check_result: Result<CheckResult, InternalError> =
+                    DatabaseTransactionRunner::new(catalog.clone())
+                        .transactional(|transational_catalog| async move {
+                            let dataset_registry = transational_catalog
+                                .get_one::<dyn DatasetRegistry>()
+                                .unwrap();
+                            match dataset_registry.get_dataset_by_ref(&dataset_ref).await {
+                                Ok(resolved_dataset) => {
+                                    Ok(CheckResult::CheckedDataset(resolved_dataset))
+                                }
+                                Err(GetDatasetError::NotFound(err)) => {
+                                    tracing::warn!("Dataset not found: {:?}", err);
+                                    Ok(CheckResult::ErrorResponse(not_found_response()))
+                                }
+                                Err(err) => {
+                                    tracing::error!("Could not get dataset: {:?}", err);
+                                    Ok(CheckResult::ErrorResponse(internal_server_error_response()))
+                                }
+                            }
+                        })
+                        .await;
+
+                match check_result {
+                    Ok(CheckResult::CheckedDataset(target)) => {
+                        request.extensions_mut().insert((*target).clone());
                     }
+                    Ok(CheckResult::ErrorResponse(r)) => return Ok(r),
                     Err(err) => {
-                        tracing::error!("Could not get dataset: {:?}", err);
+                        tracing::error!(error=?err, error_msg=%err, "DatasetResolverLayer failed");
                         return Ok(internal_server_error_response());
                     }
-                };
-
-                request.extensions_mut().insert(dataset);
+                }
             }
 
             request.extensions_mut().insert(dataset_ref);

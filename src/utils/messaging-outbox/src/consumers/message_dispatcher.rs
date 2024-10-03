@@ -20,7 +20,7 @@ use crate::Message;
 #[derive(Debug, Copy, Clone)]
 pub enum ConsumerFilter<'a> {
     AllConsumers,
-    BestEffortConsumers,
+    ImmediateConsumers,
     SelectedConsumer(&'a str),
 }
 

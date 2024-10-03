@@ -7,15 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// Copyright Kamu Data, Inc. and contributors. All rights reserved.
-//
-// Use of this software is governed by the Business Source License
-// included in the LICENSE file.
-//
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0.
-
 use axum::extract::{Extension, Query};
 use axum::response::Json;
 use comma_separated::CommaSeparatedSet;
@@ -149,9 +140,9 @@ pub async fn dataset_metadata_handler(
 ) -> Result<Json<DatasetMetadataResponse>, ApiError> {
     use kamu_core::{metadata_chain_visitors as vis, MetadataChainExt as _};
 
-    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-    let dataset = dataset_repo
-        .find_dataset_by_ref(&dataset_ref)
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+    let resolved_dataset = dataset_registry
+        .get_dataset_by_ref(&dataset_ref)
         .await
         .api_err()?;
 
@@ -189,7 +180,7 @@ pub async fn dataset_metadata_handler(
         &mut vocab_visitor,
     ];
 
-    dataset
+    resolved_dataset
         .as_metadata_chain()
         .accept(&mut visitors)
         .await
@@ -223,7 +214,7 @@ pub async fn dataset_metadata_handler(
     let refs = if !params.include.contains(&Include::Refs) {
         None
     } else {
-        dataset
+        resolved_dataset
             .as_metadata_chain()
             .try_get_ref(&BlockRef::Head)
             .await

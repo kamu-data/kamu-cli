@@ -26,6 +26,7 @@ pub enum PushPhase {
     InitialRequest,
     MetadataRequest,
     ObjectsRequest,
+    EnsuringTargetExists,
     ObjectsUploadProgress,
     CompleteRequest,
 }
@@ -65,6 +66,7 @@ impl fmt::Display for PushPhase {
             PushPhase::InitialRequest => "Initial Request",
             PushPhase::MetadataRequest => "Metadata Request",
             PushPhase::ObjectsRequest => "Objects Request",
+            PushPhase::EnsuringTargetExists => "Ensuring Target Dataset Exists",
             PushPhase::ObjectsUploadProgress => "Objects Upload Progress",
             PushPhase::CompleteRequest => "Complete Request",
         };

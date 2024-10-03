@@ -10,6 +10,7 @@
 use std::net::SocketAddr;
 
 use dill::Catalog;
+use kamu_core::TenancyConfig;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
@@ -21,7 +22,11 @@ pub struct TestAPIServer {
 }
 
 impl TestAPIServer {
-    pub fn new(catalog: Catalog, listener: tokio::net::TcpListener, multi_tenant: bool) -> Self {
+    pub fn new(
+        catalog: Catalog,
+        listener: tokio::net::TcpListener,
+        tenancy_config: TenancyConfig,
+    ) -> Self {
         let (router, _api) = OpenApiRouter::new()
             .routes(routes!(kamu_adapter_http::platform_login_handler))
             .routes(routes!(kamu_adapter_http::platform_token_validate_handler))
@@ -35,16 +40,15 @@ impl TestAPIServer {
             .merge(kamu_adapter_http::data::root_router())
             .merge(kamu_adapter_http::general::root_router())
             .nest(
-                if multi_tenant {
-                    "/:account_name/:dataset_name"
-                } else {
-                    "/:dataset_name"
+                match tenancy_config {
+                    TenancyConfig::MultiTenant => "/:account_name/:dataset_name",
+                    TenancyConfig::SingleTenant => "/:dataset_name",
                 },
                 kamu_adapter_http::add_dataset_resolver_layer(
                     OpenApiRouter::new()
                         .merge(kamu_adapter_http::smart_transfer_protocol_router())
                         .merge(kamu_adapter_http::data::dataset_router()),
-                    multi_tenant,
+                    tenancy_config,
                 ),
             )
             .layer(

@@ -7,22 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// Copyright Kamu Data, Inc. and contributors. All rights reserved.
-//
-// Use of this software is governed by the Business Source License
-// included in the LICENSE file.
-//
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0.
-
 use axum::extract::{Extension, Path};
 use axum::response::Json;
 use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
 use kamu_accounts::AuthenticationService;
-use kamu_core::{DatasetRepository, GetDatasetError};
+use kamu_core::{DatasetRegistry, GetDatasetError};
 use opendatafabric::{AccountID, AccountName, DatasetHandle, DatasetID, DatasetName};
 
 use crate::axum_utils::ensure_authenticated_account;
@@ -108,9 +99,9 @@ async fn get_dataset_by_id(
     //          to access dataset and not reject non-authed users
     ensure_authenticated_account(catalog).api_err()?;
 
-    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-    let dataset_handle = dataset_repo
-        .resolve_dataset_ref(&dataset_id.clone().as_local_ref())
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+    let dataset_handle = dataset_registry
+        .resolve_dataset_handle_by_ref(&dataset_id.clone().as_local_ref())
         .await
         .map_err(|err| match err {
             GetDatasetError::NotFound(e) => ApiError::not_found(e),

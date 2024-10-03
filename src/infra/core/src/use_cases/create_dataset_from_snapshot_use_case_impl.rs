@@ -51,6 +51,7 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
 
 #[async_trait::async_trait]
 impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
+    #[tracing::instrument(level = "info", skip_all, fields(?snapshot, ?options))]
     async fn execute(
         &self,
         snapshot: DatasetSnapshot,

@@ -7,20 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// Copyright Kamu Data, Inc. and contributors. All rights reserved.
-//
-// Use of this software is governed by the Business Source License
-// included in the LICENSE file.
-//
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0.
-
 use std::str::FromStr;
 use std::sync::Arc;
 
 use axum::response::IntoResponse;
 use axum_extra::typed_header::TypedHeader;
+use database_common::DatabaseTransactionRunner;
 use http_common::*;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
@@ -304,23 +296,29 @@ pub async fn dataset_push_ws_upgrade_handler(
     let server_url_config = catalog.get_one::<ServerUrlConfig>().unwrap();
     let dataset_url = get_base_dataset_url(uri, &server_url_config.protocols.base_url_rest, 1);
 
-    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-
-    let dataset = match dataset_repo.find_dataset_by_ref(&dataset_ref).await {
-        Ok(ds) => Ok(Some(ds)),
-        Err(GetDatasetError::NotFound(_)) => {
-            // Make sure account in dataset ref being created and token account match
-            let CurrentAccountSubject::Logged(acc) = current_account_subject.as_ref() else {
-                unreachable!()
-            };
-            if let Some(ref_account_name) = dataset_ref.account_name() {
-                if ref_account_name != &acc.account_name {
-                    return Err(ApiError::new_forbidden());
+    let maybe_dataset = {
+        let dataset_ref = dataset_ref.clone();
+        DatabaseTransactionRunner::new(catalog.clone())
+            .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
+                match dataset_registry.get_dataset_by_ref(&dataset_ref).await {
+                    Ok(resolved_dataset) => Ok(Some((*resolved_dataset).clone())),
+                    Err(GetDatasetError::NotFound(_)) => {
+                        // Make sure account in dataset ref being created and token account match
+                        let CurrentAccountSubject::Logged(acc) = current_account_subject.as_ref()
+                        else {
+                            unreachable!()
+                        };
+                        if let Some(ref_account_name) = dataset_ref.account_name() {
+                            if ref_account_name != &acc.account_name {
+                                return Err(ApiError::new_forbidden());
+                            }
+                        }
+                        Ok(None)
+                    }
+                    Err(err) => Err(err.api_err()),
                 }
-            }
-            Ok(None)
-        }
-        Err(err) => Err(err.api_err()),
+            })
+            .await
     }?;
 
     Ok(ws.on_upgrade(|socket| {
@@ -328,7 +326,7 @@ pub async fn dataset_push_ws_upgrade_handler(
             socket,
             catalog,
             dataset_ref,
-            dataset,
+            maybe_dataset,
             dataset_url,
             maybe_bearer_header,
         )

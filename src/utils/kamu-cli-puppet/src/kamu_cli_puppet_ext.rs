@@ -470,7 +470,7 @@ fn assert_execute_command_result<'a>(
         for expected_stderr_item in expected_stderr_items {
             assert!(
                 stderr.contains(expected_stderr_item),
-                "Unexpected output:\n{stderr}",
+                "Expected output:\n{expected_stderr_item}\nUnexpected output:\n{stderr}",
             );
         }
     }

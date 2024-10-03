@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use database_common::*;
 use dill::{Catalog, CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu::domain::TenancyConfig;
 use secrecy::SecretString;
 use tempfile::TempDir;
 
@@ -50,14 +51,14 @@ impl AppDatabaseConfig {
 pub fn get_app_database_config(
     workspace_layout: &WorkspaceLayout,
     config: &config::CLIConfig,
-    multi_tenant_workspace: bool,
+    tenancy_config: TenancyConfig,
     init_command: bool,
 ) -> AppDatabaseConfig {
     if let Some(database_config) = config.database.clone() {
         return AppDatabaseConfig::Explicit(database_config);
     }
 
-    if !multi_tenant_workspace {
+    if tenancy_config == TenancyConfig::SingleTenant {
         // Default for multi-tenant workspace only
         return AppDatabaseConfig::None;
     };

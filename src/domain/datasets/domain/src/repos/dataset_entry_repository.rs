@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::PaginationOpts;
 use internal_error::InternalError;
 use opendatafabric::{AccountID, DatasetID, DatasetName};
 use thiserror::Error;
@@ -18,23 +19,36 @@ use crate::DatasetEntry;
 #[cfg_attr(any(feature = "testing", test), mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetEntryRepository: Send + Sync {
-    async fn dataset_entries_count(&self) -> Result<usize, GetDatasetEntryError>;
+    async fn dataset_entries_count(&self) -> Result<usize, InternalError>;
+
+    async fn dataset_entries_count_by_owner_id(
+        &self,
+        owner_id: &AccountID,
+    ) -> Result<usize, InternalError>;
+
+    fn get_dataset_entries(&self, pagination: PaginationOpts) -> DatasetEntryStream<'_>;
+
+    fn get_dataset_entries_by_owner_id(
+        &self,
+        owner_id: &AccountID,
+        pagination: PaginationOpts,
+    ) -> DatasetEntryStream<'_>;
 
     async fn get_dataset_entry(
         &self,
         dataset_id: &DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError>;
 
-    async fn get_dataset_entry_by_name(
+    async fn get_multiple_dataset_entries(
+        &self,
+        dataset_ids: &[DatasetID],
+    ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError>;
+
+    async fn get_dataset_entry_by_owner_and_name(
         &self,
         owner_id: &AccountID,
         name: &DatasetName,
     ) -> Result<DatasetEntry, GetDatasetEntryByNameError>;
-
-    async fn get_dataset_entries_by_owner_id(
-        &self,
-        owner_id: &AccountID,
-    ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByOwnerIdError>;
 
     async fn save_dataset_entry(
         &self,
@@ -55,11 +69,31 @@ pub trait DatasetEntryRepository: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub type DatasetEntryStream<'a> = std::pin::Pin<
+    Box<dyn tokio_stream::Stream<Item = Result<DatasetEntry, InternalError>> + Send + 'a>,
+>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default, Debug, Eq, PartialEq)]
+pub struct DatasetEntriesResolution {
+    pub resolved_entries: Vec<DatasetEntry>,
+    pub unresolved_entries: Vec<DatasetID>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Debug)]
 pub enum GetDatasetEntryError {
     #[error(transparent)]
     NotFound(#[from] DatasetEntryNotFoundError),
 
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
+pub enum GetMultipleDatasetEntriesError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
@@ -101,14 +135,6 @@ impl DatasetEntryByNameNotFoundError {
             dataset_name,
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum GetDatasetEntriesByOwnerIdError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -218,10 +218,10 @@ pub async fn odata_collection_handler_common(
         return Err(ApiError::not_found_without_body());
     };
 
-    let repo: Arc<dyn DatasetRepository> = catalog.get_one().unwrap();
+    let registry: Arc<dyn DatasetRegistry> = catalog.get_one().unwrap();
 
-    let dataset_handle = match repo
-        .resolve_dataset_ref(&DatasetAlias::new(account_name, dataset_name).into())
+    let dataset_handle = match registry
+        .resolve_dataset_handle_by_ref(&DatasetAlias::new(account_name, dataset_name).into())
         .await
     {
         Ok(hdl) => Ok(hdl),
@@ -232,9 +232,9 @@ pub async fn odata_collection_handler_common(
     }
     .unwrap();
 
-    let dataset = repo.get_dataset_by_handle(&dataset_handle);
+    let resolved_dataset = registry.get_dataset_by_handle(&dataset_handle);
 
-    let ctx = ODataCollectionContext::new(catalog, addr, dataset_handle, dataset);
+    let ctx = ODataCollectionContext::new(catalog, addr, resolved_dataset);
     let response = datafusion_odata::handlers::odata_collection_handler(
         Extension(Arc::new(ctx)),
         query,

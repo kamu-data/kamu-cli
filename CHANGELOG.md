@@ -14,6 +14,22 @@ Recommendation: for ease of reading, use the following order:
 ## [0.207.3] - 2024-11-21
 ### Changed
 - Add version for `OutboxMessage` structure to prevent startup failures after breaking changes
+- Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution of datasets:
+  - Registry is backed by database-stored dataset entries, which are automatically maintained
+  - Scope for `DatasetRepository` is now limited to support `DatasetRegistry` and in-memory dataset dependency graph
+  - New concept of `ResolvedDataset`: a wrapper arround `Arc<dyn Dataset>`, aware of dataset identity
+  - `DatasetRegistryRepoBridge` utility connects both abstractions in a simple way for testing needs
+  - Query and Dataset Search functions now consider only the datasets accessible for current user
+  - Core services now explicitly separate planning (transactional) and execution (non-transactional) processing phases
+  - Similar decomposition introduced in task system execution logic
+  - Revised implementation of core commands and services: `pull`, `push`, `reset`, `verify`, `compact`, setting watermark
+  - More parallelism from `pull` command, allowing to mix ingest/sync/transform operations of the same depth level
+  - Optimized `pull` flow, when a single non-recursive dataset is sent for processing
+  - Batched form for dataset authorization checks
+  - Ensuring correct transactionality for dataset lookup and authorization checks all over the code base
+  - Passing multi/single tenancy as an enum configuration instead of boolean
+  - Renamed outbox "durability" term to "delivery mechanism" to clarify the design intent
+  - Greatly reduced complexity and code duplication of many use case and service tests with `oop` macro for inheritance of harnesses
 
 ## [0.207.2] - 2024-11-15
 ### Fixed

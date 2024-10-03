@@ -20,7 +20,7 @@ use crate::*;
 pub trait ResetService: Send + Sync {
     async fn reset_dataset(
         &self,
-        dataset_handle: &DatasetHandle,
+        target: ResolvedDataset,
         block_hash: Option<&Multihash>,
         old_head_maybe: Option<&Multihash>,
     ) -> Result<Multihash, ResetError>;

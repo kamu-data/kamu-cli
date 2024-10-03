@@ -15,6 +15,7 @@ use console::style as s;
 use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
+use kamu::domain::TenancyConfig;
 use kamu_accounts::*;
 use kamu_accounts_services::PasswordLoginCredentials;
 use kamu_adapter_oauth::*;
@@ -28,7 +29,7 @@ use crate::OutputConfig;
 pub struct APIServerRunCommand {
     base_catalog: Catalog,
     cli_catalog: Catalog,
-    multi_tenant_workspace: bool,
+    tenancy_config: TenancyConfig,
     output_config: Arc<OutputConfig>,
     address: Option<IpAddr>,
     port: Option<u16>,
@@ -44,7 +45,7 @@ impl APIServerRunCommand {
     pub fn new(
         base_catalog: Catalog,
         cli_catalog: Catalog,
-        multi_tenant_workspace: bool,
+        tenancy_config: TenancyConfig,
         output_config: Arc<OutputConfig>,
         address: Option<IpAddr>,
         port: Option<u16>,
@@ -58,7 +59,7 @@ impl APIServerRunCommand {
         Self {
             base_catalog,
             cli_catalog,
-            multi_tenant_workspace,
+            tenancy_config,
             output_config,
             address,
             port,
@@ -113,7 +114,7 @@ impl APIServerRunCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for APIServerRunCommand {
     async fn validate_args(&self) -> Result<(), CLIError> {
-        if self.multi_tenant_workspace {
+        if self.tenancy_config == TenancyConfig::MultiTenant {
             if self.github_auth_config.client_id.is_empty() {
                 return Err(CLIError::missed_env_var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID));
             }
@@ -134,7 +135,7 @@ impl Command for APIServerRunCommand {
         let api_server = crate::explore::APIServer::new(
             &self.base_catalog,
             &self.cli_catalog,
-            self.multi_tenant_workspace,
+            self.tenancy_config,
             self.address,
             self.port,
             self.external_address,

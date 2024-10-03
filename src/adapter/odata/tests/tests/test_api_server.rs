@@ -10,6 +10,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use dill::Catalog;
+use kamu_core::TenancyConfig;
 use utoipa_axum::router::OpenApiRouter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,15 +25,14 @@ impl TestAPIServer {
         catalog: Catalog,
         address: Option<IpAddr>,
         port: Option<u16>,
-        multi_tenant: bool,
+        tenancy_config: TenancyConfig,
     ) -> Self {
         let (router, _api) = OpenApiRouter::new()
             .nest(
                 "/odata",
-                if multi_tenant {
-                    kamu_adapter_odata::router_multi_tenant()
-                } else {
-                    kamu_adapter_odata::router_single_tenant()
+                match tenancy_config {
+                    TenancyConfig::MultiTenant => kamu_adapter_odata::router_multi_tenant(),
+                    TenancyConfig::SingleTenant => kamu_adapter_odata::router_single_tenant(),
                 },
             )
             .layer(

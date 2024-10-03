@@ -65,6 +65,7 @@ impl DatasetFactoryImpl {
             ObjectRepositoryLocalFS::new(layout.data_dir),
             ObjectRepositoryLocalFS::new(layout.checkpoints_dir),
             NamedObjectRepositoryLocalFS::new(layout.info_dir),
+            Url::from_directory_path(&layout.root_dir).unwrap(),
         )
     }
 
@@ -101,6 +102,7 @@ impl DatasetFactoryImpl {
                 base_url.join("info/").unwrap(),
                 header_map,
             ),
+            base_url.clone(),
         )
     }
 
@@ -114,10 +116,6 @@ impl DatasetFactoryImpl {
         // TODO: We should ensure optimal credential reuse. Perhaps in future we should
         // create a cache of S3Contexts keyed by an endpoint.
         let s3_context = S3Context::from_url(&base_url).await;
-        Self::get_s3_from_context(s3_context)
-    }
-
-    pub fn get_s3_from_context(s3_context: S3Context) -> Result<impl Dataset, InternalError> {
         Ok(DatasetImpl::new(
             MetadataChainImpl::new(
                 MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
@@ -130,6 +128,7 @@ impl DatasetFactoryImpl {
             ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/")),
             ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
             NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
+            base_url,
         ))
     }
 
@@ -212,6 +211,7 @@ impl DatasetFactoryImpl {
                 Default::default(),
             ),
             NamedObjectRepositoryIpfsHttp::new(client.clone(), dataset_url.join("info/").unwrap()),
+            dataset_url.clone(),
         ))
     }
 

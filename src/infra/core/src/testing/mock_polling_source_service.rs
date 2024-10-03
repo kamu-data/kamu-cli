@@ -14,14 +14,13 @@ use kamu_core::{
     GetDatasetError,
     PollingIngestError,
     PollingIngestListener,
-    PollingIngestMultiListener,
     PollingIngestOptions,
-    PollingIngestResponse,
     PollingIngestResult,
     PollingIngestService,
+    ResolvedDataset,
 };
 use opendatafabric::{
-    DatasetRef,
+    DatasetAlias,
     FetchStep,
     FetchStepUrl,
     MergeStrategy,
@@ -37,32 +36,39 @@ use opendatafabric::{
 
 mockall::mock! {
     pub PollingIngestService {}
+
     #[async_trait::async_trait]
     impl PollingIngestService for PollingIngestService {
-      async fn get_active_polling_source(
-          &self,
-          dataset_ref: &DatasetRef,
-      ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError>;
+        async fn get_active_polling_source(
+            &self,
+            target: ResolvedDataset,
+        ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError>;
 
-    async fn ingest(
-        &self,
-        dataset_ref: &DatasetRef,
-        options: PollingIngestOptions,
-        listener: Option<Arc<dyn PollingIngestListener>>,
-    ) -> Result<PollingIngestResult, PollingIngestError>;
-
-    async fn ingest_multi(
-        &self,
-        dataset_refs: Vec<DatasetRef>,
-        options: PollingIngestOptions,
-        listener: Option<Arc<dyn PollingIngestMultiListener>>,
-    ) -> Vec<PollingIngestResponse>;
+        async fn ingest(
+            &self,
+            target: ResolvedDataset,
+            options: PollingIngestOptions,
+            listener: Option<Arc<dyn PollingIngestListener>>,
+        ) -> Result<PollingIngestResult, PollingIngestError>;
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl MockPollingIngestService {
+    pub fn make_expect_ingest(mut self, dataset_alias: DatasetAlias) -> Self {
+        self.expect_ingest()
+            .withf(move |target, _, _| target.get_alias() == &dataset_alias)
+            .times(1)
+            .returning(|_, _, _| {
+                Ok(PollingIngestResult::UpToDate {
+                    no_source_defined: false,
+                    uncacheable: false,
+                })
+            });
+        self
+    }
+
     pub fn without_active_polling_source() -> Self {
         let mut dependency_graph_repo_mock = MockPollingIngestService::default();
         dependency_graph_repo_mock

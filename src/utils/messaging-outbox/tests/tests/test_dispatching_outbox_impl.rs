@@ -29,15 +29,15 @@ test_message_type!(A);
 test_message_type!(B);
 test_message_type!(C);
 
-test_message_consumer!(A, A, TEST_PRODUCER_A, BestEffort);
-test_message_consumer!(B, B, TEST_PRODUCER_B, Durable);
-test_message_consumer!(C, CB, TEST_PRODUCER_C, BestEffort);
-test_message_consumer!(C, CD, TEST_PRODUCER_C, Durable);
+test_message_consumer!(A, A, TEST_PRODUCER_A, Immediate);
+test_message_consumer!(B, B, TEST_PRODUCER_B, Transactional);
+test_message_consumer!(C, CB, TEST_PRODUCER_C, Immediate);
+test_message_consumer!(C, CD, TEST_PRODUCER_C, Transactional);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_best_effort_only_messages() {
+async fn test_immediate_only_messages() {
     let message_1 = TestMessageA {
         body: "foo".to_string(),
     };
@@ -93,8 +93,8 @@ async fn test_best_effort_only_messages() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_durable_only_messages() {
-    let message_1 = TestMessageB {
+async fn test_transactional_only_messages() {
+    let message_1: TestMessageB = TestMessageB {
         body: "foo".to_string(),
     };
     let message_2 = TestMessageB {
@@ -145,7 +145,7 @@ async fn test_durable_only_messages() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_messages_mixed_durability() {
+async fn test_messages_mixed_delivery() {
     let message_1 = TestMessageC {
         body: "foo".to_string(),
     };
@@ -214,7 +214,7 @@ impl DispatchingOutboxHarness {
         let mut b = CatalogBuilder::new();
         b.add_builder(
             messaging_outbox::OutboxImmediateImpl::builder()
-                .with_consumer_filter(messaging_outbox::ConsumerFilter::BestEffortConsumers),
+                .with_consumer_filter(messaging_outbox::ConsumerFilter::ImmediateConsumers),
         );
         b.add::<OutboxTransactionalImpl>();
         b.add::<OutboxDispatchingImpl>();

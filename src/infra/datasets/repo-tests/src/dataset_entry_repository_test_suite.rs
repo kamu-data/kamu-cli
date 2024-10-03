@@ -11,9 +11,11 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{SubsecRound, Utc};
+use database_common::PaginationOpts;
 use dill::Catalog;
 use kamu_accounts::{Account, AccountRepository, AccountType};
 use kamu_datasets::{
+    DatasetEntriesResolution,
     DatasetEntry,
     DatasetEntryByNameNotFoundError,
     DatasetEntryNotFoundError,
@@ -76,6 +78,190 @@ pub async fn test_get_dataset_entry(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_stream_many_entries(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+
+    use futures::TryStreamExt;
+
+    {
+        let get_res: Result<Vec<_>, _> = dataset_entry_repo
+            .get_dataset_entries(PaginationOpts {
+                limit: 100,
+                offset: 0,
+            })
+            .try_collect()
+            .await;
+        let expected_dataset_entries = vec![];
+
+        assert_matches!(
+            get_res,
+            Ok(actual_dataset_entries)
+                if actual_dataset_entries == expected_dataset_entries
+        );
+    }
+
+    let account_1 = new_account_with_name(&account_repo, "user1").await;
+    let account_2 = new_account_with_name(&account_repo, "user2").await;
+
+    let dataset_entry_acc_1_1 = new_dataset_entry_with(&account_1, "dataset1");
+    let dataset_entry_acc_1_2 = new_dataset_entry_with(&account_1, "dataset2");
+    let dataset_entry_acc_2_3 = new_dataset_entry_with(&account_2, "dataset3");
+
+    {
+        let save_res = dataset_entry_repo
+            .save_dataset_entry(&dataset_entry_acc_1_1)
+            .await;
+
+        assert_matches!(save_res, Ok(_));
+    }
+    {
+        let save_res = dataset_entry_repo
+            .save_dataset_entry(&dataset_entry_acc_1_2)
+            .await;
+
+        assert_matches!(save_res, Ok(_));
+    }
+    {
+        let save_res = dataset_entry_repo
+            .save_dataset_entry(&dataset_entry_acc_2_3)
+            .await;
+
+        assert_matches!(save_res, Ok(_));
+    }
+
+    {
+        let get_res: Result<Vec<_>, _> = dataset_entry_repo
+            .get_dataset_entries(PaginationOpts {
+                limit: 100,
+                offset: 0,
+            })
+            .try_collect()
+            .await;
+        let expected_dataset_entries = vec![
+            dataset_entry_acc_1_1,
+            dataset_entry_acc_1_2,
+            dataset_entry_acc_2_3,
+        ];
+
+        assert_matches!(
+            get_res,
+            Ok(actual_dataset_entries)
+                if actual_dataset_entries == expected_dataset_entries
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_get_multiple_entries(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+
+    {
+        let get_multiple_res = dataset_entry_repo
+            .get_multiple_dataset_entries(&[])
+            .await
+            .unwrap();
+
+        assert_eq!(
+            get_multiple_res,
+            DatasetEntriesResolution {
+                resolved_entries: vec![],
+                unresolved_entries: vec![]
+            }
+        );
+    }
+
+    let account = new_account(&account_repo).await;
+
+    let dataset_entry_acc_1 = new_dataset_entry_with(&account, "dataset1");
+    let dataset_entry_acc_2 = new_dataset_entry_with(&account, "dataset2");
+    let dataset_entry_acc_3 = new_dataset_entry_with(&account, "dataset3");
+
+    {
+        let save_res = dataset_entry_repo
+            .save_dataset_entry(&dataset_entry_acc_1)
+            .await;
+
+        assert_matches!(save_res, Ok(_));
+    }
+    {
+        let save_res = dataset_entry_repo
+            .save_dataset_entry(&dataset_entry_acc_2)
+            .await;
+
+        assert_matches!(save_res, Ok(_));
+    }
+    {
+        let save_res = dataset_entry_repo
+            .save_dataset_entry(&dataset_entry_acc_3)
+            .await;
+
+        assert_matches!(save_res, Ok(_));
+    }
+
+    {
+        let mut get_multiple_res = dataset_entry_repo
+            .get_multiple_dataset_entries(&[
+                dataset_entry_acc_1.id.clone(),
+                dataset_entry_acc_3.id.clone(),
+            ])
+            .await
+            .unwrap();
+
+        get_multiple_res.resolved_entries.sort();
+
+        let mut expected_resolved_entries =
+            vec![dataset_entry_acc_1.clone(), dataset_entry_acc_3.clone()];
+        expected_resolved_entries.sort();
+
+        assert_eq!(
+            get_multiple_res,
+            DatasetEntriesResolution {
+                resolved_entries: expected_resolved_entries,
+                unresolved_entries: vec![]
+            }
+        );
+    }
+
+    {
+        let wrong_id = DatasetID::new_seeded_ed25519(b"wrong_id");
+        let get_multiple_res = dataset_entry_repo
+            .get_multiple_dataset_entries(&[dataset_entry_acc_2.id.clone(), wrong_id.clone()])
+            .await
+            .unwrap();
+
+        assert_eq!(
+            get_multiple_res,
+            DatasetEntriesResolution {
+                resolved_entries: vec![dataset_entry_acc_2.clone()],
+                unresolved_entries: vec![wrong_id]
+            }
+        );
+    }
+
+    {
+        let wrong_id_1 = DatasetID::new_seeded_ed25519(b"wrong_id_1");
+        let wrong_id_2 = DatasetID::new_seeded_ed25519(b"wrong_id_2");
+
+        let get_multiple_res = dataset_entry_repo
+            .get_multiple_dataset_entries(&[wrong_id_1.clone(), wrong_id_2.clone()])
+            .await
+            .unwrap();
+
+        assert_eq!(
+            get_multiple_res,
+            DatasetEntriesResolution {
+                resolved_entries: vec![],
+                unresolved_entries: vec![wrong_id_1, wrong_id_2]
+            }
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_get_dataset_entry_by_name(catalog: &Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
@@ -85,7 +271,7 @@ pub async fn test_get_dataset_entry_by_name(catalog: &Catalog) {
     let dataset_entry = new_dataset_entry(&account);
     {
         let get_res = dataset_entry_repo
-            .get_dataset_entry_by_name(&dataset_entry.owner_id, &dataset_entry.name)
+            .get_dataset_entry_by_owner_and_name(&dataset_entry.owner_id, &dataset_entry.name)
             .await;
 
         assert_matches!(
@@ -105,7 +291,7 @@ pub async fn test_get_dataset_entry_by_name(catalog: &Catalog) {
     }
     {
         let get_res = dataset_entry_repo
-            .get_dataset_entry_by_name(&dataset_entry.owner_id, &dataset_entry.name)
+            .get_dataset_entry_by_owner_and_name(&dataset_entry.owner_id, &dataset_entry.name)
             .await;
 
         assert_matches!(
@@ -125,9 +311,33 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
     let account_1 = new_account_with_name(&account_repo, "user1").await;
     let account_2 = new_account_with_name(&account_repo, "user2").await;
 
+    use futures::TryStreamExt;
+
     {
-        let get_res = dataset_entry_repo
-            .get_dataset_entries_by_owner_id(&account_1.id)
+        assert_eq!(
+            dataset_entry_repo
+                .dataset_entries_count_by_owner_id(&account_1.id)
+                .await
+                .unwrap(),
+            0,
+        );
+        assert_eq!(
+            dataset_entry_repo
+                .dataset_entries_count_by_owner_id(&account_2.id)
+                .await
+                .unwrap(),
+            0,
+        );
+
+        let get_res: Result<Vec<_>, _> = dataset_entry_repo
+            .get_dataset_entries_by_owner_id(
+                &account_1.id,
+                PaginationOpts {
+                    limit: 100,
+                    offset: 0,
+                },
+            )
+            .try_collect()
             .await;
         let expected_dataset_entries = vec![];
 
@@ -138,8 +348,15 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
         );
     }
     {
-        let get_res = dataset_entry_repo
-            .get_dataset_entries_by_owner_id(&account_2.id)
+        let get_res: Result<Vec<_>, _> = dataset_entry_repo
+            .get_dataset_entries_by_owner_id(
+                &account_2.id,
+                PaginationOpts {
+                    limit: 100,
+                    offset: 0,
+                },
+            )
+            .try_collect()
             .await;
         let expected_dataset_entries = vec![];
 
@@ -175,8 +392,15 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
         assert_matches!(save_res, Ok(_));
     }
     {
-        let get_res = dataset_entry_repo
-            .get_dataset_entries_by_owner_id(&account_1.id)
+        let get_res: Result<Vec<_>, _> = dataset_entry_repo
+            .get_dataset_entries_by_owner_id(
+                &account_1.id,
+                PaginationOpts {
+                    limit: 100,
+                    offset: 0,
+                },
+            )
+            .try_collect()
             .await;
         let mut expected_dataset_entries = vec![dataset_entry_acc_1_1, dataset_entry_acc_1_2];
 
@@ -192,10 +416,25 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
                 panic!("A successful result was expected, but an error was received: {e}");
             }
         }
+
+        assert_eq!(
+            dataset_entry_repo
+                .dataset_entries_count_by_owner_id(&account_1.id)
+                .await
+                .unwrap(),
+            2,
+        );
     }
     {
-        let get_res = dataset_entry_repo
-            .get_dataset_entries_by_owner_id(&account_2.id)
+        let get_res: Result<Vec<_>, _> = dataset_entry_repo
+            .get_dataset_entries_by_owner_id(
+                &account_2.id,
+                PaginationOpts {
+                    limit: 100,
+                    offset: 0,
+                },
+            )
+            .try_collect()
             .await;
         let expected_dataset_entries = vec![dataset_entry_acc_2_3];
 
@@ -203,6 +442,14 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
             get_res,
             Ok(actual_dataset_entries)
                 if actual_dataset_entries == expected_dataset_entries
+        );
+
+        assert_eq!(
+            dataset_entry_repo
+                .dataset_entries_count_by_owner_id(&account_2.id)
+                .await
+                .unwrap(),
+            1,
         );
     }
     {

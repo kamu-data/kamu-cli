@@ -69,7 +69,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                    expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
                     }),
@@ -83,7 +83,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(90),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                    expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
                     }),
@@ -244,7 +244,7 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(110),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                    expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
                     }),
@@ -333,7 +333,7 @@ async fn test_cron_config() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::seconds(6),
                     finish_in_with: Some((Duration::seconds(1), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                    expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
                     }),
@@ -463,7 +463,7 @@ async fn test_manual_trigger() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                    expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
                     }),
@@ -477,7 +477,7 @@ async fn test_manual_trigger() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(60),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                    expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
                     }),
@@ -491,7 +491,7 @@ async fn test_manual_trigger() {
                     dataset_id: Some(bar_id.clone()),
                     run_since_start: Duration::milliseconds(100),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                    expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                       dataset_id: bar_id.clone(),
                       fetch_uncacheable: false
                     }),
@@ -674,7 +674,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                    expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: true
                     }),
@@ -688,7 +688,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(60),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                    expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: true
                     }),
@@ -702,7 +702,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     dataset_id: Some(bar_id.clone()),
                     run_since_start: Duration::milliseconds(100),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                    expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                       dataset_id: bar_id.clone(),
                       fetch_uncacheable: false
                     }),
@@ -875,7 +875,7 @@ async fn test_manual_trigger_compaction() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                    expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                       dataset_id: foo_id.clone(),
                       max_slice_size: None,
                       max_slice_records: None,
@@ -890,7 +890,7 @@ async fn test_manual_trigger_compaction() {
                   dataset_id: Some(bar_id.clone()),
                   run_since_start: Duration::milliseconds(60),
                   finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                  expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                  expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
                     max_slice_records: None,
@@ -1036,7 +1036,7 @@ async fn test_manual_trigger_reset() {
                     dataset_id: Some(create_dataset_result.dataset_handle.id.clone()),
                     run_since_start: Duration::milliseconds(20),
                     finish_in_with: Some((Duration::milliseconds(90), TaskOutcome::Success(TaskResult::ResetDatasetResult(TaskResetDatasetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") })))),
-                    expected_logical_plan: LogicalPlan::Reset(ResetDataset {
+                    expected_logical_plan: LogicalPlan::ResetDataset(LogicalPlanResetDataset {
                       dataset_id: create_dataset_result.dataset_handle.id.clone(),
                       // By deafult should reset to seed block
                       new_head_hash: Some(dataset_blocks[1].0.clone()),
@@ -1178,7 +1178,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               dataset_id: Some(create_foo_result.dataset_handle.id.clone()),
               run_since_start: Duration::milliseconds(20),
               finish_in_with: Some((Duration::milliseconds(70), TaskOutcome::Success(TaskResult::ResetDatasetResult(TaskResetDatasetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") })))),
-              expected_logical_plan: LogicalPlan::Reset(ResetDataset {
+              expected_logical_plan: LogicalPlan::ResetDataset(LogicalPlanResetDataset {
                 dataset_id: create_foo_result.dataset_handle.id.clone(),
                 new_head_hash: Some(dataset_blocks[1].0.clone()),
                 old_head_hash: Some(dataset_blocks[0].0.clone()),
@@ -1206,7 +1206,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
                   }
                 ))
               )),
-              expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+              expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                 dataset_id: foo_baz_id.clone(),
                 max_slice_size: None,
                 max_slice_records: None,
@@ -1234,7 +1234,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
                   }
                 ))
               )),
-              expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+              expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                 dataset_id: foo_bar_id.clone(),
                 max_slice_size: None,
                 max_slice_records: None,
@@ -1369,7 +1369,7 @@ async fn test_manual_trigger_compaction_with_config() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(30),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                    expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                       dataset_id: foo_id.clone(),
                       max_slice_size: Some(max_slice_size),
                       max_slice_records: Some(max_slice_records),
@@ -1509,7 +1509,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                   }))
                 )
               ),
-              expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+              expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                 dataset_id: foo_id.clone(),
                 max_slice_size: Some(max_slice_size),
                 max_slice_records: Some(max_slice_records),
@@ -1537,7 +1537,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                   }
                 ))
               )),
-              expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+              expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                 dataset_id: foo_baz_id.clone(),
                 max_slice_size: None,
                 max_slice_records: None,
@@ -1565,7 +1565,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                   }
                 ))
               )),
-              expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+              expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                 dataset_id: foo_bar_id.clone(),
                 max_slice_size: None,
                 max_slice_records: None,
@@ -1737,7 +1737,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                     }))
                   )
                 ),
-                expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                   dataset_id: foo_id.clone(),
                   max_slice_size: None,
                   max_slice_records: None,
@@ -1765,7 +1765,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                     }
                   ))
                 )),
-                expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                   dataset_id: foo_bar_id.clone(),
                   max_slice_size: None,
                   max_slice_records: None,
@@ -1793,7 +1793,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                     }
                   ))
                 )),
-                expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                   dataset_id: foo_bar_baz_id.clone(),
                   max_slice_size: None,
                   max_slice_records: None,
@@ -1967,7 +1967,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
                     }))
                   )
                 ),
-                expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                   dataset_id: foo_id.clone(),
                   max_slice_size: None,
                   max_slice_records: None,
@@ -2017,7 +2017,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
     let petya_account_name = AccountName::new_unchecked("petya");
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        is_multi_tenant: true,
+        tenancy_config: TenancyConfig::MultiTenant,
         custom_account_names: vec![wasya_account_name.clone(), petya_account_name.clone()],
         ..Default::default()
     })
@@ -2089,7 +2089,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                     old_num_blocks: 5,
                     new_num_blocks: 4,
                 }})))),
-                expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                   dataset_id: foo_id.clone(),
                   max_slice_size: None,
                   max_slice_records: None,
@@ -2120,7 +2120,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                     new_num_blocks: 4,
                 }})))),
                 // Make sure we will take config from root dataset
-                expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                   dataset_id: foo_bar_id.clone(),
                   max_slice_size: None,
                   max_slice_records: None,
@@ -2252,7 +2252,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                   dataset_id: foo_id.clone(),
                   fetch_uncacheable: false
                 }),
@@ -2266,7 +2266,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                   dataset_id: bar_id.clone(),
                   fetch_uncacheable: false
                 }),
@@ -2484,7 +2484,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                   dataset_id: foo_id.clone(),
                   fetch_uncacheable: false
                 }),
@@ -2498,7 +2498,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                   dataset_id: bar_id.clone(),
                   fetch_uncacheable: false
                 }),
@@ -2705,7 +2705,7 @@ async fn test_dataset_deleted() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                   dataset_id: foo_id.clone(),
                   fetch_uncacheable: false
                 }),
@@ -2719,7 +2719,7 @@ async fn test_dataset_deleted() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                   dataset_id: bar_id.clone(),
                   fetch_uncacheable: false
                 }),
@@ -2894,7 +2894,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                   dataset_id: foo_id.clone(),
                   fetch_uncacheable: false
                 }),
@@ -2908,7 +2908,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::Empty))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                   dataset_id: bar_id.clone(),
                   fetch_uncacheable: false
                 }),
@@ -2922,7 +2922,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 dataset_id: Some(baz_id.clone()),
                 run_since_start: Duration::milliseconds(30),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Cancelled)),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                   dataset_id: baz_id.clone(),
                   fetch_uncacheable: false
                 }),
@@ -3119,7 +3119,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                   dataset_id: foo_id.clone(),
                   fetch_uncacheable: false
                 }),
@@ -3139,7 +3139,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                     new_head: Multihash::from_digest_sha3_256(b"new-slice"),
                   },
                 })))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                   dataset_id: bar_id.clone(),
                   fetch_uncacheable: false
                 }),
@@ -3159,7 +3159,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                     new_head: Multihash::from_digest_sha3_256(b"newest-slice"),
                   },
                 })))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                   dataset_id: foo_id.clone(),
                   fetch_uncacheable: false
                 }),
@@ -3173,7 +3173,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(130),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                   dataset_id: bar_id.clone(),
                   fetch_uncacheable: false
                 }),
@@ -3371,7 +3371,7 @@ async fn test_throttling_manual_triggers() {
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(40),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
             }),
@@ -3532,7 +3532,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
             }),
@@ -3551,7 +3551,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 new_head: Multihash::from_digest_sha3_256(b"fbar-new-slice"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: bar_id.clone(),
               fetch_uncacheable: false
             }),
@@ -3565,7 +3565,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             dataset_id: Some(baz_id.clone()),
             run_since_start: Duration::milliseconds(30),
             finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: baz_id.clone(),
               fetch_uncacheable: false
             }),
@@ -3584,7 +3584,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                     new_head: Multihash::from_digest_sha3_256(b"foo-newest-slice"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
             }),
@@ -3598,7 +3598,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             dataset_id: Some(baz_id.clone()),
             run_since_start: Duration::milliseconds(160),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: baz_id.clone(),
               fetch_uncacheable: false
             }),
@@ -3617,7 +3617,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-newest-slice"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: bar_id.clone(),
               fetch_uncacheable: false
             }),
@@ -3999,7 +3999,7 @@ async fn test_batching_condition_records_reached() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4018,7 +4018,7 @@ async fn test_batching_condition_records_reached() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: bar_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4037,7 +4037,7 @@ async fn test_batching_condition_records_reached() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4056,7 +4056,7 @@ async fn test_batching_condition_records_reached() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4075,7 +4075,7 @@ async fn test_batching_condition_records_reached() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: bar_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4322,7 +4322,7 @@ async fn test_batching_condition_timeout() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4341,7 +4341,7 @@ async fn test_batching_condition_timeout() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: bar_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4360,7 +4360,7 @@ async fn test_batching_condition_timeout() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4381,7 +4381,7 @@ async fn test_batching_condition_timeout() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: bar_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4596,7 +4596,7 @@ async fn test_batching_condition_watermark() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4615,7 +4615,7 @@ async fn test_batching_condition_watermark() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: bar_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4634,7 +4634,7 @@ async fn test_batching_condition_watermark() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4655,7 +4655,7 @@ async fn test_batching_condition_watermark() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: bar_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4940,7 +4940,7 @@ async fn test_batching_condition_with_2_inputs() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4959,7 +4959,7 @@ async fn test_batching_condition_with_2_inputs() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: bar_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4978,7 +4978,7 @@ async fn test_batching_condition_with_2_inputs() {
                 new_head: Multihash::from_digest_sha3_256(b"baz-new-slice"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: baz_id.clone(),
               fetch_uncacheable: false
             }),
@@ -4997,7 +4997,7 @@ async fn test_batching_condition_with_2_inputs() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
             }),
@@ -5016,7 +5016,7 @@ async fn test_batching_condition_with_2_inputs() {
                 new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: bar_id.clone(),
               fetch_uncacheable: false
             }),
@@ -5035,7 +5035,7 @@ async fn test_batching_condition_with_2_inputs() {
                 new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
             }),
@@ -5054,7 +5054,7 @@ async fn test_batching_condition_with_2_inputs() {
                 new_head: Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
                 },
             })))),
-            expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+            expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
               dataset_id: baz_id.clone(),
               fetch_uncacheable: false
             }),
@@ -5340,7 +5340,7 @@ async fn test_list_all_flow_initiators() {
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         custom_account_names: vec![foo_account_name.clone(), bar_account_name.clone()],
-        is_multi_tenant: true,
+        tenancy_config: TenancyConfig::MultiTenant,
         ..Default::default()
     })
     .await;
@@ -5399,7 +5399,7 @@ async fn test_list_all_flow_initiators() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                    expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                       dataset_id: foo_id.clone(),
                       max_slice_size: None,
                       max_slice_records: None,
@@ -5414,7 +5414,7 @@ async fn test_list_all_flow_initiators() {
                   dataset_id: Some(bar_id.clone()),
                   run_since_start: Duration::milliseconds(60),
                   finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                  expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                  expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
                     max_slice_records: None,
@@ -5490,7 +5490,7 @@ async fn test_list_all_datasets_with_flow() {
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         custom_account_names: vec![foo_account_name.clone(), bar_account_name.clone()],
-        is_multi_tenant: true,
+        tenancy_config: TenancyConfig::MultiTenant,
         ..Default::default()
     })
     .await;
@@ -5559,7 +5559,7 @@ async fn test_list_all_datasets_with_flow() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
-                    expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                    expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                       dataset_id: foo_id.clone(),
                       max_slice_size: None,
                       max_slice_records: None,
@@ -5574,7 +5574,7 @@ async fn test_list_all_datasets_with_flow() {
                   dataset_id: Some(bar_id.clone()),
                   run_since_start: Duration::milliseconds(60),
                   finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                  expected_logical_plan: LogicalPlan::HardCompactionDataset(HardCompactionDataset {
+                  expected_logical_plan: LogicalPlan::HardCompactDataset(LogicalPlanHardCompactDataset {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
                     max_slice_records: None,
@@ -5707,7 +5707,7 @@ async fn test_abort_flow_before_scheduling_tasks() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
                 }),
@@ -5803,7 +5803,7 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
                 }),
@@ -5904,7 +5904,7 @@ async fn test_abort_flow_after_task_running_has_started() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(100), TaskOutcome::Success(TaskResult::Empty))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
                 }),
@@ -5994,7 +5994,7 @@ async fn test_abort_flow_after_task_finishes() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
                 }),
@@ -6008,7 +6008,7 @@ async fn test_abort_flow_after_task_finishes() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(90),
                 finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
-                expected_logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
                 }),

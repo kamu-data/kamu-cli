@@ -22,29 +22,32 @@ use crate::output::*;
 use crate::{accounts, NotInMultiTenantWorkspace};
 
 pub struct ListCommand {
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     current_account: accounts::CurrentAccountIndication,
     related_account: accounts::RelatedAccountIndication,
     output_config: Arc<OutputConfig>,
+    tenancy_config: TenancyConfig,
     detail_level: u8,
 }
 
 impl ListCommand {
     pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         current_account: accounts::CurrentAccountIndication,
         related_account: accounts::RelatedAccountIndication,
         output_config: Arc<OutputConfig>,
+        tenancy_config: TenancyConfig,
         detail_level: u8,
     ) -> Self {
         Self {
-            dataset_repo,
+            dataset_registry,
             remote_alias_reg,
             current_account,
             related_account,
             output_config,
+            tenancy_config,
             detail_level,
         }
     }
@@ -76,7 +79,7 @@ impl ListCommand {
     ) -> Result<String, CLIError> {
         let is_remote = self
             .remote_alias_reg
-            .get_remote_aliases(&handle.as_local_ref())
+            .get_remote_aliases(handle)
             .await?
             .get_by_kind(RemoteAliasKind::Pull)
             .next()
@@ -176,20 +179,21 @@ impl ListCommand {
     }
 
     fn stream_datasets(&self) -> DatasetHandleStream {
-        if self.dataset_repo.is_multi_tenant() {
-            match &self.related_account.target_account {
+        match self.tenancy_config {
+            TenancyConfig::MultiTenant => match &self.related_account.target_account {
                 accounts::TargetAccountSelection::Current => self
-                    .dataset_repo
-                    .get_datasets_by_owner(&self.current_account.account_name),
+                    .dataset_registry
+                    .all_dataset_handles_by_owner(&self.current_account.account_name),
                 accounts::TargetAccountSelection::Specific {
                     account_name: user_name,
-                } => self
-                    .dataset_repo
-                    .get_datasets_by_owner(&AccountName::from_str(user_name.as_str()).unwrap()),
-                accounts::TargetAccountSelection::AllUsers => self.dataset_repo.get_all_datasets(),
-            }
-        } else {
-            self.dataset_repo.get_all_datasets()
+                } => self.dataset_registry.all_dataset_handles_by_owner(
+                    &AccountName::from_str(user_name.as_str()).unwrap(),
+                ),
+                accounts::TargetAccountSelection::AllUsers => {
+                    self.dataset_registry.all_dataset_handles()
+                }
+            },
+            TenancyConfig::SingleTenant => self.dataset_registry.all_dataset_handles(),
         }
     }
 }
@@ -206,7 +210,7 @@ impl Command for ListCommand {
         use datafusion::arrow::datatypes::Schema;
         use datafusion::arrow::record_batch::RecordBatch;
 
-        let show_owners = if self.dataset_repo.is_multi_tenant() {
+        let show_owners = if self.tenancy_config == TenancyConfig::MultiTenant {
             self.current_account.is_explicit() || self.related_account.is_explicit()
         } else if self.related_account.is_explicit() {
             return Err(CLIError::usage_error_from(NotInMultiTenantWorkspace));
@@ -240,12 +244,14 @@ impl Command for ListCommand {
         datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
 
         for hdl in &datasets {
-            let dataset = self.dataset_repo.get_dataset_by_handle(hdl);
-            let current_head = dataset
+            let resolved_dataset = self.dataset_registry.get_dataset_by_handle(hdl);
+            let current_head = resolved_dataset
                 .as_metadata_chain()
                 .resolve_ref(&BlockRef::Head)
                 .await?;
-            let summary = dataset.get_summary(GetSummaryOpts::default()).await?;
+            let summary = resolved_dataset
+                .get_summary(GetSummaryOpts::default())
+                .await?;
 
             name.push(hdl.alias.dataset_name.to_string());
 
@@ -262,14 +268,14 @@ impl Command for ListCommand {
             size.push(summary.data_size);
 
             if self.detail_level > 0 {
-                let num_blocks = dataset
+                let num_blocks = resolved_dataset
                     .as_metadata_chain()
                     .get_block(&current_head)
                     .await
                     .int_err()?
                     .sequence_number
                     + 1;
-                let last_watermark = dataset
+                let last_watermark = resolved_dataset
                     .as_metadata_chain()
                     .last_data_block()
                     .await

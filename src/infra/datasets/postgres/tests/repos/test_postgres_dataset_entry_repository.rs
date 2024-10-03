@@ -27,6 +27,22 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture = dataset_entry_repo::test_stream_many_entries,
+    harness = PostgresDatasetEntryRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = dataset_entry_repo::test_get_multiple_entries,
+    harness = PostgresDatasetEntryRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = dataset_entry_repo::test_get_dataset_entry_by_name,
     harness = PostgresDatasetEntryRepositoryHarness
 );

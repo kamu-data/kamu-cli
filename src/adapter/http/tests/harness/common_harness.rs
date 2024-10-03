@@ -154,15 +154,18 @@ async fn create_random_parquet_file(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn commit_add_data_event(
-    dataset_repo: &dyn DatasetRepository,
+    dataset_registry: &dyn DatasetRegistry,
     dataset_ref: &DatasetRef,
     dataset_layout: &DatasetLayout,
     prev_data_block_hash: Option<Multihash>,
 ) -> CommitResult {
-    let dataset = dataset_repo.find_dataset_by_ref(dataset_ref).await.unwrap();
+    let resolved_dataset = dataset_registry
+        .get_dataset_by_ref(dataset_ref)
+        .await
+        .unwrap();
 
     let (prev_offset, prev_checkpoint) = if let Some(prev_data_block_hash) = prev_data_block_hash {
-        let prev_data_block = dataset
+        let prev_data_block = resolved_dataset
             .as_metadata_chain()
             .get_block(&prev_data_block_hash)
             .await
@@ -182,7 +185,7 @@ pub(crate) async fn commit_add_data_event(
         .await
         .build();
 
-    dataset
+    resolved_dataset
         .commit_event(MetadataEvent::AddData(random_data), CommitOpts::default())
         .await
         .unwrap()

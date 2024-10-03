@@ -20,10 +20,17 @@ use kamu_core::{
     DatasetLifecycleMessage,
     DatasetRepository,
     DatasetVisibility,
+    TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use kamu_datasets::{DatasetEntry, DatasetEntryRepository, MockDatasetEntryRepository};
-use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryService};
+use kamu_datasets::{
+    DatasetEntry,
+    DatasetEntryNotFoundError,
+    DatasetEntryRepository,
+    GetDatasetEntryError,
+    MockDatasetEntryRepository,
+};
+use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
 use mockall::predicate::eq;
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle, DatasetID, DatasetName};
@@ -39,6 +46,10 @@ async fn test_correctly_handles_outbox_messages() {
     let new_dataset_name = DatasetName::new_unchecked("new-name");
 
     let mut mock_dataset_entry_repository = MockDatasetEntryRepository::new();
+    DatasetEntryServiceHarness::add_get_dataset_entry_expectation(
+        &mut mock_dataset_entry_repository,
+        dataset_id.clone(),
+    );
     DatasetEntryServiceHarness::add_save_dataset_entry_expectation(
         &mut mock_dataset_entry_repository,
         dataset_id.clone(),
@@ -198,7 +209,7 @@ impl DatasetEntryServiceHarness {
         let catalog = {
             let mut b = CatalogBuilder::new();
 
-            b.add::<DatasetEntryService>();
+            b.add::<DatasetEntryServiceImpl>();
             b.add::<DatasetEntryIndexer>();
 
             b.add_value(mock_dataset_entry_repository);
@@ -226,6 +237,8 @@ impl DatasetEntryServiceHarness {
             b.bind::<dyn Outbox, OutboxImmediateImpl>();
 
             b.add_value(CurrentAccountSubject::new_test());
+
+            b.add_value(TenancyConfig::SingleTenant);
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
@@ -338,6 +351,21 @@ impl DatasetEntryServiceHarness {
             .returning(|_| Ok(()));
     }
 
+    fn add_get_dataset_entry_expectation(
+        mock_dataset_entry_repository: &mut MockDatasetEntryRepository,
+        dataset_id: DatasetID,
+    ) {
+        mock_dataset_entry_repository
+            .expect_get_dataset_entry()
+            .with(eq(dataset_id.clone()))
+            .times(1)
+            .returning(move |_| {
+                Err(GetDatasetEntryError::NotFound(DatasetEntryNotFoundError {
+                    dataset_id: dataset_id.clone(),
+                }))
+            });
+    }
+
     fn add_save_dataset_entry_expectation(
         mock_dataset_entry_repository: &mut MockDatasetEntryRepository,
         dataset_id: DatasetID,
@@ -374,11 +402,10 @@ impl DatasetEntryServiceHarness {
         dataset_handles: Vec<DatasetHandle>,
     ) {
         mock_dataset_repository
-            .expect_get_all_datasets()
+            .expect_all_dataset_handles()
             .times(1)
             .returning(move || {
                 let stream = futures::stream::iter(dataset_handles.clone().into_iter().map(Ok));
-
                 Box::pin(stream)
             });
     }

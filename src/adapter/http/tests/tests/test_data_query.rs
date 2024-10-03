@@ -58,7 +58,7 @@ impl Harness {
             .build();
 
         let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
+            tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
             base_catalog: Some(catalog),
         })

@@ -24,7 +24,7 @@ async fn test_task_agg_create_new() {
     let mut task = Task::new(
         Utc::now(),
         event_store.new_task_id().await.unwrap(),
-        Probe::default().into(),
+        LogicalPlanProbe::default().into(),
         Some(metadata.clone()),
     );
 
@@ -38,7 +38,10 @@ async fn test_task_agg_create_new() {
 
     let task = Task::load(task.task_id, &event_store).await.unwrap();
     assert_eq!(task.status(), TaskStatus::Queued);
-    assert_eq!(task.logical_plan, LogicalPlan::Probe(Probe::default()));
+    assert_eq!(
+        task.logical_plan,
+        LogicalPlan::Probe(LogicalPlanProbe::default())
+    );
     assert_eq!(task.metadata, metadata);
 }
 
@@ -49,7 +52,12 @@ async fn test_task_save_load_update() {
     let event_store = InMemoryTaskEventStore::new();
     let task_id = event_store.new_task_id().await.unwrap();
 
-    let mut task = Task::new(Utc::now(), task_id, Probe::default().into(), None);
+    let mut task = Task::new(
+        Utc::now(),
+        task_id,
+        LogicalPlanProbe::default().into(),
+        None,
+    );
     task.save(&event_store).await.unwrap();
 
     task.run(Utc::now()).unwrap();
@@ -97,7 +105,7 @@ async fn test_task_agg_illegal_transition() {
     let mut task = Task::new(
         Utc::now(),
         event_store.new_task_id().await.unwrap(),
-        Probe::default().into(),
+        LogicalPlanProbe::default().into(),
         None,
     );
     task.finish(Utc::now(), TaskOutcome::Cancelled).unwrap();
@@ -114,7 +122,7 @@ async fn test_task_requeue() {
     let mut task = Task::new(
         Utc::now(),
         event_store.new_task_id().await.unwrap(),
-        Probe::default().into(),
+        LogicalPlanProbe::default().into(),
         None,
     );
     task.run(Utc::now()).unwrap();

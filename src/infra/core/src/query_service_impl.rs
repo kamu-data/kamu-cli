@@ -31,7 +31,7 @@ use crate::utils::docker_images;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct QueryServiceImpl {
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
 }
@@ -40,18 +40,21 @@ pub struct QueryServiceImpl {
 #[interface(dyn QueryService)]
 impl QueryServiceImpl {
     pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     ) -> Self {
         Self {
-            dataset_repo,
+            dataset_registry,
             object_store_registry,
             dataset_action_authorizer,
         }
     }
 
-    fn session_context(&self, options: QueryOptions) -> SessionContext {
+    async fn session_context(
+        &self,
+        options: QueryOptions,
+    ) -> Result<SessionContext, InternalError> {
         let mut cfg = SessionConfig::new()
             .with_information_schema(true)
             .with_default_catalog_and_schema("kamu", "kamu");
@@ -72,16 +75,16 @@ impl QueryServiceImpl {
         let runtime = Arc::new(RuntimeEnv::new(runtime_config).unwrap());
         let session_context = SessionContext::new_with_config_rt(cfg, runtime);
 
-        session_context.register_catalog(
-            "kamu",
-            Arc::new(KamuCatalog::new(Arc::new(KamuSchema::new(
-                &session_context,
-                self.dataset_repo.clone(),
-                self.dataset_action_authorizer.clone(),
-                options,
-            )))),
-        );
-        session_context
+        let schema = KamuSchema::prepare(
+            &session_context,
+            self.dataset_registry.clone(),
+            self.dataset_action_authorizer.clone(),
+            options,
+        )
+        .await?;
+
+        session_context.register_catalog("kamu", Arc::new(KamuCatalog::new(Arc::new(schema))));
+        Ok(session_context)
     }
 
     /// Unless state is already provided in the options this will attempt to
@@ -103,15 +106,15 @@ impl QueryServiceImpl {
                 // SECURITY: We expect that access permissions will be validated during
                 // the query execution and that we're not leaking information here if the
                 // user doesn't have access to this dataset.
-                let dataset = self
-                    .dataset_repo
-                    .find_dataset_by_ref(&id.as_local_ref())
+                let resolved_dataset = self
+                    .dataset_registry
+                    .get_dataset_by_ref(&id.as_local_ref())
                     .await?;
 
                 let block_hash = if let Some(block_hash) = opts.block_hash {
                     // Validate that block the user is asking for exists
                     // SECURITY: Are we leaking information here by doing this check before auth?
-                    if !dataset
+                    if !resolved_dataset
                         .as_metadata_chain()
                         .contains_block(&block_hash)
                         .await
@@ -122,7 +125,7 @@ impl QueryServiceImpl {
 
                     block_hash
                 } else {
-                    dataset
+                    resolved_dataset
                         .as_metadata_chain()
                         .resolve_ref(&BlockRef::Head)
                         .await
@@ -173,7 +176,11 @@ impl QueryServiceImpl {
                         tracing::warn!(alias, "Ignoring table with invalid alias");
                         continue;
                     };
-                    let Ok(hdl) = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await else {
+                    let Ok(hdl) = self
+                        .dataset_registry
+                        .resolve_dataset_handle_by_ref(&dataset_ref)
+                        .await
+                    else {
                         tracing::warn!(?dataset_ref, "Ignoring table with unresolvable alias");
                         continue;
                     };
@@ -181,9 +188,9 @@ impl QueryServiceImpl {
                     // SECURITY: We expect that access permissions will be validated during
                     // the query execution and that we're not leaking information here if the user
                     // doesn't have access to this dataset.
-                    let dataset = self.dataset_repo.get_dataset_by_handle(&hdl);
+                    let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&hdl);
 
-                    let block_hash = dataset
+                    let block_hash = resolved_dataset
                         .as_metadata_chain()
                         .resolve_ref(&BlockRef::Head)
                         .await
@@ -201,33 +208,31 @@ impl QueryServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
         last_records_to_consider: Option<u64>,
-    ) -> Result<(Arc<dyn Dataset>, DataFrame), QueryError> {
-        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+    ) -> Result<(ResolvedDataset, DataFrame), QueryError> {
+        let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
 
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle, DatasetAction::Read)
+        let ctx = self
+            .session_context(QueryOptions {
+                input_datasets: BTreeMap::from([(
+                    resolved_dataset.get_id().clone(),
+                    QueryOptionsDataset {
+                        alias: resolved_dataset.get_alias().to_string(),
+                        block_hash: None,
+                        hints: Some(DatasetQueryHints {
+                            last_records_to_consider,
+                        }),
+                    },
+                )]),
+            })
             .await?;
-
-        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
-
-        let ctx = self.session_context(QueryOptions {
-            input_datasets: BTreeMap::from([(
-                dataset_handle.id.clone(),
-                QueryOptionsDataset {
-                    alias: dataset_handle.alias.to_string(),
-                    block_hash: None,
-                    hints: Some(DatasetQueryHints {
-                        last_records_to_consider,
-                    }),
-                },
-            )]),
-        });
 
         let df = ctx
-            .table(TableReference::bare(dataset_handle.alias.to_string()))
+            .table(TableReference::bare(
+                resolved_dataset.get_alias().to_string(),
+            ))
             .await?;
 
-        Ok((dataset, df))
+        Ok((resolved_dataset, df))
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
@@ -235,15 +240,9 @@ impl QueryServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<arrow::datatypes::SchemaRef>, QueryError> {
-        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+        let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
 
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle, DatasetAction::Read)
-            .await?;
-
-        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
-
-        let schema = dataset
+        let schema = resolved_dataset
             .as_metadata_chain()
             .accept_one(SearchSetDataSchemaVisitor::new())
             .await
@@ -262,16 +261,10 @@ impl QueryServiceImpl {
         session_context: &SessionContext,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<Type>, QueryError> {
-        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
-
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle, DatasetAction::Read)
-            .await?;
-
-        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
+        let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
 
         // TODO: Update to use SetDataSchema event
-        let maybe_last_data_slice_hash = dataset
+        let maybe_last_data_slice_hash = resolved_dataset
             .as_metadata_chain()
             .last_data_block_with_new_data()
             .await
@@ -288,7 +281,7 @@ impl QueryServiceImpl {
             Some(last_data_slice_hash) => {
                 // TODO: Avoid boxing url - requires datafusion to fix API
                 let data_url = Box::new(
-                    dataset
+                    resolved_dataset
                         .as_data_repo()
                         .get_internal_url(&last_data_slice_hash)
                         .await,
@@ -308,6 +301,22 @@ impl QueryServiceImpl {
             None => Ok(None),
         }
     }
+
+    async fn resolve_dataset(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> Result<ResolvedDataset, QueryError> {
+        let dataset_handle = self
+            .dataset_registry
+            .resolve_dataset_handle_by_ref(dataset_ref)
+            .await?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, DatasetAction::Read)
+            .await?;
+
+        Ok(self.dataset_registry.get_dataset_by_handle(&dataset_handle))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -316,7 +325,7 @@ impl QueryServiceImpl {
 impl QueryService for QueryServiceImpl {
     #[tracing::instrument(level = "info", skip_all)]
     async fn create_session(&self) -> Result<SessionContext, CreateSessionError> {
-        Ok(self.session_context(QueryOptions::default()))
+        Ok(self.session_context(QueryOptions::default()).await?)
     }
 
     #[tracing::instrument(
@@ -331,7 +340,7 @@ impl QueryService for QueryServiceImpl {
         skip: u64,
         limit: u64,
     ) -> Result<DataFrame, QueryError> {
-        let (dataset, df) = self.single_dataset(dataset_ref, Some(skip + limit)).await?;
+        let (resolved_dataset, df) = self.single_dataset(dataset_ref, Some(skip + limit)).await?;
 
         // Our custom catalog provider resolves schemas lazily, so the dataset will be
         // found even if it's empty and its schema will be empty, but we decide not to
@@ -342,7 +351,7 @@ impl QueryService for QueryServiceImpl {
             })?;
         }
 
-        let vocab: DatasetVocabulary = dataset
+        let vocab: DatasetVocabulary = resolved_dataset
             .as_metadata_chain()
             .accept_one(SearchSetVocabVisitor::new())
             .await
@@ -398,7 +407,7 @@ impl QueryService for QueryServiceImpl {
                 })
                 .collect(),
         };
-        let ctx = self.session_context(options);
+        let ctx = self.session_context(options).await?;
         let df = ctx.sql(statement).await?;
 
         Ok(QueryResponse { df, state })
@@ -417,7 +426,7 @@ impl QueryService for QueryServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<Type>, QueryError> {
-        let ctx = self.session_context(QueryOptions::default());
+        let ctx = self.session_context(QueryOptions::default()).await?;
         self.get_schema_parquet_impl(&ctx, dataset_ref).await
     }
 

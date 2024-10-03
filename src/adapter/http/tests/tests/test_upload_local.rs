@@ -35,7 +35,7 @@ use kamu_adapter_http::{
     UploadToken,
     UploadTokenBase64Json,
 };
-use kamu_core::MediaType;
+use kamu_core::{MediaType, TenancyConfig};
 use opendatafabric::{AccountID, AccountName};
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
@@ -97,7 +97,7 @@ impl Harness {
 
         let authentication_service = catalog.get_one::<AuthenticationServiceImpl>().unwrap();
 
-        let api_server = TestAPIServer::new(catalog, listener, true);
+        let api_server = TestAPIServer::new(catalog, listener, TenancyConfig::MultiTenant);
 
         Self {
             _tempdir: tempdir,

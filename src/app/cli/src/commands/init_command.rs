@@ -9,6 +9,8 @@
 
 use std::sync::Arc;
 
+use kamu::domain::TenancyConfig;
+
 use super::{CLIError, Command};
 use crate::{AlreadyInWorkspace, OutputConfig, WorkspaceLayout};
 
@@ -16,7 +18,7 @@ pub struct InitCommand {
     output_config: Arc<OutputConfig>,
     workspace_layout: Arc<WorkspaceLayout>,
     exists_ok: bool,
-    multi_tenant: bool,
+    tenancy_config: TenancyConfig,
 }
 
 impl InitCommand {
@@ -24,13 +26,13 @@ impl InitCommand {
         output_config: Arc<OutputConfig>,
         workspace_layout: Arc<WorkspaceLayout>,
         exists_ok: bool,
-        multi_tenant: bool,
+        tenancy_config: TenancyConfig,
     ) -> Self {
         Self {
             output_config,
             workspace_layout,
             exists_ok,
-            multi_tenant,
+            tenancy_config,
         }
     }
 }
@@ -53,17 +55,16 @@ impl Command for InitCommand {
             };
         }
 
-        WorkspaceLayout::create(&self.workspace_layout.root_dir, self.multi_tenant)?;
+        WorkspaceLayout::create(&self.workspace_layout.root_dir, self.tenancy_config)?;
 
         // TODO, write a workspace config
 
         if !self.output_config.quiet {
             eprintln!(
                 "{}",
-                console::style(if self.multi_tenant {
-                    "Initialized an empty multi-tenant workspace"
-                } else {
-                    "Initialized an empty workspace"
+                console::style(match self.tenancy_config {
+                    TenancyConfig::MultiTenant => "Initialized an empty multi-tenant workspace",
+                    TenancyConfig::SingleTenant => "Initialized an empty workspace",
                 })
                 .green()
                 .bold()

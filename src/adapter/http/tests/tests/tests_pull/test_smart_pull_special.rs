@@ -20,6 +20,7 @@ use std::assert_matches::assert_matches;
 
 use kamu::domain::PullResult;
 use kamu::testing::DatasetTestHelper;
+use kamu_core::TenancyConfig;
 use opendatafabric::DatasetRefAny;
 
 use crate::harness::{
@@ -38,11 +39,11 @@ use crate::tests::tests_pull::scenarios::*;
 async fn test_smart_pull_unauthenticated() {
     let scenario = SmartPullNewDatasetScenario::prepare(
         ClientSideHarness::new(ClientSideHarnessOptions {
-            multi_tenant: false,
+            tenancy_config: TenancyConfig::SingleTenant,
             authenticated_remotely: false,
         }),
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: false,
+            tenancy_config: TenancyConfig::SingleTenant,
             authorized_writes: true,
             base_catalog: None,
         })
@@ -84,11 +85,11 @@ async fn test_smart_pull_unauthenticated() {
 async fn test_smart_pull_incompatible_version_err() {
     let scenario = SmartPullNewDatasetScenario::prepare(
         ClientSideHarness::new(ClientSideHarnessOptions {
-            multi_tenant: true,
+            tenancy_config: TenancyConfig::MultiTenant,
             authenticated_remotely: true,
         }),
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
+            tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
             base_catalog: None,
         })

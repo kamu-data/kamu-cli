@@ -97,7 +97,7 @@ async fn test_ingest_polling_snapshot() {
 
     let dataset_alias = dataset_snapshot.name.clone();
 
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Round 1
@@ -114,7 +114,7 @@ async fn test_ingest_polling_snapshot() {
     )
     .unwrap();
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -172,7 +172,7 @@ async fn test_ingest_polling_snapshot() {
         .time_source
         .set(Utc.with_ymd_and_hms(2050, 2, 1, 12, 0, 0).unwrap());
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
 
     data_helper
         .assert_last_data_records_eq(indoc!(
@@ -215,7 +215,7 @@ async fn test_ingest_polling_snapshot() {
         .time_source
         .set(Utc.with_ymd_and_hms(2050, 2, 1, 12, 0, 0).unwrap());
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
     let event = data_helper.get_last_block_typed::<AddData>().await.event;
 
     assert_eq!(event.new_data, None);
@@ -271,7 +271,7 @@ async fn test_ingest_polling_ledger() {
 
     let dataset_alias = dataset_snapshot.name.clone();
 
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Round 1
@@ -288,7 +288,7 @@ async fn test_ingest_polling_ledger() {
     )
     .unwrap();
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
     data_helper
         .assert_last_data_eq(
             indoc!(
@@ -341,7 +341,7 @@ async fn test_ingest_polling_ledger() {
     )
     .unwrap();
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
 
     data_helper
         .assert_last_data_records_eq(indoc!(
@@ -377,7 +377,7 @@ async fn test_ingest_polling_ledger() {
     )
     .unwrap();
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
 
     data_helper
         .assert_last_data_records_eq(indoc!(
@@ -413,7 +413,7 @@ async fn test_ingest_polling_ledger() {
     )
     .unwrap();
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
     let event = data_helper.get_last_block_typed::<AddData>().await.event;
 
     assert_eq!(event.new_data, None);
@@ -426,7 +426,7 @@ async fn test_ingest_polling_ledger() {
     // Round 5 (empty data, commit only updates the source state)
     std::fs::write(&src_path, "").unwrap();
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
     let event = data_helper.get_last_block_typed::<AddData>().await.event;
 
     assert_eq!(event.new_data, None);
@@ -484,11 +484,11 @@ async fn test_ingest_polling_empty_data() {
 
     let dataset_alias = dataset_snapshot.name.clone();
 
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     std::fs::write(&src_path, "").unwrap();
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
 
     // Should only contain source state
     let event = data_helper.get_last_block_typed::<AddData>().await.event;
@@ -543,7 +543,7 @@ async fn test_ingest_polling_event_time_as_date() {
 
     let dataset_alias = dataset_snapshot.name.clone();
 
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     std::fs::write(
@@ -559,7 +559,7 @@ async fn test_ingest_polling_event_time_as_date() {
     )
     .unwrap();
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -639,9 +639,7 @@ async fn test_ingest_polling_event_time_of_invalid_type() {
         })
         .build();
 
-    let dataset_alias = dataset_snapshot.name.clone();
-
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
 
     std::fs::write(
         &src_path,
@@ -656,7 +654,7 @@ async fn test_ingest_polling_event_time_of_invalid_type() {
     )
     .unwrap();
 
-    let res = harness.ingest(&dataset_alias).await;
+    let res = harness.ingest(&created).await;
     assert_matches!(res, Err(PollingIngestError::BadInputSchema(_)));
 }
 
@@ -700,7 +698,7 @@ async fn test_ingest_polling_bad_column_names_preserve() {
 
     let dataset_alias = dataset_snapshot.name.clone();
 
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     std::fs::write(
@@ -715,7 +713,7 @@ async fn test_ingest_polling_bad_column_names_preserve() {
     )
     .unwrap();
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
     data_helper
         .assert_last_data_eq(
             indoc!(
@@ -792,7 +790,7 @@ async fn test_ingest_polling_bad_column_names_rename() {
 
     let dataset_alias = dataset_snapshot.name.clone();
 
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     std::fs::write(
@@ -807,7 +805,7 @@ async fn test_ingest_polling_bad_column_names_rename() {
     )
     .unwrap();
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -885,7 +883,7 @@ async fn test_ingest_polling_schema_case_sensitivity() {
 
     let dataset_alias = dataset_snapshot.name.clone();
 
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Round 1
@@ -902,7 +900,7 @@ async fn test_ingest_polling_schema_case_sensitivity() {
     )
     .unwrap();
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -961,7 +959,7 @@ async fn test_ingest_polling_schema_case_sensitivity() {
         .time_source
         .set(Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap());
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
 
     data_helper
         .assert_last_data_records_eq(indoc!(
@@ -1004,7 +1002,7 @@ async fn test_ingest_polling_schema_case_sensitivity() {
         .time_source
         .set(Utc.with_ymd_and_hms(2050, 1, 3, 12, 0, 0).unwrap());
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
     let event = data_helper.get_last_block_typed::<AddData>().await.event;
 
     assert_eq!(event.new_data, None);
@@ -1073,8 +1071,8 @@ async fn test_ingest_polling_preprocess_with_spark() {
 
     let dataset_alias = dataset_snapshot.name.clone();
 
-    harness.create_dataset(dataset_snapshot).await;
-    harness.ingest(&dataset_alias).await.unwrap();
+    let created = harness.create_dataset(dataset_snapshot).await;
+    harness.ingest(&created).await.unwrap();
 
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
@@ -1165,8 +1163,8 @@ async fn test_ingest_polling_preprocess_with_flink() {
 
     let dataset_alias = dataset_snapshot.name.clone();
 
-    harness.create_dataset(dataset_snapshot).await;
-    harness.ingest(&dataset_alias).await.unwrap();
+    let created = harness.create_dataset(dataset_snapshot).await;
+    harness.ingest(&created).await.unwrap();
 
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
@@ -1201,54 +1199,10 @@ async fn test_ingest_polling_preprocess_with_flink() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(engine, ingest, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_ingest_checks_auth() {
-    let harness = IngestTestHarness::new_with_authorizer(
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(
-            &DatasetAlias::new(None, DatasetName::new_unchecked("foo.bar")),
-            1,
-            true,
-        ),
-    );
-    let src_path = harness.temp_dir.path().join("data.json");
-
-    let dataset_snapshot = MetadataFactory::dataset_snapshot()
-        .name("foo.bar")
-        .kind(DatasetKind::Root)
-        .push_event(
-            MetadataFactory::set_polling_source()
-                .fetch_file(&src_path)
-                .read(ReadStepNdJson {
-                    schema: Some(vec![
-                        "event_time TIMESTAMP".to_string(),
-                        "city STRING".to_string(),
-                        "population BIGINT".to_string(),
-                    ]),
-                    ..ReadStepNdJson::default()
-                })
-                .build(),
-        )
-        .build();
-
-    let dataset_alias = dataset_snapshot.name.clone();
-
-    harness.create_dataset(dataset_snapshot).await;
-
-    std::fs::write(
-        &src_path,
-        r#"{"event_time": "2020-01-01T12:00:00", "city": "A", "population": 1000}"#,
-    )
-    .unwrap();
-
-    harness.ingest(&dataset_alias).await.unwrap();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 struct IngestTestHarness {
     temp_dir: TempDir,
-    dataset_repo: Arc<DatasetRepositoryLocalFs>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     ingest_svc: Arc<dyn PollingIngestService>,
     time_source: Arc<SystemTimeSourceStub>,
     ctx: SessionContext,
@@ -1256,12 +1210,6 @@ struct IngestTestHarness {
 
 impl IngestTestHarness {
     fn new() -> Self {
-        Self::new_with_authorizer(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new())
-    }
-
-    fn new_with_authorizer<TDatasetAuthorizer: auth::DatasetActionAuthorizer + 'static>(
-        dataset_action_authorizer: TDatasetAuthorizer,
-    ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = temp_dir.path().join("run");
         let cache_dir = temp_dir.path().join("cache");
@@ -1278,14 +1226,11 @@ impl IngestTestHarness {
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
-            .add_value(dataset_action_authorizer)
-            .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(false),
-            )
+            .add_value(TenancyConfig::SingleTenant)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add_value(EngineProvisionerLocalConfig::default())
             .add::<EngineProvisionerLocal>()
             .add_value(SystemTimeSourceStub::new_set(
@@ -1298,33 +1243,36 @@ impl IngestTestHarness {
             .add::<DatasetKeyValueServiceSysEnv>()
             .build();
 
-        let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
+        let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+        let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
         let ingest_svc = catalog.get_one::<dyn PollingIngestService>().unwrap();
         let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
 
         Self {
             temp_dir,
-            dataset_repo,
+            dataset_registry,
+            dataset_repo_writer,
             ingest_svc,
             time_source,
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
     }
 
-    async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) {
-        self.dataset_repo
+    async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) -> CreateDatasetResult {
+        self.dataset_repo_writer
             .create_dataset_from_snapshot(dataset_snapshot)
             .await
-            .unwrap();
+            .unwrap()
+            .create_dataset_result
     }
 
     async fn ingest(
         &self,
-        dataset_alias: &DatasetAlias,
+        created: &CreateDatasetResult,
     ) -> Result<PollingIngestResult, PollingIngestError> {
         self.ingest_svc
             .ingest(
-                &dataset_alias.as_local_ref(),
+                ResolvedDataset::from(created),
                 PollingIngestOptions::default(),
                 None,
             )
@@ -1332,12 +1280,12 @@ impl IngestTestHarness {
     }
 
     async fn dataset_data_helper(&self, dataset_alias: &DatasetAlias) -> DatasetDataHelper {
-        let dataset = self
-            .dataset_repo
-            .find_dataset_by_ref(&dataset_alias.as_local_ref())
+        let resolved_dataset = self
+            .dataset_registry
+            .get_dataset_by_ref(&dataset_alias.as_local_ref())
             .await
             .unwrap();
 
-        DatasetDataHelper::new_with_context(dataset, self.ctx.clone())
+        DatasetDataHelper::new_with_context((*resolved_dataset).clone(), self.ctx.clone())
     }
 }

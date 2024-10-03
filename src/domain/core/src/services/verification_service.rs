@@ -24,16 +24,13 @@ use crate::*;
 pub trait VerificationService: Send + Sync {
     async fn verify(
         &self,
-        dataset_ref: &DatasetRef,
-        block_range: (Option<Multihash>, Option<Multihash>),
-        options: VerificationOptions,
+        request: VerificationRequest<ResolvedDataset>,
         listener: Option<Arc<dyn VerificationListener>>,
     ) -> VerificationResult;
 
     async fn verify_multi(
         &self,
-        requests: Vec<VerificationRequest>,
-        options: VerificationOptions,
+        requests: Vec<VerificationRequest<ResolvedDataset>>,
         listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Vec<VerificationResult>;
 }
@@ -42,10 +39,11 @@ pub trait VerificationService: Send + Sync {
 // DTOs
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct VerificationRequest {
-    pub dataset_ref: DatasetRef,
+#[derive(Clone, Debug)]
+pub struct VerificationRequest<TTarget> {
+    pub target: TTarget,
     pub block_range: (Option<Multihash>, Option<Multihash>),
+    pub options: VerificationOptions,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -123,6 +121,7 @@ pub trait VerificationListener: Send + Sync {
     fn begin(&self) {}
     fn success(&self, _result: &VerificationResult) {}
     fn error(&self, _error: &VerificationError) {}
+    fn transform_error(&self, _error: &VerifyTransformExecuteError) {}
 
     fn begin_phase(&self, _phase: VerificationPhase) {}
     fn end_phase(&self, _phase: VerificationPhase) {}
@@ -224,10 +223,10 @@ pub enum VerificationError {
         CheckpointDoesNotMatchMetadata,
     ),
     #[error(transparent)]
-    Transform(
+    VerifyTransform(
         #[from]
         #[backtrace]
-        TransformError,
+        VerifyTransformError,
     ),
     #[error(transparent)]
     Access(

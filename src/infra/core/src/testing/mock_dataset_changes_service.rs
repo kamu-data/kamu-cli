@@ -14,6 +14,7 @@ use opendatafabric::{DatasetID, Multihash};
 
 mockall::mock! {
     pub DatasetChangesService {}
+
     #[async_trait::async_trait]
     impl DatasetChangesService for DatasetChangesService {
         #[allow(clippy::ref_option_ref)]

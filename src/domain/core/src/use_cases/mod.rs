@@ -9,14 +9,26 @@
 
 mod append_dataset_metadata_batch_use_case;
 mod commit_dataset_event_use_case;
+mod compact_dataset_use_case;
 mod create_dataset_from_snapshot_use_case;
 mod create_dataset_use_case;
 mod delete_dataset_use_case;
+mod pull_dataset_use_case;
+mod push_dataset_use_case;
 mod rename_dataset_use_case;
+mod reset_dataset_use_case;
+mod set_watermark_use_case;
+mod verify_dataset_use_case;
 
 pub use append_dataset_metadata_batch_use_case::*;
 pub use commit_dataset_event_use_case::*;
+pub use compact_dataset_use_case::*;
 pub use create_dataset_from_snapshot_use_case::*;
 pub use create_dataset_use_case::*;
 pub use delete_dataset_use_case::*;
+pub use pull_dataset_use_case::*;
+pub use push_dataset_use_case::*;
 pub use rename_dataset_use_case::*;
+pub use reset_dataset_use_case::*;
+pub use set_watermark_use_case::*;
+pub use verify_dataset_use_case::*;

@@ -25,7 +25,7 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
-use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryService};
+use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
@@ -97,23 +97,24 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     );
     let workspace_version = workspace_svc.workspace_version()?;
 
-    let is_multi_tenant_workspace = workspace_svc.is_multi_tenant_workspace();
+    let tenancy_config = if workspace_svc.is_multi_tenant_workspace() {
+        TenancyConfig::MultiTenant
+    } else {
+        TenancyConfig::SingleTenant
+    };
+
     let config = load_config(&workspace_layout);
     let current_account = AccountService::current_account_indication(
         args.account.clone(),
-        is_multi_tenant_workspace,
+        tenancy_config,
         config.users.as_ref().unwrap(),
     );
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
     let is_init_command = maybe_init_command.is_some();
-    let app_database_config = get_app_database_config(
-        &workspace_layout,
-        &config,
-        is_multi_tenant_workspace,
-        is_init_command,
-    );
+    let app_database_config =
+        get_app_database_config(&workspace_layout, &config, tenancy_config, is_init_command);
     let (database_config, maybe_temp_database_path) = app_database_config.into_inner();
     let maybe_db_connection_settings = database_config
         .as_ref()
@@ -123,13 +124,13 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     let (guards, base_catalog, cli_catalog, maybe_server_catalog, output_config) = {
         let dependencies_graph_repository = prepare_dependencies_graph_repository(
             &workspace_layout,
-            is_multi_tenant_workspace,
+            tenancy_config,
             current_account.to_current_account_subject(),
         );
 
         let mut base_catalog_builder = configure_base_catalog(
             &workspace_layout,
-            is_multi_tenant_workspace,
+            tenancy_config,
             args.system_time.map(Into::into),
             args.e2e_output_data_path.is_some(),
         );
@@ -169,11 +170,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             "Initializing {BINARY_NAME}"
         );
 
-        register_config_in_catalog(
-            &config,
-            &mut base_catalog_builder,
-            is_multi_tenant_workspace,
-        );
+        register_config_in_catalog(&config, &mut base_catalog_builder, tenancy_config);
 
         let base_catalog = base_catalog_builder.build();
 
@@ -199,7 +196,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
         let cli_catalog = configure_cli_catalog(
             maybe_server_catalog.as_ref().unwrap_or(&final_base_catalog),
-            is_multi_tenant_workspace,
+            tenancy_config,
         )
         .add_value(current_account.to_current_account_subject())
         .build();
@@ -243,7 +240,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             if command.needs_workspace() && is_workspace_upgrade_needed {
                 Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))?;
             }
-            if current_account.is_explicit() && !is_multi_tenant_workspace {
+            if current_account.is_explicit() && tenancy_config == TenancyConfig::SingleTenant {
                 Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))?;
             }
 
@@ -354,7 +351,7 @@ where
 
 pub fn prepare_dependencies_graph_repository(
     workspace_layout: &WorkspaceLayout,
-    multi_tenant_workspace: bool,
+    tenancy_config: TenancyConfig,
     current_account_subject: CurrentAccountSubject,
 ) -> DependencyGraphRepositoryInMemory {
     // Construct a special catalog just to create 1 object, but with a repository
@@ -362,10 +359,9 @@ pub fn prepare_dependencies_graph_repository(
 
     let special_catalog_for_graph = CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
+        .add_value(tenancy_config)
         .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(workspace_layout.datasets_dir.clone())
-                .with_multi_tenant(multi_tenant_workspace),
+            DatasetRepositoryLocalFs::builder().with_root(workspace_layout.datasets_dir.clone()),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
@@ -383,7 +379,7 @@ pub fn prepare_dependencies_graph_repository(
 // Public only for tests
 pub fn configure_base_catalog(
     workspace_layout: &WorkspaceLayout,
-    multi_tenant_workspace: bool,
+    tenancy_config: TenancyConfig,
     system_time: Option<DateTime<Utc>>,
     is_e2e_testing: bool,
 ) -> CatalogBuilder {
@@ -398,6 +394,8 @@ pub fn configure_base_catalog(
 
     b.add::<ContainerRuntime>();
 
+    b.add_value(tenancy_config);
+
     if let Some(system_time) = system_time {
         b.add_value(SystemTimeSourceStub::new_set(system_time));
         b.bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
@@ -406,9 +404,7 @@ pub fn configure_base_catalog(
     }
 
     b.add_builder(
-        DatasetRepositoryLocalFs::builder()
-            .with_root(workspace_layout.datasets_dir.clone())
-            .with_multi_tenant(multi_tenant_workspace),
+        DatasetRepositoryLocalFs::builder().with_root(workspace_layout.datasets_dir.clone()),
     );
     b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
     b.bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>();
@@ -431,7 +427,9 @@ pub fn configure_base_catalog(
 
     b.add::<PushIngestServiceImpl>();
 
-    b.add::<TransformServiceImpl>();
+    b.add::<TransformRequestPlannerImpl>();
+    b.add::<TransformElaborationServiceImpl>();
+    b.add::<TransformExecutionServiceImpl>();
 
     b.add::<VerificationServiceImpl>();
 
@@ -440,10 +438,13 @@ pub fn configure_base_catalog(
     b.add::<SearchServiceImpl>();
 
     b.add::<SyncServiceImpl>();
+    b.add::<SyncRequestBuilder>();
 
-    b.add::<PullServiceImpl>();
+    b.add::<PullRequestPlannerImpl>();
 
-    b.add::<PushServiceImpl>();
+    b.add::<PushRequestPlannerImpl>();
+
+    b.add::<WatermarkServiceImpl>();
 
     b.add::<ResetServiceImpl>();
 
@@ -457,21 +458,28 @@ pub fn configure_base_catalog(
 
     b.add::<EngineProvisionerLocal>();
 
+    b.add::<kamu::utils::simple_transfer_protocol::SimpleTransferProtocol>();
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
 
     b.add::<DependencyGraphServiceInMemory>();
 
     b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
     b.add::<CommitDatasetEventUseCaseImpl>();
+    b.add::<CompactDatasetUseCaseImpl>();
     b.add::<CreateDatasetUseCaseImpl>();
     b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
     b.add::<DeleteDatasetUseCaseImpl>();
+    b.add::<PullDatasetUseCaseImpl>();
+    b.add::<PushDatasetUseCaseImpl>();
     b.add::<RenameDatasetUseCaseImpl>();
+    b.add::<ResetDatasetUseCaseImpl>();
+    b.add::<SetWatermarkUseCaseImpl>();
+    b.add::<VerifyDatasetUseCaseImpl>();
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 
     // No GitHub login possible for single-tenant workspace
-    if multi_tenant_workspace {
+    if tenancy_config == TenancyConfig::MultiTenant {
         if is_e2e_testing {
             b.add::<kamu_adapter_oauth::DummyOAuthGithub>();
         } else {
@@ -494,15 +502,15 @@ pub fn configure_base_catalog(
 
     b.add::<RebacServiceImpl>();
 
-    if multi_tenant_workspace {
+    if tenancy_config == TenancyConfig::MultiTenant {
         b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
     }
 
-    b.add::<DatasetEntryService>();
+    b.add::<DatasetEntryServiceImpl>();
 
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()
-            .with_consumer_filter(messaging_outbox::ConsumerFilter::BestEffortConsumers),
+            .with_consumer_filter(messaging_outbox::ConsumerFilter::ImmediateConsumers),
     );
     b.add::<messaging_outbox::OutboxTransactionalImpl>();
     b.add::<messaging_outbox::OutboxDispatchingImpl>();
@@ -521,13 +529,15 @@ pub fn configure_base_catalog(
 // Public only for tests
 pub fn configure_cli_catalog(
     base_catalog: &Catalog,
-    multi_tenant_workspace: bool,
+    tenancy_config: TenancyConfig,
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
 
     b.add::<config::ConfigService>();
     b.add::<GcService>();
-    b.add_builder(WorkspaceService::builder().with_multi_tenant(multi_tenant_workspace));
+    b.add_builder(
+        WorkspaceService::builder().with_multi_tenant(tenancy_config == TenancyConfig::MultiTenant),
+    );
     b.add::<odf_server::LoginService>();
 
     b
@@ -598,7 +608,7 @@ fn load_config(workspace_layout: &WorkspaceLayout) -> config::CLIConfig {
 pub fn register_config_in_catalog(
     config: &config::CLIConfig,
     catalog_builder: &mut CatalogBuilder,
-    multi_tenant_workspace: bool,
+    tenancy_config: TenancyConfig,
 ) {
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
 
@@ -712,13 +722,15 @@ pub fn register_config_in_catalog(
     });
     catalog_builder.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
 
-    if multi_tenant_workspace {
+    if tenancy_config == TenancyConfig::MultiTenant {
         let mut implicit_user_config = PredefinedAccountsConfig::new();
         implicit_user_config.predefined.push(
             AccountConfig::from_name(opendatafabric::AccountName::new_unchecked(
-                AccountService::default_account_name(true).as_str(),
+                AccountService::default_account_name(TenancyConfig::MultiTenant).as_str(),
             ))
-            .set_display_name(AccountService::default_user_name(true)),
+            .set_display_name(AccountService::default_user_name(
+                TenancyConfig::MultiTenant,
+            )),
         );
 
         use merge::Merge;

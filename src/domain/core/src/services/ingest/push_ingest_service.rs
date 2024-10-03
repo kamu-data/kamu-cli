@@ -26,7 +26,7 @@ pub trait PushIngestService: Send + Sync {
     /// Returns the set of active push sources
     async fn get_active_push_sources(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
     ) -> Result<Vec<(Multihash, MetadataBlockTyped<AddPushSource>)>, GetDatasetError>;
 
     /// Uses push source definition in metadata to ingest data from the
@@ -35,7 +35,7 @@ pub trait PushIngestService: Send + Sync {
     /// See also [MediaType].
     async fn ingest_from_url(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
         source_name: Option<&str>,
         url: url::Url,
         opts: PushIngestOpts,
@@ -48,7 +48,7 @@ pub trait PushIngestService: Send + Sync {
     /// See also [MediaType].
     async fn ingest_from_file_stream(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
         source_name: Option<&str>,
         data: Box<dyn AsyncRead + Send + Unpin>,
         opts: PushIngestOpts,
@@ -123,13 +123,6 @@ impl PushIngestListener for NullPushIngestListener {}
 #[derive(Debug, Error)]
 pub enum PushIngestError {
     #[error(transparent)]
-    DatasetNotFound(
-        #[from]
-        #[backtrace]
-        DatasetNotFoundError,
-    ),
-
-    #[error(transparent)]
     SourceNotFound(
         #[from]
         #[backtrace]
@@ -198,24 +191,6 @@ pub enum PushIngestError {
         #[backtrace]
         InternalError,
     ),
-}
-
-impl From<GetDatasetError> for PushIngestError {
-    fn from(v: GetDatasetError) -> Self {
-        match v {
-            GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
-            GetDatasetError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-impl From<auth::DatasetActionUnauthorizedError> for PushIngestError {
-    fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
-        match v {
-            auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -12,6 +12,7 @@ use std::path::Path;
 use dill::Component;
 use kamu::domain::*;
 use kamu::testing::*;
+use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use messaging_outbox::DummyOutboxImpl;
@@ -32,13 +33,11 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let catalog = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
         .add_value(CurrentAccountSubject::new_test())
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(false),
-        )
+        .add_value(TenancyConfig::SingleTenant)
+        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+        .add::<DatasetRegistryRepoBridge>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(RemoteRepositoryRegistryImpl::create(tmp_workspace_dir.join("repos")).unwrap())
         .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
@@ -47,7 +46,9 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<auth::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
+        .add::<SyncRequestBuilder>()
         .add::<DummySmartTransferProtocolClient>()
+        .add::<SimpleTransferProtocol>()
         .add::<SearchServiceImpl>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()
@@ -56,6 +57,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let remote_repo_reg = catalog.get_one::<dyn RemoteRepositoryRegistry>().unwrap();
     let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
+    let sync_request_builder = catalog.get_one::<SyncRequestBuilder>().unwrap();
     let search_svc = catalog.get_one::<dyn SearchService>().unwrap();
 
     // Add repository
@@ -77,8 +79,14 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
 
     sync_svc
         .sync(
-            &dataset_local_alias.as_any_ref(),
-            &dataset_remote_alias.as_any_ref(),
+            sync_request_builder
+                .build_sync_request(
+                    dataset_local_alias.as_any_ref(),
+                    dataset_remote_alias.as_any_ref(),
+                    true,
+                )
+                .await
+                .unwrap(),
             SyncOptions::default(),
             None,
         )
