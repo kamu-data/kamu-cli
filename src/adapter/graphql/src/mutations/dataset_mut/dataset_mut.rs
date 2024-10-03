@@ -9,7 +9,6 @@
 
 use chrono::{DateTime, Utc};
 use domain::{DeleteDatasetError, RenameDatasetError};
-use kamu_auth_rebac::{PropertyValue, SetEntityPropertyError};
 use kamu_core::{self as domain};
 use opendatafabric as odf;
 
@@ -163,6 +162,8 @@ impl DatasetMut {
         ctx: &Context<'_>,
         visibility: DatasetVisibilityInput,
     ) -> Result<SetDatasetPropertyResultSuccess> {
+        ensure_account_owns_dataset(ctx, &self.dataset_handle).await?;
+
         let rebac_svc = from_catalog::<dyn kamu_auth_rebac::RebacService>(ctx).unwrap();
 
         let (allows_public_read, allows_anonymous_read) = match visibility {
@@ -172,87 +173,29 @@ impl DatasetMut {
             }) => (true, anonymous_available),
         };
 
+        use kamu_auth_rebac::DatasetPropertyName;
+
+        let (allows_public_read_property, allows_anonymous_read_property) = (
+            DatasetPropertyName::allows_public_read(allows_public_read),
+            DatasetPropertyName::allows_anonymous_read(allows_anonymous_read),
+        );
         {
-            let (name, value) =
-                kamu_auth_rebac::DatasetPropertyName::allows_public_read(allows_public_read);
-            let res = rebac_svc
+            let (name, value) = allows_public_read_property;
+            rebac_svc
                 .set_dataset_property(&self.dataset_handle.id, name, &value)
-                .await;
+                .await
+                .int_err()?;
+        }
+        {
+            let (name, value) = allows_anonymous_read_property;
+            rebac_svc
+                .set_dataset_property(&self.dataset_handle.id, name, &value)
+                .await
+                .int_err()?;
         }
 
-        // let res = rebac_svc
-        //     .set_dataset_property(&self.dataset_handle.id, property_name,
-        // &property_value)     .await;
-
         Ok(SetDatasetPropertyResultSuccess::default())
-
-        // Ok(())
-
-        // let res = rebac_svc
-        //     .set_dataset_property(&self.dataset_handle.id, property_name,
-        // &property_value)     .await;
-
-        // ensure_account_owns_dataset(ctx, &self.dataset_handle).await?;
-        //
-        // let (name, value) =
-        // kamu_auth_rebac::DatasetPropertyName::allows_public_read(yes);
-        //
-        // self.set_property(ctx, name, value).await
     }
-
-    // /// Set visibility for the dataset
-    // #[graphql(guard = "LoggedInGuard::new()")]
-    // async fn set_publicly_available(
-    //     &self,
-    //     ctx: &Context<'_>,
-    //     yes: bool,
-    // ) -> Result<SetDatasetPropertyResultSuccess> {
-    //     ensure_account_owns_dataset(ctx, &self.dataset_handle).await?;
-    //
-    //     let (name, value) =
-    // kamu_auth_rebac::DatasetPropertyName::allows_public_read(yes);
-    //
-    //     self.set_property(ctx, name, value).await
-    // }
-    //
-    // /// Changing dataset availability for anonymous users
-    // #[graphql(guard = "LoggedInGuard::new()")]
-    // async fn set_anonymous_available(
-    //     &self,
-    //     ctx: &Context<'_>,
-    //     yes: bool,
-    // ) -> Result<SetDatasetPropertyResultSuccess> {
-    //     ensure_account_owns_dataset(ctx, &self.dataset_handle).await?;
-    //
-    //     let (name, value) =
-    // kamu_auth_rebac::DatasetPropertyName::allows_anonymous_read(yes);
-    //
-    //     self.set_property(ctx, name, value).await
-    // }
-
-    // #[graphql(skip)]
-    // async fn set_property(
-    //     &self,
-    //     ctx: &Context<'_>,
-    //     property_name: kamu_auth_rebac::DatasetPropertyName,
-    //     property_value: PropertyValue<'_>,
-    // ) -> Result<SetDatasetPropertyResultSuccess> {
-    //     let rebac_svc = from_catalog::<dyn
-    // kamu_auth_rebac::RebacService>(ctx).unwrap();
-    //
-    //     let res = rebac_svc
-    //         .set_dataset_property(&self.dataset_handle.id, property_name,
-    // &property_value)         .await;
-    //
-    //     match res {
-    //         Ok(_) => Ok(SetDatasetPropertyResultSuccess {
-    //             updated_property: property_name.into(),
-    //         }),
-    //         Err(e) => match e {
-    //             SetEntityPropertyError::Internal(ie) => Err(ie.into()),
-    //         },
-    //     }
-    // }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
