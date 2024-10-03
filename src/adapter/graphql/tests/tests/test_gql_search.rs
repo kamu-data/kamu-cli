@@ -17,6 +17,8 @@ use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_search_query() {
     let tempdir = tempfile::tempdir().unwrap();
@@ -36,6 +38,7 @@ async fn test_search_query() {
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+        .add::<DatasetRegistryRepoBridge>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .build();
 
@@ -204,3 +207,5 @@ async fn test_search_query() {
         })
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

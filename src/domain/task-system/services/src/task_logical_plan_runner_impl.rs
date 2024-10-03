@@ -23,6 +23,7 @@ use kamu_core::{
     PullService,
     ResetError,
     ResetService,
+    ResolvedDataset,
     TransformError,
 };
 use kamu_datasets::{DatasetEnvVar, DatasetEnvVarService};
@@ -106,14 +107,15 @@ impl TaskLogicalPlanRunnerImpl {
     async fn run_reset(&self, args: &ResetDataset) -> Result<TaskOutcome, InternalError> {
         let reset_svc = self.catalog.get_one::<dyn ResetService>().int_err()?;
         let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().int_err()?;
+
         let dataset_handle = dataset_repo
-            .resolve_dataset_ref(&args.dataset_id.as_local_ref())
+            .resolve_dataset_handle_by_ref(&args.dataset_id.as_local_ref())
             .await
             .int_err()?;
 
         let reset_result_maybe = reset_svc
             .reset_dataset(
-                &dataset_handle,
+                dataset_repo.get_dataset_by_handle(&dataset_handle),
                 args.new_head_hash.as_ref(),
                 args.old_head_hash.as_ref(),
             )
@@ -137,14 +139,18 @@ impl TaskLogicalPlanRunnerImpl {
     ) -> Result<TaskOutcome, InternalError> {
         let compaction_svc = self.catalog.get_one::<dyn CompactionService>().int_err()?;
         let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().int_err()?;
+
         let dataset_handle = dataset_repo
-            .resolve_dataset_ref(&args.dataset_id.as_local_ref())
+            .resolve_dataset_handle_by_ref(&args.dataset_id.as_local_ref())
             .await
             .int_err()?;
 
         let compaction_result = compaction_svc
             .compact_dataset(
-                &dataset_handle,
+                ResolvedDataset::new(
+                    dataset_repo.get_dataset_by_handle(&dataset_handle),
+                    dataset_handle.clone(),
+                ),
                 CompactionOptions {
                     max_slice_size: args.max_slice_size,
                     max_slice_records: args.max_slice_records,

@@ -55,7 +55,7 @@ pub trait PullService: Send + Sync {
     /// Manually advances the watermark of a root dataset
     async fn set_watermark(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset: Arc<dyn Dataset>,
         watermark: DateTime<Utc>,
     ) -> Result<PullResult, SetWatermarkError>;
 }

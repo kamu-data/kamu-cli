@@ -151,7 +151,7 @@ pub async fn dataset_metadata_handler(
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
     let dataset = dataset_repo
-        .find_dataset_by_ref(&dataset_ref)
+        .get_dataset_by_ref(&dataset_ref)
         .await
         .api_err()?;
 

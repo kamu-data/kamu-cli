@@ -13,7 +13,7 @@ use database_common::PaginationOpts;
 use futures::TryStreamExt;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use kamu_accounts::Account as AccountEntity;
-use kamu_core::DatasetRepository;
+use kamu_core::DatasetRegistry;
 use kamu_flow_system as fs;
 use opendatafabric::DatasetRefPattern;
 
@@ -111,7 +111,7 @@ impl AccountFlowRuns {
             .try_collect()
             .await?;
 
-        let dataset_repo = from_catalog::<dyn DatasetRepository>(ctx).unwrap();
+        let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
 
         let account = Account::new(
             self.account.id.clone().into(),
@@ -119,7 +119,7 @@ impl AccountFlowRuns {
         );
 
         let matched_datasets: Vec<_> =
-            filter_datasets_by_local_pattern(dataset_repo.as_ref(), datasets_with_flows)
+            filter_datasets_by_local_pattern(dataset_registry.as_ref(), datasets_with_flows)
                 .map_ok(|dataset_handle| Dataset::new(account.clone(), dataset_handle))
                 .try_collect()
                 .await

@@ -325,16 +325,17 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
 
     let root_alias = root_snapshot.name.clone();
 
-    harness
+    let root_created = harness
         .dataset_repo
         .create_dataset_from_snapshot(root_snapshot)
         .await
-        .unwrap();
+        .unwrap()
+        .create_dataset_result;
 
     harness
         .ingest_svc
         .ingest(
-            &root_alias.as_local_ref(),
+            ResolvedDataset::from(&root_created),
             PollingIngestOptions::default(),
             None,
         )
@@ -356,18 +357,15 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         )
         .build();
 
-    let deriv_alias = deriv_snapshot.name.clone();
-
-    let dataset = harness
+    let deriv_created = harness
         .dataset_repo
         .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()
-        .create_dataset_result
-        .dataset;
+        .create_dataset_result;
 
-    let deriv_helper = DatasetHelper::new(dataset.clone(), harness.tempdir.path());
-    let deriv_data_helper = DatasetDataHelper::new(dataset);
+    let deriv_helper = DatasetHelper::new(deriv_created.dataset.clone(), harness.tempdir.path());
+    let deriv_data_helper = DatasetDataHelper::new(deriv_created.dataset.clone());
 
     harness
         .time_source
@@ -376,7 +374,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
     let res = harness
         .transform_svc
         .transform(
-            &deriv_alias.as_local_ref(),
+            ResolvedDataset::from(&deriv_created),
             TransformOptions::default(),
             None,
         )
@@ -444,7 +442,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
     harness
         .ingest_svc
         .ingest(
-            &root_alias.as_local_ref(),
+            ResolvedDataset::from(&root_created),
             PollingIngestOptions::default(),
             None,
         )
@@ -458,7 +456,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
     let res = harness
         .transform_svc
         .transform(
-            &deriv_alias.as_local_ref(),
+            ResolvedDataset::from(&deriv_created),
             TransformOptions::default(),
             None,
         )
@@ -513,7 +511,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
 
     let verify_result = harness
         .transform_svc
-        .verify_transform(&deriv_alias.as_local_ref(), (None, None), None)
+        .verify_transform(ResolvedDataset::from(&deriv_created), (None, None), None)
         .await;
 
     assert_matches!(verify_result, Ok(()));
@@ -528,7 +526,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
 
     let verify_result = harness
         .transform_svc
-        .verify_transform(&deriv_alias.as_local_ref(), (None, None), None)
+        .verify_transform(ResolvedDataset::from(&deriv_created), (None, None), None)
         .await;
 
     assert_matches!(
@@ -736,7 +734,7 @@ async fn test_transform_empty_inputs() {
     let res = harness
         .transform_svc
         .transform(
-            &deriv.dataset_handle.as_local_ref(),
+            ResolvedDataset::from(&deriv),
             TransformOptions::default(),
             None,
         )
@@ -772,7 +770,7 @@ async fn test_transform_empty_inputs() {
     let ingest_result = harness
         .push_ingest_svc
         .ingest_from_file_stream(
-            &root.dataset_handle.as_local_ref(),
+            ResolvedDataset::from(&root),
             None,
             Box::new(tokio::io::BufReader::new(std::io::Cursor::new(b""))),
             PushIngestOpts::default(),
@@ -786,7 +784,7 @@ async fn test_transform_empty_inputs() {
     let res = harness
         .transform_svc
         .transform(
-            &deriv.dataset_handle.as_local_ref(),
+            ResolvedDataset::from(&deriv),
             TransformOptions::default(),
             None,
         )
@@ -822,7 +820,7 @@ async fn test_transform_empty_inputs() {
     let ingest_result = harness
         .push_ingest_svc
         .ingest_from_file_stream(
-            &root.dataset_handle.as_local_ref(),
+            ResolvedDataset::from(&root),
             None,
             Box::new(tokio::io::BufReader::new(std::io::Cursor::new(
                 br#"{"city": "A", "population": 100}"#,
@@ -838,7 +836,7 @@ async fn test_transform_empty_inputs() {
     let res = harness
         .transform_svc
         .transform(
-            &deriv.dataset_handle.as_local_ref(),
+            ResolvedDataset::from(&deriv),
             TransformOptions::default(),
             None,
         )

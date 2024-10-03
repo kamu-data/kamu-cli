@@ -40,6 +40,7 @@ async fn test_current_push_sources() {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<PushIngestServiceImpl>()
             .add::<SystemTimeSourceDefault>()

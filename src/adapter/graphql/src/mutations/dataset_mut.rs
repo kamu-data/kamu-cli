@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use domain::{DeleteDatasetError, RenameDatasetError};
-use kamu_core::{self as domain};
+use kamu_core::{self as domain, SetWatermarkUseCase};
 use opendatafabric as odf;
 
 use super::{DatasetEnvVarsMut, DatasetFlowsMut, DatasetMetadataMut};
@@ -124,9 +124,9 @@ impl DatasetMut {
         ctx: &Context<'_>,
         watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkResult> {
-        let pull_svc = from_catalog::<dyn domain::PullService>(ctx).unwrap();
-        match pull_svc
-            .set_watermark(&self.dataset_handle.as_local_ref(), watermark)
+        let set_watermark_use_case = from_catalog::<dyn SetWatermarkUseCase>(ctx).unwrap();
+        match set_watermark_use_case
+            .execute(&self.dataset_handle, watermark)
             .await
         {
             Ok(domain::PullResult::UpToDate(_)) => {

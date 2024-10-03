@@ -25,7 +25,7 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
-use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryService};
+use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
@@ -463,10 +463,14 @@ pub fn configure_base_catalog(
 
     b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
     b.add::<CommitDatasetEventUseCaseImpl>();
+    b.add::<CompactDatasetUseCaseImpl>();
     b.add::<CreateDatasetUseCaseImpl>();
     b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
     b.add::<DeleteDatasetUseCaseImpl>();
     b.add::<RenameDatasetUseCaseImpl>();
+    b.add::<ResetDatasetUseCaseImpl>();
+    b.add::<SetWatermarkUseCaseImpl>();
+    b.add::<VerifyDatasetUseCaseImpl>();
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 
@@ -498,7 +502,7 @@ pub fn configure_base_catalog(
         b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
     }
 
-    b.add::<DatasetEntryService>();
+    b.add::<DatasetEntryServiceImpl>();
 
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()

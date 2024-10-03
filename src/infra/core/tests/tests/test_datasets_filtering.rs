@@ -18,9 +18,9 @@ use kamu::utils::datasets_filtering::{
     matches_local_ref_pattern,
     matches_remote_ref_pattern,
 };
-use kamu::{DatasetRepositoryLocalFs, DatasetRepositoryWriter};
+use kamu::{DatasetRegistryRepoBridge, DatasetRepositoryLocalFs, DatasetRepositoryWriter};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
-use kamu_core::DatasetRepository;
+use kamu_core::{DatasetRegistry, DatasetRepository};
 use opendatafabric::{
     AccountName,
     DatasetAlias,
@@ -167,7 +167,7 @@ async fn test_get_local_datasets_stream_single_tenant() {
 
     let pattern = DatasetRefAnyPattern::from_str("f%").unwrap();
     let res: Vec<_> = get_local_datasets_stream(
-        dataset_filtering_harness.dataset_repo.as_ref(),
+        dataset_filtering_harness.dataset_registry.as_ref(),
         vec![pattern],
         &DEFAULT_ACCOUNT_NAME,
     )
@@ -179,7 +179,7 @@ async fn test_get_local_datasets_stream_single_tenant() {
 
     let pattern = DatasetRefAnyPattern::from_str("b%").unwrap();
     let mut res: Vec<_> = get_local_datasets_stream(
-        dataset_filtering_harness.dataset_repo.as_ref(),
+        dataset_filtering_harness.dataset_registry.as_ref(),
         vec![pattern],
         &DEFAULT_ACCOUNT_NAME,
     )
@@ -192,7 +192,7 @@ async fn test_get_local_datasets_stream_single_tenant() {
 
     let pattern = DatasetRefAnyPattern::from_str("s%").unwrap();
     let res: Vec<_> = get_local_datasets_stream(
-        dataset_filtering_harness.dataset_repo.as_ref(),
+        dataset_filtering_harness.dataset_registry.as_ref(),
         vec![pattern.clone()],
         &DEFAULT_ACCOUNT_NAME,
     )
@@ -223,7 +223,7 @@ async fn test_get_local_datasets_stream_multi_tenant() {
 
     let pattern = DatasetRefAnyPattern::from_str("account1/f%").unwrap();
     let res: Vec<_> = get_local_datasets_stream(
-        dataset_filtering_harness.dataset_repo.as_ref(),
+        dataset_filtering_harness.dataset_registry.as_ref(),
         vec![pattern],
         &account_1,
     )
@@ -235,7 +235,7 @@ async fn test_get_local_datasets_stream_multi_tenant() {
 
     let pattern = DatasetRefAnyPattern::from_str("account2/b%").unwrap();
     let res: Vec<_> = get_local_datasets_stream(
-        dataset_filtering_harness.dataset_repo.as_ref(),
+        dataset_filtering_harness.dataset_registry.as_ref(),
         vec![pattern],
         &account_2,
     )
@@ -247,7 +247,7 @@ async fn test_get_local_datasets_stream_multi_tenant() {
 
     let pattern = DatasetRefAnyPattern::from_str("account1/b%").unwrap();
     let res: Vec<_> = get_local_datasets_stream(
-        dataset_filtering_harness.dataset_repo.as_ref(),
+        dataset_filtering_harness.dataset_registry.as_ref(),
         vec![pattern],
         &account_1,
     )
@@ -263,7 +263,7 @@ async fn test_get_local_datasets_stream_multi_tenant() {
 struct DatasetFilteringHarness {
     _workdir: TempDir,
     _catalog: dill::Catalog,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
 }
 
@@ -282,16 +282,17 @@ impl DatasetFilteringHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add_value(CurrentAccountSubject::new_test())
             .build();
 
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
         let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
 
         Self {
             _workdir: workdir,
             _catalog: catalog,
-            dataset_repo,
+            dataset_registry,
             dataset_repo_writer,
         }
     }

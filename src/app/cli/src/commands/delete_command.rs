@@ -22,7 +22,7 @@ use crate::Interact;
 
 pub struct DeleteCommand {
     interact: Arc<Interact>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     delete_dataset: Arc<dyn DeleteDatasetUseCase>,
     dataset_ref_patterns: Vec<DatasetRefPattern>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
@@ -33,7 +33,7 @@ pub struct DeleteCommand {
 impl DeleteCommand {
     pub fn new<I>(
         interact: Arc<Interact>,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         delete_dataset: Arc<dyn DeleteDatasetUseCase>,
         dataset_ref_patterns: I,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
@@ -45,7 +45,7 @@ impl DeleteCommand {
     {
         Self {
             interact,
-            dataset_repo,
+            dataset_registry,
             delete_dataset,
             dataset_ref_patterns: dataset_ref_patterns.into_iter().collect(),
             dependency_graph_service,
@@ -63,10 +63,13 @@ impl Command for DeleteCommand {
         }
 
         let dataset_handles: Vec<DatasetHandle> = if self.all {
-            self.dataset_repo.get_all_datasets().try_collect().await?
+            self.dataset_registry
+                .all_dataset_handles()
+                .try_collect()
+                .await?
         } else {
             filter_datasets_by_local_pattern(
-                self.dataset_repo.as_ref(),
+                self.dataset_registry.as_ref(),
                 self.dataset_ref_patterns.clone(),
             )
             .try_collect()
@@ -84,8 +87,8 @@ impl Command for DeleteCommand {
                 .int_err()?
                 .map(DatasetID::into_local_ref)
                 .then(|hdl| {
-                    let repo = self.dataset_repo.clone();
-                    async move { repo.resolve_dataset_ref(&hdl).await }
+                    let registry = self.dataset_registry.clone();
+                    async move { registry.resolve_dataset_handle_by_ref(&hdl).await }
                 })
                 .try_collect()
                 .await?

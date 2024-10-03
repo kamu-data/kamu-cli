@@ -55,9 +55,7 @@ async fn test_ingest_push_url_stream() {
         .build();
 
     let dataset_alias = dataset_snapshot.name.clone();
-    let dataset_ref = dataset_alias.as_local_ref();
-
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Round 1: Push from URL
@@ -78,7 +76,7 @@ async fn test_ingest_push_url_stream() {
     harness
         .push_ingest_svc
         .ingest_from_url(
-            &dataset_ref,
+            ResolvedDataset::from(&created),
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts::default(),
@@ -138,7 +136,7 @@ async fn test_ingest_push_url_stream() {
     harness
         .push_ingest_svc
         .ingest_from_file_stream(
-            &dataset_ref,
+            ResolvedDataset::from(&created),
             None,
             Box::new(data),
             PushIngestOpts::default(),
@@ -203,9 +201,7 @@ async fn test_ingest_push_media_type_override() {
         .build();
 
     let dataset_alias = dataset_snapshot.name.clone();
-    let dataset_ref = dataset_alias.as_local_ref();
-
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Push CSV conversion
@@ -223,7 +219,7 @@ async fn test_ingest_push_media_type_override() {
     harness
         .push_ingest_svc
         .ingest_from_url(
-            &dataset_ref,
+            ResolvedDataset::from(&created),
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts {
@@ -276,7 +272,7 @@ async fn test_ingest_push_media_type_override() {
     harness
         .push_ingest_svc
         .ingest_from_url(
-            &dataset_ref,
+            ResolvedDataset::from(&created),
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts {
@@ -331,7 +327,7 @@ async fn test_ingest_push_media_type_override() {
     harness
         .push_ingest_svc
         .ingest_from_url(
-            &dataset_ref,
+            ResolvedDataset::from(&created),
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts {
@@ -398,9 +394,7 @@ async fn test_ingest_push_schema_stability() {
         .build();
 
     let dataset_alias = dataset_snapshot.name.clone();
-    let dataset_ref = dataset_alias.as_local_ref();
-
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Round 1: Push from URL
@@ -421,7 +415,7 @@ async fn test_ingest_push_schema_stability() {
     harness
         .push_ingest_svc
         .ingest_from_url(
-            &dataset_ref,
+            ResolvedDataset::from(&created),
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts::default(),
@@ -489,9 +483,7 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_string() {
         .build();
 
     let dataset_alias = dataset_snapshot.name.clone();
-    let dataset_ref = dataset_alias.as_local_ref();
-
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     let src_path = harness.temp_dir.path().join("data.ndjson");
@@ -508,7 +500,7 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_string() {
     harness
         .push_ingest_svc
         .ingest_from_url(
-            &dataset_ref,
+            ResolvedDataset::from(&created),
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts {
@@ -569,9 +561,7 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_unixtime() 
         .build();
 
     let dataset_alias = dataset_snapshot.name.clone();
-    let dataset_ref = dataset_alias.as_local_ref();
-
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     let src_path = harness.temp_dir.path().join("data.ndjson");
@@ -588,7 +578,7 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_unixtime() 
     harness
         .push_ingest_svc
         .ingest_from_url(
-            &dataset_ref,
+            ResolvedDataset::from(&created),
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts {
@@ -649,9 +639,7 @@ async fn test_ingest_inference_automatic_renaming_of_conflicting_columns() {
         .build();
 
     let dataset_alias = dataset_snapshot.name.clone();
-    let dataset_ref = dataset_alias.as_local_ref();
-
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     let src_path = harness.temp_dir.path().join("data.ndjson");
@@ -668,7 +656,7 @@ async fn test_ingest_inference_automatic_renaming_of_conflicting_columns() {
     harness
         .push_ingest_svc
         .ingest_from_url(
-            &dataset_ref,
+            ResolvedDataset::from(&created),
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts {
@@ -750,9 +738,7 @@ async fn test_ingest_sql_case_sensitivity() {
         .build();
 
     let dataset_alias = dataset_snapshot.name.clone();
-    let dataset_ref = dataset_alias.as_local_ref();
-
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     let src_path = harness.temp_dir.path().join("data.ndjson");
@@ -769,7 +755,7 @@ async fn test_ingest_sql_case_sensitivity() {
     harness
         .push_ingest_svc
         .ingest_from_url(
-            &dataset_ref,
+            ResolvedDataset::from(&created),
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts::default(),
@@ -857,17 +843,18 @@ impl IngestTestHarness {
         }
     }
 
-    async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) {
+    async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) -> CreateDatasetResult {
         self.dataset_repo
             .create_dataset_from_snapshot(dataset_snapshot)
             .await
-            .unwrap();
+            .unwrap()
+            .create_dataset_result
     }
 
     async fn dataset_data_helper(&self, dataset_alias: &DatasetAlias) -> DatasetDataHelper {
         let dataset = self
             .dataset_repo
-            .find_dataset_by_ref(&dataset_alias.as_local_ref())
+            .get_dataset_by_ref(&dataset_alias.as_local_ref())
             .await
             .unwrap();
 

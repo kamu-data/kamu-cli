@@ -14,25 +14,19 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
+use thiserror::Error;
 
 use super::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
-pub struct RemoteAliasesRegistryImpl {
-    dataset_repo: Arc<dyn DatasetRepository>,
-}
+#[component(pub)]
+#[interface(dyn RemoteAliasesRegistry)]
+pub struct RemoteAliasesRegistryImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn RemoteAliasesRegistry)]
 impl RemoteAliasesRegistryImpl {
-    pub fn new(dataset_repo: Arc<dyn DatasetRepository>) -> Self {
-        Self { dataset_repo }
-    }
-
     async fn read_config(dataset: Arc<dyn Dataset>) -> Result<DatasetConfig, InternalError> {
         match dataset.as_info_repo().get("config").await {
             Ok(bytes) => {
@@ -72,9 +66,8 @@ impl RemoteAliasesRegistryImpl {
 impl RemoteAliasesRegistry for RemoteAliasesRegistryImpl {
     async fn get_remote_aliases(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset: Arc<dyn Dataset>,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError> {
-        let dataset = self.dataset_repo.find_dataset_by_ref(dataset_ref).await?;
         let config = Self::read_config(dataset.clone()).await?;
         Ok(Box::new(RemoteAliasesImpl::new(dataset, config)))
     }
@@ -192,12 +185,14 @@ pub struct RemoteAliasesRegistryNull;
 impl RemoteAliasesRegistry for RemoteAliasesRegistryNull {
     async fn get_remote_aliases(
         &self,
-        dataset_ref: &DatasetRef,
+        _dataset: Arc<dyn Dataset>,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError> {
-        Err(DatasetNotFoundError {
-            dataset_ref: dataset_ref.clone(),
-        }
-        .into())
+        #[derive(Error, Debug)]
+        #[error("get_remote_aliases requested from stub implementation")]
+        struct NullError {}
+
+        let e = NullError {};
+        Err(GetAliasesError::Internal(e.int_err()))
     }
 }
 

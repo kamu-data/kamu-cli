@@ -353,6 +353,7 @@ impl TestHarness {
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<DatasetRegistryRepoBridge>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add_value(SystemTimeSourceStub::new_set(
                     Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
@@ -432,7 +433,7 @@ impl TestHarness {
 
         self.push_ingest_svc
             .ingest_from_url(
-                &ds.dataset_handle.as_local_ref(),
+                ResolvedDataset::from(&ds),
                 None,
                 url::Url::from_file_path(&src_path).unwrap(),
                 PushIngestOpts::default(),

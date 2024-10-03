@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use std::backtrace::Backtrace;
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::SchemaRef;
@@ -17,6 +19,7 @@ use internal_error::*;
 use opendatafabric::*;
 use thiserror::Error;
 
+use super::Dataset;
 use crate::{BlockRef, OwnedFile};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,6 +36,7 @@ pub trait Engine: Send + Sync {
     async fn execute_transform(
         &self,
         request: TransformRequestExt,
+        datasets_by_handle: &HashMap<DatasetHandle, Arc<dyn Dataset>>,
     ) -> Result<TransformResponseExt, EngineError>;
 }
 

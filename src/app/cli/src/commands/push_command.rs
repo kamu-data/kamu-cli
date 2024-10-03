@@ -25,7 +25,7 @@ use crate::output::OutputConfig;
 
 pub struct PushCommand {
     push_svc: Arc<dyn PushService>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     refs: Vec<DatasetRefPattern>,
     all: bool,
     recursive: bool,
@@ -34,12 +34,13 @@ pub struct PushCommand {
     to: Option<DatasetPushTarget>,
     dataset_visibility: DatasetVisibility,
     output_config: Arc<OutputConfig>,
+    in_multi_tenant_mode: bool,
 }
 
 impl PushCommand {
     pub fn new<I>(
         push_svc: Arc<dyn PushService>,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         refs: I,
         all: bool,
         recursive: bool,
@@ -48,13 +49,14 @@ impl PushCommand {
         to: Option<DatasetPushTarget>,
         dataset_visibility: DatasetVisibility,
         output_config: Arc<OutputConfig>,
+        in_multi_tenant_mode: bool,
     ) -> Self
     where
         I: IntoIterator<Item = DatasetRefPattern>,
     {
         Self {
             push_svc,
-            dataset_repo,
+            dataset_registry,
             refs: refs.into_iter().collect(),
             all,
             recursive,
@@ -63,6 +65,7 @@ impl PushCommand {
             to,
             dataset_visibility,
             output_config,
+            in_multi_tenant_mode,
         }
     }
 
@@ -101,7 +104,7 @@ impl PushCommand {
     }
 
     async fn push_with_progress(&self) -> Result<Vec<PushResponse>, CLIError> {
-        let progress = PrettyPushProgress::new(self.dataset_repo.is_multi_tenant());
+        let progress = PrettyPushProgress::new(self.in_multi_tenant_mode);
         let listener = Arc::new(progress.clone());
         self.do_push(Some(listener.clone())).await
     }

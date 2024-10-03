@@ -28,6 +28,10 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
         .create_player_scores_dataset(&token)
         .await;
 
+    // Workarround: await outbox, we should save a DatasetEntry before query start
+    // TODO: invent a way to flush outbox in e2e tests or to shorten waiting cycles
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
     // 3. Try to get the dataset tail
     kamu_api_server_client
         .rest_api_call_assert(

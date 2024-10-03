@@ -20,24 +20,24 @@ use super::{CLIError, Command};
 use crate::output::*;
 
 pub struct AliasListCommand {
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
-    dataset_ref: Option<DatasetRef>,
+    maybe_dataset_ref: Option<DatasetRef>,
 }
 
 impl AliasListCommand {
     pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
-        dataset_ref: Option<DatasetRef>,
+        maybe_dataset_ref: Option<DatasetRef>,
     ) -> Self {
         Self {
-            dataset_repo,
+            dataset_registry,
             remote_alias_reg,
             output_config,
-            dataset_ref,
+            maybe_dataset_ref,
         }
     }
 
@@ -49,10 +49,11 @@ impl AliasListCommand {
         let mut col_kind = Vec::new();
         let mut col_alias = Vec::new();
 
-        for ds in datasets {
+        for hdl in datasets {
+            let dataset = self.dataset_registry.get_dataset_by_handle(hdl);
             let aliases = self
                 .remote_alias_reg
-                .get_remote_aliases(&ds.as_local_ref())
+                .get_remote_aliases(dataset)
                 .await
                 .int_err()?;
             let mut pull_aliases: Vec<_> = aliases
@@ -68,13 +69,13 @@ impl AliasListCommand {
             push_aliases.sort();
 
             for alias in pull_aliases {
-                col_dataset.push(ds.alias.to_string());
+                col_dataset.push(hdl.alias.to_string());
                 col_kind.push("Pull");
                 col_alias.push(alias);
             }
 
             for alias in push_aliases {
-                col_dataset.push(ds.alias.to_string());
+                col_dataset.push(hdl.alias.to_string());
                 col_kind.push("Push");
                 col_alias.push(alias);
             }
@@ -93,11 +94,17 @@ impl AliasListCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for AliasListCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let mut datasets: Vec<_> = if let Some(dataset_ref) = &self.dataset_ref {
-            let hdl = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+        let mut datasets: Vec<_> = if let Some(dataset_ref) = &self.maybe_dataset_ref {
+            let hdl = self
+                .dataset_registry
+                .resolve_dataset_handle_by_ref(dataset_ref)
+                .await?;
             vec![hdl]
         } else {
-            self.dataset_repo.get_all_datasets().try_collect().await?
+            self.dataset_registry
+                .all_dataset_handles()
+                .try_collect()
+                .await?
         };
 
         datasets.sort_by(|a, b| a.alias.cmp(&b.alias));

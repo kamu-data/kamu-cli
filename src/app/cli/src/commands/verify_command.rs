@@ -24,8 +24,8 @@ type GenericVerificationResult = Result<Vec<VerificationResult>, CLIError>;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct VerifyCommand {
-    dataset_repo: Arc<dyn DatasetRepository>,
-    verification_svc: Arc<dyn VerificationService>,
+    verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
@@ -41,8 +41,8 @@ struct RemoteRefDependency {
 
 impl VerifyCommand {
     pub fn new<I>(
-        dataset_repo: Arc<dyn DatasetRepository>,
-        verification_svc: Arc<dyn VerificationService>,
+        verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
@@ -54,8 +54,8 @@ impl VerifyCommand {
         I: Iterator<Item = DatasetRefPattern>,
     {
         Self {
-            dataset_repo,
-            verification_svc,
+            verify_dataset_use_case,
+            dataset_registry,
             dependency_graph_service,
             remote_alias_reg,
             output_config,
@@ -87,41 +87,47 @@ impl VerifyCommand {
     async fn verify(
         &self,
         options: VerificationOptions,
-        listener: Option<Arc<dyn VerificationMultiListener>>,
+        multi_listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> GenericVerificationResult {
         let dataset_ref_pattern = self.refs.first().unwrap();
 
-        let dataset_ids: Vec<_> = filter_datasets_by_local_pattern(
-            self.dataset_repo.as_ref(),
+        let dataset_handles: Vec<_> = filter_datasets_by_local_pattern(
+            self.dataset_registry.as_ref(),
             vec![dataset_ref_pattern.clone()],
         )
-        .map_ok(|dataset_handle| dataset_handle.id)
         .try_collect()
         .await?;
 
-        let requests: Vec<_> = if self.recursive {
-            self.dependency_graph_service
-                .get_recursive_upstream_dependencies(dataset_ids)
+        let mut verification_results = Vec::new();
+
+        let dataset_handles: Vec<_> = if self.recursive {
+            let input_dataset_ids = dataset_handles.into_iter().map(|hdl| hdl.id).collect();
+
+            let all_dataset_ids = self
+                .dependency_graph_service
+                .get_recursive_upstream_dependencies(input_dataset_ids)
                 .await
                 .int_err()?
-                .map(|dataset_id| VerificationRequest {
-                    dataset_ref: DatasetRef::ID(dataset_id),
-                    block_range: (None, None),
-                })
                 .collect()
+                .await;
+
+            let resolution_results = self
+                .dataset_registry
+                .resolve_multiple_dataset_handles_by_ids(all_dataset_ids)
                 .await
+                .int_err()?;
+
+            for (_, e) in resolution_results.unresolved_datasets {
+                verification_results.push(VerificationResult::err_no_handle(e));
+            }
+
+            resolution_results.resolved_handles
         } else {
-            dataset_ids
-                .iter()
-                .map(|dataset_id| VerificationRequest {
-                    dataset_ref: DatasetRef::ID(dataset_id.clone()),
-                    block_range: (None, None),
-                })
-                .collect()
+            dataset_handles
         };
 
-        let (filtered_requests, missed_remote_dependencies) =
-            self.check_remote_datasets(requests).await;
+        let (filtered_dataset_handles, missed_remote_dependencies) =
+            self.detect_remote_datasets(dataset_handles).await;
 
         if !missed_remote_dependencies.is_empty() {
             let missed_dependency_warnings: Vec<String> = missed_remote_dependencies
@@ -146,70 +152,78 @@ impl VerifyCommand {
             );
         }
 
-        if filtered_requests.is_empty() {
+        if filtered_dataset_handles.is_empty() {
             return Ok(vec![]);
         }
 
-        Ok(self
-            .verification_svc
-            .verify_multi(filtered_requests, options, listener)
-            .await)
+        let filtered_requests = filtered_dataset_handles
+            .into_iter()
+            .map(|hdl| VerificationRequest {
+                target: hdl,
+                block_range: (None, None),
+                options: options.clone(),
+            })
+            .collect();
+
+        let mut main_verification_results = self
+            .verify_dataset_use_case
+            .clone()
+            .execute_multi(filtered_requests, multi_listener)
+            .await;
+
+        verification_results.append(&mut main_verification_results);
+        Ok(verification_results)
     }
 
     // Return tuple with filtered VerificationRequests(check existing)
     //   with a list of missed remote dependencies
-    async fn check_remote_datasets(
+    async fn detect_remote_datasets(
         &self,
-        verification_requests: Vec<VerificationRequest>,
-    ) -> (Vec<VerificationRequest>, Vec<RemoteRefDependency>) {
+        dataset_handles: Vec<DatasetHandle>,
+    ) -> (Vec<DatasetHandle>, Vec<RemoteRefDependency>) {
         let mut result = vec![];
         let mut missed_dependencies = vec![];
 
-        for verification_request in &verification_requests {
-            if let Ok(dataset_handle) = self
-                .dataset_repo
-                .resolve_dataset_ref(&verification_request.dataset_ref)
+        for hdl in dataset_handles {
+            let dataset = self.dataset_registry.get_dataset_by_handle(&hdl);
+            let is_remote = self
+                .remote_alias_reg
+                .get_remote_aliases(dataset)
                 .await
-            {
-                let is_remote = self
-                    .remote_alias_reg
-                    .get_remote_aliases(&dataset_handle.as_local_ref())
+                .unwrap()
+                .get_by_kind(RemoteAliasKind::Pull)
+                .next()
+                .is_some();
+            if !is_remote || self.integrity {
+                result.push(hdl);
+                continue;
+            }
+
+            let dataset = self.dataset_registry.get_dataset_by_handle(&hdl);
+            let summary = dataset
+                .get_summary(GetSummaryOpts::default())
+                .await
+                .unwrap();
+
+            let mut current_missed_dependencies = vec![];
+
+            for dependency in summary.dependencies {
+                if self
+                    .dataset_registry
+                    .resolve_dataset_handle_by_ref(&DatasetRef::ID(dependency.clone()))
                     .await
-                    .unwrap()
-                    .get_by_kind(RemoteAliasKind::Pull)
-                    .next()
-                    .is_some();
-                if !is_remote || self.integrity {
-                    result.push(verification_request.clone());
-                    continue;
+                    .is_err()
+                {
+                    current_missed_dependencies.push(dependency.to_string());
                 }
-
-                let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
-                let summary = dataset
-                    .get_summary(GetSummaryOpts::default())
-                    .await
-                    .unwrap();
-
-                let mut current_missed_dependencies = vec![];
-
-                for dependency in summary.dependencies {
-                    if self
-                        .dataset_repo
-                        .resolve_dataset_ref(&DatasetRef::ID(dependency.clone()))
-                        .await
-                        .is_err()
-                    {
-                        current_missed_dependencies.push(dependency.to_string());
-                    }
-                }
-                if !current_missed_dependencies.is_empty() {
-                    missed_dependencies.push(RemoteRefDependency {
-                        source_dataset: dataset_handle.alias.to_string(),
-                        dependencies: current_missed_dependencies,
-                    });
-                } else {
-                    result.push(verification_request.clone());
-                }
+            }
+            if !current_missed_dependencies.is_empty() {
+                missed_dependencies.push(RemoteRefDependency {
+                    source_dataset: hdl.alias.to_string(),
+                    dependencies: current_missed_dependencies,
+                });
+            } else {
+                result.push(hdl);
             }
         }
 

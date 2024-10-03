@@ -12,6 +12,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use kamu_core::{
     GetDatasetError,
+    ResolvedDataset,
     TransformError,
     TransformListener,
     TransformMultiListener,
@@ -38,26 +39,26 @@ mockall::mock! {
     impl TransformService for TransformService {
       async fn get_active_transform(
           &self,
-          dataset_ref: &DatasetRef,
+          target: ResolvedDataset,
       ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError>;
 
       async fn transform(
           &self,
-          dataset_ref: &DatasetRef,
+          target: ResolvedDataset,
           options: TransformOptions,
           listener: Option<Arc<dyn TransformListener>>,
       ) -> Result<TransformResult, TransformError>;
 
       async fn transform_multi(
           &self,
-          dataset_refs: Vec<DatasetRef>,
+          targets: Vec<ResolvedDataset>,
           options: TransformOptions,
           listener: Option<Arc<dyn TransformMultiListener>>,
       ) -> Vec<(DatasetRef, Result<TransformResult, TransformError>)>;
 
       async fn verify_transform(
           &self,
-          dataset_ref: &DatasetRef,
+          target: ResolvedDataset,
           block_range: (Option<Multihash>, Option<Multihash>),
           listener: Option<Arc<dyn VerificationListener>>,
       ) -> Result<(), VerificationError>;

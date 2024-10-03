@@ -306,7 +306,7 @@ pub async fn dataset_push_ws_upgrade_handler(
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
-    let dataset = match dataset_repo.find_dataset_by_ref(&dataset_ref).await {
+    let dataset = match dataset_repo.get_dataset_by_ref(&dataset_ref).await {
         Ok(ds) => Ok(Some(ds)),
         Err(GetDatasetError::NotFound(_)) => {
             // Make sure account in dataset ref being created and token account match

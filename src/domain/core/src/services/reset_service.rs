@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
@@ -20,7 +22,7 @@ use crate::*;
 pub trait ResetService: Send + Sync {
     async fn reset_dataset(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset: Arc<dyn Dataset>,
         block_hash: Option<&Multihash>,
         old_head_maybe: Option<&Multihash>,
     ) -> Result<Multihash, ResetError>;

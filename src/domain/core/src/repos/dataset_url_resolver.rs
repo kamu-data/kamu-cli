@@ -16,7 +16,7 @@ use super::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DatasetRegistry: Send + Sync {
+pub trait DatasetUrlResolver: Send + Sync {
     async fn get_dataset_url(&self, dataset_ref: &DatasetRef) -> Result<Url, GetDatasetUrlError>;
 }
 

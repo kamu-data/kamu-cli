@@ -26,6 +26,7 @@ use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
     DatasetOwnershipServiceInMemory,
     DatasetOwnershipServiceInMemoryStateInitializer,
+    DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
@@ -664,6 +665,7 @@ impl FlowConfigHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add_value(dataset_changes_mock)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()

@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::Utc;
 use kamu_core::engine::*;
 use kamu_core::*;
+use opendatafabric::DatasetHandle;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -57,6 +59,7 @@ impl Engine for EngineStub {
     async fn execute_transform(
         &self,
         _request: TransformRequestExt,
+        _datasets_by_handle: &HashMap<DatasetHandle, Arc<dyn Dataset>>,
     ) -> Result<TransformResponseExt, EngineError> {
         // Note: At least 1 output field must be present, watermark is easy to mimic
         Ok(TransformResponseExt {

@@ -36,7 +36,7 @@ pub enum MetadataLogOutputFormat {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct LogCommand {
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     dataset_ref: DatasetRef,
     output_format: Option<MetadataLogOutputFormat>,
@@ -47,7 +47,7 @@ pub struct LogCommand {
 
 impl LogCommand {
     pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         dataset_ref: DatasetRef,
         output_format: Option<MetadataLogOutputFormat>,
@@ -56,7 +56,7 @@ impl LogCommand {
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
-            dataset_repo,
+            dataset_registry,
             dataset_action_authorizer,
             dataset_ref,
             output_format,
@@ -94,8 +94,8 @@ impl LogCommand {
 impl Command for LogCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let id_to_alias_lookup: BTreeMap<_, _> = self
-            .dataset_repo
-            .get_all_datasets()
+            .dataset_registry
+            .all_dataset_handles()
             .map_ok(|h| (h.id, h.alias))
             .try_collect()
             .await?;
@@ -117,8 +117,8 @@ impl Command for LogCommand {
         };
 
         let dataset_handle = self
-            .dataset_repo
-            .resolve_dataset_ref(&self.dataset_ref)
+            .dataset_registry
+            .resolve_dataset_handle_by_ref(&self.dataset_ref)
             .await?;
 
         self.dataset_action_authorizer
@@ -129,7 +129,7 @@ impl Command for LogCommand {
                 auth::DatasetActionUnauthorizedError::Internal(e) => CLIError::critical(e),
             })?;
 
-        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
+        let dataset = self.dataset_registry.get_dataset_by_handle(&dataset_handle);
 
         let blocks = Box::pin(
             dataset

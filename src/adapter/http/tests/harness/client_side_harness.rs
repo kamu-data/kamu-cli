@@ -104,7 +104,8 @@ impl ClientSideHarness {
                 .with_multi_tenant(options.multi_tenant),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>();
+        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+        .add::<DatasetRegistryRepoBridge>();
 
         b.add::<RemoteRepositoryRegistryImpl>();
 

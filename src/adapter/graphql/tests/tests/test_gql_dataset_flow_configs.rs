@@ -14,6 +14,7 @@ use indoc::indoc;
 use kamu::testing::{MetadataFactory, MockPollingIngestService, MockTransformService};
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
+    DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
@@ -1630,6 +1631,7 @@ impl FlowConfigHarness {
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<DatasetRegistryRepoBridge>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
                 .add_value(polling_service_mock)

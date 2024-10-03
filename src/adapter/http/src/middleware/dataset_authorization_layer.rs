@@ -12,7 +12,9 @@ use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::response::Response;
+use database_common::DatabaseTransactionRunner;
 use futures::Future;
+use internal_error::ResultIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::GetDatasetError;
 use opendatafabric::DatasetRef;
@@ -96,16 +98,12 @@ where
         let dataset_action_query = self.dataset_action_query.clone();
 
         Box::pin(async move {
-            let catalog = request
+            let base_catalog = request
                 .extensions()
                 .get::<dill::Catalog>()
                 .expect("Catalog not found in http server extensions");
 
-            let dataset_action_authorizer = catalog
-                .get_one::<dyn kamu_core::auth::DatasetActionAuthorizer>()
-                .unwrap();
-
-            let dataset_repo = catalog
+            let dataset_repo = base_catalog
                 .get_one::<dyn kamu_core::DatasetRepository>()
                 .unwrap();
 
@@ -116,13 +114,25 @@ where
 
             let action = dataset_action_query(&request);
 
-            match dataset_repo.resolve_dataset_ref(dataset_ref).await {
+            match dataset_repo
+                .resolve_dataset_handle_by_ref(dataset_ref)
+                .await
+            {
                 Ok(dataset_handle) => {
-                    if let Err(err) = dataset_action_authorizer
-                        .check_action_allowed(&dataset_handle, action)
-                        .await
-                    {
-                        if let Err(err_result) = Self::check_logged_in(catalog) {
+                    let check_result = DatabaseTransactionRunner::new(base_catalog.clone())
+                        .transactional(|updated_catalog| async move {
+                            let dataset_action_authorizer = updated_catalog
+                                .get_one::<dyn kamu_core::auth::DatasetActionAuthorizer>()
+                                .unwrap();
+                            dataset_action_authorizer
+                                .check_action_allowed(&dataset_handle, action)
+                                .await
+                                .int_err()
+                        })
+                        .await;
+
+                    if let Err(err) = check_result {
+                        if let Err(err_result) = Self::check_logged_in(base_catalog) {
                             tracing::error!(
                                 "Dataset '{}' {} access denied: user not logged in",
                                 dataset_ref,
