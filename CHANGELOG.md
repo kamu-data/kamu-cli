@@ -24,6 +24,8 @@ Recommendation: for ease of reading, use the following order:
 - Simplified error handling code in repositories
 - Hidden part of the test code behind the feature gate
 - Updated our crate dependencies so they can be built in isolation
+- `kamu push <dataset>` command now can be called without `--to` reference and Alias or Remote dataset repository will be used as destination
+- `kamu login` command now will store repository to Repository registry. Name can be provided with `--repo-name` flag and to skip creating repo can be used `--skip-add-repo` flag
 
 ## [0.204.4] - 2024-09-30
 ### Changed
