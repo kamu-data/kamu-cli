@@ -17,6 +17,8 @@ Recommendation: for ease of reading, use the following order:
 ### Changed
 - `kamu repo alias list`: added JSON output alongside with other formats mentioned in the command's help
 - Private Datasets, `DatasetEntry` integration that will allow us to build dataset indexing
+  - Added `DatasetEntryService` for message processing
+  - Added `DatasetEntryIndexer` for one-shot indexing
   - Extend `DatasetLifecycleMessageCreated` with `dataset_name` field
   - Introducing `DatasetLifecycleMessageRenamed`
 - Simplified error handling code in repositories
