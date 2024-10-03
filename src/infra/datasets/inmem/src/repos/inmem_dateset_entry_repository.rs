@@ -64,6 +64,14 @@ impl InMemoryDatasetEntryRepository {
 
 #[async_trait::async_trait]
 impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
+    async fn dataset_entries_count(&self) -> Result<usize, GetDatasetEntryError> {
+        let readable_state = self.state.read().await;
+
+        let dataset_entries_count = readable_state.rows.len();
+
+        Ok(dataset_entries_count)
+    }
+
     async fn get_dataset_entry(
         &self,
         dataset_id: &DatasetID,

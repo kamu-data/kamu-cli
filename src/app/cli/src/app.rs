@@ -25,6 +25,7 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
+use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryService};
 use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
@@ -133,6 +134,10 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             args.e2e_output_data_path.is_some(),
         );
 
+        if workspace_svc.is_in_workspace() {
+            base_catalog_builder.add::<DatasetEntryIndexer>();
+        }
+
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
 
@@ -150,10 +155,9 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             .add_value(dependencies_graph_repository)
             .bind::<dyn DependencyGraphRepository, DependencyGraphRepositoryInMemory>();
 
-        base_catalog_builder.add_value(Interact::new(args.yes));
-
         let output_config = configure_output_format(&args, &workspace_svc);
         base_catalog_builder.add_value(output_config.clone());
+        base_catalog_builder.add_value(Interact::new(args.yes, output_config.is_tty));
 
         let guards = configure_logging(&output_config, &workspace_layout, args.no_color);
 
@@ -212,8 +216,10 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     // Register metrics
     let metrics_registry = observability::metrics::register_all(&cli_catalog);
 
-    // Evict cache
-    if workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()? {
+    let is_workspace_upgrade_needed = workspace_svc.is_upgrade_needed()?;
+
+    if workspace_svc.is_in_workspace() && !is_workspace_upgrade_needed {
+        // Evict cache
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
@@ -234,7 +240,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             if command.needs_workspace() && !workspace_svc.is_in_workspace() {
                 Err(CLIError::usage_error_from(NotInWorkspace))?;
             }
-            if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
+            if command.needs_workspace() && is_workspace_upgrade_needed {
                 Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))?;
             }
             if current_account.is_explicit() && !is_multi_tenant_workspace {
@@ -491,6 +497,8 @@ pub fn configure_base_catalog(
     if multi_tenant_workspace {
         b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
     }
+
+    b.add::<DatasetEntryService>();
 
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()

@@ -11,11 +11,11 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{
     AnonymousAccountReason,
     AuthenticationService,
     CurrentAccountSubject,
-    MockAuthenticationService,
     DEFAULT_ACCOUNT_NAME_STR,
 };
 use url::Url;

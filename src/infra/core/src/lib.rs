@@ -22,7 +22,8 @@ mod engine;
 pub mod ingest;
 mod query;
 mod repos;
-pub mod testing; // TODO: Put under feature flag
+#[cfg(any(feature = "testing", test))]
+pub mod testing;
 mod use_cases;
 pub mod utils;
 

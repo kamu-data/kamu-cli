@@ -82,7 +82,7 @@ pub trait RebacRepository: Send + Sync {
 #[derive(Error, Debug)]
 pub enum SetEntityPropertyError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,7 +93,7 @@ pub enum DeleteEntityPropertyError {
     NotFound(EntityPropertyNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 impl DeleteEntityPropertyError {
@@ -126,7 +126,7 @@ pub enum DeleteEntityPropertiesError {
     NotFound(EntityNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 impl DeleteEntityPropertiesError {
@@ -142,7 +142,7 @@ impl DeleteEntityPropertiesError {
 #[derive(Error, Debug)]
 pub enum GetEntityPropertiesError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -153,7 +153,7 @@ pub enum InsertEntitiesRelationError {
     Duplicate(InsertEntitiesRelationDuplicateError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 impl InsertEntitiesRelationError {
@@ -189,7 +189,7 @@ pub enum DeleteEntitiesRelationError {
     NotFound(EntitiesRelationNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 impl DeleteEntitiesRelationError {
@@ -222,7 +222,7 @@ pub struct EntitiesRelationNotFoundError {
 #[derive(Error, Debug)]
 pub enum SubjectEntityRelationsError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -230,7 +230,7 @@ pub enum SubjectEntityRelationsError {
 #[derive(Error, Debug)]
 pub enum SubjectEntityRelationsByObjectTypeError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -238,7 +238,7 @@ pub enum SubjectEntityRelationsByObjectTypeError {
 #[derive(Error, Debug)]
 pub enum GetRelationsBetweenEntitiesError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -56,6 +56,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         snapshot: DatasetSnapshot,
         options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
+        let dataset_name = snapshot.name.dataset_name.clone();
         let CreateDatasetFromSnapshotResult {
             create_dataset_result,
             new_upstream_ids,
@@ -76,6 +77,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                         CurrentAccountSubject::Logged(l) => l.account_id.clone(),
                     },
                     options.dataset_visibility,
+                    dataset_name,
                 ),
             )
             .await?;

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use messaging_outbox::Message;
-use opendatafabric::{AccountID, DatasetID};
+use opendatafabric::{AccountID, DatasetID, DatasetName};
 use serde::{Deserialize, Serialize};
 
 use crate::DatasetVisibility;
@@ -20,6 +20,7 @@ pub enum DatasetLifecycleMessage {
     Created(DatasetLifecycleMessageCreated),
     DependenciesUpdated(DatasetLifecycleMessageDependenciesUpdated),
     Deleted(DatasetLifecycleMessageDeleted),
+    Renamed(DatasetLifecycleMessageRenamed),
 }
 
 impl DatasetLifecycleMessage {
@@ -27,11 +28,13 @@ impl DatasetLifecycleMessage {
         dataset_id: DatasetID,
         owner_account_id: AccountID,
         dataset_visibility: DatasetVisibility,
+        dataset_name: DatasetName,
     ) -> Self {
         Self::Created(DatasetLifecycleMessageCreated {
             dataset_id,
             owner_account_id,
             dataset_visibility,
+            dataset_name,
         })
     }
 
@@ -45,6 +48,20 @@ impl DatasetLifecycleMessage {
     pub fn deleted(dataset_id: DatasetID) -> Self {
         Self::Deleted(DatasetLifecycleMessageDeleted { dataset_id })
     }
+
+    pub fn renamed(
+        dataset_id: DatasetID,
+        owner_account_id: AccountID,
+        old_dataset_name: DatasetName,
+        new_dataset_name: DatasetName,
+    ) -> Self {
+        Self::Renamed(DatasetLifecycleMessageRenamed {
+            dataset_id,
+            owner_account_id,
+            old_dataset_name,
+            new_dataset_name,
+        })
+    }
 }
 
 impl Message for DatasetLifecycleMessage {}
@@ -57,6 +74,7 @@ pub struct DatasetLifecycleMessageCreated {
     pub owner_account_id: AccountID,
     #[serde(default)]
     pub dataset_visibility: DatasetVisibility,
+    pub dataset_name: DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -72,6 +90,16 @@ pub struct DatasetLifecycleMessageDependenciesUpdated {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetLifecycleMessageDeleted {
     pub dataset_id: DatasetID,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DatasetLifecycleMessageRenamed {
+    pub dataset_id: DatasetID,
+    pub owner_account_id: AccountID,
+    pub old_dataset_name: DatasetName,
+    pub new_dataset_name: DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

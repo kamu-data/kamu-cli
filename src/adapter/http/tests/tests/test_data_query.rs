@@ -15,12 +15,12 @@ use datafusion::arrow::datatypes::*;
 use datafusion::prelude::*;
 use ed25519_dalek::Signer;
 use kamu::domain::*;
+use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_adapter_http::data::query_types::IdentityConfig;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::*;
 use serde_json::json;
-use testing::MetadataFactory;
 
 use crate::harness::*;
 
@@ -838,7 +838,7 @@ async fn test_data_verify_handler() {
                                 block with specified hash. Under normal circumstances a block can disappear \
                                 only when the owner of dataset performs history-altering operation such as \
                                 reset or hard compation. There is also a probability that block hash was \
-                                spoofed in the original request to falsify the resuts.",
+                                spoofed in the original request to falsify the results.",
                 }
             }),
         );

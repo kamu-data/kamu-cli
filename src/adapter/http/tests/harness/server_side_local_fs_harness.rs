@@ -38,7 +38,8 @@ use kamu::{
     ObjectStoreRegistryImpl,
     RemoteRepositoryRegistryImpl,
 };
-use kamu_accounts::{Account, AuthenticationService, MockAuthenticationService};
+use kamu_accounts::testing::MockAuthenticationService;
+use kamu_accounts::{Account, AuthenticationService};
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use tempfile::TempDir;

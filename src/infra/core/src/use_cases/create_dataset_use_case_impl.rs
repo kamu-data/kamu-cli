@@ -73,6 +73,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
                         CurrentAccountSubject::Logged(l) => l.account_id.clone(),
                     },
                     options.dataset_visibility,
+                    dataset_alias.dataset_name.clone(),
                 ),
             )
             .await?;

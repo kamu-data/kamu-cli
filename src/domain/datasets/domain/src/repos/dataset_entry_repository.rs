@@ -15,8 +15,11 @@ use crate::DatasetEntry;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(any(feature = "testing", test), mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetEntryRepository: Send + Sync {
+    async fn dataset_entries_count(&self) -> Result<usize, GetDatasetEntryError>;
+
     async fn get_dataset_entry(
         &self,
         dataset_id: &DatasetID,
@@ -58,7 +61,7 @@ pub enum GetDatasetEntryError {
     NotFound(#[from] DatasetEntryNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -81,7 +84,7 @@ pub enum GetDatasetEntryByNameError {
     NotFound(#[from] DatasetEntryByNameNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -105,7 +108,7 @@ impl DatasetEntryByNameNotFoundError {
 #[derive(Error, Debug)]
 pub enum GetDatasetEntriesByOwnerIdError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,7 +122,7 @@ pub enum SaveDatasetEntryError {
     NameCollision(#[from] DatasetEntryNameCollisionError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -145,7 +148,7 @@ pub enum UpdateDatasetEntryNameError {
     NameCollision(#[from] DatasetEntryNameCollisionError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -168,7 +171,7 @@ pub enum DeleteEntryDatasetError {
     NotFound(#[from] DatasetEntryNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

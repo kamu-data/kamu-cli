@@ -471,6 +471,10 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceInMemor
                     self.add_dependency(&mut state, added_id, &message.dataset_id);
                 }
             }
+
+            DatasetLifecycleMessage::Renamed(_) => {
+                // No action required
+            }
         }
 
         Ok(())

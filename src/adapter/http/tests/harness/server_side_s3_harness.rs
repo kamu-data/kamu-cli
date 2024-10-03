@@ -40,7 +40,8 @@ use kamu::{
     ObjectStoreBuilderS3,
     ObjectStoreRegistryImpl,
 };
-use kamu_accounts::{Account, AuthenticationService, MockAuthenticationService};
+use kamu_accounts::testing::MockAuthenticationService;
+use kamu_accounts::{Account, AuthenticationService};
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};

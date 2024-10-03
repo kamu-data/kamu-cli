@@ -12,12 +12,20 @@
 // Re-exports
 pub use kamu_datasets as domain;
 
+mod dataset_entry_indexer;
+mod dataset_entry_service;
 mod dataset_env_var_service_impl;
 mod dataset_env_var_service_null;
 mod dataset_key_value_service_impl;
 mod dataset_key_value_service_sys_env;
+mod jobs;
+mod messages;
 
+pub use dataset_entry_indexer::*;
+pub use dataset_entry_service::*;
 pub use dataset_env_var_service_impl::*;
 pub use dataset_env_var_service_null::*;
 pub use dataset_key_value_service_impl::*;
 pub use dataset_key_value_service_sys_env::*;
+pub use jobs::*;
+pub use messages::*;

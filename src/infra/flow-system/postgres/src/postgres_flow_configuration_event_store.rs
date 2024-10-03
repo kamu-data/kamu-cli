@@ -31,10 +31,12 @@ impl PostgresFlowConfigurationEventStore {
 
     fn get_system_events(
         &self,
-        fk_system: FlowKeySystem,
+        fk_system: &FlowKeySystem,
         maybe_from_id: Option<i64>,
         maybe_to_id: Option<i64>,
     ) -> EventStream<FlowConfigurationEvent> {
+        let flow_type = fk_system.flow_type;
+
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr
@@ -50,7 +52,7 @@ impl PostgresFlowConfigurationEventStore {
                     AND (cast($3 as INT8) IS NULL or event_id <= $3)
                 ORDER BY event_id ASC
                 "#,
-                fk_system.flow_type as SystemFlowType,
+                flow_type as SystemFlowType,
                 maybe_from_id,
                 maybe_to_id,
             ).try_map(|event_row| {
@@ -70,10 +72,13 @@ impl PostgresFlowConfigurationEventStore {
 
     fn get_dataset_events(
         &self,
-        fk_dataset: FlowKeyDataset,
+        fk_dataset: &FlowKeyDataset,
         maybe_from_id: Option<i64>,
         maybe_to_id: Option<i64>,
     ) -> EventStream<FlowConfigurationEvent> {
+        let dataset_id = fk_dataset.dataset_id.to_string();
+        let flow_type = fk_dataset.flow_type;
+
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr
@@ -90,8 +95,8 @@ impl PostgresFlowConfigurationEventStore {
                     AND (cast($4 as INT8) IS NULL or event_id <= $4)
                 ORDER BY event_id ASC
                 "#,
-                fk_dataset.dataset_id.to_string(),
-                fk_dataset.flow_type as DatasetFlowType,
+                dataset_id,
+                flow_type as DatasetFlowType,
                 maybe_from_id,
                 maybe_to_id,
             ).try_map(|event_row| {
@@ -122,7 +127,7 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
 
-        match flow_key.clone() {
+        match flow_key {
             FlowKey::Dataset(fk_dataset) => {
                 self.get_dataset_events(fk_dataset, maybe_from_id, maybe_to_id)
             }

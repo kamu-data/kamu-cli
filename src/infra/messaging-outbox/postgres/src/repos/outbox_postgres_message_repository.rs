@@ -36,7 +36,7 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
     async fn push_message(&self, message: NewOutboxMessage) -> Result<(), InternalError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr.connection_mut().await.int_err()?;
+        let connection_mut = tr.connection_mut().await?;
 
         sqlx::query!(
             r#"

@@ -70,10 +70,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
     ) -> Result<(), CreateAccessTokenError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(CreateAccessTokenError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let token_id = access_token.id;
         let token_name = access_token.token_name.clone();
@@ -113,15 +110,9 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
     async fn get_token_by_id(&self, token_id: &Uuid) -> Result<AccessToken, GetAccessTokenError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetAccessTokenError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
-        let maybe_access_token = self
-            .query_token_by_id(token_id, connection_mut)
-            .await
-            .map_err(GetAccessTokenError::Internal)?;
+        let maybe_access_token = self.query_token_by_id(token_id, connection_mut).await?;
 
         if let Some(access_token) = maybe_access_token {
             Ok(access_token)
@@ -138,10 +129,8 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
     ) -> Result<usize, GetAccessTokenError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetAccessTokenError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
+
         let account_id_string = account_id.to_string();
 
         let access_token_count = sqlx::query_scalar!(
@@ -155,8 +144,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         )
         .fetch_one(connection_mut)
         .await
-        .int_err()
-        .map_err(GetAccessTokenError::Internal)?;
+        .int_err()?;
 
         Ok(usize::try_from(access_token_count).unwrap_or(0))
     }
@@ -168,10 +156,8 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
     ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetAccessTokenError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
+
         let limit = i64::try_from(pagination.limit).unwrap();
         let offset = i64::try_from(pagination.offset).unwrap();
         let account_id_string = account_id.to_string();
@@ -196,8 +182,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         )
         .fetch_all(connection_mut)
         .await
-        .int_err()
-        .map_err(GetAccessTokenError::Internal)?;
+        .int_err()?;
 
         Ok(access_token_rows.into_iter().map(Into::into).collect())
     }
@@ -209,15 +194,9 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
     ) -> Result<(), RevokeTokenError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(RevokeTokenError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
-        let maybe_existing_token = self
-            .query_token_by_id(token_id, connection_mut)
-            .await
-            .map_err(RevokeTokenError::Internal)?;
+        let maybe_existing_token = self.query_token_by_id(token_id, connection_mut).await?;
 
         if maybe_existing_token.is_none() {
             return Err(RevokeTokenError::NotFound(AccessTokenNotFoundError {
@@ -238,8 +217,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         )
         .execute(&mut *connection_mut)
         .await
-        .int_err()
-        .map_err(RevokeTokenError::Internal)?;
+        .int_err()?;
 
         Ok(())
     }
@@ -251,10 +229,8 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
     ) -> Result<Account, FindAccountByTokenError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(FindAccountByTokenError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
+
         let token_id_search = *token_id;
 
         let maybe_account_row = sqlx::query_as!(
@@ -280,8 +256,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(FindAccountByTokenError::Internal)?;
+        .int_err()?;
 
         if let Some(account_row) = maybe_account_row {
             if token_hash != account_row.token_hash.as_slice() {
@@ -297,3 +272,5 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

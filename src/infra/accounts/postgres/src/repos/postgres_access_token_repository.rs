@@ -70,10 +70,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
     ) -> Result<(), CreateAccessTokenError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(CreateAccessTokenError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         sqlx::query!(
             r#"
@@ -103,15 +100,9 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
     async fn get_token_by_id(&self, token_id: &Uuid) -> Result<AccessToken, GetAccessTokenError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetAccessTokenError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
-        let maybe_access_token = self
-            .query_token_by_id(token_id, connection_mut)
-            .await
-            .map_err(GetAccessTokenError::Internal)?;
+        let maybe_access_token = self.query_token_by_id(token_id, connection_mut).await?;
 
         if let Some(access_token) = maybe_access_token {
             Ok(access_token)
@@ -128,10 +119,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
     ) -> Result<usize, GetAccessTokenError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetAccessTokenError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let access_token_count = sqlx::query_scalar!(
             r#"
@@ -144,7 +132,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
         )
         .fetch_one(connection_mut)
         .await
-        .map_int_err(GetAccessTokenError::Internal)?;
+        .int_err()?;
 
         Ok(usize::try_from(access_token_count.unwrap_or(0)).unwrap())
     }
@@ -156,10 +144,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
     ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetAccessTokenError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let access_token_rows = sqlx::query_as!(
             AccessTokenRowModel,
@@ -181,7 +166,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
         )
         .fetch_all(connection_mut)
         .await
-        .map_int_err(GetAccessTokenError::Internal)?;
+        .int_err()?;
 
         Ok(access_token_rows.into_iter().map(Into::into).collect())
     }
@@ -193,15 +178,9 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
     ) -> Result<(), RevokeTokenError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(RevokeTokenError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
-        let maybe_existing_token = self
-            .query_token_by_id(token_id, connection_mut)
-            .await
-            .map_err(RevokeTokenError::Internal)?;
+        let maybe_existing_token = self.query_token_by_id(token_id, connection_mut).await?;
 
         if maybe_existing_token.is_none() {
             return Err(RevokeTokenError::NotFound(AccessTokenNotFoundError {
@@ -222,7 +201,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
         )
         .execute(&mut *connection_mut)
         .await
-        .map_int_err(RevokeTokenError::Internal)?;
+        .int_err()?;
 
         Ok(())
     }
@@ -234,10 +213,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
     ) -> Result<Account, FindAccountByTokenError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(FindAccountByTokenError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let maybe_account_row = sqlx::query_as!(
             AccountWithTokenRowModel,
@@ -262,7 +238,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .map_int_err(FindAccountByTokenError::Internal)?;
+        .int_err()?;
 
         if let Some(account_row) = maybe_account_row {
             if token_hash != account_row.token_hash.as_slice() {

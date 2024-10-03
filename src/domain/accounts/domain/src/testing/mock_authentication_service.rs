@@ -24,11 +24,10 @@ use crate::{
     UnsupportedLoginMethodError,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
+    DUMMY_ACCESS_TOKEN,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub const DUMMY_ACCESS_TOKEN: &str = "some-token";
 
 pub const DUMMY_LOGIN_METHOD: &str = "test";
 

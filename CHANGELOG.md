@@ -16,6 +16,13 @@ Recommendation: for ease of reading, use the following order:
 - Postgres implementation for dataset entry and account Re-BAC repositories
 ### Changed
 - `kamu repo alias list`: added JSON output alongside with other formats mentioned in the command's help
+- Private Datasets, `DatasetEntry` integration that will allow us to build dataset indexing
+  - Added `DatasetEntryService` for message processing
+  - Added `DatasetEntryIndexer` for one-shot indexing
+  - Extend `DatasetLifecycleMessageCreated` with `dataset_name` field
+  - Introducing `DatasetLifecycleMessageRenamed`
+- Simplified error handling code in repositories
+- Hidden part of the test code behind the feature gate
 
 ## [0.204.4] - 2024-09-30
 ### Changed

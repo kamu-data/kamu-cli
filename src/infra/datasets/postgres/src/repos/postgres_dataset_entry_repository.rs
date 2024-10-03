@@ -33,16 +33,31 @@ impl PostgresDatasetEntryRepository {
 
 #[async_trait::async_trait]
 impl DatasetEntryRepository for PostgresDatasetEntryRepository {
+    async fn dataset_entries_count(&self) -> Result<usize, GetDatasetEntryError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let dataset_entries_count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*)
+            FROM dataset_entries
+            "#,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(usize::try_from(dataset_entries_count.unwrap_or(0)).unwrap())
+    }
+
     async fn get_dataset_entry(
         &self,
         dataset_id: &DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetDatasetEntryError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
 
@@ -60,7 +75,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .map_int_err(GetDatasetEntryError::Internal)?;
+        .int_err()?;
 
         if let Some(dataset_entry_row) = maybe_dataset_entry_row {
             Ok(dataset_entry_row.into())
@@ -76,10 +91,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
     ) -> Result<DatasetEntry, GetDatasetEntryByNameError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetDatasetEntryByNameError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let stack_owner_id = owner_id.as_did_str().to_stack_string();
 
@@ -99,7 +111,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .map_int_err(GetDatasetEntryByNameError::Internal)?;
+        .int_err()?;
 
         if let Some(dataset_entry_row) = maybe_dataset_entry_row {
             Ok(dataset_entry_row.into())
@@ -114,10 +126,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
     ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByOwnerIdError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetDatasetEntriesByOwnerIdError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let stack_owner_id = owner_id.as_did_str().to_stack_string();
 
@@ -135,7 +144,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         )
         .fetch_all(connection_mut)
         .await
-        .map_int_err(GetDatasetEntriesByOwnerIdError::Internal)?;
+        .int_err()?;
 
         Ok(dataset_entry_rows.into_iter().map(Into::into).collect())
     }
@@ -146,10 +155,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
     ) -> Result<(), SaveDatasetEntryError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(SaveDatasetEntryError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let stack_dataset_id = dataset_entry.id.as_did_str().to_stack_string();
         let stack_owner_id = dataset_entry.owner_id.as_did_str().to_stack_string();
@@ -188,10 +194,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
     ) -> Result<(), UpdateDatasetEntryNameError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(UpdateDatasetEntryNameError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
 
@@ -226,10 +229,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
     ) -> Result<(), DeleteEntryDatasetError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(DeleteEntryDatasetError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
 
@@ -241,7 +241,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         )
         .execute(&mut *connection_mut)
         .await
-        .map_int_err(DeleteEntryDatasetError::Internal)?;
+        .int_err()?;
 
         if delete_result.rows_affected() == 0 {
             return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());

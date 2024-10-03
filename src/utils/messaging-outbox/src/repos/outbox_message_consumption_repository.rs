@@ -52,7 +52,7 @@ pub enum CreateConsumptionBoundaryError {
     DuplicateConsumptionBoundary(DuplicateConsumptionBoundaryError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -73,7 +73,7 @@ pub enum UpdateConsumptionBoundaryError {
     ConsumptionBoundaryNotFound(ConsumptionBoundaryNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]

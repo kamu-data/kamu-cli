@@ -16,6 +16,8 @@ pub mod jobs;
 pub mod messages;
 pub mod repos;
 pub mod services;
+#[cfg(any(feature = "testing", test))]
+pub mod testing;
 pub mod use_cases;
 pub mod utils;
 

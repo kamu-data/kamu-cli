@@ -9,7 +9,7 @@
 
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 
 use crate::domain::*;
 
@@ -87,10 +87,7 @@ impl OutboxMessageConsumptionRepository for SqliteOutboxMessageConsumptionReposi
     ) -> Result<(), CreateConsumptionBoundaryError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(|e| CreateConsumptionBoundaryError::Internal(e.int_err()))?;
+        let connection_mut = tr.connection_mut().await?;
 
         let last_consumed_message_id = boundary.last_consumed_message_id.into_inner();
 
@@ -129,10 +126,7 @@ impl OutboxMessageConsumptionRepository for SqliteOutboxMessageConsumptionReposi
     ) -> Result<(), UpdateConsumptionBoundaryError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(|e| UpdateConsumptionBoundaryError::Internal(e.int_err()))?;
+        let connection_mut = tr.connection_mut().await?;
 
         let last_consumed_message_id = boundary.last_consumed_message_id.into_inner();
 
@@ -147,7 +141,7 @@ impl OutboxMessageConsumptionRepository for SqliteOutboxMessageConsumptionReposi
         )
         .execute(connection_mut)
         .await
-        .map_err(|e| UpdateConsumptionBoundaryError::Internal(e.int_err()))?;
+        .int_err()?;
 
         if res.rows_affected() != 1 {
             Err(UpdateConsumptionBoundaryError::ConsumptionBoundaryNotFound(

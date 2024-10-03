@@ -9,7 +9,7 @@
 
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 
 use crate::domain::*;
 
@@ -87,10 +87,7 @@ impl OutboxMessageConsumptionRepository for PostgresOutboxMessageConsumptionRepo
     ) -> Result<(), CreateConsumptionBoundaryError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(|e| CreateConsumptionBoundaryError::Internal(e.int_err()))?;
+        let connection_mut = tr.connection_mut().await?;
 
         sqlx::query!(
             r#"
@@ -127,10 +124,7 @@ impl OutboxMessageConsumptionRepository for PostgresOutboxMessageConsumptionRepo
     ) -> Result<(), UpdateConsumptionBoundaryError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(|e| UpdateConsumptionBoundaryError::Internal(e.int_err()))?;
+        let connection_mut = tr.connection_mut().await?;
 
         let res = sqlx::query!(
             r#"
@@ -143,7 +137,7 @@ impl OutboxMessageConsumptionRepository for PostgresOutboxMessageConsumptionRepo
         )
         .execute(connection_mut)
         .await
-        .map_err(|e| UpdateConsumptionBoundaryError::Internal(e.int_err()))?;
+        .int_err()?;
 
         if res.rows_affected() != 1 {
             Err(UpdateConsumptionBoundaryError::ConsumptionBoundaryNotFound(
