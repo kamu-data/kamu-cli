@@ -23,6 +23,7 @@ Recommendation: for ease of reading, use the following order:
   - Introducing `DatasetLifecycleMessageRenamed`
 - Simplified error handling code in repositories
 - Hidden part of the test code behind the feature gate
+- Updated our crate dependencies so they can be built in isolation
 
 ## [0.204.4] - 2024-09-30
 ### Changed
